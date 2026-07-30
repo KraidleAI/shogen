@@ -1,0 +1,8 @@
+# Fins de ligne : LF partout (leçon CRLF/cp1252 de cet environnement Windows —
+# un diff de 1476 lignes de fins de ligne a déjà eu lieu sur le projet frère)
+* text=auto eol=lf
+
+# Binaires : jamais de normalisation
+*.pdf binary
+*.png binary
+*.jpg binary
