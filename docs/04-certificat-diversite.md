@@ -146,11 +146,13 @@ est l'objet de l'ADR.
 
 ## 6. Dettes de cette spec
 
-1. Recherche académique formelle sur la quantification de diversité de
-   sources (deux périmètres web sans contre-exemple au 2026-07-30 —
-   insuffisant pour écrire « nouveau » dans une publication ; il faut une
-   passe arXiv/ACM/IEEE dédiée, mots-clés : common-mode failure, diversity
-   metrics, oracle independence, N-version).
+1. ~~Recherche académique formelle~~ — **fait le 2026-07-30** : verdict
+   R-1 rendu dans `06-etat-de-lart-diversite.md`. Conséquences pour cette
+   spec : le claim est rescopé (le geste « mesurer plutôt que postuler »
+   est occupé ; la case propre est sources + historique testé + partition
+   par observables + certificat par décision) ; k_eff doit être défini
+   par contraste avec le n_eff de Kish (Kohli 2026), le nombre effectif
+   TIFS 2016 et le Vendi Score — tous détenus ou en dette de fetch.
 2. Les définitions d'écart par classe (§2) et la relation k_eff/f (§3).
 3. Le corpus d'attaques du certificat (§5) au format classes numérotées.
 4. ~~Lecture au texte de K&L §6-8~~ — **fait le 2026-07-30** (INDEX, entrée

@@ -45,6 +45,14 @@ Insuffisant pour un papier. Passe dédiée arXiv + ACM DL + IEEE + USENIX :
 **Critère** : un document `06-etat-de-lart-diversite.md` existe, avec
 verdict et artefacts fetchés dans `biblio/`.
 
+**→ R-1 RENDUE le 2026-07-30** : balayage 5 angles (50 candidats bruts,
+45 classés, ~36 recherches vides documentées), 6 artefacts critiques
+fetchés et vérifiés en page de titre, verdict écrit dans `06` — le geste
+générique est occupé (NUREG, INDaaS, n_eff), les quatre angles propres à
+Shōgen sont vides vérifiés, le claim de nouveauté est rescopé. Restent
+les dettes de fetch de `06 §5.5` — bloquantes pour S5 (publication),
+pas pour S1-S4.
+
 ## S1 — Le vocabulaire fait spec *(documentation)*
 
 1. Registre des assumptions au format A(...) : A(attestor-honesty),

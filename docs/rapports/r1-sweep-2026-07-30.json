@@ -1,0 +1,589 @@
+{
+  "summary": "R-1 : balayage academique multi-angle — diversite mesuree, defaillances correlees, independance des sources",
+  "agentCount": 6,
+  "logs": [
+    "50 candidats bruts, 35 recherches vides declarees"
+  ],
+  "result": {
+    "ranked": [
+      {
+        "title": "Signals and Spoils: Speculative Oracle Extractable Value in the Era of Cross-Chain Interoperability",
+        "authors": "Hasret Ozan Sevim, Christof Ferreira Torres",
+        "venue_year": "arXiv:2606.03434 (cs.CR), juin 2026",
+        "url": "https://arxiv.org/abs/2606.03434",
+        "what_it_does": "Mesure empiriquement, sur quatre chaines (liquidations Aave), que des DON Chainlink 'independants' consomment des donnees de prix hors chaine quasi identiques quasi simultanement mais publient a des instants differents, creant des fenetres d'exploitation cross-chain statistiquement predictibles (64 liquidateurs speculatifs, 57% des liquidateurs detectes).",
+        "overlap_with_shogen": "Rang 1 — la seule mesure publiee du phenomene exact de Shogen (amont commun + correlation temporelle entre quorums de SOURCES DE DONNEES supposees independantes), mais exploitee comme MEV : aucun test contre un modele d'independance, aucun observable ASN, ni k_eff ni certificat. VERDICT NOUVEAUTE : RENFORCE — prouve que le phenomene est reel et mesurable sur l'objet exact du certificat sans construire l'instrument (ni test, ni k_eff, ni artefact), donc probleme documente et solution absente.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Nine Judges, Two Effective Votes: Correlated Errors Undermine LLM Evaluation Panels",
+        "authors": "Guneet Kohli",
+        "venue_year": "arXiv:2605.29800, mai 2026",
+        "url": "https://arxiv.org/abs/2605.29800",
+        "what_it_does": "Mesure les erreurs correlees de 9 juges LLM de familles differentes : environ deux votes d'information independante seulement ('roughly three-quarters of the panel's nominal independence is lost'), perte quantifiee par la taille d'echantillon effective de Kish (n_eff) contre un modele nul de Condorcet.",
+        "overlap_with_shogen": "Rang 2 — le formalisme central de Shogen (compte effectif derive d'une correlation mesuree contre un modele nul d'independance) existe deja publie, applique a des panels de juges LLM ; aucun observable d'infrastructure, aucune partition, aucun certificat. VERDICT NOUVEAUTE : MENACE — le concept k_eff-depuis-correlation-mesuree n'est plus revendicable en soi ; la nouveaute doit etre re-scopee sur l'objet (quorums de sources de donnees), les observables d'infrastructure et l'artefact de certificat.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Semantic Quorum Assurance: Collective Certification for Non-Deterministic AI Infrastructure",
+        "authors": "Jun He, Deying Yu",
+        "venue_year": "arXiv:2606.08021, soumis le 6 juin 2026",
+        "url": "https://arxiv.org/pdf/2606.08021",
+        "what_it_does": "[Fusion de 3 doublons : angles lignee-kl, quorums-distribues, arxiv-recent] Certifie les propositions d'agents LLM via un quorum de validateurs-agents divers : 'correlated cognitive failure model' formalise, predicat de quorum adaptatif au risque imposant diversite de modele et d'archetype, poids calibres et vetos ; correlation par paires estimee sur scenarios de calibration (indicateurs binaires, copule gaussienne), formule P = p^K + rho(p - p^K) ; 500 scenarios, approbations dangereuses 18,5% -> 0,3%.",
+        "overlap_with_shogen": "Rang 3 — le candidat le plus proche en intention ('quorum + certification + defaillance correlee + diversite') et le seul a nommer une defaillance correlee de composants IA dans un quorum ; mais les membres sont des validateurs LLM et non des sources de donnees, la diversite est IMPOSEE par etiquettes et ponderee par scores, la correlation est estimee en calibration et non sur un historique de production — ni test K&L, ni ASN/amont, ni k_eff par partition. VERDICT NOUVEAUTE : MENACE le terrain nominal (tout relecteur fera le rapprochement) mais laisse le mecanisme libre, puisque la diversite y est imposee par construction et jamais mesuree contre un historique de co-defaillances de sources.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Heading Off Correlated Failures through Independence-as-a-Service (INDaaS)",
+        "authors": "Ennan Zhai, Ruichuan Chen, David Isaac Wolinsky, Bryan Ford",
+        "venue_year": "USENIX OSDI 2014",
+        "url": "https://ennanzhai.github.io/pub/zhai14heading.pdf",
+        "what_it_does": "[Fusion de 2 doublons : angles metriques-diversite, arxiv-recent] Audite proactivement l'independance de systemes nominalement redondants au lieu de la supposer : modules enfichables d'acquisition de dependances structurelles (reseau, materiel, pile logicielle), graphes de fautes probabilistes classant les causes racines de defaillance correlee, et audit inter-organisations preservant la confidentialite par cardinalite d'intersection privee.",
+        "overlap_with_shogen": "Rang 4 — le jumeau mecanique du certificat : sa premisse ('seemingly independent systems may share deep, hidden dependencies') est celle de Shogen et ses observables d'infrastructure recouvrent substantiellement ASN/amont commun ; mais il raisonne sur des graphes structurels declares/collectes, pas sur un historique de CO-DEFAILLANCES teste contre un modele d'independance, ne produit ni k_eff par partition ni certificat lie a une decision (rapport d'audit), et vise la redondance cloud, pas des sources de donnees. VERDICT NOUVEAUTE : MENACE la formulation — 'mesurer l'independance par observables d'infrastructure au lieu de la postuler' est INDaaS 2014 mot pour mot, donc le claim doit porter sur l'historique teste, le k_eff par partition et le certificat par decision, les trois absents d'INDaaS.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "ChainLink: A Decentralized Oracle Network (whitepaper v1.0)",
+        "authors": "Steve Ellis, Ari Juels, Sergey Nazarov",
+        "venue_year": "Whitepaper auto-publie, 4 septembre 2017",
+        "url": "https://research.chain.link/whitepaper-v1.pdf",
+        "what_it_does": "Nomme l'attaque par 'mirroring' (oracles partageant les donnees hors chaine en pretendant les sourcer independamment), propose un service de certification cense detecter mirroring et quorums colludants, et annonce comme recherche future la cartographie et la publication de l'independance des sources de donnees.",
+        "overlap_with_shogen": "Rang 5 — le concept meme du certificat est enonce comme travail futur des 2017, pour des sources de donnees, sans aucune methode (ni historique de co-defaillances, ni test d'independance, ni observables ASN) et sans realisation publiee trouvee depuis. VERDICT NOUVEAUTE : RENFORCE — reconnaissance du probleme par l'acteur dominant du domaine depuis 2017 et vide de realisation depuis : l'anteriorite conceptuelle a citer, et la preuve que le probleme est reconnu mais pas resolu pour les sources de donnees.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Diversity for Security: a Study with Off-The-Shelf AntiVirus Engines",
+        "authors": "Vladimir Stankovic, R. E. Bloomfield, P. G. Bishop, I. Gashi",
+        "venue_year": "ISSRE 2011 ; follow-up Gashi, Sobesto, Stankovic, Cukier, SAFECOMP 2013",
+        "url": "https://openaccess.city.ac.uk/id/eprint/524/2/ISSRE11_AV_Diversity.pdf",
+        "what_it_does": "Mesure les defaillances de detection observees de nombreux moteurs antivirus du commerce sur de grands jeux de malware et quantifie le gain reel du 1-parmi-N divers ; lignee soeur pour les IDS (2017, EMSE 2021).",
+        "overlap_with_shogen": "Rang 6 — l'analogue le plus proche ou les unites diverses sont des SOURCES DE JUGEMENT co-observees sur un flux partage, exactement la forme de donnees de Shogen ; mais recouvrements empiriques sans test contre un modele formel d'independance, sans attribution de la co-defaillance a un amont partage, sans quorum effectif par partition.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Fault Tolerance via Diversity for Off-the-Shelf Products: A Study with SQL Database Servers",
+        "authors": "Ilir Gashi, Peter Popov, Lorenzo Strigini",
+        "venue_year": "IEEE TDSC 4(4):280-294, 2007 (companion DSN 2004)",
+        "url": "https://openaccess.city.ac.uk/id/eprint/518/4/TDSC07_SQLdiversity.pdf",
+        "what_it_does": "[Fusion de 2 doublons : angles lignee-kl, metriques-diversite] Mesure la co-defaillance depuis l'HISTORIQUE reel des rapports de bugs de quatre serveurs SQL du commerce : tres peu de bugs touchent deux serveurs, aucun plus de deux, une poignee seulement de defaillances identiques indetectables ; en deduit le gain reel de la redondance diverse plutot que celui que l'independance aurait predit.",
+        "overlap_with_shogen": "Rang 7 — l'usage existant le plus proche d'un historique de co-defaillances de composants heterogenes REELS (que personne n'a concus pour etre divers) pour etayer une pretention de diversite mesuree ; mais analyse hors-ligne, sans test d'hypothese contre un modele d'independance, sans observable d'infrastructure expliquant POURQUOI deux produits co-defaillent, sans quorum effectif ni certificat.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "NUREG/CR-5485 — Guidelines on Modeling Common-Cause Failures in Probabilistic Risk Assessment",
+        "authors": "A. Mosleh, D. Rasmuson, F. Marshall (U.S. NRC / INEEL)",
+        "venue_year": "U.S. NRC, novembre 1998 ; parametres maintenus par INL (2020 Update, 2022)",
+        "url": "https://nrcoe.inl.gov/publicdocs/CCF/NUREGCR-5485_Guidelines%20on%20Modeling%20Common-Cause%20Failures%20in%20PRA.pdf",
+        "what_it_does": "Cadre reglementaire nucleaire ou la dependance entre composants redondants est ESTIMEE et non postulee : facteurs alpha/beta ajustes sur une base maintenue d'evenements de defaillance de cause commune reels (impact vectors, Bayes hierarchique), et le parametre ajuste re-price la redondance k-parmi-n.",
+        "overlap_with_shogen": "Rang 8 — le precedent le plus fort et le plus ancien du geste central ('l'historique de co-defaillances fait autorite sur l'independance et change la redondance effective d'un vote k-parmi-n'), pratique reglementaire depuis pres de trente ans — donc 'remplacer le postule par le mesure' n'est pas en soi nouveau ; mais composants physiques dans le perimetre d'un exploitant, pas d'amont partage detecte par contenu, et un parametre de PRA plutot qu'un certificat attache a une decision de quorum.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "N-Version Programming with Coding Agents",
+        "authors": "Javier Ron, Benoit Baudry, Martin Monperrus",
+        "venue_year": "arXiv:2606.20158 (cs.SE), soumis le 18 juin 2026",
+        "url": "https://arxiv.org/pdf/2606.20158",
+        "what_it_does": "[Fusion de 2 doublons : angles lignee-kl, arxiv-recent] Rejoue le protocole Knight & Leveson (cite) avec 48 versions du Launch Interceptor Program generees par agents LLM, un million de tests : 429 co-defaillances observees contre 115,36 predites par l'independance ; vote 3 versions 387,44 -> 130,99 defaillances moyennes, 11 844 unites N-versions sans defaillance. Rejette l'independance, la diversite reste rentable.",
+        "overlap_with_shogen": "Rang 9 — exactement le coeur statistique du certificat (historique de co-defaillances teste contre le modele d'independance, methode K&L) transpose a l'IA, donc la transposition de la METHODE existe deja — mais sur des VERSIONS de programme generees, pas des quorums de sources de donnees : ni observables d'infrastructure, ni k_eff par partition, ni certificat emis en continu.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "A Systematic Methodology for Evaluating Failure Independence in LLM-Generated Code",
+        "authors": "Rodrigo Pato Nogueira, Karthik Pattabiraman, Marco Vieira, Joao R. Campos",
+        "venue_year": "arXiv:2607.02808 (cs.SE), soumis le 2 juillet 2026",
+        "url": "https://arxiv.org/abs/2607.02808",
+        "what_it_does": "Premiere methodologie systematique revendiquee pour l'independance de defaillance du code LLM (224 problemes, 12 modeles, 5 langages) : diversite structurelle + comportementale (co-defaillance sur les memes tests), convertie en fiabilite N-versions sous vote majoritaire — les ensembles 3 et 5 versions n'atteignent que ~0,43-0,44 du gain que l'independance predirait.",
+        "overlap_with_shogen": "Rang 10 — co-defaillance mesuree comparee a une base d'independance puis exprimee en FRACTION DE LA REDONDANCE THEORIQUE OBTENUE, c'est-a-dire un k_eff sans le nom, pour un vote N-versions ; mais unites = versions de programme generees, evidence = suite de tests controlee et non historique operationnel, sans explication d'infrastructure de la correlation ni artefact de certificat.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Network Diversity: A Security Metric for Evaluating the Resilience of Networks Against Zero-Day Attacks",
+        "authors": "Mengyuan Zhang, Lingyu Wang, Sushil Jajodia, Anoop Singhal, Massimiliano Albanese",
+        "venue_year": "IEEE TIFS 11(5):1071-1086, 2016 (etend ESORICS 2014)",
+        "url": "https://users.encs.concordia.ca/~wang/papers/tifs16zhang.pdf",
+        "what_it_does": "Modelise formellement la diversite reseau comme metrique de securite pour remplacer les 'notions intuitives et imprecises de diversite' : construction inspiree de la biodiversite fondee sur le NOMBRE EFFECTIF de ressources distinctes (least/effective/probabilistic richness), premisse etant que des fabricants/logiciels partages rendent une vulnerabilite commune plus probable.",
+        "overlap_with_shogen": "Rang 11 — chevauchement conceptuel maximal avec l'instrument k_eff : un 'nombre effectif de composants distincts' de securite publie et evalue par les pairs, que Shogen doit citer (l'instrument du compte effectif n'est pas revendicable comme nouveau) ; l'ecart tenu est l'entree — etiquettes de ressources et topologie declarees, pas d'historique de co-defaillances mesure ni d'amont commun detecte par correlation — et l'absence de quorum et de certificat.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "On Correlated Failures in Survivable Storage Systems",
+        "authors": "Mehmet Bakkaloglu, Jay J. Wylie, Chenxi Wang, Gregory R. Ganger",
+        "venue_year": "Rapport technique CMU-CS-02-129, mai 2002",
+        "url": "https://www.pdl.cmu.edu/PDL-FTP/PASIS/CMU-CS-02-129.pdf",
+        "what_it_does": "Etend le modele de disponibilite fonde sur l'independance avec un parametre de correlation (probabilites conditionnelles et beta-binomiale), valide contre des mesures reelles (serveurs web, campus Microsoft) ; la correlation mesuree change l'ordre de preference des schemas de distribution (replication, seuil, quorum) et le placement.",
+        "overlap_with_shogen": "Rang 12 — ancetre direct du geste : co-defaillances historiques mesurees, confrontees au modele d'independance, avec consequence sur le dimensionnement des schemas a quorum ; mais un seul parametre global, sans certificat par quorum, sans observables d'infrastructure, sans test d'hypothese formel ni k_eff par partition, et objet = stockage survivable.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "An Auditing Language for Preventing Correlated Failures in the Cloud (RepAudit)",
+        "authors": "Ennan Zhai, Ruzica Piskac, Ronghui Gu, Xun Lao, Xi Wang",
+        "venue_year": "PACMPL 1, OOPSLA, article 97, octobre 2017",
+        "url": "https://www.cs.yale.edu/homes/zhai-ennan/oopsla17-final.pdf",
+        "what_it_does": "Suite d'INDaaS : DSL declaratif (RAL) + moteur d'audit + generateur de code pour interroger la structure de dependances d'un deploiement (ex. top-20 causes racines de defaillance correlee), motive par des repliques partageant des switchs d'agregation ; ~80x moins de lignes que les approches anterieures.",
+        "overlap_with_shogen": "Rang 13 — recouvre la moitie operationnelle du certificat : rendre 'cet ensemble redondant est-il reellement independant ?' calculable et repetable au moment de l'emission ; ne recouvre pas la moitie statistique (aucun modele d'independance ajuste a un historique de co-defaillances, aucune mesure de diversite, aucun k_eff) et vise des repliques datacenter, pas des sources de donnees heterogenes.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Introspective Failure Analysis: Avoiding Correlated Failures in Peer-to-Peer Systems",
+        "authors": "Hakim Weatherspoon, Tal Moscovitz, John Kubiatowicz",
+        "venue_year": "Workshop on Reliable Peer-to-Peer Distributed Systems (avec IEEE SRDS), 2002",
+        "url": "https://www.researchgate.net/publication/4003721_Introspective_Failure_Analysis_Avoiding_Correlated_Failures_in_Peer-to-Peer_Systems",
+        "what_it_does": "Mecanisme introspectif (OceanStore) qui surveille en ligne l'historique de defaillances des noeuds, les regroupe par correlation observee, puis choisit les repliques dans des groupes distincts pour minimiser l'impact des evenements correles.",
+        "overlap_with_shogen": "Rang 14 — la boucle operationnelle 'correlation mesuree sur l'historique, puis selection de membres independants' est la moitie dynamique du certificat, anticipee des 2002 ; mais ni test d'hypothese contre le modele d'independance, ni artefact de certificat verifiable, ni comptabilite de quorum effectif, observables limites aux traces de defaillance.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Subtleties in Tolerating Correlated Failures in Wide-area Storage Systems",
+        "authors": "Suman Nath, Haifeng Yu, Phillip B. Gibbons, Srinivasan Seshan",
+        "venue_year": "USENIX NSDI 2006",
+        "url": "https://www.usenix.org/legacy/event/nsdi06/tech/full_papers/nath/nath.pdf",
+        "what_it_does": "Reexamine sur plusieurs traces reelles (PlanetLab, serveurs web) les techniques contre les defaillances correlees : les conceptions fondees sur l'independance surestiment fortement la disponibilite ; principes de conception integres dans IrisStore (rendements decroissants sous correlation, evenements rares massifs).",
+        "overlap_with_shogen": "Rang 15 — meme diagnostic que Shogen (l'independance postulee est fausse, la remplacer par la correlation mesuree dans les traces) avec consequences chiffrees sur les configurations quorum/erasure ; mais analyse hors-ligne produisant des principes de conception, pas un certificat par ensemble de sources — ni test par ensemble, ni ASN, ni quorum effectif recalcule en continu.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "OS Diversity for Intrusion Tolerance: Myth or Reality?",
+        "authors": "Miguel Garcia, Alysson Bessani, Ilir Gashi, Nuno Neves, Rafael Obelheiro",
+        "venue_year": "IEEE/IFIP DSN 2011",
+        "url": "https://www.researchgate.net/publication/220957670_OS_diversity_for_intrusion_tolerance_Myth_or_reality",
+        "what_it_does": "Exploite ~15 ans de NVD sur 11 OS pour compter les vulnerabilites communes et mesurer empiriquement combien d'independance de defaillance la diversite d'OS achete pour des ensembles de repliques BFT ; la diversite paie, mais bien moins que le postulat naif, avec des paires d'OS bien et mal choisies.",
+        "overlap_with_shogen": "Rang 16 — meme geste epistemique que le certificat (auditer empiriquement le postulat d'independance derriere des repliques diversifiees, lignee K&L revendiquee), mais sur la seule dimension vulnerabilites logicielles, hors-ligne, sans ajustement de la taille du quorum ni certificat ; ni sources de donnees, ni observables reseau, ni co-defaillance operationnelle observee.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Surviving Internet Catastrophes (informed replication / Phoenix)",
+        "authors": "Flavio Junqueira, Ranjita Bhagwan, Alejandro Hevia, Keith Marzullo, Geoffrey M. Voelker",
+        "venue_year": "USENIX Annual Technical Conference 2005",
+        "url": "https://usenix.org/legacy/event/usenix05/tech/general/full_papers/junqueira/junqueira_html/paper.html",
+        "what_it_does": "'Informed replication' : modele de defaillances correlees fonde sur les vulnerabilites partagees (OS, services reseau), alimente par une mesure de la diversite logicielle reelle des hotes d'une grande organisation ; heuristiques construisant des 'cores' dont les membres ne partagent aucun attribut vulnerable.",
+        "overlap_with_shogen": "Rang 17 — mecanisme classique le plus proche ou des attributs de diversite MESURES pilotent la construction d'ensembles quorum-like resistants aux defaillances correlees ; mais observables = piles logicielles (pas ASN ni amont detecte par contenu), risque modele = epidemie de vers, et ni test statistique contre un historique de co-defaillances, ni certificat, ni k_eff par partition.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Availability in Globally Distributed Storage Systems",
+        "authors": "Daniel Ford, Francois Labelle, Florentina I. Popovici, Murray Stokely, Van-Anh Truong, et al. (Google)",
+        "venue_year": "USENIX OSDI 2010",
+        "url": "https://www.usenix.org/legacy/event/osdi10/tech/full_papers/Ford.pdf",
+        "what_it_does": "Un an de production sur des dizaines de clusters Google : 'failure bursts' (pannes a moins de 2 minutes d'ecart) a forte affinite de rack (bursts >20 noeuds : affinite >0,7) ; la correlation entre defaillances de noeuds ecrase toutes les autres contributions a l'indisponibilite ; modeles markoviens de stripes integrant cette correlation.",
+        "overlap_with_shogen": "Rang 18 — la piece a conviction en production que le calcul de disponibilite fonde sur l'independance est faux, motivation empirique du certificat cote datacenter ; mais observables physiques (rack), ni test d'independance par ensemble choisi de membres, ni certificat, ni quorum effectif par partition, rien sur des sources de donnees externes.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "A Decentralized Truth Discovery Approach to the Blockchain Oracle Problem (DecenTruth)",
+        "authors": "Yang Xiao, Ning Zhang, Wenjing Lou, Y. Thomas Hou",
+        "venue_year": "IEEE INFOCOM 2023",
+        "url": "https://ieeexplore.ieee.org/document/10229019/",
+        "what_it_does": "Combine truth discovery (ponderation des sources estimee a partir des donnees) et consensus BFT asynchrone pour que des noeuds oracle s'accordent sur des valeurs estimees vraies malgre sources et noeuds byzantins, avec une resilience superieure a la mediane.",
+        "overlap_with_shogen": "Rang 19 — la machinerie academique la plus proche sur l'objet (fiabilite des SOURCES apprise de l'historique dans un quorum d'oracle), mais aucune modelisation de la dependance/copie entre sources ni de la correlation des defaillances — la branche 'copying detection' de la truth discovery (Dong et al., VLDB 2009) n'a jamais ete transposee aux oracles blockchain d'apres les recherches menees.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Oracle Risk and Security Standards: Data Replicability (Pt. 4)",
+        "authors": "Omer Goldberg (Chaos Labs)",
+        "venue_year": "Chaos Labs, 21 aout 2024",
+        "url": "https://chaoslabs.xyz/posts/oracle-data-replicability-pt-4",
+        "what_it_does": "Cadre industriel d'evaluation du risque oracle : constate que les entrees de donnees manquent d'independance verifiable et que l'ensemble exact d'agregateurs d'un feed Chainlink reste non nomme, empechant toute verification tierce de la diversite des sources.",
+        "overlap_with_shogen": "Rang 20 — nomme precisement le manque que le certificat comble (diversite des sources inverifiable par un tiers) pour des feeds de donnees reels, mais ne propose ni mesure d'independance ni test de co-defaillance : un standard de transparence, pas une independance mesuree.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Oracle Outage Risk in DeFi: Why One Data Feed Can Freeze a Trading Protocol",
+        "authors": "Ethan Caldwell (CryptoDaily, editorial)",
+        "venue_year": "CryptoDaily (blog industriel), 25 mai 2026",
+        "url": "https://cryptodaily.co.uk/2026/05/oracle-outage-risk-defi",
+        "what_it_does": "Explainer recommandant de cartographier les editeurs partages (exchanges, market makers, operateurs, relayers) et d'examiner la correlation historique des pannes et erreurs de prix ; avertit que moyenner deux feeds partageant le meme amont cree une illusion de redondance.",
+        "overlap_with_shogen": "Rang 21 — la recette du certificat (observables d'amont partage + correlation historique des co-defaillances) enoncee comme conseil qualitatif, formulation informelle la plus proche trouvee, mais sans methode statistique, sans modele d'independance teste (aucune reference K&L) et sans quorum effectif.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "An Incentive-Compatible Reward Sharing Mechanism for Mitigating Mirroring Attacks in Decentralized Data-Feed Systems",
+        "authors": "Sina Aeeneh, Nikola Zlatanov, Jiangshan Yu",
+        "venue_year": "arXiv:2509.11294 (cs.GT), septembre 2025",
+        "url": "https://arxiv.org/abs/2509.11294",
+        "what_it_does": "Traite le mirroring (un meme acteur derriere plusieurs oracles d'un data-feed) par un partage de recompenses incitativement compatible rendant l'exploitation de plusieurs oracles economiquement irrationnelle (equilibre de Nash a un oracle par utilisateur).",
+        "overlap_with_shogen": "Rang 22 — meme menace que le certificat (independance de facade dans un quorum de sources) mais reponse par conception economique ex ante, explicitement sans detection ni mesure de correlation ; complementaire du certificat plutot que concurrent.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "A First Look into DeFi Oracles",
+        "authors": "Bowen Liu, Pawel Szalachowski",
+        "venue_year": "IEEE DAPPS 2021 (arXiv:2005.04377)",
+        "url": "https://arxiv.org/abs/2005.04377",
+        "what_it_does": "Premiere etude de mesure a grande echelle des oracles DeFi deployes (MakerDAO, Compound, dYdX, Fulcrum) : deviations regulieres des prix rapportes, incidents operationnels, anomalies des rapports, recommandations de conception.",
+        "overlap_with_shogen": "Rang 23 — produit exactement la matiere premiere d'un historique de co-defaillances de sources de donnees (deviations et anomalies datees, par source et par protocole), mais ne croise pas les defaillances ENTRE sources et ne teste aucun modele d'independance.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "The Vendi Score: A Diversity Evaluation Metric for Machine Learning",
+        "authors": "Dan Friedman, Adji Bousso Dieng",
+        "venue_year": "TMLR 2023 ; arXiv:2210.02410",
+        "url": "https://arxiv.org/abs/2210.02410",
+        "what_it_does": "Diversite d'un echantillon = exponentielle de l'entropie de Shannon des valeurs propres d'une matrice de similarite (fonction de similarite fournie par l'utilisateur) : un NOMBRE EFFECTIF interpretable (score v = aussi divers que v elements totalement dissemblables), sans distribution de reference.",
+        "overlap_with_shogen": "Rang 24 — la forme mathematique la plus propre de l'instrument dont k_eff a besoin (compte effectif derive d'une matrice de similarite/correlation sur observables) : a citer ou a distinguer explicitement ; aucun recouvrement d'objet (ni defaillance, ni securite, ni quorum, ni certification, rien sur similarite mesuree -> co-defaillance).",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Effectiveness of LLM-based Software Diversity for Reliability Improvement — an Empirical Study",
+        "authors": "Gabriel Almeida, Ilir Gashi, Vladimir Stankovic, Joao R. Campos",
+        "venue_year": "arXiv:2607.03174 (cs.SE), soumis le 3 juillet 2026",
+        "url": "https://arxiv.org/pdf/2607.03174",
+        "what_it_does": "Mesure le recouvrement des defaillances de variantes generees par LLM (familles de modeles, temperatures, langages) contre des programmes humains sur trois specifications, en 1-parmi-2 ; les combinaisons heterogenes, surtout inter-langages, apportent des gains de fiabilite.",
+        "overlap_with_shogen": "Rang 25 — la lignee Gashi transposee a la diversite generee par LLM : recouvrement de defaillances mesure, mais entre canaux LOGICIELS — pas de quorum de sources de donnees, pas de test contre un modele d'independance nomme, pas d'observables d'infrastructure.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "The Effectiveness of Software Diversity in a Large Population of Programs",
+        "authors": "Meine J. P. van der Meulen, Miguel A. Revilla",
+        "venue_year": "IEEE TSE 34(6):753-764, 2008",
+        "url": "https://ieeexplore.ieee.org/document/4604670/",
+        "what_it_does": "Mesure les fonctions de difficulte d'Eckhardt-Lee/Littlewood-Miller et le gain du 1-parmi-2 sur 36 123 programmes ecrits pour les memes specifications (collection Online Judge, >2 500 000 programmes, >1 500 specifications), y compris l'effet de la diversite de langage.",
+        "overlap_with_shogen": "Rang 26 — la plus grande demonstration que la correlation de defaillances est MESURABLE en population, precedent direct de 'mesurer plutot que postuler' — mais programmes de concours, sans test d'independance par quorum operationnel ni dimension infrastructure. Contenu libre via la these de van der Meulen (City Research Online, URL dans l'entree d'origine).",
+        "pdf_accessible": false
+      },
+      {
+        "title": "An Experimental Evaluation of Software Redundancy as a Strategy for Improving Reliability",
+        "authors": "Dave E. Eckhardt Jr., Alper K. Caglayan, John C. Knight, Larry D. Lee, David F. McAllister, Mladen A. Vouk, John P. J. Kelly",
+        "venue_year": "IEEE TSE 17(7):692-702, 1991 (NASA TM-102613, mai 1990)",
+        "url": "https://ntrs.nasa.gov/api/citations/19900014642/downloads/19900014642.pdf",
+        "what_it_does": "Deuxieme grande experience controlee multi-universites de la lignee : mesure empiriquement les defaillances coincidentes de versions developpees independamment ; les fautes de conception se manifestent en defaillances dependantes, conditionnant l'efficacite de la redondance.",
+        "overlap_with_shogen": "Rang 27 — mesure la correlation de defaillances entre versions (le type d'evidence du certificat) mais dans une experience fermee sur versions logicielles, sans production continue d'un verdict par quorum deploye.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "A design diversity metric and analysis of redundant systems",
+        "authors": "Mitra, Saxena, McCluskey",
+        "venue_year": "IEEE Transactions on Computers 51(5), 2002 (version anterieure 1999)",
+        "url": "https://ieeexplore.ieee.org/document/1004589/",
+        "what_it_does": "Pose que 'la notion conventionnelle de diversite est qualitative' et presente ce qu'il revendique comme la premiere metrique quantifiant la diversite entre designs, calculee sur les paires de fautes et leur comportement de defaillance conjointe ; modeles analytiques de fiabilite valides par simulation (duplex, TMR).",
+        "overlap_with_shogen": "Rang 28 — le precedent canonique de 'mesurer la diversite, ne pas la declarer', la D-metrique etant derivee du comportement de defaillance CONJOINT observe/simule plutot que de declarations de provenance — le meme geste que Shogen ; mais observables = injections de fautes au niveau portes dans des designs materiels, aucune infrastructure, aucun quorum effectif par partition, figure de merite design-time et non certificat runtime.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Estimating Bounds on the Reliability of Diverse Systems",
+        "authors": "Peter Popov, Lorenzo Strigini, John May, Silke Kuball",
+        "venue_year": "IEEE TSE 29(4):345-359, 2003",
+        "url": "https://www.researchgate.net/publication/3188315_Estimating_bounds_on_the_reliability_of_diverse_systems",
+        "what_it_does": "Derive des bornes (notamment superieures) sur la pfd d'un systeme 1-parmi-2 divers a partir des fiabilites individuelles par sous-domaines de l'espace de demande, sans supposer l'independance ; vise les systemes assembles de sous-systemes sur etagere.",
+        "overlap_with_shogen": "Rang 29 — l'idee 'certificat = borne sous connaissance partielle' : sa decomposition par sous-domaines est le parallele le plus net du k_eff PAR PARTITION de Shogen ; mais entrees = fiabilites de versions, pas un historique de co-defaillances ni des observables d'infrastructure.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Modeling software design diversity: a review",
+        "authors": "Bev Littlewood, Peter Popov, Lorenzo Strigini",
+        "venue_year": "ACM Computing Surveys 33(2):177-208, 2001",
+        "url": "https://dl.acm.org/doi/10.1145/384192.384195",
+        "what_it_does": "Survey de reference des modeles probabilistes expliquant POURQUOI des versions independamment developpees ne defaillent pas independamment (Eckhardt-Lee, Littlewood-Miller, fonctions de difficulte) ; enonce qu'evaluer la fiabilite d'une configuration diverse particuliere reste difficile precisement parce que l'independance ne peut etre supposee. (PDF libre du survey via City Research Online, URL dans l'entree Littlewood-Miller.)",
+        "overlap_with_shogen": "Rang 30 — le cadre theorique dans lequel le certificat doit etre enonce : la communaute tient depuis 1985-1989 que l'independance est fausse, donc le claim de nouveaute ne peut pas etre 'l'independance est postulee' mais doit etre 'l'independance est CERTIFIEE DEPUIS DES OBSERVABLES, par quorum, au moment de la decision' ; a citer pour eviter l'homme de paille.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "A Theoretical Basis for the Analysis of Multiversion Software Subject to Coincident Errors",
+        "authors": "Dave E. Eckhardt Jr., Larry D. Lee",
+        "venue_year": "IEEE TSE SE-11(12):1511-1517, dec. 1985 (NASA TM-86369)",
+        "url": "https://ntrs.nasa.gov/api/citations/19850015006/downloads/19850015006.pdf",
+        "what_it_does": "Le modele probabiliste fondateur des erreurs coincidentes : une fonction d'intensite/difficulte variable sur l'espace d'entree fait que des versions developpees independamment defaillent de facon dependante.",
+        "overlap_with_shogen": "Rang 31 — fournit la structure du modele nul que le certificat teste (pourquoi l'independance postulee echoue meme sans infrastructure partagee : la variation de difficulte suffit) ; modele, ne mesure pas, ignore les quorums de sources de donnees.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Conceptual Modeling of Coincident Failures in Multiversion Software",
+        "authors": "Bev Littlewood, Douglas R. Miller",
+        "venue_year": "IEEE TSE 15(12):1596-1614, dec. 1989",
+        "url": "https://ieeexplore.ieee.org/document/58771/",
+        "what_it_does": "Generalise Eckhardt-Lee a la diversite FORCEE : versions developpees sous methodologies deliberement diverses, dualite entrees/programmes ; la diversite de methodologies reduit la probabilite de defaillance simultanee et peut faire mieux que l'independance.",
+        "overlap_with_shogen": "Rang 32 — la diversite forcee est l'analogue logiciel des observables d'infrastructure de Shogen (imposer ASN/amonts divers = imposer des methodologies diverses), et 'mieux qu'independant' est le phenomene que Shogen veut mesurer plutot que postuler ; reste un modele de versions, sans historique mesure ni certificat. Aucun PDF libre trouve (NTRS sans telechargement, IEEE sous abonnement).",
+        "pdf_accessible": false
+      },
+      {
+        "title": "When Does \"Diversity\" in Development Reduce Common Failures? Insights from Probabilistic Modeling",
+        "authors": "Kizito Salako, Lorenzo Strigini",
+        "venue_year": "IEEE TDSC 11(2):193-206, 2014",
+        "url": "https://openaccess.city.ac.uk/id/eprint/3027/6/KS_LS_ISA_OneCol_AcceptedPaperSubmission_20130806.pdf",
+        "what_it_does": "Prolonge Littlewood-Miller pour etablir sous quelles conditions les decisions de diversification reduisent effectivement les defaillances communes — et montre que ce n'est pas garanti.",
+        "overlap_with_shogen": "Rang 33 — modelise precisement le risque que le certificat doit detecter (une diversite imposee qui ne livre pas l'independance attendue) ; modele probabiliste de decisions de developpement, sans mesure de co-defaillances ni sources de donnees.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Synchronous Consensus for Dependent Process Failures",
+        "authors": "Flavio P. Junqueira, Keith Marzullo",
+        "venue_year": "IEEE ICDCS 2003",
+        "url": "https://cseweb.ucsd.edu/~marzullo/pubs/icdcs-depfail.pdf",
+        "what_it_does": "Remplace 'au plus t fautifs parmi n independants' par des structures explicites de defaillances dependantes (cores, survivor sets, equivalents aux fail-prone systems) ; conditions de replication et protocoles de consensus parametres par ces structures.",
+        "overlap_with_shogen": "Rang 34 — le formalisme cible cote CONSOMMATION : des quorums definis sous defaillances non independantes, c'est-a-dire la semantique d'un k_eff ; mais la structure de dependance est un postulat d'entree, jamais mesuree ni certifiee depuis un historique — Shogen serait le producteur de l'objet que ce cadre consomme.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Byzantine Quorum Systems",
+        "authors": "Dahlia Malkhi, Michael Reiter",
+        "venue_year": "Distributed Computing 11(4):203-213, 1998",
+        "url": "https://link.springer.com/content/pdf/10.1007/s004460050050.pdf",
+        "what_it_does": "Fonde la theorie des systemes de quorum byzantins via les fail-prone systems : une collection arbitraire d'ensembles potentiellement fautifs remplace le seuil uniforme, avec conditions de coherence et de disponibilite ; toute la lignee ulterieure (asymmetric trust, quorums permissionless, FBA) generalise ce cadre.",
+        "overlap_with_shogen": "Rang 35 — l'objection canonique qu'un relecteur opposera ('les quorums sans independance existent depuis 1998') ; mais les fail-prone sets y sont SUPPOSES, jamais derives d'observations — aucun pont entre co-defaillances mesurees et structure declaree ; le certificat se positionne comme la preuve empirique qu'une structure declaree correspond a la realite.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Governing Actions, Not Agents: Institutional Attestation as a Governance Model for Autonomous AI Systems",
+        "authors": "Jakob Salfeld-Nebgen",
+        "venue_year": "arXiv:2606.26298, juin 2026",
+        "url": "https://arxiv.org/abs/2606.26298",
+        "what_it_does": "Modele de gouvernance ou une action consequente d'un agent ne s'execute que si ses preconditions sont chacune attestees independamment par une source faisant autorite distincte, liees cryptographiquement a une intention declaree et evaluees par une politique deterministe.",
+        "overlap_with_shogen": "Rang 36 — le voisin conceptuel le plus direct cote COUCHE (faits attestes multi-sources en amont de l'action d'un agent) ; mais l'independance des attestateurs y est POSTULEE comme exigence de conception : aucune mesure de co-defaillances, aucun observable, aucun quorum effectif — exactement l'hypothese que le certificat remplace.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "SoK: Blockchain Oracles Between Theory and Practice",
+        "authors": "Colin Finkbeiner, Ghada Almashaqbeh",
+        "venue_year": "Cryptology ePrint 2025/2106, novembre 2025",
+        "url": "https://eprint.iacr.org/2025/2106",
+        "what_it_does": "SoK le plus recent du domaine : systematise les solutions oracle academiques et deployees selon capacites, hypotheses de confiance et architecture, avec enquete empirique des deploiements et liste de lacunes ouvertes.",
+        "overlap_with_shogen": "Rang 37 — la carte a jour des hypotheses de confiance du champ ; son resume n'aborde ni la mesure de l'independance des sources ni les co-defaillances : la reference a depouiller integralement pour asseoir la revendication de nouveaute (verifier si le gap y est liste comme probleme ouvert).",
+        "pdf_accessible": true
+      },
+      {
+        "title": "SoK: Oracles from the Ground Truth to Market Manipulation",
+        "authors": "Shayan Eskandari, Mehdi Salehi, Wanyun Catherine Gu, Jeremy Clark",
+        "venue_year": "ACM AFT 2021 (arXiv:2106.00667)",
+        "url": "https://arxiv.org/abs/2106.00667",
+        "what_it_does": "SoK de reference sur les oracles : modularise le pipeline (selection des sources, agregation, livraison), recense les attaques dont la manipulation de feeds, discute attenuations et modeles de confiance.",
+        "overlap_with_shogen": "Rang 38 — cadre canonique ou la diversite/independance des sources est un objectif de conception postule, jamais mesure ni teste contre un historique de co-defaillances ; utile pour situer le certificat dans la taxonomie, pas comme anteriorite du mecanisme.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Empirical Evidence in AI Oracle Development (blog Chainlink)",
+        "authors": "Chainlink Labs",
+        "venue_year": "Blog Chainlink, 21 mars 2025",
+        "url": "https://chain.link/blog/ai-oracles",
+        "what_it_does": "Oracles IA verifiant des faits du monde reel par raisonnement LLM, distribues sur des DON pour obtenir plusieurs verifications 'independantes' ancrees sur des sources et modeles divers.",
+        "overlap_with_shogen": "Rang 39 — l'analogue industriel le plus proche d'une couche de faits pour agents, independance postulee via la decentralisation ; le billet concede lui-meme que des modeles partageant leurs donnees d'entrainement peuvent exhiber des biais correles et que le consensus seul pourrait ne pas suffire — il nomme le trou que le certificat comble, sans le mesurer.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Tool Receipts, Not Zero-Knowledge Proofs: Practical Hallucination Detection for AI Agents (NabaOS)",
+        "authors": "Abhinaba Basu",
+        "venue_year": "arXiv:2603.10060, mars 2026",
+        "url": "https://arxiv.org/abs/2603.10060",
+        "what_it_does": "Le runtime signe en HMAC un recu par appel d'outil (haches entree/sortie, faits extraits), classe chaque affirmation du LLM par source epistemique et la verifie contre les recus ; cross-checking par re-telechargement independant des URLs (78,4% des fabrications d'URL attrapees).",
+        "overlap_with_shogen": "Rang 40 — attestation de perception LOCALE (racine de confiance = le runtime unique qui signe ses propres recus), le re-fetch etant un embryon de seconde source ; aucun quorum de sources externes, aucune mesure d'independance — complementaire plutot que concurrent.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "Pramana: A Protocol-Layer Treatment of Claim Verification in Autonomous Agent Networks",
+        "authors": "Ravi Kiran Kadaboina",
+        "venue_year": "arXiv:2605.20312, mai 2026",
+        "url": "https://arxiv.org/abs/2605.20312",
+        "what_it_does": "Format de fil standardise enveloppant chaque sortie consequente d'agent dans une ClaimAttestation typee avec verify() deterministe contre la source enregistree ; cycle de vie specifie en TLA+ et verifie par TLC.",
+        "overlap_with_shogen": "Rang 41 — couche protocolaire de revendications attestees pour reseaux d'agents, mais strictement mono-source par revendication : ni quorum, ni analyse d'independance entre sources ; chevauche le vocabulaire (attestation de faits pour agents), pas le mecanisme differenciant.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "zkAgent: Verifiable LLM Agent Execution via One-Shot Transcript Proofs",
+        "authors": "Lizheng Wang, Hancheng Lou, Chongrong Li, Yu Yu, Yuncong Hu",
+        "venue_year": "IACR ePrint 2026/199, fevrier 2026",
+        "url": "https://eprint.iacr.org/2026/199",
+        "what_it_does": "Preuve de bout en bout d'une execution d'agent LLM liant chaque observation d'outil a une execution authentifiee via sous-preuves zkTLS ou zkVM, contre un fournisseur qui fabriquerait des observations.",
+        "overlap_with_shogen": "Rang 42 — realise la moitie 'attestation de perception' (chaque entree rattachee cryptographiquement a sa session TLS d'origine), mais strictement mono-source par fait : aucun quorum de sources, aucune notion d'independance entre sources.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "AI Counterparty Trust (blog Reclaim Protocol)",
+        "authors": "Madhavan Malolan (Reclaim Protocol)",
+        "venue_year": "Blog Reclaim Protocol, 20 janvier 2025",
+        "url": "https://blog.reclaimprotocol.org/posts/counterparty-trust",
+        "what_it_does": "Soutient que les agents IA ne doivent rien croire par defaut et verifier leurs entrees via signatures ou preuves zkTLS ; zkTLS comme palliatif pour des sources qui ne signent pas.",
+        "overlap_with_shogen": "Rang 43 — entrees attestees pour agents cote industrie, explicitement mono-source ; leurs attestateurs stakes ont une independance postulee economiquement (stake/slash), jamais mesuree par historique de co-defaillances ou observables d'infrastructure.",
+        "pdf_accessible": false
+      },
+      {
+        "title": "Retrieval-Augmented Generation with Conflicting Evidence (RAMDocs / MADAM-RAG)",
+        "authors": "Han Wang, Archiki Prasad, Elias Stengel-Eskin, Mohit Bansal",
+        "venue_year": "arXiv:2504.13079, avril 2025",
+        "url": "https://arxiv.org/abs/2504.13079",
+        "what_it_does": "Jeu de donnees de requetes ambigues avec sources conflictuelles (desinformation, bruit) et approche multi-agents ou des agents LLM debattent sur plusieurs tours avant qu'un agregateur ne tranche.",
+        "overlap_with_shogen": "Rang 44 — represente le courant 'multi-source fact checking' : agregation multi-sources purement SEMANTIQUE (debat, credibilite), sans attestation cryptographique ni mesure d'independance — le courant entier pondere la credibilite des sources, jamais leur independance structurelle.",
+        "pdf_accessible": true
+      },
+      {
+        "title": "DeFort: Automatic Detection and Analysis of Price Manipulation Attacks in DeFi Applications",
+        "authors": "Maoyi Xie, Ming Hu, Ziqiao Kong, Cen Zhang, Yebo Feng, Haijun Wang, Yue Xue, Hao Zhang, Ye Liu, Yang Liu",
+        "venue_year": "ACM ISSTA 2024",
+        "url": "https://yebof.github.io/assets/pdf/xie2024defort.pdf",
+        "what_it_does": "Representatif de la famille 2024-2026 de detection d'attaques (DeFiRanger, DeFiTrace, AiRacleX) : modele comportemental de manipulation de prix et surveillance de pools pour detecter et analyser les attaques on-chain (5 attaques reelles, 441 projets, deux mois).",
+        "overlap_with_shogen": "Rang 45 — toute cette famille detecte la manipulation EN AVAL, dans l'etat on-chain, et ne regarde jamais la couche des sources de donnees ni leur independance mutuelle ; elle motive le certificat (l'oracle reste un vecteur majeur, 13% des exploits DeFi 2025 selon les syntheses industrielles) sans le recouvrir.",
+        "pdf_accessible": true
+      }
+    ],
+    "empty_searches": [
+      "\"coincident failures\" OR \"failure correlation\" measured independence \"data sources\" quorum voting Knight Leveson transposition — VERDICT : rien qui transpose le test de co-defaillances K&L a des quorums de SOURCES DE DONNEES ; les resultats sont la lignee versions-logicielles elle-meme, plus un seul voisin (Semantic Quorum Assurance, liste en candidat 5) qui impose la diversite sans la mesurer.",
+      "deep neural network multi-version redundancy \"coincident failures\" OR \"common failures\" empirical measurement diversity ensembles reliability — VERDICT : uniquement de la litterature generique de diversite d'ensembles DNN (metriques de diversite type-1/type-2, dynamic heterogeneous redundancy) ; aucun travail ne teste des co-defaillances DNN observees contre un modele d'independance a la maniere K&L.",
+      "\"Conceptual modelling of coincident failures\" Littlewood Miller filetype:pdf — VERDICT : aucun PDF en libre acces de Littlewood & Miller 1989 trouve (PDF direct IEEE refuse en HTTP 418 sans abonnement, record NTRS 19900036555 explicitement sans telechargement, miroirs CORE en 403).",
+      "openaccess.city.ac.uk \"Estimating bounds on the reliability of diverse systems\" Popov Strigini May Kuball IEEE 2003 — VERDICT : pas d'eprint City Research Online avec PDF pour ce papier TSE 2003 (seuls des papiers de bornes apparentes apparaissent) ; le PDF reste sous abonnement IEEE.",
+      "\"Correlated failures in multi-version software\" IFAC SAFECOMP 1986 OR 1987 OR 1988 author — VERDICT : un record ScienceDirect recurrent portant ce titre (pii S1474667017601009) n'a pas pu etre identifie (page en 403, recherche sans attribution fiable d'auteurs/venue) ; ecarte des candidats plutot que devine.",
+      "\"diversity certificate\" OR \"attestation of diversity\" quorum data sources measured independence correlated failure history — EMPTY for the artifact. No published work issues a certificate/attestation of MEASURED diversity for a quorum of sources. Nearest returns were INDaaS (an audit report, not a certificate) and an unrelated 2026 preprint, 'Semantic Quorum Assurance: Collective Certification for Non-Deterministic AI Infrastructure' (arXiv:2606.08021), which enforces model/archetype diversity in an LLM-validator quorum predicate and posits a correlated cognitive failure model — diversity there is a declared archetype label, not measured from observables. Verdict: the certificate-as-artifact is unclaimed on this angle.",
+      "quantify diversity data source quorum ASN autonomous system observables independence metric effective quorum size certificate — EMPTY. Nothing combines ASN-level infrastructure observables with an effective quorum size for a set of DATA SOURCES; results were ASN-lookup vendor pages, patents scoring 'inbound/outbound ASN diversity' for malicious-account detection (not a dependability metric), and ML dataset-diversity work. Verdict: the ASN-observable-to-k_eff path is unoccupied.",
+      "\"effective quorum\" OR \"effective redundancy\" size correlated failures partition diversity metric distributed systems measurement — EMPTY for a named k_eff. Results were tutorials, patents on correlated-failure zones and quorum placement, and Junqueira's 'Coping with dependent failures in distributed systems' (UC San Diego, cores/survivor-sets informed replication) — which selects replicas using a model of correlated failures and software diversity, but takes the failure model as given rather than measuring it. Verdict: no published 'effective quorum size under measured dependence' construct found.",
+      "\"effective number\" of independent components correlated failures effective redundancy metric quantify diversity ensemble — EMPTY on the dependability side. The effective-number formulation surfaces only via ecology-derived work (the TIFS network-diversity metric and the Vendi Score, both listed above); no reliability/safety paper defines an 'effective number of independent components' from measured co-failure. Verdict: notable gap, and an argument for Shogen naming k_eff explicitly.",
+      "testing independence assumption data sources feeds observed co-failure history statistical test independence model sensor sources quantify — EMPTY. Returns were generic statistics only: quasi-independence tests for truncated/censored failure data, conditional-independence diagnostics in latent-class models, Christoffersen's test. No framework applies an independence-model goodness-of-fit test to a SET OF DATA SOURCES in order to size a quorum. Verdict: the Knight-&-Leveson-style test transposed to sources is not published on this angle.",
+      "\"common upstream\" detection shared provenance content correlation independent sources measure real independence news data feeds — EMPTY within dependability/security. The only close line is truth discovery / data fusion, notably 'Global Detection of Complex Copying Relationships Between Sources' (VLDB 2010), which infers copying between web sources from shared MISTAKES — the same signal as Shogen's content-correlation observable, but used for source recommendation and truth resolution, never converted into a diversity metric, a quorum size, or a certificate. Verdict: empty on this angle; flagging it as the one line another angle should chase.",
+      "2025 2026 framework measuring diversity redundant components observables dependability empirical common cause failure independence assessment — SEARCHED, NOTHING NEWER. The only 2025-2026 items are 'An extension to the Alpha Factor method for enhanced common cause failure analysis' (Reliability Engineering & System Safety, vol. 267, 2026 — lets a component belong to multiple CCF groups; still fitted from event data inside one plant boundary) and the LLM failure-independence preprint listed above. No 2024-2026 framework quantifies effective diversity of a component set from infrastructure observables. Verdict: the corpus cutoff costs nothing here.",
+      "survey \"diversity metrics\" software security systematic review quantifying diversity measures taxonomy — SURVEYS EXIST, CERTIFICATE ABSENT. Found 'Diversity-By-Design for Dependable and Secure Cyber-Physical Systems: A Survey' (arXiv:2007.08688), 'Quantifying Cybersecurity Effectiveness of Software Diversity' (Chen, Garcia-Lebron, Sun, Cho, Xu, arXiv:2111.10090 — simulation-driven, and concludes diversity does not necessarily improve whole-network security), 'Quantifying the security effectiveness of network diversity' (HoTSoS 2018), and 'Measuring Software Diversity, with Applications to Security' (Hernandez-Castro & Rossman, arXiv:1310.3307 — Shannon-Wiener over software market share, i.e. population diversity, no failure data). None defines a measured-independence certificate over a source set. Verdict: the survey layer confirms the gap rather than filling it.",
+      "VERIFIED NEGATIVE — 'Trust Without Trusting: A Recomputable Trust Protocol for Autonomous Agents' (Lars Kersten Kroehl, arXiv:2605.06738). A search snippet attributed to it the sentence that independence is computed from structure rather than declared categories, with clusters derived from an endorsement graph by reciprocal-Jaccard analysis — which would have been a near-exact hit. Fetching the paper's own abstract does not support it: the work is about recomputable verification that a boundary-owner followed its own admission rules, with no endorser-independence metric, no clustering, no effective count. Verdict: not a candidate; recording it because the snippet is misleading and someone re-running this search will hit it again.",
+      "« \"diversity certificate\" OR \"measured independence\" OR \"common upstream\" oracle price feed quorum » → VIDE : aucun cadre nommé « certificat de diversité » ni travail dédié à l'indépendance mesurée des sources d'un feed ; seulement des pages de bonnes pratiques génériques.",
+      "« \"Knight and Leveson\" independence assumption blockchain OR oracle OR validators » → VIDE : le papier de 1986 lui-même et des surveys oracle sans lien ; aucune transposition du test de co-défaillances de Knight & Leveson aux oracles ou quorums blockchain n'a été trouvée.",
+      "« \"effective quorum\" OR \"effective number of independent sources\" oracle correlated data providers overlap measurement Pyth Chainlink academic » → VIDE : rien qui calcule un quorum effectif (type k_eff) sous corrélation mesurée pour un feed de prix ; seulement la théorie classique des systèmes de quorum et l'ingénierie cloud (billet Amazon Aurora sur quorums et défaillances corrélées).",
+      "« Chainlink node operators same three data aggregators upstream concentration criticism » → VIDE côté mesure : la documentation Chainlink décrit ses trois niveaux d'agrégation (nœuds sourçant chez CoinGecko, CoinMarketCap, Tiingo...), mais aucune mesure indépendante du recouvrement de l'ensemble d'agrégateurs par feed n'existe — le Pt. 4 du cadre Chaos Labs constate précisément que cet ensemble n'est pas publié.",
+      "« correlated failures common-mode failure decentralized oracle network nodes academic paper » → VIDE sur l'objet précis : brevets, stockage distribué, federated learning et billets de vulgarisation ; aucun papier testant l'historique de co-défaillances de nœuds ou sources d'oracle contre un modèle d'indépendance.",
+      "« blockchain oracle price feed data source independence measurement shared infrastructure » → VIDE : uniquement du contenu marketing/pédagogique de fournisseurs d'oracles affirmant l'indépendance sans la mesurer ; les mesures d'infrastructure par ASN/hébergeur existent pour les validateurs PoS (rapport Messari « Evaluating Validator Decentralization » : Nakamoto coefficient d'hébergement, 67,4 % du stake AVAX sur AWS) mais n'ont jamais été appliquées aux sources d'un feed de prix.",
+      "« Pyth network publishers price feed correlation independence first-party oracle analysis » → VIDE sur la corrélation inter-éditeurs : Pyth publie des « Publisher Metrics » (performance historique par éditeur individuel) et le risque d'amont partagé entre publishers n'apparaît que comme remarque qualitative dans des rapports d'analystes ; aucun travail ne mesure l'indépendance mutuelle des publishers d'un feed.",
+      "\"diversity certificate\" quorum independence data sources attestation — VIDE : uniquement des resultats RH/achats (certification de fournisseurs divers, DEI) ; le terme \"diversity certificate\" n est revendique par aucun travail en systemes distribues ou fiabilite.",
+      "\"effective quorum size\" measured correlation \"k_eff\" OR \"effective replication factor\" partition — VIDE pour les systemes distribues : aucun travail ne nomme ni ne calcule une taille de quorum effective par partition a partir d une correlation mesuree ; le plus proche remonte est le n_eff de Kish applique aux juges LLM (candidat 2), hors systemes.",
+      "test independence assumption co-failure history oracle networks data feeds statistical — VIDE : seulement de la statistique generique (risques concurrents, classes latentes, structure de reseaux de Markov) ; rien sur des quorums d oracles ou de flux de donnees testant l independance contre un historique de co-defaillances.",
+      "correlation-aware quorum size estimation failure correlation replication protocol — VIDE cote replication classique : aucun protocole precedent qui dimensionne son quorum d apres une correlation mesuree ; seuls remontent le papier SQA 2026 (candidat 1) et de la documentation generique (Kafka, RabbitMQ).",
+      "adaptive BFT quorum weights correlated faults measured 2024 2025 arXiv — VIDE au sens strict : les BFT adaptatifs existants ajustent sur la performance ou la latence (BFTBrain par RL, WHEAT/AWARE par poids de vote lies a la latence), aucun n ajuste quorum ou poids a une correlation de defaillances mesuree.",
+      "Knight Leveson independence assumption applied Byzantine fault tolerance replicas N-version — quasi-VIDE : Knight & Leveson 1986 est cite comme motivation dans la litterature BFT-diversite (survey de Schneider, lignee BASE), mais aucun travail trouve ne transpose leur test statistique d independance a la composition de quorums BFT ou de sources — la transposition revendiquee par Shogen n a pas ete trouvee deja faite.",
+      "Ethereum client diversity measurement correlated failure validators supermajority — NON PERTINENT en academique : presque uniquement des blogs et dashboards (clientdiversity.org, Kiln, Blocknative) ; seule exception academique, la mesure de participation/decentralisation de Grandjean, Heimbach, Wattenhofer (arXiv 2306.10777, FC 2024 Workshops), qui mesure la concentration clients/operateurs comme risque de defaillance correlee mais ne construit ni certificat ni quorum ajuste — ecartee du top 10 au profit de travaux plus proches.",
+      "\"diversity certificate\" OR \"certificate of diversity\" data sources quorum independence attestation — VIDE : uniquement du bruit DEI et certification de fournisseurs « divers » ; le terme est libre au sens technique visé par Shogen.",
+      "\"perception attestation\" OR \"attested perception\" OR \"attested facts\" AI agent layer sources — VIDE pour le concept exact : les résultats portent sur l'attestation d'ACTIONS (Action Attestation Layer), l'infra TEE ou les reçus locaux (NabaOS) ; personne n'emploie « attested perception » pour une couche de faits multi-sources.",
+      "\"measured independence\" OR \"effective quorum\" sources co-failure history AI agent facts — VIDE côté sources de données : les seuls travaux mesurant des défaillances corrélées en contexte IA portent sur des validateurs LLM (SQA) ou des versions de programme (N-version coding agents), jamais sur des quorums de sources de données ; aucun « k_eff » ou quorum effectif par partition trouvé nulle part.",
+      "ICME Labs web proofs AI agents verifiable data — VIDE pour le chevauchement : ICME Labs fait du zkML et des guardrails vérifiables (Jolt Atlas, PreFlight, NovaNet, verifiable-agent-kit) ; aucun produit de couche de faits attestés multi-sources, aucune agrégation de web proofs avec mesure d'indépendance.",
+      "\"common-mode failure\" OR \"correlated failure\" data sources oracle networks measured independence ASN — VIDE dans la fenêtre agents 2024-2026 : rien d'agent-facing ; le seul mécanisme d'indépendance mesurée par observables d'infrastructure est INDaaS (OSDI 2014, listé en candidat), et rien n'utilise l'ASN ni la détection d'amont commun par corrélation de contenu pour des sources consommées par des agents.",
+      "arXiv multi-source attestation AI agent independence measurement quorum data feeds — VIDE pour la mesure : les résultats (identité d'agents DID/VC, attestation institutionnelle, runtime verification, confidential computing) postulent tous l'indépendance des attestateurs ; aucun ne la mesure.",
+      "zkTLS web proofs AI agents aggregation multiple sources 2025 — VIDE pour l'agrégation mesurée : contenus industriels zkTLS mono-source (zkPass, MCPay, explainers presse crypto) et services d'agrégation de PREUVES (batching on-chain), mais aucune agrégation multi-SOURCES d'un même fait avec indépendance mesurée."
+    ],
+    "raw_count": 50
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Balayage"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Synthese"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "sweep:lignee-kl",
+      "phaseIndex": 1,
+      "phaseTitle": "Balayage",
+      "agentId": "adbf4e2a074a3e469",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1785418410184,
+      "queuedAt": 1785418410168,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Tu travailles pour le projet Shogen (attestation de perception pour agents IA). Son coeur differenciant : un CERTIFICAT DE DIVERSITE pour quorums de sources de donnees — remplacer l independance POSTULEE des sources par une independance MESUREE (historique de co-defaillances teste contre le modele d independance, methode transposee de Knight & Leveson 1986 ; observables d infrastructure : ASN, amo…",
+      "lastProgressAt": 1785419029614,
+      "tokens": 98153,
+      "toolCalls": 35,
+      "durationMs": 619429,
+      "resultPreview": "{\"candidates\":[{\"title\":\"N-Version Programming with Coding Agents\",\"authors\":\"Javier Ron, Benoit Baudry, Martin Monperrus\",\"venue_year\":\"arXiv:2606.20158 (cs.SE), soumis le 18 juin 2026\",\"url\":\"https://arxiv.org/pdf/2606.20158\",\"what_it_does\":\"Rejoue le protocole de Knight & Leveson avec 48 versions du Launch Interceptor Program generees par des agents de codage LLM, soumises a un million de tests…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "sweep:metriques-diversite",
+      "phaseIndex": 1,
+      "phaseTitle": "Balayage",
+      "agentId": "a2c70ca38be510b1e",
+      "model": "claude-fable-5",
+      "fallbackModel": "claude-opus-5",
+      "state": "done",
+      "startedAt": 1785418410186,
+      "queuedAt": 1785418410168,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Tu travailles pour le projet Shogen (attestation de perception pour agents IA). Son coeur differenciant : un CERTIFICAT DE DIVERSITE pour quorums de sources de donnees — remplacer l independance POSTULEE des sources par une independance MESUREE (historique de co-defaillances teste contre le modele d independance, methode transposee de Knight & Leveson 1986 ; observables d infrastructure : ASN, amo…",
+      "lastProgressAt": 1785419125856,
+      "tokens": 111203,
+      "toolCalls": 47,
+      "durationMs": 715670,
+      "resultPreview": "{\"candidates\":[{\"title\":\"Heading Off Correlated Failures through Independence-as-a-Service\",\"authors\":\"Ennan Zhai, Ruichuan Chen, David Isaac Wolinsky, Bryan Ford\",\"venue_year\":\"USENIX OSDI 2014 (11th USENIX Symposium on Operating Systems Design and Implementation)\",\"url\":\"https://ennanzhai.github.io/pub/zhai14heading.pdf\",\"what_it_does\":\"INDaaS is an architecture that proactively AUDITS the indep…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "sweep:oracles-blockchain",
+      "phaseIndex": 1,
+      "phaseTitle": "Balayage",
+      "agentId": "ad13128d566243121",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1785418410187,
+      "queuedAt": 1785418410168,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Tu travailles pour le projet Shogen (attestation de perception pour agents IA). Son coeur differenciant : un CERTIFICAT DE DIVERSITE pour quorums de sources de donnees — remplacer l independance POSTULEE des sources par une independance MESUREE (historique de co-defaillances teste contre le modele d independance, methode transposee de Knight & Leveson 1986 ; observables d infrastructure : ASN, amo…",
+      "lastProgressAt": 1785419245775,
+      "tokens": 119967,
+      "toolCalls": 44,
+      "durationMs": 835588,
+      "resultPreview": "{\"candidates\":[{\"title\":\"Signals and Spoils: Speculative Oracle Extractable Value in the Era of Cross-Chain Interoperability\",\"authors\":\"Hasret Ozan Sevim, Christof Ferreira Torres\",\"venue_year\":\"arXiv preprint (cs.CR), juin 2026\",\"url\":\"https://arxiv.org/abs/2606.03434\",\"what_it_does\":\"Mesure empiriquement, sur quatre chaînes (Arbitrum, Base, Ethereum, Optimism) et via les liquidations Aave, que …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "sweep:quorums-distribues",
+      "phaseIndex": 1,
+      "phaseTitle": "Balayage",
+      "agentId": "a101349fa03495f84",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1785418410187,
+      "queuedAt": 1785418410169,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Tu travailles pour le projet Shogen (attestation de perception pour agents IA). Son coeur differenciant : un CERTIFICAT DE DIVERSITE pour quorums de sources de donnees — remplacer l independance POSTULEE des sources par une independance MESUREE (historique de co-defaillances teste contre le modele d independance, methode transposee de Knight & Leveson 1986 ; observables d infrastructure : ASN, amo…",
+      "lastProgressAt": 1785418946413,
+      "tokens": 100660,
+      "toolCalls": 33,
+      "durationMs": 536225,
+      "resultPreview": "{\"candidates\":[{\"title\":\"Semantic Quorum Assurance: Collective Certification for Non-Deterministic AI Infrastructure\",\"authors\":\"Jun He, Deying Yu\",\"venue_year\":\"arXiv preprint 2606.08021, juin 2026\",\"url\":\"https://arxiv.org/abs/2606.08021\",\"what_it_does\":\"Plan de controle qui route les propositions d agents LLM vers des agents validateurs diversifies et sandboxes, avec un \\\"risk-adaptive quorum p…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "sweep:arxiv-recent",
+      "phaseIndex": 1,
+      "phaseTitle": "Balayage",
+      "agentId": "ae57889fb8831f6f9",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1785418410188,
+      "queuedAt": 1785418410169,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Tu travailles pour le projet Shogen (attestation de perception pour agents IA). Son coeur differenciant : un CERTIFICAT DE DIVERSITE pour quorums de sources de donnees — remplacer l independance POSTULEE des sources par une independance MESUREE (historique de co-defaillances teste contre le modele d independance, methode transposee de Knight & Leveson 1986 ; observables d infrastructure : ASN, amo…",
+      "lastProgressAt": 1785418959999,
+      "tokens": 102290,
+      "toolCalls": 33,
+      "durationMs": 549811,
+      "resultPreview": "{\"candidates\":[{\"title\":\"Semantic Quorum Assurance: Collective Certification for Non-Deterministic AI Infrastructure\",\"authors\":\"Jun He, Deying Yu\",\"venue_year\":\"arXiv preprint 2606.08021, juin 2026\",\"url\":\"https://arxiv.org/abs/2606.08021\",\"what_it_does\":\"Certifie les mutations proposées par des agents LLM en opérations cloud via un quorum de validateurs-agents divers, avec un modèle formel de dé…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "synthese",
+      "phaseIndex": 2,
+      "phaseTitle": "Synthese",
+      "agentId": "aab329e85fef17764",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1785419245783,
+      "queuedAt": 1785419245782,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "Dedup et classe ces candidats de recherche academique pour le projet Shogen (certificat de diversite mesuree pour quorums de sources). Fusionne les doublons (meme travail via angles differents), classe par proximite decroissante avec le coeur du projet (un travail qui mesure l independance de sources de DONNEES bat un travail qui la modelise pour des VERSIONS logicielles, qui bat une simple etude …",
+      "lastProgressAt": 1785420454026,
+      "tokens": 72875,
+      "toolCalls": 1,
+      "durationMs": 1208243,
+      "resultPreview": "{\"candidates\":[{\"title\":\"Signals and Spoils: Speculative Oracle Extractable Value in the Era of Cross-Chain Interoperability\",\"authors\":\"Hasret Ozan Sevim, Christof Ferreira Torres\",\"venue_year\":\"arXiv:2606.03434 (cs.CR), juin 2026\",\"url\":\"https://arxiv.org/abs/2606.03434\",\"what_it_does\":\"Mesure empiriquement, sur quatre chaines (liquidations Aave), que des DON Chainlink 'independants' consomment …"
+    }
+  ],
+  "totalTokens": 605148,
+  "totalToolCalls": 193
+}
