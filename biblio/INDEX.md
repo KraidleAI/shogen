@@ -1,7 +1,7 @@
 # Shōgen — registre bibliographique
 
-**8 artefacts détenus** au 2026-07-30 (compte re-mesuré par listing du
-dossier dans la passe qui écrit ce chiffre — audit du même jour). Chaque
+**9 artefacts détenus** au 2026-07-30 (compte re-mesuré par listing du
+dossier dans la passe qui écrit ce chiffre). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
 de vérification des citations qui s'appuient dessus. Pas de sidecars encore
 (outillage à monter — les greps ci-dessous portent sur les fichiers bruts,
@@ -9,7 +9,7 @@ les PDFs sur lectures visuelles).
 
 | fichier | ce que c'est (page de titre / en-tête) | lu | citations vérifiées |
 |---|---|---|---|
-| `deco-2019.pdf` | Zhang, Maram, Malvai, Goldfeder, Juels, *DECO: Liberating Web Data Using Decentralized Oracles for TLS*, arXiv:1909.00938 (version étendue de CCS '20) | pp. 1-2 lues au fichier le 2026-07-30 (titre, abstract, §1–1.3) | Vérifiées au texte p. 1 : « prove that a piece of data accessed via TLS came from a particular website » — provenance, pas vérité ; « without trusted hardware or server-side modifications ». **À relire au texte : le modèle de menace formel (§3-4).** |
+| `deco-2019.pdf` | Zhang, Maram, Malvai, Goldfeder, Juels, *DECO: Liberating Web Data Using Decentralized Oracles for TLS*, arXiv:1909.00938 (version étendue de CCS '20) | pp. 1-6 lues au fichier le 2026-07-30 (titre, abstract, §1–1.3, §2 TLS/MPC, §3 problème, modèle adversarial, F_Oracle, strawman, §3.4 aperçu, §4.1 début) | Vérifiées au texte p. 1 : « prove that a piece of data accessed via TLS came from a particular website » — provenance, pas vérité ; « without trusted hardware or server-side modifications ». §3 (pp. 3-4) : adversaire réseau **statique et malveillant**, sécurité maintenue « when either P or V is corrupted » ; prover-integrity : « A malicious P cannot forge content provenance » ; « oracles running DECO are trusted **only for integrity, not for privacy** » ; et le renvoi qui nomme le gap de Shōgen : « Smart contracts can further hedge against integrity failures by **querying multiple oracles and requiring, e.g., majority agreement** » — le quorum à indépendance postulée, délégué sans mécanisme. Preuve envers un vérificateur **participant** (handshake à trois parties) : résidu de désignation analogue à TLSNotary. |
 | `knight-leveson-1986-full.pdf` | Knight & Leveson, *An Experimental Evaluation of the Assumption of Independence in Multi-Version Programming*, article complet (manuscrit, copie MIT OCW 16.358J, 46 p. ; version journal : IEEE TSE 12(1):96-109, 1986). Page de titre lue le 2026-07-30 — apporté par le mainteneur, remplace le résumé de séminaire KTH (supprimé). | pp. fichier 1-3 et 10-25 (abstract, intro, §4 résultats, §5 modèle et test, §6 fautes, §7 discussion, §8 conclusions) | Vérifiées au texte : abstract « the number of tests in which more than one program failed was substantially more than expected » ; §5 : N=27, n=1 000 000, K=1255, z=100,51 > 2,33 (point 99 %), « we reject the null hypothesis with a confidence level of 99% … Thus, we reject this assumption » ; §5 : « from an operational viewpoint, it does not matter *why* programs fail on the same input, it merely matters that they *do* » ; §4 : « In the preliminary analysis of common faults, *all* were found to involve versions from both schools » ; §8, la réserve de portée : « it is conditional on the application that we used. The result may or may not extend to other programs, we do not know » ; §8 : « approximately one half of the total software faults found involved two or more programs » ; §8, le mandat matériel : les concepteurs matériels « use sophisticated techniques to determine common failure modes and systematically alter their designs ». |
 | `knight-leveson-1986-uva-report.pdf` | Page de titre lue le 2026-07-30 : *Detection of Faults and Software Reliability Analysis*, Annual Progress Report NASA NAG-1-605, juil. 1985–juin 1987, J.C. Knight, UVA Report UVA/528243/CS88/103, août 1987, 14 p. (NASA-CR-180347). Rapport d'avancement compagnon — intérêt marginal. | page 1 | aucune citation ne s'appuie dessus |
 | `knight-leveson-reply.pdf` | Page de titre lue le 2026-07-30 : Knight & Leveson, *A Reply to the Criticisms of the Knight & Leveson Experiment*. Venue relevée par recherche web du 2026-07-30 (fiche ACM DL : SIGSOFT Software Engineering Notes 15(1), janv. 1990, pp. 24-35) — à vérifier sur l'artefact/DOI avant citation formelle. Documente la controverse avec Avizienis et al. ; p. 1 porte la citation d'Avizienis nommant l'indépendance « the fundamental conjecture of the NVP approach ». | page 1 | la citation Avizienis ci-contre est utilisable (lue p. 1) ; le reste non lu |
@@ -17,6 +17,7 @@ les PDFs sur lectures visuelles).
 | `c2pa-spec-2.4.html` | C2PA Technical Specification v2.4 (spec.c2pa.org — copie du 2026-07-30) | sections modèle de données + trust model (via fetch) + §1.2 Scope (localisation vérifiée par grep) | vérifiée par grep dans le fichier détenu (1 occurrence, **§1.2 Scope**, bloc citant les Guiding Principles C2PA — pas le §14 Trust Model) : « SHOULD NOT provide value judgments » — la spec s'interdit de juger si la provenance est « bonne », elle valide seulement intégrité, association et non-altération. Modèle : assertions → claim signé → claim signature ; chaîne par ingredients. |
 | `reclaim-security-faq.html` | *Is Reclaim Secure?* — FAQ sécurité officielle, blog.reclaimprotocol.org (page mutable — copie du 2026-07-30) | oui (fetch du 2026-07-30 ; « only protection against fake proofs » vérifié par grep, 2 occurrences) | un attestor compromis ne peut pas lire les données (TLS de bout en bout) mais **peut forger des preuves** — « The only protection against fake proofs here is decentralisation or self-hosting of the attestor » ; BGP surveillé via RIPE RIS, connexion coupée si reroutage suspect ; modèle à attestor unique (la décentralisation est une mitigation évoquée, pas l'architecture). |
 | `reclaim-attestor-core-readme.html` | README du dépôt reclaimprotocol/attestor-core (« witness server ») — copie du 2026-07-30 | non lu au-delà du fetch de recherche | aucune citation ne s'appuie dessus |
+| `eckhardt-lee-1985-tm86369.pdf` | Page de titre lue le 2026-07-30 : Eckhardt & Lee, *A Theoretical Basis for the Analysis of Redundant Software Subject to Coincident Errors*, NASA Technical Memorandum 86369, janv. 1985, Langley (NTRS 19850015006). Version mémorandum du papier IEEE TSE SE-11(12):1511-1517 (1985) — le tiré IEEE n'est pas détenu. | pp. 1-2 (titre, summary) | Vérifiée au texte p. 2 : la fonction centrale « intensity of coincident errors » — « the propensity of a population of programmers to introduce design faults in such a way that software components fail together when executing in the user environment » ; hypothèses (i) composants choisis en échantillon aléatoire, (ii) série d'entrées stationnaire. **À lire : le modèle formel (corps) avant de citer une inégalité.** |
 
 ## Dettes de registre
 
@@ -27,9 +28,11 @@ les PDFs sur lectures visuelles).
    ne doit pas être citée par numéro de page depuis cette copie.
 
 2. ~~Pages de titre des deux PDFs compagnons~~ — **fermée le 2026-07-30**
-   (entrées mises à jour). Reste : la venue du « Reply » (SEN 15(1), 1990)
-   est un relevé web, à vérifier sur l'artefact/DOI avant citation
-   formelle.
+   (entrées mises à jour). Venue du « Reply » : deux fiches web
+   concordantes (ACM DL, DOI 10.1145/382294.382710 : SIGSOFT SEN 15(1),
+   janv. 1990, pp. 24-35) — la page DOI elle-même refuse le fetch
+   automatisé (403) ; résidu minime : contrôle visuel de la fiche avant
+   citation formelle dans une publication.
 
 3. ~~Artefact primaire Reclaim~~ — **fermée le 2026-07-30** (FAQ sécurité
    + README attestor-core détenus, voir les entrées). Restes : le

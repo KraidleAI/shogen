@@ -13,10 +13,17 @@ tracées, mémoire projet (memstack, groupe Shogen).
 
 **Critère de sortie** : les trois dettes de lecture sont fermées —
 (a) ~~K&L §6-8 lu~~ — fait le 2026-07-30 (INDEX ; récolte dans 04 §6.4) ;
-(b) DECO lu au modèle de menace — partiel : pp. 1-2 lues, le modèle formel
-    (§3-4) reste dû ;
-(c) venue du « Reply » — relevée par web (SEN 15(1), 1990), vérification
-    sur artefact/DOI restant due.
+(b) ~~DECO lu au modèle de menace~~ — fait le 2026-07-30 (INDEX : §3 lu,
+    adversaire statique malveillant, propriétés, et le renvoi « multiple
+    oracles … majority agreement » qui nomme le gap de Shōgen dans le
+    papier fondateur du champ) ;
+(c) ~~venue du « Reply »~~ — fait le 2026-07-30 (deux fiches concordantes,
+    DOI 10.1145/382294.382710 ; résidu minime tracé à l'INDEX).
+
+**→ S0 CLOS le 2026-07-30.** Bonus de passe : Eckhardt & Lee détenu
+(TM-86369, NTRS) avec le concept central pour R1 — l'« intensity of
+coincident errors » comme fonction de l'environnement d'entrée ;
+Littlewood & Miller 1989 introuvable en accès libre → `WISHLIST.md`.
 → *Oui/non : chaque entrée d'INDEX.md citée par une spec porte « lu » sur
 la section citée.*
 
