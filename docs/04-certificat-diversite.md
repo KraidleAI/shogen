@@ -54,6 +54,9 @@ ans, détenu, au lieu d'une méthode inventée) :
   de l'enveloppe des autres au-delà du seuil de classe).
 - Sous indépendance, le nombre K de fenêtres à écarts multiples suit la
   binomiale de K&L §5 (P_more, approximation normale, statistique z).
+  **Le test agrégé suppose A(window-stationarity)** — l'hypothèse (ii)
+  d'Eckhardt & Lee (« stationary input series ») transposée aux fenêtres
+  d'une classe de faits ; elle est écrite dans chaque certificat R1.
 - Le certificat R1 publie : n, K, z, la définition d'écart utilisée, et la
   fenêtre d'historique. **Un z élevé ne « prouve » pas la dépendance d'une
   paire précise — il rejette le modèle d'indépendance du pool**, exactement
@@ -142,11 +145,14 @@ dès la v1 (chacun → corpus de classes d'attaque, le geste Kraidle) :
   certificat fixe la fenêtre par politique de classe, pas par émetteur.
 - **Gonflement de k nominal** : sans effet — seul k_eff est publié en tête.
 
-**[À décider]** : le certificat est-il émis par Shōgen (centralisé, résidu
-A(shogen-mesure) à nommer) ou recalculable par le vérificateur offline
-depuis les témoignages R2 embarqués ? La seconde option est la seule
-cohérente avec « sans confiance dans Shōgen » — son coût (volume du lot)
-est l'objet de l'ADR.
+~~[À décider] : certificat émis ou recalculable ?~~ — **tranché par
+ADR-0003** (2026-07-30) : **recalculable** par le vérificateur offline
+depuis les témoignages embarqués ; la signature de Shōgen n'est qu'un
+cache, jamais une racine de confiance. La branche « émis » est morte, et
+avec elle le résidu A(shogen-mesure) qu'elle aurait exigé — il n'est
+créé nulle part. Le résidu réellement créé par la décision est
+**A(history-integrity)** (`08-assumptions.md`). Coût assumé : volume du
+lot, à dimensionner en S4.
 
 ## 6. Dettes de cette spec
 

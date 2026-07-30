@@ -42,15 +42,16 @@ transposée.
 ## 2. Le résidu par transport — des hypothèses nommées, jamais fusionnées
 
 Chaque transport importe un résidu distinct, documenté par ses propres
-sources, et le témoignage le porte par référence. Registre initial
-(chaque entrée à développer au format A(...) avec niveau d'assurance et
-condition de décharge) :
+sources, et le témoignage le porte par référence. **Le registre qui fait
+foi est `08-assumptions.md`** (format A(...) complet : assurance, sites
+porteurs, condition de décharge) ; la table ci-dessous en est le rappel
+au point d'usage :
 
 | transport | résidu (hypothèse nommée) | source du résidu (détenue) |
 |---|---|---|
 | `tlsn-mpc` | A(notary-neutrality) : la preuve vaut envers un vérificateur désigné ; s'il n'a pas conduit le MPC lui-même, il doit « trust in the notary's neutrality » | FAQ TLSNotary, grep vérifié |
 | `proxy-witness` | A(attestor-honesty) : un attestor compromis ne lit pas les données mais **peut forger des preuves** — « The only protection against fake proofs here is decentralisation or self-hosting of the attestor » | FAQ sécurité Reclaim, copie du 2026-07-30 |
-| `tee-*` | A(enclave-integrity) : l'attestation vaut ce que vaut l'enclave et sa chaîne d'attestation | à documenter (littérature TEE, dette) |
+| `tee-*` | A(enclave-integrity) : l'attestation vaut ce que vaut l'enclave et sa chaîne d'attestation | DECO §3.1 (détenu, lu) : « If a single TEE is broken, TLS session content, including user credentials, can leak » |
 | `source-sig` | A(source-key) : la clé de la source est la bonne et n'est pas compromise | à documenter |
 
 **Règle transposée de Kraidle (les trois latences, RFC 5280 §3.3)** : les
@@ -77,9 +78,13 @@ typeur.
 
 ## 4. Ce qu'un vérificateur offline vérifie (cible)
 
-Pour un témoignage isolé : (1) le `transport_proof` se vérifie avec l'outil
-du transport contre les clés épinglées de `attestor` ; (2) le hash de
-`utterance` correspond ; (3) le `residual` résout dans le registre publié.
+Pour un témoignage isolé : (1) le `transport_proof` se vérifie avec
+l'outil du transport contre les clés épinglées de `attestor` — **et pour
+les transports à vérificateur participant (MPC, 3P-handshake), cette
+étape n'a de valeur pour un tiers que sous A(verifier-designation)** : ce
+que le tiers vérifie alors est la signature du participant, pas le
+transport ; (2) le hash de `utterance` correspond ; (3) le `residual`
+résout dans le registre publié.
 Le verdict du vérificateur nomme le résidu : « témoignage valide **sous
 A(attestor-honesty)** » — jamais « témoignage vrai ».
 

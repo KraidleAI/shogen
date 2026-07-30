@@ -80,8 +80,21 @@ support.
 **État au 2026-07-30** : livré — registre `08-assumptions.md` (9 entrées,
 transport + couche), ADR-0002/0003/0004/0005 acceptées (DECISIONS.md),
 vocabulaire interdit `09-vocabulaire.md` (11 entrées propres + héritées),
-amendements portés dans 03 §5 et 04 §1/§4. Reste pour clore S1 : la passe
-d'audit de sortie (le critère est l'audit, pas l'existence des fichiers).
+amendements portés dans 03 §5 et 04 §1/§4.
+
+**S1 NON CLOSE — audit de sortie partiel.** La passe d'audit a été
+interrompue par une limite d'usage : **1 dimension sur 3 a rendu**
+(cohérence des registres — 6 trouvailles, toutes vérifiées à la main par
+le mainteneur-agent et **toutes corrigées** le 2026-07-30 : fermeture
+non portée de 04 §5 + identifiant mort A(shogen-mesure), trois
+« registres touchés » périmés, deux assumptions non citées à leur site,
+localisations Chainlink v1 non vérifiées, 03 §2 périmé, 4ᵉ référence
+inter-projets omise). **Les deux dimensions manquantes n'ont jamais
+tourné** : (a) fidélité des citations des ADR-0002..0005 aux artefacts
+détenus, (b) le projet contrôlé contre son propre vocabulaire interdit.
+Tant qu'elles n'ont pas tourné, le critère de sortie de S1 n'est **pas**
+satisfait — et rien de S1 ne doit être cité comme audité sur ces deux
+axes. À relancer dès que le budget le permet.
 
 ## S2 — Le prototype qui tranche *(code, premier)*
 

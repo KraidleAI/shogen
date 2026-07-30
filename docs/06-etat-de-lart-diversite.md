@@ -77,11 +77,13 @@ vérifié par le balayage ; quiconque relance la recherche retombera dessus).
 
 ## 4. Les renforts — le problème est reconnu, l'instrument absent
 
-- **Chainlink whitepaper v1 (2017, détenu, p.1 lue)** : nomme l'attaque
-  par *mirroring* et annonce en travaux futurs la cartographie de
-  l'indépendance des sources — **jamais réalisée en neuf ans** (angle
-  vide : le recouvrement des agrégateurs par feed n'est mesuré nulle part ;
-  Chaos Labs Pt.4 (lead) constate que l'ensemble n'est même pas publié).
+- **Chainlink whitepaper v1 (2017, détenu, §4.1 p. 11 et §5.3 p. 19 lues
+  au texte)** : nomme l'attaque par *mirroring* (§5.3), donne l'amont
+  commun en exemple et annonce en travaux futurs « mapping and reporting
+  the independence of data sources » (§4.1) — **jamais réalisée en neuf
+  ans** (angle vide : le recouvrement des agrégateurs par feed n'est
+  mesuré nulle part ; Chaos Labs Pt.4 (lead) constate que l'ensemble
+  n'est même pas publié).
 - **Sevim & Torres 2026 (détenu, p.1 lue)** : la mesure du phénomène
   exact — des DONs « indépendants » consomment « largely identical
   off-chain price data nearly simultaneously », fenêtres d'exploitation

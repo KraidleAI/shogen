@@ -16,7 +16,7 @@
 | A(attestor-honesty) | L'attestor d'un transport proxy-witness ne forge pas de preuves | FAQ sécurité Reclaim (détenue) : un attestor compromis « peut forger des preuves » ; « The only protection … is decentralisation or self-hosting » | 03 §2 | aucune | self-hosting par le client, ou multi-attestor (ADR-0004 : k témoignages, l'ensemble d'attestors entre dans les observables R2) | aucune |
 | A(enclave-integrity) | L'enclave d'un transport TEE et sa chaîne d'attestation sont intègres | DECO §3.1 (détenu, lu) : « If a single TEE is broken, TLS session content, including user credentials, can leak » | 03 §2 | aucune | hors de portée de Shōgen (matériel) ; l'atténuation est la diversité de transports dans le lot | aucune |
 | A(source-key) | Pour un transport `source-sig`, la clé publiée par la source est la bonne et n'est pas compromise | à documenter — aucun artefact détenu ne porte ce résidu précis (transparence de clés : littérature à fetcher au moment du premier adapter `source-sig`) | 03 §2 | aucune | journal de transparence ou épinglage multi-canal — au premier adapter concerné | aucune |
-| A(verifier-designation) | La preuve d'un transport à vérificateur participant (3P-handshake DECO, notaire TLSNotary) vaut envers ce participant ; sa transmission à un tiers repose sur la signature du participant, pas sur le transport | DECO §3.4 (détenu, lu) : clés de session secret-partagées entre P et V ; FAQ TLSNotary : vérificateur désigné | 03 §4 (ce que le vérificateur de lot vérifie réellement) | aucune | transports à preuve publiquement vérifiable (zk), ou le participant signe comme attestor et son résidu devient A(attestor-honesty) | aucune |
+| A(verifier-designation) | La preuve d'un transport à vérificateur participant (3P-handshake DECO, notaire TLSNotary) vaut envers ce participant ; sa transmission à un tiers repose sur la signature du participant, pas sur le transport | DECO §3.4 (détenu, lu) : clés de session secret-partagées entre P et V ; FAQ TLSNotary : vérificateur désigné | 03 §4, point (1) — citée au site depuis le 2026-07-30 | aucune | transports à preuve publiquement vérifiable (zk), ou le participant signe comme attestor et son résidu devient A(attestor-honesty) | aucune |
 
 ## Résidus de couche (Shōgen lui-même)
 
@@ -24,7 +24,7 @@
 |---|---|---|---|---|---|---|
 | A(typer-correctness) | Le typeur extrait du dire brut le fait annoncé (classe, valeur, unité) sans erreur de sens | 03 §3 — le typeur est un adapter, testé jamais prouvé | tout fait typé ; verdicts | tested (à venir : compte d'itérations par typeur, S3) | n'est jamais déchargée — bornée par tests + identité du typeur dans le fait | aucune |
 | A(axis-coverage) | Les axes R2 mesurés couvrent les modes communs *dominants* du pool ; un mode commun hors axes reste possible | 04 §4.1 (K&L appliqué à nous-mêmes) ; le signal « co-défaillance non expliquée par les axes » (04 §3) existe précisément parce qu'elle peut être fausse | tout certificat ; k_eff | aucune (par construction indéchargeable en général) | jamais totalement ; R1 la *teste* en continu (z élevé + partition propre = axes insuffisants, motif de refus) | aucune |
-| A(window-stationarity) | Les fenêtres d'observation R1 d'une classe de faits sont comparables — le processus d'entrée est suffisamment stationnaire pour que le test agrégé ait un sens | Eckhardt & Lee, TM-86369 (détenu, summary lu) : hypothèse (ii), « the system is required to execute on a stationary input series » — le même postulat, hérité et nommé | 04 §2 (le test R1) | aucune | stratification des fenêtres par régime (calme/stress) quand S2 aura mesuré ; jusque-là l'hypothèse est écrite dans chaque certificat R1 | aucune |
+| A(window-stationarity) | Les fenêtres d'observation R1 d'une classe de faits sont comparables — le processus d'entrée est suffisamment stationnaire pour que le test agrégé ait un sens | Eckhardt & Lee, TM-86369 (détenu, summary lu) : hypothèse (ii), « the system is required to execute on a stationary input series » — le même postulat, hérité et nommé | 04 §2 (le test R1) — citée au site depuis le 2026-07-30 | aucune | stratification des fenêtres par régime (calme/stress) quand S2 aura mesuré ; jusque-là l'hypothèse est écrite dans chaque certificat R1 | aucune |
 | A(history-integrity) | L'historique de co-défaillances sur lequel R1 calcule n'a pas été altéré ni sélectionné (fenêtre de complaisance exclue par politique de classe — 04 §5) | 04 §5 (surface de jeu du certificat) | tout certificat R1 | aucune | l'historique est lui-même un lot de témoignages datés — la décharge est récursive et partielle, à spécifier en S4 | aucune |
 
 ## Notes de registre
@@ -32,10 +32,12 @@
 1. **Aucune entrée D** pour l'instant : les énoncés de déploiement
    n'existeront qu'avec du code déployable (S3+). Le registre les
    accueillera au même rang, sans les confondre avec les A(...).
-2. RFC 8949 (CBOR) et RFC 9052 (COSE), porteuses d'ADR-0002, sont
-   détenues **dans la biblio Kraidle** (avec sidecar pour 9052) — même
-   situation de référence croisée que le Lemme 8 (INDEX, dette 5) ; la
-   décision copie-locale vs référence inter-projets couvre les trois.
+2. **Quatre références inter-projets**, toutes détenues côté Kraidle et
+   absentes du registre Shōgen : RFC 8949 (CBOR) et RFC 9052 (COSE),
+   porteuses d'ADR-0002 ; le Lemme 8 de Chainlink OCR (INDEX, dette 5) ;
+   et **RFC 5280 §3.3**, invoquée par 03 §2 pour la règle des latences
+   par mécanisme. La décision copie-locale vs référence croisée porte sur
+   les quatre — pas trois (corrigé le 2026-07-30, audit S1).
 3. La règle de rédaction : citer la feuille, pas le parapluie — un site
    qui ne dépend que d'A(attestor-honesty) ne cite pas « les résidus de
    transport » en bloc.

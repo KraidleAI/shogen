@@ -75,8 +75,9 @@ revendique la provenance, pas la vérité. La couche au-dessus est vacante.
 
 ### Registres touchés
 
-Crée le besoin des registres : assumptions par transport (à ouvrir avec la
-vision), forme canonique de témoignage (spec à venir).
+Crée le besoin des registres : assumptions par transport et forme
+canonique de témoignage — **ouverts le 2026-07-30** :
+`08-assumptions.md` (le registre qui fait foi) et `03-temoignage.md`.
 
 ---
 
@@ -198,11 +199,17 @@ projet reproche aux DONs (indépendance intra-objet postulée). Rejetée.
 
 ### La source qui tranche
 
-Reclaim (détenu) : l'architecture réelle du champ est à attestor unique,
-la décentralisation étant « une mitigation évoquée, pas l'architecture » —
-la forme à un attestor est le cas natif des transports. Et la leçon
-mirroring (Chainlink v1, détenu) : toute agrégation dont les membres ne
-sont pas comptés dans la diversité est une façade possible.
+Reclaim (détenu, grep) : l'architecture réelle du champ est à attestor
+unique, la décentralisation n'étant qu'une parade évoquée — « The only
+protection against fake proofs here is decentralisation or self-hosting
+of the attestor » ; la forme à un attestor est le cas natif des
+transports. Et le *mirroring* du whitepaper Chainlink v1 (détenu, §5.3
+p. 19 lue au texte le 2026-07-30) : « a Sybil attacker can adopt a
+behavior called *mirroring*, in which it causes oracles to send
+individual responses based on data obtained from a *single data-source
+query* … misbehaving oracles may share data off-chain but pretend to
+source data independently » — toute agrégation dont les membres ne sont
+pas comptés dans la diversité est une façade possible.
 
 ### Ce que la décision coûte
 
@@ -212,8 +219,8 @@ témoignage porte la sienne) ; k attestations = k artefacts de preuve
 
 ### Registres touchés
 
-03 §5.3 : fermé. 04 : les attestors deviennent un axe R2 explicite
-(amendement à porter à la prochaine édition de 04).
+03 §5.3 : fermé. 04 §1 (ligne R2) : les attestors sont un axe R2
+explicite — **porté le 2026-07-30**.
 
 ---
 
@@ -260,5 +267,5 @@ et vie privée par classe à spécifier en S2/S4.
 
 ### Registres touchés
 
-03 §5.4 : fermé. 04 §4.4 : la liste des entrées rédigées rejoint le
-périmètre embarqué du certificat (amendement à porter).
+03 §5.4 : fermé. 04 §4, item 5 : la liste des entrées rédigées est au
+périmètre embarqué du certificat — **porté le 2026-07-30**.
