@@ -77,6 +77,12 @@ pas pour S1-S4.
 mutatis mutandis) passe sur l'ensemble docs/ sans trouver de claim sans
 support.
 
+**État au 2026-07-30** : livré — registre `08-assumptions.md` (9 entrées,
+transport + couche), ADR-0002/0003/0004/0005 acceptées (DECISIONS.md),
+vocabulaire interdit `09-vocabulaire.md` (11 entrées propres + héritées),
+amendements portés dans 03 §5 et 04 §1/§4. Reste pour clore S1 : la passe
+d'audit de sortie (le critère est l'audit, pas l'existence des fichiers).
+
 ## S2 — Le prototype qui tranche *(code, premier)*
 
 Pas le produit — l'instrument de mesure. Un harnais R1/R2 sur données

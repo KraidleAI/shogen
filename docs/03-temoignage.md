@@ -88,15 +88,16 @@ liste des résidus, et le **certificat de diversité** — spécifié dans un
 document séparé, car il a son propre appareil (les axes mesurés, la leçon
 Knight & Leveson §4 : un axe déclaré n'est pas un axe protecteur).
 
-## 5. [À décider] — matière des prochains ADRs
+## 5. [À décider] — état au 2026-07-30 (S1)
 
-1. Encodage concret (CBOR déterministe ? le précédent COSE/C2PA à
-   examiner) et canonicalisation de `subject`.
-2. Le registre des résidus : format A(...) complet, niveaux, conditions de
-   décharge.
-3. Multi-attestor : Reclaim documente un attestor unique ; un témoignage
-   Shōgen à k attestors du même transport est-il un objet (co-signatures)
-   ou k témoignages agrégés plus haut ? [pèse sur le certificat de
-   diversité]
-4. La politique de rétention des octets bruts (`utterance` complète vs
-   hash + extraction — vie privée vs rejouabilité).
+1. ~~Encodage concret~~ — **tranché par ADR-0002** : CBOR déterministe
+   (RFC 8949) + COSE (RFC 9052), précédent C2PA vérifié au fichier.
+   **Reste ouvert** : la canonicalisation de `subject` (sous-décision
+   explicitement non réglée par l'ADR).
+2. ~~Le registre des résidus~~ — **fait** : `08-assumptions.md` (v1), les
+   identifiants du §2 y résolvent tous.
+3. ~~Multi-attestor~~ — **tranché par ADR-0004** : k témoignages agrégés
+   au-dessus ; les attestors deviennent un axe R2 du certificat.
+4. ~~Rétention~~ — **tranché par ADR-0005** : hash toujours, octets par
+   politique de classe, rédaction possible et déclarée (précédent DECO
+   §3.4.3, selective opening).

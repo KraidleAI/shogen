@@ -35,7 +35,7 @@ rangs, du plus fort au plus faible — et le rang fait partie du certificat :
 | rang | nature | exemple | ce que ça vaut |
 |---|---|---|---|
 | **R1 — co-défaillance mesurée** | historique observé des défaillances conjointes des sources (pannes, valeurs aberrantes, staleness simultanées), testé contre le modèle d'indépendance | « sur n fenêtres, K co-défaillances ; z = … » | la seule mesure qui teste réellement la conjecture — c'est le test de K&L §5 lui-même, transposé aux sources |
-| **R2 — observable d'infrastructure** | recouvrements constatables au moment du quorum : ASN/hébergeur, CDN, émetteur de certificat, dépendance amont détectée (deux « sources » servant les octets du même agrégateur) | « src3 et src7 : même ASN ; corrélation de contenu à 0,999 sur 30 j » | borne les modes communs *visibles dans ces axes* ; ne teste pas la conjecture |
+| **R2 — observable d'infrastructure** | recouvrements constatables au moment du quorum : ASN/hébergeur, CDN, émetteur de certificat, dépendance amont détectée (deux « sources » servant les octets du même agrégateur), **et les attestors des témoignages** (ADR-0004 : le même attestor derrière deux témoignages est un mode commun), la *méthode* commune (même estimateur ou logique d'agrégation amont — récolte K&L §6, cf. §6.4) | « src3 et src7 : même ASN ; corrélation de contenu à 0,999 sur 30 j » | borne les modes communs *visibles dans ces axes* ; ne teste pas la conjecture |
 | **R3 — déclaration** | entité légale, juridiction, méthodologie annoncée | « opérateurs distincts (déclaré) » | aucun poids protecteur propre — publié pour la traçabilité, jamais compté seul |
 
 **Règle de rédaction transposée du vocabulaire Kraidle** : une phrase sur la
@@ -124,6 +124,10 @@ Chaque certificat embarque, en clair, son périmètre :
 4. Les observables R2 sont eux-mêmes des témoignages (une mesure d'ASN, une
    corrélation de contenu) avec leurs transports et leurs résidus — le
    certificat cite les siens.
+5. Les entrées **rédigées** (ADR-0005) sont listées : une utterance
+   rédigée est exclue de la corrélation de contenu, donc l'axe
+   amont-commun de son témoignage est non mesuré — A(axis-coverage)
+   s'élargit d'autant, visiblement.
 
 ## 5. Résistance au jeu — le certificat comme cible
 
