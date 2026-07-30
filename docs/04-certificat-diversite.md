@@ -68,6 +68,24 @@ certificat R1 soit émissible (en dessous : le certificat dit « historique
 insuffisant », jamais un z non significatif présenté comme une absence de
 dépendance).
 
+**La forme statistique mûre du R1 est déjà publiée** (Littlewood & Miller,
+IEEE TSE 15(12), 1989 — détenu, lu pp. 1596-1604) : l'écart à
+l'indépendance de deux composants est exactement Var(Θ) dans le cas d'une
+« méthodologie » unique (éq. 14-16), et entre deux méthodologies le
+facteur d'élévation conditionnel est 1 + Corr(Θ_A,Θ_B)·CV(Θ_A)·CV(Θ_B)
+(éq. 28) — la corrélation des fonctions de difficulté *est* la mesure du
+degré de dépendance. Le R1 de Shōgen peut donc publier, au-delà du z de
+K&L, l'estimée de Corr entre paires de sources ; et L&M p. 1601 ouvre une
+possibilité que le certificat doit savoir exprimer : **Cov < 0 existe** —
+un pool anti-corrélé fait *mieux* que l'indépendance. Nuance apportée par
+leur ré-analyse des données K&L en deux méthodologies (p. 1603) : l'axe
+deux-écoles, que K&L §4 montrait non-protecteur au sens « toutes les
+fautes communes traversaient les deux écoles », *réduisait* néanmoins la
+probabilité de co-échec en espérance (ρ = 0,1808 ; 10,944e-6 contre
+12,963e-6 en tirage aléatoire) — un axe déclaré peut porter un poids
+réel, mais **seule la mesure le convertit en évidence**, ce qui est
+précisément la thèse des rangs.
+
 ## 3. Le quorum effectif k_eff
 
 Le chiffre de tête du certificat. Principe : **des sources indistinguables

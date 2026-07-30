@@ -6,16 +6,10 @@ pourquoi il est nécessaire, et où il se trouve derrière paywall.
 
 ## Priorité 1 — bloque R-1
 
-- [ ] **Littlewood & Miller, *Conceptual Modeling of Coincident Failures
-  in Multiversion Software*, IEEE Transactions on Software Engineering
-  15(12):1596-1614, décembre 1989.** DOI : `10.1109/32.58771`.
-  Pourquoi : la seconde suite théorique de Knight & Leveson — le modèle de
-  **diversité forcée** (méthodologies distinctes délibérées) et la dualité
-  choix-d'entrée / choix-de-programme. C'est le fondement théorique le
-  plus proche du certificat de diversité (axes *choisis* pour casser la
-  corrélation) ; R-1 ne peut pas conclure sans lui.
-  Où : IEEE Xplore (`ieeexplore.ieee.org/document/58771`), ACM DL,
-  ProQuest. NTRS a la fiche (19900036555) mais **sans** PDF.
+- [x] ~~**Littlewood & Miller, IEEE TSE 15(12):1596-1614, déc. 1989**~~ —
+  **apporté par le mainteneur le 2026-07-30** (tiré journal authentique),
+  enregistré `biblio/littlewood-miller-1989-tse.pdf`, lu pp. 1596-1604,
+  citations vérifiées à l'INDEX. R-1 n'est plus bloquée.
 
 ## Priorité 2 — utiles, non bloquants
 
