@@ -6,8 +6,11 @@
 
 ## 0. Ce que le certificat remplace
 
-Les quorums existants comptent des signatures et **postulent** l'indépendance
-des signataires. Le postulat a un nom dans la littérature adverse elle-même :
+Les architectures de quorum recensées dans la passe web du 2026-07-30
+(01-precedents §3) reposent sur une indépendance des signataires qu'elles
+ne mesurent pas — même la plus explicite détenue, Chainlink OCR, **nomme**
+son postulat (≤ f fautifs, le modèle du Lemme 8) sans le mesurer. Le
+postulat a un nom dans la littérature adverse elle-même :
 Avizienis l'appelle « the fundamental conjecture of the NVP approach »
 (cité dans le Reply détenu, p. 1). Et il a une réfutation expérimentale
 détenue et lue au texte : Knight & Leveson, 27 versions, un million de
@@ -132,5 +135,14 @@ est l'objet de l'ADR.
    metrics, oracle independence, N-version).
 2. Les définitions d'écart par classe (§2) et la relation k_eff/f (§3).
 3. Le corpus d'attaques du certificat (§5) au format classes numérotées.
-4. Lecture au texte de K&L §6-8 (l'analyse des fautes corrélées — pages
-   non lues) : la taxonomie des fautes communes peut informer les axes R2.
+4. ~~Lecture au texte de K&L §6-8~~ — **fait le 2026-07-30** (INDEX, entrée
+   K&L : pp. fichier 10-25). Récolte pour les axes : les fautes corrélées
+   venaient de *méconceptions partagées* (§6 — quatre versions sur
+   vingt-sept ont fait la même hypothèse fausse sur la comparaison de
+   cosinus), « approximately one half of the total software faults found
+   involved two or more programs » (§8), et le mandat du certificat est
+   dans la conclusion même : les concepteurs matériels « use sophisticated
+   techniques to determine common failure modes and systematically alter
+   their designs » (§8). Conséquence pour R2 : la *méthode* commune (même
+   estimateur, même logique d'agrégation amont) est un axe candidat au
+   même titre que l'infrastructure.

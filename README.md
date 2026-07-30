@@ -12,10 +12,13 @@ témoignage est une déposition, pas une vérité.
 ## Le produit en une phrase (hypothèse de travail, non figée)
 
 Une couche qui transforme les réponses du monde (APIs, flux, pages) en
-**faits signés, datés, à provenance traçable**, agrégés par **quorums dont la
-diversité est mesurée** (infrastructures, juridictions, dépendances), et
-livrés dans un vocabulaire qu'un noyau de décision — Kraidle en premier —
-peut consommer, avec vérification offline du lot de faits par un tiers.
+**témoignages attestés, typés en faits datés à provenance traçable**
+(l'attestation couvre les octets ; le typage est un adapter identifié —
+03 §3), agrégés par **quorums dont la diversité est mesurée sur ses axes
+observables** (infrastructure, dépendances amont) **et seulement déclarée
+sur les autres** (juridiction, opérateur), rangs publiés (04 §1), et livrés
+dans un vocabulaire qu'un noyau de décision — Kraidle en premier — peut
+consommer, avec vérification offline du lot par un tiers.
 
 ## La relation à Kraidle
 
@@ -32,10 +35,16 @@ peut consommer, avec vérification offline du lot de faits par un tiers.
 ## État du projet
 
 - 2026-07-30 : création. Trois idées candidates enregistrées
-  (`docs/00-idees.md`), Shōgen retenue. Première passe de précédents
-  effectuée (`docs/01-precedents.md`) — conclusion principale : le primitif
-  de transport (zkTLS) est mûr et ne doit pas être reconstruit ; le gap est
-  la couche sémantique/quorum/diversité au-dessus.
+  (`docs/00-idees.md`), Shōgen retenue. Passe librarian exécutée
+  (`docs/01-precedents.md`, `biblio/INDEX.md` — 8 artefacts) ; conclusion
+  principale : le primitif de transport (zkTLS) est mûr et ne doit pas être
+  reconstruit (ADR-0001, `docs/DECISIONS.md`) ; le gap est la couche
+  sémantique/quorum/diversité au-dessus. Écrits le même jour : vision
+  (`02`), forme canonique de témoignage (`03`), certificat de diversité
+  (`04`), roadmap S0–S5 (`05`), plan DevOps (`DEVOPS.md`). Dépôt
+  `Kraidle/shogen` créé (privé), commit fondateur signé. Un audit
+  documentaire multi-agents (22 trouvailles confirmées) a été appliqué le
+  même jour — ce texte en intègre les corrections.
 
 ## Discipline
 

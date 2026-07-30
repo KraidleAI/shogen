@@ -12,9 +12,11 @@ certificat de diversité (04), biblio 8 artefacts + INDEX avec dettes
 tracées, mémoire projet (memstack, groupe Shogen).
 
 **Critère de sortie** : les trois dettes de lecture sont fermées —
-(a) K&L §6-8 lu (taxonomie des fautes corrélées → axes R2) ;
-(b) DECO lu au modèle de menace (pas seulement l'abstract) ;
-(c) venue exacte du « Reply » confirmée.
+(a) ~~K&L §6-8 lu~~ — fait le 2026-07-30 (INDEX ; récolte dans 04 §6.4) ;
+(b) DECO lu au modèle de menace — partiel : pp. 1-2 lues, le modèle formel
+    (§3-4) reste dû ;
+(c) venue du « Reply » — relevée par web (SEN 15(1), 1990), vérification
+    sur artefact/DOI restant due.
 → *Oui/non : chaque entrée d'INDEX.md citée par une spec porte « lu » sur
 la section citée.*
 
@@ -48,7 +50,13 @@ verdict et artefacts fetchés dans `biblio/`.
    majeur de 04 — la cohérence avec « sans confiance dans Shōgen » penche
    pour recalculable ; l'ADR paie le coût en volume de lot).
 4. Vocabulaire interdit v1 (déjà amorcé : « quorum de k sources diverses »
-   sans rangs ; « donnée vérifiée » ; « prix garanti correct »).
+   sans rangs ; « donnée vérifiée » ; « prix garanti correct » ; « fait
+   signé » — l'attestation couvre les octets, le typage est un adapter).
+5. ADR-0004 : multi-attestor — un témoignage à k attestors est-il un objet
+   (co-signatures) ou k témoignages agrégés plus haut (03 §5, item 3 ;
+   pèse sur le certificat de diversité).
+6. ADR-0005 : politique de rétention des octets bruts — utterance complète
+   vs hash + extraction (03 §5, item 4).
 
 **Critère** : les quatre documents existent et l'auditor (skill Kraidle,
 mutatis mutandis) passe sur l'ensemble docs/ sans trouver de claim sans

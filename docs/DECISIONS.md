@@ -54,12 +54,16 @@ revendique la provenance, pas la vérité. La couche au-dessus est vacante.
 
 ### Ce que la décision coûte
 
-- Une **hypothèse par transport**, au rang d'assumption nommée :
-  A(transport-tlsnotary), A(transport-tee), etc. — chacune avec le résidu
-  propre du mécanisme (neutralité du notaire, intégrité de l'enclave,
-  honnêteté du proxy). Shōgen hérite de ces résidus et doit les publier par
-  transport, jamais fusionnés — la règle des trois latences de Kraidle,
-  transposée.
+- Une **hypothèse par transport**, au rang d'assumption nommée — le
+  nommage est celui du registre de `03-temoignage.md` §2 :
+  A(notary-neutrality), A(attestor-honesty), A(enclave-integrity),
+  A(source-key) — chacune avec le résidu propre du mécanisme. Shōgen
+  hérite de ces résidus et doit les publier par transport, jamais
+  fusionnés — la règle des trois latences de Kraidle, transposée.
+  *(Amendement du 2026-07-30, même jour : la première rédaction nommait un
+  schéma provisoire A(transport-*) qui ne résolvait dans aucun registre —
+  trouvaille « identifiants morts » de l'audit documentaire ; remplacé
+  sans changer la décision.)*
 - La qualité des témoignages bruts est bornée par l'écosystème externe
   (couverture TLS 1.2/1.3, sources supportées).
 - Un travail d'interface : la forme canonique de témoignage que tous les

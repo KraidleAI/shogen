@@ -18,12 +18,14 @@ vérifiable **offline par un tiers** sans confiance dans Shōgen.
 
 **Une attestation prouve ce que la source a dit — jamais que la source dit
 vrai.** Cette distinction n'est pas une prudence de style : c'est la ligne
-que chaque précédent sérieux du domaine trace lui-même.
+que les quatre précédents détenus tracent eux-mêmes.
 
-- DECO (CCS '20, détenu) prouve « that a piece of data accessed via TLS
-  came from a particular website » — provenance, pas contenu de vérité.
+- DECO (CCS '20, détenu, abstract lu au fichier p. 1) prouve « that a
+  piece of data accessed via TLS came from a particular website » —
+  provenance, pas contenu de vérité.
 - TLSNotary (FAQ détenue) : « does not solve the "Oracle Problem" ».
-- C2PA 2.4 (spec détenue, §Trust Model) : les spécifications « SHOULD NOT
+- C2PA 2.4 (spec détenue, §1.2 Scope, citant les Guiding Principles —
+  localisation vérifiée par grep) : les spécifications « SHOULD NOT
   provide value judgments » — valider l'intégrité et l'association, jamais
   la bonté du contenu.
 - Chainlink OCR (détenu côté Kraidle, Lemme 8) : la médiane attestée « is
@@ -60,23 +62,32 @@ développées indépendamment depuis la même spécification, un million de
 tests, K = 1255 cas où plus d'une version échoue, statistique z = 100,51
 contre un seuil à 99 % de 2,33 — « we reject the null hypothesis with a
 confidence level of 99% … Thus, we reject this assumption » (§5).
-**L'hypothèse d'indépendance est empiriquement fausse même quand
-l'indépendance est organisée.** Et le détail qui fonde le certificat de
+**Dans la seule expérience de cette échelle, l'hypothèse d'indépendance a
+été rejetée à 99 % alors même que l'indépendance de développement était
+organisée** — et K&L bornent eux-mêmes la portée de leur résultat (§8, lu
+au texte) : « it is conditional on the application that we used », la
+généralisation exige d'autres expériences. Personne n'a mené l'équivalent
+sur des sources de données ; c'est précisément le vide que le certificat
+R1 instrumente. Et le détail qui fonde le certificat de
 diversité : l'axe organisé (deux universités) n'a rien protégé — « In the
 preliminary analysis of common faults, *all* were found to involve versions
 from both schools » (§4). Un axe de diversité *déclaré* n'est pas un axe
 *protecteur* ; seule la mesure des défaillances conjointes le dit — d'où le
-certificat. Quarante ans plus tard, les quorums
-d'oracles comptent des signatures et *postulent* l'indépendance des
-signataires — exactement l'axiome que l'expérience a tué, et exactement la
+certificat. Quarante ans plus tard, les architectures de quorum recensées
+dans la passe du 2026-07-30 (01-precedents §3) reposent sur une
+indépendance des signataires qu'elles ne mesurent pas — Chainlink OCR, le
+modèle le plus explicite détenu, *nomme* son postulat (≤ f fautifs, Lemme
+8) sans le mesurer davantage — l'axiome que K&L ont rejeté sur leur
+terrain, jamais testé sur celui-ci, et exactement la
 dette que Kraidle nomme A(indépendance des sources) sans pouvoir la
 décharger.
 
 Shōgen en fait son objet central : ne jamais postuler l'indépendance — la
-**mesurer**. Axes candidats (à spécifier, chacun devra être un observable et
-non un déclaratif) : infrastructure d'hébergement commune, dépendances amont
-communes (le même agrégateur derrière deux « sources »), juridiction,
-opérateur, méthode. Le certificat de diversité publie ce qui a été mesuré et
+**mesurer** là où elle est observable, et publier le rang de ce qui ne
+l'est pas (04 §1). Axes observables candidats : infrastructure
+d'hébergement commune, dépendances amont communes (le même agrégateur
+derrière deux « sources »), méthode commune. Axes déclaratifs, publiés
+sans poids protecteur propre : juridiction, opérateur. Le certificat de diversité publie ce qui a été mesuré et
 ce qui reste déclaratif — un quorum dont deux sources partagent un amont
 n'est pas un quorum de k, et le certificat le dit.
 

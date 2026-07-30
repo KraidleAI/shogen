@@ -130,6 +130,35 @@ mainteneur. Modèle et effort conformes à la règle absolue du 2026-07-29
    SHA.
 6. À S3 : passage public + attestations de build sur le vérificateur.
 
+## État d'exécution (2026-07-30)
+
+- `git init` fait, branche `main` ; premier commit **signé et vérifié**
+  (clé SSH ed25519 dédiée `~/.ssh/shogen_signing`, config locale au dépôt,
+  allowed-signers local en place).
+- Dépôt GitHub **privé** créé et poussé, puis **transféré vers le compte
+  `Kraidle`** (le compte de destination correct) : `Kraidle/shogen`.
+  Transfert initié le 2026-07-30 depuis `phoenixgoku00-cell` — **en
+  attente d'acceptation par le compte Kraidle** (notification GitHub/email,
+  délai 24 h). Le remote local pointe déjà sur
+  `https://github.com/Kraidle/shogen.git`. Après acceptation : soit
+  authentifier `gh` avec le compte Kraidle sur cette machine
+  (`gh auth login`), soit ajouter `phoenixgoku00-cell` comme collaborateur
+  — sans l'un des deux, les push suivants échoueront.
+- **Dette ouverte — protection de branche** : refusée par l'API (GitHub
+  Pro requis pour les dépôts privés du plan gratuit). Deux issues : passer
+  Pro, ou attendre le passage public à S3 où la protection devient
+  disponible ; d'ici là, la discipline de non-force-push est
+  comportementale, pas mécanique. À réévaluer à S3.
+- ~~Action mainteneur : clé de signature~~ — **fait le 2026-07-30** : clé
+  `shogen-signing` posée sur le compte Kraidle (via Chrome, autorisation
+  explicite du mainteneur), et **identité git du dépôt basculée** sur
+  `Kraidle <309500047+Kraidle@users.noreply.github.com>` (GitHub rattache
+  la vérification à l'email du commit — l'email personnel appartient à
+  l'autre compte, d'où un premier `unknown_key`). Commit fondateur amendé,
+  re-signé, re-poussé : **`3d54450`, `verified: true — reason: valid`**
+  confirmé par l'API. L'ancien hash `43e7f9f` n'existe plus (forced update
+  avant toute autre histoire).
+
 ## Décisions qui vous appartiennent
 
 - Nom/organisation GitHub du dépôt (`shogen` sous votre compte ? une org

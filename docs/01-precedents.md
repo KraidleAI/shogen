@@ -5,11 +5,13 @@
 > décision structurante est prise (ADR-0001, `DECISIONS.md`), la vision est
 > écrite (`02-vision.md`). Les dettes restantes sont listées dans l'INDEX.
 
-> **Statut.** Passe de reconnaissance web (recherches du 2026-07-30), au
-> standard « lead » et non « source » : rien ici n'a encore été ouvert au
-> texte ni fetché en `biblio/`. Chaque affirmation ci-dessous doit repasser
-> par le protocole complet (fetch, page de titre, sidecar, grep) avant de
-> porter une décision. Les absences revendiquées portent le périmètre de
+> **Statut initial (conservé pour trace — antérieur à la mise à jour
+> ci-dessus).** Passe de reconnaissance web (recherches du 2026-07-30), au
+> standard « lead » et non « source ». Depuis la mise à jour du même jour,
+> les éléments détenus et vérifiés sont enregistrés dans
+> `../biblio/INDEX.md`, qui fait foi ; le statut « lead » ne couvre plus
+> que ce qui n'y figure pas (zkPass, Opacity, vlayer, les arXiv cités, les
+> chiffres vendeur). Les absences revendiquées portent le périmètre de
 > cette recherche seulement.
 
 ## 1. La découverte qui recadre le projet
@@ -19,8 +21,10 @@ zkTLS (« web proofs ») est passé des papiers aux SDKs :
 
 - **TLSNotary** — pionnier open source de l'approche MPC
   ([crypto.news](https://crypto.news/what-is-zktls-web-proofs-explained/)).
-- **Reclaim Protocol** — modèle proxy-witness, preuves mobiles en 2–4 s,
-  **889 sources de données**, le plus avancé du champ
+- **Reclaim Protocol** — modèle proxy-witness ; le vendeur annonce des
+  preuves mobiles en 2–4 s et 889 sources de données, et se présente comme
+  le plus avancé du champ (chiffres et jugement vendeur, relevés au web le
+  2026-07-30, non vérifiés sur artefact détenu — INDEX, dette 3)
   ([Reclaim — zkTLS Canon](https://blog.reclaimprotocol.org/posts/zktls-canon),
   [Shoal Research](https://www.shoal.gg/p/zktls-verifiable-data-composability)).
 - **zkPass** — hybride proxy/MPC, déploiements en production
@@ -73,12 +77,14 @@ Ce que personne n'offre (périmètre : cette recherche) :
    qu'une page disait X », mais un fait de classe connue (prix, solde,
    état), daté, avec fraîcheur, unité et méthode, consommable par un noyau
    de décision fail-closed.
-2. **La diversité de quorum MESURÉE** — les quorums existants comptent des
-   signatures ; personne ne mesure l'indépendance des sources
-   (infrastructure commune, juridiction commune, dépendance amont commune :
-   les modes de défaillance corrélés). C'est précisément
-   A(indépendance des sources), la dette que Kraidle nomme sans pouvoir la
-   décharger. **C'est le cœur différenciant de Shōgen.**
+2. **La diversité de quorum MESURÉE** — les quorums recensés dans cette
+   passe comptent des signatures ; personne n'y mesure l'indépendance des
+   sources sur ses axes observables (infrastructure commune, dépendance
+   amont commune — la juridiction ou l'opérateur communs restent des
+   déclaratifs, rang distinct, cf. 04 §1 : les modes de défaillance
+   corrélés). C'est précisément A(indépendance des sources), la dette que
+   Kraidle nomme sans pouvoir la décharger. **C'est le cœur différenciant
+   de Shōgen.**
 3. **La vérification offline du LOT de faits** — un tiers vérifie sans
    confiance dans Shōgen que k témoignages de sources mesurées-diverses,
    dans la fenêtre de fraîcheur, supportent la valeur admise — le miroir
@@ -101,7 +107,9 @@ Ce que personne n'offre (périmètre : cette recherche) :
    C'est le point où Shōgen peut être *neuf* au sens fort — la recherche de
    cette passe n'a rien trouvé d'industrialisé, absence à re-vérifier par
    une recherche dédiée.
-4. C2PA : lire la spec au texte — le modèle « manifeste de provenance
-   signé » côté médias est le cousin le plus proche du fait typé Shōgen.
-5. Écrire l'ADR-0001 Shōgen (transports = adapters, jamais reconstruits)
-   avec alternatives et coûts, puis la vision 00 au format Kraidle.
+4. ~~C2PA : lire la spec au texte~~ — **fait le 2026-07-30**
+   (`c2pa-spec-2.4.html` détenu, sections lues : INDEX) ; le modèle
+   « manifeste de provenance signé » est bien le cousin le plus proche du
+   fait typé Shōgen.
+5. ~~Écrire l'ADR-0001 puis la vision~~ — **fait le 2026-07-30** :
+   ADR-0001 acceptée (`DECISIONS.md`), vision écrite (`02-vision.md`).
