@@ -135,20 +135,21 @@ mainteneur. Modèle et effort conformes à la règle absolue du 2026-07-29
 - `git init` fait, branche `main` ; premier commit **signé et vérifié**
   (clé SSH ed25519 dédiée `~/.ssh/shogen_signing`, config locale au dépôt,
   allowed-signers local en place).
-- Dépôt GitHub **privé** créé et poussé, puis **transféré vers le compte
-  `Kraidle`** (le compte de destination correct) : `Kraidle/shogen`.
-  Transfert initié le 2026-07-30 depuis `phoenixgoku00-cell` — **en
-  attente d'acceptation par le compte Kraidle** (notification GitHub/email,
-  délai 24 h). Le remote local pointe déjà sur
-  `https://github.com/Kraidle/shogen.git`. Après acceptation : soit
-  authentifier `gh` avec le compte Kraidle sur cette machine
-  (`gh auth login`), soit ajouter `phoenixgoku00-cell` comme collaborateur
-  — sans l'un des deux, les push suivants échoueront.
-- **Dette ouverte — protection de branche** : refusée par l'API (GitHub
-  Pro requis pour les dépôts privés du plan gratuit). Deux issues : passer
-  Pro, ou attendre le passage public à S3 où la protection devient
-  disponible ; d'ici là, la discipline de non-force-push est
-  comportementale, pas mécanique. À réévaluer à S3.
+- Dépôt GitHub **privé** créé, poussé, transféré vers le compte `Kraidle`
+  (accepté), puis — décision du mainteneur du 2026-07-30 — **transféré
+  vers l'organisation `KraidleAI`** (plan Team, owner : `Kraidle`) :
+  **`KraidleAI/shogen`**, la forme org recommandée (continuité de
+  propriété, gouvernance, deux produits sous une maison). Le remote local
+  pointe sur `https://github.com/KraidleAI/shogen.git` ; `gh` est
+  authentifié avec le compte `Kraidle` (owner) ; le collaborateur
+  résiduel `phoenixgoku00-cell` a été retiré (l'org n'avait pas de siège
+  pour lui — seats 1/1). La signature des commits reste vérifiée après
+  transfert (clé sur le compte utilisateur `Kraidle`, email noreply
+  inchangé — `verified: true` re-contrôlé par l'API sur `dcbb493`).
+- ~~Dette : protection de branche~~ — **fermée le 2026-07-30** par le
+  transfert vers l'org Team : protection active sur `main` et vérifiée
+  par l'API — force-push interdit, suppression interdite, historique
+  linéaire requis, admins inclus, **et signatures de commit requises**.
 - ~~Action mainteneur : clé de signature~~ — **fait le 2026-07-30** : clé
   `shogen-signing` posée sur le compte Kraidle (via Chrome, autorisation
   explicite du mainteneur), et **identité git du dépôt basculée** sur
