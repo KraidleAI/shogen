@@ -152,7 +152,12 @@ transposition K&L, les axes, k_eff, les mesures pilotes de S2 comme
 ## Ce qui n'est pas sur la route (non-buts re-dits)
 
 Pas de transport propriétaire (ADR-0001). Pas de choix de sources pour le
-client. Pas de moteur d'autorisation. Pas de token, pas de chaîne.
+client. Pas de moteur d'autorisation. **Pas de token — jamais, sur ce
+projet comme sur ses frères — et pas de calcul on-chain** (ADR-0006).
+L'*ancrage* d'un engagement sur chaîne (hash des certificats émis) est en
+revanche une **question ouverte**, recommandée à partir de S2 : elle ne
+demande de croire personne et serait la seule voie connue de décharge
+partielle d'A(history-integrity).
 
 ## Règles de conduite héritées
 

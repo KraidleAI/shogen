@@ -7,6 +7,7 @@
 | ADR-0003 | Le certificat est recalculable offline, jamais seulement émis | acceptée | 2026-07-30 |
 | ADR-0004 | Multi-attestor : k témoignages agrégés au-dessus, jamais un objet co-signé | acceptée | 2026-07-30 |
 | ADR-0005 | Rétention : hash toujours, octets par politique de classe, rédaction possible et déclarée | acceptée | 2026-07-30 |
+| ADR-0006 | Aucun token, aucun calcul on-chain — l'ancrage reste ouvert | acceptée | 2026-07-30 |
 
 ---
 
@@ -269,3 +270,66 @@ et vie privée par classe à spécifier en S2/S4.
 
 03 §5.4 : fermé. 04 §4, item 5 : la liste des entrées rédigées est au
 périmètre embarqué du certificat — **porté le 2026-07-30**.
+
+---
+
+## ADR-0006 — Aucun token, aucun calcul on-chain — l'ancrage reste ouvert
+
+**Statut** : acceptée · 2026-07-30
+
+### Contexte
+
+La quasi-totalité des acteurs visés (protocoles de prêt, réseaux d'oracle,
+cabinets de risque) opère on-chain, et le mainteneur a posé la question de
+notre absence de présence sur chaîne. L'analyse distingue **trois surfaces
+qu'on confond souvent** : y *calculer*, y *ancrer* un engagement, y *lire*
+une valeur. Elles n'ont ni le même coût, ni le même risque.
+
+### Décision
+
+1. **Aucun token, jamais** — sur ce projet comme sur ses frères.
+2. **Aucun calcul on-chain** : le test R1 (milliers de fenêtres, matrices
+   de corrélation) reste hors ligne ; c'est précisément ce que la
+   vérifiabilité hors ligne existe pour permettre.
+3. **L'ancrage reste une question ouverte**, avec une recommandation
+   consignée : publier périodiquement un engagement (hash / racine de
+   Merkle) des certificats émis, dès l'existence du benchmark public (S2).
+   Non tranché ici — la décision appartient au mainteneur.
+4. **Invariant qui borne toute présence future** : ce qui irait sur la
+   chaîne serait un **engagement**, jamais une **affirmation**. Publier
+   k_eff comme valeur à croire ferait de Shōgen un oracle à l'indépendance
+   postulée — l'auto-réfutation exacte que le projet combat. La valeur
+   voyage avec sa preuve, la chaîne n'atteste que la non-répudiation.
+
+### Alternative considérée
+
+Un token de protocole avec période de contestation, staking et slashing —
+la forme optimiste qui rendrait le certificat contestable économiquement.
+Rejetée : elle transforme un instrument de mesure en protocole à
+gouverner, et surtout elle **détruit le moat**. Notre différenciation est
+qu'un certificat émis par un tiers neutre vaut ce que l'auto-notation d'un
+mesuré ne vaudra jamais (GTM §4) ; un jeton fait de nous une partie
+intéressée au résultat de nos propres mesures.
+
+### La source qui tranche
+
+Décision du mainteneur, énoncée le 2026-07-30 — assurance : *reviewed*
+(mainteneur, 2026-07-30), pas *proven* ni *tested*. Elle est renforcée par
+un argument interne : le risque n°1 du GTM (riposte narrative sur la
+méthodologie) ne se pare que par la neutralité vérifiable, qu'un token
+compromettrait.
+
+### Ce que la décision coûte
+
+Pas de financement par émission ; le revenu vient des canaux 1 à 4 du GTM.
+Pas de mécanisme de contestation économique — la contestation reste
+scientifique (recalculer hors ligne et publier le contre-calcul), ce qui
+est cohérent avec le produit mais plus lent qu'un slashing.
+
+### Registres touchés
+
+`05-roadmap.md` §Non-buts : « pas de token, pas de chaîne » est trop large
+et devient « pas de token, pas de calcul on-chain ; ancrage : question
+ouverte, ADR-0006 » — **porté le 2026-07-30**. Si l'ancrage est adopté, il
+décharge partiellement A(history-integrity) (`08-assumptions.md`), sa
+seule voie de décharge connue à ce jour.
