@@ -1,0 +1,564 @@
+<title>Shōgen — Planches de positionnement</title>
+<style>
+  :root{
+    --paper:#F1F0EC; --card:#FBFAF8; --ink:#15181A; --ink-2:#3E4548;
+    --muted:#767E80; --rule:#D9D7D0; --rule-2:#E8E6E0;
+    --seal:#B23A2B;            /* cinabre — Shōgen */
+    --seal-soft:#F3E3DF;
+    --patina:#2C6B66;          /* vert-de-gris — mesuré */
+    --patina-soft:#DFEBE9;
+    --amber:#8A6A16;           /* déclaré */
+    --grid:#E4E2DB;
+    --serif: ui-serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    --sans: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+    --mono: ui-monospace,"SF Mono","Cascadia Mono",Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#101314; --card:#171B1C; --ink:#EDEBE6; --ink-2:#C3C7C6;
+      --muted:#8B9294; --rule:#2A3031; --rule-2:#232829;
+      --seal:#E2705C; --seal-soft:#3A2320;
+      --patina:#6FBDB4; --patina-soft:#17302E;
+      --amber:#C9A54A; --grid:#1E2324;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#101314; --card:#171B1C; --ink:#EDEBE6; --ink-2:#C3C7C6;
+    --muted:#8B9294; --rule:#2A3031; --rule-2:#232829;
+    --seal:#E2705C; --seal-soft:#3A2320;
+    --patina:#6FBDB4; --patina-soft:#17302E;
+    --amber:#C9A54A; --grid:#1E2324;
+  }
+  :root[data-theme="light"]{
+    --paper:#F1F0EC; --card:#FBFAF8; --ink:#15181A; --ink-2:#3E4548;
+    --muted:#767E80; --rule:#D9D7D0; --rule-2:#E8E6E0;
+    --seal:#B23A2B; --seal-soft:#F3E3DF;
+    --patina:#2C6B66; --patina-soft:#DFEBE9;
+    --amber:#8A6A16; --grid:#E4E2DB;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+       font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:56px 24px 96px;display:flex;flex-direction:column;gap:64px}
+
+  /* — en-tête — */
+  .masthead{display:flex;flex-direction:column;gap:18px;padding-bottom:28px;border-bottom:2px solid var(--ink)}
+  .seal-row{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+  .kanji{font-family:var(--serif);font-size:44px;line-height:1;color:var(--seal)}
+  h1{font-family:var(--serif);font-size:clamp(30px,4.2vw,46px);line-height:1.06;margin:0;
+     letter-spacing:-.015em;text-wrap:balance}
+  .sub{font-size:17px;color:var(--ink-2);max-width:62ch;margin:0}
+  .legend{display:flex;gap:26px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;
+          color:var(--muted);letter-spacing:.03em;padding-top:6px}
+  .legend b{color:var(--ink-2);font-weight:600}
+
+  /* — planches — */
+  .plate{background:var(--card);border:1px solid var(--rule);border-radius:3px;
+         padding:34px 34px 28px;display:flex;flex-direction:column;gap:20px}
+  .plate-head{display:flex;flex-direction:column;gap:7px;border-bottom:1px solid var(--rule-2);padding-bottom:16px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+           color:var(--seal);display:flex;gap:12px;align-items:center}
+  .eyebrow span{color:var(--muted)}
+  h2{font-family:var(--serif);font-size:clamp(21px,2.4vw,27px);margin:0;line-height:1.18;
+     letter-spacing:-.01em;text-wrap:balance}
+  .lede{font-size:15px;color:var(--ink-2);margin:0;max-width:74ch}
+  .canvas{overflow-x:auto;padding:6px 0 2px}
+  .canvas svg{display:block;min-width:720px;width:100%;height:auto}
+  .caption{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px 30px;
+           border-top:1px solid var(--rule-2);padding-top:16px}
+  .caption h3{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+              color:var(--muted);margin:0 0 5px;font-weight:600}
+  .caption p{margin:0;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);font-weight:600}
+  .mk{font-family:var(--mono);font-size:10px;color:var(--muted);vertical-align:super}
+
+  /* — SVG partagé — */
+  text{font-family:var(--sans);fill:var(--ink)}
+  .t-lab{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;fill:var(--muted)}
+  .t-ttl{font-size:14px;font-weight:600;fill:var(--ink)}
+  .t-sm{font-size:12px;fill:var(--ink-2)}
+  .t-xs{font-size:10.5px;fill:var(--muted)}
+  .t-num{font-family:var(--mono);font-size:13px;font-weight:600;fill:var(--ink)}
+  .box{fill:var(--paper);stroke:var(--rule);stroke-width:1}
+  .box-m{fill:var(--patina-soft);stroke:var(--patina);stroke-width:1.5}
+  .box-o{fill:none;stroke:var(--patina);stroke-width:1.5}
+  .box-d{fill:none;stroke:var(--muted);stroke-width:1.2;stroke-dasharray:4 4}
+  .box-s{fill:var(--seal-soft);stroke:var(--seal);stroke-width:2}
+  .ln{stroke:var(--rule);stroke-width:1}
+  .flow{stroke:var(--ink-2);stroke-width:1.4;fill:none}
+  .flow-d{stroke:var(--muted);stroke-width:1.2;fill:none;stroke-dasharray:5 4}
+  .flow-s{stroke:var(--seal);stroke-width:2;fill:none}
+
+  footer{border-top:1px solid var(--rule);padding-top:22px;font-size:13px;color:var(--muted);
+         display:flex;flex-direction:column;gap:8px}
+  footer b{color:var(--ink-2)}
+  @media (max-width:640px){ .plate{padding:22px 18px 20px} .wrap{padding:36px 14px 64px;gap:44px} }
+  @media print{ body{background:#fff} .plate{break-inside:avoid;border-color:#bbb} .wrap{gap:28px} }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="seal-row">
+      <div class="kanji">証言</div>
+      <h1>Shōgen — où nous nous plaçons</h1>
+    </div>
+    <p class="sub">Six planches de positionnement. Shōgen certifie l'indépendance <em>mesurée</em> d'un quorum de
+    sources de données : un artefact par décision, recalculable hors ligne, sans confiance dans nous.</p>
+    <div class="legend">
+      <span><b>●</b> artefact détenu et lu à la section citée</span>
+      <span><b>○</b> relevé web daté du 30/07/2026, non vérifié sur artefact</span>
+      <span><b>⎯</b> mesuré &nbsp; <b>┄</b> déclaré ou postulé</span>
+    </div>
+  </header>
+
+  <!-- ═══════════ PLANCHE 1 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 1 <span>· la pile</span></div>
+      <h2>La couche que personne n'occupe, entre le transport attesté et la décision</h2>
+      <p class="lede">Le transport attesté est mûr et industrialisé — nous n'en construisons aucun. La décision
+      (noyau d'autorisation, oracle, protocole) attend des faits qualifiés. Entre les deux, il n'y a rien.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 400" role="img" aria-label="Pile : sources, transports attestés, Shōgen, consommateurs">
+        <!-- colonnes -->
+        <text class="t-lab" x="20" y="26">Le monde</text>
+        <text class="t-lab" x="215" y="26">Transports attestés · adapters</text>
+        <text class="t-lab" x="470" y="26">Shōgen</text>
+        <text class="t-lab" x="905" y="26">Consommateurs</text>
+
+        <!-- sources -->
+        <rect class="box" x="20" y="44" width="150" height="46" rx="2"/>
+        <text class="t-sm" x="34" y="66">API de marché</text><text class="t-xs" x="34" y="81">prix, carnet</text>
+        <rect class="box" x="20" y="104" width="150" height="46" rx="2"/>
+        <text class="t-sm" x="34" y="126">Flux, endpoint</text><text class="t-xs" x="34" y="141">état, solde</text>
+        <rect class="box" x="20" y="164" width="150" height="46" rx="2"/>
+        <text class="t-sm" x="34" y="186">Page, document</text><text class="t-xs" x="34" y="201">non signé</text>
+        <text class="t-xs" x="20" y="232">aucune ne signe</text>
+        <text class="t-xs" x="20" y="247">ce qu'elle dit</text>
+
+        <!-- transports -->
+        <rect class="box-d" x="215" y="44" width="190" height="46" rx="2"/>
+        <text class="t-sm" x="229" y="66">zkTLS · MPC</text><text class="t-xs" x="229" y="81">A(notary-neutrality)</text>
+        <rect class="box-d" x="215" y="104" width="190" height="46" rx="2"/>
+        <text class="t-sm" x="229" y="126">zkTLS · proxy-witness</text><text class="t-xs" x="229" y="141">A(attestor-honesty)</text>
+        <rect class="box-d" x="215" y="164" width="190" height="46" rx="2"/>
+        <text class="t-sm" x="229" y="186">Enclave TEE</text><text class="t-xs" x="229" y="201">A(enclave-integrity)</text>
+        <rect class="box-d" x="215" y="224" width="190" height="46" rx="2"/>
+        <text class="t-sm" x="229" y="246">Signature native</text><text class="t-xs" x="229" y="261">A(source-key)</text>
+        <text class="t-xs" x="215" y="292">interchangeables · testés, jamais prouvés</text>
+        <text class="t-xs" x="215" y="307">résidus publiés séparément, jamais fusionnés</text>
+
+        <!-- flèches monde → transports -->
+        <path class="flow-d" d="M170 67 H210"/><path class="flow-d" d="M170 127 H210"/><path class="flow-d" d="M170 187 H210"/>
+
+        <!-- bande Shōgen -->
+        <rect class="box-s" x="450" y="40" width="380" height="270" rx="3"/>
+        <text class="t-ttl" x="470" y="66" style="fill:var(--seal)">証言 · la couche vacante</text>
+
+        <rect class="box" x="470" y="82" width="150" height="52" rx="2"/>
+        <text class="t-sm" x="484" y="103">Témoignage</text><text class="t-xs" x="484" y="119">octets + source + instant</text>
+        <path class="flow-s" d="M620 108 H656"/><path class="flow-s" d="M648 103 l8 5 -8 5" fill="var(--seal)"/>
+        <rect class="box" x="660" y="82" width="150" height="52" rx="2"/>
+        <text class="t-sm" x="674" y="103">Fait typé</text><text class="t-xs" x="674" y="119">classe, unité, fraîcheur</text>
+
+        <rect class="box-m" x="470" y="150" width="340" height="60" rx="2"/>
+        <text class="t-ttl" x="484" y="172">Verdict de quorum + certificat de diversité</text>
+        <text class="t-xs" x="484" y="192">k_eff · test de co-défaillance · partition par observables</text>
+
+        <rect class="box" x="470" y="226" width="340" height="62" rx="2"/>
+        <text class="t-sm" x="484" y="248">Lot vérifiable</text>
+        <text class="t-xs" x="484" y="266">témoignages + verdict + certificat + résidus</text>
+        <text class="t-xs" x="484" y="281">recalculable hors ligne — sans confiance dans Shōgen</text>
+
+        <!-- flèches transports → Shōgen -->
+        <path class="flow" d="M405 108 H446"/><path class="flow" d="M438 103 l8 5 -8 5" fill="var(--ink-2)"/>
+        <path class="flow" d="M405 187 C 425 187, 425 130, 446 122"/>
+
+        <!-- consommateurs -->
+        <rect class="box" x="880" y="60" width="220" height="44" rx="2"/>
+        <text class="t-sm" x="894" y="80">Noyau d'autorisation</text><text class="t-xs" x="894" y="95">Kraidle — le gather</text>
+        <rect class="box" x="880" y="114" width="220" height="44" rx="2"/>
+        <text class="t-sm" x="894" y="134">Réseau d'oracle</text><text class="t-xs" x="894" y="149">feed livré avec son certificat</text>
+        <rect class="box" x="880" y="168" width="220" height="44" rx="2"/>
+        <text class="t-sm" x="894" y="188">Protocole de prêt</text><text class="t-xs" x="894" y="203">seuils fonction de k_eff</text>
+        <rect class="box" x="880" y="222" width="220" height="44" rx="2"/>
+        <text class="t-sm" x="894" y="242">Agent autonome</text><text class="t-xs" x="894" y="257">décide sur un fait qualifié</text>
+
+        <path class="flow-s" d="M830 175 H876"/><path class="flow-s" d="M868 170 l8 5 -8 5" fill="var(--seal)"/>
+
+        <!-- vérificateur tiers -->
+        <rect class="box-o" x="450" y="336" width="380" height="42" rx="2"/>
+        <text class="t-sm" x="470" y="356">Vérificateur tiers, hors ligne</text>
+        <text class="t-xs" x="470" y="371">recalcule partition, k_eff et statistiques — ne nous croit pas</text>
+        <path class="flow-d" d="M640 310 V332"/><path class="flow-d" d="M635 324 l5 8 5 -8" fill="var(--muted)"/>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Ce qui existe déjà</h3><p>Les transports (zkTLS MPC et proxy, TEE, signature native) sont
+      industrialisés. Notre décision fondatrice : n'en construire aucun — ce sont des adapters interchangeables.</p></div>
+      <div><h3>Ce qui manque</h3><p>Rien ne transforme un dire attesté en <em>fait qualifié</em> assorti d'une
+      mesure d'indépendance du quorum. La racine académique du champ délègue elle-même l'intégrité à
+      « querying multiple oracles … majority agreement ».<span class="mk">●</span></p></div>
+      <div><h3>La contrainte de conception</h3><p>Le lot est recalculable hors ligne : notre signature est un cache,
+      jamais une racine de confiance. Un certificat qu'il faut nous croire ne vaudrait rien.</p></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PLANCHE 2 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 2 <span>· le problème, déjà mesuré et déjà monétisé</span></div>
+      <h2>Des réseaux « indépendants » qui boivent à la même fontaine</h2>
+      <p class="lede">Une étude de juin 2026 mesure exactement le phénomène que nous certifions — et montre
+      qu'il est aujourd'hui exploité comme source de revenu, pas défendu.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 400" role="img" aria-label="Amont commun des réseaux d'oracle et fenêtre d'exploitation">
+        <text class="t-lab" x="20" y="26">Amont réel</text>
+        <rect class="box-d" x="20" y="42" width="250" height="70" rx="2"/>
+        <text class="t-sm" x="36" y="66">Mêmes places de marché,</text>
+        <text class="t-sm" x="36" y="84">mêmes agrégateurs</text>
+        <text class="t-xs" x="36" y="102">« largely identical off-chain price data »</text>
+
+        <text class="t-lab" x="330" y="26">Réseaux dits indépendants</text>
+        <rect class="box" x="330" y="42" width="180" height="40" rx="2"/><text class="t-sm" x="344" y="67">DON · Optimism</text>
+        <rect class="box" x="330" y="92" width="180" height="40" rx="2"/><text class="t-sm" x="344" y="117">DON · Base</text>
+        <rect class="box" x="330" y="142" width="180" height="40" rx="2"/><text class="t-sm" x="344" y="167">DON · Arbitrum</text>
+        <path class="flow-d" d="M270 77 C300 77, 300 62, 326 62"/>
+        <path class="flow-d" d="M270 82 C300 82, 300 112, 326 112"/>
+        <path class="flow-d" d="M270 90 C300 95, 300 162, 326 162"/>
+        <text class="t-xs" x="330" y="204">indépendance déclarée, amont partagé</text>
+
+        <!-- timeline -->
+        <text class="t-lab" x="570" y="26">Publication décalée, régulière</text>
+        <line class="ln" x1="570" y1="240" x2="1090" y2="240"/>
+        <text class="t-xs" x="570" y="262">t₀</text>
+        <line class="ln" x1="600" y1="60" x2="600" y2="240" stroke-dasharray="3 3"/>
+        <circle cx="600" cy="62" r="5" fill="var(--patina)"/><text class="t-sm" x="614" y="66">Optimism publie</text>
+        <line class="ln" x1="790" y1="112" x2="790" y2="240" stroke-dasharray="3 3"/>
+        <circle cx="790" cy="112" r="5" fill="var(--patina)"/><text class="t-sm" x="804" y="116">Base publie</text>
+        <line class="ln" x1="930" y1="162" x2="930" y2="240" stroke-dasharray="3 3"/>
+        <circle cx="930" cy="162" r="5" fill="var(--patina)"/><text class="t-sm" x="944" y="166">Arbitrum publie</text>
+
+        <rect x="600" y="212" width="330" height="28" fill="var(--seal-soft)" stroke="var(--seal)" stroke-width="1.5"/>
+        <text class="t-sm" x="616" y="231" style="fill:var(--seal);font-weight:600">Fenêtre d'exploitation statistiquement prédictible</text>
+        <text class="t-xs" x="600" y="278">l'attaquant qui voit la première publication sait ce qui arrivera sur les autres chaînes</text>
+
+        <!-- stats -->
+        <rect class="box" x="20" y="290" width="1080" height="86" rx="2"/>
+        <text class="t-lab" x="40" y="315">Mesuré sur la chaîne, octobre 2025 — Sevim &amp; Ferreira Torres, arXiv:2606.03434 ●</text>
+        <text class="t-num" x="40" y="345">63</text><text class="t-xs" x="40" y="362">feeds analysés</text>
+        <text class="t-num" x="180" y="345">12 009</text><text class="t-xs" x="180" y="362">mises à jour de prix</text>
+        <text class="t-num" x="360" y="345">100 000+</text><text class="t-xs" x="360" y="362">observations d'oracle</text>
+        <text class="t-num" x="560" y="345">2 986</text><text class="t-xs" x="560" y="362">liquidations Aave liées</text>
+        <text class="t-num" x="760" y="345">64</text><text class="t-xs" x="760" y="362">liquidateurs spéculatifs (57 %)</text>
+        <text class="t-num" x="980" y="345">831</text><text class="t-xs" x="980" y="362">liquidations spéculatives</text>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Ce que l'étude établit</h3><p>Des réseaux présentés comme indépendants consomment des données
+      quasi identiques quasi simultanément, puis publient à des instants différents — l'écart devient
+      exploitable.<span class="mk">●</span></p></div>
+      <div><h3>Pourquoi c'est notre marché</h3><p>Les attaquants ont bâti l'instrument de mesure pour extraire.
+      Personne n'a bâti le même instrument pour défendre. C'est la case exacte de Shōgen.</p></div>
+      <div><h3>L'antériorité qui accuse</h3><p>Le livre blanc fondateur de Chainlink (2017) nomme déjà l'attaque
+      par <em>mirroring</em> et annonce vouloir « pursue research into mapping and reporting the independence of
+      data sources ».<span class="mk">●</span> Neuf ans, jamais livré.</p></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PLANCHE 3 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 3 <span>· la carte du champ</span></div>
+      <h2>Quarante ans de travaux voisins, et un quadrant vide</h2>
+      <p class="lede">Le geste « mesurer plutôt que postuler » est occupé depuis 1985. Ce qui ne l'est pas :
+      le faire sur des <em>sources de données</em>, et en sortir un <em>artefact par décision</em>.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 470" role="img" aria-label="Carte : objet mesuré contre forme de sortie">
+        <!-- grille -->
+        <rect x="150" y="40" width="900" height="360" fill="none" stroke="var(--grid)"/>
+        <line x1="600" y1="40" x2="600" y2="400" stroke="var(--grid)"/>
+        <line x1="150" y1="220" x2="1050" y2="220" stroke="var(--grid)"/>
+        <rect x="600" y="40" width="450" height="180" fill="var(--seal-soft)" opacity=".55"/>
+
+        <!-- axes -->
+        <text class="t-lab" x="150" y="428">Objet mesuré →</text>
+        <text class="t-xs" x="150" y="446">versions logicielles, répliques</text>
+        <text class="t-xs" x="880" y="446">sources de données en production</text>
+        <text class="t-lab" x="20" y="60">Sortie ↑</text>
+        <text class="t-xs" x="20" y="78">artefact</text><text class="t-xs" x="20" y="93">par décision,</text>
+        <text class="t-xs" x="20" y="108">vérifiable</text><text class="t-xs" x="20" y="123">par un tiers</text>
+        <text class="t-xs" x="20" y="380">modèle ou</text><text class="t-xs" x="20" y="395">rapport</text>
+        <text class="t-xs" x="20" y="410">hors ligne</text>
+
+        <!-- points existants -->
+        <g>
+          <circle cx="230" cy="352" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="243" y="349">Eckhardt &amp; Lee 1985 ●</text><text class="t-xs" x="243" y="364">le modèle nul : difficulté variable</text>
+
+          <circle cx="285" cy="300" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="298" y="297">Knight &amp; Leveson 1986 ●</text><text class="t-xs" x="298" y="312">le test : z = 100,51 contre 2,33</text>
+
+          <circle cx="240" cy="252" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="253" y="249">Littlewood &amp; Miller 1989 ●</text><text class="t-xs" x="253" y="264">Var(Θ) ; 1 + Corr·CV·CV</text>
+
+          <circle cx="430" cy="360" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="443" y="357">Lignée Gashi — SQL, antivirus, OS ○</text>
+
+          <circle cx="470" cy="315" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="483" y="312">NUREG/CR-5485 · nucléaire ○</text><text class="t-xs" x="483" y="327">dépendance estimée, re-prix du k-parmi-n</text>
+
+          <circle cx="330" cy="150" r="5" fill="var(--patina)"/>
+          <text class="t-sm" x="343" y="147">INDaaS · OSDI 2014 ●</text><text class="t-xs" x="343" y="162">observables structurels, rapport d'audit</text>
+
+          <circle cx="520" cy="200" r="5" fill="var(--patina)"/>
+          <text class="t-sm" x="533" y="197">Kohli 2026 — n_eff de Kish ●</text><text class="t-xs" x="533" y="212">panels de juges, pas des sources</text>
+
+          <circle cx="455" cy="105" r="5" fill="var(--patina)"/>
+          <text class="t-sm" x="468" y="102">Semantic Quorum Assurance 2026 ●</text><text class="t-xs" x="468" y="117">diversité imposée par étiquettes, non mesurée</text>
+
+          <circle cx="200" cy="195" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="213" y="192">Malkhi &amp; Reiter 1998 ○</text><text class="t-xs" x="213" y="207">quorums sous dépendance supposée</text>
+
+          <circle cx="880" cy="345" r="5" fill="var(--muted)"/>
+          <text class="t-sm" x="700" y="342">Sevim &amp; Torres 2026 ● — mesuré, mais pour extraire</text>
+
+          <circle cx="820" cy="300" r="5" fill="none" stroke="var(--muted)" stroke-dasharray="3 2"/>
+          <text class="t-sm" x="640" y="297">Chainlink 2017 ● — promesse, jamais livrée</text>
+        </g>
+
+        <!-- Shōgen -->
+        <rect class="box-s" x="760" y="82" width="270" height="76" rx="3"/>
+        <text class="t-ttl" x="778" y="108" style="fill:var(--seal)">証言 Shōgen</text>
+        <text class="t-xs" x="778" y="127">sources de données · historique testé</text>
+        <text class="t-xs" x="778" y="143">+ observables · certificat par décision</text>
+        <text class="t-lab" x="620" y="62" style="fill:var(--seal)">quadrant inoccupé</text>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Ce que nous ne revendiquons pas</h3><p>« Mesurer plutôt que postuler » ne nous appartient pas :
+      réglementaire depuis ~1998, service d'audit cloud depuis 2014, compte effectif publié pour des panels
+      de juges en mai 2026.</p></div>
+      <div><h3>Ce que nous revendiquons</h3><p>Quatre angles de recherche vides, vérifiés et archivés : le test
+      transposé aux sources, le chemin observables → quorum effectif, le certificat-artefact, et le terme lui-même.</p></div>
+      <div><h3>Pourquoi ça tient en revue</h3><p>Notre appareil théorique est détenu et lu : le modèle nul de 1985,
+      le test de 1986, la mesure de dépendance de 1989. Nous héritons, nous n'inventons pas la statistique.</p></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PLANCHE 4 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 4 <span>· les marchés, séquencés</span></div>
+      <h2>Vendre au côté qui saigne, pas au côté conflité</h2>
+      <p class="lede">Le benchmark public ouvre le marché ; l'acteur dominant est le dernier client, pas le premier.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 430" role="img" aria-label="Quatre canaux de mise sur le marché et leur séquence">
+        <!-- axe temps -->
+        <line class="ln" x1="40" y1="392" x2="1080" y2="392"/>
+        <text class="t-xs" x="40" y="414">maintenant</text><text class="t-xs" x="990" y="414">18–24 mois</text>
+
+        <!-- benchmark -->
+        <rect class="box-s" x="40" y="40" width="230" height="120" rx="3"/>
+        <text class="t-lab" x="58" y="64" style="fill:var(--seal)">mouvement d'ouverture</text>
+        <text class="t-ttl" x="58" y="88">Benchmark public</text>
+        <text class="t-xs" x="58" y="108">k_eff et corrélations des feeds</text>
+        <text class="t-xs" x="58" y="124">majeurs, gratuits, recalculables</text>
+        <text class="t-xs" x="58" y="146">précédents : L2Beat, clientdiversity ○</text>
+        <line class="ln" x1="155" y1="160" x2="155" y2="392" stroke-dasharray="3 3"/>
+        <circle cx="155" cy="392" r="5" fill="var(--seal)"/>
+
+        <!-- canal 1 -->
+        <rect class="box-m" x="300" y="40" width="240" height="132" rx="3"/>
+        <text class="t-lab" x="318" y="64">canal 1 · revenu</text>
+        <text class="t-ttl" x="318" y="88">Cabinets de gestion du risque</text>
+        <text class="t-xs" x="318" y="108">le mandat existe déjà et il est payé :</text>
+        <text class="t-num" x="318" y="130">1,6 M$</text><text class="t-xs" x="380" y="130">Gauntlet · Aave ○</text>
+        <text class="t-num" x="318" y="150">≈2 M$</text><text class="t-xs" x="380" y="150">Chaos Labs · Aave ○</text>
+        <text class="t-num" x="318" y="168">2,3 M$</text><text class="t-xs" x="380" y="168">Gauntlet · Compound ○</text>
+        <line class="ln" x1="420" y1="172" x2="420" y2="392" stroke-dasharray="3 3"/>
+        <circle cx="420" cy="392" r="5" fill="var(--patina)"/>
+
+        <!-- canal 2 -->
+        <rect class="box-m" x="570" y="40" width="240" height="132" rx="3"/>
+        <text class="t-lab" x="588" y="64">canal 2 · distribution</text>
+        <text class="t-ttl" x="588" y="88">Oracles challengers</text>
+        <text class="t-xs" x="588" y="108">la transparence comme arme</text>
+        <text class="t-num" x="588" y="130">7,5 Md$</text><text class="t-xs" x="660" y="130">Chronicle ○</text>
+        <text class="t-num" x="588" y="150">3,6 Md$</text><text class="t-xs" x="660" y="150">RedStone ○</text>
+        <text class="t-num" x="588" y="168">3,1 Md$</text><text class="t-xs" x="660" y="168">Pyth ○</text>
+        <line class="ln" x1="690" y1="172" x2="690" y2="392" stroke-dasharray="3 3"/>
+        <circle cx="690" cy="392" r="5" fill="var(--patina)"/>
+
+        <!-- canal 3 -->
+        <rect class="box-o" x="300" y="196" width="240" height="130" rx="3"/>
+        <text class="t-lab" x="318" y="220">canal 3 · la douleur</text>
+        <text class="t-ttl" x="318" y="244">Protocoles de prêt</text>
+        <text class="t-num" x="318" y="268">&gt;500 M$</text><text class="t-xs" x="400" y="268">fuite OEV cumulée ○</text>
+        <text class="t-num" x="318" y="290">23,4 M$</text><text class="t-xs" x="400" y="290">primes Aave V3, 2024 ○</text>
+        <text class="t-xs" x="318" y="312">API3 recapture l'enchère — nous certifions la cause</text>
+        <line class="ln" x1="540" y1="260" x2="565" y2="260"/>
+
+        <!-- canal 4 -->
+        <rect class="box-o" x="570" y="196" width="240" height="130" rx="3"/>
+        <text class="t-lab" x="588" y="220">canal 4 · aval</text>
+        <text class="t-ttl" x="588" y="244">Assureurs on-chain</text>
+        <text class="t-xs" x="588" y="266">k_eff comme paramètre actuariel :</text>
+        <text class="t-xs" x="588" y="284">la prime suit la diversité mesurée</text>
+        <text class="t-xs" x="588" y="308">s'ouvre après le benchmark</text>
+        <line class="ln" x1="880" y1="260" x2="880" y2="392" stroke-dasharray="3 3"/>
+        <circle cx="880" cy="392" r="5" fill="var(--patina)"/>
+
+        <!-- incumbent -->
+        <rect class="box-d" x="840" y="40" width="240" height="132" rx="3"/>
+        <text class="t-lab" x="858" y="64">en dernier · défensif</text>
+        <text class="t-ttl" x="858" y="88">L'acteur dominant</text>
+        <text class="t-xs" x="858" y="108">≈33 Md$ sécurisés, ~505 protocoles ○</text>
+        <text class="t-xs" x="858" y="128">l'ensemble des agrégateurs par feed</text>
+        <text class="t-xs" x="858" y="144">n'est pas publié — il est conflité</text>
+        <text class="t-xs" x="858" y="164">il achète quand k_eff devient la question</text>
+        <line class="ln" x1="1020" y1="172" x2="1020" y2="392" stroke-dasharray="3 3"/>
+        <circle cx="1020" cy="392" r="5" fill="var(--muted)"/>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Pourquoi le benchmark d'abord</h3><p>Il crée la demande, installe la neutralité, produit les données
+      du prototype et date l'antériorité — un seul geste, quatre effets.</p></div>
+      <div><h3>Le moat</h3><p>Un certificat vendu par le mesuré ne vaut rien. Le nôtre est tiers et recalculable :
+      un oracle qui ferait « son propre Shōgen » publierait un bulletin d'auto-notation.</p></div>
+      <div><h3>Statut des chiffres</h3><p>Toutes les figures marquées <span class="mk">○</span> sont des relevés
+      web du 30/07/2026, sans mécanisme de fraîcheur : elles se re-mesurent avant toute réutilisation.</p></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PLANCHE 5 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 5 <span>· le duo</span></div>
+      <h2>Deux produits, une phrase : autorité bornée, perception attestée</h2>
+      <p class="lede">Kraidle borne ce qu'un agent peut faire. Shōgen qualifie ce qu'il perçoit. Souverains l'un
+      de l'autre, vendus ensemble.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 300" role="img" aria-label="Kraidle et Shōgen autour de l'agent">
+        <rect class="box-s" x="30" y="60" width="290" height="150" rx="3"/>
+        <text class="t-lab" x="50" y="86" style="fill:var(--seal)">証言 Shōgen · en amont</text>
+        <text class="t-ttl" x="50" y="112">Perception attestée</text>
+        <text class="t-sm" x="50" y="138">Aucun fait critique sans témoignage</text>
+        <text class="t-sm" x="50" y="156">lié à sa source, ni quorum sans</text>
+        <text class="t-sm" x="50" y="174">mesure d'indépendance.</text>
+        <text class="t-xs" x="50" y="196">l'attestation prouve le dire, jamais le vrai</text>
+
+        <rect class="box" x="400" y="60" width="290" height="150" rx="3"/>
+        <text class="t-lab" x="420" y="86">l'agent</text>
+        <text class="t-ttl" x="420" y="112">Oracle : texte vers texte</text>
+        <text class="t-sm" x="420" y="138">Il ne détient rien, n'exécute rien,</text>
+        <text class="t-sm" x="420" y="156">n'apparaît dans aucun théorème.</text>
+        <text class="t-sm" x="420" y="174">Il propose.</text>
+        <text class="t-xs" x="420" y="196">le maillon faible, traité comme tel</text>
+
+        <rect class="box-m" x="770" y="60" width="290" height="150" rx="3"/>
+        <text class="t-lab" x="790" y="86">Kraidle · en aval</text>
+        <text class="t-ttl" x="790" y="112">Autorité bornée</text>
+        <text class="t-sm" x="790" y="138">Aucune action irréversible sans</text>
+        <text class="t-sm" x="790" y="156">permis lié aux octets exacts,</text>
+        <text class="t-sm" x="790" y="174">vérifié hors ligne.</text>
+        <text class="t-xs" x="790" y="196">la clé vit derrière l'effecteur, pas dans l'agent</text>
+
+        <path class="flow-s" d="M320 135 H396"/><path class="flow-s" d="M388 130 l8 5 -8 5" fill="var(--seal)"/>
+        <path class="flow" d="M690 135 H766"/><path class="flow" d="M758 130 l8 5 -8 5" fill="var(--ink-2)"/>
+        <text class="t-xs" x="322" y="122">faits qualifiés</text>
+        <text class="t-xs" x="692" y="122">plans proposés</text>
+
+        <line class="ln" x1="30" y1="244" x2="1060" y2="244"/>
+        <text class="t-sm" x="30" y="272">Une injection réussie ne fait plus qu'une chose : elle propose. Ce qu'elle propose repose sur des faits qualifiés ; ce qu'elle obtient est borné par un permis.</text>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Le même client d'entrée</h3><p>L'opérateur d'agents de trading achète les deux d'une phrase, et
+      chaque produit a son marché propre — ni l'un ni l'autre ne dépend du succès de son frère.</p></div>
+      <div><h3>La même discipline</h3><p>Preuve portable, refus par défaut, et un vocabulaire qui interdit de
+      revendiquer plus que ce qui est tenu. C'est vérifiable dans les dépôts, pas seulement affirmé ici.</p></div>
+      <div><h3>La ligne de partage</h3><p>Shōgen ne décide jamais, Kraidle ne perçoit jamais. Le mélange des deux
+      serait la confusion que toute l'architecture existe pour empêcher.</p></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ PLANCHE 6 ═══════════ -->
+  <section class="plate">
+    <div class="plate-head">
+      <div class="eyebrow">Planche 6 <span>· le produit</span></div>
+      <h2>Ce que le certificat dit — et, imprimé dessus, ce qu'il ne dit pas</h2>
+      <p class="lede">Trois rangs, jamais confondus. Un axe déclaré n'est pas un axe protecteur : l'expérience
+      fondatrice de 1986 l'a établi, nos rangs l'encodent.</p>
+    </div>
+    <div class="canvas">
+      <svg viewBox="0 0 1120 430" role="img" aria-label="Anatomie du certificat de diversité">
+        <!-- en-tête certificat -->
+        <rect class="box" x="30" y="36" width="640" height="360" rx="3"/>
+        <text class="t-lab" x="52" y="62">Certificat de diversité · classe : prix · fenêtre : 30 j</text>
+        <line class="ln" x1="52" y1="74" x2="648" y2="74"/>
+
+        <text class="t-num" x="52" y="112" style="font-size:30px">k_eff = 3</text>
+        <text class="t-sm" x="210" y="112">pour k nominal = 7</text>
+        <text class="t-xs" x="210" y="130">quatre sources fusionnées par la partition</text>
+
+        <!-- R1 -->
+        <rect class="box-m" x="52" y="146" width="596" height="72" rx="2"/>
+        <text class="t-lab" x="70" y="168" style="fill:var(--patina)">R1 · co-défaillance mesurée</text>
+        <text class="t-sm" x="70" y="190">n = 8 640 fenêtres · K = 214 co-écarts · z = 11,4 &gt; 2,33</text>
+        <text class="t-xs" x="70" y="208">modèle d'indépendance rejeté · Corr(Θᵢ,Θⱼ) max = 0,41 entre src2 et src5</text>
+
+        <!-- R2 -->
+        <rect class="box-o" x="52" y="230" width="596" height="72" rx="2"/>
+        <text class="t-lab" x="70" y="252" style="fill:var(--patina)">R2 · observables d'infrastructure</text>
+        <text class="t-sm" x="70" y="274">src2 · src5 · src6 → même ASN &amp; corrélation de contenu 0,999</text>
+        <text class="t-xs" x="70" y="292">axes mesurés : ASN, amont détecté, attestor, méthode</text>
+
+        <!-- R3 -->
+        <rect class="box-d" x="52" y="314" width="596" height="62" rx="2"/>
+        <text class="t-lab" x="70" y="336">R3 · déclaré — poids nul sur k_eff</text>
+        <text class="t-sm" x="70" y="358">juridictions distinctes, opérateurs distincts — publié pour la traçabilité</text>
+
+        <!-- panneau limites -->
+        <rect class="box-s" x="700" y="36" width="390" height="360" rx="3"/>
+        <text class="t-lab" x="722" y="62" style="fill:var(--seal)">Ce que ce certificat ne dit pas</text>
+        <line x1="722" y1="74" x2="1068" y2="74" stroke="var(--seal)" stroke-width="1"/>
+        <text class="t-sm" x="722" y="102">Un axe non mesuré reste un mode</text>
+        <text class="t-sm" x="722" y="120">commun possible.</text>
+        <text class="t-sm" x="722" y="152">R1 mesure le passé ; il ne borne pas</text>
+        <text class="t-sm" x="722" y="170">un adversaire qui ne s'est pas exprimé.</text>
+        <text class="t-sm" x="722" y="202">Le quorum achète du confinement,</text>
+        <text class="t-sm" x="722" y="220">jamais de l'exactitude.</text>
+        <text class="t-sm" x="722" y="252">Deux entrées rédigées : leur axe</text>
+        <text class="t-sm" x="722" y="270">amont-commun n'est pas mesuré.</text>
+        <text class="t-xs" x="722" y="306">résidus portés : A(attestor-honesty),</text>
+        <text class="t-xs" x="722" y="322">A(notary-neutrality), A(window-stationarity)</text>
+        <text class="t-xs" x="722" y="356">recalculable hors ligne — la signature</text>
+        <text class="t-xs" x="722" y="372">de Shōgen n'est qu'un cache</text>
+      </svg>
+    </div>
+    <div class="caption">
+      <div><h3>Chiffres de la planche</h3><p>Les valeurs du certificat sont <em>illustratives</em> : le format est
+      spécifié, la mesure sur sources réelles est le jalon suivant. Aucune n'est présentée comme un résultat.</p></div>
+      <div><h3>Pourquoi imprimer les limites</h3><p>Parce qu'un certificat qui promet l'indépendance mentirait.
+      Le panneau de droite est l'argument de vente auprès d'une institution, pas une concession.</p></div>
+      <div><h3>La leçon qui structure les rangs</h3><p>En 1986, l'axe de diversité organisé — deux universités —
+      n'a rien protégé : toutes les fautes communes le traversaient.<span class="mk">●</span> D'où R3 sans poids.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <div><b>Usage.</b> Chaque planche est autonome et dimensionnée pour une diapositive : capture d'écran directe,
+    ou impression de la page (les planches ne se coupent pas entre deux pages).</div>
+    <div><b>Provenance.</b> ● artefact détenu dans la bibliothèque du projet et lu à la section citée ·
+    ○ relevé web du 30/07/2026 non vérifié sur artefact. Les sources complètes sont référencées dans le dépôt.</div>
+  </footer>
+
+</div>
