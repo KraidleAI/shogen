@@ -8,6 +8,7 @@
 | ADR-0004 | Multi-attestor : k témoignages agrégés au-dessus, jamais un objet co-signé | acceptée | 2026-07-30 |
 | ADR-0005 | Rétention : hash toujours, octets par politique de classe, rédaction possible et déclarée | acceptée | 2026-07-30 |
 | ADR-0006 | Aucun token, aucun calcul on-chain — l'ancrage reste ouvert | acceptée | 2026-07-30 |
+| ADR-0007 | La profondeur du marché de référence n'est pas un axe — le certificat nomme l'amont, il ne le note pas | acceptée | 2026-07-31 |
 
 ---
 
@@ -333,3 +334,84 @@ et devient « pas de token, pas de calcul on-chain ; ancrage : question
 ouverte, ADR-0006 » — **porté le 2026-07-30**. Si l'ancrage est adopté, il
 décharge partiellement A(history-integrity) (`08-assumptions.md`), sa
 seule voie de décharge connue à ce jour.
+
+---
+
+## ADR-0007 — La profondeur du marché de référence n'est pas un axe — le certificat nomme l'amont, il ne le note pas
+
+**Statut** : acceptée · 2026-07-31
+
+### Contexte
+
+L'incident SK Hynix du 28 juillet 2026 (Galaxy Research, détenu :
+`biblio/galaxy-2026-07-31-tradexyz-oracle.html`, citations vérifiées par
+grep) : une action s'échange à 1 272 000 won, « 29.96% below the previous
+close », dans les premières secondes du pré-marché NextTrade ; le prix se
+propage et déclenche ≈ 60 M$ de liquidations. L'article qualifie lui-même
+la lecture de **« accurate but anomalous »** — la source a dit vrai — et
+conclut : « The oracle worked. The risk system didn't. »
+
+Deux constats pour nous. **Le premier valide le certificat** : le prix de
+référence est « the median of three inputs: the oracle price, the oracle
+plus a 150-second exponential moving average of the book's deviation from
+it, and the median of best bid, best ask, and last trade » — deux des
+trois entrées sont des fonctions de la même entrée, soit k nominal = 3
+pour un k_eff ≤ 2, et le cluster décide la médiane. C'est exactement
+l'illusion de redondance que le rang R2 existe pour révéler. **Le second
+ouvre une dette** : la cause racine tient à la profondeur du marché cité,
+qui n'est aucun de nos axes.
+
+### Décision
+
+La profondeur, la liquidité et plus généralement la **qualité du marché
+sous-jacent ne sont pas des axes du certificat** — c'est un non-but
+explicite. En contrepartie, obligation nouvelle : **le certificat nomme
+les amonts identifiés par la partition**, et pas seulement leur nombre.
+Il écrit « cluster A = {src1, src2} via place X », jamais « 3 sources → 2
+clusters ». Nommer l'amont rend la question de la profondeur *répondable*
+par celui à qui elle appartient ; la noter nous-mêmes ferait de nous
+autre chose.
+
+### Alternative considérée
+
+Ajouter la profondeur comme axe R2 (carnet, volume, spread de la place
+citée). Rejetée pour trois raisons : (a) ce n'est pas une propriété
+d'**indépendance** — la profondeur qualifie *une* source, quand nos axes
+qualifient une *relation entre* sources, et mélanger les deux brouille ce
+que k_eff signifie ; (b) c'est un autre métier, avec d'autres
+concurrents établis (fournisseurs de données de marché), et il diluerait
+la seule revendication qui nous distingue ; (c) il nous placerait en
+notation de qualité, cousine du jugement de vérité que la vision
+interdit.
+
+### La source qui tranche
+
+L'article lui-même situe la couche fautive : « The oracle worked. The
+risk system didn't », et rappelle que « Traditional markets separated
+last trade, index price, and fair value for risk purposes decades ago,
+precisely so one local execution cannot decide the fate of a leveraged
+account » — la séparation dire / référence / valeur de risque est
+exactement la nôtre (témoignage / fait / verdict), et la profondeur
+appartient au dernier étage, celui du système de risque, qui n'est ni
+Shōgen ni Kraidle.
+
+### Ce que la décision coûte
+
+**Nous ne couvrons pas la classe de défaillance SK Hynix**, et il faut le
+dire là où un lecteur pourrait croire l'inverse : le panneau « ce que ce
+certificat ne dit pas » (04 §4, planche 6 du dossier) gagne une ligne
+explicite sur la qualité du marché sous-jacent. Un prospect qui cherche
+une couverture du risque de profondeur doit être redirigé, pas converti.
+Contrepartie assumée : c'est ce qui rend le canal 1 du GTM (cabinets de
+risque) complémentaire plutôt que concurrent — nous livrons la partition
+nommée, ils en tirent le prix du risque de profondeur.
+
+### Registres touchés
+
+`04-certificat-diversite.md` §3 (le certificat nomme les amonts) et §4
+(nouvelle limite publiée) — **portés le 2026-07-31**.
+`09-vocabulaire.md` : nouvelle formulation interdite — « Shōgen évalue la
+qualité d'une source » — **portée**. `05-roadmap.md` §Non-buts —
+**porté**. Le [à décider] de 04 §2 sur la stratification des fenêtres par
+régime gagne son cas motivant : l'ouverture de pré-marché illiquide est
+précisément le régime où A(window-stationarity) casse.

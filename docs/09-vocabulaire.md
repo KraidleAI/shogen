@@ -27,6 +27,7 @@ licite ; « donnée vérifiée » = surclamation, interdit).
 | « l'historique **prouve** l'absence de dépendance » | un z non significatif n'est pas une absence ; en dessous du seuil d'historique le certificat dit « historique insuffisant » (04 §2) | « le modèle d'indépendance n'est pas rejeté sur [n fenêtres, axes] » |
 | « personne ne mesure l'indépendance » (et variantes) | faux depuis 1985 — l'homme de paille que LPS 2001 interdit ; le geste générique est occupé (06 §1) | le claim rescopé de 06 §1, avec son périmètre |
 | « diversité **imposée** donc sûre » | SQA impose par étiquettes ; K&L/L&M : l'organisé n'a pas produit l'indépendance — seule la mesure convertit un axe en évidence | « axe imposé [nom], poids mesuré : [R1/R2 ou “non mesuré”] » |
+| « Shōgen évalue la qualité d'une source » / « nos sources sont bonnes » | la qualité d'un marché (profondeur, liquidité) est hors périmètre (ADR-0007) ; nous mesurons une *relation entre* sources, pas la valeur de l'une | « k_eff = …, amonts nommés : … — leur profondeur n'est pas mesurée ici » |
 | « attestor décentralisé » (pour un pool non compté) | la décentralisation non comptée dans la diversité est le mirroring possible (Chainlink v1) ; les attestors sont un axe R2 (ADR-0004) | « n attestors, comptés dans la partition R2 » |
 
 ## Règle d'application

@@ -66,8 +66,11 @@ ans, détenu, au lieu d'une méthode inventée) :
 
 **[À décider]** : définitions d'écart par classe de faits (le seuil
 « hors enveloppe » réutilise l'estimateur du verdict — lignée Chainlink OCR
-Lemme 8, détenu côté Kraidle) ; taille minimale d'historique avant qu'un
-certificat R1 soit émissible (en dessous : le certificat dit « historique
+Lemme 8, détenu côté Kraidle) ; **stratification des fenêtres par régime**
+— son cas motivant est daté : l'ouverture de pré-marché illiquide du
+28 juillet 2026 (SK Hynix), régime où A(window-stationarity) casse et où
+un test agrégé sur des fenêtres de séance normale ne dit rien ;
+taille minimale d'historique avant qu'un certificat R1 soit émissible (en dessous : le certificat dit « historique
 insuffisant », jamais un z non significatif présenté comme une absence de
 dépendance).
 
@@ -98,6 +101,10 @@ dans un axe fort comptent pour une**.
   même infrastructure) : k_eff = nombre de classes de la partition, pas de
   membres du pool. « Un quorum dont deux sources partagent un amont n'est
   pas un quorum de k » (02-vision) devient calculable.
+- **La partition nomme ses amonts** (ADR-0007) : le certificat écrit
+  « cluster A = {src1, src2} via place X », jamais « 3 sources → 2
+  clusters ». Nommer rend répondable, par celui à qui elle appartient, la
+  question que nous ne traitons pas — la profondeur de X.
 - R1 module la confiance dans la partition : un z de pool élevé avec une
   partition R2 propre signifie que les axes mesurés ne capturent pas le
   mode commun — le certificat le dit en clair (« co-défaillance observée
@@ -131,6 +138,12 @@ Chaque certificat embarque, en clair, son périmètre :
    rédigée est exclue de la corrélation de contenu, donc l'axe
    amont-commun de son témoignage est non mesuré — A(axis-coverage)
    s'élargit d'autant, visiblement.
+6. **La qualité du marché sous-jacent n'est pas mesurée** (ADR-0007) :
+   profondeur, liquidité, largeur de fourchette de la place citée sont
+   hors périmètre. Le certificat *nomme* l'amont ; il ne le note pas. Un
+   pool de k_eff élevé dont tous les amonts sont peu profonds reste
+   exposé — le cas SK Hynix du 28 juillet 2026, où le prix était
+   « accurate but anomalous », est la démonstration à citer.
 
 ## 5. Résistance au jeu — le certificat comme cible
 

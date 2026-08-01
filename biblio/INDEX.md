@@ -1,6 +1,6 @@
 # Shōgen — registre bibliographique
 
-**16 artefacts détenus** au 2026-07-30 (compte re-mesuré par listing du
+**17 artefacts détenus** au 2026-07-31 (compte re-mesuré par listing du
 dossier dans la passe qui écrit ce chiffre). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
 de vérification des citations qui s'appuient dessus. Pas de sidecars encore
@@ -30,6 +30,12 @@ les PDFs sur lectures visuelles).
 | `sevim-torres-2026-signals-spoils.pdf` | Sevim & Ferreira Torres, *Signals and Spoils: Speculative Oracle Extractable Value in the Era of Cross-Chain Interoperability*, arXiv:2606.03434 (cs.CR), 2 juin 2026 | p. 1 (titre, abstract, §1) | Vérifié p. 1 : « independent DONs consume largely identical off-chain price data nearly simultaneously yet publish updates at different times, creating statistically predictable cross-chain exploitation windows » ; 63 feeds Chainlink, 12 009 mises à jour, 2 986 liquidations Aave. La mesure du phénomène exact — sans l'instrument. |
 | `chainlink-2017-whitepaper-v1.pdf` | Ellis, Juels, Nazarov, *ChainLink: A Decentralized Oracle Network*, whitepaper v1.0, 4 septembre 2017 | pp. 1, 11, 19 (titre ; §4.1 *Distributing sources* ; §5.3 *Certification Service*) | **Localisations vérifiées au texte le 2026-07-30.** §4.1 p. 11 — l'amont commun donné en exemple : « If site Src₁ = EchoEcho.com obtains its data from Src₂ = TheHorsesMouth.com, an error at Src₂ will always imply an error at Src₁ », suivi de « More subtle correlations between data sources can also occur » et de l'annonce jamais réalisée : « Chainlink also intends to pursue research into **mapping and reporting the independence of data sources** in an easily digestible way so that oracles and users can avoid undesired correlations ». §5.3 p. 19 — le *mirroring* : « a Sybil attacker can adopt a behavior called *mirroring*, in which it causes oracles to send individual responses based on data obtained from a *single data-source query* … misbehaving oracles may share data off-chain but pretend to source data independently ». |
 | `zhang-2016-network-diversity-tifs.pdf` | Zhang, Wang, Jajodia, Singhal, Albanese, *Network Diversity: A Security Metric for Evaluating the Resilience of Networks against Zero-Day Attacks*, IEEE TIFS (version auteurs ; fiche balayage : 11(5):1071-1086, 2016) | p. 1 (titre, abstract, §1) | Vérifié p. 1 : métrique « biodiversity-inspired … based on the effective number of distinct resources » ; « most existing efforts rely on intuitive and imprecise notions of diversity ». La forme du compte effectif à citer-et-distinguer pour k_eff. |
+
+### Cas d'espèce (fetché le 2026-07-31)
+
+| fichier | ce que c'est | lu | citations vérifiées |
+|---|---|---|---|
+| `galaxy-2026-07-31-tradexyz-oracle.html` | Galaxy Research, note hebdomadaire du 31 juillet 2026 — section sur les liquidations TradeXYZ / xyz:SKHYNIX (copie du 2026-07-31 ; page mutable) | sections liquidations + « Our take » (fetch, puis grep sur la copie) | Vérifiées par grep dans le fichier détenu (1 occurrence chacune) : « liquidations resulting from an **accurate but anomalous** third-party price feed reading » ; « a single share of chip manufacturer SK Hynix changed hands for **1,272,000** won (roughly $868) in the opening seconds of South Korea's **NextTrade** pre-market session … 29.96% below the previous close » ; la composition — « TradeXYZ's mark price is the **median of three inputs**: the oracle price, the oracle plus a 150-second exponential moving average of the book's deviation from it, and the median of best bid, best ask, and last trade » ; « That smoothing absorbed about 11 percentage points of a 30% corrupted input. It was not enough. The mark fell 18.7% » ; le verdict — « **The oracle worked. The risk system didn't.** Traditional markets **separated last trade**, index price, and fair value for risk purposes decades ago, precisely so one local execution cannot decide the fate of a leveraged account ». Porte ADR-0007. |
 
 ## Dettes de registre
 

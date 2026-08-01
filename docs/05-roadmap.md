@@ -159,6 +159,11 @@ revanche une **question ouverte**, recommandée à partir de S2 : elle ne
 demande de croire personne et serait la seule voie connue de décharge
 partielle d'A(history-integrity).
 
+Pas de notation de la **qualité du marché sous-jacent** — profondeur,
+liquidité, fourchette (ADR-0007). Le certificat nomme l'amont, il ne le
+note pas ; la classe de défaillance SK Hynix (28 juillet 2026) n'est pas
+couverte et le certificat le publie.
+
 ## Règles de conduite héritées
 
 Deux échecs même approche = changement de piste écrit. Toute figure
