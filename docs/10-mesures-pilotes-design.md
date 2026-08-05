@@ -610,8 +610,9 @@ compris la dernière, enregistrée cette passe :
    garde les 2 flux USDT, l'écart de peg devient mesurable par (2a).
 5. Budget → **≈ 2 semaines, w = 60 s, 2 strates** (calme/stress) : n
    bien au-delà du seuil §5.4 dans les deux régimes.
-6. Règle `basis:doc` → **portée en ADR-0008** (proposée le 2026-08-05, en
-   attente d'acceptation), avec alternative et coût.
+6. Règle `basis:doc` → **ADR-0008, acceptée le 2026-08-05** (décision
+   déléguée à l'orchestrateur, fondée sur INDaaS / Chainlink v1 / 04 §1),
+   avec alternative et coût.
 
 La justification de chaque option et les alternatives restent consignées
 ci-dessous, telles qu'écrites avant la décision.

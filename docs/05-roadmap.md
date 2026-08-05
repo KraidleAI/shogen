@@ -145,7 +145,7 @@ remontées (10 §9) sont **prises le 2026-08-05** : pool = 11 sources,
 oracles inclus ; classe « BTC/USD-stable », devise marquée par flux ;
 ≈ 2 semaines, w = 60 s, 2 strates ; CoinGecko strictement sans clé ;
 lecture on-chain admise sous ADR-0006 ; règle `basis:doc` → ADR-0008
-(proposée). **S2 passe à l'implémentation du harnais.**
+(acceptée). **S2 passe à l'implémentation du harnais.**
 
 ## S3 — Le témoignage de bout en bout *(code)*
 

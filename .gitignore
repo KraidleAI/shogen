@@ -9,3 +9,11 @@ biblio/*.sidecar
 *.tmp
 *.bak
 scratch/
+
+# Python (s2-harness, jetable) — artefacts d'exécution, jamais versionnés.
+__pycache__/
+*.pyc
+# Sortie de collecte S2 : le journal recalculable est volumineux (12 flux ×
+# 1/min × 2 semaines) et se régénère — jamais dans le dépôt. Les fixtures de
+# test (tests/fixtures/) sont versionnées, elles ; c'est voulu.
+s2-harness/data/

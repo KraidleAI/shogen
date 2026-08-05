@@ -420,7 +420,7 @@ précisément le régime où A(window-stationarity) casse.
 
 ## ADR-0008 — Une arête d'amont `basis:doc` ne partitionne pas k_eff ; elle déclenche la mesure de contenu
 
-**Statut** : proposée · 2026-08-05 (en attente d'acceptation du mainteneur)
+**Statut** : acceptée · 2026-08-05 (décision déléguée à l'orchestrateur — révision mainteneur ouverte)
 
 ### Contexte
 
@@ -455,12 +455,19 @@ mesure recalculable.
 
 ### La source qui tranche
 
-Proposée par la conception S2 (10 §4.3) sur la base de la hiérarchie R2
-déjà actée (04 §1, rangs mesuré/déclaré). Assurance : *reviewed* **en
-attente** (mainteneur) — ni proven ni tested. Renfort externe : Chainlink
-v1 (INDEX) nomme le vecteur — des oracles qui « pretend to source data
-independently » — une indépendance déclarée non mesurée est précisément
-l'attaque.
+Décision **déléguée par le mainteneur à l'orchestrateur** le 2026-08-05
+(« choisis chaque dilemme avec rigueur académique, solutions
+documentées »), tranchée sur pièce et non par préférence. Le précédent
+académique qui la fonde : **INDaaS** (Zhai, Chen, Wolinsky, Ford, 2014,
+détenu) — « seemingly independent systems may share deep, hidden
+dependencies » — construit un service qui **audite** les dépendances au
+lieu de les croire déclarées ; c'est exactement « ne pas partitionner sur
+du déclaré, mesurer d'abord ». Renfort : Chainlink v1 (détenu) nomme le
+vecteur — des oracles qui « pretend to source data independently ». Et
+c'est la hiérarchie R2 déjà actée (04 §1, mesuré > déclaré) appliquée au
+calcul de partition. Assurance : décision déléguée, **fondée sur les
+précédents cités** (INDaaS, Chainlink v1, 04 §1) — ni proven ni tested,
+et pas encore *reviewed* : la révision du mainteneur reste ouverte.
 
 ### Ce que la décision coûte
 
@@ -479,5 +486,7 @@ continu.
 prochaine passe docs (10 dette §10.11, avec les autres fermetures dues à
 04). `docs/10-mesures-pilotes-design.md` §3.2, §4.3, §5.6 : la règle y est
 écrite. `09-vocabulaire.md` : candidate — « une arête déclarée fait
-chuter k_eff » comme formulation interdite. **À l'acceptation** : statut →
-*acceptée*, et la règle devient invariante du calcul de partition en S2.
+chuter k_eff » comme formulation interdite. **Accepté le 2026-08-05** : la
+règle est invariante du calcul de partition en S2 — `partition.py`
+l'applique, et un test la vérifie (une arête `basis:doc` seule laisse
+k_eff inchangé).

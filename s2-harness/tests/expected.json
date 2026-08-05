@@ -1,0 +1,81 @@
+{
+  "binance": {
+    "price": "64529.50000000",
+    "currency": "USDT",
+    "source_ts": null,
+    "extra": {}
+  },
+  "coinbase": {
+    "price": "64475.75",
+    "currency": "USD",
+    "source_ts": 1785946281.674372,
+    "extra": {}
+  },
+  "kraken": {
+    "price": "64476.90000",
+    "currency": "USD",
+    "source_ts": null,
+    "extra": {}
+  },
+  "okx_ticker": {
+    "price": "64530.7",
+    "currency": "USDT",
+    "source_ts": 1785946282.963,
+    "extra": {}
+  },
+  "okx_index": {
+    "price": "64475.9",
+    "currency": "USD",
+    "source_ts": 1785946283.338,
+    "extra": {}
+  },
+  "bitstamp": {
+    "price": "64475.35",
+    "currency": "USD",
+    "source_ts": 1785946282.0,
+    "extra": {}
+  },
+  "gemini": {
+    "price": "64483.67000",
+    "currency": "USD",
+    "source_ts": 1785946260.0,
+    "extra": {}
+  },
+  "bitfinex": {
+    "price": "64545",
+    "currency": "USD",
+    "source_ts": null,
+    "extra": {}
+  },
+  "coingecko": {
+    "price": "64432",
+    "currency": "USD",
+    "source_ts": 1785946180.0,
+    "extra": {}
+  },
+  "defillama": {
+    "price": "64436.511163191906",
+    "currency": "USD",
+    "source_ts": 1785946190.0,
+    "extra": {
+      "confidence": "0.99"
+    }
+  },
+  "pyth": {
+    "price": "64474.32058169",
+    "currency": "USD",
+    "source_ts": 1785946281.0,
+    "extra": {
+      "conf": "18.95058169"
+    }
+  },
+  "chainlink": {
+    "price": "64447.50117128",
+    "currency": "USD",
+    "source_ts": 1785943127.0,
+    "extra": {
+      "round_id": "129127208515966884399"
+    }
+  },
+  "_cryptocompare_http": 401
+}
