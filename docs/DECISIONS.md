@@ -415,3 +415,69 @@ qualité d'une source » — **portée**. `05-roadmap.md` §Non-buts —
 **porté**. Le [à décider] de 04 §2 sur la stratification des fenêtres par
 régime gagne son cas motivant : l'ouverture de pré-marché illiquide est
 précisément le régime où A(window-stationarity) casse.
+
+---
+
+## ADR-0008 — Une arête d'amont `basis:doc` ne partitionne pas k_eff ; elle déclenche la mesure de contenu
+
+**Statut** : proposée · 2026-08-05 (en attente d'acceptation du mainteneur)
+
+### Contexte
+
+Le pool S2 (décidé le 2026-08-05, 10 §9) inclut agrégateurs et oracles,
+dont les liens d'amont sont d'abord connus par **déclaration
+documentaire** (CoinGecko ← Binance, Pyth ← Coinbase, DefiLlama ←
+CoinGecko — 10 §4.3), pas par mesure. La question, structurante pour
+k_eff : une arête d'amont établie seulement par doc (`basis:doc`)
+doit-elle réduire k_eff — fusionner deux sources dans une même classe de
+partition — au même titre qu'une arête **mesurée** (`basis:measured` :
+ASN partagé re-mesuré, ou co-résidus corrélés) ?
+
+### Décision
+
+Une arête `basis:doc` seule **ne réduit pas k_eff**. Elle **déclenche** la
+mesure de contenu (b) (10 §4.2) sur la paire concernée, et ne partitionne
+(fusionne) qu'une fois **corroborée `basis:measured`**. C'est la
+hiérarchie des rangs R2 (a/b mesurés > c déclaré, 04 §1) appliquée à
+l'intérieur du calcul de partition : une déclaration d'amont, seule, ne
+fait pas chuter un quorum — elle désigne **où** mesurer.
+
+### Alternative considérée
+
+Faire chuter k_eff dès la déclaration doc (traiter `basis:doc` ≡
+`basis:measured`). Rejetée : (a) elle donne un poids protecteur à une
+déclaration invérifiée — exactement le rang R3 que 04 §1 refuse de
+compter ; (b) une source pourrait **gonfler** sa diversité apparente en
+cachant un amont documentaire (fausse indépendance), ou une source
+honnête serait pénalisée par une doc périmée ; (c) elle rend k_eff
+tributaire de la fraîcheur et de l'honnêteté d'une page web, pas d'une
+mesure recalculable.
+
+### La source qui tranche
+
+Proposée par la conception S2 (10 §4.3) sur la base de la hiérarchie R2
+déjà actée (04 §1, rangs mesuré/déclaré). Assurance : *reviewed* **en
+attente** (mainteneur) — ni proven ni tested. Renfort externe : Chainlink
+v1 (INDEX) nomme le vecteur — des oracles qui « pretend to source data
+independently » — une indépendance déclarée non mesurée est précisément
+l'attaque.
+
+### Ce que la décision coûte
+
+Un amont réel que la mesure de contenu ne capte pas (un copieur qui
+**bruite** ses copies — 10 §4.2, A(axis-coverage)) restera compté comme
+deux classes tant que `basis:measured` n'est pas atteint : k_eff peut donc
+**surestimer** la diversité dans ce cas précis. C'est le prix de ne pas
+faire confiance aux déclarations. Garde-fous : l'arête `basis:doc` est
+publiée (visible au lecteur), et le drapeau « co-défaillance observée non
+expliquée par les axes R2 » (04 §3 ; 10 §5.6) teste A(axis-coverage) en
+continu.
+
+### Registres touchés
+
+`04-certificat-diversite.md` §3 (calcul de k_eff) — à porter à la
+prochaine passe docs (10 dette §10.11, avec les autres fermetures dues à
+04). `docs/10-mesures-pilotes-design.md` §3.2, §4.3, §5.6 : la règle y est
+écrite. `09-vocabulaire.md` : candidate — « une arête déclarée fait
+chuter k_eff » comme formulation interdite. **À l'acceptation** : statut →
+*acceptée*, et la règle devient invariante du calcul de partition en S2.

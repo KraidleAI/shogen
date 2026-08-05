@@ -595,7 +595,26 @@ compris la dernière, enregistrée cette passe :
   attribution croisée sur ≥ 2 bases BGP distinctes + re-mesure à chaque
   quorum.
 
-## 9. Décisions remontées au mainteneur — non tranchées ici
+## 9. Décisions remontées au mainteneur — prises le 2026-08-05
+
+**Résolutions (mainteneur, 2026-08-05 — assurance *reviewed*)** :
+
+1. Périmètre → **les 11 sources répondantes, oracles inclus** (donc
+   lecture on-chain admise, cf. 2).
+2. Lecture on-chain par RPC → **admise** : un `eth_call` en lecture est la
+   surface « lire » qu'ADR-0006 distingue explicitement de « calculer »
+   (interdit) ; aucun calcul on-chain n'est introduit.
+3. CoinGecko → **strictement sans clé** ; un throttle (429) est compté en
+   panne (iii) — comportement publié de l'instrument (§5.2).
+4. Homogénéité → **« BTC/USD-stable », devise marquée par flux** (§2) :
+   garde les 2 flux USDT, l'écart de peg devient mesurable par (2a).
+5. Budget → **≈ 2 semaines, w = 60 s, 2 strates** (calme/stress) : n
+   bien au-delà du seuil §5.4 dans les deux régimes.
+6. Règle `basis:doc` → **portée en ADR-0008** (proposée le 2026-08-05, en
+   attente d'acceptation), avec alternative et coût.
+
+La justification de chaque option et les alternatives restent consignées
+ci-dessous, telles qu'écrites avant la décision.
 
 1. **Périmètre du pool S2** : les 7 places primaires seules, ou les 11
    sources répondantes (12 flux, avec agrégateurs et oracles) ?
