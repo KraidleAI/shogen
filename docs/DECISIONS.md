@@ -113,8 +113,8 @@ déterministe non garantie par la spec, rejeté.
 
 Le précédent structurel du projet : C2PA 2.4 (détenu, vérifié par grep) —
 la claim est « a CBOR payload, which shall comply with the Core
-Deterministic Encoding Requirements of CBOR », signée en COSE (40
-occurrences dans la spec). Le cousin le plus proche du fait typé fait
+Deterministic Encoding Requirements of CBOR », signée en COSE (56
+occurrences du mot sur 40 lignes de la copie détenue). Le cousin le plus proche du fait typé fait
 exactement ce choix, pour les mêmes raisons de vérifiabilité.
 
 ### Ce que la décision coûte
@@ -158,9 +158,9 @@ revérifie. Rejetée.
 
 ### La source qui tranche
 
-02-vision (la promesse fondatrice) ; le contraste INDaaS ; et le GTM §4 :
-la neutralité du benchmark n'est défendable que si « tout est
-recalculable offline » (parade au risque n°1).
+02-vision (la promesse fondatrice) ; le contraste INDaaS ; et le GTM (thèse
+de neutralité au §4 ; parade au risque n°1 au §6, où la chaîne « tout est
+recalculable offline » est écrite verbatim).
 
 ### Ce que la décision coûte
 
@@ -348,10 +348,10 @@ L'incident SK Hynix du 28 juillet 2026 (Galaxy Research, détenu :
 grep) : une action s'échange à 1 272 000 won, « 29.96% below the previous
 close », dans les premières secondes du pré-marché NextTrade ; le prix se
 propage et déclenche ≈ 60 M$ de liquidations. L'article qualifie lui-même
-la lecture de **« accurate but anomalous »** — la source a dit vrai — et
+la lecture de **« accurate but anomalous »** — une exécution réelle a eu lieu à ce prix, au sens de l'article — et
 conclut : « The oracle worked. The risk system didn't. »
 
-Deux constats pour nous. **Le premier valide le certificat** : le prix de
+Deux constats pour nous. **Le premier illustre exactement ce que le rang R2 existe pour révéler** : le prix de
 référence est « the median of three inputs: the oracle price, the oracle
 plus a 150-second exponential moving average of the book's deviation from
 it, and the median of best bid, best ask, and last trade » — deux des

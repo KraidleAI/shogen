@@ -82,19 +82,25 @@ transport + couche), ADR-0002/0003/0004/0005 acceptées (DECISIONS.md),
 vocabulaire interdit `09-vocabulaire.md` (11 entrées propres + héritées),
 amendements portés dans 03 §5 et 04 §1/§4.
 
-**S1 NON CLOSE — audit de sortie partiel.** La passe d'audit a été
-interrompue par une limite d'usage : **1 dimension sur 3 a rendu**
-(cohérence des registres — 6 trouvailles, toutes vérifiées à la main par
-le mainteneur-agent et **toutes corrigées** le 2026-07-30 : fermeture
-non portée de 04 §5 + identifiant mort A(shogen-mesure), trois
-« registres touchés » périmés, deux assumptions non citées à leur site,
-localisations Chainlink v1 non vérifiées, 03 §2 périmé, 4ᵉ référence
-inter-projets omise). **Les deux dimensions manquantes n'ont jamais
-tourné** : (a) fidélité des citations des ADR-0002..0005 aux artefacts
-détenus, (b) le projet contrôlé contre son propre vocabulaire interdit.
-Tant qu'elles n'ont pas tourné, le critère de sortie de S1 n'est **pas**
-satisfait — et rien de S1 ne doit être cité comme audité sur ces deux
-axes. À relancer dès que le budget le permet.
+**→ S1 CLOSE le 2026-08-05.** L'audit de sortie s'est déroulé en deux
+temps. **Passe 1 (2026-07-30)** — coupée par une limite d'usage à 1
+dimension sur 3 (cohérence des registres) : 6 trouvailles vérifiées à la
+main et corrigées (fermeture non portée de 04 §5 + identifiant mort
+A(shogen-mesure), trois « registres touchés » périmés, deux assumptions
+non citées à leur site, localisations Chainlink v1, 03 §2 périmé, 4ᵉ
+référence inter-projets). **Passe 2 (2026-08-05)** — les deux dimensions
+manquantes ont tourné jusqu'au bout (18 agents, 0 mort) : fidélité des
+citations des ADR et projet contrôlé contre son propre vocabulaire
+interdit. **11 confirmées, 5 réfutées**, toutes re-vérifiées à la main
+(frontière de passe) et corrigées : cible « tested » écrite dans une case
+d'état (→ « aucune »), ADR-0003 pointant GTM §4 pour une citation en §6,
+« intends »→« proposes » (Chainlink), « 40 occurrences » = 40 lignes/56
+occurrences, deux gloses françaises entre guillemets d'une citation
+anglaise, et **deux graves de vocabulaire** : « faits signés » en page de
+garde (→ « à provenance attestée »), « la source a dit vrai » et « valide
+le certificat » dans la voix du projet en ADR-0007 (→ reformulés).
+Rapport de passe 2 archivé : `docs/rapports/s1-exit-audit-2026-08-05.json`.
+Le critère de sortie de S1 (audit sans claim sans support) est satisfait.
 
 ## S2 — Le prototype qui tranche *(code, premier)*
 

@@ -26,7 +26,7 @@ consommer, avec vérification offline du lot par un tiers.
   aux bytes. La perception y est bornée et rendue visible, jamais empêchée.
 - Shōgen : *attested perception* — aucun fait critique sans témoignage lié à
   sa source, et aucun quorum sans mesure d'indépendance.
-- Le `gather` de Kraidle exige des faits signés par leurs sources
+- Le `gather` de Kraidle exige des faits à provenance attestée par leurs sources
   (ADR-0017 Kraidle) et des quorums pour les classes critiques (ADR-0023) ;
   A(indépendance des sources) y est une dette nommée non déchargée. Shōgen
   est l'outil qui la décharge. Les deux projets restent souverains : Shōgen
