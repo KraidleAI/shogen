@@ -120,10 +120,27 @@ ou si R1 ne discrimine rien sur données réelles, le cœur différenciant est
 une hypothèse morte et il faut le savoir avant d'écrire une ligne de
 produit. C'est le « prototype qui tranche » — jetable, résultat écrit.
 
-**Critère** : un rapport `07-mesures-pilotes.md` avec les chiffres réels :
-n fenêtres, K, z du pool, la partition R2 constatée, k_eff vs k nominal.
+**Critère** : un rapport `11-mesures-pilotes.md` (07 est occupé par le
+GTM ; réconcilié le 2026-08-05, 10 §7) avec les chiffres réels : n
+fenêtres, K, z du pool, la partition R2 constatée, k_eff vs k nominal.
 *Résultat négatif = résultat* : « les axes ne discriminent pas » s'écrit
 avec les chiffres et déclenche la révision de 04.
+
+**État au 2026-08-05** : la conception de l'instrument est écrite —
+`docs/10-mesures-pilotes-design.md` (classe pilote, pool, graphe d'amonts,
+trois observables R2, statistique R1 sourcée, table de sortie recalculable,
+6 décisions remontées, 11 dettes nommées) — sur faits re-établis à
+l'aveugle uniquement (3 workers + 5 vérificateurs, même jour). La
+faisabilité du pool est établie par mesure : 11 des 12 endpoints candidats
+répondent 200 sans clé (12 flux, prix mutuellement cohérents à ~0,16 %,
+re-mesure du 2026-08-05 ~12:02–12:04 UTC), CryptoCompare exige une clé
+(401) et est écartée ; et l'axe R2 ASN est observable en une mesure
+rejouable — 4 des 5 hôtes sondés partagent AS13335 (Cloudflare), soit côté
+livraison k_eff = 2 pour k nominal = 5. L'axe corrélation de contenu reste
+une conception non exécutée, et l'instrument n'a pas tourné : aucun
+n, K, z encore. Le critère de sortie binaire ci-dessus reste inchangé
+(seul le nom de fichier du rapport a été réconcilié en
+`11-mesures-pilotes.md`, 07 étant occupé par le GTM).
 
 ## S3 — Le témoignage de bout en bout *(code)*
 

@@ -1,7 +1,8 @@
 # Shōgen — registre bibliographique
 
-**17 artefacts détenus** au 2026-07-31 (compte re-mesuré par listing du
-dossier dans la passe qui écrit ce chiffre). Chaque
+**21 artefacts détenus** au 2026-08-05 (compte re-mesuré par listing du
+dossier dans la passe qui écrit ce chiffre ; +4 fetchés à la passe S2, en
+bas de registre). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
 de vérification des citations qui s'appuient dessus. Pas de sidecars encore
 (outillage à monter — les greps ci-dessous portent sur les fichiers bruts,
@@ -37,6 +38,19 @@ les PDFs sur lectures visuelles).
 |---|---|---|---|
 | `galaxy-2026-07-31-tradexyz-oracle.html` | Galaxy Research, note hebdomadaire du 31 juillet 2026 — section sur les liquidations TradeXYZ / xyz:SKHYNIX (copie du 2026-07-31 ; page mutable) | sections liquidations + « Our take » (fetch, puis grep sur la copie) | Vérifiées par grep dans le fichier détenu (1 occurrence chacune) : « liquidations resulting from an **accurate but anomalous** third-party price feed reading » ; « a single share of chip manufacturer SK Hynix changed hands for **1,272,000** won (roughly $868) in the opening seconds of South Korea's **NextTrade** pre-market session … 29.96% below the previous close » ; la composition — « TradeXYZ's mark price is the **median of three inputs**: the oracle price, the oracle plus a 150-second exponential moving average of the book's deviation from it, and the median of best bid, best ask, and last trade » ; « That smoothing absorbed about 11 percentage points of a 30% corrupted input. It was not enough. The mark fell 18.7% » ; le verdict — « **The oracle worked. The risk system didn't.** Traditional markets **separated last trade**, index price, and fair value for risk purposes decades ago, precisely so one local execution cannot decide the fate of a leveraged account ». Porte ADR-0007. |
 
+### Fetchés par la passe S2 (2026-08-05) — source du seuil statistique et précédent de détection de copie
+
+Les quatre appuient `docs/10-mesures-pilotes-design.md`. Trois formes du
+seuil d'approximation normale de la binomiale coexistent et **ne se
+confondent pas** (10 §5.4) : c'est pourquoi les trois sources sont détenues.
+
+| fichier | ce que c'est (page de titre / en-tête) | lu | citations vérifiées |
+|---|---|---|---|
+| `uconn-oer-math3160-ch9-2018.pdf` | University of Connecticut, OER Math 3160 (Probability), ch. 9 « Normal approximation to the binomial », p. 121 (`prob3160ch9.pdf`) | p. 121 lue au fichier le 2026-08-05 (V5 + grep de rédaction) | Vérifiée : sous le théorème 9.1, « This approximation is good if np(1 − p) ⩾ 10 and gets better the larger this quantity gets » (le « ⩾ » tombe à l'extraction texte, présent au rendu ; grep confirme la phrase). **Source du critère « historique insuffisant » de R1** (10 §5.4) — la forme produit-variance, en une inégalité. |
+| `nist-sematech-ehandbook-prc24.html` | NIST/SEMATECH e-Handbook of Statistical Methods, §7.2.4 « Does the proportion of defectives meet requirements? » (copie du 2026-08-05 ; page mutable) | §7.2.4, sous-section « Restriction on sample size » (fetch + grep) | Vérifiée par grep : « min{Np₀, N(1 − p₀)} ≥ 5 » et « valid for large N, (N > 30) ». **Forme voisine distincte** (seuil 5, min des deux) — garde-fou de 10 §5.4, à ne pas confondre avec le produit-variance. Piège écarté (V5, verdict REFUTE) : la page « Binomial Distribution » §1.3.6.6.18 (`eda366i.htm`) ne contient aucun seuil d'approximation. |
+| `psu-stat200-8-1-1-1.html` | Penn State STAT 200, §8.1.1.1 « Normal Approximation Formulas » (copie du 2026-08-05 ; page mutable) | §8.1.1.1 (fetch + grep) | Vérifiée par grep : « both np ≥ 10 and n(1−p) ≥ 10 » — deux comptes de succès/échec, **forme voisine distincte** (10 §5.4). |
+| `dong-2010-pvldb-copying-R120.pdf` | Dong, Berti-Équille, Hu, Srivastava, *Global Detection of Complex Copying Relationships Between Sources*, PVLDB 3(1):1358-1369, 2010 (`vldb.org/pvldb/vol3/R120.pdf` — **R120**, pas R121) | page de titre + résumé + intro lus le 2026-08-05 (V5) ; **corps non lu** | Identité re-établie (titre, auteurs, venue, p. 1358). Précédent académique de l'axe R2 (2c), détection de copie par fautes partagées (10 §4.2). **(2c) ne le cite pas tant que le corps n'est pas lu** (dette 6). Prédécesseur du mécanisme pairwise : « Integrating Conflicting Data: The Role of Source Dependence », PVLDB 2, 2009 (non détenu). |
+
 ## Dettes de registre
 
 1. ~~L'article original de Knight & Leveson~~ — **fermée le 2026-07-30** :
@@ -70,3 +84,9 @@ les PDFs sur lectures visuelles).
    vérifié le 2026-07-30 : « v is either the observation of a correct
    oracle or lies between the observations of two correct oracles »).
    Décision à prendre : copie locale ou référence croisée inter-projets.
+
+6. **Corps de Dong et al. 2010** (`dong-2010-pvldb-copying-R120.pdf`) non
+   lu (page de titre + intro seulement) ; le prédécesseur PVLDB 2009
+   (« Integrating Conflicting Data: The Role of Source Dependence », où naît
+   le mécanisme des fautes partagées) n'est pas détenu. À lire / fetcher
+   avant que l'axe R2 (2c) ne cite le précédent (10 §4.2, dette §10.1).
