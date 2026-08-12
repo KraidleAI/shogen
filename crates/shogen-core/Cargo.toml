@@ -1,0 +1,21 @@
+[package]
+name = "shogen-core"
+version = "0.0.0"
+description = "Cœur pur de Shōgen : formes canoniques. Aucune I/O, aucune horloge, aucun nom de transport."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# ADR-0012 D3 : « Dans `crates/shogen-core` et `crates/shogen-verifier`, chaque
+# dépendance directe porte une version **exacte** ».
+# État visé et tenu en S2.5 : ZÉRO dépendance directe hors dev.
+# Le choix d'une crate CBOR réelle est un travail S3, sous R-8 — pas de S2.5 :
+# le sous-ensemble canonique nécessaire au squelette est écrit à la main ici.
+[dependencies]
+
+[dev-dependencies]
+# Property-based obligatoire sur le cœur pur (ADR-0011, point 2).
+# Contrôle R-8 fait AVANT installation le 2026-08-12 (existence, ancienneté,
+# mainteneurs, téléchargements) — voir le rapport de passe.
+# Version exacte (D3, appliqué aussi aux dépendances de développement du cœur).
+proptest = { version = "=1.11.0", default-features = false, features = ["std"] }

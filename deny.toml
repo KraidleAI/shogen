@@ -1,0 +1,71 @@
+# Configuration cargo-deny — le volet MÉCANIQUE de R-8 (ADR-0012 D5, moitié 2)
+# et les volets « licence non listée / advisory non traitée » de la gate S-G7
+# (DEVOPS §3).
+#
+# Rattachement (G0) : ADR-0012 D1 (le lockfile fait foi), D4 (registre, pas
+# vendoring), D5 (R-8 en deux moitiés qui ne se remplacent pas).
+#
+# Règle qui gouverne ce fichier, écrite ici pour qu'aucun futur passage ne
+# l'ignore : « Une advisory qu'on choisit de ne pas corriger n'est **jamais** un
+# ignore silencieux : elle devient une entrée de dette formée (R-13), avec
+# propriétaire et échéance, ou la gate reste rouge » (ADR-0012 D5). La liste
+# `ignore` ci-dessous est donc VIDE, et elle ne se remplit pas sans ADR.
+
+[graph]
+all-features = true
+# Déclaré explicitement plutôt qu'hérité d'un défaut d'outil : les dépendances
+# de développement entrent dans le graphe contrôlé. `proptest` est aujourd'hui
+# la seule, et elle est une dépendance directe du cœur (ADR-0012 D5).
+exclude-dev = false
+
+[advisories]
+# Toute advisory connue casse la construction. Aucun délai de grâce.
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+# ADR-0014 (2026-08-12) : la décision de licence de NOS crates est contractée
+# à l'entrée de S3 (dette prudente-délibérée au sens Fowler/G5, propriétaire :
+# mainteneur, échéance : passage public). D'ici là les crates du workspace sont
+# `publish = false` (fait de manifeste) et la gate les ignore — re-serrage
+# mécanique : toute crate rendue publiable sans licence remet le rouge.
+# Modification de gate portée par ADR-0014, jamais de la propre initiative de
+# l'outilleur (charte shogen-devops §2).
+private = { ignore = true }
+# Resserrage explicite : cargo-deny ne contrôle PAS les licences des dépendances
+# de développement par défaut (elles ne sont pas redistribuées). Nous les
+# contrôlons quand même — `proptest` et son arbre entrent dans le dépôt qui
+# passe public à S3 (DEVOPS §1), fût-ce par le lockfile.
+include-dev = true
+# Liste fermée. Le dépôt passe public à S3 (DEVOPS §1) : ce qu'il embarque
+# devient redistribué, et l'obligation d'attribution suit.
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.93
+exceptions = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Aucune dépendance de transport ni de réseau ne doit apparaître dans le graphe
+# (ADR-0001, S-G2). La liste est un filet, pas la gate : S-G2 tient l'arête.
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# D4 : les dépendances viennent du registre officiel, liées par les empreintes
+# du lockfile. Aucun registre ni dépôt git alternatif.
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

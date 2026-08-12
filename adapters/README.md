@@ -1,0 +1,1 @@
+Un adapter par transport d'attestation (ADR-0001) — **aucun n'existe en S2.5** (12 §1, non-objet 1) : ce répertoire est vide par décision, et le vérificateur n'aura jamais d'arête vers lui (gate S-G2).

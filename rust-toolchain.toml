@@ -1,0 +1,15 @@
+# Toolchain épinglée par fichier versionné — ADR-0009, point 3 de la Décision :
+# « version exacte (pas `stable`), composants et cibles déclarés ; la CI Windows
+# et Linux consomme ce même fichier, jamais un canal flottant ».
+# Fondation citée dans ADR-0012 D2 : les entrées d'un build incluent
+# « the entire build toolchain including the compiler, linker and build system ».
+#
+# La valeur est la version MESURÉE par l'orchestrateur le 2026-08-12 sur la
+# machine du mainteneur, et re-mesurée dans la passe qui écrit ce fichier :
+#   rustc 1.97.1 (8bab26f4f 2026-07-14) / cargo 1.97.1 (c980f4866 2026-06-30)
+# Ce n'est pas une citation bibliographique : c'est une mesure locale rejouable
+# (`rustc --version`, `cargo --version`, `rustup show active-toolchain`).
+[toolchain]
+channel = "1.97.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

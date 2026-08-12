@@ -1,0 +1,143 @@
+# Walking skeleton sous gates — CI Windows ET Linux, toutes bloquantes.
+#
+# Rattachement (G0) :
+#   - ADR-0013, point 1 : les gates sont bloquantes et non discrétionnaires ;
+#     aucun `continue-on-error`, aucun break-glass.
+#   - ADR-0013, point 4 : « CI Windows ET Linux, bloquantes toutes deux, sur
+#     chaque push », et les mêmes gates rejouables en local (`cargo xtask
+#     verify`) — l'entrée est LA MÊME ici et sur le poste.
+#   - ADR-0013, point 5 : « actions GitHub épinglées par SHA de commit, jamais
+#     par tag — la version taguée d'une action est une page mutable ».
+#   - ADR-0009, point 3 : la toolchain vient de `rust-toolchain.toml`, jamais
+#     d'un canal flottant ; le job le VÉRIFIE au lieu de l'espérer.
+#   - ADR-0012 D1 : toute construction est verrouillée (`--locked`) ; une
+#     construction qui devrait réécrire le lockfile échoue.
+#   - ADR-0012 D7 / ADR-0010 point 8 : zéro autorité ambiante — permissions
+#     minimales déclarées ici, credentials de checkout non persistés, aucun
+#     secret, aucun droit de publier dans ce workflow.
+#
+# Ce que ce workflow N'A PAS : le double-build à environnement varié d'ADR-0012
+# D6 (reproductibilité bit-à-bit) et les volets licences/advisories de S-G7.
+# Les deux sont nommés comme dus dans le rapport de passe, pas simulés ici.
+
+name: squelette
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Zéro autorité ambiante : rien d'autre que la lecture du dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: squelette-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  squelette:
+    name: squelette (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        # actions/checkout, épinglé par SHA de commit — tag v7.0.1
+        # (SHA résolu par `gh api repos/actions/checkout/tags` le 2026-08-12 ;
+        #  commit daté 2026-07-17T18:45:11Z)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          echo "toolchain épinglée : ${TOOLCHAIN}"
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          cargo --version
+          # La toolchain servie DOIT être celle du fichier : sinon le lockfile
+          # et l'épinglage ne veulent rien dire (ADR-0012 D2).
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Lockfile intact (le lockfile fait foi — ADR-0012 D1)
+        run: |
+          set -euo pipefail
+          cargo metadata --locked --format-version 1 > /dev/null
+          git diff --exit-code -- Cargo.lock
+
+      - name: Build verrouillé
+        run: cargo build --locked --workspace --all-targets
+
+      - name: Vérificateur sans features par défaut (préparation no_std, S3)
+        # ADR-0009, point 6 : « En S2.5, le walking skeleton pose et **teste**
+        # les contraintes qui rendent ce basculement possible : … le
+        # vérificateur compile avec `--no-default-features` ». Ce n'est PAS
+        # `no_std` — c'est la contrainte qui le laisse atteignable.
+        run: cargo build --locked --package shogen-verifier --no-default-features
+
+      - name: Tests (dont les mutants semés des gates)
+        run: cargo test --locked --workspace -- --nocapture
+
+      - name: Gates — cargo xtask verify (S-G1, S-G2, S-G3, S-G7a, fmt, clippy)
+        run: cargo run --locked --package xtask -- verify
+
+      - name: Walking skeleton bout-en-bout (lot intact puis lot muté)
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/lots"
+          INTACT="${RUNNER_TEMP}/lots/lot.cbor"
+          MUTE="${RUNNER_TEMP}/lots/lot-mute.cbor"
+          cargo run --locked --package xtask -- emettre-exemple "${INTACT}"
+          cargo build --locked --package shogen-verifier
+          echo "--- lot intact : doit sortir 0 et NOMMER son résidu ---"
+          cargo run --locked --quiet --package shogen-verifier -- "${INTACT}"
+          echo "--- lot muté (octet de structure 0) : doit sortir != 0 ---"
+          cargo run --locked --package xtask -- muter "${INTACT}" "${MUTE}" 0 255
+          if cargo run --locked --quiet --package shogen-verifier -- "${MUTE}"; then
+            echo "::error::le vérificateur a ACCEPTÉ un lot muté — fail-closed rompu"
+            exit 1
+          fi
+          echo "lot muté refusé, fail-closed tenu."
+
+      - name: Outil S-G7 — cargo-deny, version exacte
+        # Version EXACTE et `--locked` : l'outil de contrôle de la chaîne entre
+        # par la même discipline que ce qu'il contrôle (ADR-0012 D3, D5).
+        # Aucune action tierce n'est ajoutée à la chaîne pour l'installer : un
+        # acteur de moins entre le dépôt et le binaire.
+        run: cargo install cargo-deny --locked --version 0.20.2
+
+      - name: S-G7 — licences, bans, sources, advisories (cargo-deny)
+        # BLOQUANT, sans exception (ADR-0013, point 1 ; corpus R-22).
+        #
+        # ÉTAT CONNU AU 2026-08-12, écrit ici plutôt que tu : cette étape est
+        # ROUGE tant que les trois crates du dépôt n'ont pas de champ `license`
+        # (`error[unlicensed]` × 3). Ce n'est pas un défaut de la gate — c'est
+        # une décision de projet non prise : sous quelle licence Shōgen passe-t-il
+        # public à S3 (DEVOPS §1) ? Deux sorties licites, toutes deux au
+        # mainteneur : (1) choisir la licence et la déclarer aux manifestes ;
+        # (2) une ADR qui ratifie `[licenses] private = { ignore = true }` en
+        # justifiant que le contrôle ne porte que sur le code tiers.
+        # Mesure de la passe S2.5-C : `bans ok, sources ok` ; licences des
+        # dépendances tierces (dev incluses) toutes dans la liste blanche ;
+        # `advisories` NON exécuté localement (accès git indisponible dans
+        # l'environnement de la passe) — ce runner le fait tourner pour de bon.
+        run: cargo deny --locked check

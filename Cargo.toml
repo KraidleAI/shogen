@@ -1,0 +1,29 @@
+# Racine du workspace Shōgen.
+#
+# Rattachement (G0) :
+#   - DEVOPS §2 (structure cible), ratifiée par ADR-0010 (« DEVOPS §2 : ratifié.
+#     La structure du workspace est la doctrine de cette ADR, non plus un plan »).
+#   - ADR-0009 : Rust pour les trois rôles ; MSRV = la version épinglée,
+#     déclarée mécaniquement en manifeste (`rust-version`) ; edition 2024.
+#   - ADR-0012 D1 : le lockfile committé fait foi à la construction.
+#
+# `adapters/` n'est PAS membre du workspace : S2.5 n'écrit aucun adapter réel
+# (12 §1, non-objet 1). Le répertoire existe et porte son README, rien d'autre.
+[workspace]
+resolver = "3"
+members = ["crates/shogen-core", "crates/shogen-verifier", "xtask"]
+
+[workspace.package]
+# ADR-0009, points 4 et 5 — seuils CANDIDATS, ratification mainteneur due (12 §9.1).
+edition = "2024"
+rust-version = "1.97"
+publish = false
+
+[profile.release]
+# Défense en profondeur : un débordement arithmétique devient un échec détecté
+# plutôt qu'un résultat silencieusement faux. La tension est nommée : une panique
+# est un déni (S-G3) ; un vérificateur qui ACCEPTE un lot sur un calcul débordé
+# est pire. Le cœur et le vérificateur ne portent aujourd'hui AUCUN opérateur
+# arithmétique (S-G3 le mesure) : ce réglage ne couvre donc que d'éventuelles
+# dépendances futures, et il n'est pas ce qui établit l'absence de panique.
+overflow-checks = true

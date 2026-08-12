@@ -12,12 +12,22 @@ on:
     branches: [main]
   pull_request:
 
+# Zéro autorité ambiante : le droit du jeton est DÉCLARÉ ici, jamais hérité d'un
+# réglage de dépôt implicite (ADR-0012 D7 ; DEVOPS §4).
+permissions:
+  contents: read
+
 jobs:
   g5-dette:
     name: g5-no-naked-todo
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # Épinglé par SHA de commit, jamais par tag (ADR-0013, point 5 : « la
+      # version taguée d'une action est une page mutable »). SHA résolu le
+      # 2026-08-12 par `gh api repos/actions/checkout/git/ref/tags/v4`.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # tag v4.4.0
+        with:
+          persist-credentials: false
       - name: TODO/FIXME nus interdits (R-13)
         # Motif testé sur le dépôt réel avant instanciation (0 marqueur au 2026-08-12).
         # Exclusions : biblio/ (corpus de recherche), .claude/ (instructions d'agents),

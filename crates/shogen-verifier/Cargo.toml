@@ -1,0 +1,22 @@
+[package]
+name = "shogen-verifier"
+version = "0.0.0"
+description = "Vérificateur offline de Shōgen. Ne dépend que du cœur : ni réseau, ni horloge, ni adapter."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "shogen-verifier"
+path = "src/main.rs"
+
+# ADR-0010, point 3 : « `shogen-verifier -> shogen-core`, et rien d'autre ».
+# ADR-0012 D3 : version exacte au manifeste sur le périmètre cœur + vérificateur.
+# La gate S-G2 contrôle CE manifeste et la fermeture de dépendances réelle
+# (`cargo tree -e normal`), pas une intention.
+[dependencies]
+shogen-core = { path = "../shogen-core", version = "=0.0.0" }
+
+# Zéro dépendance de développement : les tests du vérificateur exercent le
+# binaire réel via `CARGO_BIN_EXE_shogen-verifier`, sans harnais tiers.
+[dev-dependencies]

@@ -5,6 +5,11 @@ biblio/*.pdf
 biblio/*.html
 biblio/*.sidecar
 
+# Rust — artefacts de build, jamais versionnés (demande phase C S2.5,
+# 2026-08-12 ; le pis-aller target/.gitignore posé par le worker devient
+# ainsi redondant mais inoffensif).
+/target/
+
 # Scratch local
 *.tmp
 *.bak

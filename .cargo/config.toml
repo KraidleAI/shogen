@@ -1,0 +1,9 @@
+# Alias unique : `cargo xtask verify` est L'ENTRÉE des gates, en local comme en
+# CI (DEVOPS §3 : « mêmes gates en local » — « une gate qui ne tourne que quand
+# on y pense ne vaut rien » ; ADR-0013, point 4).
+#
+# Ce fichier ne porte QUE l'alias : aucun drapeau de compilation implicite,
+# aucune variable d'environnement, aucun registre alternatif — zéro autorité
+# ambiante (ADR-0012 D7). Tout ce dont un job dépend est déclaré là où il tourne.
+[alias]
+xtask = "run --quiet --package xtask --"

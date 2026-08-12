@@ -1,0 +1,21 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+description = "Les gates de Shōgen (S-G1, S-G2, S-G3, volet mécanisable de S-G7) et l'outillage de passe."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+name = "xtask"
+path = "src/lib.rs"
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+# ADR-0012 D3, seconde moitié : « dans `adapters/*` et `xtask/`, des plages
+# semver ». L'ensemble vide de dépendances est ce qui reste le plus simple à
+# auditer — la seule arête est interne au workspace.
+[dependencies]
+shogen-core = { path = "../crates/shogen-core", version = "=0.0.0" }
