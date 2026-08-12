@@ -1,8 +1,10 @@
 # Shōgen — registre bibliographique
 
-**42 artefacts détenus** au 2026-08-12 (compte re-mesuré par listing du
-dossier dans la passe qui écrit ce chiffre ; +21 fetchés à la passe S2.5, en
-bas de registre). Chaque
+**114 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
+dossier dans la passe qui écrit ce chiffre — mécanisé par la gate S-G6
+depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), en bas
+de registre ; les `*.sidecar`, extractions texte locales des PDF pour la
+gate S-G5, ne comptent pas comme artefacts). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
 de vérification des citations qui s'appuient dessus. Pas de sidecars encore
 (outillage à monter — les greps ci-dessous portent sur les fichiers bruts,
@@ -71,7 +73,7 @@ lectures de section se font à la rédaction des ADR, une-citation-un-grep.
 | `cisa-2023-memory-safe-roadmaps.pdf` | CISA, NSA, FBI + ASD ACSC, CCCS, NCSC-UK, NCSC-NZ, CERT NZ : *The Case for Memory Safe Roadmaps — Why Both C-Suite Executives and Technical Experts Need to Take Memory Safe Coding Seriously*, « Publication: December 2023 », **TLP:CLEAR** (« may be distributed without restriction »). sha256 `dfe3e72e075738e345aab81a541f72ab4c0cd149235426108090bf48787bc34b` | page de titre lue au fichier le 2026-08-12 | Source primaire .gov. ADR-0009 (instruit l'alternative C/C++). |
 | `parnas-1972-criteria-cacm.pdf` | Tiré CACM authentique : D.L. Parnas (Carnegie-Mellon), *On the Criteria To Be Used in Decomposing Systems into Modules*, CACM 15(12), déc. 1972, p. 1053, © 1972 ACM — **pagination journal citable**. Provenance re-établie (octets identiques à `win.tue.nl/~wstomv/edu/2ip30/references/criteria_for_modularization.pdf`). sha256 `7008fd6abc833ded750e52dbac4968e8eda339f66b462ca4427f1953f98df9c4` | p. 1053 lue au fichier le 2026-08-12 (abstract, intro) | ADR-0010 — la source-qui-tranche candidate de la décomposition. |
 | `meyer-1992-dbc-computer.pdf` | Bertrand Meyer (Interactive Software Engineering), *Applying "Design by Contract"*, IEEE Computer, p. 40, bandeau « 0018-9162/92/1000-0040 © 1992 IEEE » (cohérent avec 25(10), oct. 1992 — candidat). Provenance re-établie (octets identiques à `se.inf.ethz.ch/~meyer/publications/computer/contract.pdf`). sha256 `bc1bab86f8753e5eafb40b7558e961b2c4bc9938c061e8dd8c141b839873ac07` | p. 40 lue au fichier le 2026-08-12 | Accroche vue p. 40 : « reduce bugs by building software components on the basis of carefully designed contracts ». ADR-0010 ; le livre OOSC2 reste en procurement (12 §4.2). |
-| `claessen-hughes-2000-quickcheck-icfp.pdf` | Claessen & Hughes (Chalmers ×2), *QuickCheck: A Lightweight Tool for Random Testing of Haskell Programs*, ICFP '00 (Montréal), © 2000 ACM 1-58113-202-6/00/0009 — DOI non imprimé ; copie de cours (Tufts) paginée 1..N : pages ACM 268-279 non citables d'ici. sha256 `bfddcaa648f836e50804910fc0956cc037c1a8b3e3d6716fb12e4e1ffdcb5172` | p. 1 lue au fichier le 2026-08-12 (titre, abstract, §1) | ADR-0011 — fondation du property-based. |
+| `claessen-hughes-2000-quickcheck-icfp.pdf` | Claessen & Hughes (Chalmers ×2), *QuickCheck: A Lightweight Tool for Random Testing of Haskell Programs*, ICFP '00 (Montréal), © 2000 ACM 1-58113-202-6/00/0009 — DOI non imprimé ; copie de cours (Tufts) paginée 1..N : pages ACM 268-279 non citables d'ici. sha256 `bfddcaa648f836e50804910fc0956cc037c1a8b3e3d6716fb12e4e1ffdcb5172` | p. 1 lue au fichier le 2026-08-12 (titre, abstract, §1) ; p. 1 relue visuellement le 2026-08-12 (S3) | ADR-0011 — fondation du property-based. **Citations vérifiées visuellement p. 1 (S3)** : abstract, « Random testing is especially suitable for functional programs because properties can be stated at a fine grain. » ; §1, « It is generally accepted that pure functions are much easier to test than side-effecting ones, because one need not be concerned with a state before and after execution. » **Limite d'extraction consignée** : la fonte du PDF n'a pas de mapping pour la ligature « fi » — pdftotext ET pypdf la perdent (« ne grain », « su ces ») ; le sidecar ne peut PAS porter ces phrases, le registre les porte ici, c'est le chemin couvert par S-G5. |
 | `demillo-1978-hints-computer.pdf` | Tiré Computer authentique : DeMillo (Georgia Tech), Lipton & Sayward (Yale), *Hints on Test Data Selection: Help for the Practicing Programmer*, Computer 11(4), avr. 1978, p. 34, © 1978 IEEE (bandeau « 0018-9162/78/0400-0034 ») ; miroir de cours `gse.ufsc.br`. sha256 `3f0baffdc0cff1400caacf4318c6e6b72f2c5bf49511be77c1c3d739ff35c789` | p. 34 lue au fichier le 2026-08-12 ; corps lu par le worker (8 p.), **à relire avant citation** | **Trouvaille de passe** (worker ; corroborée p. 34 par l'orchestrateur) : la locution « competent programmer hypothesis » n'apparaît PAS dans l'article — p. 34 écrit « competent programmers, in their many iterations through the design process… », le « coupling effect » est en accroche (« this so-called coupling effect ») ; la **nomination** CPH est postérieure (Jia & Harman, §II.A). Citer la phrase de 1978 et la nomination de 2011, jamais l'une pour l'autre. ADR-0011. |
 | `jia-harman-2011-mutation-survey-tse.pdf` | Jia & Harman (KCL/CREST), *An Analysis and Survey of the Development of Mutation Testing*, IEEE TSE — copie d'auteur (UCL, `www0.cs.ucl.ac.uk/staff/mharman/`) paginée 1..N : la référence 37(5):649-678 (2011) reste **candidate**, pagination non citable d'ici. sha256 `056ac9b99410321c7cb80a29284c4ca106456e1a0cf64b6f4d633ba83edff342` | p. 1 lue au fichier le 2026-08-12 (titre, abstract, §I) | Vu p. 1 : « mutation adequacy score », « The history of Mutation Testing can be traced back to 1971 in a student paper by Richard Lipton ». ADR-0011 — le survey qui porte la nomination CPH (§II.A, à greper à la rédaction). |
 | `inozemtseva-holmes-2014-coverage-icse.pdf` | Inozemtseva & Holmes, *Coverage Is Not Strongly Correlated with Test Suite Effectiveness*, ICSE '14 (Hyderabad), © ACM 978-1-4503-2756-5/14/05 — DOI non imprimé, copie paginée 1..11 (pages ACM 435-445 non citables d'ici). **Affiliation imprimée : University of Waterloo** (la copie est hébergée sur la page UBC de Holmes — l'hébergement n'est pas l'affiliation). sha256 `e56c4dbe3f2255ecd774b1288c60c1cb68893f3b31b7fca39c0156672fdb8317` | p. 1 lue au fichier le 2026-08-12 (titre, abstract, §1) | Vu p. 1, abstract : « coverage, while useful for identifying under-tested parts of a program, should not be used as a quality target because it is not a good indicator of test suite effectiveness » — la phrase qui fonde les seuils-en-candidats. ADR-0011. |
@@ -127,3 +129,148 @@ lectures de section se font à la rédaction des ADR, une-citation-un-grep.
    (« Integrating Conflicting Data: The Role of Source Dependence », où naît
    le mécanisme des fautes partagées) n'est pas détenu. À lire / fetcher
    avant que l'axe R2 (2c) ne cite le précédent (10 §4.2, dette §10.1).
+
+
+### Fetchés à l'ouverture de S3 (2026-08-12) — corpus transport (TLSNotary) et corpus licence
+
+Acquisition par 5 workers `claude-opus-5[1m]` (run `wf_f92df5a1-844`, gate
+de résolution verte en tête) + 1 fetch orchestrateur. **Contrôle
+orchestrateur du 2026-08-12, même passe** : sha256 recalculé en destination
+pour les 67 pièces — **65/65 concordants avec les rapports de workers, 0
+divergence** (l'entrée-alias « SEE-ABOVE » du pack T3 résolue : hash
+concordant sous le nom réel) ; marqueurs greppés sur copie par
+l'orchestrateur là où la colonne « lu » le dit. Corps non lus sauf
+mention : les lectures de section se font à la rédaction des ADR,
+une-citation-un-grep (S-G5 mécanise désormais l'existence au corpus).
+
+**Faits d'état constatés par la passe, à instruire dans ADR-0015** :
+(a) le serveur notaire est **déprécié** par le projet (page « Notary
+Server (Deprecated) ») et `notary.pse.dev` ne répond plus — la
+notarisation hébergée n'est pas un service sur lequel s'appuyer ;
+(b) **aucun binaire vérificateur autonome, WASM de vérification ou service
+de vérification n'existe** (résultat négatif établi par le pack T3 sur le
+sitemap complet) — l'intégration passe par les crates ;
+(c) les crates `tlsn*` **ne sont pas publiées sur crates.io** (contrôle
+R-8 : recherche registre vide) — toute dépendance serait un épinglage git
+par révision, pas une version de registre ;
+(d) version amont : 0.1.0-alpha.15 publiée, alpha.16-pre en rustdoc — un
+**alpha**, et la doc n'est pas versionnée (Docusaurus « current ») ;
+(e) TLS 1.2 seulement ; sur TLS 1.3 deux pages officielles se
+contredisent (intro « on the roadmap » vs FAQ « no immediate plans ») —
+les deux copies sont détenues ;
+(f) réserves des workers consignées aux rapports (run `wf_f92df5a1-844`) :
+pages `/docs/mpc/*` non acquises (couverture partielle assumée du
+protocole bas niveau), trois pièces T3 versées non dépouillées, taille de
+l'artefact de preuve non documentée par l'amont.
+
+**Pack T1 — documentation du protocole (12 pièces)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `tlsnotary-docs-intro-2026-08-12.html` | « Introduction \| TLSNotary », tlsnotary.org/docs/intro (Docusaurus, docs NON versionnées — aucune date de modification affichée ; éditeur revendiqué en page : Privacy Stewards of Ethereum). Modèle de confiance du notaire généraliste, oracle problem, TLS 1.2 | non, sauf marqueurs | `d12e4c4cfc813658742928634c742877b4c44f82cd692796a8fb8f305a30cff1` |
+| `tlsnotary-docs-protocol-mpc-tls-2026-08-12.html` | « MPC-TLS \| TLSNotary » — en-tête de section : le vérificateur ne voit que le chiffré ; le prouveur ne peut ni construire seul ni forger | non, sauf marqueurs | `4c732f400967352976e3585ff665536578974d2bc44d11aaf6f98ae43c00e3cb` |
+| `tlsnotary-docs-protocol-mpc-tls-handshake-2026-08-12.html` | « Handshake \| TLSNotary » — clé de session en parts (aucune partie ne détient la clé entière) ; face à un vérificateur malveillant la garantie est celle du MPC, plus celle de TLS | non, sauf marqueurs | `7c173e4f75ed7c13bd532a9511f7a77c8fe8185d23672b114856def70eccd454` |
+| `tlsnotary-docs-protocol-mpc-tls-encryption-2026-08-12.html` | « Encryption, Decryption, and MAC Computation \| TLSNotary » — chiffrement aveugle ; la page se déclare elle-même simplifiée (« more nuanced than what we have described here ») | non, sauf marqueurs | `603e943046c22820ed69612d602b49c7350dee8c0d1d895f8bd21557a4d3354d` |
+| `tlsnotary-docs-protocol-notarization-2026-08-12.html` | « Notarization \| TLSNotary » — engagements authentifiés signés par le notaire sans qu'il voie le clair | non, sauf marqueurs | `3b8660a65e28e52dd17c5cf6d6e45aedc1494a204c528510656097d360a554c6` |
+| `tlsnotary-docs-protocol-verification-2026-08-12.html` | « Verification \| TLSNotary » — ce que contrôle le vérificateur d'une présentation | non, sauf marqueurs | `2d7e08356d3828d6218955d2d9385332e7db4210bbd56b998a2945c1d89de894` |
+| `tlsnotary-docs-protocol-commit-strategy-2026-08-12.html` | « Commit Strategy \| TLSNotary » — stratégies d'engagement sur le transcript | non, sauf marqueurs | `42956d9763ba35b242bbf3a2263b91d4fcc0aef55baa19af1d62e9bbaa8b8f54` |
+| `tlsnotary-docs-protocol-proxy-mode-2026-08-12.html` | « Proxy Mode \| TLSNotary » — le mode qui troque le MPC contre une hypothèse de chemin réseau | non, sauf marqueurs | `9bcc2ec907c33e0e773d13d497c4baf9f36de03cbcb356097fa6285480e35271` |
+| `tlsnotary-docs-protocol-server-identity-privacy-2026-08-12.html` | « Server Identity Privacy \| TLSNotary » | non, sauf marqueurs | `78c3fce77885f07d14449c07519697fcf98490590a6f6903456483a79a2befbe` |
+| `tlsnotary-docs-protocol-configuration-2026-08-12.html` | « Configuration \| TLSNotary » | non, sauf marqueurs | `55326bab41887b3adba1481fd2ed8ed0065f4dc72e0178a5a466bdb600aeb519` |
+| `tlsnotary-docs-glossary-2026-08-12.html` | « Glossary \| TLSNotary » — vocabulaire officiel (Prover/Verifier/Notary/attestation/presentation) | non, sauf marqueurs | `ee38348beaca65c6358f7f19b8ca40978290bb94e0785c7f5a40d12f60b44be2` |
+| `tlsnotary-docs-faq-2026-08-12.html` | « Frequently Asked Questions \| TLSNotary » — FAQ courante ; sur TLS 1.3 elle CONTREDIT la page intro (« no immediate plans » vs « on the roadmap ») — divergence consignée, les deux copies détenues | non, sauf marqueurs | `2f706555153e881fbe6a394224465bd295c6ea631ab07313e834e8b3e5331563` |
+
+**Pack T2 — dépôt amont et contrôle R-8 (25 pièces)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `tlsn-repo-readme-raw-2026-08-12.md` | README.md brut de tlsnotary/tlsn (branche main) | non, sauf marqueurs | `b95e34f3c6315d5502d91bc3aa652419028e04216fba666338c0c0e9296ff657` |
+| `tlsn-repo-readme-rendered-2026-08-12.html` | README rendu GitHub de tlsnotary/tlsn | non, sauf marqueurs | `7cf1fd1f22dc7d7359f82592a94c1203677b10806f4fcaa073567ab938d424af` |
+| `tlsn-repo-metadata-api-2026-08-12.json` | métadonnées GitHub API du dépôt (licence déclarée du projet, langages, dates) | non, sauf marqueurs | `4717e7aa57978a5d9b764e31f4c4d710442d3455c19c8456e3a22a32029768e4` |
+| `tlsn-repo-root-contents-api-2026-08-12.json` | inventaire API de la racine du dépôt (branche main) | non, sauf marqueurs | `d81800c0faf797f0e87cfa33521b4a689a8e79c1b52cdfcedbd3c64980ba6e5f` |
+| `tlsn-repo-crates-dir-api-2026-08-12.json` | inventaire API de crates/ (les crates réelles du workspace amont) | non, sauf marqueurs | `3df954a06fac2598a8aa6ac77d1093d7659c25cd2d2c9e33e96dbc4c703c25ad` |
+| `tlsn-repo-workspace-cargo-toml-2026-08-12.toml` | manifeste workspace Cargo de tlsnotary/tlsn | non, sauf marqueurs | `2acabd886a2460aa5ba705d67600bda1f9af8c185714af6b95c5fb52694bb427` |
+| `tlsn-repo-cargo-lock-2026-08-12.lock` | Cargo.lock amont complet (graphe de dépendances réel du projet) | non, sauf marqueurs | `eff3d7223fcd9d8ce478042eb8d40a49202f1c3fc111c42db36cbc8b01f0f2a0` |
+| `tlsn-repo-releases-api-2026-08-12.json` | liste API complète des releases amont | non, sauf marqueurs | `2f773294a63004885926d978c9000733055ed3d61721e863e629311901aa5d5a` |
+| `tlsn-repo-releases-page-2026-08-12.html` | page releases rendue | non, sauf marqueurs | `1809b372e88a2a1ae0b925f54bbb8b109c64527d189a8202a879ba33e58b331c` |
+| `tlsn-repo-ci-workflow-2026-08-12.yml` | workflow CI amont (.github/workflows/ci.yml) | non, sauf marqueurs | `5d0db5e752ac4a4f24abed57eb81a26e031a353151a58047e23708724e8f85c0` |
+| `tlsn-crate-tlsn-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn` (« The TLSNotary library ») | non, sauf marqueurs | `ed9bc7d226bc34ea6b3c9dedec9f9d83b92bb7e4fd8c3d4ca6afac6bfbe5dee1` |
+| `tlsn-crate-core-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-core` | non, sauf marqueurs | `9c353a7559f88792092b13b5f06f24fc41b75d1988d72c32b8c16c5498249c39` |
+| `tlsn-crate-attestation-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-attestation` | non, sauf marqueurs | `366c21831bd8376fa0996fbb1627be4578f49e4d3e555ff44b955a200b5687f3` |
+| `tlsn-crate-formats-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-formats` | non, sauf marqueurs | `400ee619810f6c184c9ebc249bf51bd5609f1d353076c7a009888d0473854427` |
+| `tlsn-crate-sdk-core-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-sdk-core` | non, sauf marqueurs | `e63b9712bc15e25e5bd65c5f327a80bd81bdc99b0fce5294c9800fcee473b0c8` |
+| `tlsn-crate-mpc-tls-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-mpc-tls` | non, sauf marqueurs | `b1e986b2e6a0df50cca1e39b4d6ebe1072fb96010f990bb8dbcb9f66688ca2ea` |
+| `tlsn-crate-tls-core-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-tls-core` | non, sauf marqueurs | `7ef5558491b3cdc03defea8f3539d1b22af507f37f45badc06b4908d6ca53078` |
+| `tlsn-crate-wasm-cargo-toml-2026-08-12.toml` | manifeste crate `tlsn-wasm` | non, sauf marqueurs | `9de8d98b446eb4a1be0c7335f53ecca289676529545cde5138b4d1e0b4199b60` |
+| `cratesio-search-tlsn-2026-08-12.json` | recherche crates.io q=tlsn — contrôle R-8 : les crates `tlsn*` du projet N'EXISTENT PAS sur le registre officiel (consommation git seulement) | non, sauf marqueurs | `4fccad39e4d21d9c2fa2c4a92c5790fe3a1ef9fd0b969c3ef1e4b1b50ac9e1d5` |
+| `cratesio-notary-client-2026-08-12.json` | fiche crates.io `notary-client` (homonymie à surveiller — contrôle R-8) | non, sauf marqueurs | `79a7a09ca9d17935936e7184bc1d46c08090167ce2fc0679eed03060b314b256` |
+| `cratesio-notary-client-owners-2026-08-12.json` | owners crates.io de `notary-client` | non, sauf marqueurs | `cf11dc5c13b12d5b9b606cde9847542b7bbd664fc41357e7c2d9ef0de9a8c3d5` |
+| `cratesio-rangeset-owners-2026-08-12.json` | owners crates.io de `rangeset` (dépendance amont publiée par tlsnotary) | non, sauf marqueurs | `08115d768eb06cb8eb07dc38b25b4d5dc3badfbcf21e39285909b18ecd767659` |
+| `cratesio-serio-owners-2026-08-12.json` | owners crates.io de `serio` (idem) | non, sauf marqueurs | `08115d768eb06cb8eb07dc38b25b4d5dc3badfbcf21e39285909b18ecd767659` |
+| `cratesio-web-spawn-owners-2026-08-12.json` | owners crates.io de `web-spawn` (idem) | non, sauf marqueurs | `08115d768eb06cb8eb07dc38b25b4d5dc3badfbcf21e39285909b18ecd767659` |
+| `tlsnotary-org-repos-api-2026-08-12.json` | liste API des 42 dépôts de l'organisation GitHub tlsnotary | non, sauf marqueurs | `2d0e1c7f5b8d26202541e94e222e21f89cc553f6bf621e87b524224189b01873` |
+
+**Pack T3 — notariat, vérification, sources épinglées (20 pièces nouvelles ; 4 pages du pack recoupent T1 à octets identiques)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `tlsnotary-docs-notary-server-2026-08-12.html` | « Notary Server (Deprecated) \| TLSNotary » — LA pièce d'état : le serveur notaire est déprécié par le projet lui-même (« Deprecated » greppé par l'orchestrateur) | non, sauf marqueurs | `d624197d0b19e6a7f2e6f6766437a8acf07c77c4294c773bb70df34e7121c29f` |
+| `tlsn-github-release-v0.1.0-alpha.13-api-2026-08-12.json` | release amont v0.1.0-alpha.13 (API GitHub) | non, sauf marqueurs | `2b598ca12755fb2a371af7210d4900fc3d489fdb2667b25db791facb8b429bc6` |
+| `tlsn-github-release-v0.1.0-alpha.15-api-2026-08-12.json` | release amont v0.1.0-alpha.15 (API GitHub, published_at 2026-05) | non, sauf marqueurs | `6fa2b94a142208ca92af3d889908c6ca8940b83818e57dc535b4a8dddc2786c6` |
+| `tlsn-crate-attestation-presentation-rs-g0fe3c32d.rs` | source amont crates/attestation/src/presentation.rs, épinglé au commit 0fe3c32d | non, sauf marqueurs | `0d03f8373ac9e6b7e03c1cc830e7c34c81a64ed47c1316363cb89c915c761de2` |
+| `tlsn-crate-attestation-lib-rs-g0fe3c32d.rs` | source amont crates/attestation/src/lib.rs (doc de crate), épinglé 0fe3c32d | non, sauf marqueurs | `be78d7e5335170398141ba1d2b6dba3b516179071bd049d4088139d73b027a0b` |
+| `tlsn-crate-attestation-proof-rs-g0fe3c32d.rs` | source amont crates/attestation/src/proof.rs, épinglé 0fe3c32d | non, sauf marqueurs | `7727ef53595f936beb0796786338d9ba81fbe2a9ebae0f122520bcd3dc304b6e` |
+| `tlsn-crate-attestation-serialize-rs-g0fe3c32d.rs` | source amont crates/attestation/src/serialize.rs, épinglé 0fe3c32d | non, sauf marqueurs | `ec69c500a5da3f4a7de826cd964dc5fa7a18497857536b91e2ab0e92cbff1f05` |
+| `tlsn-crate-attestation-signing-rs-g0fe3c32d.rs` | source amont crates/attestation/src/signing.rs, épinglé 0fe3c32d | non, sauf marqueurs | `7ebab2b84027a88f336944ff4e1fc0065770eeeac2aa7205988ef36601d62edb` |
+| `tlsn-example-attestation-verify-rs-g0fe3c32d.rs` | exemple officiel attestation_verify (crates/examples/attestation/verify.rs), épinglé 0fe3c32d | non, sauf marqueurs | `70c76fe2beddadb78cbb19fec4dcc412ee8d2093ef990af9b2849e9b53fa0873` |
+| `tlsn-example-attestation-present-rs-g0fe3c32d.rs` | exemple officiel attestation_present, épinglé 0fe3c32d (rapporté par le worker sous une entrée-alias « SEE-ABOVE » — hash concordant contrôlé par l'orchestrateur) | non, sauf marqueurs | `486515502b12b62cb93d334aec477f97639aa595ce6365d68f03ce392f96edf8` |
+| `tlsn-example-attestation-readme-g0fe3c32d.md` | README de l'exemple attestation amont, épinglé 0fe3c32d | non, sauf marqueurs | `c8729e3ca737b1dc5dd324331830356dab197ac942a824db5faa7670201106b9` |
+| `tlsnotary-blog-public-verifiability-2026-06-17-dl2026-08-12.html` | billet officiel « Zero-knowledge ≠ trustless: what “publicly verifiable” means… » (2026-06-17) — le projet lui-même sur la portée de la vérifiabilité | non, sauf marqueurs | `f6b499badf00c9c2356820cc78d265d947af95d43c145eeded46fdb709886dcc` |
+| `tlsnotary-blog-where-trust-lives-2026-06-23-dl2026-08-12.html` | billet officiel « Where does your trust live? Cryptographic soundness and the TEE … » (2026-06-23) | non, sauf marqueurs | `8d6c6c658947fddef6a5896607fc96ebc719204c43c1bf99db93582801af6e6c` |
+| `tlsnotary-blog-benchmarks-2025-08-31-dl2026-08-12.html` | billet officiel « TLSNotary Performance Benchmarks (August 2025) » | non, sauf marqueurs | `68cdeb7766d09e0ecf1b9b61de3861a6fd200e633a8f6c7525414de593866bca` |
+| `tlsnotary-docs-extension-verifier-2026-08-12.html` | « Verifier Server \| TLSNotary » (rubrique Browser Extension) | non, sauf marqueurs | `5dfe57e579ac645323564b24290554715a4a4ca5d806498d9e9ff03ccf94e80b` |
+| `tlsn-rustdoc-crate-tlsn-2026-08-12.html` | rustdoc générée du crate `tlsn`, version affichée 0.1.0-alpha.16-pre | non, sauf marqueurs | `b8ea6cacfab2e74f5c2af911754118f5cd0e41468cb809aaff0e2de9458d29fc` |
+| `tlsn-rustdoc-crate-tlsn-core-2026-08-12.html` | rustdoc générée du crate `tlsn-core`, version affichée 0.1.0-alpha.16-pre | non, sauf marqueurs | `68196fdddd5d4e540a32dba248834180edb0fe51265988d1077b3aa1d5b3de49` |
+| `tlsn-crate-attestation-cargo-toml-g0fe3c32d.toml` | manifeste crates/attestation/Cargo.toml épinglé 0fe3c32d (octets identiques à la copie T2 non épinglée — concordance constatée) | non, sauf marqueurs | `366c21831bd8376fa0996fbb1627be4578f49e4d3e555ff44b955a200b5687f3` |
+| `tlsnotary-docs-quickstart-rust-2026-08-12.html` | « Rust Quick Start \| TLSNotary » | non, sauf marqueurs | `2e62b53da1e6fb5c896f850ebf57ea61645e2eaeda03925135ade5246ad3e8ad` |
+| `tlsnotary-docs-quickstart-2026-08-12.html` | « Quick Start \| TLSNotary » (index de rubrique) | non, sauf marqueurs | `99929539df811f498372ae64d148e8388890c603df43d84530876506183037c6` |
+
+**Pack L1 — textes canoniques des licences (ADR-0014) (5 pièces)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `apache-license-2.0-2026-08-12.txt` | texte canonique Apache License 2.0 (apache.org/licenses/LICENSE-2.0.txt) — §3 « Grant of Patent License » greppé par l'orchestrateur | marqueurs greppés | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` |
+| `apache-license-2.0-page-2026-08-12.html` | page canonique apache.org de la licence (HTML) | marqueurs greppés | `33492ade6e67d48fac256d155edd01b1a9a9866f77586698ff6d714b49699a5f` |
+| `osi-mit-license-2026-08-12.html` | The MIT License, page canonique Open Source Initiative (opensource.org/license/mit) | marqueurs greppés | `4ce24f62a5dcaa89feb92913bc8f7a2608cf6965a84436578db3bbebf628f861` |
+| `gnu-agpl-3.0-2026-08-12.txt` | texte intégral GNU AGPL-3.0 (gnu.org, text/plain, 661 lignes) — §13 « Remote Network Interaction » greppé par l'orchestrateur (la clause qui pèse sur un vérificateur offert en service) | marqueurs greppés | `0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0` |
+| `gnu-agpl-3.0-2026-08-12.html` | page canonique gnu.org AGPL-3.0 (HTML) | marqueurs greppés | `3cea8a3640e0a825b1e6f975994ef107fe39b0aed40cddcf876970bb12a6bbcf` |
+
+**Pack L2 — convention d'écosystème Rust (4 pièces)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `rust-lang-rust-copyright-2026-08-12.txt` | fichier COPYRIGHT du dépôt rust-lang/rust (branche master) — le compilateur lui-même est dual-licencié | marqueurs greppés | `172020dbfd5b53a226dfde77616190a48dcff519b0bc0e6deb91a8450782c4af` |
+| `rust-lang-rust-readme-2026-08-12.md` | README.md de rust-lang/rust (section licence) | marqueurs greppés | `b3f6ef2fef88b98cb9ec013a5c86213095e53e40eb228679574e4d06517f33c8` |
+| `rust-api-guidelines-necessities-2026-08-12.html` | Rust API Guidelines, page « Necessities » — ligne directrice C-PERMISSIVE (« permissive » greppé par l'orchestrateur) | marqueurs greppés | `1e0a791145f72b6e7ff496ca429fc9aa6e87367f7050e83cbbc3d26c814649ca` |
+| `cargo-reference-manifest-2026-08-12.html` | The Cargo Book, « The Manifest Format » (canal stable) — champ `license` SPDX | marqueurs greppés | `3e02b4c928b55202e53599abf6a51fe8a24938bb14a446d8b7d5ebc77cd0cb57` |
+
+**Acquisition orchestrateur (1 pièce)**
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `coingecko-methodology-2026-08-12.html` | CoinGecko, page méthodologie (coingecko.com/en/methodology) — fetch orchestrateur du 2026-08-12 ; « the VWAP of all remaining tickers » greppé sur la copie (2 occurrences) : la citation de 10 §3 est désormais adossée à des octets détenus (décharge partielle de la dette S2 §10.4) | grep VWAP | `8edbb0d566706f9f67ee0b7ee19cdcba305940c323c573ebcb862b1a8f80cd94` |
+
+
+### Fetchés à la phase B de S3 (2026-08-13) — sources normatives des drafts ADR-0015/0016
+
+Workers `claude-opus-5` (run `wf_8db62dce-162`) ; sha256 recalculés par
+l'orchestrateur en destination : **5/5 concordants**. Textes IETF/WHATWG
+librement redistribuables (les RFC portent leur licence dans le texte).
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `rfc-8949-cbor-2026-08-13.txt` | RFC 8949, STD 94 — Bormann & Hoffman, *Concise Binary Object Representation (CBOR)*, IETF Standards Track, déc. 2020 (obsolète RFC 7049) — le texte canonique que l'ADR-0002 invoquait au travers de la copie C2PA ; §4.2.1 Core Deterministic Encoding Requirements | worker : §4.2.1 lu ; orchestrateur : versement contrôlé | `f1164a5b31a39350ad46abe29b83575eb933ca6c45366989c118b6b1058a214a` |
+| `rfc-9052-cose-2026-08-13.txt` | RFC 9052, STD 96 — Schaad, *CBOR Object Signing and Encryption (COSE): Structures and Process*, IETF Standards Track, août 2022 (obsolète RFC 8152) ; §4.2 Signing with One Signer (`Cose_Sign1`, tag 18) | worker : §4.2 lu ; orchestrateur : versement contrôlé | `01eecd7f646537600e7aad665b1fa581ce6ec33dae4ef4add0997aaf38cd0a45` |
+| `rfc3986-uri-generic-syntax.txt` | RFC 3986, STD 66 — Berners-Lee, Fielding, Masinter, *Uniform Resource Identifier (URI): Generic Syntax*, janv. 2005 ; §6 Normalization and Comparison — la source-qui-tranche attendue d'ADR-0016 | worker : §6 lu ; orchestrateur : versement contrôlé | `3102dae4b68cebe40337730312fcb612297b8928547267e8b3d1ee6002b2d683` |
+| `rfc9110-http-semantics.txt` | RFC 9110, STD 97 — Fielding, Nottingham, Reschke, *HTTP Semantics*, juin 2022 ; §4.2.3 (équivalence d'URI http/https) | worker : §4.2.3 lu ; orchestrateur : versement contrôlé | `21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a` |
+| `whatwg-url-standard-dl2026-08-12.html` | WHATWG, *URL Standard*, Living Standard — « Last Updated 6 July 2026 » constaté à la balise `<time>` ; **page mutable et non versionnée** : l'ancre opposable est le couple (date de copie, sha256) — alternative instruite (et rejetée en draft) d'ADR-0016 | worker : sections normalisation lues ; orchestrateur : versement contrôlé | `a4295a30e0203fc5b63a83a10c04daeef8a9741ff727e9beec89d2ae0c50a0de` |
