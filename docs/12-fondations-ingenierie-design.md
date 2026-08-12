@@ -382,8 +382,45 @@ ou une unité de travail nommée avec propriétaire. **État au 2026-08-12
 | 1 | ~~Licence des trois crates~~ — **résolu le 2026-08-12 par ADR-0014** (report contracté à S3, gate re-cadrée, `licenses ok` revu vert par l'orchestrateur) | fermé |
 | 2 | S-G4/S-G5/S-G6/S-G8 (gates de `docs/`/`biblio/`/journal) non instanciées — la phase C ne pouvait pas les écrire (hors de son périmètre d'écriture) | unité de travail nommée, **orchestrateur** (elles outillent son propre périmètre), après ratification |
 | 3 | Double-build de reproductibilité (ADR-0012 D6, 6 variations) non écrit | unité dédiée, **orchestrateur + shogen-devops**, après ratification du seuil et de la cible Linux |
-| 4 | `cargo deny check advisories` jamais vu tourner (réseau git sortant indisponible localement) | premier run CI ; aucun vert d'advisory n'est rapporté d'ici là |
+| 4 | ~~`cargo deny check advisories` jamais vu tourner localement~~ — **résolu le 2026-08-12** : étape « S-G7 — licences, bans, sources, advisories » verte au run CI `31645277610`, sur les deux plateformes | fermé |
 | 5 | Score de mutation de programme (`cargo-mutants`, R-8 fait) et budgets de fuzz (seuil 7) | **S3** — le régime en deux temps d'ADR-0011 le prévoit ; en S2.5 le plancher binaire (mutant de gate tué) est tenu |
-| 6 | Walking skeleton vert **sur Linux** (critère §7 : Windows ET Linux) — Windows vu vert par l'orchestrateur | **débloqué le 2026-08-12** (autorisation commit/push reçue, ADR-0014 posée) — en cours : push puis premier run CI |
+| 6 | ~~Walking skeleton vert **sur Linux**~~ — **résolu le 2026-08-12** : run CI `31645277610` vert sur ubuntu-latest ET windows-latest, zéro étape non-verte (toolchain épinglée, lockfile intact, build verrouillé, tests + mutants, gates, walking skeleton bout-en-bout, cargo-deny) | fermé |
 | 7 | Documentation Zig (manque nommé, ADR-0009) — l'option ne se rouvre que par acquisition | fetch sur demande mainteneur, sinon reste un rejet « faute de pièce », honnête |
 | 8 | Andrews et al. 2006 / Just et al. 2014 (planchers adossés plutôt qu'assumés, ADR-0011 coûts pt 7) | procurement conditionnel — ne devient demande formée que si le mainteneur exige un plancher adossé |
+
+## 11. Clôture de passe — rapport (2026-08-12)
+
+**Le critère de sortie du §7 est atteint**, chaque branche constatée :
+
+1. Les ADR-0009 à 0013 (plus 0014, née de la passe) sont **acceptées et
+   ratifiées** (délégation mainteneur du 2026-08-12, procès-verbal §9) ;
+   les 14 seuils sont ratifiés au statut exact que leurs sources
+   autorisent — régimes fondés, valeurs en budgets déclarés révisables
+   par ADR.
+2. La source-qui-tranche de chaque ADR est **détenue et lue à la section**
+   (INDEX §S2.5, sha256 par entrée) ou couverte par une **demande de
+   procurement formée** (WISHLIST §Priorité 3 — Humble & Farley et
+   Accelerate, nommés « manques » par ADR-0013 qui ne les cite pas).
+3. Le **walking skeleton est vert à travers toutes les gates applicables
+   sur Windows ET Linux** : localement (rejeu intégral orchestrateur,
+   phases C) puis au run CI `31645277610` du 2026-08-12 — deux jobs,
+   zéro étape non-verte, avec zéro logique produit.
+
+**Section dettes (G5)** : le tableau du §10 ne porte aucun dû nu — items
+1, 4, 6 fermés ; items 2, 3, 5 assignés avec propriétaire (unités
+nommées : gates documentaires S-G4/5/6/8, double-build D6, mutation de
+programme et fuzz à S3) ; item 7 en fetch-sur-demande ; item 8 en
+procurement conditionnel. Les 5 procurements de la WISHLIST restent à la
+main du mainteneur.
+
+**Provenance de la passe** (G1/R-9) : workers `claude-opus-5[1m]`
+(résolution contrôlée, §6.2), orchestrateur Fable 5 ; runs
+`wf_65513c15-e37` (corpus), `wf_e63a0e8d-7e7` (procurement),
+`wf_e704a674-9da` (ADR), worker devops phase C ; chaque sortie de worker
+adjugée avant consommation (P6/R-21) ; commits `d7a6709`, `20b3835`,
+`91c4524`, `b38022b` (+ clôture), signés, poussés après autorisation
+explicite du mainteneur.
+
+**S3 peut commencer** — sur des fondations où chaque choix porte sa
+source, ses seuils portent leur statut exact, et l'ossature est *tested*
+avec compte, sur deux plateformes.

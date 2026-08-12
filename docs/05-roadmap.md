@@ -188,10 +188,12 @@ skeleton **adjugés verts sur rejeu intégral de l'orchestrateur**
 (S-G1/2/3/7a, 13 mutants + témoin, 41 tests, couverture cœur 92,23 %,
 fail-closed vu sur octets mutés — Windows ; Linux suspendu au premier
 push) ; registres portés (vocabulaire v2, assumptions v2, DEVOPS v1).
-**Reste la phase E — au mainteneur** : ratification des 14 seuils, de la
-variante `claude-opus-5[1m]`, décision de licence des crates, et
-autorisation de commit/push (le critère de sortie exige la CI Linux
-verte). Détail : 12 §9-§10.
+**Phase E close, S2.5 CLOSE le 2026-08-12** : délégation mainteneur
+exercée (procès-verbal 12 §9 — 14 seuils ratifiés en budgets déclarés
+révisables par ADR, `[1m]` confirmée, licence contractée par ADR-0014),
+commits signés poussés, **run CI `31645277610` vert sur ubuntu ET
+windows, zéro étape non-verte** — le critère de sortie est atteint
+(rapport de clôture : 12 §11). **S3 peut commencer.**
 
 ## S3 — Le témoignage de bout en bout *(code)*
 
