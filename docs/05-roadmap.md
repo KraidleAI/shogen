@@ -207,6 +207,14 @@ raison structurée) sur les 3 mutants semés : preuve altérée, hash
 d'utterance faux, résidu non résolu. *(La règle gatewright : un
 vérificateur qui n'a jamais rejeté n'a rien montré.)*
 
+**État au 2026-08-12 : lancée.** Conception écrite
+(`docs/13-temoignage-e2e-design.md`) : périmètre (un transport, lot à un
+témoignage, source du pool S2), les 8 échéances contractées qui arrivent à
+S3 (licence ADR-0014, passage public + purge biblio/, `no_std` en gate,
+mutation ≥ 80 %, fuzz, Build L2 + D6, gates S-G4/5/6/8, typeur tested),
+phases A–E, remontées mainteneur nommées (licence, moment du passage
+public, push).
+
 ## S4 — Le verdict de quorum *(code + spec)*
 
 Estimateur de confinement (médiane, lignée Lemme 8 — prouver ou citer,
