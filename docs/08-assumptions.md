@@ -1,4 +1,4 @@
-# Shōgen — registre des assumptions (v2, 2026-08-12 ; v1 2026-07-30)
+# Shōgen — registre des assumptions (v3, 2026-08-13 ; v2 2026-08-12 ; v1 2026-07-30)
 
 > **Le registre fait foi** : une assumption absente d'ici n'existe pas, et
 > tout identifiant A(...) écrit ailleurs se résout ici (règle héritée du
@@ -17,6 +17,7 @@
 | A(enclave-integrity) | L'enclave d'un transport TEE et sa chaîne d'attestation sont intègres | DECO §3.1 (détenu, lu) : « If a single TEE is broken, TLS session content, including user credentials, can leak » | 03 §2 | aucune | hors de portée de Shōgen (matériel) ; l'atténuation est la diversité de transports dans le lot | aucune |
 | A(source-key) | Pour un transport `source-sig`, la clé publiée par la source est la bonne et n'est pas compromise | à documenter — aucun artefact détenu ne porte ce résidu précis (transparence de clés : littérature à fetcher au moment du premier adapter `source-sig`) | 03 §2 | aucune | journal de transparence ou épinglage multi-canal — au premier adapter concerné | aucune |
 | A(verifier-designation) | La preuve d'un transport à vérificateur participant (3P-handshake DECO, notaire TLSNotary) vaut envers ce participant ; sa transmission à un tiers repose sur la signature du participant, pas sur le transport | DECO §3.4 (détenu, lu) : clés de session secret-partagées entre P et V ; FAQ TLSNotary : vérificateur désigné | 03 §4, point (1) — citée au site depuis le 2026-07-30 | aucune | transports à preuve publiquement vérifiable (zk), ou le participant signe comme attestor et son résidu devient A(attestor-honesty) | aucune |
+| A(self-attestation) | En S3, le notaire du transport `tlsn-mpc/1` est opéré par Shōgen : A(notary-neutrality) n'est pas seulement non déchargée, elle est portée par la partie même dont 02-vision exige qu'on ne lui fasse pas confiance — le verdict S3 est démonstratif, pas probant | page « Notary Server (Deprecated) » (détenue : service arrêté, binaire retiré en alpha.13) ; billet officiel du 2026-06-17 (détenu) : « A notary is just a verifier you didn't run yourself. » | tout verdict S3 ; ADR-0015 pt 4 | aucune | notaire tiers, ou quorum de notaires comptés en axe R2 (ADR-0004) | aucune |
 
 ## Résidus de couche (Shōgen lui-même)
 
@@ -29,6 +30,8 @@
 | A(asn-attribution) | L'attribution IP → ASN rapportée par les services (RIPEstat, Team Cymru) reflète l'annonce BGP effective au moment de la mesure — l'axe ASN de R2 en dépend | 10 §4.1, résidu 6 (les services d'attribution sont eux-mêmes des témoins) ; concordance RIPEstat = Cymru 8/8 du 2026-08-05 (V1, re-mesure aveugle) — une observation, pas une décharge | 10 §4.1 (axe ASN) ; futur harnais R2 de S2 | aucune | jamais totale ; attribution croisée sur ≥ 2 bases BGP distinctes + re-mesure à chaque quorum | aucune |
 | A(toolchain-soundness) | La solidité de `rustc` et de la bibliothèque standard (qui emploie `unsafe`) est supposée, jamais établie — RustBelt couvre un langage formalisé, pas le compilateur | RustBelt p. 66:3 (détenu, relu 2026-08-12 ; graphie re-vérifiée à la page le 2026-08-12, S3 — la première copie portait « language itself ») : « several soundness bugs have been found in Rust, both in the type system itself » et §1.2 « we do not consider the full Rust language » | ADR-0009 ; tout binaire du produit | aucune | aucune complète connue ; réduction par dépendances minimales (ADR-0009) et par la reproductibilité du binaire vérificateur (ADR-0012 D6) | aucune |
 | A(verifier-binary) | Le binaire `shogen-verifier` qu'un tiers exécute correspond au code source publié | Lamb & Zacchiroli p. 1 (détenu, relu 2026-08-12) : « trusting code is not the same as trusting its executable counterparts » | ADR-0012 ; la promesse offline d'ADR-0003 et 02-vision | aucune | rebuild bit-à-bit indépendant (décharge complète — ADR-0012 D6) ; provenance attestée (décharge partielle : le résidu se déplace vers la plateforme de build) | aucune |
+| A(transport-check-delegated) | Le contrôle (1) de 03 §4 est exécuté par `shogen-tlsn-verify` construit depuis l'amont épinglé ; `shogen-verifier` en contrôle la liaison (hash de `transport_proof`, hash d'`utterance`), jamais le contenu cryptographique | ADR-0015 pt 8 (forme β) — le verdict nomme la délégation | tout verdict S3 ; ADR-0015 | aucune | forme α (vérification embarquée), sous les trois conditions d'ADR-0015 pt 11 | aucune |
+| A(upstream-alpha) | L'amont TLSNotary est en alpha, déclaré impropre à la production par ses auteurs ; aucune stabilité du format d'attestation n'est établie | README amont (détenu) : « should not be used in production. Expect bugs and regular major breaking changes. » ; releases API (détenue) : 15 releases, toutes `prerelease: true`, alpha.15 publiée 2026-05-21 | ADR-0015 ; tout `transport_proof` archivé | aucune | une version stable amont ; en attendant, la révision amont exacte voyage avec le lot (ADR-0015 coût 5, sous-décision ouverte) | aucune |
 
 ## Résidus de méthode (la chaîne d'ingénierie elle-même — S2.5, 2026-08-12)
 
@@ -47,12 +50,15 @@ part (leçon des identifiants morts, ADR-0001).
 1. **Aucune entrée D** pour l'instant : les énoncés de déploiement
    n'existeront qu'avec du code déployable (S3+). Le registre les
    accueillera au même rang, sans les confondre avec les A(...).
-2. **Quatre références inter-projets**, toutes détenues côté Kraidle et
-   absentes du registre Shōgen : RFC 8949 (CBOR) et RFC 9052 (COSE),
-   porteuses d'ADR-0002 ; le Lemme 8 de Chainlink OCR (INDEX, dette 5) ;
-   et **RFC 5280 §3.3**, invoquée par 03 §2 pour la règle des latences
-   par mécanisme. La décision copie-locale vs référence croisée porte sur
-   les quatre — pas trois (corrigé le 2026-07-30, audit S1).
+2. **Références inter-projets** (détenues côté Kraidle, absentes du
+   registre Shōgen) : il en reste **deux** — le Lemme 8 de Chainlink OCR
+   (INDEX, dette 5) et **RFC 5280 §3.3**, invoquée par 03 §2 pour la règle
+   des latences par mécanisme. RFC 8949 (CBOR) et RFC 9052 (COSE),
+   porteuses d'ADR-0002, sont **détenues côté Shōgen depuis le 2026-08-13**
+   (phase B de S3, INDEX §phase B — fermeture partielle de cette note).
+   La décision copie-locale vs référence croisée ne porte plus que sur les
+   deux restantes (historique : quatre, pas trois — corrigé le 2026-07-30,
+   audit S1).
 3. La règle de rédaction : citer la feuille, pas le parapluie — un site
    qui ne dépend que d'A(attestor-honesty) ne cite pas « les résidus de
    transport » en bloc.

@@ -91,6 +91,43 @@ ouvert). Identité finale à re-établir sur l'exemplaire acquis.
   copie dans `biblio/` ou le dépôt : non. ADR-0010 cite depuis cette URL,
   accès re-vérifié à chaque citation.
 
+## Priorité 3 bis — S3 transport (manques nommés par ADR-0015, 2026-08-13)
+
+Chacun avec son usage prévu ; aucun n'est bloquant pour la phase C (le
+chemin de bout en bout se conduit sans eux), tous le sont pour un claim
+public sur `tlsn-mpc/1`.
+
+1. **QuickSilver (système de preuve VOLE-IZK employé par l'amont)** —
+   demande à former sur identité confirmée : la FAQ amont détenue nomme le
+   système ; identité bibliographique **probable, non vérifiée sur pièce** :
+   Yang, Sarkar, Weng, Wang, *QuickSilver: Efficient and Affordable
+   Zero-Knowledge Proofs for Circuits and Polynomials over Any Field*,
+   ACM CCS 2021 — DOI à confirmer AVANT toute citation. Usage prévu : toute
+   phrase qui qualifierait la solidité de la preuve ZK ; sans lui, rien ne
+   se dit au-delà de la citation de la FAQ. Tentatives : aucune encore
+   (nommé par le draft ADR-0015, 2026-08-13).
+2. **Analyse de sécurité arbitrée du protocole TLSNotary courant**
+   (lignée MPC-TLS 2022+, alpha.13–alpha.16) — DECO (détenu) est un
+   protocole voisin, pas celui-ci : l'employer comme caution serait une
+   substitution de source. Usage : argumenter le résidu du transport
+   au-delà de la parole de l'éditeur. État : existence même d'une telle
+   analyse non établie — recherche à conduire avant demande formée.
+3. **Pages `/docs/mpc/*` de la doc amont** (6 pages au sitemap :
+   key_exchange, commitments, deap, encryption, mac, ff-arithmetic) —
+   fetch simple, non fait en phase A (réserve de worker consignée à
+   l'INDEX). Usage : le protocole bas niveau.
+4. **README des exemples amont `basic` et `proxy`** (seul `attestation`
+   est détenu, épinglé 0fe3c32d) — fetch simple. Usage : conduire la
+   session réelle en phase C sans deviner l'API.
+5. **Source du test amont `no_syscall_verify`**
+   (`crates/attestation/tests/no_syscall_verify.rs`) — fetch simple,
+   épinglage même commit. Usage : la pièce qui établit ce qu'un chemin de
+   vérification « sans syscall » recouvre — condition (iii) de réouverture
+   de la forme α (ADR-0015 pt 11).
+
+*(La taille d'un artefact `Presentation` n'est PAS ici : elle se résout
+par mesure en phase C — ADR-0015, manque 6.)*
+
 ## Déjà réglé (pour mémoire)
 
 - ~~Knight & Leveson 1986, article complet~~ — apporté par le mainteneur.

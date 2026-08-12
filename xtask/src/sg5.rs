@@ -56,8 +56,13 @@ const MOTS_ANGLAIS: &[&str] = &[
 /// Nombre minimal d'occurrences de mots-fonction pour qualifier un fragment.
 const OCCURRENCES_MINIMALES: usize = 2;
 
-/// Extensions de `biblio/` lues comme texte pour le grep.
-const EXTENSIONS_TEXTE: &[&str] = &["html", "htm", "txt", "md", "sidecar", "json", "xml"];
+/// Extensions de `biblio/` lues comme texte pour le grep. Les extensions de
+/// code et de manifeste sont entrées avec le corpus amont de la phase A S3
+/// (sources Rust épinglées, manifestes, lock, workflow CI) — S-G5 a attrapé
+/// leur absence le jour où une ADR a cité `presentation.rs` (2026-08-13).
+const EXTENSIONS_TEXTE: &[&str] = &[
+    "html", "htm", "txt", "md", "sidecar", "json", "xml", "rs", "toml", "yml", "yaml", "lock",
+];
 
 pub fn executer(racine: &Path) -> Rapport {
     let mut rapport = Rapport::nouveau("S-G5", "citations (une-citation-un-grep, mécanisée)");

@@ -76,6 +76,13 @@ qu'il n'a PAS vérifié lui-même), ou frontière `no_std` repositionnée
 (cœur `no_std`, vérificateur std) — chaque forme a un coût de résidu
 différent et ADR-0015 le chiffre.
 
+*(Close le 2026-08-13 par ADR-0015 : forme déléguée retenue — binaire
+compagnon `shogen-tlsn-verify` hors workspace, `shogen-verifier` maintenu
+à zéro dépendance, `no_std` en gate confirmé dû tel quel ; la « frontière
+repositionnée » requalifiée en pré-condition de la forme embarquée, pas en
+troisième forme. Résidus nouveaux au registre 08 : A(self-attestation),
+A(transport-check-delegated), A(upstream-alpha).)*
+
 ## 3. Les échéances contractées qui arrivent à S3
 
 Chacune a son contrat écrit ; aucune n'est optionnelle (G5, règle du

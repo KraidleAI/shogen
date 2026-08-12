@@ -16,6 +16,7 @@
 | ADR-0012 | Environnement : le lockfile fait foi, exact au manifeste sur cœur/vérificateur, R-8 en deux moitiés, reproductibilité bit-à-bit du vérificateur visée, SLSA L2 candidat | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0013 | DevOps : gates bloquantes (doctrine gatewright : mutant semé tué), trunk-based sur main protégée, CI Windows+Linux, actions épinglées SHA, JOURNAL opposable | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0014 | Licence : décision contractée à l'entrée de S3 (dette prudente-délibérée, Fowler/G5) ; crates non publiables d'ici là, gate re-serrée mécaniquement | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
+| ADR-0015 | Transport de S3 : TLSNotary `tlsn-mpc/1` en mode Notary (notaire opéré par Shōgen, résidu aggravé A(self-attestation)) ; vérification déléguée à un binaire compagnon épinglé — `shogen-verifier` reste à zéro dépendance | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 
 ---
 
@@ -1578,3 +1579,445 @@ agent orchestrateur »), exercée sur le référentiel qu'il a rendu opposable.
   contrat (cette ADR) ; item 6 (CI Linux) : débloqué.
 - `WISHLIST.md` : rien — aucune pièce à procurer pour ce report ;
   l'instruction de S3 dira si l'analyse juridique exige des acquisitions.
+
+## ADR-0015 — Le transport de S3 : TLSNotary en mode Notary, avec vérification déléguée à un binaire compagnon épinglé
+
+**Statut** : acceptée (adjugée par l'orchestrateur sur pièces le 2026-08-13
+— révision mainteneur ouverte) · 2026-08-13
+
+> **Note d'adjudication (2026-08-13).** Draft de worker (`claude-opus-5`,
+> run `wf_8db62dce-162`), adjugé par l'orchestrateur : les affirmations
+> porteuses re-vérifiées une à une sur les pièces détenues — `use std::fmt;`
+> dans `presentation.rs` épinglé (1 occurrence), champs `license` absents de
+> `tlsn-attestation` et `tlsn-formats` et présents sur les 6 autres
+> manifestes détenus, aucun `LICENSE` à la racine amont (12 entrées d'API,
+> zéro) et `"license":null` aux métadonnées, 8 jobs CI amont tous
+> `ubuntu-latest` (zéro windows/macos), 15 releases toutes
+> `prerelease: true` (alpha.15 publiée 2026-05-21T19:47:08Z), et chaque
+> citation-clé greppée sur sa copie. **Une requalification d'adjudication** :
+> le compte de fermeture de dépendances de la forme α — le chiffre du
+> worker (116, fermeture à features déclarées) et le recompte majorant de
+> l'orchestrateur (359, fermeture sans élagage de features depuis les mêmes
+> manifestes et le même lock) sont TOUS DEUX portés au tableau avec leur
+> méthode ; l'écart mesure la sensibilité aux features, pas une incertitude
+> sur l'ordre de grandeur (plus de cent crates tierces dans les deux cas),
+> et le compte définitif est la mesure R-8 du compagnon, due en phase C.
+
+### Contexte
+
+S3 doit produire le premier chemin complet sur **un** transport : source
+réelle → témoignage canonique → vérification offline par un binaire séparé
+qui nomme le résidu (05 §S3 ; 13 §1). Le critère de sortie est écrit et
+binaire : une commande `shogen verify <lot>` retourne « valide sous
+A(notary-neutrality) » sur un témoignage réel, et échoue fail-closed sur
+trois mutants semés. Le candidat nommé par la roadmap est TLSNotary.
+
+Deux questions se posent ensemble, et l'une commande l'autre :
+
+1. **Quel transport, et sous quelle de ses formes ?** TLSNotary offre deux
+   formes distinctes — un *Verifier* qui co-conduit la session, et un
+   *Notary* qui la co-conduit à la place d'un vérificateur absent et signe
+   une attestation portable.
+2. **Sous quelle forme la vérification du transport entre-t-elle dans
+   `shogen-verifier` ?** C'est la tension nommée en 13 §2 : le contrôle (1)
+   de 03 §4 exige l'outil de vérification du transport, or `shogen-verifier`
+   est aujourd'hui à **zéro dépendance tierce** (`cargo tree -p
+   shogen-verifier -e normal` : une seule arête, `shogen-core`) et vise
+   `#![no_std]` + `alloc` en gate à S3 (ADR-0009 pt 6).
+
+Le corpus §S3 de l'INDEX a été acquis à l'ouverture de la passe (67 pièces,
+sha256 recalculés en destination, 0 divergence). Il consigne cinq faits
+d'état que cette ADR doit instruire, et non contourner : serveur notaire
+déprécié, aucun vérificateur autonome, crates non publiées sur crates.io,
+version alpha, TLS 1.2 seulement avec contradiction interne sur TLS 1.3.
+
+### Décision
+
+#### A. Le transport : `tlsn-mpc/1`, **mode Notary**, notaire opéré par Shōgen en S3
+
+1. **Le transport de S3 est TLSNotary en MPC-TLS**, identifiant de champ
+   `transport` = `tlsn-mpc/1` — la valeur déjà écrite en 03 §2, aucune
+   invention de vocabulaire.
+
+2. **La forme retenue est le mode Notary** (attestation → présentation), et
+   non le mode Verifier direct. **Motif structurel, pas préférentiel** : le
+   critère de S3 exige un artefact vérifiable *offline*, par un binaire
+   séparé, après la session. Le mode Verifier direct ne produit aucun tel
+   artefact — la preuve ne convainc que le participant. Le projet l'écrit
+   lui-même : « Every zkTLS protocol today is designated-verifier in this
+   way. » (billet officiel du 2026-06-17, détenu). Choisir le mode Verifier
+   direct, ce serait choisir un mode où `shogen verify <lot>` n'a **rien** à
+   vérifier. La roadmap avait donc déjà tranché sans le dire : en nommant
+   A(notary-neutrality) dans son critère, elle nommait le résidu de la
+   délégation, donc le mode Notary.
+
+3. **Le rôle de Notary est joué par un processus opéré par Shōgen**,
+   construit depuis la bibliothèque amont épinglée — et **non** par un
+   service hébergé. Fait d'état contraignant, sur pièce : « The Notary
+   server was removed from the TLSNotary project in alpha.13. » (page
+   « Notary Server (Deprecated) », détenue), le service public a été
+   arrêté, et « The project's scope was narrowed to focus on the core
+   TLSNotary libraries and the upcoming SDK. » Le rôle survit comme rôle de
+   bibliothèque : « TLSNotary also supports a workflow where a Verifier
+   (acting as Attestor) attests to the proven data. » (Rust Quick Start,
+   détenu).
+
+4. **Le résidu de ce montage est nommé, aggravé, et écrit dans le verdict.**
+   A(notary-neutrality) n'est pas seulement non déchargée en S3 : elle est
+   portée par Shōgen lui-même, c'est-à-dire par la partie dont 02-vision
+   exige qu'on ne lui fasse pas confiance. Une entrée nouvelle est due au
+   registre 08 — **A(self-attestation)** — et le verdict de S3 la porte à
+   côté d'A(notary-neutrality). Ce que S3 démontre est **la chaîne et la
+   forme de l'artefact**, pas la neutralité ; ce que S3 ne démontre pas se
+   dit dans la même phrase que ce qu'il démontre.
+
+5. **Une condition de bascule mécanique, décidée d'avance.** TLSNotary
+   « currently supports TLS 1.2. Support for TLS 1.3 is on the roadmap. »
+   (page intro, copie du 2026-08-12) — et la FAQ courante dit l'inverse :
+   « There are no immediate plans to support TLS 1.3. » **Aucune pièce
+   détenue n'établit qu'un endpoint du pool S2 (10 §3.1) accepte encore une
+   poignée de main TLS 1.2.** Une mesure est donc due en tête de phase C :
+   négociation TLS 1.2 tentée contre les 11 sources répondantes, résultat
+   consigné. **Si zéro endpoint du pool accepte TLS 1.2, le chemin réel de
+   S3 est mécaniquement inconduisible** et l'alternative (c) ci-dessous
+   prend effet **par règle**, sans improvisation ni renégociation du
+   critère. La décision porte donc son propre fail-closed.
+
+#### B. La forme d'intégration : **vérification déléguée à un binaire compagnon** (forme β)
+
+6. **`shogen-verifier` n'importe aucune crate du transport.** Il reste à
+   zéro dépendance tierce, et l'échéance contractée « `#![no_std]` +
+   `alloc` devient une gate en S3 » (ADR-0009 pt 6, 13 §3 item 3) **reste
+   due telle quelle** — elle n'est ni repositionnée ni reportée.
+
+7. **Un binaire compagnon `shogen-tlsn-verify`**, hors membres du workspace
+   (comme `adapters/` l'est déjà), construit depuis l'amont épinglé par
+   révision git exacte, exécute `Presentation::verify(&CryptoProvider)` et
+   imprime un résultat structuré : clé de vérification, `server_name`,
+   `connection_info.time`, longueurs de transcript, et le hash des octets
+   révélés. C'est un **adapter** au sens d'ADR-0001 — « les transports sont
+   des adapters » — donc « testé, jamais prouvé ».
+
+8. **`shogen-verifier` vérifie la liaison, et nomme ce qu'il ne vérifie
+   pas.** Ses contrôles, tous purs et sans dépendance :
+   - (a) le lot décode dans le sous-ensemble canonique CBOR et se ré-encode
+     à l'octet près (acquis S2.5, conservé) ;
+   - (b) le hash de `utterance` porté par le témoignage égale le hash des
+     octets révélés rapportés par le compagnon (ADR-0005 règle 1 : le hash
+     des octets exacts « lie le témoignage à sa preuve de transport ») ;
+   - (c) le hash des octets de `transport_proof` égale celui que le
+     compagnon déclare avoir consommé — c'est ce qui interdit qu'on vérifie
+     une preuve et qu'on en livre une autre ;
+   - (d) `residual` résout dans le registre publié (08) ;
+   - (e) **le verdict nomme la délégation**, chaîne proposée : "valide sous
+     A(notary-neutrality), A(self-attestation) et
+     A(transport-check-delegated) — le contrôle cryptographique de la preuve
+     de transport a été exécuté par shogen-tlsn-verify [révision amont],
+     jamais par ce binaire".
+   Le contrôle (1) de 03 §4 n'est donc pas escamoté : il est **exécuté
+   ailleurs et déclaré comme tel**, ce que 13 §2 autorisait explicitement
+   (« le vérificateur Shōgen vérifie alors la chaîne hash→proof et nomme ce
+   qu'il n'a PAS vérifié lui-même »).
+
+9. **Trois résidus nouveaux sont dus au registre 08** : A(self-attestation),
+   A(transport-check-delegated), A(upstream-alpha). Aucun ne se déduit d'un
+   autre.
+
+10. **Où atterrit COSE (ADR-0002, `Cose_Sign1`).** Sur l'**enveloppe
+    Shōgen**, jamais sur la preuve de transport, et **pas en S3**.
+    - *Jamais sur la preuve* : l'attestation TLSNotary est signée par son
+      propre schéma — `SignatureAlgId::SECP256K1` / `SECP256R1` /
+      `SECP256K1ETH` (`signing.rs` amont épinglé) — et sérialisée en
+      `bcs`/`bincode` (dépendance `bcs` au manifeste `tlsn-attestation` ;
+      l'exemple officiel lit la présentation par `bincode::deserialize`).
+      La ré-emballer en COSE serait re-spécifier un transport, ce
+      qu'ADR-0001 interdit. `transport_proof` reste ce que 03 §1 dit qu'il
+      est : des octets « opaque pour Shōgen ».
+    - *Sur l'enveloppe* : le slot de `Cose_Sign1` est la signature du
+      **lot** — la structure taguée est « identified by the CBOR tag 18. »
+      (RFC 9052 §4.2, détenue) — au-dessus du payload CBOR des « Core
+      Deterministic Encoding Requirements » (RFC 8949 §4.2.1, détenue).
+    - *Pas en S3* : ADR-0003 pose que la signature de Shōgen est « un
+      commodité de cache, jamais la racine de confiance » (graphie du
+      registre). Sur un lot à un témoignage dont la vérification est un
+      recalcul (13 §6 pt 2), il n'y a rien dont la signature soit utile.
+      **S3 laisse le slot nommé et vide** ; l'émission effective de
+      `Cose_Sign1` appartient à S4, avec le certificat. C'est un état
+      écrit, pas un oubli.
+
+11. **Condition de réouverture, nommée d'avance** (pour que la forme β ne
+    devienne pas un dogme) : la forme α (vérification embarquée dans
+    `shogen-verifier`) redevient instruisible dès que **les trois**
+    conditions sont réunies chez l'amont — (i) publication sur crates.io
+    avec version de registre, (ii) champ `license` présent au manifeste de
+    la crate portant `Presentation::verify`, (iii) un chemin de
+    vérification `no_std`. Aucune n'est vraie au 2026-08-13, et le
+    §« coûts » chiffre pourquoi chacune compte.
+
+### Alternative considérée
+
+#### (a) Forme α — vérification embarquée dans `shogen-verifier`
+
+Rejetée. Chiffrée sur les pièces détenues (manifestes amont + lock amont
+`tlsn-repo-cargo-lock-2026-08-12.lock`), **deux comptes, deux méthodes,
+portés ensemble** (note d'adjudication en tête) :
+
+| grandeur | aujourd'hui | forme α |
+|---|---|---|
+| dépendances tierces du graphe normal de `shogen-verifier` | **0** | **116** (fermeture à features déclarées, calcul worker) à **359** (fermeture majorante sans élagage de features, recompte orchestrateur) — compte définitif : mesure R-8 du compagnon, phase C |
+| dont épinglées git (hors registre) | 0 | ≥ 1 (`rs_merkle`, fork `tlsnotary/rs-merkle`, rev `85f3e82`) |
+| crates à chaîne C / build natif | 0 | `ring`, `cc`, `libc`, `windows-sys` |
+| crate d'horloge dans le graphe | 0 | `web-time` |
+| lock amont complet (référence de taille, comptage direct des blocs `[[package]]`) | — | 700 paquets, dont 29 git et 21 locaux |
+
+Cinq motifs de rejet, chacun sur pièce :
+
+1. **La forme α contredit ADR-0009 pt 6, elle ne le repositionne pas.** La
+   crate qui porte `Presentation::verify` **est `std`** : `presentation.rs`
+   ouvre par « use std::fmt; », et ses erreurs portent
+   `Box<dyn std::error::Error + Send + Sync>`. `#![no_std]` n'est donc pas
+   « déplaçable » : il devient **impossible** tant que l'amont n'a pas
+   changé. L'amont vise bien les cibles contraintes — sa CI exécute un test
+   dédié sous `getrandom_backend="unsupported"` — mais *sans syscall* n'est
+   pas *`no_std`*, et la distinction est exactement celle qu'une gate
+   mesure.
+2. **S-G2 tomberait sur le fond, pas sur la lettre.** La gate porte
+   « (arêtes, horloge, réseau) » ; la fermeture α importe `web-time`
+   (horloge) et la pile `rustls-webpki`/`webpki-roots` (validation de
+   chaînes de certificats). Le vérificateur cesserait d'être ce que son
+   propre manifeste déclare : « Ne dépend que du cœur : ni réseau, ni
+   horloge, ni adapter. »
+3. **R-8 et la gate licences se retournent contre nous.** Contrôle registre
+   fait : les crates `tlsn*` **n'existent pas sur crates.io** — l'épinglage
+   serait git par révision. Et le manifeste de `tlsn-attestation` — la
+   crate même qui porte la vérification — **ne porte aucun champ
+   `license`** (là où `tlsn-core` porte `license = "MIT OR Apache-2.0"` et
+   `tlsn-tls-core` `"Apache-2.0 OR ISC OR MIT"`), tandis que le dépôt
+   n'expose aucun fichier `LICENSE` à sa racine et que l'API GitHub rend
+   `license` nul. L'intention du projet est pourtant claire au README :
+   « All crates in this repository are licensed under either of »
+   Apache-2.0 ou MIT. Mais `cargo deny check licenses` lit le manifeste,
+   pas le README : la forme α produirait un `error[unlicensed]` **sur une
+   crate tierce**, que l'assouplissement d'ADR-0014 pt 2 **ne couvre pas**
+   (son périmètre exact : « les seules crates `publish = false` du
+   workspace »). Il faudrait donc une clause `clarify` — un affaiblissement
+   de gate porté par ADR, pour un confort d'architecture. La charte
+   `shogen-devops` §2 permet de le faire ; rien ici ne justifie de le
+   faire.
+4. **ADR-0012 D6 (rebuild bit-à-bit du vérificateur sous 6 variations)
+   deviendrait un autre problème.** D6 a été restreint à un binaire
+   précisément parce qu'il est à dépendances minimales par décision
+   antérieure. Faire entrer `ring` + `cc` — une chaîne C invoquée au
+   build — dans la cible même de D6, c'est déplacer la difficulté au pire
+   endroit, à la passe qui doit la livrer.
+5. **La couverture de plateforme de l'amont ne rencontre pas la nôtre.** Le
+   workflow CI amont détenu porte **8 jobs, tous `runs-on: ubuntu-latest`,
+   zéro Windows, zéro macOS** (comptage orchestrateur re-fait sur la
+   copie) ; notre critère de clôture exige vert sur Windows **et** Linux
+   (S2.5, run `31645277610`). La forme α ferait dépendre notre vert Windows
+   d'un code que son auteur ne construit jamais sous Windows.
+
+*(À retenir de cette instruction : la « frontière `no_std` repositionnée »
+que 13 §2 présentait comme une **troisième** forme n'en est pas une. Elle
+ne résout aucun des motifs 2 à 5 — la fermeture de dépendances, `web-time`,
+l'absence de champ `license`, `ring`+`cc`, l'amont ubuntu-seul restent
+identiques. Elle est la **pré-condition** de la forme α, pas son
+alternative. La nommer comme une option distincte donnerait trois choix là
+où il y en a deux.)*
+
+#### (b) Reclaim (proxy-witness) comme transport de S3
+
+Rejetée, sur quatre pièces détenues.
+
+1. **Le résidu est strictement plus lourd, et il est décrit comme tel par
+   Reclaim.** L'attestor **voit du clair** : « The attestor validates the
+   claim by decrypting only the necessary data portions, verifying its
+   integrity, and signing the claim. » Là où le notaire TLSNotary reste
+   aveugle : « the Notary does not gain knowledge of either the plaintext
+   or the identity of the server with which the Prover communicated. » Et
+   la parade nommée par Reclaim contre la forge est un vœu d'architecture,
+   pas un contrôle : « The only protection against fake proofs here is
+   decentralisation or self-hosting of the attestor. » (déjà porté au
+   registre comme A(attestor-honesty)).
+2. **L'implémentation n'est pas dans notre langage.** `attestor-core` est
+   une « implementation of the attestor server & the SDK to interact with
+   it. » en TypeScript. La forme β (compagnon) exigerait un runtime Node
+   dans l'artefact de confiance du projet : incompatible avec ADR-0009
+   (Rust pour les trois rôles) et avec D6.
+3. **La licence est AGPL-3.0** (« AGPL-3.0 license », README détenu).
+   ADR-0014 pose que le vérificateur doit être « au régime le plus ouvert
+   (c'est l'artefact de confiance) » ; brancher le premier transport sur
+   une pièce AGPL préempterait, de fait, une décision qui appartient au
+   mainteneur et dont l'échéance est cette passe même. On ne décide pas une
+   licence par un choix de dépendance.
+4. **Reclaim reste dans le corpus comme le second transport candidat** — sa
+   qualité de contre-exemple est déjà employée. Le rejeter comme *premier*
+   transport n'est pas le rejeter comme transport.
+
+#### (c) Différer le transport réel (garder le témoignage trivial)
+
+Rejetée **par défaut** — mais **retenue comme branche mécanique** au pt 5
+de la décision. L'honnêteté de cette alternative est réelle : le squelette
+S2.5 marche déjà de bout en bout et l'amont dit de lui-même qu'il « should
+not be used in production. Expect bugs and regular major breaking
+changes. »
+
+Ce qui la fait perdre : S3 n'a pas d'autre objet. Différer le transport
+laisserait la passe sans son critère, et le pont S2.5 → S3 sans son
+tablier. Surtout, le motif d'alarme (l'état alpha) est exactement ce que la
+forme β **absorbe** : le code alpha vit dans un compagnon jetable et
+remplaçable, pas dans l'artefact de confiance du projet. Différer serait
+payer le coût de l'alpha (pas de chemin réel) sans en prendre le bénéfice
+(la chaîne montrée).
+
+Ce qui la garde vivante : la mesure TLS 1.2 du pt 5. Si le pool ne parle
+plus TLS 1.2, ce n'est plus un arbitrage — c'est un fait, et (c)
+s'applique.
+
+### La source qui tranche
+
+**Pour A (le mode Notary) — le billet officiel du projet, « Zero-knowledge
+≠ trustless » (2026-06-17, détenu).** Il énonce la ligne exacte que le
+critère de S3 suppose : « A zkTLS proof isn't checked by the world. It's
+checked by whoever trusts the verifier that witnessed it. » Il nomme le
+rôle sans le mystifier : « A notary is just a verifier you didn't run
+yourself. » Il refuse d'appeler *trustless* ce qui est portable : « You
+don't get public verifiability and zero trust at the same time; you get
+public verifiability because you accepted a notary. » Et il ferme la porte
+au mode Verifier direct pour notre usage : le vérificateur participant
+« has to be online during the session », or notre vérificateur est offline
+par décision fondatrice (ADR-0003).
+
+La FAQ courante donne la mécanique, mot pour mot : quand un vérificateur ne
+peut pas être en session, « they may choose to delegate the verification of
+the online phase of the protocol to an entity called the » Notary, qui
+« produces an attestation trusted by the » Verifier, puis « in the offline
+phase, the Verifier is able to ascertain data authenticity based on the
+attestation. » — c'est la définition de la phase que `shogen verify <lot>`
+occupe. Et elle énonce le résidu dans la graphie même du registre 08 : si
+le vérificateur n'a pas conduit le MPC, « they must trust in the notary's
+neutrality ».
+
+La FAQ dit aussi « The protocol does not have trust assumptions. » Cette
+phrase est retenue **avec son périmètre** : elle porte sur le protocole
+entre Prover et Verifier participants, pas sur le tiers qui lit une
+attestation — le billet du 2026-06-17 le corrige explicitement pour ce
+tiers (« Anyone else has no way to rule out that collusion, so to them the
+proof is only as good as their trust that the verifier played fair. »).
+Deux pièces officielles, deux périmètres : la contradiction n'est
+qu'apparente, et la citer sans son périmètre serait la surclamation que 09
+interdit.
+
+**Pour B (la délégation) — l'amont lui-même.** `presentation.rs` (épinglé
+0fe3c32d) : « A presentation is self-contained and can be verified by a
+Verifier without » accès à des données externes ; « The Verifier need only
+check that the key » utilisée pour signer vient d'un notaire de confiance.
+C'est exactement le périmètre d'un compagnon : une fonction pure sur un
+fichier, sans réseau. Et la même crate, quelques lignes plus haut, dit
+pourquoi elle ne peut pas entrer chez nous : « use std::fmt; ».
+
+**Pour le pt 10 (COSE) — RFC 9052 et RFC 8949**, versées à cette phase
+(INDEX §phase B) : « The COSE_Sign1 signature structure is used when only
+one signature is » placée sur un message ; la structure taguée est
+« identified by the CBOR tag 18. » Le slot est donc parfaitement défini, ce
+qui permet de le déclarer *nommé et vide* en S3 sans ambiguïté. (Ces deux
+RFC étaient jusqu'ici des références inter-projets non détenues côté Shōgen
+— 08, note 2. La note reste ouverte pour le Lemme 8 OCR et RFC 5280 §3.3.)
+
+**Pour le régime de la décision — le corpus doc 02.** R-8 (registre avant
+installation) est ce qui a produit le contrôle crates.io ; G5 est ce qui
+interdit de laisser « alpha » comme un dû nu : ici l'alpha est *contracté*
+(A(upstream-alpha) au registre) et *confiné* (dans un compagnon), avec une
+condition de réouverture écrite (pt 11) et une condition de bascule
+mécanique (pt 5).
+
+**Assurance de cette ADR** : *reviewed* (draft worker 2026-08-13 ;
+adjudication orchestrateur sur pièces le même jour, requalification du
+compte de fermeture consignée en note). Aucune mesure n'est ici *tested* :
+la mesure TLS 1.2 du pt 5 et la conduite d'une session réelle sont dues en
+phase C.
+
+### Ce que la décision coûte
+
+1. **Deux binaires au lieu d'un.** La promesse d'un binaire unique qui
+   recalcule tout offline devient : un binaire qui recalcule la chaîne,
+   plus un compagnon nommé qui vérifie la preuve du transport.
+   A(verifier-binary) et le double-build D6 gardent leur cible sur
+   `shogen-verifier` seul (comme ADR-0012 le restreint), donc **le
+   compagnon n'est pas bit-à-bit reproductible en S3** — et cela se dit,
+   plutôt que de s'omettre.
+2. **Un résidu de plus dans le verdict, et il est de notre fait.**
+   A(transport-check-delegated) n'existerait pas dans la forme α. C'est le
+   prix franc de la délégation : nous échangeons une fermeture de plus de
+   cent crates contre une phrase de verdict plus longue. Le vocabulaire 09
+   accueille la formulation fautive correspondante ("transport vérifié par
+   shogen-verifier").
+3. **Le verdict de S3 est démonstratif, pas probant.** Avec un notaire
+   opéré par Shōgen, « valide sous A(notary-neutrality) » est littéralement
+   vrai et pratiquement creux : le tiers qui lit devrait nous croire. Aucun
+   montage disponible ne fait mieux à cette date — le service public est
+   arrêté, le binaire notaire est retiré de l'amont. **A(self-attestation)
+   est la dette contractée**, décharge nommée : un notaire tiers, ou un
+   quorum de notaires. Rien de public-facing ne peut s'appuyer sur le
+   verdict de S3.
+4. **Le coût opératoire de MPC-TLS est réel et chiffré par l'amont.**
+   Surcoût d'upload du prouveur : « ~25MB (a fixed cost per one TLSNotary
+   session) + ~10 MB per every 1KB of outgoing data + ~40KB per every 1 KB
+   of incoming data. » ; « our MPC-TLS protocol involves ~40 communication
+   rounds » ; et, sur la machine de référence de l'amont, « the native
+   build completes in ~5 s » pour une réponse d'environ 10 KB (billet
+   benchmarks d'août 2025, détenu). Un témoignage n'est donc pas gratuit,
+   et la fenêtre de fraîcheur de S4 devra vivre avec cet ordre de grandeur.
+   *(Ces chiffres datent d'août 2025 et décrivent des alphas antérieures ;
+   ils bornent l'ordre de grandeur, ils ne mesurent pas notre montage.)*
+5. **La rupture de format amont est probable, pas seulement possible.**
+   « Expect bugs and regular major breaking changes. » — le format de
+   `Presentation` peut changer d'une alpha à l'autre, et un
+   `transport_proof` archivé peut cesser d'être vérifiable par le compagnon
+   courant. Conséquence à porter : la révision amont exacte devient une
+   donnée du témoignage ou du lot, pas un détail de build. *(Sous-décision
+   à instruire, pas tranchée ici : où elle est portée — champ du lot, ou
+   registre de versions du compagnon.)*
+6. **Une divergence documentaire nous suit.** Sur TLS 1.3, deux pages
+   officielles se contredisent (« Support for TLS 1.3 is on the
+   roadmap. » vs « There are no immediate plans to support TLS 1.3. »), et
+   le Rust Quick Start renvoie encore à `--branch v0.1.0-alpha.14` alors
+   qu'alpha.15 est publiée (2026-05-21). La doc amont n'est pas versionnée
+   (Docusaurus « current »). Nos citations restent donc datées à la copie
+   détenue, jamais à « la doc ».
+7. **La sous-décision `subject` reste ouverte.** ADR-0002 la laisse
+   explicitement non réglée, et un témoignage réel ne peut plus la
+   différer : c'est ADR-0016, pas cette ADR. Nommée ici pour qu'elle ne se
+   perde pas dans l'ombre de 0015.
+
+### Registres touchés
+
+- **`docs/08-assumptions.md`** — trois entrées nouvelles (portées à
+  l'adjudication) : A(self-attestation) (résidus de transport),
+  A(transport-check-delegated) et A(upstream-alpha) (résidus de couche).
+- **`docs/09-vocabulaire.md`** — trois entrées nouvelles (adjugées depuis
+  les candidates du draft).
+- **`docs/03-temoignage.md`** — §2 : la ligne `tlsn-mpc` gagne
+  A(self-attestation) à côté d'A(notary-neutrality) pour la durée de S3 ;
+  §4 point (1) : la forme de la délégation y est fixée par cette ADR.
+- **`docs/13-temoignage-e2e-design.md`** §2 — la tension d'intégration est
+  close : forme β retenue, la « frontière repositionnée » requalifiée en
+  pré-condition de α. §3 item 3 (`no_std` en gate) : confirmé dû, non
+  repositionné.
+- **`Cargo.toml` (workspace)** — `shogen-tlsn-verify` n'entre **pas** dans
+  `members` : comme `adapters/`, il vit hors workspace pour que la
+  fermeture contrôlée par S-G2/S-G7a reste celle du cœur et du
+  vérificateur.
+- **`deny.toml`** — **inchangé**. C'est un résultat de la forme β, pas un
+  effet secondaire : la forme α aurait exigé une clause `clarify` pour
+  `tlsn-attestation`.
+- **`WISHLIST.md`** — les manques nommés par le draft y sont portés
+  (§S3) : papier QuickSilver (identité à confirmer avant citation),
+  analyse de sécurité arbitrée du protocole courant, pages `/docs/mpc/*`,
+  README des exemples `basic`/`proxy`, source du test amont
+  `no_syscall_verify` ; la taille d'un artefact `Presentation` se résout
+  par MESURE en phase C (pas un procurement).
+- **`biblio/INDEX.md`** — les deux RFC versées pendant la rédaction sont
+  inscrites (§phase B, 5/5 sha256 concordants).
+
+---
