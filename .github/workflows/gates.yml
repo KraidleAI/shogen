@@ -1,0 +1,30 @@
+# Gates VibeGates — Shogen, instanciation pilote (audit d'entrée du 2026-08-12).
+# Référentiel : corpus « Compliance et ingénierie logicielle et architecturale », doc 02.
+# Périmètre honnête : Shogen n'a pas encore de code produit (gate d'entrée « fondations
+# d'ingénierie » en préparation, docs/12) et s2-harness est JETABLE (R-22, quarantaine
+# déclarée dans son README). Le gate mécanisable réel aujourd'hui est G5 ; G3/G4/G6
+# s'instancieront avec le premier code produit (voir docs/AUDIT-ENTREE.md).
+# Invariant : jobs bloquants, jamais de continue-on-error.
+
+name: gates
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  g5-dette:
+    name: g5-no-naked-todo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: TODO/FIXME nus interdits (R-13)
+        # Motif testé sur le dépôt réel avant instanciation (0 marqueur au 2026-08-12).
+        # Exclusions : biblio/ (corpus de recherche), .claude/ (instructions d'agents),
+        # ce workflow (fichier vérificateur).
+        run: |
+          if git grep -nE '\b(TODO|FIXME):' -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml'; then
+            echo '::error::Marqueur TODO/FIXME nu. Registre de dette + ADR, ou résoudre (R-13).'
+            exit 1
+          fi
+          echo "OK: aucun marqueur de dette nu."
