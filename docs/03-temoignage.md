@@ -26,7 +26,7 @@ Champs, tous obligatoires sauf mention :
 
 | champ | contenu | pourquoi |
 |---|---|---|
-| `subject` | désignation canonique de la source interrogée (domaine + endpoint normalisé + paramètres de requête normalisés) | ce dont on témoigne |
+| `subject` | désignation canonique de la source interrogée — forme construite à l'adapter, prédicat de canonicité au cœur (ADR-0016) ; **paramètres de requête conservés verbatim, jamais normalisés en ordre** | ce dont on témoigne |
 | `utterance` | les octets exacts de la réponse (ou leur hash + extraction, voir §3) | le « dire » — jamais interprété à ce rang |
 | `observed_at` | instant de l'observation, avec l'horloge qui l'a produit (celle du transport, jamais celle de Shōgen) | la fraîcheur se calcule plus haut ; ici on enregistre qui a daté |
 | `transport` | identifiant du mécanisme d'attestation (ex. `tlsn-mpc/1`, `proxy-witness/1`, `tee-sgx/1`, `source-sig/1`) | chaque transport a un modèle de menace distinct |
@@ -100,8 +100,9 @@ Knight & Leveson §4 : un axe déclaré n'est pas un axe protecteur).
 
 1. ~~Encodage concret~~ — **tranché par ADR-0002** : CBOR déterministe
    (RFC 8949) + COSE (RFC 9052), précédent C2PA vérifié au fichier.
-   **Reste ouvert** : la canonicalisation de `subject` (sous-décision
-   explicitement non réglée par l'ADR).
+   ~~Reste ouvert : la canonicalisation de `subject`~~ — **tranché par
+   ADR-0016 le 2026-08-13** (forme construite, prédicat au cœur, requête
+   verbatim). Les quatre items de ce § sont clos.
 2. ~~Le registre des résidus~~ — **fait** : `08-assumptions.md` (v1), les
    identifiants du §2 y résolvent tous.
 3. ~~Multi-attestor~~ — **tranché par ADR-0004** : k témoignages agrégés

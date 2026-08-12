@@ -121,7 +121,8 @@ pub fn executer(racine: &Path) -> Rapport {
                 match std::fs::read(&chemin) {
                     Ok(brut) => {
                         let texte = String::from_utf8_lossy(&brut);
-                        corpus.push(normaliser_pour_recherche(&retirer_balises(&texte)));
+                        let depagine = retirer_pagination_rfc(&texte);
+                        corpus.push(normaliser_pour_recherche(&retirer_balises(&depagine)));
                         octets_presents = octets_presents.saturating_add(1);
                     }
                     Err(erreur) => rapport.incident(format!(
@@ -172,13 +173,16 @@ pub fn executer(racine: &Path) -> Rapport {
                     continue;
                 }
                 controlees = controlees.saturating_add(1);
-                // Second essai sans tirets : l'extraction PDF déshyphène les
-                // coupures de ligne en avalant les tirets réels du mot
-                // (« bit-for-bit » extrait « bit-forbit ») — l'identité de la
-                // citation ne tient pas au tiret.
-                let sans_tirets = normalise.replace('-', "");
+                // Second essai sans tirets ni espaces : l'extraction PDF
+                // déshyphène en avalant les tirets réels (« bit-for-bit » →
+                // « bit-forbit ») et les RFC en texte césurent les mots en
+                // fin de ligne (« case-\ninsensitive » → « case- insensitive »
+                // après pli des blancs) — l'identité d'une citation de 15+
+                // caractères ne tient ni au tiret ni à l'espace.
+                let compacte = |texte: &str| texte.replace(['-', ' '], "");
+                let normalise_compacte = compacte(&normalise);
                 if corpus.iter().any(|piece| {
-                    piece.contains(&normalise) || piece.replace('-', "").contains(&sans_tirets)
+                    piece.contains(&normalise) || compacte(piece).contains(&normalise_compacte)
                 }) {
                     continue;
                 }
@@ -304,6 +308,30 @@ fn scinder_crochets(texte: &str) -> String {
     }
     sortie.push_str(reste);
     sortie
+}
+
+/// Retire la pagination des RFC en texte brut : le pied « […] [Page N] »,
+/// l'en-tête « RFC NNNN … 20NN » et les sauts de page interrompent des
+/// phrases en plein milieu (constaté : RFC 3986 §6.2.3, coupée par la
+/// page 41 dans une citation d'ADR-0016). Appliqué au corpus seulement.
+fn retirer_pagination_rfc(texte: &str) -> String {
+    texte
+        .lines()
+        .filter(|ligne| {
+            let net = ligne.trim_end();
+            let pied = net.ends_with(']')
+                && net.contains("[Page ")
+                && (net.contains("Standards Track") || net.contains("Informational"));
+            let entete = net.starts_with("RFC ")
+                && net.len() > 40
+                && net
+                    .rsplit(' ')
+                    .next()
+                    .is_some_and(|fin| fin.len() == 4 && fin.chars().all(|c| c.is_ascii_digit()));
+            !(pied || entete || net.contains('\u{c}'))
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Retire les balises `<…>` d'un texte de corpus HTML : une citation d'une

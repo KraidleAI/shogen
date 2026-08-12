@@ -47,7 +47,7 @@ trivial par le réel, sans casser ce qui est tested :
    `residual` (résolu dans 08). Testé, jamais prouvé (ADR-0001).
 2. **Le cœur** (`shogen-core`) : la forme canonique complète en CBOR
    déterministe (RFC 8949, ADR-0002) — extension des champs du squelette
-   vers les 7 champs de 03 §1 ; la liaison hash d'utterance (ADR-0005
+   vers les 7 champs de 03 §1 ; le prédicat de canonicité de `subject` (ADR-0016 C10) et la liaison hash d'utterance (ADR-0005
    règle 1 : « le hash des octets exacts est toujours porté — il lie le
    témoignage à sa preuve de transport ») entre au cœur — c'est la charge
    utile que les 37 mutations acceptées de S2.5 attendaient (« liaison

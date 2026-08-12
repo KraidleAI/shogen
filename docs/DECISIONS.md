@@ -3,7 +3,7 @@
 | ADR | titre | statut | date |
 |---|---|---|---|
 | ADR-0001 | Les transports d'attestation sont des adapters — Shōgen n'en construit aucun | acceptée | 2026-07-30 |
-| ADR-0002 | Encodage : CBOR déterministe (RFC 8949) + COSE (RFC 9052) | acceptée | 2026-07-30 |
+| ADR-0002 | Encodage : CBOR déterministe (RFC 8949) + COSE (RFC 9052) — sous-décision `subject` fermée par ADR-0016 le 2026-08-13 | acceptée | 2026-07-30 |
 | ADR-0003 | Le certificat est recalculable offline, jamais seulement émis | acceptée | 2026-07-30 |
 | ADR-0004 | Multi-attestor : k témoignages agrégés au-dessus, jamais un objet co-signé | acceptée | 2026-07-30 |
 | ADR-0005 | Rétention : hash toujours, octets par politique de classe, rédaction possible et déclarée | acceptée | 2026-07-30 |
@@ -17,6 +17,7 @@
 | ADR-0013 | DevOps : gates bloquantes (doctrine gatewright : mutant semé tué), trunk-based sur main protégée, CI Windows+Linux, actions épinglées SHA, JOURNAL opposable | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0014 | Licence : décision contractée à l'entrée de S3 (dette prudente-délibérée, Fowler/G5) ; crates non publiables d'ici là, gate re-serrée mécaniquement | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0015 | Transport de S3 : TLSNotary `tlsn-mpc/1` en mode Notary (notaire opéré par Shōgen, résidu aggravé A(self-attestation)) ; vérification déléguée à un binaire compagnon épinglé — `shogen-verifier` reste à zéro dépendance | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
+| ADR-0016 | Canonicalisation de `subject` : forme construite à l'adapter, prédicat total au cœur, refus nommés, requête verbatim jamais triée — ferme la sous-décision ouverte d'ADR-0002 | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 
 ---
 
@@ -2019,5 +2020,460 @@ phase C.
   par MESURE en phase C (pas un procurement).
 - **`biblio/INDEX.md`** — les deux RFC versées pendant la rédaction sont
   inscrites (§phase B, 5/5 sha256 concordants).
+
+---
+
+## ADR-0016 — La canonicalisation de `subject` : forme construite, prédicat au vérificateur, aucun tri de requête
+
+**Statut** : acceptée (adjugée par l'orchestrateur sur pièces le 2026-08-13
+— révision mainteneur ouverte) · 2026-08-13
+
+> **Note d'adjudication (2026-08-13).** Draft de worker (`claude-opus-5`,
+> run `wf_8db62dce-162`), livré avec sa propre table de contrôle
+> une-citation-un-grep (58 fragments, comptes d'occurrences portés).
+> Adjudication : échantillon adversarial de 10 fragments re-greppé par
+> l'orchestrateur (10/10 trouvés à l'artefact annoncé, dont l'ABNF en
+> chaîne fixe et l'apostrophe en entité HTML de C2PA §8.4.2.2) ; les trois
+> réserves du worker levées une à une — la déduction de grammaire sur
+> l'endpoint Pyth **re-contrôlée et confirmée** (10 §3.1 ligne 11 : la
+> graphie réelle porte `ids[]=`, et les crochets sont absents de l'ABNF
+> `query`/`pchar` citée) ; enfin S-G5 contrôle mécaniquement chaque
+> citation de ce texte à chaque `verify`. **Deux mises à jour d'état** :
+> les workers ayant tourné en parallèle, le draft croyait RFC 8949 et
+> RFC 9052 non détenues — elles ont été versées par le draft ADR-0015 le
+> même soir (INDEX §phase B) ; son « manque 4 » est donc résolu et ne
+> figure plus ci-dessous. Les trois pièces acquises par ce draft
+> (RFC 3986, RFC 9110, WHATWG URL) sont versées et contrôlées : provenance
+> re-téléchargée à octets identiques par le worker, sha256 recalculés par
+> l'orchestrateur (5/5 de la phase, INDEX §phase B).
+
+### Contexte
+
+ADR-0002 a tranché le conteneur et a laissé, à la lettre, une
+sous-décision ouverte : « La canonicalisation de `subject` (URL + requête
+normalisées) est une sous-décision séparée, ouverte, qui n'est pas réglée
+par le choix du conteneur. » `03-temoignage.md` §5, item 1, porte la même
+mention. Elle a pu rester ouverte tant que le témoignage était trivial :
+le squelette S2.5 encode trois champs factices dont aucun n'est une URL.
+
+S3 la ferme par force. Le motif est celui d'ADR-0002 lui-même — deux
+encodeurs honnêtes doivent produire les mêmes octets — transposé d'un cran
+plus bas : si deux graphies d'une même requête produisent deux `subject`,
+alors le hash du témoignage dépend de la **graphie**, et deux témoignages
+du même dire deviennent incomparables. Le critère de S3 exige un
+`shogen verify <lot>` sur un témoignage **réel** ; un témoignage réel
+désigne un endpoint réel, avec scheme, hôte, chemin et — pour une partie
+des endpoints du pool S2 (10 §3.1) — une chaîne de requête.
+
+Trois faits du dépôt bornent la rédaction et ne sont pas rouverts :
+**ADR-0003** (recalculable offline : ce que le vérificateur ne peut pas
+faire hors réseau n'entre pas dans la forme canonique) ; **ADR-0009 pt 6
+et ADR-0012 D3** (dépendances minimales, `no_std` visé, épinglage exact —
+toute canonicalisation qui exige une table Unicode ou un résolveur est un
+coût de graphe) ; **ADR-0010 et la posture déjà codée** — le décodeur du
+cœur est strict par décision : `temoignage.rs` écrit qu'un encodage valide
+mais non canonique est « refusé, pas normalisé ». La question n'est donc
+pas seulement *quelles normalisations* mais **où elles ont lieu**.
+
+Enfin, `subject` n'est pas le porteur d'intégrité du témoignage :
+ADR-0005 règle 1 — le « hash des octets exacts est toujours porté ». Une
+erreur de désignation ne peut pas faire passer un dire faux ; elle peut
+faire croire que deux dires portent sur la même chose, ou l'inverse. C'est
+exactement le mode d'erreur que RFC 3986 §6 traite.
+
+### Décision
+
+#### C0 — Le principe : la forme canonique est **construite**, jamais réécrite après coup
+
+`subject` est **la requête effectivement émise, octet pour octet, dans sa
+forme canonique**. La normalisation a lieu **une fois, à la construction,
+dans l'adapter** (la coquille impérative d'ADR-0010) — le seul rang à
+savoir ce qui a été interrogé — et l'adapter émet ensuite exactement les
+octets qu'il a inscrits dans `subject`. Le cœur et le vérificateur ne
+normalisent **rien** : ils évaluent un **prédicat de canonicité** total
+sur des octets, et un `subject` hors forme est un **refus nommé**, jamais
+une réécriture silencieuse.
+
+C'est la posture déjà codée pour le CBOR, étendue au champ. Sa conséquence
+décide de tout le reste : un vérificateur qui **refuse** n'a besoin d'être
+cru que sur son refus ; un vérificateur qui **normalise** devrait être cru
+pour normaliser exactement comme le producteur — deux implémentations, une
+égalité à établir, hors réseau, des années plus tard.
+
+Au rang du vérificateur, la comparaison de deux `subject` redevient la
+moins chère de l'échelle de RFC 3986 §6.2.1 — « If two URIs, when
+considered as character strings, are identical, then it is safe to
+conclude that they are equivalent » — parce que le coût de normalisation a
+été payé une fois, en amont. La RFC nomme cette discipline comme la voie
+de réduction des alias : « Unnecessary aliases can be reduced, regardless
+of the comparison method, by consistently providing URI references in an
+already-normalized form ».
+
+#### C1 — Grammaire de la forme canonique (S3)
+
+Le `subject` canonique est une **chaîne d'octets US-ASCII**, encodée en
+texte CBOR (ADR-0002), de la forme :
+
+```
+subject = "https://" host [ ":" port ] path [ "?" query ]
+```
+
+et satisfaisant C2 à C9. Tout octet ≥ 0x80 est **refusé** (`OctetNonAscii`)
+— un caractère hors US-ASCII doit déjà être percent-encodé au moment où le
+`subject` existe (RFC 3986 §2.4 : « Once produced, a URI is always in its
+percent-encoded form. »).
+
+#### C2 — Scheme : `https` uniquement, en minuscules
+
+Le scheme est la chaîne littérale `https`. Casse : RFC 3986 §3.1 —
+« Although schemes are case-insensitive, the canonical form is
+lowercase ». Restriction à `https` : elle **n'est pas** un jugement de
+sécurité, c'est une conséquence de transport — le transport d'ADR-0015
+atteste une session TLS ; un `subject` en `http` désignerait une
+interrogation que le transport ne peut pas attester. RFC 9110 §4.2.2 pose
+en outre que « Resources made available via the "https" scheme have no
+shared identity with the "http" scheme. » — aucune normalisation ne peut
+passer de l'un à l'autre. *Si un transport futur atteste du trafic
+non-TLS, cette clause se rouvre par ADR ; pas autrement.*
+
+#### C3 — Hôte : nom enregistré ASCII en minuscules ; ni IDN, ni littéral d'adresse
+
+L'hôte est un **nom enregistré** en lettres ASCII minuscules, chiffres,
+`-` et `.`. Une majuscule est normalisée à la construction et **refusée**
+au prédicat (`HoteMajuscule`) — RFC 3986 §6.2.2.1 : « scheme and host are
+case-insensitive and therefore should be normalized to lowercase ». Un
+octet percent-encodé dans l'hôte est refusé (`HotePercentEncode`). Un
+littéral d'adresse est refusé (`HoteLitteralAdresse`) : RFC 3986 §3.2.2
+réserve les crochets au seul littéral IP — « This is the only place where
+square bracket characters are allowed in the URI syntax. » — et §7.4
+documente que l'interprétation des formes pointées dépend de la
+plateforme (« many implementations allow dotted forms of three numbers,
+wherein the last part is interpreted as a 16-bit quantity ») : une
+désignation dont l'interprétation dépend de la plateforme du lecteur
+n'est pas recalculable offline (ADR-0003). Un hôte non-ASCII (IDN) est
+**refusé** (`HoteNonAscii`), pas converti en Punycode : la conversion
+exige une table Unicode versionnée (alternative A1) que le vérificateur
+`no_std` à dépendances minimales ne porte pas. Le refus est nommé et
+chiffré au §Coûts.
+
+#### C4 — Aucun `userinfo`
+
+Un `@` séparant un `userinfo` de l'hôte est **refusé**
+(`UserinfoPresent`). RFC 9110 §4.2.4 : « A sender MUST NOT generate the
+userinfo subcomponent (and its "@" delimiter) when an "http" or "https"
+URI reference is generated within a message as a target URI or field
+value. » RFC 3986 §7.6 documente l'attaque sémantique que ce
+sous-composant permet ; un `subject` porteur d'identifiant serait en
+outre une fuite au sens de §7.5.
+
+#### C5 — Port : omis quand il est le port par défaut du scheme
+
+Le port est **absent** quand il vaut 443 ; présent, il est décimal sans
+zéro de tête et différent de 443 (`PortParDefautExplicite`,
+`PortNonDecimal`). RFC 3986 §3.2.3 : « URI producers and normalizers
+should omit the port component and its ":" delimiter if port is empty or
+if its value would be the same as that of the scheme's default » ; la
+valeur du défaut vient du scheme — RFC 9110 §4.2.2 : « TCP port 443 (the
+reserved port for HTTP over TLS) is the default. » ; §4.2.3 : « If the
+port is equal to the default port for a scheme, the normal form is to
+omit the port subcomponent. »
+
+#### C6 — Chemin : jamais vide, sans segment pointillé
+
+Un chemin vide est écrit `/` à la construction ; le prédicat refuse le
+chemin vide (`CheminVide`) — RFC 9110 §4.2.3 : hors OPTIONS, « an empty
+path component is equivalent to an absolute path of "/" ». Un segment `.`
+ou `..` est **refusé** (`SegmentPointille`), graphies percent-encodées
+comprises (contrôle après C7).
+
+Sur ce point, la décision **s'écarte volontairement d'un « should » de la
+source et le dit**. RFC 3986 §6.2.2.3 recommande de retirer : « URI
+normalizers should remove dot-segments by applying the
+remove_dot_segments algorithm to the path ». Nous **refusons** au lieu de
+retirer : (a) retirer, c'est réécrire — C0 l'exclut au vérificateur, et
+l'algorithme entrerait dans le binaire `no_std` ; (b) le refus produit la
+même classe d'équivalence, amputée d'un alias qu'aucun endpoint du pool
+n'emploie ; (c) c'est le geste du seul précédent structurel détenu — C2PA
+2.4 §8.4.2.1 : « URIs shall not contain the sequence .. (a pair of
+U+002E, Full Stop). » Le même appareil de manifeste signé **interdit** au
+lieu de normaliser. Que les graphies encodées soient le même segment est
+documenté par la pièce WHATWG détenue : le *double-dot URL path segment*
+est « ".." or an ASCII case-insensitive match for ".%2e", "%2e.", or
+"%2e%2e" ».
+
+#### C7 — Percent-encoding : casse haute, triplets inutiles décodés, réservés intouchés
+
+1. Chiffres hexadécimaux des triplets en **majuscules**
+   (`TripletPercentMinuscule`) — RFC 3986 §2.1 : « For consistency, URI
+   producers and normalizers should use uppercase hexadecimal digits for
+   all percent-encodings. »
+2. Un triplet codant un caractère **non réservé** est décodé à la
+   construction et **refusé** au prédicat (`PercentEncodageInutile`) —
+   RFC 3986 §2.3 : « URIs that differ in the replacement of an unreserved
+   character with its corresponding percent-encoded US-ASCII octet are
+   equivalent » ; RFC 9110 §4.2.3 en fait la forme normale http(s).
+3. Tout `%` ouvre un triplet bien formé (`TripletPercentMalForme`) ;
+   `%00` est **refusé** (`OctetNulEncode`) — RFC 3986 §7.3 : le NUL
+   « should be rejected » hors donnée brute attendue.
+
+**L'interdiction** : un caractère **réservé** n'est ni encodé ni décodé,
+jamais, à aucun rang — RFC 3986 §2.2 : « URIs that differ in the
+replacement of a reserved character with its corresponding percent-encoded
+octet are not equivalent. » C'est la clause qui interdit à elle seule
+toute « harmonisation » de séparateurs dans la requête. Et l'idempotence —
+§2.4 : les implémentations « must not percent-encode or decode the same
+string more than once » — interdit d'appliquer la normalisation deux
+fois : elle a lieu une fois, à la construction (C0) ; le prédicat ne
+transforme rien.
+
+#### C8 — Requête : conservée **verbatim**, jamais triée, jamais dédupliquée
+
+- Absente, ou présente et **non vide** — le `?` nu est refusé
+  (`RequeteVide`) : RFC 3986 §6.2.3, « Normalization should not remove
+  delimiters when their associated component is empty unless licensed to
+  do so by the scheme specification. » — et le scheme http(s) ne donne pas
+  cette licence (RFC 9110 §4.2.3 énumère ses règles, aucune sur la
+  requête).
+- La requête conforme à l'ABNF `query` de RFC 3986 §3.4 est reprise
+  **octet pour octet**, dans l'ordre émis. **Aucun tri. Aucune
+  déduplication. Aucune fusion de clés répétées. Aucune réécriture
+  `+`/espace.** Seules les règles de C7 s'y appliquent (elles portent sur
+  les octets, pas sur la structure clé/valeur).
+- Un caractère hors grammaire — au premier chef `[` et `]` — est refusé
+  (`CaractereHorsGrammaire`).
+
+**Le tri des paramètres, instruit honnêtement** — c'est la normalisation
+la plus tentante et celle que nous refusons :
+
+1. **Aucun barreau de l'échelle ne la licencie.** RFC 3986 §6.2.2 énumère
+   « case normalization, percent-encoding normalization, and removal of
+   dot-segments » — trois techniques, pas de réordonnancement ; §6.2.3
+   renvoie au scheme, et RFC 9110 §4.2.3 n'ajoute rien sur la requête ;
+   §6.2.4 (protocol-based) est le geste des spiders, refusé en R2.
+2. **La requête appartient à l'origine, pas à nous.** RFC 3986 §3.4 :
+   « The query component contains non-hierarchical data » qui sert
+   l'identification « within the scope of the URI's scheme and naming
+   authority ». Réordonner, c'est affirmer une propriété du parseur de
+   l'origine — que nous ne détenons pour aucune source du pool.
+3. **L'asymétrie de RFC 3986 §6.1 tranche** : « comparison methods are
+   designed to minimize false negatives while strictly avoiding false
+   positives. » Le tri achète une réduction de faux négatifs au prix d'un
+   faux positif possible — deux ressources distinctes sous un seul
+   `subject`, le mode d'échec qu'aucun résidu nommé ne rattrape.
+4. **Le tri ne ferme même pas l'alias qu'il promet.** Le seul tri normatif
+   détenu (WHATWG, `URLSearchParams.sort()`) ordonne par **nom
+   seulement** ; deux requêtes aux valeurs permutées restent distinctes.
+   Et son motif déclaré n'est pas l'identité : « It can be useful to sort
+   the name-value tuples in a URLSearchParams object, in particular to
+   increase cache hits ».
+5. **`+` n'est pas un espace au rang de l'URI.** `+` est un `sub-delim`,
+   réservé, protégé par §2.2 ; l'équivalence `+`/espace appartient au
+   format `application/x-www-form-urlencoded` (WHATWG : « Replace any
+   0x2B (+) in name and value with 0x20 (SP) ») — appliquer une règle de
+   format à une désignation d'URI serait le faux positif du point 3.
+
+#### C9 — Aucun fragment
+
+Un `#` est **refusé** (`FragmentPresent`). RFC 3986 §6.1 : pour
+sélectionner une action réseau, les fragments « should be excluded from
+the comparison » ; et §6.2.3 : « The fragment component is not subject to
+any scheme-based normalization ». Un composant jamais émis vers l'origine
+et non normalisable n'a pas de place dans la désignation de ce qui a été
+interrogé.
+
+#### C10 — Le prédicat vit au cœur ; le vérificateur ne fait que refuser
+
+`shogen-core` porte une fonction **totale**
+`subject_est_canonique(&[u8]) -> Result<(), ErreurSubject>` : sans I/O,
+sans horloge, au régime d'ADR-0010, variantes d'erreur **nommées et
+positionnées** au patron d'`ErreurDecodage`. Le vérificateur l'appelle et
+propage : verdict fail-closed, raison structurée. Ce que l'adapter utilise
+pour **construire** n'est pas tranché ici — il est dans la coquille, hors
+périmètre `no_std`, sous une seule contrainte : ce qu'il produit satisfait
+le prédicat du cœur, et son outillage éventuel passe R-8. Un désaccord
+constructeur/prédicat est un **rouge** — deux implémentations qui se
+contrôlent l'une l'autre.
+
+#### Les refus explicites — ce que la canonicalisation ne fait pas
+
+**R1 — Aucune résolution de noms.** RFC 3986 §3.2.2 : la présence d'un
+hôte « does not imply that the scheme requires access to the given host on
+the Internet », et la conformité du nom est déléguée à l'environnement —
+la spec « delegates the issue of registered name syntax conformance to
+the » système du lecteur : une forme dont le résultat dépend du système ne
+serait pas recalculable (ADR-0003).
+
+**R2 — Aucun suivi de redirection.** Le `subject` désigne **ce qui a été
+interrogé**, jamais ce vers quoi l'origine a renvoyé — la normalisation
+« protocol-based » de §6.2.4 est un geste de spider en ligne, non
+rejouable hors ligne, et le vérificateur n'a pas de réseau (S-G2).
+
+**R3 — Aucune revendication d'identité de ressource.** RFC 3986 §6.1 :
+« URI comparison is not sufficient to determine whether two URIs identify
+different resources. » Le vocabulaire de sortie le dit (§Registres).
+
+**R4 — Aucune promesse de persistance.** RFC 3986 §7.1 : « There is no
+guarantee that once a URI has been used to retrieve information, the same
+information will be retrievable by that URI in the future. » Ce résidu est
+déjà porté par `observed_at` (03 §1) ; aucune entrée nouvelle.
+
+**R5 — Hors périmètre : les requêtes qu'aucune URI ne désigne.** La forme
+couvre une interrogation **http(s) sans corps**. La source #12 du pool
+(`eth_call` RPC) inclut un corps de requête qu'aucune URI ne porte : hors
+périmètre de `subject` tel que décidé ; l'admettre exigera une ADR, due au
+premier branchement d'une telle source.
+
+**Régime d'assurance** : rien ici n'est *proven*. Le prédicat sera
+*tested* en phase C (property-based + mutants, comptes à la date) ; d'ici
+là, l'assurance est *reviewed* (draft worker, adjudication orchestrateur,
+2026-08-13).
+
+### Alternative considérée
+
+**A1 — Le WHATWG URL Standard comme référence normative.** Instruite
+sérieusement (c'est la spec des clients réels, détenue). Rejetée sur trois
+constats de copie : (1) cible mouvante sans version — « Last Updated 6
+July 2026 », aucune identité que « courant », le mode d'échec déjà
+rencontré avec la doc TLSNotary ; (2) son but déclaré est de remplacer la
+source, pas de la préciser — Goals : « Align RFC 3986 and RFC 3987 with
+contemporary implementations and obsolete the RFCs in the process. » ;
+(3) sa normalisation d'hôte importe une table Unicode versionnée (UTS #46,
+« and not IDNA2008 », écarts « due to web compatibility ») — contre
+ADR-0009 pt 6 et ADR-0012 D3, et un verdict dépendant du millésime de la
+table. **Retenue comme pièce de corroboration** : graphies du segment
+pointillé (C6), portée réelle du tri (C8 pt 4), localisation de
+`+`/espace dans un format (C8 pt 5).
+
+**A2 — Ne rien normaliser.** Rejetée comme décision, **retenue à
+moitié** : c'est ce que fait le vérificateur (C0). Seule, elle ne ferme
+pas ADR-0002 : sans discipline de construction, deux graphies restent deux
+hashes — la RFC nomme la solution retenue (« in an already-normalized
+form »), pas l'abstention.
+
+**A3 — Toute l'échelle dans le vérificateur.** Rejetée : elle fait entrer
+`remove_dot_segments`, le décodage percent et le pliage de casse dans un
+binaire `no_std`, et surtout elle fait **réécrire au vérificateur ce qu'il
+contrôle** — la posture que le cœur refuse déjà pour le CBOR.
+
+**A4 — Trier les paramètres.** Rejetée, instruite en C8 points 1-5. La
+seule alternative dont le rejet coûte quelque chose de mesurable, écrit au
+§Coûts.
+
+**A5 — Déléguer à une crate d'URL de l'écosystème.** Rejetée pour le
+périmètre cœur/vérificateur : elle importe la sémantique d'A1 et ses
+tables IDNA dans le graphe, contre ADR-0012 D3. R-8 non instruit car sans
+objet ici ; il redevient dû si l'adapter (coquille) veut une telle crate
+pour **construire** — ce que C10 laisse ouvert.
+
+**A6 — Admettre le jeu de caractères de requête du WHATWG (`[`/`]`
+bruts).** Instruite parce qu'immédiatement utile (source #11 du pool).
+Rejetée à S3 : c'est A1 par la petite porte, pour un gain d'une source
+quand le critère porte sur UN témoignage et que le pool en offre d'autres
+en grammaire. Première option à instruire si une classe de faits l'exige.
+
+### La source qui tranche
+
+**RFC 3986 §6 « Normalization and Comparison » (détenue, lue §6.1-§6.2.4
+par le worker, échantillon re-greppé par l'orchestrateur).** Elle seule
+fait deux choses ensemble : elle **énumère** les normalisations licites et
+elle **donne la règle de choix** — §6.1 : « comparison methods are
+designed to minimize false negatives while strictly avoiding false
+positives. » Cette asymétrie décide de tout le sous-ensemble : toutes les
+normalisations que la source déclare préserver l'équivalence, **aucune**
+de celles qu'elle ne licencie pas. Le geste est celui d'ADR-0008 : ne pas
+prendre le déclaré pour du mesuré.
+
+**RFC 9110 §4.2.3 (détenue)** est la seconde, indispensable : §6.2.3 de la
+3986 renvoie au scheme, et l'énumération close de 9110 (port, chemin vide,
+casse, non-réservés — rien sur la requête) fait du tri une invention et
+non une normalisation. Elle porte aussi la clause qui **nomme le résidu** :
+« distinct resources SHOULD NOT be identified by HTTP URIs that are
+equivalent after normalization » — un SHOULD NOT adressé aux **origines**,
+que rien ne nous permet de contrôler : d'où l'entrée
+A(origin-normalization-conformance) au registre.
+
+**Le précédent structurel : C2PA 2.4 §8.4 (détenu).** Le cousin le plus
+proche fait trois choses reprises telles quelles : il **interdit au lieu
+de normaliser** (« URIs shall not contain the sequence .. ») ; il **refuse
+fail-closed sur l'ambiguïté** (« a validator shall treat the reference as
+unresolved ») ; et il **ne fait jamais porter l'intégrité par l'URI**
+(toute référence est URL **plus** hash). Ce dernier point borne l'enjeu de
+cette ADR : chez nous aussi l'intégrité est portée par le hash des octets
+(ADR-0005 règle 1) — une canonicalisation défaillante ne fait pas passer
+un dire faux, elle apparie mal. Mode d'échec de **comptage** (quorum, S4),
+pas d'authenticité.
+
+### Ce que la décision coûte
+
+- **Une source du pool sort du périmètre à sa graphie actuelle.**
+  L'endpoint Pyth (10 §3.1, ligne 11) s'écrit avec `ids[]=` — crochets
+  hors de l'ABNF `query`/`pchar` de RFC 3986 §3.4, réservés par §3.2.2 au
+  littéral IP. Le prédicat refuse (`CaractereHorsGrammaire`). Réécrire en
+  `ids%5B%5D=` n'est **pas** une normalisation (§2.2 : substituer un
+  réservé n'est pas une équivalence) mais une requête différente, dont
+  l'acceptation par l'origine est une question empirique non tranchée.
+  **Conséquence assumée** : le témoignage réel de S3 se fait sur une des
+  autres sources en grammaire ; l'admission de Pyth est une décision
+  ultérieure (A6), pas un contournement.
+- **Les sources IDN sont hors périmètre** (C3). Aucun endpoint du pool
+  n'en porte : coût nul aujourd'hui, entier demain — la première source
+  IDN exigera une ADR **et** des pièces non détenues (§Manques).
+- **Deux graphies de requête = deux `subject` = deux hashes** (C8). Le
+  prix explicite du refus de trier, payé à la construction où il est
+  visible : la graphie d'un endpoint est fixée au registre du pool
+  (10 §3.1) ; un changement de graphie est un changement de `subject` —
+  constatable, jamais silencieux.
+- **Le prédicat est un contrôleur, pas un normaliseur d'URI général** — et
+  ne doit jamais être décrit comme tel (ni IDN, ni littéraux, ni schemes
+  autres que `https`, ni corps de requête). Deux entrées de vocabulaire en
+  découlent.
+- **Nous nous écartons de deux « should » de la source, et nous le
+  publions** : §6.2.2.3 (retirer les segments pointillés — nous refusons)
+  et §6.2.2 (décoder les non-réservés — fait à la construction, refusé au
+  contrôle). Les deux écarts sont *plus stricts*, jamais plus permissifs :
+  des faux négatifs, jamais des faux positifs — le sens même de §6.1.
+- **Un refus est un blocage opérateur** — l'effet recherché (fail-closed),
+  et un travail non planifié à chaque source nouvelle, borné par le refus
+  nommé et positionné (C10).
+- **Aucune mesure ne chiffre le risque évité.** Aucune pièce détenue ne
+  mesure la proportion d'origines sensibles à l'ordre des paramètres :
+  l'argument de C8 est **normatif**, pas empirique, et il est écrit comme
+  tel. Sans acquisition (§Manques), aucune phrase sortante ne chiffre ce
+  risque.
+
+### Registres touchés
+
+- **ADR-0002** : la sous-décision ouverte est **fermée par la présente
+  ADR** (note portée à la table des ADR ; le texte d'ADR-0002 reste
+  historique).
+- **`docs/03-temoignage.md` §1** : la ligne `subject` est précisée —
+  paramètres de requête **conservés verbatim**, jamais normalisés en
+  ordre (la rédaction antérieure laissait croire l'inverse). §5 item 1 :
+  fermé — les quatre items du §5 sont tous clos.
+- **`docs/08-assumptions.md`** : entrée nouvelle
+  A(origin-normalization-conformance) (résidus de couche), portée à
+  l'adjudication.
+- **`docs/09-vocabulaire.md`** : deux entrées nouvelles (adjugées).
+- **`crates/shogen-core`** : `ErreurSubject` (variantes nommées C2-C9) et
+  le prédicat total — phase C ; `subject` entre au vocabulaire du
+  témoignage avec les 7 champs de 03 §1 — phase C.
+- **`docs/13-temoignage-e2e-design.md` §2** : le point 2 (« le cœur »)
+  gagne le prédicat de canonicité comme charge utile de phase C.
+- **`biblio/INDEX.md`** : les trois pièces du draft sont versées et
+  enregistrées (§phase B).
+- **`WISHLIST.md`** : manques 1-3 ci-dessous portés.
+
+### Manques nommés
+
+1. **RFC 5890/5891 (IDNA2008) et UTS #46** — requis seulement si une
+   classe de faits admet une source IDN (C3). Localisation connue
+   (rfc-editor.org ; unicode.org/reports/tr46/, la copie WHATWG référence
+   la révision tr46-35 du 4 septembre 2025).
+2. **RFC 5952 (représentation textuelle IPv6)** — requise seulement si un
+   littéral d'adresse est un jour admis (C3).
+3. **Une mesure de la sensibilité des origines à l'ordre des paramètres**
+   — aucune pièce détenue, aucune candidate identifiée ; elle ne
+   changerait pas C8 (fondée normativement) mais permettrait de chiffrer
+   le risque évité, aujourd'hui qualitatif.
 
 ---

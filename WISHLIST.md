@@ -125,6 +125,18 @@ public sur `tlsn-mpc/1`.
    vérification « sans syscall » recouvre — condition (iii) de réouverture
    de la forme α (ADR-0015 pt 11).
 
+6. **RFC 5890/5891 (IDNA2008) + UTS #46** (ADR-0016 C3) — requis
+   seulement si une classe de faits admet une source à domaine
+   internationalisé. Localisation : rfc-editor.org ;
+   unicode.org/reports/tr46/ (la copie WHATWG détenue référence tr46-35,
+   4 septembre 2025).
+7. **RFC 5952 (représentation textuelle IPv6)** (ADR-0016 C3) — requise
+   seulement si un littéral d'adresse est un jour admis.
+8. **Mesure de la sensibilité des origines à l'ordre des paramètres de
+   requête** (ADR-0016 C8) — aucune pièce détenue, aucune candidate
+   identifiée ; ne changerait pas la décision (normative) mais
+   chiffrerait le risque évité.
+
 *(La taille d'un artefact `Presentation` n'est PAS ici : elle se résout
 par mesure en phase C — ADR-0015, manque 6.)*
 

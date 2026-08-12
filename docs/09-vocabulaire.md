@@ -44,13 +44,15 @@ licite ; « donnée vérifiée » = surclamation, interdit).
 | « SLSA niveau N » (sans propriétés de plateforme établies) | le niveau dépend de propriétés de la plateforme de build qu'aucune pièce détenue n'établit (ADR-0012) | « provenance attestée par [plateforme] ; niveau SLSA non établi sur pièce » |
 | « CI verte **donc** code correct » / « gate verte donc conforme » | une gate verte n'atteste que ce que ses mutants semés ont montré (ADR-0013 pt 2) ; hors corpus, elle ne dit rien | « gate S-Gx verte, n mutants semés tués le [date] » |
 
-## Propres au transport S3 (2026-08-13 — proposées par ADR-0015, adjugées par l'orchestrateur)
+## Propres à S3 — transport et subject (2026-08-13 — proposées par ADR-0015/0016, adjugées par l'orchestrateur)
 
 | interdit | pourquoi c'est un mensonge | on écrit à la place |
 |---|---|---|
 | « preuve publiquement vérifiable » (nue) | le projet amont lui-même : « You don't get public verifiability and zero trust at the same time » — la portabilité s'achète par un notaire | « attestation portable, vérifiable par quiconque fait confiance à la clé du notaire [identité] » |
 | « transport vérifié par shogen-verifier » | en forme β le vérificateur contrôle la liaison hash→preuve, pas la cryptographie de la preuve (ADR-0015 pt 8) | « liaison hash→preuve contrôlée par shogen-verifier ; contrôle cryptographique délégué à shogen-tlsn-verify [révision] » |
 | « zkTLS trustless » / « transport sans confiance » | designated-verifier : « Every zkTLS protocol today is designated-verifier in this way. » | « designated-verifier ; portable sous confiance en [notaire] » |
+| « le vérificateur normalise l'URL » / « subject normalisé » (au vérificateur) | ce qui a lieu au vérificateur est un refus, pas une transformation (ADR-0016 C0/C10) | « subject en forme canonique C1-C9 ; prédicat de canonicité, refus nommé » |
+| « deux subject différents donc deux ressources » (et la réciproque) | RFC 3986 §6.1 : « URI comparison is not sufficient to determine whether two URIs identify different resources » | « subject distincts ; l'identité des ressources n'est pas établie — sous A(origin-normalization-conformance) » |
 
 ## Règle d'application
 
