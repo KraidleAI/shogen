@@ -7,8 +7,8 @@ description: >-
   épinglées, cargo-deny, attestations de build), préparer les workflows
   GitHub Actions, et auditer la conformité du dépôt au plan
   docs/DEVOPS.md. Jamais pour affaiblir une gate, jamais pour publier.
-model: opus
-effort: max
+model: claude-opus-5
+effort: high
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
