@@ -1,4 +1,4 @@
-# Shōgen — registre des assumptions (v1, 2026-07-30)
+# Shōgen — registre des assumptions (v2, 2026-08-12 ; v1 2026-07-30)
 
 > **Le registre fait foi** : une assumption absente d'ici n'existe pas, et
 > tout identifiant A(...) écrit ailleurs se résout ici (règle héritée du
@@ -27,6 +27,20 @@
 | A(window-stationarity) | Les fenêtres d'observation R1 d'une classe de faits sont comparables — le processus d'entrée est suffisamment stationnaire pour que le test agrégé ait un sens | Eckhardt & Lee, TM-86369 (détenu, summary lu) : hypothèse (ii), « the system is required to execute on a stationary input series » — le même postulat, hérité et nommé | 04 §2 (le test R1) — citée au site depuis le 2026-07-30 | aucune | stratification des fenêtres par régime (calme/stress) quand S2 aura mesuré ; jusque-là l'hypothèse est écrite dans chaque certificat R1 | aucune |
 | A(history-integrity) | L'historique de co-défaillances sur lequel R1 calcule n'a pas été altéré ni sélectionné (fenêtre de complaisance exclue par politique de classe — 04 §5) | 04 §5 (surface de jeu du certificat) | tout certificat R1 | aucune | l'historique est lui-même un lot de témoignages datés — la décharge est récursive et partielle, à spécifier en S4 | aucune |
 | A(asn-attribution) | L'attribution IP → ASN rapportée par les services (RIPEstat, Team Cymru) reflète l'annonce BGP effective au moment de la mesure — l'axe ASN de R2 en dépend | 10 §4.1, résidu 6 (les services d'attribution sont eux-mêmes des témoins) ; concordance RIPEstat = Cymru 8/8 du 2026-08-05 (V1, re-mesure aveugle) — une observation, pas une décharge | 10 §4.1 (axe ASN) ; futur harnais R2 de S2 | aucune | jamais totale ; attribution croisée sur ≥ 2 bases BGP distinctes + re-mesure à chaque quorum | aucune |
+| A(toolchain-soundness) | La solidité de `rustc` et de la bibliothèque standard (qui emploie `unsafe`) est supposée, jamais établie — RustBelt couvre un langage formalisé, pas le compilateur | RustBelt p. 66:3 (détenu, relu 2026-08-12) : « several soundness bugs have been found in Rust, both in the language itself » et §1.2 « we do not consider the full Rust language » | ADR-0009 ; tout binaire du produit | aucune | aucune complète connue ; réduction par dépendances minimales (ADR-0009) et par la reproductibilité du binaire vérificateur (ADR-0012 D6) | aucune |
+| A(verifier-binary) | Le binaire `shogen-verifier` qu'un tiers exécute correspond au code source publié | Lamb & Zacchiroli p. 1 (détenu, relu 2026-08-12) : « trusting code is not the same as trusting its executable counterparts » | ADR-0012 ; la promesse offline d'ADR-0003 et 02-vision | aucune | rebuild bit-à-bit indépendant (décharge complète — ADR-0012 D6) ; provenance attestée (décharge partielle : le résidu se déplace vers la plateforme de build) | aucune |
+
+## Résidus de méthode (la chaîne d'ingénierie elle-même — S2.5, 2026-08-12)
+
+Section ouverte par l'orchestrateur sur proposition des ADR-0011/0013 :
+les résidus ci-dessous portent sur **notre façon de tester**, pas sur le
+produit. Tant qu'un identifiant n'était pas ici, il ne s'écrivait nulle
+part (leçon des identifiants morts, ADR-0001).
+
+| id | énoncé | source du résidu | porteur dans | assurance | décharge | exercée par |
+|---|---|---|---|---|---|---|
+| A(coupling-effect) | Les fautes semées simples couvrent les fautes réelles par couplage — la prémisse de tout score de mutation | DeMillo, Lipton & Sayward p. 35 (détenu, relu 2026-08-12) : « There is, of course, no hope of "proving" the coupling effect; it is an empirical principle » | tout score de mutation publié (ADR-0011 pt 3) | aucune | jamais totale ; les fautes réelles trouvées en production entrent au corpus de mutants (l'évasion devient test) | aucune |
+| A(gate-adequacy) | Les mutants semés d'une gate représentent les violations réelles que la gate doit attraper | transposition du geste de mutation aux gates, nommée comme analogie de méthode (ADR-0013, source qui tranche, pt 2) — rien ne l'établit | tout vert de gate (ADR-0013 pt 2 : un vert n'atteste que ce que ses mutants ont montré) | aucune | jamais totale ; l'invariant « l'évasion devient test permanent » fait de chaque contre-exemple réel un mutant de plus | xtask/tests/mutants.rs — 13 mutants + 1 témoin, vus verts par l'orchestrateur le 2026-08-12 |
 
 ## Notes de registre
 

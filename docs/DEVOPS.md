@@ -1,10 +1,16 @@
-# Shōgen — plan DevOps (v0, 2026-07-30)
+# Shōgen — doctrine DevOps (v1, 2026-08-12 ; plan v0 du 2026-07-30)
 
-> Statut : plan, rien n'est encore en place. Le principe directeur est une
-> conséquence directe de la thèse du projet : **Shōgen vend de la provenance
-> vérifiable ; sa propre chaîne de code doit être attestable au même
-> standard**, sous peine d'auto-réfutation. Chaque choix ci-dessous en
-> découle.
+> Statut : **fondé et partiellement en place**. Ce qui était « plan, rien
+> n'est encore en place » (v0) est depuis le 2026-08-12 adossé aux
+> ADR-0009 à 0013 (S2.5, DECISIONS.md) et exécuté en phase C pour le
+> squelette : workspace, toolchain épinglée, gates S-G1/S-G2/S-G3 + S-G7a
+> avec mutants semés tués et committés, walking skeleton, CI écrite
+> (non poussée). Le principe directeur est inchangé : **Shōgen vend de la
+> provenance vérifiable ; sa propre chaîne de code doit être attestable au
+> même standard**, sous peine d'auto-réfutation. Par section : §2 est la
+> doctrine d'ADR-0010, §3 exécute ADR-0011/0013, §4 est gouverné par
+> ADR-0012. Les citations d'autres documents visant « plan, rien n'est
+> encore en place » décrivent l'état v0 à leur date — exact alors.
 
 ## 1. Le dépôt
 
@@ -73,6 +79,19 @@ CI sur **Windows + Linux** dès le début (la leçon plateforme-dans-la-trace),
 sur chaque push, mêmes gates en local via `just verify` — une gate qui ne
 tourne que quand on y pense ne vaut rien.
 
+**État d'instanciation (2026-08-12, phase C S2.5, adjugé par
+l'orchestrateur — gates vues vertes, mutants vus tués)** :
+S-G1, S-G2, S-G3 instanciées dans `xtask/` (+ **S-G7a**, le volet
+« version exacte » de S-G7 porté par rôle, ADR-0012 D3), chacune avec
+sélection par chemins exacts, ligne de couverture avant verdict, et ses
+mutants permanents (`xtask/tests/mutants.rs` : 13 mutants + 1 témoin).
+Entrée unique : `cargo xtask verify`. Le reste de S-G7 (licences, bans,
+sources, advisories) est tenu par `cargo deny --locked check`. **S-G4,
+S-G5, S-G6 et S-G8** (vocabulaire, citations, index, ligne de journal —
+elles gardent `docs/` et `biblio/`) ne sont pas instanciées : unité de
+travail nommée, à conduire par l'orchestrateur (elles outillent son propre
+périmètre d'écriture), consignée en 12 §10.
+
 ## 4. Chaîne d'approvisionnement — le standard auto-imposé
 
 Le projet qui dit « une attestation est liée à sa source » signe et atteste
@@ -114,8 +133,10 @@ Défini dans le fichier d'agent à côté de ce plan. Sa charte en trois
 lignes : il **propose et outille, ne relâche jamais** — il peut ajouter une
 gate, jamais l'affaiblir sans ADR ; il sème le mutant avant de rapporter un
 vert ; il ne pousse rien vers GitHub sans instruction explicite du
-mainteneur. Modèle et effort conformes à la règle absolue du 2026-07-29
-(Opus/Fable, effort max).
+mainteneur. Modèle et effort conformes à la règle mainteneur en vigueur
+(CLAUDE.md global, 2026-08-05, effort amendé le 2026-08-12 — ratifiée pour
+Shōgen le 2026-08-12) : workers `claude-opus-5` épinglé, orchestrateur
+Fable 5, effort high partout.
 
 ## 7. Séquence de mise en place (à valider avant exécution)
 
