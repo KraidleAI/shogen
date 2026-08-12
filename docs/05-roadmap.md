@@ -147,6 +147,52 @@ oracles inclus ; classe « BTC/USD-stable », devise marquée par flux ;
 lecture on-chain admise sous ADR-0006 ; règle `basis:doc` → ADR-0008
 (acceptée). **S2 passe à l'implémentation du harnais.**
 
+## S2.5 — Les fondations d'ingénierie *(gate d'entrée du code produit)*
+
+> Jalon inséré le 2026-08-12 (règle mainteneur du 2026-08-05 : aucun code
+> produit avant la passe fondations ; ratifications du 2026-08-12 — jalon
+> dédié, conception : `docs/12-fondations-ingenierie-design.md`). L'index
+> fractionnaire évite de renuméroter S3–S5, cités dans tout le corpus docs.
+
+Le génie logiciel entre dans `biblio/` par ses sources fondatrices, comme la
+statistique l'a fait ; les choix d'ingénierie — stack et toolchain,
+architecture cœur pur/coquille, stratégie de test et ses seuils, politique
+d'environnement (versions épinglées par lockfile), gates et flux DevOps —
+deviennent les **ADR-0009 à 0013**, au même régime que les ADR
+statistiques : options instruites, conséquences chiffrées, seuils en
+candidats **ratifiés par le mainteneur**. L'ossature est ensuite exercée de
+bout en bout (tested) par un **walking skeleton** sans logique produit
+(12 §5). Hors-champ : `s2-harness` (jetable, 10 §1) — S2 continue en
+parallèle et n'est pas gaté.
+
+**Critère de sortie** : les cinq ADR 0009–0013 acceptées et leurs seuils
+ratifiés ; la source-qui-tranche de chacune détenue dans `biblio/` et lue à
+la section (ou demande de procurement formée déposée) ; et le walking
+skeleton vert à travers toutes les gates applicables sur Windows ET Linux —
+un témoignage trivial → CBOR canonique → contrôle offline par un binaire
+séparé qui nomme son résidu et échoue fail-closed sur un octet muté — avec
+zéro logique produit. *Atteint = S3 peut commencer.*
+
+**État au 2026-08-12** : lancée. Conception écrite (docs/12) ; règle des
+modèles ratifiée et définitions d'agents réparées ; contrôle de résolution
+exécuté (deux chemins, 12 §6.2 — variante `claude-opus-5[1m]` consignée,
+révision mainteneur ouverte) ; **rang A du corpus versé et contrôlé le
+2026-08-12** — 21 artefacts (dont SLSA v1.2 courante), chacun page de
+titre lue ou greppé par l'orchestrateur, sha256 à l'INDEX ; **phase A
+close le 2026-08-12** — 5 demandes de procurement formées (WISHLIST
+§Priorité 3), OOSC2 réglé sans procurement (texte légal chez l'auteur,
+redistribution interdite). **Phases B, C et D closes le 2026-08-12** :
+ADR-0009 à 0013 acceptées (déléguées — révision ouverte, ~176 citations
+re-établies par l'orchestrateur) ; squelette sous gates et walking
+skeleton **adjugés verts sur rejeu intégral de l'orchestrateur**
+(S-G1/2/3/7a, 13 mutants + témoin, 41 tests, couverture cœur 92,23 %,
+fail-closed vu sur octets mutés — Windows ; Linux suspendu au premier
+push) ; registres portés (vocabulaire v2, assumptions v2, DEVOPS v1).
+**Reste la phase E — au mainteneur** : ratification des 14 seuils, de la
+variante `claude-opus-5[1m]`, décision de licence des crates, et
+autorisation de commit/push (le critère de sortie exige la CI Linux
+verte). Détail : 12 §9-§10.
+
 ## S3 — Le témoignage de bout en bout *(code)*
 
 Premier chemin complet sur UN transport (candidat : TLSNotary, open
