@@ -84,13 +84,27 @@ l'orchestrateur — gates vues vertes, mutants vus tués)** :
 S-G1, S-G2, S-G3 instanciées dans `xtask/` (+ **S-G7a**, le volet
 « version exacte » de S-G7 porté par rôle, ADR-0012 D3), chacune avec
 sélection par chemins exacts, ligne de couverture avant verdict, et ses
-mutants permanents (`xtask/tests/mutants.rs` : 13 mutants + 1 témoin).
+mutants permanents (`xtask/tests/mutants.rs` — au 2026-08-13 : 23 mutants +
+4 témoins, re-mesuré par `grep -c '#[test]'` ; 13 mutants de gates de code
++ 10 de gates documentaires).
 Entrée unique : `cargo xtask verify`. Le reste de S-G7 (licences, bans,
 sources, advisories) est tenu par `cargo deny --locked check`. **S-G4,
-S-G5, S-G6 et S-G8** (vocabulaire, citations, index, ligne de journal —
-elles gardent `docs/` et `biblio/`) ne sont pas instanciées : unité de
-travail nommée, à conduire par l'orchestrateur (elles outillent son propre
-périmètre d'écriture), consignée en 12 §10.
+S-G5, S-G6 et S-G8 instanciées le 2026-08-12 (ouverture de S3, unité
+orchestrateur — dette 12 §10 item 2 fermée)** : vocabulaire (sous-ensemble
+non ambigu du registre 09, citations marquées exclues), citations
+(une-citation-un-grep contre INDEX + octets locaux + sidecars `*.sidecar`
+générés par `just sidecars` ; en CI sans octets le contrôle partiel se dit
+partiel), index (compte d'en-tête + chaque octet versé nommé au registre),
+journal (3 cellules, date ISO, ordre chronologique). 10 mutants semés + 3
+témoins sur arbre synthétique (`xtask/tests/mutants.rs`), dont les témoins
+du régime « corpus partiel » exigés par la revue G2 du 2026-08-13
+(verdict : accepter avec corrections — bloquante `.gitignore` et majeures
+2-5 toutes fermées le jour même). Premières prises
+le jour de l'instanciation : un site « faits signés » survivant de l'audit
+S1 (02-vision), deux citations infidèles dans des ADR ratifiées (RustBelt
+« type system itself » cité « language itself » ; sigstore « secure but
+accessible » inversé en « and » par l'adjudication S2.5) — corrigées en
+classe, trace aux sites.
 
 ## 4. Chaîne d'approvisionnement — le standard auto-imposé
 

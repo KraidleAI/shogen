@@ -51,23 +51,30 @@ pub struct Recensement {
 /// pas un ensemble vide — sinon la gate deviendrait verte en supprimant ce
 /// qu'elle surveille.
 pub fn fichiers_rust(racine: &Path, relatif: &str) -> Recensement {
+    fichiers_par_extension(racine, relatif, "rs")
+}
+
+/// Recense récursivement les fichiers d'une extension sous `racine/relatif`,
+/// triés — la brique commune des recensements de gate (R-3 : une seule
+/// implémentation, `fichiers_rust` et `fichiers_markdown` s'y ramènent).
+pub fn fichiers_par_extension(racine: &Path, relatif: &str, extension: &str) -> Recensement {
     let repertoire = racine.join(relatif);
     let mut fichiers = Vec::new();
     let mut incidents = Vec::new();
     if !repertoire.is_dir() {
         incidents.push(format!(
-            "répertoire de rôle absent ou illisible : {relatif} (chemin exact attendu — la gate refuse de conclure)"
+            "répertoire absent ou illisible : {relatif} (chemin exact attendu — la gate refuse de conclure)"
         ));
         return Recensement {
             fichiers,
             incidents,
         };
     }
-    parcourir(&repertoire, &mut fichiers, &mut incidents);
+    parcourir(&repertoire, extension, &mut fichiers, &mut incidents);
     fichiers.sort();
     if fichiers.is_empty() {
         incidents.push(format!(
-            "aucun fichier .rs sous {relatif} : la gate refuse de conclure sur un rôle vide"
+            "aucun fichier .{extension} sous {relatif} : la gate refuse de conclure sur un périmètre vide"
         ));
     }
     Recensement {
@@ -76,7 +83,12 @@ pub fn fichiers_rust(racine: &Path, relatif: &str) -> Recensement {
     }
 }
 
-fn parcourir(repertoire: &Path, fichiers: &mut Vec<PathBuf>, incidents: &mut Vec<String>) {
+fn parcourir(
+    repertoire: &Path,
+    extension: &str,
+    fichiers: &mut Vec<PathBuf>,
+    incidents: &mut Vec<String>,
+) {
     let entrees = match std::fs::read_dir(repertoire) {
         Ok(entrees) => entrees,
         Err(erreur) => {
@@ -92,8 +104,8 @@ fn parcourir(repertoire: &Path, fichiers: &mut Vec<PathBuf>, incidents: &mut Vec
             Ok(entree) => {
                 let chemin = entree.path();
                 if chemin.is_dir() {
-                    parcourir(&chemin, fichiers, incidents);
-                } else if chemin.extension().is_some_and(|e| e == "rs") {
+                    parcourir(&chemin, extension, fichiers, incidents);
+                } else if chemin.extension().is_some_and(|e| e == extension) {
                     fichiers.push(chemin);
                 }
             }

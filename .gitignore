@@ -1,9 +1,11 @@
-# biblio/ : les artefacts détenus (copies d'articles, pages fetchées) ne vont
-# JAMAIS dans le dépôt — copyright (DEVOPS.md §1). Le registre INDEX.md, lui,
-# est versionné.
-biblio/*.pdf
-biblio/*.html
-biblio/*.sidecar
+# biblio/ : les artefacts détenus (copies d'articles, pages fetchées, JSON
+# d'API, sources amont, textes de licence) ne vont JAMAIS dans le dépôt —
+# copyright et doctrine DEVOPS §1 : le registre est public, les octets
+# restent privés. Allowlist : SEUL INDEX.md est versionné. (Trouvaille
+# bloquante de la revue G2 du 2026-08-13 : l'ancienne liste par extension
+# laissait passer .json/.toml/.rs/.md/.txt/.yml/.lock.)
+biblio/*
+!biblio/INDEX.md
 
 # Rust — artefacts de build, jamais versionnés (demande phase C S2.5,
 # 2026-08-12 ; le pis-aller target/.gitignore posé par le worker devient

@@ -661,8 +661,8 @@ pièce, et toutes deux converties en décisions ci-dessus : (a) « it is
 possible to defeat the memory protection guarantees in some MSLs » — le
 mot-clé `unsafe` est nommé (CISA p. 13) ; d'où le point 2 de la décision ;
 (b) des défauts de solidité ont été trouvés — « several soundness bugs have
-been found in Rust, both in the language itself » et dans des bibliothèques
-utilisant `unsafe`, certains subtils au point qu'« they involve an
+been found in Rust, both in the type system itself » et dans des
+bibliothèques utilisant `unsafe`, certains subtils au point qu'« they involve an
 interaction of multiple libraries, each of which is (or seems to be)
 perfectly safe on its own » (RustBelt, p. 66:3) ; d'où la règle de
 dépendances minimales du vérificateur, qui n'est pas une élégance mais une
@@ -1175,6 +1175,11 @@ in-toto pp. 1393-1395, Sigstore pp. 2353-2354, et les documents internes
 contrôlés en lecture directe. **Une citation corrigée à l'écriture** : le
 draft portait « secure but accessible » là où Sigstore p. 2354 §2.1 écrit
 « secure and accessible » — corrigée ci-dessous à la forme du texte.
+*(Adjudication inversée — réparée le 2026-08-12, ouverture de S3 : la
+page 2354 relue visuellement au fichier ET l'extraction texte concordent
+sur « secure **but** accessible » ; le draft du worker était fidèle, la
+« correction » ci-dessus était le faux. Site rétabli. Première prise de
+la gate S-G5 le jour de son instanciation.)*
 
 ### Contexte
 
@@ -1432,7 +1437,7 @@ tient, et elle le tient déjà.
   déjà décidée, née de la « leçon des 1476 lignes CRLF de Kraidle » — dépôt
   frère, même environnement Windows.
 - **La signature.** Garde de clé : « Traditionally, the signer must keep the
-  private signing key secure and accessible; this is the source of many
+  private signing key secure but accessible; this is the source of many
   usability issues » (Sigstore, p. 2354, §2.1). Le dépôt a déjà payé cette
   facture une fois : clé SSH dédiée, bascule d'identité git, puis « Commit
   fondateur amendé, » « re-signé, re-poussé » (DEVOPS, état d'exécution du

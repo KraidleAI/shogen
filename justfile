@@ -23,3 +23,9 @@ skeleton:
 # S-G7, volets licences/bans/sources/advisories (exige cargo-deny installé).
 deny:
     cargo deny --locked check
+
+# Régénère les sidecars texte des PDF de biblio/ (extraction locale pour la
+# gate S-G5 ; *.sidecar est gitignoré — les octets ne quittent jamais le
+# poste, DEVOPS §1). Exige pdftotext (poppler) sur le PATH.
+sidecars:
+    cd biblio && for f in *.pdf; do pdftotext -enc UTF-8 "$f" "$f.sidecar"; done

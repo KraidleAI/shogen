@@ -97,7 +97,7 @@ jobs:
       - name: Tests (dont les mutants semés des gates)
         run: cargo test --locked --workspace -- --nocapture
 
-      - name: Gates — cargo xtask verify (S-G1, S-G2, S-G3, S-G7a, fmt, clippy)
+      - name: Gates — cargo xtask verify (S-G1–S-G8 mécanisées, fmt, clippy)
         run: cargo run --locked --package xtask -- verify
 
       - name: Walking skeleton bout-en-bout (lot intact puis lot muté)

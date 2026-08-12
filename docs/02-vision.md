@@ -100,7 +100,7 @@ nous-mêmes — et il sera écrit à ce rang dans toute publication.
 
 Kraidle : *bounded authority* — la perception y est bornée et rendue
 visible, jamais empêchée. Shōgen : *attested perception* — remplit le
-`gather` (faits signés par leurs sources), fournit l'instrument qui
+`gather` (faits typés depuis des témoignages attestés), fournit l'instrument qui
 décharge A(indépendance des sources). Souverains l'un de l'autre : Shōgen
 sert tout agent, Kraidle accepte d'autres sources de faits. Le duo se vend
 en une ligne : *bounded authority, attested perception*.

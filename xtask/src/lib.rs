@@ -10,6 +10,7 @@
 //! rend les mutants semés rejouables sur un arbre copié (`xtask/tests/`) sans
 //! jamais toucher l'arbre de travail.
 
+pub mod documents;
 pub mod exemple;
 pub mod manifeste;
 pub mod rapport;
@@ -17,7 +18,11 @@ pub mod roles;
 pub mod sg1;
 pub mod sg2;
 pub mod sg3;
+pub mod sg4;
+pub mod sg5;
+pub mod sg6;
 pub mod sg7a;
+pub mod sg8;
 pub mod source;
 
 use std::path::{Path, PathBuf};
@@ -52,7 +57,11 @@ pub fn verifier_tout(racine: &Path, avec_outils_cargo: bool) -> i32 {
         sg1::executer(racine),
         sg2::executer(racine, avec_outils_cargo),
         sg3::executer(racine),
+        sg4::executer(racine),
+        sg5::executer(racine),
+        sg6::executer(racine),
         sg7a::executer(racine),
+        sg8::executer(racine),
     ];
 
     let mut rouge = false;

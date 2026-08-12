@@ -7,12 +7,16 @@
 //!
 //! Ce que ce fichier fait, à chaque exécution de `cargo test` :
 //!
-//! 1. copie les chemins exacts des deux rôles dans un arbre **temporaire**
-//!    (l'arbre de travail n'est jamais modifié — règle du dépôt) ;
-//! 2. contrôle que l'arbre copié intact est VERT (sinon la mesure suivante ne
+//! 1. construit un arbre **temporaire** (l'arbre de travail n'est jamais
+//!    modifié — règle du dépôt) : copie des chemins exacts des deux rôles
+//!    pour les gates de code (S-G1/2/3/7a), arbre **synthétique** pour les
+//!    gates documentaires (S-G4/5/6/8 — les registres réels bougent à
+//!    chaque passe, voir le commentaire de leur section) ;
+//! 2. contrôle que l'arbre intact est VERT (sinon la mesure suivante ne
 //!    voudrait rien dire) ;
-//! 3. injecte la violation, depuis une fixture versionnée de
-//!    `xtask/tests/fixtures/` ;
+//! 3. injecte la violation — depuis une fixture versionnée de
+//!    `xtask/tests/fixtures/` pour le code Rust, en ligne pour les
+//!    documents ;
 //! 4. exige le ROUGE, et exige que le motif rapporté soit celui attendu ;
 //! 5. l'arbre temporaire meurt avec le test.
 //!
@@ -299,7 +303,10 @@ fn mutant_couverture_repertoire_de_role_supprime() {
         .expect("suppression du répertoire de rôle");
     let rapports = gates(&racine);
     for gate in ["S-G1", "S-G2", "S-G3"] {
-        exiger_rouge(rapport_de(&rapports, gate), "répertoire de rôle absent");
+        exiger_rouge(
+            rapport_de(&rapports, gate),
+            "répertoire absent ou illisible",
+        );
     }
 }
 
@@ -345,4 +352,290 @@ fn mutant_sg2_manifeste_illisible_par_la_gate() {
     );
     let rapports = gates(&racine);
     exiger_rouge(rapport_de(&rapports, "S-G2"), "non analysable");
+}
+
+// ---------------------------------------------------------------------------
+// Gates documentaires S-G4/S-G5/S-G6/S-G8 (unité orchestrateur, passe S3 —
+// dette 12 §10 item 2). Les mutants tournent sur un arbre SYNTHÉTIQUE minimal,
+// pas sur une copie du dépôt : les registres réels bougent à chaque passe
+// (versements biblio/, lignes de journal) et un test qui exigerait leur vert
+// permanent coulerait la suite à chaque acquisition — le témoin synthétique
+// fixe l'état « conforme » une fois pour toutes.
+// ---------------------------------------------------------------------------
+
+/// Construit l'arbre documentaire synthétique conforme : docs/ (registre 09
+/// présent + une note propre), JOURNAL.md valide, biblio/INDEX.md dont
+/// l'en-tête et les mentions concordent avec deux artefacts présents.
+fn arbre_documentaire(nom_du_cas: &str) -> PathBuf {
+    let racine = std::env::temp_dir().join(format!("shogen-mutant-doc-{nom_du_cas}"));
+    let _ = std::fs::remove_dir_all(&racine);
+    ecrire(
+        &racine,
+        "docs/09-vocabulaire.md",
+        "# registre synthétique\n\n| interdit |\n|---|\n| « donnée vérifiée » |\n",
+    );
+    ecrire(
+        &racine,
+        "docs/note.md",
+        concat!(
+            "# note synthétique\n\n",
+            "Le registre interdit « donnée vérifiée » — la locution est ici en\n",
+            "citation marquée et la voix du projet reste propre.\n\n",
+            "Une citation adossée : « this quotation is present in the corpus and\n",
+            "it is checked by the gate ».\n",
+        ),
+    );
+    ecrire(
+        &racine,
+        "JOURNAL.md",
+        concat!(
+            "# journal synthétique\n\n",
+            "| date | unité | résultat |\n",
+            "|---|---|---|\n",
+            "| 2026-08-11 | première unité | rendue |\n",
+            "| 2026-08-12 | seconde unité | rendue |\n",
+        ),
+    );
+    ecrire(
+        &racine,
+        "biblio/INDEX.md",
+        concat!(
+            "# registre synthétique\n\n",
+            "**2 artefacts détenus** au 2026-08-12.\n\n",
+            "| fichier |\n|---|\n",
+            "| `artefact-a.html` |\n",
+            "| `artefact-b.txt` |\n",
+        ),
+    );
+    ecrire(
+        &racine,
+        "biblio/artefact-a.html",
+        "<p>this quotation is present in the corpus and it is checked by the gate</p>\n",
+    );
+    ecrire(&racine, "biblio/artefact-b.txt", "contenu quelconque\n");
+    racine
+}
+
+fn gates_documentaires(racine: &Path) -> Vec<Rapport> {
+    vec![
+        xtask::sg4::executer(racine),
+        xtask::sg5::executer(racine),
+        xtask::sg6::executer(racine),
+        xtask::sg8::executer(racine),
+    ]
+}
+
+/// Témoin : l'arbre documentaire synthétique conforme est VERT sur les quatre
+/// gates — y compris la locution interdite PRÉSENTE mais en citation marquée —
+/// et la ligne de couverture est pleine (invariant 2 d'ADR-0013, même
+/// exigence que le témoin des gates de rôle).
+#[test]
+fn temoin_arbre_documentaire_intact_est_vert() {
+    let racine = arbre_documentaire("temoin");
+    for rapport in gates_documentaires(&racine) {
+        assert!(
+            rapport.vert(),
+            "l'arbre documentaire intact devrait être VERT sur {} :\n{}",
+            rapport.gate,
+            motifs(&rapport)
+        );
+        assert_eq!(
+            rapport.examines, rapport.presents,
+            "{} : couverture incomplète ({} examinés sur {} présents)",
+            rapport.gate, rapport.examines, rapport.presents
+        );
+        assert!(rapport.presents > 0, "{} : rien d'examiné", rapport.gate);
+    }
+}
+
+#[test]
+fn mutant_sg4_locution_interdite_dans_la_voix_du_projet() {
+    let racine = arbre_documentaire("sg4-locution");
+    ajouter(
+        &racine,
+        "docs/note.md",
+        "\nCette donnée vérifiée fonde le verdict.\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G4"), "« donnée vérifiée »");
+}
+
+#[test]
+fn mutant_sg4_guillemet_ouvert_jamais_referme() {
+    let racine = arbre_documentaire("sg4-guillemet");
+    ajouter(
+        &racine,
+        "docs/note.md",
+        "\nUne « citation ouverte qui ne se referme jamais.\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G4"), "jamais refermé");
+}
+
+#[test]
+fn mutant_sg5_citation_hors_corpus() {
+    let racine = arbre_documentaire("sg5-citation");
+    ajouter(
+        &racine,
+        "docs/note.md",
+        "\nUne citation forgée : « this quotation is not anywhere in the corpus\nand the gate must catch it ».\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G5"), "citation introuvable");
+}
+
+#[test]
+fn mutant_sg6_artefact_verse_sans_entree_de_registre() {
+    let racine = arbre_documentaire("sg6-non-enregistre");
+    ecrire(
+        &racine,
+        "biblio/artefact-c.txt",
+        "octets versés sans entrée\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G6"), "absent du registre");
+}
+
+#[test]
+fn mutant_sg6_compte_declare_en_derive() {
+    // La dérive courante : un versement sans remise à jour de l'en-tête —
+    // le compte déclaré est INFÉRIEUR au réel. (La direction inverse,
+    // déclaré > réel avec tous les présents mentionnés, est le régime
+    // « corpus partiel » : note imprimée, résidu nommé dans sg6.rs — c'est
+    // le témoin `temoin_sg6_corpus_partiel…` qui la fige.)
+    let racine = arbre_documentaire("sg6-compte");
+    remplacer(
+        &racine,
+        "biblio/INDEX.md",
+        "**2 artefacts détenus**",
+        "**1 artefacts détenus**",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G6"), "compte déclaré en tête (1)");
+}
+
+#[test]
+fn mutant_sg8_ordre_chronologique_rompu() {
+    let racine = arbre_documentaire("sg8-ordre");
+    ajouter(
+        &racine,
+        "JOURNAL.md",
+        "| 2026-08-10 | unité insérée au mauvais endroit | rendue |\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G8"), "ordre chronologique rompu");
+}
+
+#[test]
+fn mutant_sg8_ligne_de_journal_malformee() {
+    let racine = arbre_documentaire("sg8-malforme");
+    ajouter(
+        &racine,
+        "JOURNAL.md",
+        "| 2026-08-12 | cellule manquante |\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G8"), "malformée");
+}
+
+/// Témoins du régime « corpus partiel » (revue G2 du 2026-08-13, majeure 4) :
+/// la branche qui transforme les violations en notes est celle qui porte la
+/// promesse « un contrôle partiel qui se dit partiel » — elle se teste comme
+/// le reste, sinon le vert de CI repose sur du code hors registre d'assurance.
+fn arbre_documentaire_sans_octets(nom_du_cas: &str) -> PathBuf {
+    let racine = arbre_documentaire(nom_du_cas);
+    std::fs::remove_file(racine.join("biblio/artefact-a.html")).expect("suppression artefact a");
+    std::fs::remove_file(racine.join("biblio/artefact-b.txt")).expect("suppression artefact b");
+    racine
+}
+
+#[test]
+fn temoin_sg5_corpus_incomplet_dit_partiel_et_liste_les_non_controles() {
+    let racine = arbre_documentaire_sans_octets("sg5-partiel");
+    ajouter(
+        &racine,
+        "docs/note.md",
+        "\nUne citation forgée : « this quotation is not anywhere in the corpus\nand the gate must catch it ».\n",
+    );
+    let rapport = xtask::sg5::executer(&racine);
+    rapport.imprimer();
+    assert!(
+        rapport.vert(),
+        "en corpus incomplet, l'introuvable est une note, pas une violation :\n{}",
+        motifs(&rapport)
+    );
+    let notes = rapport.notes.join("\n");
+    assert!(
+        notes.contains("CORPUS INCOMPLET"),
+        "la note de régime partiel doit s'imprimer ; notes :\n{notes}"
+    );
+    assert!(
+        notes.contains("this quotation is not anywhere in the corpus"),
+        "chaque fragment non contrôlé doit être listé nommément ; notes :\n{notes}"
+    );
+}
+
+#[test]
+fn temoin_sg6_corpus_partiel_dit_partiel_sans_vert_muet() {
+    let racine = arbre_documentaire_sans_octets("sg6-partiel");
+    let rapport = xtask::sg6::executer(&racine);
+    rapport.imprimer();
+    assert!(
+        rapport.vert(),
+        "biblio/ sans octets = régime partiel, pas une violation :\n{}",
+        motifs(&rapport)
+    );
+    let notes = rapport.notes.join("\n");
+    assert!(
+        notes.contains("compte déclaré 2") && notes.contains("non contrôlable"),
+        "la note doit nommer le compte déclaré et le contrôle non tenu ; notes :\n{notes}"
+    );
+}
+
+#[test]
+fn mutant_sg4_guillemet_ascii_orphelin_ne_blanchit_rien_et_se_dit() {
+    let racine = arbre_documentaire("sg4-ascii-orphelin");
+    ajouter(
+        &racine,
+        "docs/note.md",
+        "\nIl a dit \"bonjour, et cette donnée vérifiée fonde le verdict \"selon nous\".\n",
+    );
+    let rapport = xtask::sg4::executer(&racine);
+    rapport.imprimer();
+    assert!(!rapport.vert(), "S-G4 devait être ROUGE");
+    let motifs = motifs(&rapport);
+    assert!(
+        motifs.contains("donnée vérifiée"),
+        "la locution ne doit pas être cachée par l'appariement glouton ; motifs :\n{motifs}"
+    );
+    assert!(
+        motifs.contains("orphelin"),
+        "le guillemet ASCII orphelin doit être un incident ; motifs :\n{motifs}"
+    );
+}
+
+#[test]
+fn mutant_sg6_sous_repertoire_dans_biblio() {
+    let racine = arbre_documentaire("sg6-sous-repertoire");
+    ecrire(
+        &racine,
+        "biblio/sous-dossier/y.txt",
+        "octets déplacés hors du plat\n",
+    );
+    let rapport = xtask::sg6::executer(&racine);
+    rapport.imprimer();
+    assert!(!rapport.vert(), "S-G6 devait être ROUGE");
+    assert!(
+        motifs(&rapport).contains("sous-répertoire inattendu"),
+        "le sous-répertoire doit être un incident, pas un ensemble invisible ; motifs :\n{}",
+        motifs(&rapport)
+    );
+}
+
+#[test]
+fn mutant_sg8_ligne_de_table_entierement_vide() {
+    let racine = arbre_documentaire("sg8-vide");
+    ajouter(&racine, "JOURNAL.md", "|  |  |  |\n");
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge(rapport_de(&rapports, "S-G8"), "malformée");
 }
