@@ -5,6 +5,7 @@ description = "Vérificateur offline de Shōgen. Ne dépend que du cœur : ni r�
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [[bin]]
 name = "shogen-verifier"

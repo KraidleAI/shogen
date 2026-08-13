@@ -1,5 +1,14 @@
 # Dossier d'instruction — licence du dépôt (échéance ADR-0014, S3)
 
+> **CLOS le 2026-08-13 — la décision est prise : ADR-0017, « MIT OR
+> Apache-2.0 » uniforme sur le workspace**, décidée par l'orchestrateur sur
+> délégation explicite du mainteneur (« tranche… de façon définitive »),
+> adjugée sur ce dossier. Q1 tranchée en son troisième terme (le moat est
+> la neutralité) ; Q2 oui (brevets voulus pour eux-mêmes) ; Q3 sans objet
+> ((c) rejetée) ; Q4-Q5 sans objet ((b) rejetée) ; Q6 non nécessaires ;
+> Q7 : champ posé d'avance, opposabilité au passage public. Ce dossier
+> reste la pièce d'instruction de la décision.
+
 > **Ce document ne tranche pas.** ADR-0014 pt 1 nomme le propriétaire de la
 > décision : « Propriétaire : le mainteneur. » Ce dossier instruit les trois
 > options pré-cadrées sur les pièces détenues, chiffre leurs conséquences, et

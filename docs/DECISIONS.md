@@ -15,9 +15,10 @@
 | ADR-0011 | Tests : pyramide par rôle, property-based sur le cœur, mutation en validateur, couverture en garde-fou — 7 seuils candidats | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0012 | Environnement : le lockfile fait foi, exact au manifeste sur cœur/vérificateur, R-8 en deux moitiés, reproductibilité bit-à-bit du vérificateur visée, SLSA L2 candidat | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0013 | DevOps : gates bloquantes (doctrine gatewright : mutant semé tué), trunk-based sur main protégée, CI Windows+Linux, actions épinglées SHA, JOURNAL opposable | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
-| ADR-0014 | Licence : décision contractée à l'entrée de S3 (dette prudente-délibérée, Fowler/G5) ; crates non publiables d'ici là, gate re-serrée mécaniquement | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
+| ADR-0014 | Licence : décision contractée à l'entrée de S3 (dette prudente-délibérée, Fowler/G5) — **échéance tenue le 2026-08-13 par ADR-0017** | acceptée (ratifiée par délégation mainteneur du 2026-08-12) | 2026-08-12 |
 | ADR-0015 | Transport de S3 : TLSNotary `tlsn-mpc/1` en mode Notary (notaire opéré par Shōgen, résidu aggravé A(self-attestation)) ; vérification déléguée à un binaire compagnon épinglé — `shogen-verifier` reste à zéro dépendance | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 | ADR-0016 | Canonicalisation de `subject` : forme construite à l'adapter, prédicat total au cœur, refus nommés, requête verbatim jamais triée — ferme la sous-décision ouverte d'ADR-0002 | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
+| ADR-0017 | Licence : « MIT OR Apache-2.0 » uniforme sur le workspace — échéance ADR-0014 soldée (décidée sur délégation explicite du mainteneur du 2026-08-13) | acceptée | 2026-08-13 |
 
 ---
 
@@ -2475,5 +2476,138 @@ pas d'authenticité.
    — aucune pièce détenue, aucune candidate identifiée ; elle ne
    changerait pas C8 (fondée normativement) mais permettrait de chiffrer
    le risque évité, aujourd'hui qualitatif.
+
+---
+
+## ADR-0017 — Licence du dépôt : « MIT OR Apache-2.0 », uniforme sur le workspace
+
+**Statut** : acceptée (décidée par l'orchestrateur sur **délégation
+explicite du mainteneur du 2026-08-13** — « tranche la question de la
+licence maintenant et de façon définitive ; choisis la combinaison la plus
+adaptée, académiquement, pour la compliance et pour la protection de notre
+travail ») · 2026-08-13
+
+### Contexte
+
+ADR-0014 a contracté la décision à l'entrée de S3, propriétaire mainteneur,
+options pré-cadrées. Le dossier d'instruction est versé
+(`docs/14-dossier-licence-adr-0014.md` : lectures verbatim des trois textes
+détenus, table options × conséquences, questions Q1-Q7). Le mainteneur a
+exercé sa propriété **par délégation de la décision à l'orchestrateur**,
+avec trois critères nommés : académique, compliance, protection du travail.
+La présente ADR est l'exercice de cette délégation, adjugé sur le dossier
+et ses pièces — aucune pièce nouvelle.
+
+### Décision
+
+1. **Le régime est « MIT OR Apache-2.0 »** — double licence au choix du
+   destinataire — **uniforme sur tout le workspace** (`shogen-core`,
+   `shogen-verifier`, `xtask`, et par défaut toute crate future du dépôt,
+   adapters et binaire compagnon compris). C'est l'option (a) du dossier,
+   dans la variante d'uniformité que la contrainte d'arête du dossier §8.2
+   rendait de toute façon effective : le régime du binaire vérificateur est
+   celui de son cœur.
+2. **Matérialisation** : `license = "MIT OR Apache-2.0"` au
+   `[workspace.package]`, hérité par `license.workspace = true` dans chaque
+   crate ; textes canoniques en racine — `LICENSE-APACHE` (octets de la
+   copie canonique apache.org détenue, versée en phase A) et `LICENSE-MIT`
+   (texte de la page OSI détenue, titulaire « Copyright (c) 2026
+   KraidleAI ») ; section « Licence » au README avec la clause de
+   contribution (toute contribution intentionnelle est réputée offerte sous
+   la même double licence — la mécanique qui évite le besoin d'un CLA,
+   docs/14 M4 devenant sans objet).
+3. **Opposabilité** : la licence devient opposable au passage public du
+   dépôt (DEVOPS §1) — le champ est posé d'avance, ce que docs/14 Q7
+   établit comme séparable ; rien n'est publiable (`publish = false`
+   inchangé) et le re-serrage mécanique d'ADR-0014 pt 3 reste en place.
+4. **`deny.toml` : inchangé** — `MIT` et `Apache-2.0` figurent déjà dans la
+   liste `allow` ; aucune ADR de gate n'est requise. `cargo deny --locked
+   check licenses` revu **vert** après application (les trois crates ne
+   sont plus couvertes par l'ignore `private` que par redondance).
+
+### Alternative considérée
+
+**(b) AGPL-3.0.** Rejetée sur les pièces du dossier : elle ne couvre pas le
+scénario qu'elle promet — le service sur code **non modifié** reste permis
+(AGPL §2, lu sur la copie : « permission to run the unmodified Program ») ;
+elle crée une friction directe sur notre propre offre payante et le canal 1
+du GTM (l'instrument opéré sous la marque des cabinets) ; elle exige
+d'amender la liste `allow` de la gate S-G7 (ADR de gate) ; et la
+double-licence commerciale qu'elle appellerait exige un accord de
+contribution (docs/14 M4). Le moat revendiqué par le GTM n'est pas
+l'exclusivité du code mais la **neutralité mesurable** du tiers (GTM §4) —
+une licence protectrice ne protège pas ce moat-là.
+
+**(c/c′) Licences différenciées par crate.** Rejetée : la contrainte
+d'arête `shogen-verifier → shogen-core` (ADR-0010 pt 3) rend le régime du
+binaire égal à celui du cœur — la différenciation sur le périmètre de
+confiance est donc illusoire ; ce qui reste différenciable (`xtask`,
+adapters) n'a pas de valeur à protéger séparément qui justifie N fichiers,
+N champs et une revue de régime à chaque arête nouvelle (docs/14 §8, §12).
+
+**(d) MIT seul ou Apache-2.0 seul.** Non pré-cadrée par ADR-0014, examinée
+en passant : MIT seul abandonne la concession de brevets et l'exclusion de
+marque ; Apache-2.0 seul est incompatible GPLv2 pour l'aval et s'écarte de
+la convention d'écosystème. La double licence donne les deux protections
+sans le coût de l'une ou l'autre.
+
+### La source qui tranche
+
+Trois pièces, une par critère du mandat :
+
+- **Académique / écosystème** : la convention détenue — Rust API
+  Guidelines, C-PERMISSIVE (« permissive ») et le COPYRIGHT de rust-lang
+  lui-même (le compilateur est dual-licencié MIT/Apache-2.0). Le projet
+  protège académiquement son travail par l'**antériorité** (arXiv, S5) et
+  l'**attribution** — la condition unique de MIT : « The above copyright
+  notice and this permission notice shall be included in all copies or
+  substantial portions of the Software. »
+- **Compliance** : `deny.toml` détenu au dépôt (aucun amendement) et
+  concordance amont — le README de tlsnotary/tlsn déclare « All crates in
+  this repository are licensed under either of » Apache-2.0 ou MIT : le
+  compagnon d'ADR-0015 vivra dans un régime concordant.
+- **Protection du travail** : Apache-2.0 §3, la concession de brevets à
+  terminaison défensive (« Grant of Patent License ») que MIT ne porte pas
+  (0 occurrence de « patent », mesuré sur la copie OSI) ; et Apache-2.0 §6 :
+  la licence « does not grant permission to use the trade names,
+  trademarks, service marks, or product names of the Licensor » — le nom
+  du projet reste à nous.
+
+**Assurance** : *reviewed* (dossier worker 144 citations contrôlées ;
+décision adjugée par l'orchestrateur sur délégation explicite du mainteneur
+du 2026-08-13). La question Q1 du dossier est tranchée en son troisième
+terme : le moat est la neutralité ; la protection utile est brevets +
+marque + antériorité, pas la réciprocité.
+
+### Ce que la décision coûte
+
+1. **Un tiers peut embarquer le vérificateur dans un produit fermé et
+   offrir un service concurrent sans rien publier.** C'est le prix assumé
+   de (a), et il est cohérent avec le GTM : ce que le tiers ne peut pas
+   copier est la neutralité du certificateur — un mesuré qui s'auto-note
+   n'a pas le produit (GTM §4). La valeur défendable reste chez nous.
+2. **L'irréversibilité vers le bas** : ce qui est publié sous double
+   licence permissive le reste ; durcir ne vaudra que pour le code futur.
+   Symétriquement, aucune dette CLA n'est créée et l'assouplissement n'a
+   pas de sens (on est déjà au régime le plus ouvert utile).
+3. **La décision engage les crates futures par défaut** (workspace) ; une
+   crate qui devrait y déroger le fera par ADR, jamais par un champ posé en
+   silence.
+4. **Le point que la licence ne résout pas** (docs/14 §9.3) demeure :
+   `tlsn-attestation` amont sans champ `license` bloquerait `cargo deny`
+   si elle entrait au graphe — c'est un motif de plus de la forme β
+   d'ADR-0015, pas un problème de notre régime.
+
+### Registres touchés
+
+- **ADR-0014** : échéance tenue — la dette prudente-délibérée est soldée le
+  2026-08-13 (note à la table des ADR) ; le re-serrage mécanique du pt 3
+  reste en place (il devient redondant, pas caduc).
+- **`Cargo.toml` (workspace) + 3 manifestes** : champ posé, hérité.
+- **`LICENSE-APACHE`, `LICENSE-MIT`, `README.md` §Licence** : créés.
+- **`deny.toml`** : inchangé — vérifié vert.
+- **`docs/13-temoignage-e2e-design.md` §3 item 1** : échéance licence
+  fermée. **`docs/14`** : note de clôture (la décision est prise, le
+  dossier reste la pièce d'instruction).
 
 ---

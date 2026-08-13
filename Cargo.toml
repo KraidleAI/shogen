@@ -18,6 +18,11 @@ members = ["crates/shogen-core", "crates/shogen-verifier", "xtask"]
 edition = "2024"
 rust-version = "1.97"
 publish = false
+# ADR-0017 (2026-08-13, délégation mainteneur — échéance ADR-0014 tenue) :
+# double licence de l'écosystème Rust, uniforme sur le workspace ; textes
+# canoniques en racine (LICENSE-MIT, LICENSE-APACHE). L'opposabilité naît au
+# passage public (DEVOPS §1) ; le champ est posé d'avance (docs/14 Q7).
+license = "MIT OR Apache-2.0"
 
 [profile.release]
 # Défense en profondeur : un débordement arithmétique devient un échec détecté

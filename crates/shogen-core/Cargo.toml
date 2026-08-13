@@ -5,6 +5,7 @@ description = "Cœur pur de Shōgen : formes canoniques. Aucune I/O, aucune horl
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+license.workspace = true
 
 # ADR-0012 D3 : « Dans `crates/shogen-core` et `crates/shogen-verifier`, chaque
 # dépendance directe porte une version **exacte** ».

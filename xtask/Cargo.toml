@@ -5,6 +5,7 @@ description = "Les gates de Shōgen (S-G1, S-G2, S-G3, volet mécanisable de S-G
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+license.workspace = true
 
 [lib]
 name = "xtask"

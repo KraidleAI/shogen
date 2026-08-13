@@ -90,7 +90,7 @@ Chacune a son contrat écrit ; aucune n'est optionnelle (G5, règle du
 
 | # | échéance | contrat | véhicule S3 |
 |---|---|---|---|
-| 1 | **Licence du dépôt** | ADR-0014 : décision mainteneur, « échéance : l'événement S3 » ; options pré-cadrées (« MIT OR Apache-2.0 » ; AGPL-3.0 ; différenciées par crate, vérificateur au plus ouvert) ; « aucune pièce détenue n'instruit ses conséquences » | phase A acquiert les pièces (textes canoniques + convention d'écosystème), phase B instruit, le mainteneur tranche en phase E |
+| 1 | ~~**Licence du dépôt**~~ — **soldée le 2026-08-13 par ADR-0017** : « MIT OR Apache-2.0 » uniforme, décidée sur délégation explicite du mainteneur (dossier d'instruction : docs/14 ; textes en racine, champ au workspace, deny inchangé vert) | fermé |
 | 2 | **Passage public + purge `biblio/`** | DEVOPS §1 : « privé de S0 à S2, public à S3 », calé sur l'existence du vérificateur ; « `biblio/` ne va PAS dans le dépôt public » (AUDIT-ENTREE G6 : jamais public sans purge) | phase E — décision mainteneur (le moment exact lui appartient) ; la purge et le contrôle `.gitignore`/historique sont une unité orchestrateur AVANT tout passage |
 | 3 | **`no_std` du vérificateur en gate** | ADR-0009 pt 6 : « `#![no_std]` + `alloc` devient une gate en S3 » | phase C — ou repositionnée par ADR-0015 si l'instruction du §2 le fonde (révision par ADR, jamais silencieuse) |
 | 4 | **Score de mutation ≥ 80 % du cœur** | ADR-0011 seuil 3, régime deux temps : « dès la logique (S3) », mutants non équivalents (Jia & Harman p. 4), chaque survivant justifié en une ligne | phase C — `cargo-mutants` (R-8 fait en S2.5), budget CI ≤ 10 min/PR + nightly complet (seuil 4) |

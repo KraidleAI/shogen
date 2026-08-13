@@ -53,3 +53,19 @@ mots d'assurance (proven/tested/reviewed), les sources ouvertes avant d'être
 citées, les chiffres mesurés dans la passe, les décisions en ADR avec
 alternative et coût. Les skills `kraidle-*` s'appliquent mutatis mutandis
 jusqu'à ce que Shōgen ait les siens.
+
+## Licence
+
+Ce dépôt est sous double licence, au choix du destinataire (ADR-0017,
+convention de l'écosystème Rust) :
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT License ([LICENSE-MIT](LICENSE-MIT))
+
+Sauf mention contraire explicite de votre part, toute contribution soumise
+intentionnellement pour inclusion dans ce travail est réputée offerte sous
+la même double licence, sans clause additionnelle — la définition de
+contribution étant celle de l'Apache-2.0 §5.
+
+`biblio/` ne fait pas partie du dépôt distribué (DEVOPS §1) : les artefacts
+détenus localement gardent chacun leur propre régime.
