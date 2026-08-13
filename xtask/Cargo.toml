@@ -20,3 +20,10 @@ path = "src/main.rs"
 # auditer — la seule arête est interne au workspace.
 [dependencies]
 shogen-core = { path = "../crates/shogen-core", version = "=0.0.0" }
+# Le harnais de fuzz (ADR-0011 seuil 7) éprouve la bibliothèque `no_std` du
+# vérificateur, pas son binaire : `catch_unwind` est une capacité `std` et vit
+# dans la coquille (xtask), jamais dans ce qui est éprouvé. L'arête va de
+# `xtask` vers le vérificateur et JAMAIS l'inverse — le vérificateur reste à
+# zéro dépendance tierce et à zéro dépendance de développement (ADR-0010
+# point 3, ADR-0015 point 6, gate S-G2).
+shogen-verifier = { path = "../crates/shogen-verifier", version = "=0.0.0" }

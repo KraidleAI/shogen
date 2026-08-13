@@ -23,6 +23,10 @@
 //! qu'ADR-0001 interdit et que la gate S-G1 attrape. Le registre publié
 //! (`docs/08-assumptions.md`) entre donc en **donnée**, comme l'horodatage.
 
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use crate::empreinte::{OCTETS_D_EMPREINTE, empreinte_en_hexadecimal, empreinte_sha256};
 use crate::temoignage_canonique::Temoignage;
 
@@ -135,7 +139,7 @@ impl core::fmt::Display for ErreurVerification {
     }
 }
 
-impl std::error::Error for ErreurVerification {}
+impl core::error::Error for ErreurVerification {}
 
 /// Les contrôles (b), (c) et (d) d'ADR-0015 point 8, dans cet ordre.
 ///

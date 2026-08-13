@@ -30,6 +30,25 @@ skeleton:
 double-build:
     cargo xtask double-build
 
+# Score de mutation du cœur — ADR-0011 seuils 3 et 4. Hors de `verify` pour la
+# même raison que le double-build : 12 min 12 s mesurées le 2026-08-13 sur 417
+# mutants (parallélisme 4, déclaré par la gate elle-même), au-dessus du budget
+# de 10 min/PR. La CI la joue en deux
+# régimes (.github/workflows/mutation.yml) : diff sur PR, complète en nightly.
+# Exige cargo-mutants 27.1.0 installé (R-8 : docs/R-8-outillage.md).
+mutation:
+    cargo xtask mutation
+
+# Fuzz du vérificateur — ADR-0011 seuil 7, budget CI par défaut (15 min).
+# Aucune installation : le harnais est en arbre et le corpus est committé.
+fuzz duree="900":
+    cargo run --locked --release --package xtask -- fuzz --duree {{duree}}
+
+# Réécrit les graines DIRIGÉES du corpus de fuzz. Les contre-exemples
+# (`panique-*.bin`) ne sont pas touchés : rien ne les reconstruit.
+fuzz-corpus:
+    cargo xtask fuzz-corpus
+
 # S-G7, volets licences/bans/sources/advisories (exige cargo-deny installé).
 deny:
     cargo deny --locked check

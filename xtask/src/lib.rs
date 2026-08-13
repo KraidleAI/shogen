@@ -12,7 +12,9 @@
 
 pub mod documents;
 pub mod exemple;
+pub mod fuzz;
 pub mod manifeste;
+pub mod mutation;
 pub mod rapport;
 pub mod reproductible;
 pub mod roles;
@@ -103,9 +105,50 @@ pub fn verifier_tout(racine: &Path, avec_outils_cargo: bool) -> i32 {
     }
 }
 
+/// La cible **sans bibliothèque standard** sur laquelle la gate `no_std`
+/// s'établit.
+///
+/// Pourquoi une cible bare-metal plutôt qu'une relecture du source : `#![no_std]`
+/// écrit en tête d'un fichier n'est qu'une intention tant que rien ne l'oppose
+/// à un environnement où `std` **n'existe pas**. `thumbv7em-none-eabi` n'a pas
+/// de bibliothèque standard ; si une arête vers `std` réapparaît dans la
+/// bibliothèque du vérificateur ou dans le cœur qu'elle appelle, la
+/// construction échoue à la résolution de module, avant même l'édition de
+/// liens. Contrôle exécuté le 2026-08-13 : `use std::collections::BTreeMap`
+/// réintroduit dans `crates/shogen-verifier/src/lib.rs` → `error[E0433]:
+/// cannot find module or crate `std` in this scope`, construction ROUGE ;
+/// ligne retirée → VERT. La gate discrimine.
+///
+/// Un `rlib` n'exige ni `panic_handler` ni allocateur global : la construction
+/// de la seule cible `lib` suffit, et elle entraîne `shogen-core` avec elle
+/// (l'arête d'ADR-0010 point 3). Le binaire, lui, reste `std` par définition
+/// (ADR-0010 point 4) et n'est pas construit pour cette cible.
+///
+/// Pré-requis d'environnement : `rustup target add thumbv7em-none-eabi`. S'il
+/// manque, la gate est ROUGE — ce qui empêche de conclure est ROUGE, jamais
+/// un vert par défaut (ADR-0010 point 5, même règle que le double-build D6).
+pub const CIBLE_SANS_STD: &str = "thumbv7em-none-eabi";
+
 fn outils_cargo() -> Vec<(&'static str, Vec<&'static str>)> {
     vec![
         ("cargo fmt --check", vec!["fmt", "--all", "--check"]),
+        // Échéance contractée d'ADR-0009 point 6 (« `#![no_std]` + `alloc`
+        // devient une gate en S3 »), maintenue telle quelle par ADR-0015
+        // point 6, échéance 3 de 13 §3. Elle vit ici et non dans
+        // `cargo xtask gates` : `gates` est lexicale et sans sous-processus
+        // cargo par contrat (usage de `xtask/src/main.rs`).
+        (
+            "no_std du vérificateur (construction pour une cible sans bibliothèque standard)",
+            vec![
+                "build",
+                "--locked",
+                "--lib",
+                "--package",
+                "shogen-verifier",
+                "--target",
+                CIBLE_SANS_STD,
+            ],
+        ),
         (
             "cargo clippy -D warnings",
             vec![

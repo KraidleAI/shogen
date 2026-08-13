@@ -19,6 +19,9 @@
 //! le lot se donnerait à lui-même. Toute autre taille est refusée : le défaut
 //! est le refus, l'admission est énumérée.
 
+use alloc::boxed::Box;
+use alloc::vec::Vec;
+
 use crate::cbor::{Lecteur, PREFIXE_CARTE};
 use crate::erreur::ErreurDecodage;
 use crate::temoignage::{

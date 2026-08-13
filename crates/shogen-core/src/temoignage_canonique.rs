@@ -27,6 +27,9 @@
 //! pas en négocier un autre, et l'agilité d'algorithme, le jour où elle sera
 //! due, entrera par une ADR et par un champ — pas par une branche.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use crate::cbor::{
     ControleDeTri, Lecteur, PREFIXE_CARTE, PREFIXE_TABLEAU, PREFIXE_UINT, ecrire_entete,
     ecrire_octets, ecrire_texte, lire_octets, lire_texte,

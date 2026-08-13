@@ -7,6 +7,8 @@
 
 /// Refus de décodage. Un lot que le cœur ne sait pas classer est refusé, jamais
 /// admis par défaut (ADR-0010, point 5 : *fail-safe defaults*).
+use alloc::string::String;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErreurDecodage {
@@ -232,4 +234,4 @@ impl core::fmt::Display for ErreurDecodage {
     }
 }
 
-impl std::error::Error for ErreurDecodage {}
+impl core::error::Error for ErreurDecodage {}

@@ -9,6 +9,9 @@
 //! ADR-0010, point 1 — « Un horodatage est une **donnée** qui entre en
 //! argument, jamais une lecture d'horloge ». La gate S-G2 le mesure.
 
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use crate::cbor::{
     ControleDeTri, Lecteur, PREFIXE_CARTE, PREFIXE_UINT, ecrire_entete, ecrire_octets,
     ecrire_texte, lire_octets, lire_texte,

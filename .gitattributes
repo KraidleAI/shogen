@@ -6,3 +6,16 @@
 *.pdf binary
 *.png binary
 *.jpg binary
+
+# Corpus de fuzz (ADR-0011 seuil 7) : des OCTETS, jamais du texte — y compris
+# les graines d'extension `.txt`, qui sont des octets pour le harnais et non
+# des fichiers à lire. Sans cette ligne, la règle `* text=auto eol=lf`
+# ci-dessus normaliserait toute graine contenant 0x0D 0x0A que l'heuristique
+# de Git ne classe pas binaire : la graine changerait au passage par le dépôt,
+# le contre-exemple qu'elle porte ne se rejouerait plus, et l'étape CI qui
+# vérifie la fraîcheur du corpus (`git diff --exit-code`) casserait sans que
+# rien ne soit cassé. Contrôlé le 2026-08-13 : `git check-attr text` rendait
+# `text: auto` sur `dirigee-lot-exemple.bin` avant cette ligne.
+crates/shogen-verifier/fuzz-corpus/** -text
+# Sauf le registre du corpus, qui est bien du texte.
+crates/shogen-verifier/fuzz-corpus/README.md text=auto eol=lf

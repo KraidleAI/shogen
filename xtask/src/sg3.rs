@@ -106,26 +106,30 @@ pub fn executer(racine: &Path) -> Rapport {
             }
         }
 
-        // `forbid(unsafe_code)` sur le fichier racine du rôle (ADR-0009, point 2)
-        let racine_crate = racine.join(role.fichier_racine);
-        match std::fs::read_to_string(&racine_crate) {
-            Ok(texte) => {
-                if !texte.contains(ATTRIBUT_FORBID) {
-                    rapport.violation(
-                        role.fichier_racine.to_string(),
-                        1,
-                        format!(
-                            "attribut « {ATTRIBUT_FORBID} » absent du fichier racine du rôle « {} » — ADR-0009, point 2",
-                            role.nom
-                        ),
-                        String::new(),
-                    );
+        // `forbid(unsafe_code)` sur CHAQUE fichier racine du rôle (ADR-0009,
+        // point 2). Chaque racine est une crate distincte pour `rustc` :
+        // l'attribut ne se propage pas de l'une à l'autre, donc la gate les
+        // contrôle une par une (scission `no_std` du 2026-08-13).
+        for fichier_racine in role.fichiers_racines {
+            let racine_crate = racine.join(fichier_racine);
+            match std::fs::read_to_string(&racine_crate) {
+                Ok(texte) => {
+                    if !texte.contains(ATTRIBUT_FORBID) {
+                        rapport.violation(
+                            (*fichier_racine).to_string(),
+                            1,
+                            format!(
+                                "attribut « {ATTRIBUT_FORBID} » absent du fichier racine du rôle « {} » — ADR-0009, point 2",
+                                role.nom
+                            ),
+                            String::new(),
+                        );
+                    }
                 }
+                Err(erreur) => rapport.incident(format!(
+                    "fichier racine de rôle illisible : {fichier_racine} ({erreur})"
+                )),
             }
-            Err(erreur) => rapport.incident(format!(
-                "fichier racine de rôle illisible : {} ({erreur})",
-                role.fichier_racine
-            )),
         }
     }
 

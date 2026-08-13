@@ -20,6 +20,10 @@
 //! ce qui rend vraie la seconde moitié de la propriété (a) d'ADR-0011 —
 //! `encode(decode(b)) == b` pour tout `b` accepté.
 
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use crate::erreur::ErreurDecodage;
 
 /// Masque des trois bits de type majeur.

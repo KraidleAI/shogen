@@ -1,3 +1,4 @@
+#![no_std]
 #![forbid(unsafe_code)]
 #![deny(
     clippy::unwrap_used,
@@ -7,6 +8,29 @@
     clippy::arithmetic_side_effects
 )]
 //! Cœur de Shōgen — **pur, total, sans I/O, sans panique** (ADR-0010, point 1).
+//!
+//! # `#![no_std]` — l'échéance d'ADR-0009 point 6, tenue par le bas
+//!
+//! ADR-0009 point 6 contracte la gate sur le **vérificateur** :
+//! « `#![no_std]` + `alloc` devient une gate en S3 ». ADR-0015 point 6 la
+//! maintient telle quelle (« elle n'est ni repositionnée ni reportée »). Un vérificateur
+//! `no_std` est impossible tant que ce qu'il appelle est `std` : l'arête va du
+//! vérificateur vers le cœur (ADR-0010 point 3), donc la contrainte descend
+//! ici d'abord. Ce module ne lie plus `std` ; il lie `core` et `alloc`.
+//!
+//! Ce que le basculement a coûté, dit en toutes lettres : trois `impl
+//! std::error::Error` deviennent `impl core::error::Error` (stable depuis Rust
+//! 1.81, la toolchain épinglée est 1.97.1 — ADR-0009 point 3), et `String` /
+//! `Vec` / `Box` / `ToOwned` s'importent de `alloc` au lieu d'arriver par le
+//! prélude. Aucune signature publique ne change. Les tests d'intégration de
+//! `tests/` restent des crates `std` : `#![no_std]` porte sur la cible `lib`,
+//! pas sur les harnais qui l'exercent.
+//!
+//! La gate mécanique qui l'établit n'est pas cette ligne d'attribut — c'est la
+//! construction pour une cible **sans bibliothèque standard**
+//! (`thumbv7em-none-eabi`), exécutée par `cargo xtask verify` et en CI. Un
+//! `#![no_std]` non construit pour une telle cible est une intention ; la
+//! construction est le fait.
 //!
 //! Rattachement (G0) : ADR-0002 (CBOR déterministe), ADR-0010 (architecture),
 //! ADR-0011 (tests), 12 §5 (walking skeleton).
@@ -45,6 +69,10 @@
 //! Ce que cette carte **n'établit pas** : que le cœur ne peut pas paniquer. La
 //! gate S-G3 rejette une liste de formes nommées ; l'absence de panique n'est
 //! pas établie (ADR-0010, §Coûts point 6).
+
+// `alloc` est la seule extension admise au-delà de `core` (ADR-0009 point 6 :
+// « `#![no_std]` + `alloc` »). Aucune autre.
+extern crate alloc;
 
 mod cbor;
 mod empreinte;

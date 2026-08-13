@@ -140,8 +140,25 @@ fn lot_intact() -> Vec<u8> {
     )
 }
 
+/// Un répertoire de travail **propre à ce processus**.
+///
+/// Le suffixe de PID n'est pas cosmétique (trouvaille du 2026-08-13, unité
+/// mutation/fuzz) : sans lui le chemin est FIXE, et `remove_dir_all` en tête
+/// l'efface. Tant qu'une seule suite tourne, personne ne le voit. Sous un
+/// exécuteur parallèle — et la gate de mutation en est un, elle lance quatre
+/// suites de front (`cargo xtask mutation`, `--jobs 4`) — deux processus
+/// partagent le répertoire et l'un efface les lots de l'autre en pleine
+/// itération. Le vérificateur rend alors « lot illisible » (code 66) sur un
+/// lot qui existait, la position bascule de « acceptée » à « refusée », et le
+/// test échoue pour une raison qui n'est pas celle qu'il mesure.
+///
+/// Effet mesuré avant correctif : le score de mutation n'était pas rejouable —
+/// le mutant `subject.rs:522:17` était compté survivant au premier run et tué
+/// aux suivants, sur un code de `subject.rs` que le lot trivial n'atteint même
+/// pas. Un score non rejouable n'est pas un fait (ADR-0011 point 2).
 fn repertoire(nom: &str) -> PathBuf {
-    let chemin = std::env::temp_dir().join(format!("shogen-canonique-{nom}"));
+    let chemin =
+        std::env::temp_dir().join(format!("shogen-canonique-{nom}-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&chemin);
     std::fs::create_dir_all(&chemin).expect("création du répertoire de test");
     chemin

@@ -9,14 +9,24 @@
 //! Vérificateur offline — la **coquille impérative** du walking skeleton
 //! (ADR-0010, point 4 : « I/O, lecture d'arguments : binaire CLI »).
 //!
-//! Ce qu'il fait, et rien de plus : lit des fichiers d'octets, les passe au
-//! cœur, ré-encode, compare — puis **nomme son résidu**. Il ne réclame aucune
+//! Ce qu'il fait, et rien de plus : lit des fichiers d'octets, les passe à la
+//! bibliothèque, imprime — puis **nomme son résidu**. Il ne réclame aucune
 //! capacité qu'il n'exerce : ni réseau, ni horloge, ni aléa (ADR-0010, point 8 ;
 //! gate S-G2). Il ne sait pas écrire : produire un lot d'exemple est le travail
 //! de `cargo xtask emettre-exemple`, pas le sien.
 //!
 //! Fail-closed (ADR-0010, point 5) : tout octet muté, tronqué, en trop ou non
 //! canonique donne un code de sortie non nul et une **erreur nommée**.
+//!
+//! # Ce fichier est `std`, et c'est sa définition
+//!
+//! ADR-0009 point 6 contracte `#![no_std]` + `alloc` en gate à S3, et ADR-0015
+//! point 6 la maintient telle quelle. La logique du vérificateur est donc
+//! passée en bibliothèque `no_std` (`src/lib.rs`) et ce fichier en est la
+//! **coquille mince** : il ne garde que ce que `core` et `alloc` ne peuvent pas
+//! faire — `std::fs`, `std::env`, `std::process::exit`, l'impression. Aucune
+//! décision ne se prend ici ; toutes se lisent dans la bibliothèque, et se
+//! construisent pour une cible sans bibliothèque standard.
 //!
 //! # Les deux formes de lot, et les deux entrées de contexte
 //!
@@ -42,9 +52,10 @@
 //! arrive. Deux fichiers texte, lus en clair, recalculables à la main : c'est le
 //! choix le plus contrôlable par un tiers, et il est remonté comme tel.
 
-use shogen_core::{
-    Constat, Lot, OCTETS_D_EMPREINTE, Temoignage, Verdict, decoder_lot, empreinte_en_hexadecimal,
-    encoder_lot, verifier_temoignage,
+use shogen_core::{Constat, Verdict, empreinte_en_hexadecimal};
+use shogen_verifier::{
+    Examen, OPTION_CONSTAT, OPTION_REGISTRE, analyser_constat, analyser_registre, examiner_lot,
+    examiner_verification, tete_hexadecimale,
 };
 
 /// Lot conforme au sous-ensemble canonique.
@@ -67,19 +78,51 @@ const CODE_VERIFICATION: i32 = 4;
 /// ne juge pas la vérité d'une source).
 const VERDICT_CONFORME: &str = "VERDICT : octets conformes au sous-ensemble canonique ; résidu : la conformité ne dit rien de la vérité de la source — ADR-0001";
 
-/// L'option du registre publié des résidus.
-const OPTION_REGISTRE: &str = "--registre";
-/// L'option du constat du binaire compagnon.
-const OPTION_CONSTAT: &str = "--constat";
-
-/// Les clés du fichier de constat.
-const CLE_OUTIL: &str = "outil";
-const CLE_EMPREINTE_PREUVE: &str = "empreinte-preuve";
-const CLE_EMPREINTE_UTTERANCE: &str = "empreinte-utterance";
-
-fn main() {
-    std::process::exit(executer());
+/// Le code de sortie est **rendu**, jamais imposé par `std::process::exit`.
+///
+/// # Pourquoi, et ce que le contournement coûtait (mesuré le 2026-08-13)
+///
+/// `std::process::exit` termine le processus **sans dérouler la sortie
+/// normale** du programme. Conséquence mesurée, et cause de la dette
+/// « couverture vérificateur NON mesurée » du JOURNAL : sous
+/// `-Cinstrument-coverage`, le binaire créait bien son fichier de profil mais
+/// n'y écrivait **rien** — `verif-39584.profraw`, **0 octet**, `llvm-profdata
+/// show` : « empty raw profile file ». Les compteurs n'étaient jamais vidés,
+/// donc `cargo llvm-cov` rapportait **0,00 %** sur `main.rs` et `lib.rs` alors
+/// que dix tests de bout en bout exerçaient le binaire. La couverture n'était
+/// pas basse : elle n'était pas mesurable, ce qui est pire, parce que 0,00 %
+/// se lit comme un fait alors que c'est un défaut d'instrument.
+///
+/// `ExitCode` rend le contrôle à la sortie normale : les compteurs sont vidés,
+/// le profil est écrit, et le code de sortie est celui que `executer` a
+/// choisi. Aucun code de sortie ne change — la table `CODE_*` est intacte, et
+/// les tests de bout en bout qui les assèrent le vérifient.
+fn main() -> std::process::ExitCode {
+    std::process::ExitCode::from(octet_de_sortie(executer()))
 }
+
+/// Réduit un code de sortie à l'octet que le système d'exploitation transporte.
+///
+/// Tous les codes de ce binaire tiennent dans un `u8` (0, 2, 3, 4, 64, 65, 66)
+/// et la conversion est donc exacte. Le bras d'échec n'est pas mort pour
+/// autant : il est ce qui garantit qu'un code futur hors plage devienne un
+/// refus visible plutôt qu'un silencieux modulo 256 — un verdict tronqué qui
+/// se lirait comme un autre verdict serait exactement la faute qu'un
+/// vérificateur fail-closed ne peut pas commettre (ADR-0010 point 5).
+fn octet_de_sortie(code: i32) -> u8 {
+    match u8::try_from(code) {
+        Ok(octet) => octet,
+        Err(_) => {
+            eprintln!(
+                "  erreur nommée : code de sortie {code} hors de la plage transportable — refus plutôt que troncature silencieuse"
+            );
+            CODE_USAGE_OCTET
+        }
+    }
+}
+
+/// La valeur de repli de [`octet_de_sortie`], égale à [`CODE_USAGE`].
+const CODE_USAGE_OCTET: u8 = 64;
 
 /// Les arguments reconnus.
 struct Arguments {
@@ -115,39 +158,32 @@ fn executer() -> i32 {
     println!("  octets lus : {}", octets.len());
     println!("  tête du lot : {}", tete_hexadecimale(&octets));
 
-    let lot = match decoder_lot(&octets) {
-        Ok(lot) => lot,
-        Err(erreur) => {
+    match examiner_lot(&octets) {
+        Examen::Refuse(erreur) => {
             eprintln!("VERDICT : refusé (fail-closed)");
             eprintln!("  erreur nommée : {erreur}");
             eprintln!("  variante : {erreur:?}");
-            return CODE_DECODAGE;
+            CODE_DECODAGE
         }
-    };
-
-    let reencode = encoder_lot(&lot);
-    if reencode.as_slice() != octets.as_slice() {
-        eprintln!("VERDICT : refusé (fail-closed)");
-        eprintln!(
-            "  erreur nommée : ré-encodage divergent — le lot décode mais n'est pas sa propre forme canonique"
-        );
-        eprintln!("    octets du lot     : {}", octets.len());
-        eprintln!("    octets ré-encodés : {}", reencode.len());
-        eprintln!(
-            "    première divergence : {}",
-            premiere_divergence(&octets, &reencode)
-        );
-        return CODE_ROUND_TRIP;
-    }
-
-    println!("  décodage : accepté (sous-ensemble canonique CBOR, RFC 8949 — ADR-0002)");
-    println!(
-        "  ré-encodage : {} octets, identiques au lot (round-trip exact)",
-        reencode.len()
-    );
-
-    match lot {
-        Lot::Trivial(temoignage) => {
+        Examen::NonCanonique {
+            octets_du_lot,
+            octets_reencodes,
+            divergence,
+        } => {
+            eprintln!("VERDICT : refusé (fail-closed)");
+            eprintln!(
+                "  erreur nommée : ré-encodage divergent — le lot décode mais n'est pas sa propre forme canonique"
+            );
+            eprintln!("    octets du lot     : {octets_du_lot}");
+            eprintln!("    octets ré-encodés : {octets_reencodes}");
+            eprintln!("    première divergence : {divergence}");
+            CODE_ROUND_TRIP
+        }
+        Examen::Trivial {
+            temoignage,
+            octets_reencodes,
+        } => {
+            imprimer_decodage(octets_reencodes);
             // Substitution de forme (revue G2 de phase C, autour de F8) : un
             // appelant qui fournit --registre/--constat demande les contrôles
             // de 03 §4 — un lot trivial n'en porte aucun. Sortir en 0 en
@@ -171,12 +207,24 @@ fn executer() -> i32 {
             println!("{VERDICT_CONFORME}");
             CODE_CONFORME
         }
-        Lot::Canonique(temoignage) => verifier_le_temoignage(&temoignage, &arguments),
+        Examen::Canonique {
+            temoignage,
+            octets_reencodes,
+        } => {
+            imprimer_decodage(octets_reencodes);
+            verifier_le_temoignage(&temoignage, &arguments)
+        }
     }
 }
 
+/// La ligne de décodage, commune aux deux formes de lot acceptées.
+fn imprimer_decodage(octets_reencodes: usize) {
+    println!("  décodage : accepté (sous-ensemble canonique CBOR, RFC 8949 — ADR-0002)");
+    println!("  ré-encodage : {octets_reencodes} octets, identiques au lot (round-trip exact)");
+}
+
 /// Les trois contrôles de 03 §4 sur un témoignage canonique.
-fn verifier_le_temoignage(temoignage: &Temoignage, arguments: &Arguments) -> i32 {
+fn verifier_le_temoignage(temoignage: &shogen_core::Temoignage, arguments: &Arguments) -> i32 {
     println!("  forme : témoignage canonique — les sept champs de 03 §1");
     println!("  subject : « {} »", temoignage.subject);
     println!(
@@ -226,7 +274,7 @@ fn verifier_le_temoignage(temoignage: &Temoignage, arguments: &Arguments) -> i32
         None => None,
     };
 
-    match verifier_temoignage(temoignage, &registre, constat.as_ref()) {
+    match examiner_verification(temoignage, &registre, constat.as_ref()) {
         Ok(verdict) => {
             imprimer_verdict(&verdict);
             CODE_CONFORME
@@ -312,90 +360,22 @@ fn valeur_d_option(
     }
 }
 
-/// Le registre publié : un identifiant par ligne, `#` pour les commentaires.
+/// Lit le registre publié, puis le fait analyser par la bibliothèque.
 ///
-/// Format volontairement pauvre : il doit se relire à l'œil et se recalculer à
-/// la main depuis `docs/08-assumptions.md` (ADR-0003 : recalculable offline).
+/// La coupure est à l'endroit exact où l'I/O s'arrête : ce qui reste ici est la
+/// lecture du fichier et la ligne imprimée ; l'analyse est `no_std`.
 fn lire_registre(chemin: &std::ffi::OsString) -> Result<Vec<String>, String> {
     let texte = lire_texte(chemin, "registre")?;
-    let mut identifiants: Vec<String> = Vec::new();
-    for ligne in texte.lines() {
-        let ligne = ligne.trim();
-        if ligne.is_empty() || ligne.starts_with('#') {
-            continue;
-        }
-        if identifiants.iter().any(|deja| deja == ligne) {
-            return Err(format!(
-                "registre mal formé : « {ligne} » figure deux fois — un registre à doublons n'est pas un registre"
-            ));
-        }
-        identifiants.push(String::from(ligne));
-    }
+    let identifiants = analyser_registre(&texte)?;
     println!("  registre publié : {} identifiant(s)", identifiants.len());
     Ok(identifiants)
 }
 
-/// Le constat du binaire compagnon : trois clés, une par ligne.
+/// Lit le constat du binaire compagnon, puis le fait analyser par la
+/// bibliothèque.
 fn lire_constat(chemin: &std::ffi::OsString) -> Result<Constat, String> {
     let texte = lire_texte(chemin, "constat")?;
-    let mut outil: Option<String> = None;
-    let mut empreinte_de_la_preuve: Option<[u8; OCTETS_D_EMPREINTE]> = None;
-    let mut empreinte_de_l_utterance: Option<[u8; OCTETS_D_EMPREINTE]> = None;
-
-    for ligne in texte.lines() {
-        let ligne = ligne.trim();
-        if ligne.is_empty() || ligne.starts_with('#') {
-            continue;
-        }
-        let Some((cle, valeur)) = ligne.split_once('=') else {
-            return Err(format!(
-                "constat mal formé : ligne sans « = » — « {ligne} »"
-            ));
-        };
-        let cle = cle.trim();
-        let valeur = valeur.trim();
-        // Clé répétée : refus nommé, jamais « la dernière l'emporte » (revue
-        // G2 de phase C, trouvaille F7 — démontrée : l'ordre des lignes
-        // changeait le verdict). Même argument que le registre : un constat
-        // à doublons n'est pas un constat.
-        if cle == CLE_OUTIL {
-            if outil.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            outil = Some(String::from(valeur));
-        } else if cle == CLE_EMPREINTE_PREUVE {
-            if empreinte_de_la_preuve.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            empreinte_de_la_preuve = Some(empreinte_depuis_hexadecimal(valeur, cle)?);
-        } else if cle == CLE_EMPREINTE_UTTERANCE {
-            if empreinte_de_l_utterance.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            empreinte_de_l_utterance = Some(empreinte_depuis_hexadecimal(valeur, cle)?);
-        } else {
-            return Err(format!("constat mal formé : clé inconnue « {cle} »"));
-        }
-    }
-
-    let outil = exiger(outil, CLE_OUTIL)?;
-    if outil.is_empty() {
-        return Err(String::from(
-            "constat mal formé : « outil » vide — un contrôle délégué se nomme, sinon la délégation ne se vérifie pas",
-        ));
-    }
-    Ok(Constat {
-        outil,
-        empreinte_de_la_preuve: exiger(empreinte_de_la_preuve, CLE_EMPREINTE_PREUVE)?,
-        empreinte_de_l_utterance: exiger(empreinte_de_l_utterance, CLE_EMPREINTE_UTTERANCE)?,
-    })
-}
-
-fn exiger<T>(valeur: Option<T>, cle: &str) -> Result<T, String> {
-    match valeur {
-        Some(valeur) => Ok(valeur),
-        None => Err(format!("constat mal formé : clé « {cle} » absente")),
-    }
+    analyser_constat(&texte)
 }
 
 fn lire_texte(chemin: &std::ffi::OsString, quoi: &str) -> Result<String, String> {
@@ -403,77 +383,5 @@ fn lire_texte(chemin: &std::ffi::OsString, quoi: &str) -> Result<String, String>
     match std::fs::read_to_string(chemin) {
         Ok(texte) => Ok(texte),
         Err(erreur) => Err(format!("{quoi} illisible « {affichage} » : {erreur}")),
-    }
-}
-
-/// Une empreinte en hexadécimal : exactement 64 chiffres, aucune tolérance.
-fn empreinte_depuis_hexadecimal(
-    texte: &str,
-    cle: &str,
-) -> Result<[u8; OCTETS_D_EMPREINTE], String> {
-    let octets = texte.as_bytes();
-    let mut valeurs: Vec<u8> = Vec::new();
-    for paire in octets.chunks_exact(2) {
-        let mut valeur: u8 = 0;
-        let mut complet = true;
-        for chiffre in paire.iter().copied() {
-            match valeur_hexadecimale(chiffre) {
-                Some(quartet) => valeur = valeur.wrapping_shl(4) | quartet,
-                None => complet = false,
-            }
-        }
-        if !complet {
-            return Err(format!(
-                "constat mal formé : « {cle} » n'est pas de l'hexadécimal"
-            ));
-        }
-        valeurs.push(valeur);
-    }
-    if !octets.chunks_exact(2).remainder().is_empty() {
-        return Err(format!(
-            "constat mal formé : « {cle} » a un nombre impair de chiffres"
-        ));
-    }
-    match <[u8; OCTETS_D_EMPREINTE]>::try_from(valeurs.as_slice()) {
-        Ok(empreinte) => Ok(empreinte),
-        Err(_) => Err(format!(
-            "constat mal formé : « {cle} » fait {} octet(s), {OCTETS_D_EMPREINTE} attendus",
-            valeurs.len()
-        )),
-    }
-}
-
-fn valeur_hexadecimale(octet: u8) -> Option<u8> {
-    match octet {
-        b'0'..=b'9' => Some(octet.wrapping_sub(b'0')),
-        b'A'..=b'F' => Some(octet.wrapping_sub(b'A').wrapping_add(10)),
-        b'a'..=b'f' => Some(octet.wrapping_sub(b'a').wrapping_add(10)),
-        _ => None,
-    }
-}
-
-/// Rend les premiers octets en hexadécimal, pour qu'un refus soit
-/// diagnosticable sans outil tiers.
-fn tete_hexadecimale(octets: &[u8]) -> String {
-    let mut rendu = String::new();
-    for octet in octets.iter().copied().take(16) {
-        rendu.push_str(&format!("{octet:02x}"));
-    }
-    if octets.len() > 16 {
-        rendu.push('…');
-    }
-    rendu
-}
-
-/// Position du premier octet divergent, ou une mention de longueur.
-fn premiere_divergence(gauche: &[u8], droite: &[u8]) -> String {
-    let position = gauche
-        .iter()
-        .copied()
-        .zip(droite.iter().copied())
-        .position(|(a, b)| a != b);
-    match position {
-        Some(position) => format!("octet {position}"),
-        None => String::from("aucune sur le préfixe commun — les longueurs diffèrent"),
     }
 }

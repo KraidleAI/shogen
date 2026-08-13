@@ -137,8 +137,116 @@ fn executer() -> i32 {
                 }
             }
         }
+        // ADR-0011 seuils 3 et 4. Hors de `verify` pour la même raison que
+        // `double-build` : 12 min 12 s mesurées le 2026-08-13 pour le run
+        // complet (417 mutants, `-j 4`), au-dessus du budget de 10 min/PR
+        // d'ADR-0011 seuil 4. Elle est bloquante là où elle est budgétée — le job CI
+        // dédié (.github/workflows/mutation.yml), en deux régimes.
+        "mutation" => {
+            let mut diff = None;
+            let mut faute = None;
+            while let Some(argument) = arguments.next() {
+                match argument.as_str() {
+                    "--in-diff" => match arguments.next() {
+                        Some(valeur) => diff = Some(PathBuf::from(valeur)),
+                        None => {
+                            faute = Some(String::from(
+                                "--in-diff attend le chemin d'un fichier de diff unifié",
+                            ));
+                        }
+                    },
+                    autre => faute = Some(format!("argument inconnu : {autre}")),
+                }
+            }
+            if let Some(faute) = faute {
+                eprintln!("{faute}");
+                eprintln!("usage : cargo xtask mutation [--in-diff <fichier>]");
+                return 64;
+            }
+            match xtask::mutation::executer(&racine, diff.as_deref()) {
+                Ok(rapport) => {
+                    println!();
+                    rapport.imprimer();
+                    if rapport.vert() { 0 } else { 1 }
+                }
+                Err(erreur) => {
+                    // Fail-closed : ce qui empêche de conclure est ROUGE.
+                    eprintln!("mutation : ROUGE — {erreur}");
+                    1
+                }
+            }
+        }
+        // ADR-0011 seuil 7. Comme `double-build`, cette commande n'entre PAS
+        // dans `verify` : son unité est le budget de temps (≥ 15 min en CI,
+        // ≥ 4 h en nightly), pas la seconde. Elle est bloquante là où elle est
+        // budgétée : le job CI dédié (.github/workflows/fuzz.yml).
+        "fuzz" => {
+            let mut graine = xtask::fuzz::GRAINE_PAR_DEFAUT;
+            let mut duree = xtask::fuzz::DUREE_PAR_DEFAUT;
+            let mut faute = None;
+            while let Some(argument) = arguments.next() {
+                // Même règle que `double-build` : un drapeau privé de sa
+                // valeur, ou une valeur illisible, est une FAUTE — jamais un
+                // repli silencieux sur le défaut. Un budget qu'on croit avoir
+                // donné et qui n'a pas été lu produit un vert qui ne vaut rien.
+                match argument.as_str() {
+                    "--graine" => match arguments.next().and_then(|v| lire_u64(&v)) {
+                        Some(valeur) => graine = valeur,
+                        None => {
+                            faute = Some(String::from(
+                                "--graine attend un entier (décimal, ou hexadécimal préfixé 0x)",
+                            ));
+                        }
+                    },
+                    "--duree" => match arguments.next().and_then(|v| v.parse::<u64>().ok()) {
+                        Some(valeur) => duree = valeur,
+                        None => faute = Some(String::from("--duree attend un nombre de secondes")),
+                    },
+                    autre => faute = Some(format!("argument inconnu : {autre}")),
+                }
+            }
+            if let Some(faute) = faute {
+                eprintln!("{faute}");
+                eprintln!("usage : cargo xtask fuzz [--graine <entier>] [--duree <secondes>]");
+                return 64;
+            }
+            let plan = xtask::fuzz::Plan {
+                racine: racine.clone(),
+                graine,
+                duree: std::time::Duration::from_secs(duree),
+            };
+            match xtask::fuzz::executer(&plan) {
+                Ok(rapport) => {
+                    println!();
+                    rapport.imprimer();
+                    if rapport.vert() { 0 } else { 1 }
+                }
+                Err(erreur) => {
+                    // Fail-closed : ce qui empêche de conclure est ROUGE.
+                    eprintln!("fuzz : ROUGE — {erreur}");
+                    1
+                }
+            }
+        }
+        // Réécrit les graines DIRIGÉES du corpus — celles qui se déduisent des
+        // formes du dépôt. Les contre-exemples, eux, ne se régénèrent pas :
+        // ils sont écrits par une panique observée et restent au corpus.
+        "fuzz-corpus" => match xtask::fuzz::ecrire_corpus_dirige(&racine) {
+            Ok(rapport) => {
+                for ligne in &rapport {
+                    println!("{ligne}");
+                }
+                0
+            }
+            Err(erreur) => {
+                eprintln!("{erreur}");
+                65
+            }
+        },
         _ => {
-            eprintln!("usage : cargo xtask <verify|gates|emettre-exemple|muter|double-build>");
+            eprintln!(
+                "usage : cargo xtask <verify|gates|emettre-exemple|muter|double-build|mutation|fuzz|fuzz-corpus>"
+            );
             eprintln!("  verify           : toutes les gates + fmt + clippy (l'entrée de CI)");
             eprintln!("  gates            : les gates lexicales seules, sans sous-processus cargo");
             eprintln!("  emettre-exemple  : écrit le lot d'exemple du walking skeleton");
@@ -146,7 +254,29 @@ fn executer() -> i32 {
             eprintln!(
                 "  double-build     : construit le vérificateur deux fois sous 6 variations d'environnement et compare les octets (ADR-0012 D6)"
             );
+            eprintln!(
+                "  mutation         : score de mutation du cœur, seuil 80 % et non-régression (ADR-0011 seuils 3 et 4)"
+            );
+            eprintln!(
+                "  fuzz             : éprouve le vérificateur sur des suites d'octets tirées depuis le corpus committé (ADR-0011 seuil 7)"
+            );
+            eprintln!("  fuzz-corpus      : réécrit les graines dirigées du corpus de fuzz");
             64
         }
+    }
+}
+
+/// Lit un entier décimal, ou hexadécimal préfixé `0x`.
+///
+/// Les graines s'impriment en hexadécimal (`{:#018x}`) : elles doivent se
+/// **redonner** sous la forme où elles ont été lues, sinon le rejeu exact
+/// qu'ADR-0011 point 2 exige devient une conversion à la main.
+fn lire_u64(texte: &str) -> Option<u64> {
+    match texte
+        .strip_prefix("0x")
+        .or_else(|| texte.strip_prefix("0X"))
+    {
+        Some(reste) => u64::from_str_radix(&reste.replace('_', ""), 16).ok(),
+        None => texte.replace('_', "").parse::<u64>().ok(),
     }
 }

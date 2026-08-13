@@ -179,7 +179,7 @@ impl core::fmt::Display for ErreurSubject {
     }
 }
 
-impl std::error::Error for ErreurSubject {}
+impl core::error::Error for ErreurSubject {}
 
 /// Le prédicat de canonicité — **fonction totale** sur toute suite d'octets.
 ///

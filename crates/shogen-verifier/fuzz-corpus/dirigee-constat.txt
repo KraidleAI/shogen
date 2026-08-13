@@ -1,0 +1,3 @@
+outil = exemple-compagnon/1
+empreinte-preuve = 9c114e983a7b36eddd59ad5584f40b8beddb04918e665107e8e362fcd0252c86
+empreinte-utterance = 04f501ade9aec2a345218a7264fe2dec87d2f0fbf7a6c500605dbc425a6fac9d

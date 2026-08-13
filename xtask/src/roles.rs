@@ -16,8 +16,18 @@ pub struct Role {
     pub racine_source: &'static str,
     /// Manifeste du rôle, relatif à la racine du workspace.
     pub manifeste: &'static str,
-    /// Fichier racine de la crate (celui qui doit porter `forbid(unsafe_code)`).
-    pub fichier_racine: &'static str,
+    /// Fichiers racines de compilation du rôle — ceux qui doivent porter
+    /// `forbid(unsafe_code)`.
+    ///
+    /// **Une liste, et non un fichier** (2026-08-13, scission `no_std` du
+    /// vérificateur) : depuis qu'ADR-0009 point 6 est tenu, `shogen-verifier`
+    /// a DEUX racines de compilation — `src/lib.rs` (la logique `no_std`) et
+    /// `src/main.rs` (la coquille `std`). Ce sont deux crates distinctes pour
+    /// `rustc` : un `forbid(unsafe_code)` posé sur l'une ne couvre pas l'autre.
+    /// Un champ singulier laissait donc la bibliothèque hors du contrôle
+    /// d'ADR-0009 point 2 — exactement le trou qu'une gate « par chemins
+    /// exacts » existe pour empêcher.
+    pub fichiers_racines: &'static [&'static str],
 }
 
 /// Les deux rôles sous gate : le cœur et le vérificateur (ADR-0010, DEVOPS §2).
@@ -28,13 +38,16 @@ pub const ROLES: &[Role] = &[
         nom: "coeur",
         racine_source: "crates/shogen-core/src",
         manifeste: "crates/shogen-core/Cargo.toml",
-        fichier_racine: "crates/shogen-core/src/lib.rs",
+        fichiers_racines: &["crates/shogen-core/src/lib.rs"],
     },
     Role {
         nom: "verificateur",
         racine_source: "crates/shogen-verifier/src",
         manifeste: "crates/shogen-verifier/Cargo.toml",
-        fichier_racine: "crates/shogen-verifier/src/main.rs",
+        fichiers_racines: &[
+            "crates/shogen-verifier/src/lib.rs",
+            "crates/shogen-verifier/src/main.rs",
+        ],
     },
 ];
 

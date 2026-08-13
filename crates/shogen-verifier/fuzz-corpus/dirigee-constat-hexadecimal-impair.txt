@@ -1,0 +1,3 @@
+outil = x
+empreinte-preuve = 9c1
+empreinte-utterance = 04f5

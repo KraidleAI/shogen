@@ -65,8 +65,17 @@ jobs:
             exit 1
           fi
           echo "toolchain épinglée : ${TOOLCHAIN}"
+          # `--target thumbv7em-none-eabi` : ajouté le 2026-08-13 avec la gate
+          # `no_std` du vérificateur (ADR-0009 point 6, échéance 3 de 13 §3).
+          # `rustup toolchain install` avec des drapeaux explicites ne lit PAS
+          # la clé `targets` de rust-toolchain.toml — la cible y est déclarée
+          # quand même (c'est là que ce fichier promet qu'elle l'est) et se
+          # redemande ici, sans quoi `cargo xtask verify` serait ROUGE en CI
+          # sur une gate dont rien n'est cassé : le pire mode d'échec d'une
+          # gate.
           rustup toolchain install "${TOOLCHAIN}" --profile minimal \
-            --component rustfmt --component clippy --no-self-update
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
           rustup default "${TOOLCHAIN}"
           rustc --version
           cargo --version
@@ -87,11 +96,11 @@ jobs:
       - name: Build verrouillé
         run: cargo build --locked --workspace --all-targets
 
-      - name: Vérificateur sans features par défaut (préparation no_std, S3)
-        # ADR-0009, point 6 : « En S2.5, le walking skeleton pose et **teste**
-        # les contraintes qui rendent ce basculement possible : … le
-        # vérificateur compile avec `--no-default-features` ». Ce n'est PAS
-        # `no_std` — c'est la contrainte qui le laisse atteignable.
+      - name: Vérificateur sans features par défaut
+        # ADR-0009, point 6 — l'échéance no_std est TENUE depuis le
+        # 2026-08-13 (phase C S3) : la gate vit dans `cargo xtask verify`
+        # (construction de la lib pour thumbv7em-none-eabi). Cette étape-ci
+        # reste comme contrôle distinct du binaire complet sans features.
         run: cargo build --locked --package shogen-verifier --no-default-features
 
       - name: Tests (dont les mutants semés des gates)

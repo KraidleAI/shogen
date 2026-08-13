@@ -296,6 +296,28 @@ fn mutant_sg3_attribut_forbid_unsafe_retire() {
     );
 }
 
+/// Mutant semé de la **scission `no_std`** (2026-08-13, échéance ADR-0009
+/// point 6) : depuis que `shogen-verifier` a deux racines de compilation, un
+/// `forbid(unsafe_code)` retiré de la **bibliothèque** doit rougir tout autant
+/// que retiré de la coquille. Avant la scission, la gate ne regardait que
+/// `main.rs` — ce test est la preuve que le trou est fermé, pas l'affirmation
+/// qu'il l'est.
+#[test]
+fn mutant_sg3_attribut_forbid_unsafe_retire_de_la_bibliotheque() {
+    let racine = arbre_copie("sg3-forbid-lib");
+    remplacer(
+        &racine,
+        "crates/shogen-verifier/src/lib.rs",
+        "#![forbid(unsafe_code)]\n",
+        "",
+    );
+    let rapports = gates(&racine);
+    exiger_rouge(
+        rapport_de(&rapports, "S-G3"),
+        "attribut « #![forbid(unsafe_code)] » absent",
+    );
+}
+
 #[test]
 fn mutant_couverture_repertoire_de_role_supprime() {
     let racine = arbre_copie("couverture-role");

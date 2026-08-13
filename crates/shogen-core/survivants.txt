@@ -1,0 +1,73 @@
+# Survivants justifiés du score de mutation du cœur — ADR-0011 seuil 3.
+#
+# Forme : <mutant, exactement comme `mutants.out/missed.txt` l'écrit> # <justification en une ligne>
+#
+# Ce fichier est la LIGNE DE BASE de la non-régression : `cargo xtask mutation`
+# casse sur tout survivant qui n'y figure pas. Il n'est pas une liste
+# d'exemptions — chaque ligne porte la DÉMONSTRATION que le mutant est
+# équivalent au programme, au sens de Jia & Harman p. 4 : aucune entrée du
+# programme ne distingue le mutant de l'original. « Automatically detecting all
+# equivalent mutants is impossible » (§II.B, p. 4) : c'est un travail humain, et
+# c'est ici qu'il est écrit.
+#
+# Un survivant TUABLE n'a rien à faire ici : il se tue par un test, dans
+# `crates/shogen-core/tests/mutation_programme.rs`. Quatorze l'ont été le
+# 2026-08-13, sur les 34 survivants de la première mesure.
+#
+# ÉTAT MESURÉ ET REJOUABLE (2026-08-13, `cargo xtask mutation`, cargo-mutants
+# 27.1.0, parallélisme 4) : 417 mutants générés, 363 tués, 22 survivants, 32
+# non viables — score 94,2857 % sur 385 non équivalents. Les 22 survivants sont
+# EXACTEMENT les 22 lignes ci-dessous.
+#
+# Pourquoi « rejouable » est écrit ici. Les trois premières mesures de la
+# journée ne l'étaient pas : le même mutant était compté survivant dans l'une
+# et tué dans l'autre. La cause a été trouvée sur pièce — les tests de bout en
+# bout du vérificateur travaillaient dans un répertoire temporaire au chemin
+# FIXE, que chacun efface en entrant ; sous les quatre suites de front de cette
+# gate, un processus effaçait les lots d'un autre. Le chemin porte désormais le
+# PID (`crates/shogen-verifier/tests/`), et le run de re-mesure rend une liste
+# de survivants IDENTIQUE à cette ligne de base (22 sur 22, zéro entrée non
+# revue) — ce qui est un run, pas une série : ce qui porte la stabilité ici
+# est le mécanisme retiré, pas le compte de répétitions. Un score
+# non rejouable n'est pas un fait (ADR-0011 point 2) : la liste ci-dessous
+# n'aurait rien valu tant que cette course existait.
+#
+# Trois équivalences seulement sont vraies « en soi » (les identités de FIPS
+# 180-4). Les autres sont équivalentes AU PROGRAMME : la fonction mutée se
+# comporterait différemment sur une entrée que rien, dans ce dépôt, ne lui
+# donne. La distinction est écrite ligne à ligne, parce qu'elle change ce qui
+# invaliderait la justification : un site d'appel nouveau, et non un test
+# nouveau.
+
+# ── cbor.rs — composition de bits sur champs disjoints ──────────────────────
+# Un préfixe de type majeur CBOR (0x00, 0x20, 0x40, 0x60, 0x80, 0xA0) a ses
+# cinq bits bas à zéro ; l'argument direct (<= 23) et les codes d'information
+# (24, 25, 26, 27) tiennent tous dans ces cinq bits. Sur des champs disjoints,
+# `|` et `^` rendent le même octet. Équivalent AU PROGRAMME : tous les appels
+# de `ecrire_entete` passent une des six constantes `PREFIXE_*`.
+crates/shogen-core/src/cbor.rs:74:29: replace | with ^ in ecrire_entete # équivalent au programme : préfixe à 5 bits bas nuls, argument <= 23 — champs disjoints, `|` et `^` coïncident
+crates/shogen-core/src/cbor.rs:76:29: replace | with ^ in ecrire_entete # équivalent au programme : idem, argument = INFO_UN_OCTET (24) tient dans les 5 bits bas
+crates/shogen-core/src/cbor.rs:79:29: replace | with ^ in ecrire_entete # équivalent au programme : idem, INFO_DEUX_OCTETS (25)
+crates/shogen-core/src/cbor.rs:82:29: replace | with ^ in ecrire_entete # équivalent au programme : idem, INFO_QUATRE_OCTETS (26)
+crates/shogen-core/src/cbor.rs:85:29: replace | with ^ in ecrire_entete # équivalent au programme : idem, INFO_HUIT_OCTETS (27)
+crates/shogen-core/src/cbor.rs:215:49: replace | with ^ in Lecteur<'a>::entete # équivalent : `argument.wrapping_shl(8)` a ses 8 bits bas nuls, `u64::from(octet)` tient dedans — disjoints
+crates/shogen-core/src/cbor.rs:306:36: replace < with <= in ControleDeTri::suivante # équivalent au programme : le cas d'égalité est déjà sorti deux lignes plus haut par `CleDupliquee`, `<` et `<=` ne peuvent plus différer
+
+# ── empreinte.rs — identités de FIPS 180-4 et bras de repli ─────────────────
+crates/shogen-core/src/empreinte.rs:217:13: replace ^ with | in choix # équivalent : dans `Ch = (x & y) ^ (!x & z)` les deux termes sont masqués par x et !x — disjoints bit à bit
+crates/shogen-core/src/empreinte.rs:222:23: replace ^ with | in majorite # équivalent : identité classique de la majorité, `(x&y)^(x&z)^(y&z)` = `(x&y)|(x&z)|(y&z)` — vérifiée sur les 8 configurations d'un bit
+crates/shogen-core/src/empreinte.rs:222:13: replace ^ with | in majorite # équivalent : même identité, l'autre opérateur de la même expression (la précédence de `|` sous `^` ne change pas le résultat)
+crates/shogen-core/src/empreinte.rs:255:39: replace | with ^ in comprimer # équivalent : `mot.wrapping_shl(8)` a ses 8 bits bas nuls, l'octet ajouté tient dedans — disjoints
+crates/shogen-core/src/empreinte.rs:260:18: replace < with <= in comprimer # équivalent au programme : une itération de plus n'ajoute qu'un 65e mot au planning, et la boucle de compression n'en lit que 64 (`CONSTANTES.len()`) — le mot surnuméraire est calculé sans jamais être lu, `mot_de` bornant les lectures par `get().unwrap_or(0)`
+crates/shogen-core/src/empreinte.rs:364:9: delete match arm 0 in chiffre_hexadecimal # équivalent : le bras retiré rend '0' et le bras de repli `_` rend '0' aussi — même valeur, par construction du repli
+
+# ── subject.rs — bornes inatteignables et chemins gardés en amont ───────────
+crates/shogen-core/src/subject.rs:306:22: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : `controler_hote` sort en `HoteVide` quand debut >= fin, donc fin_effective > debut est toujours vrai à l'entrée
+crates/shogen-core/src/subject.rs:340:26: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : le seul cas où fin_effective == debut_label+1 est un label d'un octet, déjà rendu vrai par le contrôle « tout chiffres » au-dessus
+crates/shogen-core/src/subject.rs:480:57: replace | with ^ in controler_triplet # équivalent : `haut.wrapping_shl(4)` a ses 4 bits bas nuls, `bas` <= 15 tient dedans — disjoints
+crates/shogen-core/src/subject.rs:516:43: replace >= with < in segment_est_pointille # équivalent au programme : la borne ne se distingue que sur un triplet tronqué au bord du segment, forme que C7 refuse en `TripletPercentMalForme` avant C6 ; sur un triplet entier atteignable (`%2F`) les deux chemins rendent faux
+crates/shogen-core/src/subject.rs:522:17: delete match arm (Some(haut), Some(bas)) in segment_est_pointille # équivalent au programme : C7 (controler_octets) précède C6 et refuse `%2E`/`%2e` en `PercentEncodageInutile` — mesuré le 2026-08-13 ; aucun triplet atteignant ce bras ne décode en `.`, les deux chemins rendent faux
+crates/shogen-core/src/subject.rs:522:66: replace | with & in segment_est_pointille # équivalent au programme : même démonstration — sur un triplet réservé atteignable (`%2F`), `(2<<4)|15` et `(2<<4)&15` diffèrent mais aucun des deux ne vaut POINT, la fonction rend faux dans les deux cas
+crates/shogen-core/src/subject.rs:522:66: replace | with ^ in segment_est_pointille # équivalent : champs disjoints (quartet haut décalé, quartet bas), `|` et `^` coïncident
+crates/shogen-core/src/subject.rs:569:9: delete match arm b'a'..= b'f' in valeur_hexadecimale # équivalent au programme : les deux appelants excluent la minuscule en amont — `controler_triplet` sort en `TripletPercentMinuscule` avant l'appel, et `segment_est_pointille` ne voit aucun triplet (démonstration ci-dessus)
+crates/shogen-core/src/subject.rs:582:20: replace < with <= in premier_parmi_borne # équivalent : à `position == fin` la boucle rendrait `fin`, ce que le repli rend déjà — les deux chemins rendent la même valeur

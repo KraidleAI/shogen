@@ -1,0 +1,156 @@
+# Fuzz du vérificateur — ADR-0011 seuil 7, échéance 5 de 13 §3.
+#
+# Rattachement (G0) :
+#   - ADR-0011 seuil 7 : « *Totalité du vérificateur (fuzz)* : **zéro panique
+#     sur toute suite d'octets** — seuil binaire, non négociable (S-G3, 12 §5) ;
+#     budgets candidats : ≥ 15 min par CI, ≥ 4 h en nightly, corpus de graines
+#     committé et croissant de chaque contre-exemple. »
+#   - ADR-0011 point 2 (c) : « totalité du vérificateur : aucune suite d'octets
+#     ne fait paniquer `shogen-verifier` — le pendant *tested* de la gate S-G3,
+#     qui est lexicale (elle interdit `unwrap` dans le source ; elle ne dit rien
+#     de ce que fait le binaire sur une entrée hostile) ».
+#   - ADR-0011 point 2, trois obligations d'exécution : graine consignée et
+#     rejeu exact ; distribution des cas imprimée AVANT le verdict ; tout
+#     contre-exemple devient un cas permanent.
+#   - ADR-0013, point 1 : bloquant, aucun `continue-on-error`.
+#   - ADR-0013, point 5 : actions épinglées par SHA de commit — le seul `uses:`
+#     est celui de `squelette`, au même SHA.
+#   - ADR-0012 D7 / ADR-0010 point 8 : zéro autorité ambiante.
+#
+# CE QUE CE WORKFLOW TIENT, ET CE QU'IL NE TIENT PAS — à lire avant de le
+# croire plus large qu'il n'est. Le harnais exécuté (`cargo xtask fuzz`) est
+# **aveugle** : il tire des mutations depuis un corpus committé, il n'est pas
+# guidé par la couverture. Il tient le seuil binaire (zéro panique), le corpus
+# croissant et les budgets ; il ne tient pas le mot « instrumenté ». La couche
+# guidée par la couverture (cargo-fuzz/libFuzzer, ou AFL) exige une toolchain
+# *nightly* supplémentaire — un choix qui engage ADR-0009 point 3 (« version
+# exacte (pas `stable`) … jamais un canal flottant »). Il fait l'objet d'une
+# demande de consultation formée (R-26) déposée le 2026-08-13 et n'est pas
+# tranché ici. Ce fichier sera étendu, pas remplacé, quand il le sera.
+#
+# ZÉRO DÉPENDANCE, ZÉRO OUTIL : à la différence de `mutation` et de S-G7, ce
+# job n'installe RIEN. Le harnais est en arbre (`xtask/src/fuzz.rs`,
+# générateur SplitMix64 écrit en entier), et le corpus est committé
+# (`crates/shogen-verifier/fuzz-corpus/`). Un acteur de chaîne
+# d'approvisionnement de moins.
+#
+# LE CORPUS EST EN LECTURE ICI. Le harnais écrit un contre-exemple au corpus
+# quand il en trouve un — sur un runner, ce fichier meurt avec le runner. C'est
+# voulu : `permissions: contents: read` interdit d'écrire au dépôt, et un job
+# qui committerait son propre corpus s'auto-modifierait. Le job IMPRIME les
+# octets fautifs et devient ROUGE ; le versement du contre-exemple au corpus
+# committé est un acte humain, dans une PR, avec le test nommé qui l'accompagne
+# (« l'évasion devient un test », DEVOPS §3).
+
+name: fuzz
+
+on:
+  pull_request:
+  schedule:
+    # Nightly, 02:43 UTC — décalé de `mutation` (03:17) pour que les deux
+    # campagnes longues ne se disputent pas le même créneau d'ordonnanceur.
+    - cron: "43 2 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ── Budget de PR : ≥ 15 min (ADR-0011 seuil 7) ────────────────────────────
+  pr:
+    name: fuzz de PR (15 min)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        # actions/checkout, épinglé par SHA de commit — tag v7.0.1, le SHA que
+        # `squelette` emploie déjà.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Le corpus dirigé est à jour (il se régénère, il ne dérive pas)
+        # Le corpus dirigé se déduit des formes du dépôt : s'il a dérivé de ce
+        # que le dépôt produit, le fuzz part d'un bord qui n'existe plus. La
+        # moitié CROISSANTE du corpus (les contre-exemples `panique-*.bin`)
+        # n'est pas régénérée par cette commande, donc `git diff` ne la voit
+        # jamais bouger.
+        run: |
+          set -euo pipefail
+          cargo run --locked --package xtask -- fuzz-corpus
+          git diff --exit-code -- crates/shogen-verifier/fuzz-corpus
+
+      - name: Fuzz — 15 min, graine consignée, zéro panique
+        # `--release` : la vitesse de tirage est le budget. Mesure du
+        # 2026-08-13 en release, 20 s : 12 640 272 cas.
+        run: cargo run --locked --release --package xtask -- fuzz --duree 900
+
+  # ── Nightly : ≥ 4 h (ADR-0011 seuil 7) ────────────────────────────────────
+  nightly:
+    name: fuzz nightly (4 h)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Fuzz — 4 h, graine décalée par le numéro de run
+        # La graine du nightly n'est PAS celle du job de PR : rejouer chaque
+        # nuit exactement les mêmes 4 h de tirages ne trouverait jamais rien de
+        # neuf. Elle reste consignée et rejouable — `github.run_id` est écrit
+        # dans le journal du run et la commande l'imprime en hexadécimal
+        # (ADR-0011 point 2 : « la graine est consignée et le rejeu est exact »).
+        run: |
+          set -euo pipefail
+          echo "graine dérivée du run : ${{ github.run_id }}"
+          cargo run --locked --release --package xtask -- fuzz \
+            --graine "${{ github.run_id }}" --duree 14400

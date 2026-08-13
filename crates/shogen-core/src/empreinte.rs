@@ -39,6 +39,9 @@
 //! nommée — supprimerait l'argument au lieu de le documenter.)
 
 /// Longueur d'une empreinte SHA-256, en octets (FIPS 180-4 §1 : « 256 »).
+use alloc::string::String;
+use alloc::vec::Vec;
+
 pub const OCTETS_D_EMPREINTE: usize = 32;
 
 /// Longueur d'un bloc de message, en octets (512 bits — FIPS 180-4 §5.1.1).

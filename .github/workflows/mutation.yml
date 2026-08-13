@@ -1,0 +1,169 @@
+# Score de mutation du cœur — ADR-0011 seuils 3 et 4, échéance 4 de 13 §3.
+#
+# Rattachement (G0) :
+#   - ADR-0011 seuil 3 : « dès la logique (S3) : **≥ 80 % de mutants tués**,
+#     calculé sur mutants non équivalents (la définition de Jia & Harman p. 4),
+#     chaque survivant justifié nommément en une ligne, plus non-régression ».
+#   - ADR-0011 seuil 4 : « **≤ 10 min sur `shogen-core` par PR** ; au-delà, run
+#     complet en nightly avec non-régression bloquante ».
+#   - ADR-0011 alternative (e) : la mutation se pose sur le cœur pur seul —
+#     « les adapters font de l'I/O : muter un adapter mesure surtout la
+#     stabilité de son environnement ».
+#   - ADR-0013, point 1 : bloquant, aucun `continue-on-error`.
+#   - ADR-0013, point 5 : actions épinglées par SHA de commit. Aucune action
+#     nouvelle : le seul `uses:` est celui que `squelette` emploie déjà, au
+#     même SHA — un acteur de moins dans la chaîne.
+#   - ADR-0012 D7 / ADR-0010 point 8 : zéro autorité ambiante.
+#   - ADR-0012 D5, moitié humaine : le contrôle de registre R-8 de
+#     `cargo-mutants` est écrit dans le rapport de passe du 2026-08-13 (crates.io
+#     API : 27.1.0, licence MIT, `rust-version` 1.88, propriétaire unique
+#     `sourcefrog`, 466 076 téléchargements cumulés, première publication
+#     2021-10-25). L'outil s'installe à **version exacte** et `--locked`, par la
+#     même discipline que `cargo-deny` dans `squelette` : aucune action tierce
+#     n'entre dans la chaîne pour l'installer.
+#
+# POURQUOI DEUX JOBS ET NON UN : le budget d'ADR-0011 seuil 4 (≤ 10 min/PR) et
+# le périmètre d'ADR-0011 seuil 3 (le cœur entier) ne tiennent pas dans la même
+# exécution. **Mesure du 2026-08-13**, poste du mainteneur, x86_64, `-j 4`,
+# toolchain 1.97.1, cargo-mutants 27.1.0 : 417 mutants générés sur
+# `crates/shogen-core`, run complet **12 min 12 s** (`start_time`/`end_time` de
+# `mutants.out/outcomes.json` : 04:12:34.353555Z → 04:24:47.3353673Z). Douze
+# minutes sur un poste à 4 jobs, pour un budget de dix : la marge n'existe pas,
+# et un runner GitHub a moins de cœurs que ce poste. Le repli qu'ADR-0011 nomme
+# lui-même est donc pris à la lettre :
+#
+# Le parallélisme n'est pas laissé au défaut de l'outil : `cargo xtask mutation`
+# passe `--jobs 4`, la valeur sous laquelle ce budget a été mesuré. Fait
+# constaté le 2026-08-13 : sans ce drapeau, la même gate avait traité 36
+# mutants en 9 minutes — le budget publié aurait été faux d'un ordre de
+# grandeur.
+#   * `pr` — mutation du DIFF seul (`--in-diff`), tenue par le budget ;
+#   * `nightly` — run complet, non-régression bloquante.
+# ADR-0011 nomme le coût de ce partage sans le cacher : « mutation du diff seul
+# (mesure la PR, plus la suite) ». C'est le prix du budget, pas un oubli — et
+# c'est le job nightly qui rachète la couverture perdue, chaque nuit.
+#
+# LA NON-RÉGRESSION EST MÉCANIQUE, PAS UNE LECTURE. `crates/shogen-core/survivants.txt`
+# est la ligne de base : un mutant survivant y figure avec sa justification en
+# une ligne (ADR-0011 seuil 3). Le job compare les survivants mesurés à cette
+# ligne de base et casse sur tout survivant NOUVEAU. Un survivant non justifié
+# est une dette nue, interdite (règle du 2026-08-05).
+
+name: mutation
+
+on:
+  pull_request:
+  schedule:
+    # Nightly, 03:17 UTC — une heure creuse et non ronde : les minutes rondes
+    # sont les plus encombrées de l'ordonnanceur GitHub, et un job décalé
+    # démarre plus tôt qu'un job à l'heure pile.
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  # ── Budget de PR : ≤ 10 min, mutation du diff seul (ADR-0011 seuil 4) ──────
+  pr:
+    name: mutation du diff (budget 10 min)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    # Le budget d'ADR-0011 seuil 4 est ici une CONTRAINTE DE LA MACHINE, pas
+    # une intention écrite dans un commentaire : au-delà, le job est tué et la
+    # PR est rouge. Le seuil est de 10 min sur la mutation elle-même ; les 8
+    # minutes de marge couvrent checkout, toolchain et installation de l'outil.
+    timeout-minutes: 18
+    steps:
+      - name: Checkout
+        # actions/checkout, épinglé par SHA de commit — tag v7.0.1, le SHA que
+        # `squelette` emploie déjà.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          # `--in-diff` compare à la base de la PR : sans l'historique, il n'y
+          # a pas de diff à mesurer. `fetch-depth: 0` est le seul réglage qui
+          # garantit la présence de la base quelle que soit la profondeur de
+          # la branche.
+          fetch-depth: 0
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Outil — cargo-mutants, version exacte (R-8 fait, ADR-0012 D5)
+        run: cargo install cargo-mutants --locked --version 27.1.0
+
+      - name: Diff de la PR contre sa base
+        run: |
+          set -euo pipefail
+          BASE="origin/${{ github.base_ref }}"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          git diff "${BASE}"...HEAD > "${RUNNER_TEMP}/pr.diff"
+          echo "diff de $(wc -l < "${RUNNER_TEMP}/pr.diff") ligne(s)"
+
+      - name: Mutation du diff (cœur seul)
+        run: cargo run --locked --package xtask -- mutation --in-diff "${RUNNER_TEMP}/pr.diff"
+
+  # ── Run complet, nightly, non-régression bloquante (ADR-0011 seuils 3 et 4) ─
+  nightly:
+    name: mutation complète (cœur, seuil 80 %)
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    # 12 min 12 s mesurées le 2026-08-13 avec `-j 4` ; le runner GitHub a moins
+    # de cœurs que le poste de mesure, d'où la marge large. Un dépassement est ROUGE :
+    # un run de mutation qui n'a pas fini n'a pas de score, et l'absence de
+    # score est un refus de conclure, jamais un vert.
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Outil — cargo-mutants, version exacte (R-8 fait, ADR-0012 D5)
+        run: cargo install cargo-mutants --locked --version 27.1.0
+
+      - name: Score de mutation du cœur — seuil 80 %, survivants justifiés
+        run: cargo run --locked --package xtask -- mutation

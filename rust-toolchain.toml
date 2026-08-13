@@ -12,4 +12,12 @@
 [toolchain]
 channel = "1.97.1"
 components = ["rustfmt", "clippy"]
+# Cible SANS bibliothèque standard, ajoutée le 2026-08-13 avec la gate `no_std`
+# du vérificateur (ADR-0009 point 6, échéance 3 de 13 §3). Elle est déclarée
+# ICI parce que c'est ce que l'en-tête de ce fichier promet — « composants et
+# cibles déclarés ; la CI Windows et Linux consomme ce même fichier ». Elle
+# n'entre dans aucune construction livrée : le binaire `shogen-verifier` reste
+# `std` et `x86_64` ; cette cible n'existe que pour qu'une gate puisse
+# construire la bibliothèque là où `std` N'EXISTE PAS, et échouer sinon.
+targets = ["thumbv7em-none-eabi"]
 profile = "minimal"
