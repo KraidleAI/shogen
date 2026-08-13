@@ -1,0 +1,104 @@
+# Compagnon shogen-tlsn-verify — construction, rejeu des fixtures, deny.
+# Rattachement (G0) : ADR-0015 pts 7-8 (le binaire compagnon et son constat),
+# amendement du 2026-08-13 (deny par workspace, consultation R-26) ; ADR-0005
+# règle 1 (la liaison hash porte sur les octets EXACTS — le rejeu à l'octet
+# près est ce qui la garde) ; reste nommé du chantier T : « la propriété la
+# plus forte du chantier n'est tenue que par des mesures manuelles datées ».
+#
+# Les fixtures sont VERSIONNÉES et la session réelle n'est PAS rejouée ici :
+# ce job vérifie offline, comme le vérificateur le fera — aucun réseau, aucun
+# secret. Un runner qui produit un constat différent de la fixture déposée
+# casse, et c'est le but.
+# Invariant : jobs bloquants, jamais de continue-on-error.
+
+name: compagnon
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Zéro autorité ambiante (ADR-0012 D7 ; DEVOPS §4).
+permissions:
+  contents: read
+
+jobs:
+  compagnon:
+    name: compagnon (${{ matrix.os }})
+    # Les deux plateformes : la propriété « constat identique Windows/Linux »
+    # a été MESURÉE le 2026-08-13 (chantier T) — ce job l'empêche de pourrir.
+    # L'amont ne construit jamais sous Windows (8/8 jobs ubuntu, pièce au
+    # corpus) : notre vert Windows est le nôtre, pas le sien.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: bash
+        working-directory: adapters/shogen-tlsn-verify
+    steps:
+      - name: Checkout
+        # actions/checkout épinglé par SHA de commit — tag v7.0.1, le SHA que
+        # `squelette` emploie déjà.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        working-directory: .
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+
+      - name: Construction verrouillée
+        run: cargo build --locked --release
+
+      - name: Rejeu — constat identique à l'octet à la fixture déposée
+        # ADR-0005 règle 1 : si un runner produit un autre constat sur les
+        # mêmes octets, quelque chose a bougé (fixture corrompue au transfert,
+        # dérive du compagnon, racine retirée du magasin compilé) — ROUGE.
+        run: |
+          set -euo pipefail
+          cargo run --locked --release --quiet -- fixtures/shogen-s3-binance.presentation.tlsn > constat-runner.json
+          diff constat-runner.json fixtures/shogen-s3-binance.constat.json
+          echo "constat identique à l'octet."
+
+      - name: Rejeu — les trois mutants sortent non-zéro
+        # « Un vérificateur qui n'a jamais rejeté n'a rien montré » (13 §1).
+        # Codes attendus, mesurés le 2026-08-13 : 67 / 66 / 67.
+        run: |
+          set -euo pipefail
+          declare -A attendu=(
+            [mutant-1-octet-retourne]=67
+            [mutant-2-tronquee]=66
+            [mutant-3-dernier-octet]=67
+          )
+          for mutant in "${!attendu[@]}"; do
+            code=0
+            cargo run --locked --release --quiet -- "fixtures/${mutant}.tlsn" >/dev/null 2>&1 || code=$?
+            if [ "${code}" -ne "${attendu[$mutant]}" ]; then
+              echo "::error::${mutant} : code ${code}, attendu ${attendu[$mutant]}"
+              exit 1
+            fi
+            echo "${mutant} : refusé code ${code} (attendu)."
+          done
+
+      - name: Outil deny — cargo-deny, version exacte
+        # Même discipline que squelette.yml : version exacte, --locked, aucune
+        # action tierce d'installation.
+        run: cargo install cargo-deny --locked --version 0.20.2
+
+      - name: Deny du workspace compagnon (configuration locale, ADR-0015 amendé)
+        # Le deny.toml LOCAL : sources git épinglées autorisées, CC0-1.0 et
+        # CDLA-Permissive-2.0 admises, advisories en dettes formées (fichier
+        # commenté ligne à ligne). La liste blanche RACINE reste fermée.
+        run: cargo deny --locked check

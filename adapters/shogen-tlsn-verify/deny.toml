@@ -1,0 +1,98 @@
+# Configuration cargo-deny du workspace COMPAGNON — adapters/shogen-tlsn-verify.
+#
+# Rattachement (G0) : ADR-0015 (forme β — binaire compagnon, adapter au sens
+# d'ADR-0001 : « testé, jamais prouvé ») ; ADR-0012 D5 (R-8 en deux moitiés) ;
+# amendement ADR-0015 du 2026-08-13 (périmètre deny par workspace).
+#
+# Doctrine (une fois, pas trois précédents ad hoc) : chaque workspace porte SA
+# configuration deny ; la liste blanche RACINE reste fermée ; tout
+# assouplissement vit dans le fichier du workspace qui le nécessite, écrit,
+# daté et porté par ADR. Ce fichier assouplit — il le dit, et il dit pourquoi
+# c'est acceptable ICI : le compagnon est hors artefact de confiance
+# (`shogen-verifier` reste à zéro dépendance, hors D6, hors S-G2) ; son graphe
+# est celui de l'amont TLSNotary, pas le nôtre.
+
+[graph]
+all-features = true
+exclude-dev = false
+
+[advisories]
+version = 2
+yanked = "deny"
+# JAMAIS un ignore silencieux (ADR-0012 D5) : chaque entrée ci-dessous est une
+# dette formée, propriétaire orchestrateur, à échéance ÉVÉNEMENTIELLE — chaque
+# bump de la révision amont épinglée re-pose la question « l'amont a-t-il
+# quitté cette crate ? », le même événement qui re-contrôle A(upstream-alpha)
+# (08-assumptions). Les conditions de réouverture d'ADR-0015 pt 11 déchargent.
+ignore = [
+    # bincode 1.3 : « the bincode team has taken the decision to cease
+    # development permanently » — c'est le FORMAT DE L'AMONT (manifeste racine
+    # amont `bincode = "1.3"`, exemple officiel `bincode::deserialize`) ;
+    # re-spécifier le format serait re-spécifier un transport (ADR-0001).
+    # Exposition bornée : adapter testé-jamais-prouvé, Rust sans unsafe,
+    # fail-closed mesuré (code 66 sur présentation tronquée). Advisory
+    # consignée à l'amendement ADR-0015 du 2026-08-13 (consultation R-26).
+    "RUSTSEC-2025-0141",
+    # rustls-pemfile 1.0.4 : « No safe upgrade is available! » — entre par
+    # tlsn-tls-core, c'est-à-dire par l'amont, sans qu'aucune décision de
+    # notre part puisse la retirer. Documente A(upstream-alpha). Même
+    # échéance événementielle.
+    "RUSTSEC-2025-0134",
+]
+
+[licenses]
+version = 2
+private = { ignore = true }
+include-dev = true
+# Liste racine + les deux familles PERMISSIVES que le graphe amont apporte
+# (fait de configuration, pas de licence : CC0-1.0 est une renonciation,
+# CDLA-Permissive-2.0 est permissive — elles échouaient à la racine parce que
+# non LISTÉES, la liste ayant été écrite pour le graphe du dépôt principal).
+allow = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.93
+exceptions = []
+
+# tlsn-attestation ne porte AUCUN champ `license` au manifeste (mesuré au
+# commit épinglé, sha256 identique à la pièce du corpus) et le dépôt amont n'a
+# aucun fichier LICENSE à sa racine — mais le README amont déclare : « All
+# crates in this repository are licensed under either of » Apache-2.0 ou MIT.
+# La clause ci-dessous porte cette intention déclarée à la place du champ
+# manquant. C'est l'affaiblissement qu'ADR-0015 alternative (a) motif 3
+# refusait pour la forme α : le périmètre a changé, PAS la doctrine — ici il
+# couvre un adapter hors artefact de confiance, et il est porté par
+# l'amendement ADR-0015 du 2026-08-13 (consultation R-26), jamais de la propre
+# initiative de l'outilleur.
+[[licenses.clarify]]
+crate = "tlsn-attestation"
+expression = "MIT OR Apache-2.0"
+license-files = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# Les quatre crates git du lock, épinglées par révision exacte (rev au
+# manifeste, empreintes au lockfile) : les trois tlsn-* au commit du corpus
+# et le fork rs-merkle que l'amont impose. Épinglé ≠ flottant : un bump de
+# révision est un acte de revue, jamais un glissement.
+allow-git = [
+    "https://github.com/tlsnotary/tlsn",
+    "https://github.com/tlsnotary/rs-merkle",
+]

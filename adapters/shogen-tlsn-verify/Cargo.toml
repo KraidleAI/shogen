@@ -43,7 +43,7 @@ exclude = ["session"]
 # `Presentation::verify` vit dans `tlsn-attestation` (l'exemple amont passe par
 # les ré-exports `tlsn::attestation::*`), et `tlsn` tire en plus toute la pile MPC
 # (mpz-*) dont la vérification n'a aucun besoin. Voir NOTES.md pour la mesure.
-tlsn-attestation = { git = "https://github.com/tlsnotary/tlsn", rev = "0fe3c32d35382b3f290a43c4156399ca4512bb89" }
+tlsn-attestation = { version = "=0.1.0-alpha.16-pre", git = "https://github.com/tlsnotary/tlsn", rev = "0fe3c32d35382b3f290a43c4156399ca4512bb89" }
 
 # Le format de sérialisation de la présentation amont : l'exemple officiel
 # `attestation_verify` lit la présentation par `bincode::deserialize`. La borne

@@ -1771,6 +1771,74 @@ version alpha, TLS 1.2 seulement avec contradiction interne sur TLS 1.3.
     vérification `no_std`. Aucune n'est vraie au 2026-08-13, et le
     §« coûts » chiffre pourquoi chacune compte.
 
+*(Amendement du 2026-08-13, phase C vague 1 — le compagnon construit, la
+session réelle conduite, la mesure R-8 définitive rendue ; consultation
+R-26 routée à l'ADVISOR et adjugée par l'orchestrateur. Cinq points :*
+
+*12. **Le compte définitif de la forme β est mesuré** : 96 paquets tiers au
+graphe normal du compagnon (cible hôte, name+version uniques), 123 blocs au
+lock, 4 crates git-épinglées — contre 267 paquets pour le conducteur de
+session, qui tire la crate parapluie `tlsn` entière : la vérification n'a
+besoin que de `tlsn-attestation`, le protocole MPC pèse les deux tiers du
+graphe et n'y joue aucun rôle. Le désaccord 116/359 de la note
+d'adjudication est soldé par cette mesure (`adapters/shogen-tlsn-verify/
+MESURE-R8.md`). Fait de plateforme mesuré en sus : le compagnon construit
+et s'exécute sous Windows avec un constat identique à l'octet — le motif 5
+du rejet de la forme α ne s'applique pas à la forme β.*
+
+*13. **Le contrat du constat est figé** (`version_du_constat` = 1) : une
+ligne JSON à clés triées — `attestor_cle_algorithme`, `attestor_cle_hex`
+(contrôle (f)), `connection_info_time` (contrôle (g)),
+`connection_info_version_tls`, `empreinte_presentation_sha256` (contrôle
+(c)), `empreinte_recv_revele_sha256` (contrôle (b)),
+`empreinte_sent_revele_sha256`, `octets_presentation`, `revision_amont`
+(contrôle (e), verbatim dans la chaîne de verdict), `server_name`
+(recoupement d'origine de `subject`, ADR-0016), les six longueurs de
+transcript (`transcript_{recv,sent}_{longueur,authentifie,longueur_attestee}`
+— divergence authentifié/longueur = REFUS du compagnon, pré-condition de
+(b)), `verdict`. Toute évolution passe par incrément de
+`version_du_constat` porté par amendement ici — le chantier vérificateur
+(vague 2) s'adosse à ce contrat, pas au code du compagnon.*
+
+*14. **Dette formée — advisory RUSTSEC-2025-0141 (`bincode` 1.3)** : le
+format de la présentation est celui de l'amont (manifeste racine amont
+`bincode = "1.3"`, exemple officiel `bincode::deserialize`) ; le
+re-spécifier serait re-spécifier un transport (ADR-0001). L'advisory est
+donc portée, jamais tue : propriétaire orchestrateur, **échéance
+événementielle** — chaque bump de la révision amont épinglée re-pose la
+question « l'amont a-t-il quitté bincode ? », et c'est le même événement
+qui re-contrôle A(upstream-alpha) (08) ; les conditions du pt 11 la
+déchargent aussi. Exposition bornée et mesurée : adapter testé-jamais-prouvé
+hors D6/S-G2, Rust sans `unsafe`, fail-closed vu sur mutants (codes 66/67).
+S'y adosse RUSTSEC-2025-0134 (`rustls-pemfile` via `tlsn-tls-core`) — même
+régime, même échéance. Les deux vivent en `ignore` COMMENTÉ du deny.toml du
+compagnon, conformément à ADR-0012 D5 (« jamais un ignore silencieux »).*
+
+*15. **Doctrine deny-par-workspace** (énoncée une fois, pas trois précédents
+ad hoc) : chaque workspace porte SA configuration `deny.toml` ; la liste
+blanche RACINE reste fermée ; tout assouplissement vit dans le fichier du
+workspace qui le nécessite — écrit, daté, porté par ADR. Pour le compagnon
+(`adapters/shogen-tlsn-verify/deny.toml`, vérifié VERT le 2026-08-13,
+cargo-deny 0.20.2) : sources git épinglées autorisées (tlsn + fork
+rs-merkle), CC0-1.0 et CDLA-Permissive-2.0 admises (permissives — elles
+échouaient à la racine faute d'être listées, fait de configuration),
+`error[wildcard]` fermé SANS clause par contrainte de version exacte
+`=0.1.0-alpha.16-pre` au manifeste (appariement pré-release vérifié,
+`--locked` intact), et clause `clarify` sur `tlsn-attestation`
+(`MIT OR Apache-2.0`, l'intention déclarée au README amont, à la place du
+champ `license` manquant — mécanique vérifiée sur cargo-deny 0.20.2). Cet
+affaiblissement est celui que le motif 3 du rejet de la forme α refusait :
+**le périmètre a changé, pas la doctrine** — il couvre un adapter hors
+artefact de confiance, jamais le vérificateur. Gate CI :
+`.github/workflows/compagnon.yml` (build --locked, rejeu du constat à
+l'octet, trois mutants aux codes exacts, deny local — deux plateformes).*
+
+*16. **Résidu de démonstration nommé** : la clé de signature du notaire du
+conducteur de session est dérivée d'une graine publique en clair dans le
+code — c'est A(self-attestation) rendu matériel, l'affichage exact du pt 4.
+Si une passe ultérieure prétend à autre chose que la démonstration de
+forme, la gestion de clé du notaire devient un objet à part entière.)*
+
 ### Alternative considérée
 
 #### (a) Forme α — vérification embarquée dans `shogen-verifier`
