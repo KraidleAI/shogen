@@ -14,6 +14,7 @@ pub mod documents;
 pub mod exemple;
 pub mod manifeste;
 pub mod rapport;
+pub mod reproductible;
 pub mod roles;
 pub mod sg1;
 pub mod sg2;

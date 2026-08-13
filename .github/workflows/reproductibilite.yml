@@ -1,0 +1,113 @@
+# Double-build de reproductibilité — ADR-0012 D6, sur la cible ratifiée.
+#
+# Rattachement (G0) :
+#   - ADR-0012 D6 : cible bit-à-bit pour `shogen-verifier`, « Linux x86_64
+#     d'abord, Windows *à terme* et sans date », « contrôlée dès le walking
+#     skeleton par un double-build à environnement varié dont les empreintes
+#     sont comparées, gate bloquante (R-22 : pas d'advisory) ».
+#   - ADR-0012 D1 : construction verrouillée (`--locked`), portée par la
+#     commande elle-même.
+#   - ADR-0012 D2 : la toolchain est une dépendance de build — le job la
+#     VÉRIFIE au lieu de l'espérer, comme `squelette`.
+#   - ADR-0012 D7 / ADR-0010 point 8 : zéro autorité ambiante — permissions
+#     minimales déclarées ici, credentials de checkout non persistés, aucun
+#     secret, aucun droit de publier.
+#   - ADR-0013, point 1 : bloquante, aucun `continue-on-error`.
+#   - ADR-0013, point 5 : actions épinglées par SHA de commit. Aucune action
+#     nouvelle : le seul `uses:` est celui que `squelette` emploie déjà, au
+#     même SHA — un acteur de moins dans la chaîne.
+#
+# POURQUOI UN WORKFLOW SÉPARÉ, et non un job de `squelette` : `squelette`
+# tourne sur une matrice Windows + Linux, et le bit-à-bit n'est ratifié QUE
+# sur Linux. L'y ajouter imposerait un `if: matrix.os == 'ubuntu-latest'`,
+# c'est-à-dire une asymétrie de plateforme cachée dans une matrice qui promet
+# le contraire. Ici l'asymétrie est le nom du fichier, et le coût publié
+# d'ADR-0012 (« Asymétrie de plateforme publiée ») est lisible sans lire un
+# `if`.
+#
+# CADENCE, et son motif mesuré : push sur `main` ET pull request. Mesure du
+# 2026-08-13 sur x86_64-unknown-linux-gnu, toolchain 1.97.1 — copie des deux
+# arbres + deux constructions release de `shogen-verifier` : **5,8 s** de bout
+# en bout (`time cargo run -p xtask -- double-build`, binaire de 538 712
+# octets). Le coût de ce job est donc dans le checkout et l'installation de la
+# toolchain, pas dans le double-build : le repli « push sur main seulement »
+# qu'autorise ADR-0012 (« une construction supplémentaire par push ») n'a pas
+# lieu d'être payé aujourd'hui. S'il le devenait — le vérificateur grossit, des
+# dépendances entrent —, c'est la ligne `pull_request` qui saute, et le motif
+# s'écrit ici.
+
+name: reproductibilite
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Zéro autorité ambiante : rien d'autre que la lecture du dépôt.
+permissions:
+  contents: read
+
+concurrency:
+  group: reproductibilite-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  double-build:
+    name: double-build D6 (x86_64-unknown-linux-gnu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        # actions/checkout, épinglé par SHA de commit — tag v7.0.1, le même
+        # SHA que `squelette` (résolu le 2026-08-12 par
+        # `gh api repos/actions/checkout/tags`).
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        # Même bloc que `squelette` : la toolchain est une entrée du build
+        # (ADR-0012 D2), et un rapport de reproductibilité sous une toolchain
+        # non contrôlée ne dit rien.
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          echo "toolchain épinglée : ${TOOLCHAIN}"
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: La cible ratifiée est bien la cible hôte (aucune compilation croisée)
+        # Le double-build compare des octets : les faire produire par une
+        # chaîne croisée non déclarée changerait ce qui est mesuré sans le dire.
+        run: |
+          set -euo pipefail
+          HOTE="$(rustc -vV | sed -n 's/^host: //p')"
+          echo "cible hôte du runner : ${HOTE}"
+          if [ "${HOTE}" != "x86_64-unknown-linux-gnu" ]; then
+            echo "::error::cible hôte ${HOTE} != cible ratifiée x86_64-unknown-linux-gnu (ADR-0012 D6)"
+            exit 1
+          fi
+
+      - name: Double-build à environnement varié (6 variations, ADR-0012 D6)
+        # BLOQUANT. La commande imprime sa couverture (chaque variation :
+        # exercée, en substitut avec ce qu'il ne couvre pas, ou non exercée
+        # avec son motif) AVANT son verdict, puis les deux empreintes SHA-256.
+        # Sortie non nulle = les deux constructions ne donnent pas les mêmes
+        # octets, ou l'une d'elles n'a pas abouti (fail-closed).
+        run: |
+          cargo run --locked --package xtask -- double-build \
+            --cible x86_64-unknown-linux-gnu \
+            --base "${RUNNER_TEMP}/double-build"

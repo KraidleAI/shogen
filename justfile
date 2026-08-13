@@ -20,6 +20,16 @@ skeleton:
     cargo xtask muter target/lots/lot.cbor target/lots/lot-mute.cbor 0 255
     ! cargo run --locked --quiet --package shogen-verifier -- target/lots/lot-mute.cbor
 
+# Le double-build n'est PAS dans `verify` : il coûte deux constructions release
+# complètes, et sa cible ratifiée est Linux x86_64 seul. Il est bloquant là où
+# il est ratifié — .github/workflows/reproductibilite.yml. Sur Windows la
+# commande tourne quand même et dit ce qu'elle a pu varier : le bit-à-bit n'y
+# est pas la cible (ADR-0012 D6, « Windows à terme et sans date »).
+#
+# Deux constructions du vérificateur, 6 variations d'environnement entre elles, empreintes comparées (ADR-0012 D6).
+double-build:
+    cargo xtask double-build
+
 # S-G7, volets licences/bans/sources/advisories (exige cargo-deny installé).
 deny:
     cargo deny --locked check
