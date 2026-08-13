@@ -1,0 +1,69 @@
+# `shogen-tlsn-verify` — le binaire compagnon de vérification du transport.
+#
+# Rattachement (G0) :
+#   - ADR-0015 pt 7 : « Un binaire compagnon `shogen-tlsn-verify`, hors membres
+#     du workspace (comme `adapters/` l'est déjà), construit depuis l'amont
+#     épinglé par révision git exacte, exécute `Presentation::verify(
+#     &CryptoProvider)` et imprime un résultat structuré ».
+#   - ADR-0015 pt 8, amendement (f)/(g) : le constat porte l'identité de la clé
+#     de vérification et `connection_info.time`.
+#   - ADR-0001 : « les transports sont des adapters » — testé, jamais prouvé.
+#   - ADR-0015 pt 6 : `shogen-verifier` n'importe AUCUNE crate du transport.
+#     La séparation est mécanique ici : ce répertoire est un workspace
+#     INDÉPENDANT, avec son propre `Cargo.lock` ; le workspace racine ne le
+#     référence pas et ne peut donc pas hériter d'une seule de ses arêtes.
+#
+# `session/` est EXCLU de ce workspace (voir `exclude` ci-dessous) : le conducteur
+# de session tire tout l'amont MPC (prover + verifier), et sa fermeture polluerait
+# la mesure R-8 du compagnon, qui est le chiffre dû par ADR-0015. Le précédent est
+# celui de l'amont lui-même, qui exclut `crates/examples-zk` de son workspace pour
+# le même motif (manifeste amont, commentaire `exclude`).
+
+[package]
+name = "shogen-tlsn-verify"
+version = "0.0.0"
+description = "Compagnon de vérification TLSNotary : exécute Presentation::verify et imprime un constat structuré. Adapter (ADR-0001) — testé, jamais prouvé."
+edition = "2024"
+rust-version = "1.97"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+exclude = ["session"]
+
+[dependencies]
+# Amont TLSNotary épinglé par RÉVISION GIT EXACTE (ADR-0015 pt 7).
+# Le commit 0fe3c32d35382b3f290a43c4156399ca4512bb89 est la révision du corpus S3
+# (biblio/INDEX.md, pack T3 : les sources amont y sont versées sous le suffixe
+# `-g0fe3c32d`). Contrôle R-8 fait AVANT usage (phase A de S3, ré-instruit ici) :
+# les crates `tlsn*` N'EXISTENT PAS sur crates.io — la consommation git est le
+# seul chemin, et l'épinglage est donc par révision, pas par version de registre.
+#
+# La dépendance est `tlsn-attestation` et NON la crate parapluie `tlsn` :
+# `Presentation::verify` vit dans `tlsn-attestation` (l'exemple amont passe par
+# les ré-exports `tlsn::attestation::*`), et `tlsn` tire en plus toute la pile MPC
+# (mpz-*) dont la vérification n'a aucun besoin. Voir NOTES.md pour la mesure.
+tlsn-attestation = { git = "https://github.com/tlsnotary/tlsn", rev = "0fe3c32d35382b3f290a43c4156399ca4512bb89" }
+
+# Le format de sérialisation de la présentation amont : l'exemple officiel
+# `attestation_verify` lit la présentation par `bincode::deserialize`. La borne
+# `1.3` est celle du workspace amont (`bincode = { version = "1.3" }`) — l'API
+# `deserialize` libre est de la ligne 1.x ; la 2.x l'a remplacée.
+# Contrôle registre R-8 du 2026-08-13 (crates.io API) : bincode 1.3.3, licence
+# MIT, non yanked, 226 662 970 téléchargements de cette version.
+bincode = "1.3"
+
+# SHA-256 pour les contrôles (b) et (c) d'ADR-0015 pt 8.
+# Contrôle registre R-8 du 2026-08-13 (crates.io API) : sha2 0.10.9, licence
+# « MIT OR Apache-2.0 », non yanked, 331 752 307 téléchargements de cette version,
+# propriétaires `tarcieri`, `newpavlov`, `github:rustcrypto:hashes`.
+#
+# Pourquoi PAS `shogen-core::empreinte_sha256` (l'implémentation manuelle
+# d'ADR-0018) : le module `empreinte.rs` fonde explicitement son fail-closed sur
+# l'INDÉPENDANCE des deux implémentations — « toutes les comparaisons de
+# verification.rs se font contre des empreintes calculées hors de cette crate
+# (le constat du binaire compagnon) : un condensé faux d'un seul côté ne peut
+# produire qu'un refus ». Faire path-dépendre le compagnon du cœur détruirait
+# cette propriété : la même faute serait des deux côtés. La seconde
+# implémentation est le contrôle.
+sha2 = "0.10"

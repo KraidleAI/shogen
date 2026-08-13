@@ -1,0 +1,27 @@
+HTTP/1.1 200 OK
+Content-Type: application/json;charset=UTF-8
+Content-Length: 45
+Connection: close
+Date: Thu, 13 Aug 2026 04:10:29 GMT
+Access-Control-Allow-Methods: GET, HEAD, OPTIONS
+Server: nginx
+x-mbx-uuid: f2de93a1-d573-4543-8574-5af230782dd8
+x-mbx-used-weight: 7
+x-mbx-used-weight-1m: 7
+Strict-Transport-Security: max-age=31536000; includeSubdomains
+X-Frame-Options: SAMEORIGIN
+X-Xss-Protection: 1; mode=block
+X-Content-Type-Options: nosniff
+Content-Security-Policy: default-src 'self'
+X-Content-Security-Policy: default-src 'self'
+X-WebKit-CSP: default-src 'self'
+Cache-Control: no-cache, no-store, must-revalidate
+Pragma: no-cache
+Expires: 0
+Access-Control-Allow-Origin: *
+X-Cache: Miss from cloudfront
+Via: 1.1 bbacf7d4cb14ee5c151294924cf9ea4e.cloudfront.net (CloudFront)
+X-Amz-Cf-Pop: MAD56-P2
+X-Amz-Cf-Id: GEVZ7fmq_Tq1TJteKI0d18EFl8e7wUMmnYuNTt_U4-iasgbqIvt4eg==
+
+{"symbol":"BTCUSDT","price":"63643.21000000"}

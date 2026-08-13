@@ -1,0 +1,7 @@
+GET /api/v3/ticker/price?symbol=BTCUSDT HTTP/1.1
+host: api.binance.com
+accept: */*
+accept-encoding: identity
+connection: close
+user-agent: shogen-tlsn-session/0.0.0
+

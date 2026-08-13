@@ -1,0 +1,18 @@
+# Les deux workspaces de ce répertoire (le compagnon, et `session/`) sont
+# INDÉPENDANTS du workspace racine : la règle `/target/` du `.gitignore` racine
+# est ancrée à la racine et ne les couvre pas. Cette règle-ci est locale et
+# suffit, sans toucher au fichier racine — que d'autres unités de la passe
+# modifient en parallèle.
+#
+# Ce qui EST versionné ici, et doit le rester : les deux `Cargo.lock`
+# (ADR-0012 D1 — « le lockfile committé fait foi à la construction » ; sans eux
+# l'épinglage par révision git ne se rejoue pas), et `fixtures/` (ADR-0015 pt 7,
+# la vérification offline rejouable).
+target/
+
+# Les secrets de session ne sont JAMAIS versionnés : ils portent le transcript
+# complet et le matériel d'ouverture des engagements, et permettent de fabriquer
+# d'autres présentations depuis la même attestation. Motif écrit en
+# `fixtures/NOTES.md` §1. La règle est mécanique pour qu'un dépôt distrait ne
+# puisse pas la contourner.
+*.secrets.tlsn

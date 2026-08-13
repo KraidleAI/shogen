@@ -1,0 +1,62 @@
+# `shogen-tlsn-session` — le conducteur de la session attestée réelle.
+#
+# Rattachement (G0) :
+#   - ADR-0015 pt 2 : la forme retenue est le **mode Notary** (attestation →
+#     présentation), et non le mode Verifier direct.
+#   - ADR-0015 pt 3 : « Le rôle de Notary est joué par un processus opéré par
+#     Shōgen, construit depuis la bibliothèque amont épinglée — et non par un
+#     service hébergé » (le serveur notaire amont est déprécié depuis alpha.13).
+#     Ici, les deux rôles sont deux tâches d'un même processus local, reliées
+#     par un tube en mémoire : c'est le montage « Verifier acting as Attestor »
+#     du Rust Quick Start amont, dans sa forme la plus dépouillée.
+#   - ADR-0015 pt 4 : le résidu de ce montage est A(self-attestation) — il est
+#     nommé, aggravé, et écrit dans le verdict. Ce fichier ne l'atténue pas.
+#   - ADR-0001 : adapter — testé, jamais prouvé.
+#
+# **Workspace INDÉPENDANT** (`[workspace]` ci-dessous), exclu du workspace du
+# compagnon : le conducteur tire toute la pile MPC de l'amont, et sa fermeture
+# n'a pas à peser sur la mesure R-8 du compagnon, qui est le chiffre dû par
+# ADR-0015. La séparation est mécanique, pas déclarative.
+
+[package]
+name = "shogen-tlsn-session"
+version = "0.0.0"
+description = "Conduit UNE session MPC-TLS attestée (Notary auto-hébergé en bibliothèque) contre une source réelle du pool S2, et produit attestation, secrets et présentation."
+edition = "2024"
+rust-version = "1.97"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[dependencies]
+# Même révision git EXACTE que le compagnon (ADR-0015 pt 7) : l'attestation
+# produite ici et la vérification conduite là-bas parlent du même format.
+tlsn = { git = "https://github.com/tlsnotary/tlsn", rev = "0fe3c32d35382b3f290a43c4156399ca4512bb89", features = [
+    "mozilla-certs",
+] }
+tlsn-formats = { git = "https://github.com/tlsnotary/tlsn", rev = "0fe3c32d35382b3f290a43c4156399ca4512bb89" }
+
+# Versions alignées sur le workspace amont épinglé (manifeste racine amont), afin
+# que la résolution ne soulève pas deux copies d'une même bibliothèque.
+bincode = "1.3"
+futures = "0.3"
+http-body-util = "0.1"
+hyper = { version = "1.6", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["full"] }
+k256 = { version = "0.13", features = ["ecdsa"] }
+# Dérivation de la graine de la clé du notaire (voir l'avertissement en tête de
+# `src/main.rs`). Même contrôle registre R-8 que pour le compagnon.
+sha2 = "0.10"
+tokio = { version = "1", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "io-std",
+    "io-util",
+    "fs",
+] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

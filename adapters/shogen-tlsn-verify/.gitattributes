@@ -1,0 +1,17 @@
+# Les fixtures sont des OCTETS, jamais du texte — et la distinction n'est pas
+# théorique ici : elle a été mesurée le 2026-08-13, avant le premier commit.
+#
+# `shogen-s3-binance.recv-revele.bin` porte 26 séquences CRLF et 0 LF isolé
+# (944 octets) ; `…sent-revele.bin` en porte 7 (173 octets) — c'est du HTTP, et
+# le HTTP finit ses lignes en CRLF. La machine qui écrit ces lignes a
+# `core.autocrlf = true` (mesuré : `git config --show-origin core.autocrlf` rend
+# `file:C:/Program Files/Git/etc/gitconfig  true`). Sans la règle ci-dessous,
+# git classerait ces fichiers comme du texte, retirerait les CR au versement, et
+# **toute** copie fraîchement clonée porterait 918 et 166 octets au lieu de 944
+# et 173. Leur sha256 cesserait de valoir — donc `empreinte_recv_revele_sha256`
+# du constat ne lierait plus rien, et la propriété « vérification offline
+# rejouable » de `fixtures/NOTES.md` §2 serait fausse pour quiconque clone.
+#
+# La liaison hash d'ADR-0005 règle 1 porte sur « les octets exacts » : un
+# filtre de fin de ligne est précisément ce qu'elle interdit.
+fixtures/** -text -diff
