@@ -272,11 +272,19 @@ pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
     // un run non propre qui n'a mesuré aucun mutant n'a pas de verdict.
     let run_propre = statut.success();
 
-    let tues = lire_liste(&sortie.join("caught.txt"))?.len();
-    let mut survivants = lire_liste(&sortie.join("missed.txt"))?;
-    survivants.extend(lire_liste(&sortie.join("timeout.txt"))?);
+    // Quand le diff n'engendre AUCUN mutant, cargo-mutants imprime « No
+    // mutants to filter », sort en 0 et n'écrit AUCUN fichier de sortie —
+    // pas même vides (mesuré au premier run réel de la gate, CI
+    // 31697390467 : la pousse ne touchait pas shogen-core et le fail-closed
+    // « fichier absent = erreur » a classé rouge un cas légitime). Les
+    // fichiers absents ne valent donc « listes vides » QUE sur un run
+    // propre ; sur un run non propre, l'absence reste une erreur — c'est un
+    // run interrompu.
+    let tues = lire_liste_ou_vide(&sortie.join("caught.txt"), run_propre)?.len();
+    let mut survivants = lire_liste_ou_vide(&sortie.join("missed.txt"), run_propre)?;
+    survivants.extend(lire_liste_ou_vide(&sortie.join("timeout.txt"), run_propre)?);
     survivants.sort();
-    let non_viables = lire_liste(&sortie.join("unviable.txt"))?.len();
+    let non_viables = lire_liste_ou_vide(&sortie.join("unviable.txt"), run_propre)?.len();
 
     if !run_propre && tues == 0 && survivants.is_empty() && non_viables == 0 {
         return Err(format!(
@@ -314,6 +322,18 @@ pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
 /// Un fichier absent est une **erreur** : `cargo-mutants` les écrit tous les
 /// quatre, même vides. Absent veut dire que l'outil n'a pas tourné jusqu'au
 /// bout, et un score calculé sur un run interrompu est un faux.
+/// `lire_liste`, sauf que l'ABSENCE du fichier vaut liste vide sur un run
+/// PROPRE (code 0) : c'est le comportement documenté par la mesure de
+/// cargo-mutants 27.1.0 quand le diff n'engendre aucun mutant — il n'écrit
+/// rien du tout. Sur un run non propre, l'absence reste l'erreur de
+/// `lire_liste` : un run interrompu n'a pas de listes.
+fn lire_liste_ou_vide(chemin: &Path, run_propre: bool) -> Result<Vec<String>, String> {
+    if run_propre && !chemin.exists() {
+        return Ok(Vec::new());
+    }
+    lire_liste(chemin)
+}
+
 fn lire_liste(chemin: &Path) -> Result<Vec<String>, String> {
     let texte = std::fs::read_to_string(chemin).map_err(|erreur| {
         format!(

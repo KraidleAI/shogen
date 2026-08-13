@@ -422,12 +422,18 @@ jobs:
         # installation le 2026-08-13 (docs/R-8-outillage.md).
         run: |
           set -euo pipefail
+          # `cargo install` CONSTRUIT déjà le runtime AFL++ pour la toolchain
+          # active — mesuré au premier run réel (31697390565) : un
+          # `cargo afl config --build` derrière panique sur « AFL LLVM runtime
+          # was already built » (la mesure locale passait parce qu'elle
+          # portait `--force`, jamais recopié ici — l'écart entre la commande
+          # mesurée et la commande écrite était le défaut). Sur un runner
+          # neuf, l'installation suffit ; la version d'AFL++ compilée
+          # s'imprime par `cargo afl --version` ci-dessous (constaté au même
+          # run : « cargo-afl 0.18.2 (AFL++ version 4.40c) ») et se re-lit
+          # après campagne dans fuzzer_stats (clé afl_version).
           cargo install cargo-afl --version =0.18.2 --locked
           cargo afl --version
-          # La version d'AFL++ réellement compilée s'imprime dans ce journal
-          # (et se re-lit après campagne dans fuzzer_stats, clé afl_version —
-          # c'est la commande qui fonde le chiffre du tableau de fuzz/README.md).
-          cargo afl config --build
 
       - name: Deny du workspace fuzz (configuration locale, ADR-0015 pt 15)
         # BLOQUANTE de la revue G2 du chantier : un deny.toml que la CI
