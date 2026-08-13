@@ -158,10 +158,10 @@ Mesure du 2026-08-13 (`cargo test --locked -- --nocapture`, sortie copiée) :
 ```
 ── compte d'itérations du typeur, mesuré ──
   cas acceptés (réels)      : 2
-  cas de refus              : 51
+  cas de refus              : 52
   cas générés (3 propriétés × 1000) : 3000
-  TOTAL MESURÉ              : 3053
-  déclaré (identite::COMPTE_D_ITERATIONS) : 3053
+  TOTAL MESURÉ              : 3054
+  déclaré (identite::COMPTE_D_ITERATIONS) : 3054
 ```
 
 Ce que le compte **n'est pas** : un total sur toute la suite. Les autres
@@ -176,8 +176,8 @@ Portée dans le fait, jamais dans le témoignage (03 §3) :
 |---|---|
 | nom | `shogen-typer` (du manifeste, `env!("CARGO_PKG_NAME")`) |
 | version | `0.1.0` (du manifeste, `env!("CARGO_PKG_VERSION")`) |
-| empreinte de la logique | `f75d28ad6177744dd196a4024d0d5c5ab2585184217e44a88fa9233648ed5980` — mesurée le 2026-08-13 |
-| compte d'itérations | `3053` — mesuré (§5) |
+| empreinte de la logique | `3ce5a84a5256b51c4cfd825ae390b27f8492e86a755d7b0c046df860ab08efbb` — mesurée le 2026-08-13 (re-mesurée après la correction de la revue G2 vague 1 : le diagnostic NotationScientifique ne se lève plus que sur une forme numérique bien formée) |
+| compte d'itérations | `3054` — mesuré (§5) |
 
 L'empreinte est un **SHA-256** (celui du cœur, ADR-0018) sur les sept fichiers de
 `src/`, embarqués par `include_str!`, dans l'ordre trié des chemins, avec cadrage
@@ -236,7 +236,7 @@ voit aucune arête nouvelle. L'arête `adapter → shogen-core` est le sens perm
 | binaire | tests | ce qu'il tient |
 |---|---|---|
 | `typage.rs` | 6 | les deux dires réels Coinbase typés champ par champ ; reconstruction à l'identique ; le fait cite son typeur ; le `subject` épinglé satisfait le prédicat du cœur ; impression du fait entier |
-| `refus.rs` | 3 | les **51** cas de refus, chacun asserté sur **sa variante exacte** (jamais `is_err()`) ; stabilité au rejeu |
+| `refus.rs` | 3 | les **52** cas de refus, chacun asserté sur **sa variante exacte** (jamais `is_err()`) ; stabilité au rejeu |
 | `analyseur.rs` | 12 | les chemins que le dire Coinbase ne visite pas : échappements, paire de substituts UTF-16, lexèmes de nombres verbatim, blancs, homonyme imbriqué |
 | `proprietes.rs` | 3 | (a) totalité sur octets quelconques ; (b) fidélité de la forme décimale ; (c) jamais d'altération silencieuse |
 | `compte.rs` | 1 | le compte déclaré est celui qui est mesuré |
@@ -249,7 +249,7 @@ Distributions imprimées avant verdict (patron ADR-0011 obligation 2), mesure du
 (a) totalité — cas : 1000, non vides : 991 (99.1 %), non UTF-8 : 977, acceptés : 0
 (b) fidélité — cas : 1000, avec fraction : 944 (94.4 %), négatifs : 507
 (c) altération — cas : 1000, refusés : 980 (98.0 %), acceptés : 20
-cas de refus : 51 au total, dont 13 sur dire réel
+cas de refus : 52 au total, dont 13 sur dire réel (le 52e — lexème non numérique porteur d'un « e » — vient de la revue G2 vague 1)
 ```
 
 Graine déterministe (`RngAlgorithm::ChaCha`), persistance de régression

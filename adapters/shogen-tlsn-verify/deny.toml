@@ -48,6 +48,10 @@ include-dev = true
 # (fait de configuration, pas de licence : CC0-1.0 est une renonciation,
 # CDLA-Permissive-2.0 est permissive — elles échouaient à la racine parce que
 # non LISTÉES, la liste ayant été écrite pour le graphe du dépôt principal).
+# Les entrées racine non rencontrées dans CE graphe (cargo-deny avertit sur
+# Zlib) sont gardées VOLONTAIREMENT : la doctrine est « racine + ajouts
+# nommés », pas une liste taillée par graphe — une liste par graphe dériverait
+# à chaque bump amont. (Entrée OpenSSL retirée après mesure : décorative.)
 allow = [
     "Apache-2.0",
     "MIT",

@@ -7,9 +7,14 @@
 //! # Ce que ce fichier est
 //!
 //! La première mesure du score de mutation du cœur a été faite le 2026-08-13
-//! (`cargo-mutants` 27.1.0, 417 mutants générés) et a laissé **34 survivants**.
-//! Chacun a été trié à la main. Ceux qui sont **tuables** le sont ici : chaque
-//! test nomme le mutant qu'il tue et le fait qui le tue. Ceux qui sont
+//! (`cargo-mutants` 27.1.0, 417 mutants générés) et a laissé **34 survivants**
+//! (351 tués, 32 non viables — trace : rapport du chantier G, JOURNAL du
+//! 2026-08-13). Cette première mesure était NON REJOUABLE (course du
+//! répertoire temporaire à chemin fixe, corrigée le même jour) : ses comptes
+//! ne se réconcilient donc pas arithmétiquement avec l'état re-mesuré de
+//! `survivants.txt` (22 lignes) — la population a bougé entre les mesures.
+//! Chacun des 34 a été trié à la main. Ceux qui sont **tuables** le sont ici :
+//! chaque test nomme le mutant qu'il tue et le fait qui le tue. Ceux qui sont
 //! **équivalents** — aucune entrée du programme ne les distingue — sont
 //! justifiés en une ligne dans `crates/shogen-core/survivants.txt`, avec leur
 //! démonstration.

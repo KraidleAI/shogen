@@ -238,7 +238,7 @@ pub fn executer(plan: &Plan) -> Result<Rapport, String> {
             let index = if graines.is_empty() {
                 0
             } else {
-                (generateur.suivant() as usize) % graines.len()
+                (generateur.suivant() % (graines.len() as u64)) as usize
             };
             tampon.clear();
             if let Some((_, base)) = graines.get(index) {
@@ -569,33 +569,33 @@ fn muter(tampon: &mut Vec<u8>, generateur: &mut SplitMix64) {
         let longueur = tampon.len();
         match generateur.suivant() % 5 {
             0 => {
-                let index = (generateur.suivant() as usize) % longueur;
+                let index = (generateur.suivant() % (longueur as u64)) as usize;
                 let bit = 1u8 << (generateur.suivant() % 8);
                 if let Some(case) = tampon.get_mut(index) {
                     *case ^= bit;
                 }
             }
             1 => {
-                let index = (generateur.suivant() as usize) % longueur;
+                let index = (generateur.suivant() % (longueur as u64)) as usize;
                 let valeur = generateur.suivant() as u8;
                 if let Some(case) = tampon.get_mut(index) {
                     *case = valeur;
                 }
             }
             2 => {
-                let garde = (generateur.suivant() as usize) % longueur;
+                let garde = (generateur.suivant() % (longueur as u64)) as usize;
                 tampon.truncate(garde);
             }
             3 => {
-                let combien = 1 + ((generateur.suivant() as usize) % 8);
+                let combien = 1 + (generateur.suivant() % 8) as usize;
                 for _ in 0..combien {
                     tampon.push(generateur.suivant() as u8);
                 }
             }
             _ => {
-                let coupe = (generateur.suivant() as usize) % longueur;
+                let coupe = (generateur.suivant() % (longueur as u64)) as usize;
                 let queue: Vec<u8> = tampon.split_off(coupe);
-                let repetitions = 1 + ((generateur.suivant() as usize) % 3);
+                let repetitions = 1 + (generateur.suivant() % 3) as usize;
                 for _ in 0..repetitions {
                     tampon.extend_from_slice(&queue);
                 }
@@ -617,7 +617,10 @@ fn muter(tampon: &mut Vec<u8>, generateur: &mut SplitMix64) {
 /// **quatre lignes d'arithmétique** ferait payer un acteur de chaîne
 /// d'approvisionnement de plus à l'outillage qui contrôle cette chaîne. Les
 /// constantes sont celles de l'algorithme ; le rejeu est exact à graine égale,
-/// sur toute plateforme, parce que tout y est en `wrapping_*`.
+/// sur toute plateforme, parce que tout y est en `wrapping_*` sur `u64` ET
+/// que toute réduction se fait AVANT le cast en `usize` (revue G2 vague 1 :
+/// `u64 as usize` tronque sur une cible 32 bits, et tronquer avant le modulo
+/// changeait l'index tiré — le rejeu inter-plateformes en dépend).
 struct SplitMix64 {
     etat: u64,
 }

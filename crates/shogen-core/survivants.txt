@@ -12,7 +12,16 @@
 #
 # Un survivant TUABLE n'a rien à faire ici : il se tue par un test, dans
 # `crates/shogen-core/tests/mutation_programme.rs`. Quatorze l'ont été le
-# 2026-08-13, sur les 34 survivants de la première mesure.
+# 2026-08-13, sur les 34 survivants de la PREMIÈRE mesure (417 générés,
+# 351 tués, 34 survivants, 32 non viables — score 91,1688 % ; trace : le
+# rapport du chantier G au JOURNAL du 2026-08-13). Cette première mesure
+# était NON REJOUABLE — la course du répertoire temporaire à chemin fixe,
+# décrite plus bas, faisait basculer des issues d'un run à l'autre — donc
+# 34 − 14 ne DOIT PAS se réconcilier arithmétiquement avec les 22 lignes
+# ci-dessous : la population de survivants a bougé entre les deux mesures
+# (exemple tracé : subject.rs:522:17, compté survivant au premier run, tué
+# au second). Seul l'état re-mesuré après le correctif fait foi (revue G2
+# vague 1 : un chiffre qui ne se rattache pas à sa mesure ne se copie pas).
 #
 # ÉTAT MESURÉ ET REJOUABLE (2026-08-13, `cargo xtask mutation`, cargo-mutants
 # 27.1.0, parallélisme 4) : 417 mutants générés, 363 tués, 22 survivants, 32

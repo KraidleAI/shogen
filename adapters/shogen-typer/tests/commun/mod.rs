@@ -421,6 +421,17 @@ fn corpus_de_refus_construit() -> Vec<CasDeRefus> {
             dire: b"{\"price\":\"6.447575e4\",\"time\":\"2026-08-05T16:11:21Z\"}",
             refus: decimale(ErreurDecimale::NotationScientifique { position: 8 }),
         },
+        // Un lexème non numérique porteur d'un « e » n'est PAS de la notation
+        // scientifique : le diagnostic doit dire vrai (revue G2 vague 1 —
+        // l'ancien balayage global rendait NotationScientifique sur
+        // « unavailable », un diagnostic qui apprenait quelque chose de faux).
+        CasDeRefus {
+            nom: "lexème non numérique porteur d'un e",
+            origine: Origine::Construit,
+            subject: SUBJECT_EPINGLE,
+            dire: b"{\"price\":\"unavailable\",\"time\":\"2026-08-05T16:11:21Z\"}",
+            refus: decimale(ErreurDecimale::ChiffreAttendu { position: 0 }),
+        },
         CasDeRefus {
             nom: "séparateur de milliers",
             origine: Origine::Construit,

@@ -1776,7 +1776,11 @@ session réelle conduite, la mesure R-8 définitive rendue ; consultation
 R-26 routée à l'ADVISOR et adjugée par l'orchestrateur. Cinq points :*
 
 *12. **Le compte définitif de la forme β est mesuré** : 96 paquets tiers au
-graphe normal du compagnon (cible hôte, name+version uniques), 123 blocs au
+graphe normal du compagnon (cible hôte **x86_64-unknown-linux-gnu** — la
+mesure a été prise sous WSL2, environnement déclaré en tête de MESURE-R8.md ;
+sous Windows le même compte rend 95, le paquet d'écart étant `libc`, re-mesure
+de la revue G2 vague 1 — les deux chiffres sont vrais chacun sur sa cible,
+name+version uniques), 123 blocs au
 lock, 4 crates git-épinglées — contre 267 paquets pour le conducteur de
 session, qui tire la crate parapluie `tlsn` entière : la vérification n'a
 besoin que de `tlsn-attestation`, le protocole MPC pèse les deux tiers du

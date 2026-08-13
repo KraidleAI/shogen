@@ -105,10 +105,11 @@ fn main() -> std::process::ExitCode {
 ///
 /// Tous les codes de ce binaire tiennent dans un `u8` (0, 2, 3, 4, 64, 65, 66)
 /// et la conversion est donc exacte. Le bras d'échec n'est pas mort pour
-/// autant : il est ce qui garantit qu'un code futur hors plage devienne un
-/// refus visible plutôt qu'un silencieux modulo 256 — un verdict tronqué qui
-/// se lirait comme un autre verdict serait exactement la faute qu'un
-/// vérificateur fail-closed ne peut pas commettre (ADR-0010 point 5).
+/// autant : il rend un code futur hors plage visible à l'exécution (refus
+/// imprimé, sortie 64) plutôt qu'un modulo 256 silencieux — rien ne
+/// l'établit à la compilation. Un verdict tronqué qui se lirait comme un
+/// autre verdict serait exactement la faute qu'un vérificateur fail-closed
+/// ne peut pas commettre (ADR-0010 point 5).
 fn octet_de_sortie(code: i32) -> u8 {
     match u8::try_from(code) {
         Ok(octet) => octet,

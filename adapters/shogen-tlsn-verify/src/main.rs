@@ -141,6 +141,18 @@ fn lire_options(arguments: &[String]) -> Result<Options, Echec> {
                         format!("{argument} attend un chemin. {USAGE}"),
                     ));
                 };
+                // Une option qui suit immédiatement n'est pas une valeur :
+                // sans ce refus, `--ecrire-recv --ecrire-sent chemin` avalait
+                // `--ecrire-sent` comme chemin et le diagnostic accusait
+                // l'argument suivant (revue G2 vague 1). Un chemin réel
+                // commençant par `--` reste atteignable par `./--nom`.
+                if valeur.starts_with("--") {
+                    return Err(Echec::nouveau(
+                        code::USAGE,
+                        "option_sans_valeur",
+                        format!("{argument} attend un chemin, pas l'option {valeur}. {USAGE}"),
+                    ));
+                }
                 if argument == "--ecrire-recv" {
                     ecrire_recv = Some(valeur.clone());
                 } else {
@@ -176,6 +188,22 @@ fn lire_options(arguments: &[String]) -> Result<Options, Echec> {
             USAGE.to_string(),
         ));
     };
+
+    // Deux options d'écriture vers le même chemin : le second dépôt écraserait
+    // silencieusement le premier et l'opérateur croirait détenir les octets
+    // reçus en détenant la requête (revue G2 vague 1). Refus avant toute I/O.
+    if let (Some(recv), Some(sent)) = (&ecrire_recv, &ecrire_sent)
+        && recv == sent
+    {
+        return Err(Echec::nouveau(
+            code::USAGE,
+            "chemins_de_sortie_identiques",
+            format!(
+                "--ecrire-recv et --ecrire-sent désignent le même chemin ({recv}) : \
+                 le second écraserait le premier. {USAGE}"
+            ),
+        ));
+    }
 
     Ok(Options {
         presentation,
@@ -262,6 +290,26 @@ fn executer(arguments: &[String]) -> Result<String, Echec> {
                  la totalité des octets reçus, sans remplissage",
                 recus_authentifies,
                 octets_recus.len()
+            ),
+        ));
+    }
+
+    // Garde SYMÉTRIQUE côté envoyé (revue G2 vague 1, trouvaille majeure ;
+    // ADR-0015 pt 13 pose le refus sur la divergence authentifié/longueur
+    // pour les six longueurs, sans restreindre le sens). Sans elle,
+    // `empreinte_sent_revele_sha256` pourrait hacher un tampon dont les
+    // plages rédigées sont du remplissage 0x00 (l'amont remplit les
+    // positions non authentifiées à la désérialisation) — une empreinte
+    // nommée « revele » qui ne lierait aucun octet révélé.
+    if envoyes_authentifies != octets_envoyes.len() {
+        return Err(Echec::nouveau(
+            code::CONSTAT_INCOMPLET,
+            "octets_envoyes_non_authentifies",
+            format!(
+                "{} octets envoyés sur {} sont authentifiés : l'empreinte du sens \
+                 envoyé exige la totalité des octets envoyés, sans remplissage",
+                envoyes_authentifies,
+                octets_envoyes.len()
             ),
         ));
     }

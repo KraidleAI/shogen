@@ -72,9 +72,13 @@ jobs:
           diff constat-runner.json fixtures/shogen-s3-binance.constat.json
           echo "constat identique à l'octet."
 
-      - name: Rejeu — les trois mutants sortent non-zéro
+      - name: Rejeu — les trois mutants sortent non-zéro, au constat exact
         # « Un vérificateur qui n'a jamais rejeté n'a rien montré » (13 §1).
-        # Codes attendus, mesurés le 2026-08-13 : 67 / 66 / 67.
+        # Codes attendus, mesurés le 2026-08-13 : 67 / 66 / 67 — ET constat
+        # de refus identique à l'octet à la fixture committée : deux motifs
+        # différents vivent sous le même code 67, et un mutant qui échoue
+        # pour le mauvais motif ne démontre plus ce pour quoi il a été semé
+        # (revue G2 vague 1).
         run: |
           set -euo pipefail
           declare -A attendu=(
@@ -84,12 +88,14 @@ jobs:
           )
           for mutant in "${!attendu[@]}"; do
             code=0
-            cargo run --locked --release --quiet -- "fixtures/${mutant}.tlsn" >/dev/null 2>&1 || code=$?
+            cargo run --locked --release --quiet -- "fixtures/${mutant}.tlsn" \
+              >/dev/null 2> "refus-${mutant}.json" || code=$?
             if [ "${code}" -ne "${attendu[$mutant]}" ]; then
               echo "::error::${mutant} : code ${code}, attendu ${attendu[$mutant]}"
               exit 1
             fi
-            echo "${mutant} : refusé code ${code} (attendu)."
+            diff "refus-${mutant}.json" "fixtures/${mutant}.constat.json"
+            echo "${mutant} : refusé code ${code}, constat identique à l'octet."
           done
 
       - name: Outil deny — cargo-deny, version exacte

@@ -7,7 +7,20 @@
 //! tests-là s'écrivent MAINTENANT ». Régions visées, relevées au rapport
 //! llvm-cov du 2026-08-13 : `tete_hexadecimale` (l. 291+),
 //! `premiere_divergence` (l. 303+), le refus de doublon d'`analyser_registre`
-//! (l. 172+), et la branche `NonCanonique` d'`examiner_lot` (l. 125+).
+//! (l. 172+).
+//!
+//! La branche `NonCanonique` d'`examiner_lot` (l. 125+) n'est PAS couverte
+//! ici, et ne peut pas l'être aujourd'hui : son inatteignabilité est
+//! ÉTABLIE PAR LA MESURE, pas supposée (revue G2 vague 1) — le décodeur
+//! canonique refuse toute forme qui n'est pas la sienne, donc tout octet
+//! décodé se ré-encode identique. Trois mesures indépendantes concordent :
+//! 678 528 272 cas de fuzz (classe « décodés-non-canoniques » = 0),
+//! la campagne de corroboration du réviseur (15 314 192 cas, même classe
+//! à 0), et le balayage exhaustif des 98 685 mutations d'un octet de
+//! `dirigee-lot-canonique.bin` (0 `NonCanonique`). La branche est un
+//! fail-safe contre un défaut FUTUR du décodeur : elle se garde, elle ne
+//! se couvre pas — même famille que les survivants « équivalents au
+//! programme » de `survivants.txt`.
 
 use shogen_verifier::{Examen, analyser_registre, premiere_divergence, tete_hexadecimale};
 
@@ -76,18 +89,21 @@ fn registre_sans_doublon_rend_les_identifiants_dans_l_ordre() {
 }
 
 #[test]
-fn lot_non_canonique_est_nomme_avec_longueurs_et_divergence() {
-    // Un lot qui décode mais ne se ré-encode pas à l'octet près : la variante
-    // `NonCanonique` porte les deux longueurs et la position — le refus se
-    // diagnostique sans outil tiers. On le construit en ré-encodant un lot
-    // valide d'exemple puis en le suffixant d'un octet que le décodeur CBOR
-    // tolérerait mal — à défaut, un CBOR canonique connu du corpus de fuzz.
+fn temoin_la_branche_non_canonique_est_un_fail_safe_inatteignable() {
+    // TÉMOIN, pas couverture : ce test documente et surveille l'argument
+    // d'inatteignabilité du doc de module — le décodeur canonique refuse
+    // toute forme qui n'est pas la sienne, donc une graine du corpus est
+    // soit refusée, soit décodée-et-ré-encodée à l'identique, jamais
+    // `NonCanonique`. Si ce témoin casse un jour, le décodeur a changé de
+    // régime et la branche DOIT alors être couverte par un vrai test qui
+    // assère ses trois champs.
     let canonique = std::fs::read("fuzz-corpus/dirigee-lot-exemple.bin")
         .or_else(|_| std::fs::read("../shogen-verifier/fuzz-corpus/dirigee-lot-exemple.bin"))
         .expect("graine dirigée du corpus de fuzz présente au dépôt");
-    // Contrôle du témoin : la graine elle-même est canonique ou refusée —
-    // dans les deux cas, PAS `NonCanonique`.
     if let Examen::NonCanonique { .. } = shogen_verifier::examiner_lot(&canonique) {
-        panic!("la graine du corpus ne doit pas être non-canonique");
+        panic!(
+            "la graine du corpus est devenue non-canonique : le décodeur a changé \
+             de régime — couvrir la branche NonCanonique avec ses trois champs"
+        );
     }
 }

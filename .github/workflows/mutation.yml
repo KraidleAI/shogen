@@ -53,6 +53,13 @@ name: mutation
 
 on:
   pull_request:
+  # Le dépôt travaille aussi par pousses directes sur main (44 commits, zéro
+  # merge au 2026-08-13) : sans déclencheur push, le job de budget ne
+  # s'exécutait JAMAIS et la page d'un commit affichait des contrôles verts
+  # sans qu'aucune mutation n'ait tourné — jusqu'à 23 h de vert affiché sur
+  # un arbre potentiellement rouge (revue G2 vague 1).
+  push:
+    branches: [main]
   schedule:
     # Nightly, 03:17 UTC — une heure creuse et non ronde : les minutes rondes
     # sont les plus encombrées de l'ordonnanceur GitHub, et un job décalé
@@ -126,6 +133,54 @@ jobs:
 
       - name: Mutation du diff (cœur seul)
         run: cargo run --locked --package xtask -- mutation --in-diff "${RUNNER_TEMP}/pr.diff"
+
+  # ── Pousse directe sur main : mutation de la plage poussée (revue G2 v1) ───
+  # Même régime de budget que la PR : `--in-diff` sur ce que la pousse a
+  # changé. Repli fail-closed : si la plage n'est pas calculable (pousse
+  # forcée, `before` nul), le run COMPLET est joué — coût assumé plutôt que
+  # silence. La dérive hors diff reste au nightly complet.
+  push:
+    name: mutation de la pousse (diff before..sha)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+
+      - name: Outil — cargo-mutants, version exacte (R-8 fait, ADR-0012 D5)
+        run: cargo install cargo-mutants --locked --version 27.1.0
+
+      - name: Mutation de la plage poussée (repli — run complet)
+        run: |
+          set -euo pipefail
+          AVANT="${{ github.event.before }}"
+          if [ -n "${AVANT}" ] && [ "${AVANT}" != "0000000000000000000000000000000000000000" ] \
+             && git cat-file -e "${AVANT}" 2>/dev/null; then
+            git diff "${AVANT}..${{ github.sha }}" > "${RUNNER_TEMP}/pousse.diff"
+            echo "diff de $(wc -l < "${RUNNER_TEMP}/pousse.diff") ligne(s) (${AVANT}..${{ github.sha }})"
+            cargo run --locked --package xtask -- mutation --in-diff "${RUNNER_TEMP}/pousse.diff"
+          else
+            echo "plage non calculable (before absent ou inconnu) : run complet"
+            cargo run --locked --package xtask -- mutation
+          fi
 
   # ── Run complet, nightly, non-régression bloquante (ADR-0011 seuils 3 et 4) ─
   nightly:

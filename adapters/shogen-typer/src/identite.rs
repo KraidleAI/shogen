@@ -45,7 +45,7 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Le compte d'itérations de ce typeur : nombre d'exécutions sur le corpus de
 /// la passe. **Mesuré** par `tests/compte.rs`, qui échoue si ce nombre ment.
-pub const COMPTE_D_ITERATIONS: u64 = 3_053;
+pub const COMPTE_D_ITERATIONS: u64 = 3_054;
 
 /// Les fichiers qui **sont** la logique du typeur, dans un ordre fixe (celui
 /// des chemins, trié). Embarqués à la compilation : l'empreinte porte sur ce

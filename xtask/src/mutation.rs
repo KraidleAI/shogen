@@ -89,6 +89,11 @@ pub struct Rapport {
     pub base_non_revue: Vec<String>,
     /// Vrai si l'exécution portait sur un diff seul (budget de PR).
     pub sur_diff: bool,
+    /// Vrai si `cargo-mutants` a rendu le code 0 : le run a conclu proprement.
+    /// C'est la seule condition sous laquelle « zéro mutant mesuré » peut être
+    /// un état légitime (diff de documentation) et non un run effondré
+    /// (revue G2 vague 1 — la famille « vert à vide »).
+    pub run_propre: bool,
 }
 
 impl Rapport {
@@ -113,16 +118,19 @@ impl Rapport {
     /// d'une ligne peut n'engendrer que des mutants difficiles, et un score
     /// calculé sur trois mutants ne dit rien. Ce qui s'applique toujours,
     /// c'est la non-régression — c'est elle que la PR doit tenir.
+    ///
+    /// Fail-closed sur l'absence de mesure (revue G2 vague 1) : un score
+    /// absent n'est un vert QUE sur un diff dont le run a conclu proprement
+    /// (`run_propre` — diff de documentation, zéro mutant engendré, code 0
+    /// de l'outil). Partout ailleurs, l'absence de score est un refus de
+    /// conclure, jamais un vert.
     pub fn vert(&self) -> bool {
         if !self.regressions.is_empty() {
             return false;
         }
-        if self.sur_diff {
-            return true;
-        }
         match self.score() {
-            Some(score) => score >= PLANCHER,
-            None => false,
+            Some(score) => self.sur_diff || score >= PLANCHER,
+            None => self.sur_diff && self.run_propre,
         }
     }
 
@@ -207,7 +215,20 @@ impl Rapport {
 /// défaut.
 pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
     let base = charger_ligne_de_base(racine)?;
-    let sortie = racine.join("mutants.out");
+    // Répertoire de sortie NEUF par exécution (revue G2 vague 1) : la gate ne
+    // peut plus consommer la sortie périmée d'un run antérieur comme si elle
+    // était la mesure du jour — une sortie d'hier est illisible par
+    // construction, pas par discipline. Sous target/, donc hors dépôt.
+    let sortie_racine = racine
+        .join("target")
+        .join(format!("mutants-run-{}", std::process::id()));
+    std::fs::create_dir_all(&sortie_racine).map_err(|erreur| {
+        format!(
+            "répertoire de sortie du run incréable ({}) : {erreur}",
+            sortie_racine.display()
+        )
+    })?;
+    let sortie = sortie_racine.join("mutants.out");
 
     let mut commande = Command::new("cargo");
     commande
@@ -233,6 +254,8 @@ pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
         .args(["--cargo-test-arg", PAQUET_MUTE])
         .args(["--cargo-test-arg", "--package"])
         .args(["--cargo-test-arg", "shogen-verifier"])
+        .arg("--output")
+        .arg(&sortie_racine)
         .current_dir(racine);
     if let Some(diff) = diff {
         commande.arg("--in-diff").arg(diff);
@@ -241,18 +264,28 @@ pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
     let statut = commande
         .status()
         .map_err(|erreur| format!("cargo-mutants inexécutable : {erreur} — l'outil s'installe à version exacte (`cargo install cargo-mutants --locked --version 27.1.0`), contrôle R-8 au rapport de passe du 2026-08-13"))?;
-    // Un code de sortie non nul de `cargo-mutants` signifie « des mutants ont
-    // survécu » : ce n'est PAS une erreur d'exécution, c'est le fait que cette
-    // gate est là pour juger. On ne le confond donc pas avec un échec d'outil,
-    // et on lit les fichiers de sortie dans les deux cas. En revanche, une
-    // sortie absente est bien une erreur — elle empêche de conclure.
-    let _ = statut;
+    // Le code de sortie n'est PAS jeté (revue G2 vague 1) : un code non nul
+    // couvre aussi bien « des mutants ont survécu » — le fait que cette gate
+    // est là pour juger — que l'erreur d'usage ou l'échec de ligne de base.
+    // On ne départage pas par une table de codes (non documentée par l'outil,
+    // et un chiffre non mesuré ne s'écrit pas) : on départage par la MESURE —
+    // un run non propre qui n'a mesuré aucun mutant n'a pas de verdict.
+    let run_propre = statut.success();
 
     let tues = lire_liste(&sortie.join("caught.txt"))?.len();
     let mut survivants = lire_liste(&sortie.join("missed.txt"))?;
     survivants.extend(lire_liste(&sortie.join("timeout.txt"))?);
     survivants.sort();
     let non_viables = lire_liste(&sortie.join("unviable.txt"))?.len();
+
+    if !run_propre && tues == 0 && survivants.is_empty() && non_viables == 0 {
+        return Err(format!(
+            "cargo-mutants a rendu le code {:?} sans mesurer aucun mutant : \
+             un run qui n'a pas conclu n'a pas de verdict — l'absence de score \
+             est un refus de conclure, jamais un vert",
+            statut.code()
+        ));
+    }
 
     let regressions: Vec<String> = survivants
         .iter()
@@ -272,6 +305,7 @@ pub fn executer(racine: &Path, diff: Option<&Path>) -> Result<Rapport, String> {
         regressions,
         base_non_revue,
         sur_diff: diff.is_some(),
+        run_propre,
     })
 }
 

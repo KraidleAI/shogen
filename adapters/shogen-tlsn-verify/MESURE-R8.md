@@ -66,7 +66,7 @@ remonter.
 | `tlsn-attestation` 0.1.0-alpha.16-pre | `github.com/tlsnotary/tlsn` | `0fe3c32d35382b3f290a43c4156399ca4512bb89` |
 | `tlsn-core` 0.1.0-alpha.16-pre | `github.com/tlsnotary/tlsn` | idem |
 | `tlsn-tls-core` 0.1.0-alpha.16-pre | `github.com/tlsnotary/tlsn` | idem |
-| `rs_merkle` 1.4.2 | `github.com/tlsnotary/rs-merkle.git` (fork) | `85f3e82451e18c21f110068b4322fb99d2f0a8c` |
+| `rs_merkle` 1.4.2 | `github.com/tlsnotary/rs-merkle.git` (fork) | `85f3e827451e18c21f110068b4322fb99d2f0a8c` |
 
 L'épinglage est **par révision**, jamais par version de registre : contrôle
 registre de phase A (pièce `biblio/cratesio-search-tlsn-2026-08-12.json`), les

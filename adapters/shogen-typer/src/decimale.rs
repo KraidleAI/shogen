@@ -118,11 +118,6 @@ pub fn typer_decimale(graphie: &str) -> Result<Decimale, ErreurDecimale> {
     if octets.is_empty() {
         return Err(ErreurDecimale::Vide);
     }
-    // La notation scientifique est cherchée d'abord, pour que son refus soit
-    // celui qu'on lit — et non un « octet hors forme » qui n'apprendrait rien.
-    if let Some(position) = octets.iter().position(|octet| matches!(octet, b'e' | b'E')) {
-        return Err(ErreurDecimale::NotationScientifique { position });
-    }
     let mut position = 0usize;
     let negative = octets.first() == Some(&b'-');
     if negative {
@@ -168,6 +163,14 @@ pub fn typer_decimale(graphie: &str) -> Result<Decimale, ErreurDecimale> {
     if let Some(octet) = octets.get(position) {
         if *octet == b'.' {
             return Err(ErreurDecimale::PointDecimalRepete { position });
+        }
+        // La notation scientifique n'est nommée QU'ICI — après une partie
+        // entière (et éventuellement fractionnaire) bien formée. Un balayage
+        // de la chaîne entière faisait dire « notation scientifique » à
+        // n'importe quel lexème porteur d'un « e » (« unavailable », « true »),
+        // c'est-à-dire un diagnostic qui ment (revue G2 vague 1, famille F4).
+        if matches!(*octet, b'e' | b'E') {
+            return Err(ErreurDecimale::NotationScientifique { position });
         }
         return Err(ErreurDecimale::OctetHorsForme {
             position,

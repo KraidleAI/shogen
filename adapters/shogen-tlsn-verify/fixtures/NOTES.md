@@ -123,6 +123,7 @@ présentation ancienne. C'est une propriété du compagnon, pas de la fixture.
 | `revision_amont` | **(e)** | entre verbatim dans la chaîne de verdict « … a été exécuté par shogen-tlsn-verify [révision amont] » |
 | `server_name` | — | l'identité authentifiée du serveur ; se recoupe avec l'origine de `subject` (ADR-0016) |
 | `transcript_recv_authentifie` = `transcript_recv_longueur` | pré-condition de (b) | si les deux diffèrent, le compagnon **refuse** au lieu de hacher un tampon à remplissage non authentifié |
+| `transcript_sent_authentifie` = `transcript_sent_longueur` | même règle, sens envoyé (ADR-0015 pt 13 : le refus porte les six longueurs — garde symétrique ajoutée par la revue G2 vague 1) | idem : `empreinte_sent_revele_sha256` n'est jamais l'empreinte d'un tampon à remplissage |
 
 **Contrôle croisé de l'empreinte, fait le 2026-08-13.** Les trois empreintes
 imprimées par le compagnon (crate `sha2` 0.10.9) ont été recalculées par

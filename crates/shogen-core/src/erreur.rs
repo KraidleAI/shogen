@@ -5,10 +5,10 @@
 //! *où* (position d'octet) et *quoi*, pour qu'un refus soit diagnosticable sans
 //! journal — le cœur ne journalise pas (ADR-0010, point 1, *sans I/O*).
 
-/// Refus de décodage. Un lot que le cœur ne sait pas classer est refusé, jamais
-/// admis par défaut (ADR-0010, point 5 : *fail-safe defaults*).
 use alloc::string::String;
 
+/// Refus de décodage. Un lot que le cœur ne sait pas classer est refusé, jamais
+/// admis par défaut (ADR-0010, point 5 : *fail-safe defaults*).
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ErreurDecodage {

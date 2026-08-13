@@ -46,6 +46,12 @@ name: fuzz
 
 on:
   pull_request:
+  # Pousses directes sur main : sans ce déclencheur, le job de budget ne
+  # s'exécutait jamais (le dépôt n'a aucune PR dans son historique) et
+  # l'obligation « ≥ 15 min CI » d'ADR-0011 seuil 7 n'était tenue que par
+  # le nightly (revue G2 vague 1).
+  push:
+    branches: [main]
   schedule:
     # Nightly, 02:43 UTC — décalé de `mutation` (03:17) pour que les deux
     # campagnes longues ne se disputent pas le même créneau d'ordonnanceur.
@@ -63,10 +69,10 @@ defaults:
     shell: bash
 
 jobs:
-  # ── Budget de PR : ≥ 15 min (ADR-0011 seuil 7) ────────────────────────────
+  # ── Budget CI : ≥ 15 min (ADR-0011 seuil 7) — PR ET pousse sur main ───────
   pr:
-    name: fuzz de PR (15 min)
-    if: github.event_name == 'pull_request'
+    name: fuzz (15 min)
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -105,6 +111,13 @@ jobs:
         run: |
           set -euo pipefail
           cargo run --locked --package xtask -- fuzz-corpus
+          # `--intent-to-add` rend les graines NOUVELLES visibles au diff :
+          # sans lui, `git diff` est aveugle aux fichiers non suivis, et une
+          # graine régénérée mais jamais committée laissait l'étape VERTE
+          # alors que le dépôt ne porte plus ce que le code produit (revue G2
+          # vague 1 — la famille « vert à vide », obligation « corpus
+          # committé » d'ADR-0011 seuil 7).
+          git add --intent-to-add -- crates/shogen-verifier/fuzz-corpus
           git diff --exit-code -- crates/shogen-verifier/fuzz-corpus
 
       - name: Fuzz — 15 min, graine consignée, zéro panique
