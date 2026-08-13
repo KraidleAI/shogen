@@ -1,0 +1,6 @@
+# Ce paquet est une racine de workspace autonome (voir Cargo.toml) : sa sortie
+# de construction est ici, pas dans le `/target/` de la racine du dépôt, que le
+# `.gitignore` racine couvre déjà. La règle est donc portée au plus près de ce
+# qu'elle gouverne, plutôt que d'aller modifier un fichier racine qu'un autre
+# chantier de la même phase est en train d'écrire.
+/target/

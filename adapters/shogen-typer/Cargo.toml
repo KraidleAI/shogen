@@ -1,0 +1,46 @@
+# `shogen-typer` — le premier typeur (dire brut JSON → fait prix typé).
+#
+# Rattachement (G0) :
+#   - ADR-0001 : les adapters sont testés, jamais prouvés ; le typeur en est un.
+#   - 03 §3 : l'extraction est SÉPARÉE du témoignage ; l'identité du typeur va
+#     dans le FAIT, pas dans le témoignage.
+#   - 08, A(typer-correctness) : « cible : tested à S3, avec compte
+#     d'itérations par typeur ».
+#   - 13 §2 pièce 4 : le typeur de phase C.
+#
+# **Hors du workspace racine, par décision existante** : la racine déclare
+# `members = ["crates/shogen-core", "crates/shogen-verifier", "xtask"]` et
+# commente « `adapters/` n'est PAS membre du workspace ». Ce manifeste porte
+# donc sa propre table `[workspace]` (racine de workspace autonome) et son
+# propre `Cargo.lock` — ADR-0012 D1 : « le lockfile committé fait foi à la
+# construction ». Conséquence assumée : aucune héritance `.workspace = true`
+# n'est disponible ici, les champs sont écrits en toutes lettres.
+[workspace]
+
+[package]
+name = "shogen-typer"
+version = "0.1.0"
+description = "Typeur Shōgen : dire brut JSON d'un endpoint du pool S2 → fait prix typé, décimal exact, fail-closed."
+edition = "2024"
+rust-version = "1.97"
+publish = false
+# ADR-0017 : « MIT OR Apache-2.0 » uniforme sur le dépôt.
+license = "MIT OR Apache-2.0"
+
+# Une seule dépendance directe, et elle va vers le CŒUR, jamais l'inverse :
+# la gate S-G2 interdit l'arête `shogen-verifier -> adapters/*` (ADR-0010
+# point 3) ; elle ne dit rien de l'arête `adapter -> shogen-core`, qui est le
+# sens permis. Ce que le typeur y prend : `empreinte_sha256` (ADR-0018,
+# vecteurs NIST) pour son empreinte d'identité, et `subject_est_canonique`
+# (ADR-0016 C10) pour le contrôle de son sujet.
+# Version exacte au patron d'ADR-0012 D3 (style du vérificateur).
+[dependencies]
+shogen-core = { path = "../../crates/shogen-core", version = "=0.0.0" }
+
+[dev-dependencies]
+# Même crate, même version exacte que le cœur : le contrôle registre R-8 de
+# `proptest` a été fait AVANT installation le 2026-08-12 (S2.5, existence,
+# ancienneté, mainteneurs, téléchargements — rapport de passe S2.5). Ce
+# manifeste n'introduit AUCUNE dépendance nouvelle : il réemploie l'arbre déjà
+# contrôlé et déjà présent au `Cargo.lock` racine.
+proptest = { version = "=1.11.0", default-features = false, features = ["std"] }
