@@ -19,6 +19,7 @@
 | ADR-0015 | Transport de S3 : TLSNotary `tlsn-mpc/1` en mode Notary (notaire opéré par Shōgen, résidu aggravé A(self-attestation)) ; vérification déléguée à un binaire compagnon épinglé — `shogen-verifier` reste à zéro dépendance | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 | ADR-0016 | Canonicalisation de `subject` : forme construite à l'adapter, prédicat total au cœur, refus nommés, requête verbatim jamais triée — ferme la sous-décision ouverte d'ADR-0002 | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 | ADR-0017 | Licence : « MIT OR Apache-2.0 » uniforme sur le workspace — échéance ADR-0014 soldée (décidée sur délégation explicite du mainteneur du 2026-08-13) | acceptée | 2026-08-13 |
+| ADR-0018 | Empreinte SHA-256 du cœur : manuelle pour S3 (zéro dépendance préservée, vecteurs NIST + contrôles croisés étiquetés), crate `sha2` rouverte en S4 sur pièces | acceptée (adjugée orchestrateur — position durable remontée au mainteneur) | 2026-08-13 |
 
 ---
 
@@ -1721,6 +1722,20 @@ version alpha, TLS 1.2 seulement avec contradiction interne sur TLS 1.3.
    (« le vérificateur Shōgen vérifie alors la chaîne hash→proof et nomme ce
    qu'il n'a PAS vérifié lui-même »).
 
+   *(Amendement du 2026-08-13, phase C — trouvaille du worker cœur,
+   mesurée et rendue bloquante par test : les contrôles (a)-(e) laissent
+   8 octets du témoignage liés par AUCUN contrôle recalculable — les 4 de
+   la clé épinglée d'`attestor` et les 4 de l'instant d'`observed_at`. Un
+   lot dont on remplace la clé épinglée serait accepté : l'épinglage
+   serait décoratif. Deux contrôles s'ajoutent donc au constat du
+   compagnon et au vérificateur : **(f)** le constat porte l'identité de
+   la clé contre laquelle la vérification cryptographique a été conduite,
+   et le vérificateur la compare à `attestor` ; **(g)** le constat porte
+   `connection_info.time` — que le pt 7 lui faisait déjà imprimer — et le
+   vérificateur le compare à `observed_at`. Implémentation due avec le
+   compagnon ; d'ici là le test du balayage énumère les 8 positions et
+   tombe si l'ensemble bouge dans un sens ou dans l'autre.)*
+
 9. **Trois résidus nouveaux sont dus au registre 08** : A(self-attestation),
    A(transport-check-delegated), A(upstream-alpha). Aucun ne se déduit d'un
    autre.
@@ -2457,7 +2472,11 @@ pas d'authenticité.
 - **`docs/09-vocabulaire.md`** : deux entrées nouvelles (adjugées).
 - **`crates/shogen-core`** : `ErreurSubject` (variantes nommées C2-C9) et
   le prédicat total — phase C ; `subject` entre au vocabulaire du
-  témoignage avec les 7 champs de 03 §1 — phase C.
+  témoignage avec les 7 champs de 03 §1 — phase C. *(Note du 2026-08-13 :
+  deux variantes que le code a dû nommer sans que cette ADR les nomme —
+  `SchemeNonHttps` (le refus que C2 énonce sans le nommer) et `HoteVide`
+  (l'ABNF `reg-name` admet le vide) — sont ratifiées sous ces noms,
+  adjudication ADR-0018 question 2.)*
 - **`docs/13-temoignage-e2e-design.md` §2** : le point 2 (« le cœur »)
   gagne le prédicat de canonicité comme charge utile de phase C.
 - **`biblio/INDEX.md`** : les trois pièces du draft sont versées et
@@ -2609,5 +2628,127 @@ marque + antériorité, pas la réciprocité.
 - **`docs/13-temoignage-e2e-design.md` §3 item 1** : échéance licence
   fermée. **`docs/14`** : note de clôture (la décision est prise, le
   dossier reste la pièce d'instruction).
+
+---
+
+## ADR-0018 — L'empreinte SHA-256 du cœur : implémentation manuelle pour S3, crate épinglée rouverte en S4 sur pièces
+
+**Statut** : acceptée (adjugée par l'orchestrateur le 2026-08-13 — la
+position **durable** manuel-vs-crate remonte au mainteneur, voir coûts pt 4)
+· 2026-08-13
+
+> **Note d'adjudication (2026-08-13).** Draft de worker (reprise de phase C,
+> run `wf_8cace7eb-746`), adjugé le jour même. Les quatre questions du
+> draft, tranchées : (1) **option A pour S3** — voir Décision ; (2) les
+> variantes `SchemeNonHttps` et `HoteVide`, nommées par le code sans
+> qu'ADR-0016 les nomme, sont **ratifiées sous ces noms** (note portée à
+> ADR-0016) ; (3) la lacune 119/120 octets est fermée par une **table
+> séparée « contrôles croisés, non-NIST »** — condensés calculés par
+> l'orchestrateur le 2026-08-13 depuis DEUX implémentations tierces
+> concordantes (python hashlib et GNU coreutils), étiquetés comme tels,
+> jamais mêlés aux vecteurs d'autorité ; (4) la **provenance des trois
+> pièces NIST est re-établie par l'orchestrateur** — re-téléchargement
+> depuis les URL officielles (csrc.nist.gov, nvlpubs.nist.gov), octets
+> identiques 3/3 aux pièces locales, versées à l'INDEX (§phase C). Rejeu
+> orchestrateur : verify VERT, mutant K0 vu tuer puis suite restaurée
+> verte ; compte de tests à la clôture des corrections de revue G2 :
+> **19 suites, 113 tests, 0 échec** (mesuré au rejeu — un premier compte
+> « 114 » avait été écrit ici sans mesure et la revue G2 l'a attrapé,
+> trouvaille F6 : un compte porté à une ADR se recalcule, jamais ne
+> s'anticipe).
+
+### Contexte
+
+ADR-0005 règle 1 exige que le hash des octets exacts soit toujours porté —
+il lie le témoignage à sa preuve de transport. La phase C fixe
+l'algorithme : SHA-256. Jusqu'à S2.5 le témoignage trivial ne portait aucun
+hash et `shogen-core` restait à **zéro dépendance directe hors dev** (état
+inscrit au manifeste). Porter un hash oblige à choisir : écrire SHA-256
+dans le cœur, ou faire entrer une crate. Le choix déplace trois propriétés
+**ratifiées** (S-G2, S-G7a/D3, D6) — d'où cette ADR.
+
+### Décision
+
+1. **Pour S3 : l'implémentation manuelle dans le cœur** —
+   `crates/shogen-core/src/empreinte.rs`, zéro dépendance, spécification
+   FIPS 180-4 (§4.1.2 fonctions, §4.2.2 constantes, §5.1.1 rembourrage,
+   §5.3.3 état initial, §6.2.2 calcul), pièce détenue à l'INDEX.
+2. **Son registre d'assurance, dit exactement** : *tested (avec compte)* —
+   dix vecteurs d'autorité (CAVP `SHA256ShortMsg.rsp`/`SHA256LongMsg.rsp`
+   et NIST SHA-256 Examples, chacun retrouvé au grep dans la pièce
+   officielle, aucun de mémoire), couvrant les quatre restes de rembourrage
+   {0, 55, 56, 57} et les blocs pleins amont ; PLUS une table séparée de
+   deux **contrôles croisés non-NIST** (119 et 120 octets — la combinaison
+   reste-55/56-avec-bloc-plein qu'aucun vecteur d'autorité détenu ne
+   couvre), concordance à trois implémentations. Jamais *proven* : rien
+   n'est établi sur une entrée non essayée, et ça s'écrit ainsi.
+3. **Le point d'entrée est unique** (`empreinte_sha256`,
+   `empreinte_en_hexadecimal`, `OCTETS_D_EMPREINTE`) : la bascule
+   éventuelle vers une crate est bornée à un module. Le double emploi avec
+   `xtask` est résorbé (R-3, remontée de la revue D6) : `xtask` consomme
+   l'implémentation du cœur — celle qui vit sous S-G3 — et
+   `xtask/src/sha256.rs` est supprimé.
+4. **La question est rouverte en S4, sur pièces** : contrôle R-8 de `sha2`
+   (RustCrypto) fait et versé, `cargo tree` constaté, D6 adjugé — les trois
+   pré-conditions nommées par le draft.
+
+### Alternative considérée
+
+**Option B — crate `sha2` épinglée.** Non retenue **pour S3**, pour un
+motif d'ordre et non de supériorité technique : elle exigerait d'amender
+S-G2 (la crate entrerait dans la fermeture réelle du vérificateur, mesurée
+et comparée par la gate — rouge telle qu'écrite), d'ajouter une ligne
+exacte plus ses transitives sous S-G7a/D3 (à constater par `cargo tree`,
+non vérifié à ce jour), et d'élargir la surface de D6 pendant son
+adjudication. Le contrôle R-8 de `sha2` n'est **pas fait** — aucun chiffre
+de registre n'est donc écrit ici. **Ce que B apporterait, sans
+minimisation** : une implémentation revue par une communauté large, auditée
+hors de ce dépôt, et une charge de relecture R-5 retirée sur de la
+cryptographie manuscrite — le seul argument sérieux, et il est réel.
+
+### La source qui tranche
+
+FIPS 180-4 et les vecteurs CAVP (détenus, provenance double-acquise) pour
+la conformité ; pour le régime de décision, la même hiérarchie
+qu'ADR-0015 : les trois propriétés que B déplacerait sont **ratifiées**
+(S-G2 : « offline, sans confiance dans Shōgen » en fait de link-time ;
+ADR-0012 D3/D6), et un desserrage de gate ne se fait jamais au passage
+(charte `shogen-devops` §2). Assurance : *reviewed* (draft worker +
+adjudication orchestrateur, 2026-08-13) ; l'implémentation est *tested*
+aux comptes du pt 2.
+
+### Ce que la décision coûte
+
+1. **De la cryptographie écrite à la main dans l'artefact de confiance** —
+   la classe d'erreur la plus silencieuse du dépôt. Mitigations en place :
+   vecteurs d'autorité en test permanent, mutant K0 (constante altérée →
+   suite rouge, vu deux fois), concordance à trois implémentations,
+   inatteignabilité des replis **argumentée jamais prouvée** (dit dans le
+   code). Mitigation due : **relecture intégrale R-5 par réviseur ≠
+   générateur** — unité de revue G2 de phase C, lancée à cette
+   adjudication.
+2. **Les contrôles croisés non-NIST restent non-NIST** : la table est
+   séparée et étiquetée ; les écrire parmi les vecteurs officiels serait un
+   faux.
+3. **La bascule S4 vers `sha2`, si elle est retenue, coûtera trois
+   amendements** (S-G2, S-G7a, D6) — nommés d'avance pour qu'ils ne
+   surprennent pas.
+4. **La position durable appartient au mainteneur** : préférer du code
+   maison à une implémentation largement auditée, sur un algorithme
+   cryptographique, est une position à assumer explicitement — la présente
+   décision vaut pour S3, la remontée est portée (rapport de passe).
+
+### Registres touchés
+
+- **`biblio/INDEX.md`** : 3 pièces NIST versées (§phase C, provenance
+  re-établie, sha256 recalculés).
+- **ADR-0016** : note de ratification des variantes `SchemeNonHttps` et
+  `HoteVide`.
+- **`xtask`** : `sha256.rs` supprimé, `reproductible.rs` et ses tests
+  basculés sur `shogen_core::empreinte` (R-3).
+- **`crates/shogen-core/tests/empreinte_vecteurs.rs`** : table « contrôles
+  croisés, non-NIST » ajoutée à l'adjudication.
+- **`WISHLIST.md`** : rien — le contrôle R-8 de `sha2` n'est dû que si S4
+  instruit la bascule.
 
 ---

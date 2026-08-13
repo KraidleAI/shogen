@@ -74,6 +74,7 @@ devient un test permanent.
 | S-G5 `citations` | une citation entre guillemets dans `docs/` introuvable dans les sidecars de `biblio/` | la règle une-citation-un-grep, mécanisée (précédent : G12 Kraidle, avec sa leçon de couverture) |
 | S-G6 `index-sum` | l'en-tête d'`INDEX.md` en désaccord avec le contenu réel de `biblio/` | un compte d'artefacts déclaré est déjà parti en dérive une fois |
 | S-G7 `deps` | version non exacte, licence non listée, advisory non traitée (`cargo-deny`) | R6 transposé |
+| D6 `double-build` (hors numérotation S-Gn : elle ne vit pas dans `verify` — trop coûteuse par exécution ; `cargo xtask double-build`, CI `reproductibilite.yml` bloquante sur la cible ratifiée) | deux builds release de `shogen-verifier` sous 6 variations d'environnement dont les octets divergent | ADR-0012 D6 — la promesse offline tient au rebuild indépendant |
 
 CI sur **Windows + Linux** dès le début (la leçon plateforme-dans-la-trace),
 sur chaque push, mêmes gates en local via `just verify` — une gate qui ne

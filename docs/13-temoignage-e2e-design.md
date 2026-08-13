@@ -129,10 +129,24 @@ Chacune a son contrat écrit ; aucune n'est optionnelle (G5, règle du
   08-assumptions v3 (résidus du transport branché, au niveau d'assurance
   constaté), 09-vocabulaire (candidates des ADR), DEVOPS v2 (état
   d'instanciation).
-- **Phase E — remontées mainteneur et clôture** : licence (décision),
-  passage public (décision + purge exécutée avant), commit/push
-  (autorisation), CI verte deux plateformes zéro étape non-verte,
-  rapport de clôture dans ce document.
+- **Phase E — audit de sortie, remontées mainteneur et clôture** :
+  **audit de sortie multi-dimensions** au patron de l'audit S1
+  (2026-08-05), AVANT le rapport de clôture — workers auditeurs
+  indépendants, re-vérification orchestrateur de chaque trouvaille :
+  (1) *fidélité et attribution* des citations des écritures de la passe
+  (ADR-0015/0016/0017, docs/13/14, INDEX §S3) contre les pièces — S-G5
+  mécanise l'existence, l'audit juge la fidélité, l'emploi et le
+  périmètre (la leçon sigstore : une citation existante peut être
+  inversée) ; (2) *vocabulaire* : balayage complet contre 09, au-delà du
+  sous-ensemble mécanisé par S-G4 ; (3) *cohérence des registres* :
+  identifiants A(...) résolus, renvois croisés 03/08/09/13/DECISIONS/
+  INDEX/WISHLIST, comptes déclarés ; (4) *code* : G2 tenues (réviseur ≠
+  générateur par unité), score de mutation et fuzz aux seuils d'ADR-0011
+  constatés. Chaque trouvaille confirmée est corrigée en classe dans la
+  passe ; le verdict d'audit entre au rapport de clôture. Puis : licence
+  (~~décision~~ — prise, ADR-0017), passage public (décision + purge
+  exécutée avant), commit/push (autorisation), CI verte deux plateformes
+  zéro étape non-verte, rapport de clôture dans ce document.
 
 L'ordre A→E est le chemin nominal ; les unités orchestrateur (échéance 7)
 peuvent précéder la phase B — elles gardent les écritures de la passe.

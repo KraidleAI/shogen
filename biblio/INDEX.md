@@ -1,8 +1,8 @@
 # Shōgen — registre bibliographique
 
-**114 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
+**117 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
 dossier dans la passe qui écrit ce chiffre — mécanisé par la gate S-G6
-depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), en bas
+depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), +3 à la phase C (NIST), en bas
 de registre ; les `*.sidecar`, extractions texte locales des PDF pour la
 gate S-G5, ne comptent pas comme artefacts). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
@@ -274,3 +274,22 @@ librement redistribuables (les RFC portent leur licence dans le texte).
 | `rfc3986-uri-generic-syntax.txt` | RFC 3986, STD 66 — Berners-Lee, Fielding, Masinter, *Uniform Resource Identifier (URI): Generic Syntax*, janv. 2005 ; §6 Normalization and Comparison — la source-qui-tranche attendue d'ADR-0016 | worker : §6 lu ; orchestrateur : versement contrôlé | `3102dae4b68cebe40337730312fcb612297b8928547267e8b3d1ee6002b2d683` |
 | `rfc9110-http-semantics.txt` | RFC 9110, STD 97 — Fielding, Nottingham, Reschke, *HTTP Semantics*, juin 2022 ; §4.2.3 (équivalence d'URI http/https) | worker : §4.2.3 lu ; orchestrateur : versement contrôlé | `21c1cdce6ab0e5509b04d84a28000836c7a087cf786efe6f04877ebfff47232a` |
 | `whatwg-url-standard-dl2026-08-12.html` | WHATWG, *URL Standard*, Living Standard — « Last Updated 6 July 2026 » constaté à la balise `<time>` ; **page mutable et non versionnée** : l'ancre opposable est le couple (date de copie, sha256) — alternative instruite (et rejetée en draft) d'ADR-0016 | worker : sections normalisation lues ; orchestrateur : versement contrôlé | `a4295a30e0203fc5b63a83a10c04daeef8a9741ff727e9beec89d2ae0c50a0de` |
+
+
+### Fetchés à la phase C de S3 (2026-08-13) — vecteurs d'autorité de l'empreinte SHA-256
+
+Acquisition initiale par le worker cœur mort à la limite de session (aucune
+URL consignée) ; **provenance re-établie par l'orchestrateur le
+2026-08-13** : re-téléchargement depuis les URL officielles NIST, octets
+identiques aux trois pièces locales (même geste que `parnas`/`meyer` en
+S2.5), sha256 recalculés à l'écriture de cette section. Textes NIST : œuvre
+du gouvernement fédéral américain, non soumise au copyright (17 U.S.C.
+§105). Chaque vecteur employé par `crates/shogen-core/tests/`
+`empreinte_vecteurs.rs` a été retrouvé au grep dans les `.rsp` officiels
+par le worker de reprise, puis le mutant K0 vu tuer par l'orchestrateur.
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `nist-cavp-sha-byte-test-vectors-2026-08-13.zip` | NIST CAVP, *SHA Test Vectors for Hashing Byte-Oriented Messages* (`shabytetestvectors.zip`, csrc.nist.gov) — les `.rsp` SHA256ShortMsg/LongMsg | vecteurs employés greppés aux `.rsp` | `929ef80b7b3418aca026643f6f248815913b60e01741a44bba9e118067f4c9b8` |
+| `nist-fips-180-4-secure-hash-standard-2026-08-13.pdf` | NIST, *FIPS PUB 180-4 — Secure Hash Standard (SHS)*, août 2015 (nvlpubs.nist.gov) — constantes §4.2.2, état initial §5.3.3, bourrage §5.1.1 | sections employées par empreinte.rs | `0455b406d89648d20cbde375561e19c245b9815e894164c2670772e3d54deb82` |
+| `nist-sha256-examples-intermediate-values-2026-08-13.pdf` | NIST CSRC, *SHA-256 Examples* (valeurs intermédiaires, csrc.nist.gov) — « abc » et le message à deux blocs | exemples employés | `7006b6549dad2fc8c6f29417a921f2e48208157ef496a7e1e1d7d17c5cc1e7db` |
