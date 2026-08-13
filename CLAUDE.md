@@ -3,7 +3,10 @@
 ## Référentiel qualité (obligatoire, non discrétionnaire — 2026-08-12)
 Ce dépôt est régi par le corpus « Compliance et ingénierie logicielle et architecturale »
 (C:\Users\KACIMI\compiliance et ingénierie locielle et architecturale\docs\) :
-- doc 02 : gates **G0–G7 bloquants** et règles R-1..R-25 ;
+- doc 02 : gates **G0–G7 bloquants** et règles R-1..R-26 (R-26 advisor,
+  ajoutée le 2026-08-12 — ligne mise au courant le 2026-08-13, ordre de
+  conformité mainteneur ; la mention équivalente du CLAUDE.md global
+  appartient au mainteneur) ;
 - doc 03 : méthodologie de passe (sources avant travail, niveaux [lu]/[abs]/[2nd], clôture zéro dette).
 
 Conséquences opérationnelles :
