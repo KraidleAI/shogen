@@ -10,8 +10,8 @@
 //! argument, jamais une lecture d'horloge ». La gate S-G2 le mesure.
 
 use crate::cbor::{
-    Lecteur, PREFIXE_CARTE, PREFIXE_OCTETS, PREFIXE_TEXTE, PREFIXE_UINT, ecrire_entete,
-    ecrire_octets, ecrire_texte,
+    ControleDeTri, Lecteur, PREFIXE_CARTE, PREFIXE_UINT, ecrire_entete, ecrire_octets,
+    ecrire_texte, lire_octets, lire_texte,
 };
 use crate::erreur::ErreurDecodage;
 
@@ -90,31 +90,12 @@ pub fn decoder_temoignage(octets: &[u8]) -> Result<TemoignageTrivial, ErreurDeco
     let mut source: Option<String> = None;
     let mut contenu: Option<Vec<u8>> = None;
     let mut instant: Option<u64> = None;
-    let mut cle_precedente: Option<(String, Vec<u8>)> = None;
+    let mut tri = ControleDeTri::nouveau();
 
     for _ in 0..NOMBRE_DE_CHAMPS {
         let position_cle = lecteur.position();
         let cle = lire_texte(&mut lecteur)?;
-        let encodage = encodage_de_cle(&cle);
-
-        // Tri strictement croissant : il établit à lui seul l'unicité des clés.
-        // Aucun second contrôle « au cas où » (ADR-0010, point 6 : la condition
-        // appartient à un seul côté, nommé).
-        if let Some((precedente, encodage_precedent)) = cle_precedente.as_ref() {
-            if encodage.as_slice() == encodage_precedent.as_slice() {
-                return Err(ErreurDecodage::CleDupliquee {
-                    position: position_cle,
-                    cle,
-                });
-            }
-            if encodage.as_slice() < encodage_precedent.as_slice() {
-                return Err(ErreurDecodage::ClesNonTriees {
-                    position: position_cle,
-                    precedente: precedente.clone(),
-                    courante: cle,
-                });
-            }
-        }
+        tri.suivante(position_cle, &cle)?;
 
         if cle == CLE_SOURCE {
             source = Some(lire_texte(&mut lecteur)?);
@@ -128,7 +109,6 @@ pub fn decoder_temoignage(octets: &[u8]) -> Result<TemoignageTrivial, ErreurDeco
                 cle,
             });
         }
-        cle_precedente = Some((cle, encodage));
     }
 
     if !lecteur.termine() {
@@ -168,21 +148,4 @@ pub fn encodage_de_cle(cle: &str) -> Vec<u8> {
     let mut sortie = Vec::new();
     ecrire_texte(&mut sortie, cle);
     sortie
-}
-
-fn lire_texte(lecteur: &mut Lecteur<'_>) -> Result<String, ErreurDecodage> {
-    let position = lecteur.position();
-    let argument = lecteur.entete_de_type(PREFIXE_TEXTE)?;
-    let longueur = lecteur.longueur_memoire(argument)?;
-    let octets = lecteur.tranche(longueur)?;
-    match core::str::from_utf8(octets) {
-        Ok(texte) => Ok(texte.to_owned()),
-        Err(_) => Err(ErreurDecodage::TexteNonUtf8 { position, longueur }),
-    }
-}
-
-fn lire_octets(lecteur: &mut Lecteur<'_>) -> Result<Vec<u8>, ErreurDecodage> {
-    let argument = lecteur.entete_de_type(PREFIXE_OCTETS)?;
-    let longueur = lecteur.longueur_memoire(argument)?;
-    Ok(lecteur.tranche(longueur)?.to_vec())
 }

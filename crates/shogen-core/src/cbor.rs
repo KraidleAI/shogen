@@ -33,6 +33,15 @@ pub(crate) const PREFIXE_UINT: u8 = 0x00;
 pub(crate) const PREFIXE_OCTETS: u8 = 0x40;
 /// Préfixe du type majeur 3 — chaîne de texte.
 pub(crate) const PREFIXE_TEXTE: u8 = 0x60;
+/// Préfixe du type majeur 4 — tableau, longueur définie.
+///
+/// Entré au sous-ensemble en S3 : la forme canonique de 03 §1 porte deux champs
+/// pluriels — `residual` (ADR-0015 point 4 : le verdict porte **plusieurs**
+/// résidus nommés) et `attestor` (03 §1 : « identité(s) … clés épinglées »).
+/// Un tableau est **ordonné** : ses éléments ne sont ni triés ni dédupliqués au
+/// décodage, exactement comme la requête de `subject` reste verbatim
+/// (ADR-0016 C8) — ce que le décodeur refuse, il ne le réécrit pas.
+pub(crate) const PREFIXE_TABLEAU: u8 = 0x80;
 /// Préfixe du type majeur 5 — carte.
 pub(crate) const PREFIXE_CARTE: u8 = 0xA0;
 
@@ -236,6 +245,70 @@ impl<'a> Lecteur<'a> {
                 longueur: argument,
             }),
         }
+    }
+}
+
+/// Lit une chaîne de texte et la rend en `String`.
+///
+/// Style **exigeant** au sens de Meyer : la précondition (« le curseur est au
+/// début d'une valeur ») est établie par l'appelant, qui est toujours un
+/// décodeur de forme canonique.
+pub(crate) fn lire_texte(lecteur: &mut Lecteur<'_>) -> Result<String, ErreurDecodage> {
+    let position = lecteur.position();
+    let argument = lecteur.entete_de_type(PREFIXE_TEXTE)?;
+    let longueur = lecteur.longueur_memoire(argument)?;
+    let octets = lecteur.tranche(longueur)?;
+    match core::str::from_utf8(octets) {
+        Ok(texte) => Ok(texte.to_owned()),
+        Err(_) => Err(ErreurDecodage::TexteNonUtf8 { position, longueur }),
+    }
+}
+
+/// Lit une chaîne d'octets.
+pub(crate) fn lire_octets(lecteur: &mut Lecteur<'_>) -> Result<Vec<u8>, ErreurDecodage> {
+    let argument = lecteur.entete_de_type(PREFIXE_OCTETS)?;
+    let longueur = lecteur.longueur_memoire(argument)?;
+    Ok(lecteur.tranche(longueur)?.to_vec())
+}
+
+/// Contrôle du **tri strictement croissant** des clés d'une carte.
+///
+/// Une seule implémentation pour toutes les cartes du dépôt (R-3) : celle du
+/// témoignage trivial comme celles de la forme canonique. Le tri porte sur les
+/// octets des clés **encodées**, pas sur les chaînes — les deux ne coïncident
+/// pas en général (la longueur préfixe). Strictement croissant : il établit à
+/// lui seul l'unicité des clés, aucun second contrôle « au cas où »
+/// (ADR-0010, point 6).
+pub(crate) struct ControleDeTri {
+    precedente: Option<(String, Vec<u8>)>,
+}
+
+impl ControleDeTri {
+    pub(crate) fn nouveau() -> Self {
+        Self { precedente: None }
+    }
+
+    /// Enregistre la clé suivante, ou refuse si elle rompt l'ordre.
+    pub(crate) fn suivante(&mut self, position: usize, cle: &str) -> Result<(), ErreurDecodage> {
+        let mut encodage = Vec::new();
+        ecrire_texte(&mut encodage, cle);
+        if let Some((precedente, encodage_precedent)) = self.precedente.as_ref() {
+            if encodage.as_slice() == encodage_precedent.as_slice() {
+                return Err(ErreurDecodage::CleDupliquee {
+                    position,
+                    cle: cle.to_owned(),
+                });
+            }
+            if encodage.as_slice() < encodage_precedent.as_slice() {
+                return Err(ErreurDecodage::ClesNonTriees {
+                    position,
+                    precedente: precedente.clone(),
+                    courante: cle.to_owned(),
+                });
+            }
+        }
+        self.precedente = Some((cle.to_owned(), encodage));
+        Ok(())
     }
 }
 

@@ -45,6 +45,16 @@ pub enum ErreurDecodage {
         attendue: u64,
         trouvee: u64,
     },
+    /// Taille de carte hors d'un ensemble admis à plusieurs valeurs — le cas
+    /// d'`utterance` ({1, 2} : empreinte seule, ou empreinte + octets). Une
+    /// variante dédiée parce qu'un message « 2 attendue(s) » sur une carte à
+    /// 3 entrées annoncerait une attente que le code n'a pas (revue G2 de
+    /// phase C, trouvaille F4 — un refus se diagnostique sans journal).
+    TailleCarteHorsEnsemble {
+        position: usize,
+        admises: &'static [u64],
+        trouvee: u64,
+    },
     /// Clé absente du vocabulaire du témoignage trivial.
     CleInconnue { position: usize, cle: String },
     /// Clés non triées : l'ordre lexicographique par octets des clés encodées
@@ -63,6 +73,41 @@ pub enum ErreurDecodage {
     /// Des octets subsistent après le témoignage : un lot canonique n'a pas de
     /// queue (sinon deux suites d'octets distinctes décoderaient au même fait).
     OctetsResiduels { position: usize, restants: usize },
+    /// La carte de tête n'a le nombre d'entrées d'aucune forme connue de lot.
+    /// Fail-closed jusqu'au cas dégénéré (ADR-0010, point 5) : un lot que le
+    /// cœur ne sait pas classer est refusé, jamais admis par défaut.
+    TailleDeLotInconnue { position: usize, trouvee: u64 },
+    /// `subject` ne satisfait pas le prédicat de canonicité — ADR-0016 C10 : le
+    /// témoignage est **refusé**, jamais réécrit.
+    SubjectNonCanonique {
+        position: usize,
+        cause: crate::subject::ErreurSubject,
+    },
+    /// L'empreinte portée n'a pas la longueur d'un condensé SHA-256.
+    LongueurDEmpreinteInvalide {
+        position: usize,
+        attendue: usize,
+        trouvee: usize,
+    },
+    /// Un champ obligatoire est présent mais vide : liste sans élément, texte
+    /// sans caractère, clé épinglée sans octet. Le vide n'est pas une valeur
+    /// admissible d'un champ dont 03 §1 dit qu'il est obligatoire.
+    ChampVide { position: usize, cle: &'static str },
+    /// Un identifiant porté sort de l'US-ASCII : sa comparaison dépendrait
+    /// d'une table Unicode versionnée, donc ne serait pas recalculable hors
+    /// ligne (ADR-0003 ; même motif qu'ADR-0016 C3).
+    ChampNonAscii {
+        position: usize,
+        cle: &'static str,
+        octet: u8,
+    },
+    /// Deux fois la même entrée dans une liste où la répétition n'ajoute rien.
+    /// Refus, jamais déduplication (ADR-0016 C0, transposé).
+    EntreeDupliquee {
+        position: usize,
+        cle: &'static str,
+        valeur: String,
+    },
 }
 
 impl core::fmt::Display for ErreurDecodage {
@@ -116,6 +161,14 @@ impl core::fmt::Display for ErreurDecodage {
                 f,
                 "taille de carte inattendue à l'octet {position} : {attendue} entrée(s) attendue(s), {trouvee} trouvée(s)"
             ),
+            Self::TailleCarteHorsEnsemble {
+                position,
+                admises,
+                trouvee,
+            } => write!(
+                f,
+                "taille de carte hors ensemble admis à l'octet {position} : {admises:?} entrée(s) admise(s), {trouvee} trouvée(s)"
+            ),
             Self::CleInconnue { position, cle } => write!(
                 f,
                 "clé inconnue à l'octet {position} : « {cle} » n'est pas du vocabulaire du témoignage trivial"
@@ -139,6 +192,41 @@ impl core::fmt::Display for ErreurDecodage {
             Self::OctetsResiduels { position, restants } => write!(
                 f,
                 "octets résiduels à partir de l'octet {position} : {restants} octet(s) en trop"
+            ),
+            Self::TailleDeLotInconnue { position, trouvee } => write!(
+                f,
+                "forme de lot inconnue à l'octet {position} : carte de {trouvee} entrée(s) — aucune forme du vocabulaire ne l'admet"
+            ),
+            Self::SubjectNonCanonique { position, cause } => {
+                write!(f, "subject non canonique à l'octet {position} : {cause}")
+            }
+            Self::LongueurDEmpreinteInvalide {
+                position,
+                attendue,
+                trouvee,
+            } => write!(
+                f,
+                "longueur d'empreinte invalide à l'octet {position} : {attendue} octet(s) attendu(s), {trouvee} trouvé(s)"
+            ),
+            Self::ChampVide { position, cle } => write!(
+                f,
+                "champ vide à l'octet {position} : « {cle} » est obligatoire et n'admet pas le vide"
+            ),
+            Self::ChampNonAscii {
+                position,
+                cle,
+                octet,
+            } => write!(
+                f,
+                "champ non ASCII à l'octet {position} : « {cle} » porte l'octet 0x{octet:02x}"
+            ),
+            Self::EntreeDupliquee {
+                position,
+                cle,
+                valeur,
+            } => write!(
+                f,
+                "entrée dupliquée à l'octet {position} : « {valeur} » figure deux fois dans « {cle} »"
             ),
         }
     }
