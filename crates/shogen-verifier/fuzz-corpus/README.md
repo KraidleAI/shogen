@@ -14,7 +14,7 @@ par une panique que le dépôt a observée.
 
 | préfixe | origine | régénérable ? |
 |---|---|---|
-| `dirigee-*` | déduites des formes que le dépôt connaît — le lot d'exemple, le témoignage canonique des sept champs, les bords du décodeur CBOR, les deux surfaces texte | **oui** : `cargo xtask fuzz-corpus` les réécrit |
+| `dirigee-*` | déduites des formes que le dépôt connaît — le lot d'exemple, le témoignage canonique des sept champs, les bords du décodeur CBOR, les deux surfaces texte (registre, et constat **au contrat d'ADR-0015 point 13**) | **oui** : `cargo xtask fuzz-corpus` les réécrit |
 | `panique-*` | les octets exacts d'une panique observée, écrits par le harnais au moment où il l'a vue | **non** : rien ne les reconstruit |
 
 `cargo xtask fuzz-corpus` n'écrase **que** les `dirigee-*`. Une commande qui
@@ -28,6 +28,13 @@ mesure est au dossier — **20 s de fuzz, corpus sans le témoignage canonique :
 22 057 486 cas exécutés, classe « sept champs » à 0**. La même mesure avec la
 graine canonique ajoutée : **141 515 cas** dans cette classe. Le corpus n'est
 pas un confort, c'est ce qui met le tirage au bord de la forme.
+
+Le même argument vaut pour la surface **constat** depuis la vague 2 : le contrat
+d'ADR-0015 point 13 est une ligne JSON de dix-huit clés triées, et aucun tirage
+aveugle ne l'atteint. Les deux graines `dirigee-constat*.txt` portent donc la
+forme acceptée et une forme refusée **tard** (hexadécimal de longueur impaire) :
+sans elles, l'analyseur ne serait atteint que par ses premiers octets, jamais
+par sa construction finale — contrôle de version, verdict, six longueurs.
 
 ## Ce que le passage du corpus établit
 

@@ -103,6 +103,21 @@ pub enum ErreurDecodage {
         cle: &'static str,
         octet: u8,
     },
+    /// Un identifiant porté contient un **caractère de contrôle** US-ASCII
+    /// (0x00–0x1F, 0x7F) — saut de ligne compris.
+    ///
+    /// Motif mesuré (revue G2 de la vague 2, 2026-08-13) : ces identifiants
+    /// sont recopiés tels quels dans les lignes de verdict de la coquille ; un
+    /// `transport` portant `0x0A` y forge une ligne « VERDICT : … » que le
+    /// vérificateur n'a jamais rendue, et le lot sort en code 0. Un identifiant
+    /// n'est pas un support de mise en page : le refus a lieu au décodage,
+    /// jamais à l'affichage. Même posture que l'analyseur du constat, qui
+    /// refuse déjà le non-imprimable (`shogen-verifier`, `constat.rs`).
+    ChampNonImprimable {
+        position: usize,
+        cle: &'static str,
+        octet: u8,
+    },
     /// Deux fois la même entrée dans une liste où la répétition n'ajoute rien.
     /// Refus, jamais déduplication (ADR-0016 C0, transposé).
     EntreeDupliquee {
@@ -221,6 +236,14 @@ impl core::fmt::Display for ErreurDecodage {
             } => write!(
                 f,
                 "champ non ASCII à l'octet {position} : « {cle} » porte l'octet 0x{octet:02x}"
+            ),
+            Self::ChampNonImprimable {
+                position,
+                cle,
+                octet,
+            } => write!(
+                f,
+                "champ non imprimable à l'octet {position} : « {cle} » porte le caractère de contrôle 0x{octet:02x} — un identifiant est recopié dans le verdict, il ne met jamais en page"
             ),
             Self::EntreeDupliquee {
                 position,

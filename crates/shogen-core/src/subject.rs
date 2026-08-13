@@ -214,6 +214,35 @@ pub fn subject_est_canonique(octets: &[u8]) -> Result<(), ErreurSubject> {
     controler_requete(octets, debut_requete, octets.len())
 }
 
+/// L'**hôte** d'un `subject`, extrait par découpe — jamais réécrit.
+///
+/// Style *exigeant* au sens de Meyer (carte des frontières, `lib.rs`) : la
+/// précondition — le `subject` satisfait [`subject_est_canonique`] — est établie
+/// par le décodage, qui est la frontière. **C'est de là que vient la sûreté, et
+/// de nulle part ailleurs.**
+///
+/// La fonction est **totale** (ADR-0010, point 1) — aucune entrée ne la fait
+/// diverger — mais son repli ne couvre qu'un seul écart : l'**absence du
+/// préfixe canonique**, pour laquelle elle rend la chaîne vide, c'est-à-dire
+/// une valeur qu'aucune identité de serveur authentifiée n'égale. Elle ne rend
+/// PAS la chaîne vide sur toute entrée hors forme : sur `https://` suivi de
+/// n'importe quoi, elle découpe et rend ce qu'elle trouve, hôte non canonique
+/// compris. Un appelant qui l'emploierait sans la précondition établie
+/// obtiendrait donc une découpe, pas un refus — et c'est pourquoi la
+/// précondition est nommée ici plutôt que supposée.
+///
+/// Elle ne normalise rien : ADR-0016 C0 place la normalisation à la
+/// construction, et le rang du vérificateur ne fait que refuser.
+pub fn hote_de_subject(subject: &str) -> &str {
+    let Some(reste) = subject.strip_prefix(PREFIXE_CANONIQUE) else {
+        return "";
+    };
+    // C1 : l'hôte court jusqu'au port, au chemin ou à la requête — les trois
+    // délimiteurs que la grammaire admet après l'autorité.
+    let fin = premier_parmi(reste.as_bytes(), 0, b":/?");
+    reste.get(..fin).unwrap_or("")
+}
+
 /// L'autorité : `userinfo` interdit (C4), hôte (C3), port (C5).
 fn controler_autorite(octets: &[u8], debut: usize, fin: usize) -> Result<(), ErreurSubject> {
     // C4 — un `@` dans l'autorité, quelle que soit sa place.

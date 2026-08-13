@@ -14,6 +14,10 @@ use shogen_core::{
 pub const OCTETS_D_UTTERANCE: &[u8] = b"{\"price\":\"42.17\"}";
 /// Les octets de preuve — **opaques** : le cœur n'en interprète aucun.
 pub const OCTETS_DE_PREUVE: &[u8] = b"preuve-opaque-d'exemple";
+/// Les octets du **sens émis** de la session de référence : aucun. Le
+/// témoignage ne les porte pas — c'est exactement le trou d'ADR-0015 point 17
+/// bis — mais le constat en porte l'empreinte, et elle voyage jusqu'au cœur.
+pub const OCTETS_DU_SENS_EMIS: &[u8] = b"";
 /// Le `subject` de référence, canonique au sens d'ADR-0016.
 pub const SUBJECT: &str = "https://api.example.com/v3/simple/price?ids=bitcoin";
 /// Les identifiants portés — aucun ne nomme un transport réel : le cœur est sous
@@ -24,15 +28,23 @@ pub const RESIDU_2: &str = "A(exemple-residu-2)";
 pub const TRANSPORT: &str = "exemple-transport/1";
 pub const HORLOGE: &str = "exemple:horloge-du-transport";
 pub const INSTANT: u64 = 1_754_000_000;
-/// L'identité du binaire compagnon, telle qu'un constat la porte.
-pub const OUTIL: &str = "exemple-compagnon/1 (revision 0000000)";
+/// La révision amont du binaire compagnon, telle qu'un constat la porte —
+/// verbatim dans la chaîne de verdict (ADR-0015 point 8 alinéa e).
+pub const REVISION_AMONT: &str = "0000000000000000000000000000000000000000";
+/// Les octets de la clé épinglée, dans la convention de l'adapter :
+/// `<algorithme> <chiffres hexadécimaux>`. Le cœur ne fait qu'une égalité
+/// d'octets et ne connaît pas cette convention (ADR-0001).
+pub const CLE_EPINGLEE: &[u8] = b"exemple 041a2b3c";
+/// L'origine authentifiée que le constat rapporte — l'hôte du `subject`
+/// ci-dessus (ADR-0015 point 13, recoupement d'origine).
+pub const ORIGINE: &str = "api.example.com";
 
 /// Le témoignage canonique de référence.
 pub fn reference() -> Temoignage {
     Temoignage {
         subject: String::from(SUBJECT),
         attestor: vec![Attestor {
-            key: vec![0x04, 0x1a, 0x2b, 0x3c],
+            key: CLE_EPINGLEE.to_vec(),
             identity: String::from(IDENTITE),
         }],
         residual: vec![String::from(RESIDU_1), String::from(RESIDU_2)],
@@ -62,8 +74,15 @@ pub fn registre() -> Vec<String> {
 /// Le constat que le binaire compagnon rendrait sur ce témoignage.
 pub fn constat() -> Constat {
     Constat {
-        outil: String::from(OUTIL),
+        revision_amont: String::from(REVISION_AMONT),
+        cle_du_controle: CLE_EPINGLEE.to_vec(),
+        instant_de_connexion: INSTANT,
+        origine_authentifiee: String::from(ORIGINE),
         empreinte_de_la_preuve: empreinte_sha256(OCTETS_DE_PREUVE),
         empreinte_de_l_utterance: empreinte_sha256(OCTETS_D_UTTERANCE),
+        // Le sens émis de ce témoignage de référence ne porte aucun octet : son
+        // empreinte est celle de la suite vide. Portée, jamais consommée
+        // (ADR-0015 point 17 bis).
+        empreinte_du_sens_emis: empreinte_sha256(OCTETS_DU_SENS_EMIS),
     }
 }

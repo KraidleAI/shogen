@@ -327,6 +327,18 @@ fn lire_identifiant(
 }
 
 /// Le contrôle d'un identifiant, isolé pour servir aux textes lus en liste.
+///
+/// Deux refus, dans cet ordre : hors US-ASCII (la comparaison dépendrait d'une
+/// table Unicode versionnée, ADR-0003), puis **caractère de contrôle**.
+///
+/// Le second est l'amendement de la vague 2 (2026-08-13), et il vient d'une
+/// mesure, pas d'un principe : ces identifiants — `transport`, `clock`,
+/// `identity`, les résidus — sont recopiés dans les lignes de verdict de la
+/// coquille. Un `transport` portant `0x0A` y forge une ligne
+/// « VERDICT : … » que le vérificateur n'a jamais rendue, sur un lot qui sort
+/// en code 0 (démontré en test). Le refus est posé **au décodage**, jamais à
+/// l'affichage : c'est la même posture que l'analyseur du constat, qui refuse
+/// déjà le non-imprimable au rang où il lit.
 fn controler_identifiant(
     texte: &str,
     position: usize,
@@ -338,6 +350,13 @@ fn controler_identifiant(
     for octet in texte.as_bytes().iter().copied() {
         if !octet.is_ascii() {
             return Err(ErreurDecodage::ChampNonAscii {
+                position,
+                cle,
+                octet,
+            });
+        }
+        if octet.is_ascii_control() {
+            return Err(ErreurDecodage::ChampNonImprimable {
                 position,
                 cle,
                 octet,

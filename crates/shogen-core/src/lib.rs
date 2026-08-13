@@ -56,6 +56,7 @@
 //! | [`decoder_temoignage_canonique`] | **tolérant** | aucune — tout `&[u8]`, y compris hostile | lui-même, prédicat de `subject` compris (ADR-0016 C10) |
 //! | [`subject_est_canonique`] | **tolérant** | aucune — toute suite d'octets | lui-même : c'est le prédicat, il n'a pas de précondition |
 //! | [`empreinte_sha256`] | **tolérant** | aucune — toute suite d'octets | totale par construction : elle ne refuse rien, elle rend un condensé |
+//! | [`hote_de_subject`] | exigeant | l'argument satisfait [`subject_est_canonique`] | le décodage, qui est la frontière ; hors forme elle rend la chaîne vide, qu'aucune origine n'égale |
 //! | [`verifier_temoignage`] | exigeant | l'argument est un [`Temoignage`] déjà décodé, donc déjà canonique | le décodage, qui est la frontière |
 //! | [`encoder_temoignage`], [`encoder_temoignage_canonique`], [`encoder_lot`] | exigeant | l'argument est une valeur déjà typée | le système de types |
 //! | [`encodage_de_cle`] | exigeant | l'argument est un `&str` (donc UTF-8 valide) | le système de types |
@@ -86,7 +87,9 @@ mod verification;
 pub use empreinte::{OCTETS_D_EMPREINTE, empreinte_en_hexadecimal, empreinte_sha256};
 pub use erreur::ErreurDecodage;
 pub use lot::{Lot, decoder_lot, encoder_lot};
-pub use subject::{ErreurSubject, PORT_PAR_DEFAUT, PREFIXE_CANONIQUE, subject_est_canonique};
+pub use subject::{
+    ErreurSubject, PORT_PAR_DEFAUT, PREFIXE_CANONIQUE, hote_de_subject, subject_est_canonique,
+};
 pub use temoignage::{
     CLE_CONTENU, CLE_INSTANT, CLE_SOURCE, NOMBRE_DE_CHAMPS, ORDRE_CANONIQUE_DES_CLES,
     TemoignageTrivial, decoder_temoignage, encodage_de_cle, encoder_temoignage,

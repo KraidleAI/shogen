@@ -36,10 +36,10 @@ fn temoignage_intact_le_verdict_nomme_ses_residus_et_la_delegation() {
         verdict.octets_recalcules,
         "les octets étaient portés : la liaison a été recalculée ici"
     );
-    assert_eq!(verdict.outil_delegue, commun::OUTIL);
+    assert_eq!(verdict.revision_amont_deleguee, commun::REVISION_AMONT);
     println!(
-        "verdict — résidus nommés : {:?} ; contrôle cryptographique délégué à « {} »",
-        verdict.residus, verdict.outil_delegue
+        "verdict — résidus nommés : {:?} ; contrôle cryptographique délégué au binaire compagnon de révision amont « {} »",
+        verdict.residus, verdict.revision_amont_deleguee
     );
 }
 
@@ -165,10 +165,28 @@ fn un_temoignage_sans_octets_reste_verifiable_et_le_verdict_le_dit() {
     );
 }
 
+/// **(f) ne se satisfait pas à vide** (revue G2 de la vague 2, mineure A4).
+///
+/// La boucle qui recoupe les clés épinglées ne fait aucun tour sur un
+/// `attestor` vide : sans refus explicite, `verifier_temoignage` rendrait un
+/// verdict d'acceptation en n'ayant rien établi du tout. Le décodage refuse
+/// déjà le tableau vide, mais la structure entre aussi par la construction
+/// directe — et c'est ce rang-ci qui conclut.
+#[test]
+fn un_attestor_vide_est_refuse_avant_le_controle_de_cle() {
+    let mut sans_attestateur = reference();
+    sans_attestateur.attestor.clear();
+    match verifier_temoignage(&sans_attestateur, &registre(), Some(&constat())) {
+        Err(ErreurVerification::AttestorVide) => {}
+        autre => panic!("attendu AttestorVide, obtenu {autre:?}"),
+    }
+}
+
 #[test]
 fn les_refus_se_disent_en_toutes_lettres() {
     let refus = [
         ErreurVerification::ConstatAbsent,
+        ErreurVerification::AttestorVide,
         ErreurVerification::RegistreVide,
         ErreurVerification::LiaisonUtteranceRompue {
             portee: empreinte_sha256(b"a"),

@@ -1,0 +1,46 @@
+# `shogen-temoignage` — le constructeur du témoignage réel de S3.
+#
+# Rattachement (G0) :
+#   - ADR-0001 : les transports sont des adapters, « testés, jamais prouvés » ;
+#     construire un témoignage depuis les artefacts d'un transport EST le
+#     travail d'un adapter, jamais celui du cœur ni du vérificateur.
+#   - ADR-0016 C0/C10 : « la normalisation a lieu une fois, à la construction,
+#     dans l'adapter … le cœur et le vérificateur ne normalisent rien ». Ce
+#     paquet est ce rang-là.
+#   - 03 §1 : les sept champs de la forme canonique.
+#   - ADR-0015 points 8 et 13 : les liaisons que le témoignage doit rendre
+#     recalculables, et le contrat du constat d'où viennent les valeurs.
+#   - 13 §6 point 2 : le lot de S3 est un lot à UN témoignage.
+#
+# **Hors du workspace racine**, au patron de `shogen-typer` : la racine déclare
+# `members = ["crates/shogen-core", "crates/shogen-verifier", "xtask"]` et
+# commente « `adapters/` n'est PAS membre du workspace ». Ce manifeste porte
+# donc sa propre table `[workspace]` et son propre `Cargo.lock` (ADR-0012 D1).
+# Conséquence assumée : aucune héritance `.workspace = true`, les champs sont
+# écrits en toutes lettres.
+[workspace]
+
+[package]
+name = "shogen-temoignage"
+version = "0.1.0"
+description = "Constructeur du témoignage canonique de Shōgen depuis les artefacts d'une session attestée : sept champs de 03 §1, subject canonicalisé à la construction (ADR-0016 C0), liaisons recoupées avec le constat du binaire compagnon."
+edition = "2024"
+rust-version = "1.97"
+publish = false
+# ADR-0017 : « MIT OR Apache-2.0 » uniforme sur le dépôt.
+license = "MIT OR Apache-2.0"
+
+# Une seule dépendance directe, et elle va vers le CŒUR — le sens permis
+# (ADR-0010 point 3 : l'arête interdite est `shogen-verifier -> adapters/*`).
+# Ce que l'adapter y prend : l'encodeur de la forme canonique, l'empreinte
+# (ADR-0018) et le prédicat de canonicité de `subject` (ADR-0016 C10), qui
+# contrôle ici ce que la construction vient de produire — « un désaccord
+# constructeur/prédicat est un ROUGE ».
+#
+# **Aucune dépendance tierce** : R-8 n'a donc rien à instruire (contrôle
+# registre avant installation — il n'y a pas d'installation), et aucun
+# `deny.toml` local n'est dû, exactement comme pour `shogen-typer`.
+[dependencies]
+shogen-core = { path = "../../crates/shogen-core", version = "=0.0.0" }
+
+[dev-dependencies]

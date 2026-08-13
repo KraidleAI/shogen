@@ -36,13 +36,33 @@ const EMPREINTE_DE_PREUVE: &str =
     "9c114e983a7b36eddd59ad5584f40b8beddb04918e665107e8e362fcd0252c86";
 
 const SUBJECT: &str = "https://api.example.com/v3/simple/price?ids=bitcoin";
+/// L'hôte du `subject` — l'origine que le constat doit rapporter (recoupement
+/// d'origine, ADR-0015 point 13).
+const ORIGINE: &str = "api.example.com";
 const IDENTITE: &str = "exemple:attestateur-1";
 const RESIDU_1: &str = "A(exemple-residu-1)";
 const RESIDU_2: &str = "A(exemple-residu-2)";
 const RESIDU_DE_LA_DELEGATION: &str = "A(transport-check-delegated)";
 const TRANSPORT: &str = "exemple-transport/1";
 const HORLOGE: &str = "exemple:horloge-du-transport";
-const OUTIL: &str = "exemple-compagnon/1 (revision 0000000)";
+/// La révision amont, verbatim, que le verdict reprend (ADR-0015 pt 8 alinéa e).
+const REVISION_AMONT: &str = "0000000000000000000000000000000000000000";
+/// L'instant porté par le témoignage — et, contrôle (g) oblige, celui que le
+/// constat rapporte comme instant de connexion.
+const INSTANT: u64 = 1_754_000_000;
+/// L'algorithme et les chiffres de la clé épinglée, tels que le constat les
+/// porte ; la convention d'épinglage en fait les octets `attestor.key`.
+const CLE_ALGORITHME: &str = "exemple";
+const CLE_CHIFFRES: &str = "041a2b3c";
+/// Les octets épinglés, composés selon la convention — écrits ici en toutes
+/// lettres pour que le test dise la même chose que l'adapter, sans partager de
+/// code avec lui.
+const CLE_EPINGLEE: &[u8] = b"exemple 041a2b3c";
+/// L'empreinte SHA-256 de la suite VIDE — le sens émis de ce lot synthétique
+/// ne porte aucun octet. Valeur mesurée, déjà au dépôt
+/// (`xtask/tests/reproductible.rs`, vecteurs contrôlés par deux
+/// implémentations tierces), jamais recopiée de mémoire.
+const EMPREINTE_DU_VIDE: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 /// Écrit un en-tête CBOR en sérialisation préférée — la seule forme admise.
 fn entete(octets: &mut Vec<u8>, prefixe: u8, argument: u64) {
@@ -98,7 +118,7 @@ fn lot_de_reference(
     entete(&mut octets, 0x80, 1); // tableau(1)
     entete(&mut octets, 0xa0, 2); // carte(2)
     texte(&mut octets, "key");
-    chaine_d_octets(&mut octets, &[0x04, 0x1a, 0x2b, 0x3c]);
+    chaine_d_octets(&mut octets, CLE_EPINGLEE);
     texte(&mut octets, "identity");
     texte(&mut octets, IDENTITE);
 
@@ -123,7 +143,7 @@ fn lot_de_reference(
     texte(&mut octets, "clock");
     texte(&mut octets, HORLOGE);
     texte(&mut octets, "instant");
-    entete(&mut octets, 0x00, 1_754_000_000);
+    entete(&mut octets, 0x00, INSTANT);
 
     texte(&mut octets, "transport_proof");
     chaine_d_octets(&mut octets, octets_de_preuve);
@@ -177,11 +197,47 @@ fn ecrire_registre(repertoire: &Path, residus: &[&str]) -> PathBuf {
     chemin
 }
 
-/// Le constat que le binaire compagnon d'ADR-0015 rendrait.
+/// Le constat que le binaire compagnon d'ADR-0015 rendrait — **au contrat du
+/// point 13** : une ligne JSON à clés triées, dix-huit clés.
+///
+/// Il est écrit à la main ici, clé par clé, sans passer par l'analyseur qu'il
+/// alimente : un test qui produirait son entrée avec le lecteur qu'il vérifie ne
+/// prendrait ce lecteur en défaut sur rien. Les six longueurs sont cohérentes
+/// dans chaque sens, comme le contrat l'exige (pré-condition de (b)).
 fn ecrire_constat(repertoire: &Path, empreinte_preuve: &str, empreinte_utterance: &str) -> PathBuf {
-    let chemin = repertoire.join("constat.txt");
+    ecrire_constat_ajuste(repertoire, empreinte_preuve, empreinte_utterance, INSTANT)
+}
+
+/// Le même, avec l'instant de connexion en paramètre — le contrôle (g) est le
+/// seul à en dépendre.
+fn ecrire_constat_ajuste(
+    repertoire: &Path,
+    empreinte_preuve: &str,
+    empreinte_utterance: &str,
+    instant: u64,
+) -> PathBuf {
+    let chemin = repertoire.join("constat.json");
+    let octets_de_preuve = OCTETS_DE_PREUVE.len();
+    let octets_recus = OCTETS_D_UTTERANCE.len();
     let texte = format!(
-        "# constat du binaire compagnon (ADR-0015 points 7 et 8)\noutil = {OUTIL}\nempreinte-preuve = {empreinte_preuve}\nempreinte-utterance = {empreinte_utterance}\n"
+        "{{\"attestor_cle_algorithme\":\"{CLE_ALGORITHME}\",\
+\"attestor_cle_hex\":\"{CLE_CHIFFRES}\",\
+\"connection_info_time\":{instant},\
+\"connection_info_version_tls\":\"V1_2\",\
+\"empreinte_presentation_sha256\":\"{empreinte_preuve}\",\
+\"empreinte_recv_revele_sha256\":\"{empreinte_utterance}\",\
+\"empreinte_sent_revele_sha256\":\"{EMPREINTE_DU_VIDE}\",\
+\"octets_presentation\":{octets_de_preuve},\
+\"revision_amont\":\"{REVISION_AMONT}\",\
+\"server_name\":\"{ORIGINE}\",\
+\"transcript_recv_authentifie\":{octets_recus},\
+\"transcript_recv_longueur\":{octets_recus},\
+\"transcript_recv_longueur_attestee\":{octets_recus},\
+\"transcript_sent_authentifie\":0,\
+\"transcript_sent_longueur\":0,\
+\"transcript_sent_longueur_attestee\":0,\
+\"verdict\":\"presentation_verifiee\",\
+\"version_du_constat\":1}}\n"
     );
     std::fs::write(&chemin, texte).expect("écriture du constat");
     chemin
@@ -236,8 +292,8 @@ fn temoignage_canonique_intact_le_verdict_nomme_les_residus_et_la_delegation() {
         "le verdict doit nommer ce qu'il n'a PAS vérifié (ADR-0015 point 8 alinéa e) : {sortie}"
     );
     assert!(
-        sortie.contains(OUTIL),
-        "le verdict nomme le binaire à qui le contrôle a été délégué : {sortie}"
+        sortie.contains(REVISION_AMONT),
+        "le verdict reprend VERBATIM la révision amont du constat (ADR-0015 pt 8 e) : {sortie}"
     );
     assert!(
         sortie.contains("aucune horloge lue"),
@@ -347,7 +403,9 @@ fn un_constat_mal_forme_est_refuse_sans_panique() {
     let chemin = repertoire.join("lot.cbor");
     std::fs::write(&chemin, lot_intact()).expect("écriture du lot");
     let registre = ecrire_registre(&repertoire, REGISTRE_COMPLET);
-    let constat = repertoire.join("constat.txt");
+    let constat = repertoire.join("constat.json");
+    // L'ancien format à trois clés, aujourd'hui hors contrat : il n'est même
+    // plus un objet du sous-ensemble, et le refus tombe au premier octet.
     std::fs::write(&constat, "outil = x\nempreinte-preuve = zz\n").expect("écriture");
     let (code, _, erreur) = executer(&[
         &chemin,
@@ -384,126 +442,275 @@ fn un_subject_non_canonique_est_refuse_au_decodage() {
     assert!(erreur.contains("majuscule dans l'hôte"), "{erreur}");
 }
 
-/// Les positions d'octets que **rien** ne lie dans la forme d'ADR-0015 point 8.
+/// **Le balayage des octets du lot — deux opérateurs, et l'ensemble RÉEL des
+/// régions que rien ne lie.**
 ///
-/// Deux charges utiles du témoignage n'entrent dans aucun contrôle recalculable
-/// par ce binaire, et il faut le dire au lieu de l'espérer :
+/// # Ce que ce test certifiait à vide, et par quelle mesure on l'a su
 ///
-/// - **la clé épinglée de l'attestateur** — les contrôles (b), (c) et (d) ne la
-///   touchent pas, et le constat du compagnon (ADR-0015 point 8) déclare l'outil
-///   et deux empreintes, **jamais la clé contre laquelle il a vérifié**. Rien ici
-///   ne rattache donc la clé portée à celle qu'a employée le contrôle délégué ;
-/// - **l'instant d'observation** — 03 §1 le veut ainsi (« la fraîcheur se calcule
-///   plus haut ») : ce rang enregistre qui a daté, il ne date pas.
+/// Jusqu'à la revue G2 de la vague 2 (2026-08-13), ce balayage n'avait qu'un
+/// opérateur — `^= 0xff` — et concluait « l'ensemble des acceptations est
+/// VIDE ». Le vert était **vide de sens** : inverser un octet rend non-ASCII
+/// tout octet de texte, et le lot tombe alors au DÉCODAGE (`ChampNonAscii`,
+/// `SubjectNonCanonique`), jamais aux contrôles de liaison. Un opérateur qui
+/// n'atteint pas les contrôles ne peut rien dire d'eux — et « aucune position
+/// acceptée » se lisait comme « rien n'est non lié », ce qui était faux.
 ///
-/// Ces deux trous ne sont pas des défauts de ce code : ce sont les **arêtes de la
-/// délégation** telle qu'ADR-0015 point 8 la spécifie aujourd'hui. Les fermer
-/// exigerait que le constat porte l'attestateur employé — une décision d'ADR, pas
-/// une retouche de test. Ce test les mesure exactement pour qu'ils ne puissent ni
-/// s'élargir en silence, ni être crus fermés.
-fn positions_non_liees(lot: &[u8]) -> Vec<usize> {
-    let mut positions: Vec<usize> = Vec::new();
-    for (aiguille, charge) in [
-        (CLE_ATTESTOR_ENCODEE.to_vec(), CLE_ATTESTOR.len()),
-        (instant_encode(), 4usize),
-    ] {
-        let debut = lot
-            .windows(aiguille.len())
-            .position(|fenetre| fenetre == aiguille.as_slice())
-            .expect("la charge non liée figure dans le lot");
-        // La charge suit son en-tête d'un octet.
-        let debut_charge = debut + (aiguille.len() - charge);
-        positions.extend(debut_charge..debut_charge + charge);
-    }
-    positions.sort_unstable();
-    positions
-}
-
-/// La clé épinglée du lot de référence, et son en-tête de chaîne d'octets.
-const CLE_ATTESTOR: &[u8] = &[0x04, 0x1a, 0x2b, 0x3c];
-const CLE_ATTESTOR_ENCODEE: &[u8] = &[0x44, 0x04, 0x1a, 0x2b, 0x3c];
-
-/// L'instant du lot de référence, tel que l'encodeur l'écrit : en-tête `0x1a`
-/// (entier non signé, argument sur quatre octets) puis l'argument gros-boutiste.
-fn instant_encode() -> Vec<u8> {
-    let mut aiguille = vec![0x1au8];
-    aiguille.extend_from_slice(&1_754_000_000u32.to_be_bytes());
-    aiguille
-}
-
+/// Mesure faite AVANT correction, sur ce lot de 381 octets : le même balayage
+/// conduit avec la **substitution ASCII à longueur égale** de
+/// `tests/temoignage_reel.rs` (`muter_une_lettre`) rend **84 positions
+/// acceptées** sur 304 substitutions essayées, en **quatre régions**. Le même
+/// geste sur le lot RÉEL accepte `?symbol=BTCUSDT` → `?symbol=BTCUSDX` en code
+/// 0, et de même sur `attestor.identity`, `observed_at.clock` et `transport`.
+///
+/// # Ce que le test dit désormais
+///
+/// Il tourne avec les **deux** opérateurs et ÉNUMÈRE l'ensemble réel des
+/// positions acceptées, asserté par égalité d'ensembles dans les deux sens :
+///
+/// * `^= 0xff` — ensemble VIDE, et c'est un fait sur **cet opérateur-là**, pas
+///   une conclusion sur les contrôles ;
+/// * substitution ASCII — exactement les positions substituables des quatre
+///   régions non liées, **calculées depuis la structure du lot** et non écrites
+///   en dur : le chemin et la requête de `subject` (hors schéma et hôte),
+///   `attestor.identity`, `observed_at.clock`, `transport`.
+///
+/// Ces quatre régions sont la limite qu'**ADR-0015 point 17 bis** consigne :
+/// l'alinéa (h) recoupe l'HÔTE de `subject` contre l'identité de serveur
+/// authentifiée ; la ressource désignée — chemin et requête — n'est liée par
+/// aucun contrôle recalculable en S3, et les trois identifiants restants ne le
+/// sont pas davantage. La limite est **affichée et mesurée, jamais niée** : la
+/// phrase de verdict la porte, ce balayage la chiffre, et l'unité S4 « liaison
+/// de la désignation » la traite.
+///
+/// Le test mord dans les deux sens. Un contrôle qui disparaît élargit
+/// l'ensemble et tombe ici ; un contrôle nouveau le rétrécit et tombe ici
+/// aussi — la liste nommée se rétrécit alors avec le registre, jamais l'inverse.
+///
+/// Les cas qui asserent (f), (g) et (h) à la variante exacte, sur le témoignage
+/// **réel**, vivent dans `tests/temoignage_reel.rs`.
 #[test]
-fn chaque_octet_de_structure_mute_est_refuse_ou_reste_canonique() {
-    // La limite du squelette S2.5 est ici **levée** : muter un octet de charge
-    // utile ne produit plus un autre témoignage acceptable, parce que le hash
-    // d'`utterance` et le constat lient le lot à sa preuve (ADR-0005 règle 1).
-    // Ce qui reste ouvert est **énuméré**, pas laissé au hasard : voir
-    // `positions_non_liees`.
+fn le_balayage_enumere_les_regions_que_rien_ne_lie() {
+    balayer_les_octets();
+}
+
+/// La substitution ASCII à longueur égale : une lettre pour une autre lettre,
+/// un chiffre pour un autre chiffre — le geste de `muter_une_lettre`
+/// (`tests/temoignage_reel.rs`), généralisé au balayage.
+///
+/// Elle ne s'applique qu'aux octets **alphanumériques**, et c'est une décision :
+/// ce sont les seuls dont le remplacement ne casse ni la structure CBOR (les
+/// en-têtes ne sont pas du texte) ni la canonicité de `subject` (les
+/// délimiteurs `/`, `?`, `=`, `.`, `:` ne bougent pas). Partout ailleurs
+/// l'inversion d'octet reste le seul opérateur — et les deux ensembles
+/// d'acceptations sont assertés **séparément**, pour qu'aucun ne masque
+/// l'autre.
+fn substitution_ascii(octet: u8) -> Option<u8> {
+    match octet {
+        b'a'..=b'z' => Some(if octet == b'x' { b'y' } else { b'x' }),
+        b'A'..=b'Z' => Some(if octet == b'X' { b'Y' } else { b'X' }),
+        b'0'..=b'9' => Some(if octet == b'7' { b'8' } else { b'7' }),
+        _ => None,
+    }
+}
+
+/// La position d'une aiguille dans le lot, **exigée unique**.
+///
+/// Un test qui cherche ce qu'il désigne ne devient pas faux en silence le jour
+/// où la forme bouge ; l'unicité exigée est le second garde-fou — une aiguille
+/// répétée rendrait la plage arbitraire.
+fn position_unique(lot: &[u8], aiguille: &[u8]) -> usize {
+    let occurrences: Vec<usize> = lot
+        .windows(aiguille.len())
+        .enumerate()
+        .filter(|(_, fenetre)| *fenetre == aiguille)
+        .map(|(position, _)| position)
+        .collect();
+    assert_eq!(
+        occurrences.len(),
+        1,
+        "aiguille ni absente ni répétée exigée : « {} »",
+        String::from_utf8_lossy(aiguille)
+    );
+    occurrences[0]
+}
+
+/// La plage d'octets d'une valeur textuelle du lot.
+fn plage(lot: &[u8], valeur: &str) -> std::ops::Range<usize> {
+    let debut = position_unique(lot, valeur.as_bytes());
+    debut..debut.saturating_add(valeur.len())
+}
+
+/// Les quatre régions que rien ne lie, **nommées**, plages calculées depuis la
+/// structure du lot (ADR-0015 point 17 bis).
+fn regions_non_liees(lot: &[u8]) -> Vec<(&'static str, std::ops::Range<usize>)> {
+    let debut_subject = position_unique(lot, SUBJECT.as_bytes());
+    // L'hôte est la seule part de `subject` que l'alinéa (h) lie ; sa fin est le
+    // début de ce que rien ne lie. On la trouve DANS le subject, plutôt que de
+    // compter des octets de tête qu'un changement de forme démentirait.
+    let decalage_hote = SUBJECT
+        .find(ORIGINE)
+        .expect("l'hôte figure dans le subject");
+    let fin_hote = debut_subject
+        .saturating_add(decalage_hote)
+        .saturating_add(ORIGINE.len());
+    vec![
+        (
+            "chemin et requête de subject (hors schéma et hôte)",
+            fin_hote..debut_subject.saturating_add(SUBJECT.len()),
+        ),
+        ("attestor.identity", plage(lot, IDENTITE)),
+        ("transport", plage(lot, TRANSPORT)),
+        ("observed_at.clock", plage(lot, HORLOGE)),
+    ]
+}
+
+fn balayer_les_octets() {
+    // La limite du squelette S2.5 reste levée pour tout ce que les contrôles
+    // atteignent : muter un octet de charge utile ne produit pas un autre
+    // témoignage acceptable, parce que le hash d'`utterance` et le constat lient
+    // le lot à sa preuve (ADR-0005 règle 1), et que (f), (g) et (h) lient la clé
+    // épinglée, l'instant et l'hôte. Ce qui reste non lié est ci-dessous, nommé
+    // et chiffré.
     let repertoire = repertoire("mutation");
     let origine = lot_intact();
     let registre = ecrire_registre(&repertoire, REGISTRE_COMPLET);
     let constat = ecrire_constat(&repertoire, EMPREINTE_DE_PREUVE, EMPREINTE_D_UTTERANCE);
+
+    let regions = regions_non_liees(&origine);
+    let nom_de_region = |position: usize| -> Option<&'static str> {
+        regions
+            .iter()
+            .find(|(_, plage)| plage.contains(&position))
+            .map(|(nom, _)| *nom)
+    };
+
     let mut refuses = 0usize;
-    let mut acceptes: Vec<usize> = Vec::new();
+    let mut substitutions_essayees = 0usize;
+    let mut acceptes_par_inversion: Vec<usize> = Vec::new();
+    let mut acceptes_par_substitution: Vec<usize> = Vec::new();
 
     for position in 0..origine.len() {
-        let mut mute = origine.clone();
-        mute[position] ^= 0xff;
-        let chemin = repertoire.join(format!("lot-{position}.cbor"));
-        std::fs::write(&chemin, &mute).expect("écriture du lot muté");
-        let (code, sortie, erreur) = executer(&[
-            &chemin,
-            Path::new("--registre"),
-            &registre,
-            Path::new("--constat"),
-            &constat,
-        ]);
-        if code == 0 {
-            acceptes.push(position);
-            println!("octet {position} inversé : ACCEPTÉ\n{sortie}");
-        } else {
-            assert!(
-                erreur.contains("VERDICT : refusé (fail-closed)"),
-                "octet {position} : verdict de refus absent\nstderr:{erreur}"
-            );
-            assert!(
-                !erreur.contains("panicked"),
-                "octet {position} : PANIQUE au lieu d'un refus\nstderr:{erreur}"
-            );
-            refuses += 1;
+        let octet = origine
+            .get(position)
+            .copied()
+            .expect("position dans le lot");
+        let mut operateurs: Vec<(&'static str, u8)> = vec![("inversion", octet ^ 0xff)];
+        if let Some(remplacant) = substitution_ascii(octet) {
+            substitutions_essayees = substitutions_essayees.saturating_add(1);
+            operateurs.push(("substitution", remplacant));
+        }
+
+        for (operateur, remplacant) in operateurs {
+            let mut mute = origine.clone();
+            if let Some(case) = mute.get_mut(position) {
+                *case = remplacant;
+            }
+            let chemin = repertoire.join(format!("lot-{operateur}-{position}.cbor"));
+            std::fs::write(&chemin, &mute).expect("écriture du lot muté");
+            let (code, _, erreur) = executer(&[
+                &chemin,
+                Path::new("--registre"),
+                &registre,
+                Path::new("--constat"),
+                &constat,
+            ]);
+            if code == 0 {
+                let region = nom_de_region(position).unwrap_or("HORS RÉGION NOMMÉE");
+                println!("octet {position} ({operateur}) : ACCEPTÉ — région « {region} »");
+                if operateur == "inversion" {
+                    acceptes_par_inversion.push(position);
+                } else {
+                    acceptes_par_substitution.push(position);
+                }
+            } else {
+                assert!(
+                    erreur.contains("VERDICT : refusé (fail-closed)"),
+                    "octet {position} ({operateur}) : verdict de refus absent\nstderr:{erreur}"
+                );
+                assert!(
+                    !erreur.contains("panicked"),
+                    "octet {position} ({operateur}) : PANIQUE au lieu d'un refus\nstderr:{erreur}"
+                );
+                refuses = refuses.saturating_add(1);
+            }
         }
     }
 
-    let attendues = positions_non_liees(&origine);
+    // L'ensemble ATTENDU : les positions substituables des régions nommées, et
+    // rien d'autre. Il est dérivé du lot, jamais recopié d'un run précédent.
+    let mut attendues: Vec<usize> = Vec::new();
+    for (_, plage) in &regions {
+        for position in plage.clone() {
+            let octet = origine.get(position).copied().unwrap_or(0);
+            if substitution_ascii(octet).is_some() {
+                attendues.push(position);
+            }
+        }
+    }
+    attendues.sort_unstable();
+
     println!(
-        "mutation d'octet bout-en-bout — {} positions : {refuses} refus fail-closed nommés, {} acceptations, 0 panique",
+        "balayage à deux opérateurs — {} octets : {} inversions, {substitutions_essayees} substitutions ASCII, {refuses} refus fail-closed nommés, 0 panique",
         origine.len(),
-        acceptes.len()
+        origine.len()
     );
+    for (nom, plage) in &regions {
+        let texte = String::from_utf8_lossy(origine.get(plage.clone()).unwrap_or(&[])).into_owned();
+        println!(
+            "  région non liée « {nom} » : octets {}..{} — « {texte} »",
+            plage.start, plage.end
+        );
+    }
+    println!("  acceptations par inversion    : {acceptes_par_inversion:?}");
     println!(
-        "positions acceptées {acceptes:?} — attendues (charges non liées) {attendues:?} : \
-         clé épinglée de l'attestateur et instant d'observation"
+        "  acceptations par substitution : {} — {acceptes_par_substitution:?}",
+        acceptes_par_substitution.len()
     );
-    // Égalité d'ensembles, pas inégalité de compte : le test mord dans les deux
-    // sens. Un contrôle qui disparaît élargit l'ensemble et tombe ici ; un
-    // contrôle qui se resserre (le constat portant enfin l'attestateur employé)
-    // le rétrécit et tombe ici aussi — auquel cas c'est `positions_non_liees`
-    // qu'il faut réduire, en même temps que l'ADR qui l'aura permis.
+
+    // Un ensemble attendu VIDE serait le retour exact du défaut corrigé : un
+    // « vert » qui ne mesure rien. Le test refuse de conclure dans ce cas.
+    assert!(
+        !attendues.is_empty(),
+        "les régions non liées d'ADR-0015 point 17 bis ne se dérivent plus du lot : \
+         un ensemble attendu vide ferait de ce balayage un vert à vide"
+    );
+
+    // Opérateur 1 — inversion d'octet. L'ensemble est vide, et le test dit
+    // pourquoi : cet opérateur n'atteint pas les contrôles de liaison sur les
+    // champs textuels, il tombe au décodage.
+    let aucune: Vec<usize> = Vec::new();
     assert_eq!(
-        acceptes, attendues,
-        "l'ensemble des octets non liés a changé : hors la clé épinglée et \
-         l'instant, la liaison hash → preuve ferme toute la classe que le \
-         squelette S2.5 laissait ouverte (ADR-0005 règle 1, ADR-0015 point 8)"
+        acceptes_par_inversion, aucune,
+        "une inversion d'octet a été acceptée : elle devrait tomber au décodage \
+         (non-ASCII) ou à un contrôle de liaison"
+    );
+
+    // Opérateur 2 — substitution ASCII. Égalité d'ensembles dans les deux sens
+    // contre les régions NOMMÉES d'ADR-0015 point 17 bis.
+    assert_eq!(
+        acceptes_par_substitution, attendues,
+        "l'ensemble des positions non liées a bougé. Attendu : les positions \
+         substituables du chemin et de la requête de subject (hors schéma et \
+         hôte), d'attestor.identity, de transport et d'observed_at.clock — \
+         ADR-0015 point 17 bis, unité S4 « liaison de la désignation ». Un \
+         contrôle nouveau rétrécit cet ensemble et se porte au registre ; un \
+         contrôle perdu l'élargit et c'est une régression."
     );
 }
 
 /// Revue G2 de phase C, trouvaille F7 (démontrée : l'ordre des lignes du
 /// constat changeait le verdict) : une clé répétée est un refus nommé,
-/// jamais « la dernière l'emporte ».
+/// jamais « la dernière l'emporte ». Portée au contrat du point 13, elle tombe
+/// désormais sur le **tri strict** des clés.
 #[test]
 fn un_constat_a_cle_repetee_est_refuse() {
     let (lot, registre, constat) = preparer("constat-cle-repetee", &lot_intact(), REGISTRE_COMPLET);
     let texte = std::fs::read_to_string(&constat).expect("constat de référence");
-    let doublon = format!("{texte}empreinte-utterance = {EMPREINTE_D_UTTERANCE}\n");
+    let doublon = texte.replacen(
+        &format!("\"server_name\":\"{ORIGINE}\","),
+        &format!("\"server_name\":\"{ORIGINE}\",\"server_name\":\"{ORIGINE}\","),
+        1,
+    );
     std::fs::write(&constat, doublon).expect("écriture du constat à doublon");
     let (code, sortie, erreur) = executer(&[
         &lot,

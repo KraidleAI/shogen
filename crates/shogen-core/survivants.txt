@@ -23,10 +23,49 @@
 # au second). Seul l'état re-mesuré après le correctif fait foi (revue G2
 # vague 1 : un chiffre qui ne se rattache pas à sa mesure ne se copie pas).
 #
-# ÉTAT MESURÉ ET REJOUABLE (2026-08-13, `cargo xtask mutation`, cargo-mutants
-# 27.1.0, parallélisme 4) : 417 mutants générés, 363 tués, 22 survivants, 32
-# non viables — score 94,2857 % sur 385 non équivalents. Les 22 survivants sont
+# ÉTAT MESURÉ ET REJOUABLE — **vague 2, chantier de corrections de la revue
+# G2, 2026-08-13** (`cargo xtask mutation`, cargo-mutants 27.1.0,
+# parallélisme 4) : **426 mutants générés, 372 tués, 22 survivants, 32 non
+# viables — score 94,4162 % sur 394 non équivalents**. Les 22 survivants sont
 # EXACTEMENT les 22 lignes ci-dessous.
+#
+# Ce chiffre est, au dernier chiffre, celui de la mesure précédente du même
+# jour : les deux correctifs du cœur de ce chantier — le refus du caractère de
+# contrôle dans `controler_identifiant` (`temoignage_canonique.rs`) et le refus
+# de l'`attestor` vide avant le contrôle (f) (`verification.rs`) — n'ont fait
+# naître **aucun** mutant nouveau. Les deux sont des appels de méthode gardant
+# un `return Err(...)` : `cargo-mutants` ne les mute pas, la population reste
+# 426 (comptée à l'exécution, pas déduite).
+#
+# Ce que ce chantier a changé, et pourquoi les numéros de ligne de `subject.rs`
+# ont encore bougé, de +8 cette fois : la doc de `hote_de_subject` a été
+# corrigée (mineure A5 de la revue — elle promettait « chaîne vide sur entrée
+# hors forme » alors que le repli ne couvre que l'absence de préfixe), et le
+# texte plus long a décalé le fichier de 8 lignes. Les NEUF entrées de
+# `subject.rs` ci-dessous sont les mêmes mutants, aux mêmes justifications, au
+# nouveau rang : 327→335, 361→369, 501→509, 537→545, 543→551 (trois entrées),
+# 590→598, 603→611 — décalage constant, vérifié entrée par entrée contre la
+# liste mesurée. Le run qui a rendu ROUGE ne signalait QUE ces neuf-là, et
+# aucun survivant hors ligne de base : un décalage de fichier n'est pas une
+# régression, et la gate le dit en refusant tant que la ligne de base n'est
+# pas recalée.
+#
+# Ce que la vague 2 avait déjà changé, plus tôt le même jour : les numéros de
+# `subject.rs` avaient bougé de +21 à l'ajout de `hote_de_subject` (l'alinéa
+# (h), ADR-0015 point 17). Ce décalage-là est absorbé dans les rangs
+# ci-dessous, au même titre que le +8 du chantier de corrections. (Les numéros
+# cités dans le commentaire historique plus haut, eux, ne se recalent pas :
+# ils tracent une mesure passée, pas la ligne de base.)
+#
+# La même mesure a fait naître QUATRE survivants sur `rendu_de_cle`
+# (`verification.rs`, contrôle (f)) : ils étaient **tuables**, ils ont été
+# **tués** par trois tests de `mutation_programme.rs` — un survivant tuable n'a
+# rien à faire ici. Ce qu'ils montraient : aucune suite n'imprimait le refus
+# d'épinglage, alors que ce refus est le seul endroit où un tiers lit quelle
+# clé a été épinglée et quelle clé a servi.
+#
+# ÉTAT PRÉCÉDENT (vague 1, même jour) : 417 mutants générés, 363 tués, 22
+# survivants, 32 non viables — score 94,2857 % sur 385 non équivalents.
 #
 # Pourquoi « rejouable » est écrit ici. Les trois premières mesures de la
 # journée ne l'étaient pas : le même mutant était compté survivant dans l'une
@@ -71,12 +110,12 @@ crates/shogen-core/src/empreinte.rs:260:18: replace < with <= in comprimer # éq
 crates/shogen-core/src/empreinte.rs:364:9: delete match arm 0 in chiffre_hexadecimal # équivalent : le bras retiré rend '0' et le bras de repli `_` rend '0' aussi — même valeur, par construction du repli
 
 # ── subject.rs — bornes inatteignables et chemins gardés en amont ───────────
-crates/shogen-core/src/subject.rs:306:22: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : `controler_hote` sort en `HoteVide` quand debut >= fin, donc fin_effective > debut est toujours vrai à l'entrée
-crates/shogen-core/src/subject.rs:340:26: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : le seul cas où fin_effective == debut_label+1 est un label d'un octet, déjà rendu vrai par le contrôle « tout chiffres » au-dessus
-crates/shogen-core/src/subject.rs:480:57: replace | with ^ in controler_triplet # équivalent : `haut.wrapping_shl(4)` a ses 4 bits bas nuls, `bas` <= 15 tient dedans — disjoints
-crates/shogen-core/src/subject.rs:516:43: replace >= with < in segment_est_pointille # équivalent au programme : la borne ne se distingue que sur un triplet tronqué au bord du segment, forme que C7 refuse en `TripletPercentMalForme` avant C6 ; sur un triplet entier atteignable (`%2F`) les deux chemins rendent faux
-crates/shogen-core/src/subject.rs:522:17: delete match arm (Some(haut), Some(bas)) in segment_est_pointille # équivalent au programme : C7 (controler_octets) précède C6 et refuse `%2E`/`%2e` en `PercentEncodageInutile` — mesuré le 2026-08-13 ; aucun triplet atteignant ce bras ne décode en `.`, les deux chemins rendent faux
-crates/shogen-core/src/subject.rs:522:66: replace | with & in segment_est_pointille # équivalent au programme : même démonstration — sur un triplet réservé atteignable (`%2F`), `(2<<4)|15` et `(2<<4)&15` diffèrent mais aucun des deux ne vaut POINT, la fonction rend faux dans les deux cas
-crates/shogen-core/src/subject.rs:522:66: replace | with ^ in segment_est_pointille # équivalent : champs disjoints (quartet haut décalé, quartet bas), `|` et `^` coïncident
-crates/shogen-core/src/subject.rs:569:9: delete match arm b'a'..= b'f' in valeur_hexadecimale # équivalent au programme : les deux appelants excluent la minuscule en amont — `controler_triplet` sort en `TripletPercentMinuscule` avant l'appel, et `segment_est_pointille` ne voit aucun triplet (démonstration ci-dessus)
-crates/shogen-core/src/subject.rs:582:20: replace < with <= in premier_parmi_borne # équivalent : à `position == fin` la boucle rendrait `fin`, ce que le repli rend déjà — les deux chemins rendent la même valeur
+crates/shogen-core/src/subject.rs:335:22: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : `controler_hote` sort en `HoteVide` quand debut >= fin, donc fin_effective > debut est toujours vrai à l'entrée
+crates/shogen-core/src/subject.rs:369:26: replace > with >= in dernier_label_est_un_nombre # équivalent au programme : le seul cas où fin_effective == debut_label+1 est un label d'un octet, déjà rendu vrai par le contrôle « tout chiffres » au-dessus
+crates/shogen-core/src/subject.rs:509:57: replace | with ^ in controler_triplet # équivalent : `haut.wrapping_shl(4)` a ses 4 bits bas nuls, `bas` <= 15 tient dedans — disjoints
+crates/shogen-core/src/subject.rs:545:43: replace >= with < in segment_est_pointille # équivalent au programme : la borne ne se distingue que sur un triplet tronqué au bord du segment, forme que C7 refuse en `TripletPercentMalForme` avant C6 ; sur un triplet entier atteignable (`%2F`) les deux chemins rendent faux
+crates/shogen-core/src/subject.rs:551:17: delete match arm (Some(haut), Some(bas)) in segment_est_pointille # équivalent au programme : C7 (controler_octets) précède C6 et refuse `%2E`/`%2e` en `PercentEncodageInutile` — mesuré le 2026-08-13 ; aucun triplet atteignant ce bras ne décode en `.`, les deux chemins rendent faux
+crates/shogen-core/src/subject.rs:551:66: replace | with & in segment_est_pointille # équivalent au programme : même démonstration — sur un triplet réservé atteignable (`%2F`), `(2<<4)|15` et `(2<<4)&15` diffèrent mais aucun des deux ne vaut POINT, la fonction rend faux dans les deux cas
+crates/shogen-core/src/subject.rs:551:66: replace | with ^ in segment_est_pointille # équivalent : champs disjoints (quartet haut décalé, quartet bas), `|` et `^` coïncident
+crates/shogen-core/src/subject.rs:598:9: delete match arm b'a'..= b'f' in valeur_hexadecimale # équivalent au programme : les deux appelants excluent la minuscule en amont — `controler_triplet` sort en `TripletPercentMinuscule` avant l'appel, et `segment_est_pointille` ne voit aucun triplet (démonstration ci-dessus)
+crates/shogen-core/src/subject.rs:611:20: replace < with <= in premier_parmi_borne # équivalent : à `position == fin` la boucle rendrait `fin`, ce que le repli rend déjà — les deux chemins rendent la même valeur

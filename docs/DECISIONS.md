@@ -1864,6 +1864,62 @@ code — c'est A(self-attestation) rendu matériel, l'affichage exact du pt 4.
 Si une passe ultérieure prétend à autre chose que la démonstration de
 forme, la gestion de clé du notaire devient un objet à part entière.)*
 
+*(Second amendement du 2026-08-13, vague 2 — chantier vérificateur ;
+consultations R-26 du worker V adjugées par l'orchestrateur. Deux points :*
+
+*17. **Alinéa (h) — le recoupement d'origine, lettré.** Le pt 13 assignait
+`server_name` au « recoupement d'origine de `subject` (ADR-0016) » sans
+que le pt 8 n'en porte la lettre. Le contrôle est ratifié comme alinéa
+**(h)**, même famille et même forme que l'amendement (f)/(g) du matin (une
+charge du témoignage que rien ne liait) : l'hôte de `subject` (extraction
+par découpe, jamais réécriture — ADR-0016 C0, `hote_de_subject` au cœur)
+doit égaler l'identité de serveur authentifiée que le constat porte
+(`server_name`). Le contrôle ne peut produire qu'un refus, jamais une
+acceptation ; sans lui, un témoignage dont le `subject` désigne une autre
+origine que celle de la session attestée serait accepté — l'épinglage
+d'origine serait décoratif, exactement le motif de (f).*
+
+*17 bis. **Ce que (h) ferme, et ce qu'il ne ferme PAS — mesuré par la revue
+G2 de la vague 2.** L'alinéa (h) recoupe l'HÔTE de `subject` contre
+l'identité authentifiée. Le chemin et la requête de `subject` — la
+ressource désignée — ne sont liés par AUCUN contrôle recalculable en S3 :
+un lot dont la requête est altérée en ASCII à longueur égale est accepté
+(démontré : `?symbol=BTCUSDT` → `?symbol=BTCUSDX`, code 0). La donnée qui
+fermerait ce trou existe au constat (`empreinte_sent_revele_sha256`) mais
+le témoignage ne porte pas les octets du sens émis : la fermeture exige
+soit une clé de contrat supplémentaire portée par incrément de
+`version_du_constat` (option a), soit un champ de forme supplémentaire à
+03 §1 (option b) — deux évolutions de forme ratifiée qui appartiennent au
+mainteneur. Décision S3 (adjudication R-26 de la consultation du
+réviseur) : la limite s'AFFICHE — la phrase de verdict la porte, le
+balayage des régions non liées l'ÉNUMÈRE en test (jamais un « ensemble
+vide » écrit sans être démontré), `empreinte_sent_revele_sha256` est
+portée jusqu'au cœur au lieu d'être jetée — et **l'unité S4 « liaison de
+la désignation » est nommée**, instruite aux deux options ci-dessus,
+remontée au mainteneur avec ce texte pour dossier.*
+
+*19. **Le jeton de succès du constat, figé au contrat** (consultation du
+réviseur, adjugée option a) : `verdict` vaut `"presentation_verifiee"` en
+cas de succès — le pt 13 ne figeait que les clés, laissant le jeton hors
+de la règle d'évolution ; il y entre : tout changement du jeton amont
+force un incrément de `version_du_constat`, comme les clés.*
+
+*18. **La rédaction de l'alinéa (e), amendée à ce que les données
+permettent.** La chaîne proposée au pt 8 (e) nommait le binaire compagnon
+par son nom — un nom de transport, que la gate S-G1 interdit dans les
+sources du vérificateur, et que le contrat du pt 13 ne porte dans aucune
+clé. La chaîne rendue est : « le contrôle cryptographique de la preuve de
+transport a été exécuté par le binaire compagnon du transport
+« [identifiant `transport` du lot] » à la révision amont [`revision_amont`
+du constat, verbatim], jamais par ce binaire ». Le sens de l'alinéa — QUI
+a exécuté le contrôle, et que ce binaire ne l'a PAS fait — est
+intégralement tenu ; les deux données viennent du lot et du constat, pas
+d'une constante du vérificateur. L'alternative « excepter S-G1 » est
+rejetée : ce serait l'affaiblissement de gate que le motif 3 du rejet de
+la forme α refusait déjà ; l'alternative « clé de nom d'outil au constat »
+est rejetée : une rupture de contrat (`version_du_constat`) pour une
+information que le lot porte déjà autrement.)*
+
 ### Alternative considérée
 
 #### (a) Forme α — vérification embarquée dans `shogen-verifier`

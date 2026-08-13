@@ -19,3 +19,45 @@
 crates/shogen-verifier/fuzz-corpus/** -text
 # Sauf le registre du corpus, qui est bien du texte.
 crates/shogen-verifier/fuzz-corpus/README.md text=auto eol=lf
+
+# Fixtures de tests du vérificateur (S3 phase C vague 2) : des OCTETS, jamais
+# du texte. Le motif ci-dessous est celui que la MESURE donne, et il n'est pas
+# celui que la première rédaction annonçait (revue G2 de la vague 2 : le motif
+# écrit était empiriquement faux ; mesures refaites le 2026-08-13 sur copies de
+# travail, `git -c core.autocrlf=true`, trois régimes d'attributs comparés).
+#
+# Ce que la mesure établit, fichier par fichier :
+#
+#  1. `s3-binance.lot.cbor` est **auto-détecté binaire** (420 octets NUL dans
+#     les 8000 premiers) : sous `autocrlf=true` et SANS aucun attribut, il
+#     traverse versement et checkout inchangé — 7399 octets, sha256
+#     8700d88f… Il ne serait donc PAS corrompu par autocrlf, contrairement à ce
+#     qui était écrit ici.
+#  2. `s3-binance.constat.json` et `s3-binance.registre.txt` sont du texte pur
+#     en LF. Sous `autocrlf=true` et SANS aucun attribut, ce sont EUX que le
+#     checkout gonfle : 875 → 876 et 616 → 637 octets. Mais la règle racine
+#     `* text=auto eol=lf` ci-dessus porte `eol=lf`, et `eol=lf` neutralise
+#     déjà autocrlf au checkout : mesuré avec la seule règle racine, les trois
+#     fichiers ressortent à 875 / 7399 / 616, inchangés.
+#  3. Ce que `-text` ajoute réellement, et c'est la seule raison de l'écrire :
+#     il **retire la dépendance à l'heuristique binaire de Git** pour le lot.
+#     Contrefactuel mesuré — attribut `text` forcé sur le répertoire : le blob
+#     du lot tombe de 7399 à 7340 octets au versement (59 séquences CRLF dont
+#     le CR est retiré) et son empreinte devient f0f6c3b8… L'empreinte du lot
+#     est CE QUE LE VÉRIFICATEUR COMPARE au constat (ADR-0005 règle 1, « les
+#     octets exacts ») : le critère de sortie de S3 serait faux pour quiconque
+#     clone. L'heuristique dépend du CONTENU, pas du chemin — un lot futur sans
+#     octet nul de tête basculerait en « texte » sans que rien ne change ici.
+#     La règle ferme ce basculement.
+#
+# Le constat et le registre suivent la même règle pour que le répertoire ait un
+# seul régime — protection surabondante pour eux, uniformité assumée.
+#
+# `-diff` a été RETIRÉ (revue G2 de la vague 2) : il coûtait la relecture de
+# trois fichiers versionnés sans rien protéger — la conversion de fins de ligne
+# ne dépend que de `text`, jamais de `diff`. Le constat et le registre se
+# relisent donc en diff, et le lot reste illisible parce qu'il est binaire, non
+# parce qu'un attribut le déclare.
+crates/shogen-verifier/tests/fixtures/** -text
+# Sauf la provenance, qui est bien du texte : elle reprend le régime racine.
+crates/shogen-verifier/tests/fixtures/PROVENANCE.md text=auto eol=lf

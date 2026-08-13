@@ -1,0 +1,123 @@
+# Adapter shogen-temoignage — construction, tests du binaire, rejeu du lot,
+# couverture.
+#
+# Rattachement (G0) : ADR-0001 (« les transports sont des adapters, *testés*,
+# jamais prouvés » — un adapter qu'aucun job ne construit n'est même pas
+# testé) ; ADR-0011 point 1 (l'étage d'intégration) et seuil 2 (couverture par
+# rôle ≥ 60 % lignes pour un adapter) ; ADR-0005 règle 1 (la liaison hash porte
+# sur les octets EXACTS — le rejeu à l'octet est ce qui la garde) ; ADR-0012 D1
+# (workspace autonome, `Cargo.lock` propre, `--locked` partout).
+#
+# Motif d'existence (revue G2 de la vague 2, majeure C3) : ce workspace est
+# HORS des membres du workspace racine ; ni `gates.yml` ni `squelette.yml` ne
+# le voient. Il construisait le lot du critère de sortie de S3 sans qu'aucun
+# job ne le construise. Ce fichier ferme cela, au patron de `compagnon.yml`.
+#
+# Les fixtures sont VERSIONNÉES et aucune session n'est rejouée : ce job lit des
+# fichiers et en écrit un — aucun réseau, aucun secret.
+# Invariant : jobs bloquants, jamais de continue-on-error.
+
+name: temoignage
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Zéro autorité ambiante (ADR-0012 D7 ; DEVOPS §4).
+permissions:
+  contents: read
+
+jobs:
+  temoignage:
+    name: temoignage (${{ matrix.os }})
+    # Les deux plateformes, comme le compagnon : le lot est construit sur la
+    # machine du mainteneur (Windows) et doit l'être à l'octet près ailleurs,
+    # sans quoi « le lot versionné » ne veut rien dire pour qui clone.
+    # Le rejeu ci-dessous est aussi ce qui éprouve, à chaque exécution, la règle
+    # `-text` du `.gitattributes` : sur `windows-latest`, `core.autocrlf` vaut
+    # `true` par défaut, et un lot mal attribué ressortirait du checkout amputé
+    # de ses CR — le sha256 tomberait ici.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+        working-directory: adapters/shogen-temoignage
+    steps:
+      - name: Checkout
+        # actions/checkout épinglé par SHA de commit — tag v7.0.1, le MÊME SHA
+        # que `squelette` et `compagnon` emploient déjà.
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        working-directory: .
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal --no-self-update
+          rustup default "${TOOLCHAIN}"
+          # `llvm-tools` est exigé par cargo-llvm-cov et n'est pas dans le
+          # profil minimal ; il est ajouté ici, jamais supposé présent.
+          rustup component add llvm-tools-preview --toolchain "${TOOLCHAIN}"
+          rustc --version
+
+      - name: Construction verrouillée
+        run: cargo build --locked --release
+
+      - name: Tests verrouillés (bibliothèque et binaire)
+        run: cargo test --locked
+
+      - name: Rejeu — le lot construit est, à l'octet, le lot versionné
+        # ADR-0005 règle 1 : l'empreinte du lot est ce que le vérificateur
+        # compare au constat. Si un runner construit un autre lot sur les mêmes
+        # artefacts, quelque chose a bougé (fixture corrompue au checkout,
+        # dérive du constructeur, encodage non déterministe) — ROUGE.
+        # La valeur attendue est celle que porte
+        # `crates/shogen-verifier/tests/fixtures/PROVENANCE.md`, relevée par
+        # `sha256sum` (GNU coreutils).
+        run: |
+          set -euo pipefail
+          ATTENDU="8700d88f87253f0fd8496402601dc7326362a2cd9e6614a9bf44b79052f1e5a3"
+          COMMITTE="../../crates/shogen-verifier/tests/fixtures/s3-binance.lot.cbor"
+          SORTIE="$(mktemp -d)/s3-binance.lot.cbor"
+          cargo run --locked --release --quiet -- \
+            ../shogen-tlsn-verify/fixtures shogen-s3-binance "${SORTIE}"
+          REJEU="$(sha256sum "${SORTIE}" | cut -d' ' -f1)"
+          DEPOSE="$(sha256sum "${COMMITTE}" | cut -d' ' -f1)"
+          echo "lot rejoué   : ${REJEU}"
+          echo "lot versionné: ${DEPOSE}"
+          if [ "${DEPOSE}" != "${ATTENDU}" ]; then
+            echo "::error::le lot VERSIONNÉ n'a pas l'empreinte de PROVENANCE.md (${DEPOSE})"
+            exit 1
+          fi
+          if [ "${REJEU}" != "${ATTENDU}" ]; then
+            echo "::error::le lot REJOUÉ n'a pas l'empreinte de PROVENANCE.md (${REJEU})"
+            exit 1
+          fi
+          # Et l'octet, pas seulement le condensé.
+          cmp "${SORTIE}" "${COMMITTE}"
+          echo "lot identique à l'octet."
+
+      - name: Outil de couverture — cargo-llvm-cov, version exacte
+        # Même discipline que `compagnon.yml` pour cargo-deny : version exacte,
+        # --locked, aucune action tierce d'installation. La version est celle
+        # que `docs/R-8-outillage.md` porte.
+        run: cargo install cargo-llvm-cov --locked --version 0.8.7
+
+      - name: Couverture — seuil ADR-0011 seuil 2 (≥ 60 % lignes), BLOQUANT
+        # `--fail-under-lines` rend un code non nul sous le seuil : la mesure
+        # EST la gate, elle n'est pas un rapport qu'on lit après coup.
+        # Mesure du 2026-08-13 sur la machine du mainteneur : 90,51 % lignes
+        # (lib.rs 90,45 %, main.rs 90,62 %) — 61,39 % avant que le binaire ne
+        # soit exercé, main.rs à 0,00 %.
+        run: cargo llvm-cov --locked --summary-only --fail-under-lines 60

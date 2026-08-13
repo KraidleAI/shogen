@@ -13,8 +13,9 @@
 use shogen_core::{
     CLE_ATTESTOR, CLE_BYTES, CLE_CLOCK, CLE_HASH, CLE_IDENTITY, CLE_INSTANT, CLE_KEY,
     CLE_OBSERVED_AT, CLE_RESIDUAL, CLE_SUBJECT, CLE_TRANSPORT, CLE_TRANSPORT_PROOF, ErreurDecodage,
-    ErreurSubject, Lot, ORDRE_CANONIQUE_DU_TEMOIGNAGE, decoder_lot, decoder_temoignage_canonique,
-    empreinte_sha256, encodage_de_cle, encoder_lot, encoder_temoignage_canonique,
+    ErreurSubject, Lot, ORDRE_CANONIQUE_DU_TEMOIGNAGE, Temoignage, decoder_lot,
+    decoder_temoignage_canonique, empreinte_sha256, encodage_de_cle, encoder_lot,
+    encoder_temoignage_canonique,
 };
 
 mod commun;
@@ -46,8 +47,8 @@ fn vecteur_de_reference_octet_par_octet() {
     manuel.extend_from_slice(&[0xa2]); // carte(2)
     manuel.extend_from_slice(&[0x63]); // texte(3)
     manuel.extend_from_slice(CLE_KEY.as_bytes());
-    manuel.extend_from_slice(&[0x44]); // octets(4)
-    manuel.extend_from_slice(&[0x04, 0x1a, 0x2b, 0x3c]);
+    manuel.extend_from_slice(&[0x50]); // octets(16)
+    manuel.extend_from_slice(commun::CLE_EPINGLEE);
     manuel.extend_from_slice(&[0x68]); // texte(8)
     manuel.extend_from_slice(CLE_IDENTITY.as_bytes());
     manuel.extend_from_slice(&[0x75]); // texte(21)
@@ -276,6 +277,61 @@ fn un_identifiant_non_ascii_est_refuse() {
             assert_eq!(octet, 0xC3);
         }
         autre => panic!("attendu ChampNonAscii, obtenu {autre:?}"),
+    }
+}
+
+/// Un identifiant portant un **caractère de contrôle** est refusé au décodage
+/// (amendement de la vague 2, revue G2 du chantier V).
+///
+/// La variante exacte est la mesure : le lot forgé ci-dessous — 19 octets de
+/// `transport`, dont un `0x0A` — faisait naître dans la sortie du vérificateur
+/// une ligne « VERDICT : forge », que ce binaire n'avait jamais rendue, et le
+/// lot sortait en **code 0**. Le refus est au décodage : un identifiant est
+/// recopié dans le verdict, il ne met jamais en page.
+#[test]
+fn un_identifiant_a_caractere_de_controle_est_refuse() {
+    let mut forge = reference();
+    forge.transport = String::from("aaa\nVERDICT : forge");
+    let octets = encoder_temoignage_canonique(&forge);
+    match decoder_temoignage_canonique(&octets) {
+        Err(ErreurDecodage::ChampNonImprimable { cle, octet, .. }) => {
+            assert_eq!(cle, CLE_TRANSPORT);
+            assert_eq!(octet, 0x0A);
+        }
+        autre => panic!("attendu ChampNonImprimable, obtenu {autre:?}"),
+    }
+}
+
+/// Le même refus sur les trois autres champs qui passent par le contrôle
+/// d'identifiant : `clock`, `identity`, et les résidus. Un contrôle posé sur
+/// une seule clé serait un contrôle qu'on croit fermé.
+#[test]
+fn le_caractere_de_controle_est_refuse_sur_les_quatre_identifiants() {
+    /// Le geste qui abîme un champ du témoignage de référence.
+    type Abimer = fn(&mut Temoignage);
+    let cas: [(&str, Abimer); 3] = [
+        (CLE_CLOCK, |t| {
+            t.observed_at.clock = String::from("horloge\u{7f}exemple");
+        }),
+        (CLE_IDENTITY, |t| {
+            if let Some(premier) = t.attestor.first_mut() {
+                premier.identity = String::from("exemple\u{1}attestateur");
+            }
+        }),
+        (CLE_RESIDUAL, |t| {
+            t.residual = vec![String::from("A(exemple\rresidu)")];
+        }),
+    ];
+    for (cle_attendue, abimer) in cas {
+        let mut temoignage = reference();
+        abimer(&mut temoignage);
+        let octets = encoder_temoignage_canonique(&temoignage);
+        match decoder_temoignage_canonique(&octets) {
+            Err(ErreurDecodage::ChampNonImprimable { cle, .. }) => {
+                assert_eq!(cle, cle_attendue);
+            }
+            autre => panic!("attendu ChampNonImprimable pour {cle_attendue}, obtenu {autre:?}"),
+        }
     }
 }
 

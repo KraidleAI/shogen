@@ -46,27 +46,27 @@
 
 extern crate alloc;
 
+mod constat;
+
 use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use shogen_core::{
-    Constat, ErreurDecodage, ErreurVerification, Lot, OCTETS_D_EMPREINTE, Temoignage,
-    TemoignageTrivial, Verdict, decoder_lot, encoder_lot, verifier_temoignage,
+    Constat, ErreurDecodage, ErreurVerification, Lot, Temoignage, TemoignageTrivial, Verdict,
+    decoder_lot, encoder_lot, verifier_temoignage,
+};
+
+pub use constat::{
+    CLES_DU_CONSTAT, ErreurConstat, SEPARATEUR_DE_CLE, VERDICT_DE_SUCCES, VERSION_DU_CONSTAT,
+    analyser_constat,
 };
 
 /// L'option du registre publié des résidus.
 pub const OPTION_REGISTRE: &str = "--registre";
 /// L'option du constat du binaire compagnon.
 pub const OPTION_CONSTAT: &str = "--constat";
-
-/// Les clés du fichier de constat.
-pub const CLE_OUTIL: &str = "outil";
-/// Clé de l'empreinte de la preuve de transport.
-pub const CLE_EMPREINTE_PREUVE: &str = "empreinte-preuve";
-/// Clé de l'empreinte de l'utterance.
-pub const CLE_EMPREINTE_UTTERANCE: &str = "empreinte-utterance";
 
 /// Ce que le vérificateur a établi sur une suite d'octets, avant toute
 /// impression et avant tout code de sortie.
@@ -176,114 +176,6 @@ pub fn analyser_registre(texte: &str) -> Result<Vec<String>, String> {
         identifiants.push(String::from(ligne));
     }
     Ok(identifiants)
-}
-
-/// Le constat du binaire compagnon : trois clés, une par ligne.
-pub fn analyser_constat(texte: &str) -> Result<Constat, String> {
-    let mut outil: Option<String> = None;
-    let mut empreinte_de_la_preuve: Option<[u8; OCTETS_D_EMPREINTE]> = None;
-    let mut empreinte_de_l_utterance: Option<[u8; OCTETS_D_EMPREINTE]> = None;
-
-    for ligne in texte.lines() {
-        let ligne = ligne.trim();
-        if ligne.is_empty() || ligne.starts_with('#') {
-            continue;
-        }
-        let Some((cle, valeur)) = ligne.split_once('=') else {
-            return Err(format!(
-                "constat mal formé : ligne sans « = » — « {ligne} »"
-            ));
-        };
-        let cle = cle.trim();
-        let valeur = valeur.trim();
-        // Clé répétée : refus nommé, jamais « la dernière l'emporte » (revue
-        // G2 de phase C, trouvaille F7 — démontrée : l'ordre des lignes
-        // changeait le verdict). Même argument que le registre : un constat
-        // à doublons n'est pas un constat.
-        if cle == CLE_OUTIL {
-            if outil.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            outil = Some(String::from(valeur));
-        } else if cle == CLE_EMPREINTE_PREUVE {
-            if empreinte_de_la_preuve.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            empreinte_de_la_preuve = Some(empreinte_depuis_hexadecimal(valeur, cle)?);
-        } else if cle == CLE_EMPREINTE_UTTERANCE {
-            if empreinte_de_l_utterance.is_some() {
-                return Err(format!("constat mal formé : clé répétée « {cle} »"));
-            }
-            empreinte_de_l_utterance = Some(empreinte_depuis_hexadecimal(valeur, cle)?);
-        } else {
-            return Err(format!("constat mal formé : clé inconnue « {cle} »"));
-        }
-    }
-
-    let outil = exiger(outil, CLE_OUTIL)?;
-    if outil.is_empty() {
-        return Err(String::from(
-            "constat mal formé : « outil » vide — un contrôle délégué se nomme, sinon la délégation ne se vérifie pas",
-        ));
-    }
-    Ok(Constat {
-        outil,
-        empreinte_de_la_preuve: exiger(empreinte_de_la_preuve, CLE_EMPREINTE_PREUVE)?,
-        empreinte_de_l_utterance: exiger(empreinte_de_l_utterance, CLE_EMPREINTE_UTTERANCE)?,
-    })
-}
-
-fn exiger<T>(valeur: Option<T>, cle: &str) -> Result<T, String> {
-    match valeur {
-        Some(valeur) => Ok(valeur),
-        None => Err(format!("constat mal formé : clé « {cle} » absente")),
-    }
-}
-
-/// Une empreinte en hexadécimal : exactement 64 chiffres, aucune tolérance.
-pub fn empreinte_depuis_hexadecimal(
-    texte: &str,
-    cle: &str,
-) -> Result<[u8; OCTETS_D_EMPREINTE], String> {
-    let octets = texte.as_bytes();
-    let mut valeurs: Vec<u8> = Vec::new();
-    for paire in octets.chunks_exact(2) {
-        let mut valeur: u8 = 0;
-        let mut complet = true;
-        for chiffre in paire.iter().copied() {
-            match valeur_hexadecimale(chiffre) {
-                Some(quartet) => valeur = valeur.wrapping_shl(4) | quartet,
-                None => complet = false,
-            }
-        }
-        if !complet {
-            return Err(format!(
-                "constat mal formé : « {cle} » n'est pas de l'hexadécimal"
-            ));
-        }
-        valeurs.push(valeur);
-    }
-    if !octets.chunks_exact(2).remainder().is_empty() {
-        return Err(format!(
-            "constat mal formé : « {cle} » a un nombre impair de chiffres"
-        ));
-    }
-    match <[u8; OCTETS_D_EMPREINTE]>::try_from(valeurs.as_slice()) {
-        Ok(empreinte) => Ok(empreinte),
-        Err(_) => Err(format!(
-            "constat mal formé : « {cle} » fait {} octet(s), {OCTETS_D_EMPREINTE} attendus",
-            valeurs.len()
-        )),
-    }
-}
-
-fn valeur_hexadecimale(octet: u8) -> Option<u8> {
-    match octet {
-        b'0'..=b'9' => Some(octet.wrapping_sub(b'0')),
-        b'A'..=b'F' => Some(octet.wrapping_sub(b'A').wrapping_add(10)),
-        b'a'..=b'f' => Some(octet.wrapping_sub(b'a').wrapping_add(10)),
-        _ => None,
-    }
 }
 
 /// Rend les premiers octets en hexadécimal, pour qu'un refus soit

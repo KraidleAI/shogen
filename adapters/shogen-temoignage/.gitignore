@@ -1,0 +1,3 @@
+# Ce paquet est une racine de workspace autonome (voir Cargo.toml) : sa sortie
+# de construction est ici, pas dans le `/target/` de la racine du dépôt.
+/target/

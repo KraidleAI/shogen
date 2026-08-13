@@ -120,10 +120,20 @@ présentation ancienne. C'est une propriété du compagnon, pas de la fixture.
 | `connection_info_time` | **(g)** | comparer à `observed_at` |
 | `empreinte_recv_revele_sha256` | **(b)** | comparer au hash d'`utterance` porté par le témoignage (ADR-0005 règle 1) |
 | `empreinte_presentation_sha256` | **(c)** | comparer au hash des octets de `transport_proof` — c'est ce qui interdit qu'on vérifie une preuve et qu'on en livre une autre |
-| `revision_amont` | **(e)** | entre verbatim dans la chaîne de verdict « … a été exécuté par shogen-tlsn-verify [révision amont] » |
-| `server_name` | — | l'identité authentifiée du serveur ; se recoupe avec l'origine de `subject` (ADR-0016) |
+| `revision_amont` | **(e)** | entre verbatim dans la chaîne de verdict — rédaction amendée ADR-0015 pt 18 : « … exécuté par le binaire compagnon du transport « [transport du lot] » à la révision amont [verbatim], jamais par ce binaire » (le nom de l'outil ne s'écrit pas dans le vérificateur, S-G1) |
+| `server_name` | **(h)** (lettré par l'amendement pt 17 du 2026-08-13, vague 2) | l'identité authentifiée du serveur ; comparée à l'hôte de `subject` (extraction par découpe, ADR-0016 C0) — sans quoi l'épinglage d'origine serait décoratif |
+
 | `transcript_recv_authentifie` = `transcript_recv_longueur` | pré-condition de (b) | si les deux diffèrent, le compagnon **refuse** au lieu de hacher un tampon à remplissage non authentifié |
 | `transcript_sent_authentifie` = `transcript_sent_longueur` | même règle, sens envoyé (ADR-0015 pt 13 : le refus porte les six longueurs — garde symétrique ajoutée par la revue G2 vague 1) | idem : `empreinte_sent_revele_sha256` n'est jamais l'empreinte d'un tampon à remplissage |
+
+**Le champ `residual` du témoignage, précisé (vague 2)** : il porte
+**exactement deux** identifiants — ceux que 03 §2 donne à la ligne
+`tlsn-mpc` : `A(notary-neutrality)` et `A(self-attestation)`.
+`A(transport-check-delegated)` est ajouté **au verdict** par le vérificateur
+(alinéa (e)), jamais au champ — l'y écrire le ferait nommer deux fois. La
+liste du §5 ci-dessous énumère ce que le VERDICT affiche, pas ce que le
+champ porte.
+
 
 **Contrôle croisé de l'empreinte, fait le 2026-08-13.** Les trois empreintes
 imprimées par le compagnon (crate `sha2` 0.10.9) ont été recalculées par

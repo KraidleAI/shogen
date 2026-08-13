@@ -33,10 +33,12 @@
 //! justifiés, [date] », jamais « la suite détecte les fautes »
 //! (09-vocabulaire).
 
+mod commun;
+
 use shogen_core::{
     Attestor, ErreurDecodage, ErreurSubject, ObservedAt, Temoignage, TemoignageTrivial, Utterance,
     decoder_temoignage, decoder_temoignage_canonique, empreinte_sha256, encoder_temoignage,
-    encoder_temoignage_canonique, subject_est_canonique,
+    encoder_temoignage_canonique, subject_est_canonique, verifier_temoignage,
 };
 
 /// Le témoignage trivial de référence — le même que `cargo xtask
@@ -357,4 +359,92 @@ fn un_label_0x_sans_chiffre_reste_un_nombre_refuse() {
         Err(ErreurSubject::HoteLitteralAdresse { .. }) => {}
         autre => panic!("attendu HoteLitteralAdresse sur « {subject} », obtenu {autre:?}"),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Vague 2 (2026-08-13) — les mutants nés du rendu de la clé épinglée
+// ---------------------------------------------------------------------------
+//
+// Le contrôle (f) d'ADR-0015 point 8 (amendement du 2026-08-13) a fait entrer
+// `rendu_de_cle` dans `verification.rs`, et la mesure de mutation de la vague 2
+// a rendu QUATRE survivants sur cette seule fonction :
+//
+//   verification.rs:153:5  replace rendu_de_cle -> String with "xyzzy".into()
+//   verification.rs:153:5  replace rendu_de_cle -> String with String::new()
+//   verification.rs:154:22 replace match guard texte.is_ascii() with false
+//   verification.rs:154:22 replace match guard texte.is_ascii() with true
+//
+// Ils sont **tuables**, donc ils se tuent — un survivant tuable n'a rien à
+// faire dans `survivants.txt`. Ce qu'ils montraient est réel : aucune suite
+// n'imprimait le refus d'épinglage, alors que ce refus est le seul endroit où
+// un tiers lit QUELLE clé a été épinglée et QUELLE clé a servi. Un refus qu'on
+// ne lit pas ne se diagnostique pas (le cœur ne journalise pas).
+
+/// Le refus d'épinglage, avec deux clés US-ASCII : elles se lisent **en
+/// toutes lettres**. Tue les deux mutants de valeur de retour, et le mutant de
+/// garde à `false` (qui rendrait de l'hexadécimal sur une clé lisible).
+#[test]
+fn le_refus_d_epinglage_rend_une_cle_ascii_en_toutes_lettres() {
+    let mut temoignage = commun::reference();
+    temoignage.attestor = vec![Attestor {
+        key: b"exemple aabbccdd".to_vec(),
+        identity: String::from(commun::IDENTITE),
+    }];
+    let erreur = verifier_temoignage(&temoignage, &commun::registre(), Some(&commun::constat()))
+        .expect_err("la clé épinglée n'est pas celle du contrôle : le refus est dû");
+    let rendu = erreur.to_string();
+    assert!(
+        rendu.contains("exemple aabbccdd"),
+        "la clé PORTÉE doit se lire dans le refus : {rendu}"
+    );
+    assert!(
+        rendu.contains("exemple 041a2b3c"),
+        "la clé du CONTRÔLE doit se lire dans le refus : {rendu}"
+    );
+}
+
+/// Une clé épinglée non-ASCII **mais UTF-8 valide** : elle se rend en
+/// hexadécimal, pas en lettres. Tue le mutant de garde à `true` — qui
+/// laisserait passer en texte une suite d'octets dont la comparaison
+/// dépendrait d'une table Unicode versionnée (même motif qu'ADR-0016 C3).
+#[test]
+fn le_refus_d_epinglage_rend_une_cle_non_ascii_en_hexadecimal() {
+    let mut temoignage = commun::reference();
+    // « clé » en UTF-8 : 63 6c c3 a9 — valide, non-ASCII.
+    temoignage.attestor = vec![Attestor {
+        key: "clé".as_bytes().to_vec(),
+        identity: String::from(commun::IDENTITE),
+    }];
+    let erreur = verifier_temoignage(&temoignage, &commun::registre(), Some(&commun::constat()))
+        .expect_err("clé épinglée hors contrôle : refus dû");
+    let rendu = erreur.to_string();
+    assert!(
+        rendu.contains("636cc3a9"),
+        "une clé non-ASCII se rend en hexadécimal : {rendu}"
+    );
+    // Et elle ne se rend PAS en lettres : le mot « clé » figure dans la phrase
+    // du refus, c'est la VALEUR entre guillemets qu'on regarde.
+    assert!(
+        !rendu.contains("« clé »"),
+        "elle ne se rend PAS en lettres : {rendu}"
+    );
+}
+
+/// Une clé épinglée qui n'est même pas de l'UTF-8 : hexadécimal aussi. Le
+/// pendant du cas précédent — sans lui, le bras de repli ne serait exercé par
+/// rien.
+#[test]
+fn le_refus_d_epinglage_rend_une_cle_non_utf8_en_hexadecimal() {
+    let mut temoignage = commun::reference();
+    temoignage.attestor = vec![Attestor {
+        key: vec![0xff, 0x00, 0x10],
+        identity: String::from(commun::IDENTITE),
+    }];
+    let erreur = verifier_temoignage(&temoignage, &commun::registre(), Some(&commun::constat()))
+        .expect_err("clé épinglée hors contrôle : refus dû");
+    assert!(
+        erreur.to_string().contains("ff0010"),
+        "{}",
+        erreur.to_string()
+    );
 }

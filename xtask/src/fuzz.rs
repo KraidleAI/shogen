@@ -452,13 +452,19 @@ pub fn ecrire_corpus_dirige(racine: &Path) -> Result<Vec<String>, String> {
         "dirigee-registre-doublon.txt",
         b"A(exemple-residu-1)\nA(exemple-residu-1)\n".to_vec(),
     ));
+    // 5 bis. Le constat, **au contrat d'ADR-0015 point 13** : une ligne JSON à
+    //    clés triées, dix-huit clés. La graine porte la forme ACCEPTÉE — sans
+    //    elle, l'analyseur du constat serait atteint par ses seuls premiers
+    //    octets et jamais par sa construction finale (le contrôle de version,
+    //    le verdict, les six longueurs). La seconde graine porte une forme
+    //    refusée tard : hexadécimal de longueur impaire.
     graines.push((
         "dirigee-constat.txt",
-        b"outil = exemple-compagnon/1\nempreinte-preuve = 9c114e983a7b36eddd59ad5584f40b8beddb04918e665107e8e362fcd0252c86\nempreinte-utterance = 04f501ade9aec2a345218a7264fe2dec87d2f0fbf7a6c500605dbc425a6fac9d\n".to_vec(),
+        constat_dirige("041a2b3c").into_bytes(),
     ));
     graines.push((
         "dirigee-constat-hexadecimal-impair.txt",
-        b"outil = x\nempreinte-preuve = 9c1\nempreinte-utterance = 04f5\n".to_vec(),
+        constat_dirige("041a2b3").into_bytes(),
     ));
 
     let mut journal = Vec::new();
@@ -475,6 +481,37 @@ pub fn ecrire_corpus_dirige(racine: &Path) -> Result<Vec<String>, String> {
 
 fn alloc_octets(octets: &[u8]) -> Vec<u8> {
     octets.to_vec()
+}
+
+/// Une graine de constat au contrat d'ADR-0015 point 13, dont seuls les
+/// chiffres de la clé épinglée varient.
+///
+/// Les valeurs reprennent celles du témoignage canonique de référence
+/// ci-dessous, aux mêmes empreintes tierces, pour que le corpus et la suite
+/// parlent de la même forme. `empreinte_sent_revele_sha256` est l'empreinte de
+/// la suite VIDE (vecteur mesuré du dépôt) : ce lot d'exemple ne porte aucun
+/// octet émis, et les trois longueurs du sens émis valent zéro en conséquence.
+fn constat_dirige(chiffres_de_la_cle: &str) -> String {
+    format!(
+        "{{\"attestor_cle_algorithme\":\"exemple\",\
+\"attestor_cle_hex\":\"{chiffres_de_la_cle}\",\
+\"connection_info_time\":1754000000,\
+\"connection_info_version_tls\":\"V1_2\",\
+\"empreinte_presentation_sha256\":\"9c114e983a7b36eddd59ad5584f40b8beddb04918e665107e8e362fcd0252c86\",\
+\"empreinte_recv_revele_sha256\":\"04f501ade9aec2a345218a7264fe2dec87d2f0fbf7a6c500605dbc425a6fac9d\",\
+\"empreinte_sent_revele_sha256\":\"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\
+\"octets_presentation\":23,\
+\"revision_amont\":\"0000000000000000000000000000000000000000\",\
+\"server_name\":\"api.example.com\",\
+\"transcript_recv_authentifie\":17,\
+\"transcript_recv_longueur\":17,\
+\"transcript_recv_longueur_attestee\":17,\
+\"transcript_sent_authentifie\":0,\
+\"transcript_sent_longueur\":0,\
+\"transcript_sent_longueur_attestee\":0,\
+\"verdict\":\"presentation_verifiee\",\
+\"version_du_constat\":1}}\n"
+    )
 }
 
 /// Le témoignage canonique de référence du corpus — **une graine, pas un
@@ -495,7 +532,10 @@ fn temoignage_canonique_exemple() -> shogen_core::Temoignage {
     shogen_core::Temoignage {
         subject: String::from("https://api.example.com/v3/simple/price?ids=bitcoin"),
         attestor: vec![shogen_core::Attestor {
-            key: b"cle-epinglee-d-exemple".to_vec(),
+            // La convention d'épinglage de l'adapter : `<algorithme> <chiffres
+            // hexadécimaux>` — les mêmes octets que la graine de constat
+            // ci-dessus recompose, pour que le corpus porte la forme réelle.
+            key: b"exemple 041a2b3c".to_vec(),
             identity: String::from("exemple:attestateur-1"),
         }],
         residual: vec![

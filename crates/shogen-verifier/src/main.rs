@@ -277,7 +277,7 @@ fn verifier_le_temoignage(temoignage: &shogen_core::Temoignage, arguments: &Argu
 
     match examiner_verification(temoignage, &registre, constat.as_ref()) {
         Ok(verdict) => {
-            imprimer_verdict(&verdict);
+            imprimer_verdict(&verdict, temoignage);
             CODE_CONFORME
         }
         Err(erreur) => {
@@ -290,7 +290,40 @@ fn verifier_le_temoignage(temoignage: &shogen_core::Temoignage, arguments: &Argu
 }
 
 /// Le verdict : ce qui a été établi, **sous quoi**, et ce qui ne l'a pas été ici.
-fn imprimer_verdict(verdict: &Verdict) {
+///
+/// # Pourquoi la phrase de délégation nomme le transport et une révision, et
+/// pas un binaire
+///
+/// ADR-0015 point 8 alinéa e **propose** une chaîne où le binaire compagnon est
+/// nommé : « … a été exécuté par <le nom du compagnon> [révision amont], jamais
+/// par ce binaire ». Deux faits du dépôt, mesurés, empêchent ce binaire d'écrire
+/// ce nom-là dans ses sources :
+///
+/// * la gate **S-G1** interdit tout nom de transport dans le cœur et dans le
+///   vérificateur (ADR-0001), et le nom du compagnon en porte un — la gate l'a
+///   d'ailleurs prouvé en refusant une première rédaction de ce paragraphe qui
+///   le citait ;
+/// * le **contrat du constat** (ADR-0015 point 13) fige dix-huit clés dont
+///   aucune ne porte le nom du binaire compagnon — seule `revision_amont` y
+///   est, et « toute évolution passe par incrément de `version_du_constat` ».
+///
+/// La phrase nomme donc ce que les **données** portent : l'identifiant de
+/// transport du témoignage (`transport`, une donnée du lot, jamais une
+/// constante d'ici) et la révision amont, verbatim, du constat. Elle dit la
+/// même chose que l'alinéa e — qui a fait le contrôle, et que ce binaire ne
+/// l'a pas fait. **Cette rédaction est celle du registre** : ADR-0015 point 18
+/// amende l'alinéa (e) à ce que les données permettent, et rejette
+/// explicitement les deux autres voies (excepter la gate S-G1 ; ajouter une clé
+/// de nom d'outil au constat). L'écart n'est plus un écart.
+///
+/// # Ce que la phrase ajoute depuis la vague 2
+///
+/// ADR-0015 point 17 bis (adjudication R-26) : la désignation complète de
+/// `subject` — chemin et requête — n'est liée par aucun contrôle recalculable ;
+/// seul l'hôte l'est, par l'alinéa (h). La limite **s'affiche** dans la même
+/// phrase que le reste, parce qu'un verdict qui tairait ce qu'il ne couvre pas
+/// serait lu comme s'il le couvrait.
+fn imprimer_verdict(verdict: &Verdict, temoignage: &shogen_core::Temoignage) {
     if verdict.octets_recalcules {
         println!(
             "  liaison d'utterance : empreinte recalculée sur les octets portés (ADR-0005 règle 1)"
@@ -309,8 +342,8 @@ fn imprimer_verdict(verdict: &Verdict) {
     }
     println!("VERDICT : valide sous {residus}");
     println!(
-        "  ce que ce verdict NE dit pas : le contrôle cryptographique de la preuve de transport a été exécuté par « {} », jamais par ce binaire ; et la conformité ne dit rien de la vérité de la source — ADR-0001, ADR-0015",
-        verdict.outil_delegue
+        "  ce que ce verdict NE dit pas : le contrôle cryptographique de la preuve de transport a été exécuté par le binaire compagnon du transport « {} » à la révision amont {}, jamais par ce binaire ; la désignation complète de subject — chemin et requête — n'est liée par aucun contrôle recalculable ici, seul son hôte l'est (ADR-0015 point 17 bis, unité S4 « liaison de la désignation ») ; et la conformité ne dit rien de la vérité de la source — ADR-0001, ADR-0015",
+        temoignage.transport, verdict.revision_amont_deleguee
     );
 }
 
@@ -374,9 +407,15 @@ fn lire_registre(chemin: &std::ffi::OsString) -> Result<Vec<String>, String> {
 
 /// Lit le constat du binaire compagnon, puis le fait analyser par la
 /// bibliothèque.
+///
+/// Le refus de l'analyseur est **typé** (`ErreurConstat`) ; il est rendu en
+/// texte ici, au dernier moment, parce que c'est ici que l'impression a lieu.
 fn lire_constat(chemin: &std::ffi::OsString) -> Result<Constat, String> {
     let texte = lire_texte(chemin, "constat")?;
-    analyser_constat(&texte)
+    match analyser_constat(&texte) {
+        Ok(constat) => Ok(constat),
+        Err(erreur) => Err(format!("{erreur}\n  variante : {erreur:?}")),
+    }
 }
 
 fn lire_texte(chemin: &std::ffi::OsString, quoi: &str) -> Result<String, String> {
