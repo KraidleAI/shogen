@@ -574,6 +574,19 @@ une citation.
    d'épinglage des dépendances (lockfile, `cargo-deny`, vendoring) n'est pas
    tranchée ici : elle appartient à **ADR-0012**, à qui ce point est passé
    avec le critère « chaîne d'approvisionnement outillée ».
+
+   *(Clarification du 2026-08-13, ratifiée par le mainteneur — chantier
+   fuzz instrumenté, consultation R-26 : ce point interdit un canal
+   FLOTTANT, pas une SECONDE toolchain épinglée. Une nightly épinglée par
+   sa date exacte est un artefact figé au même titre qu'une version
+   stable ; elle est admise quand un outillage l'exige, RÉSERVÉE au job
+   qui l'exige (le job cargo-fuzz de la CI), déclarée là où elle tourne —
+   la toolchain du dépôt reste seule par défaut partout ailleurs. Le
+   mainteneur a ratifié le même jour les DEUX moteurs de fuzz instrumenté :
+   cargo-fuzz sur cette nightly datée ET cargo-afl sur la stable du dépôt,
+   le harnais en arbre restant en complément multi-plateforme — la
+   diversité des moteurs explore ce qu'un seul rate, au coût publié de
+   deux jobs CI de plus.)*
 4. **MSRV = la version épinglée**, déclarée mécaniquement en manifeste
    (`rust-version`). Valeur candidate : **`1.97`** (toolchain `1.97.1`) —
    *candidat — ratification mainteneur due*.
