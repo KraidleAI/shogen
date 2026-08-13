@@ -22,6 +22,8 @@ recopiés de la réponse. Aucun chiffre de seconde main.
 | `cargo-deny` | 0.20.2 (épinglée dans `squelette.yml` ; non yanked, 430 714 téléchargements de la version) | MIT OR Apache-2.0 | `embark-studios` (organisation) | 4 990 660 | 2019-05-13 | **2026-08-13 (trace reconstituée par l'orchestrateur, API crates.io — l'écart « déclaré au JOURNAL du 2026-08-12 sans trace au dépôt » reste consigné ci-dessous)** | gate S-G7 (licences, bans, sources, advisories) |
 | `cargo-llvm-cov` | 0.8.7 (mesurée par `cargo llvm-cov --version` le 2026-08-13 ; non yanked, 1 090 683 téléchargements de la version) | Apache-2.0 OR MIT | `taiki-e` — propriétaire unique (même borne que `cargo-mutants` : version exacte, hors graphe livré, CI en lecture seule) | 7 148 919 | 2021-01-22 | **2026-08-13 (trace reconstituée par l'orchestrateur, API crates.io — même écart consigné)** | couverture par rôle (ADR-0011 seuil 1) |
 | `cargo-mutants` | **27.1.0** | **MIT** | **`sourcefrog` (Martin Pool) — propriétaire unique** | **466 076** (dont 164 607 sur 90 jours) | **2021-10-25** | **2026-08-13 (S3 phase C)** | score de mutation du cœur (ADR-0011 seuils 3 et 4) |
+| `cargo-fuzz` | **0.13.2** (non yanked, 665 687 téléchargements de la version, publiée le 2026-06-09 ; 40 versions publiées) | **MIT OR Apache-2.0** | **`frewsxcv`, `fitzgen`, `nagisa`, `Manishearth`, équipe `rust-fuzz:publishers`** | **4 050 192** | **2017-02-21** | **2026-08-13 (S3 phase C, chantier fuzz instrumenté — re-mesuré AVANT installation)** | pilote libFuzzer (job CI `cargo-fuzz`, nightly épinglée par date) |
+| `cargo-afl` | **0.18.2** (non yanked, 22 771 téléchargements de la version, publiée le 2026-05-11 ; 45 versions publiées) | **Apache-2.0** (seule) | **`smoelius`, `anishnaik`, équipe `rust-fuzz:publishers`** | **195 418** (dont 26 713 récents) | **2023-03-27** | **2026-08-13 (S3 phase C, chantier fuzz instrumenté — AVANT installation)** | pilote AFL++ (job CI `cargo-afl`, stable du dépôt) |
 
 **L'écart « trace non retrouvée », consigné puis comblé.** Le JOURNAL
 du 2026-08-12 écrit « R-8 documenté pour proptest/cargo-deny/cargo-llvm-cov »,
@@ -56,20 +58,31 @@ par un acte de revue ; (ii) il ne fait **pas** partie du graphe du vérificateur
 ni du cœur — il n'entre dans aucun artefact livré ; (iii) il ne tourne que dans
 un job CI sans droit d'écriture (`permissions: contents: read`).
 
-## Outillage de fuzz — instruit, non installé
+## Outillage de fuzz — instruit le 2026-08-13, RATIFIÉ le même jour, installé ensuite
 
-ADR-0011 seuil 7 exige un fuzz du vérificateur. Les candidats ont été contrôlés
-sur registre **avant** toute installation, et **aucun n'a été installé** : le
-choix engage la doctrine de toolchain (ADR-0009 point 3) et fait l'objet d'une
-demande de consultation formée (R-26) déposée le 2026-08-13. Les faits qui
-alimentent cette demande, mesurés le même jour :
+ADR-0011 seuil 7 exige un fuzz du vérificateur. Les candidats ont d'abord été
+contrôlés sur registre **avant** toute installation, alors qu'aucun n'était
+installé : le choix engageait la doctrine de toolchain (ADR-0009 point 3) et a
+fait l'objet d'une demande de consultation formée (R-26) déposée le 2026-08-13.
+**Le mainteneur a tranché le même jour : les DEUX moteurs sont retenus** —
+`cargo-fuzz` sur une nightly épinglée par date réservée à son job, et
+`cargo-afl` sur la stable du dépôt, le harnais en arbre restant en complément
+multi-plateforme (clarification ADR-0009 point 3, 2026-08-13). Les deux
+**outils** ont donc leur ligne dans le tableau ci-dessus — c'est ce que
+`cargo install` va chercher — et les **dépendances** qui entrent au graphe de
+la cible fuzz gardent leur tableau ci-dessous. Ce tableau-ci garde aussi sa
+ligne `cargo-fuzz`, qui est un outil : elle date de l'instruction du matin,
+elle est le document de la demande de consultation, et l'effacer réécrirait
+l'histoire de la décision. La ligne d'outil qui fait foi pour l'installation
+est celle du tableau du haut, re-mesurée avant `cargo install`. Les faits,
+mesurés le 2026-08-13 :
 
 | crate | version | licence | mainteneurs (owners) | téléchargements cumulés | 1re publication | contrainte |
 |---|---|---|---|---|---|---|
 | `cargo-fuzz` | 0.13.2 | MIT OR Apache-2.0 | `frewsxcv`, `fitzgen`, `nagisa`, `Manishearth`, équipe `rust-fuzz:publishers` | 4 044 015 | 2017-02-21 | pilote libFuzzer ; exige une toolchain **nightly** |
-| `libfuzzer-sys` | 0.4.13 | **(MIT OR Apache-2.0) AND NCSA** | `frewsxcv`, `fitzgen`, `nagisa`, `Manishearth`, `gedigi` | 56 977 318 | 2019-09-10 | entrerait au graphe de la cible fuzz ; **NCSA absente de la liste blanche de `deny.toml`** |
+| `libfuzzer-sys` | 0.4.13 | **(MIT OR Apache-2.0) AND NCSA** | `frewsxcv`, `fitzgen`, `nagisa`, `Manishearth`, `gedigi` | 56 977 318 (mesure du matin de l'instruction — même arbitrage que la note `cargo-fuzz` : la ligne date de la demande de consultation et ne se réécrit pas) | 2019-09-10 | entrerait au graphe de la cible fuzz ; **NCSA absente de la liste blanche de `deny.toml`** |
 | `arbitrary` | 1.4.2 | MIT OR Apache-2.0 | `nagisa`, équipe `rust-fuzz:publishers` | 142 350 058 | 2017-05-08 | facultative — la cible du vérificateur consomme des octets bruts, elle n'a pas besoin de types structurés |
-| `afl` | 0.18.2 | **Apache-2.0** (seule) | `frewsxcv`, `smoelius`, `anishnaik`, équipe `rust-fuzz:publishers` | 2 096 591 | 2016-01-31 | tourne sur toolchain **stable** ; construit AFL++ depuis les sources, chaîne C requise, **pas de cible Windows** |
+| `afl` | 0.18.2 | **Apache-2.0** (seule) | `frewsxcv`, `smoelius`, `anishnaik`, équipe `rust-fuzz:publishers` | 2 096 591 (mesure du matin de l'instruction, idem) | 2016-01-31 | tourne sur toolchain **stable** ; construit AFL++ depuis les sources, chaîne C requise, **pas de cible Windows** |
 
 Trois faits qui pèsent sur la décision et qu'aucun des quatre contrôles ne
 lève :
@@ -91,11 +104,52 @@ lève :
    (ADR-0015, alternative (a), motif 3). Le motif serait ici différent — un
    outil de test, hors artefact livré — mais la décision reste une décision.
 
-En attendant, ce qui tourne est le harnais en arbre (`xtask/src/fuzz.rs`) :
-**zéro dépendance, zéro outil, zéro toolchain nouvelle**, sur les deux
-plateformes. Il tient le seuil binaire, le corpus committé croissant et les
-budgets ; il ne tient pas la partie guidée par la couverture, et le dit à
-chaque exécution.
+Ce qui a été **complété le 2026-08-13**, après ratification et **avant
+installation** :
+
+* **L'outil AFL n'est PAS la crate `afl`.** `cargo install` va chercher
+  **`cargo-afl`**, crate distincte depuis la scission du paquet ; la ligne du
+  tableau d'outils ci-dessus la porte, avec ses propres mainteneurs
+  (`smoelius`, `anishnaik`, équipe `rust-fuzz:publishers` — `frewsxcv`
+  n'y figure pas, à la différence de la crate `afl`). La version retenue,
+  **0.18.2**, est celle qui apparie exactement la version de la bibliothèque
+  `afl` 0.18.2 que la cible consomme : outil et runtime au même numéro, aucun
+  appariement à deviner.
+* **`arbitrary` n'est pas une dépendance DIRECTE — mais elle entre au graphe,
+  et c'est une mesure, pas une déduction.** La cible fuzz est
+  [`shogen_verifier::eprouver`], dont la signature est `fn eprouver(octets:
+  &[u8])` : elle consomme des **octets bruts**. `arbitrary` ne sert qu'à
+  dériver des *types structurés* depuis un flux d'octets — le harnais n'a rien
+  à dériver, il transmet la tranche telle quelle, et aucun manifeste de
+  `fuzz/` ne la nomme. **Elle arrive quand même**, parce que `libfuzzer-sys`
+  en dépend inconditionnellement. Mesuré le 2026-08-13,
+  `cargo tree -p shogen-fuzz-libfuzzer -e normal` dans `fuzz/` :
+
+  ```
+  shogen-fuzz-libfuzzer v0.0.0 (/mnt/f/Shogen/fuzz/libfuzzer)
+  ├── libfuzzer-sys v0.4.13
+  │   └── arbitrary v1.4.2
+  └── shogen-verifier v0.0.0 (/mnt/f/Shogen/crates/shogen-verifier)
+      └── shogen-core v0.0.0 (/mnt/f/Shogen/crates/shogen-core)
+  ```
+
+  La conclusion utile n'est donc PAS « un acteur de chaîne
+  d'approvisionnement de moins » — ce qui aurait été faux — mais : **son
+  contrôle de registre était dû de toute façon**, il est fait (ligne du
+  tableau ci-dessous), et son périmètre est celui du workspace `fuzz/`, hors
+  artefact livré. La formule initiale de ce fichier (« facultative ») décrivait
+  l'usage direct ; le graphe, lui, se mesure.
+* **`libfuzzer-sys` n'entre que dans le workspace `fuzz/`**, jamais au graphe
+  du vérificateur ni du cœur : `fuzz/` est un workspace INDÉPENDANT (son propre
+  `Cargo.lock`), et l'arête va de la cible fuzz **vers** le vérificateur.
+  Contrôle mécanique conservé : `cargo tree -p shogen-verifier -e normal` au
+  dépôt racine reste à **2 lignes**.
+
+Le harnais en arbre (`xtask/src/fuzz.rs`) **reste** : **zéro dépendance, zéro
+outil, zéro toolchain nouvelle**, sur les deux plateformes. Il tient le seuil
+binaire, le corpus committé croissant et les budgets ; il ne tient pas la
+partie guidée par la couverture — c'est ce que les deux moteurs instrumentés
+ajoutent, sur Linux seulement (asymétrie mesurée, cf. `.github/workflows/fuzz.yml`).
 
 ## Ce que ce registre ne dit pas
 
@@ -103,5 +157,8 @@ Qu'un outil contrôlé est sûr. R-8 mesure ce qu'un registre publie — existen
 ancienneté, mainteneurs, téléchargements — et rien de plus. Un compte
 mainteneur peut être repris, un paquet peut être remplacé à version égale sur
 un registre qui l'autoriserait. C'est pourquoi la version est **exacte** et
-`--locked` partout, et pourquoi la moitié mécanique (S-G7) existe à côté :
+`--locked` partout où l'outil l'accepte — `cargo fuzz`, qui ne l'accepte pas,
+est gardé autrement : contrôle `cargo metadata --locked` avant campagne et
+`git diff --exit-code -- fuzz/Cargo.lock` après (revue G2 du chantier fuzz,
+2026-08-13) — et pourquoi la moitié mécanique (S-G7) existe à côté :
 aucune des deux ne dispense de l'autre.

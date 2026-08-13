@@ -1,0 +1,118 @@
+# Configuration cargo-deny du workspace `fuzz/` — les DEUX cibles de fuzz
+# instrumenté du vérificateur.
+#
+# Rattachement (G0) : ADR-0015 pt 15 (doctrine deny-par-workspace : « chaque
+# workspace porte SA configuration `deny.toml` ; la liste blanche RACINE reste
+# fermée ; tout assouplissement vit dans le fichier du workspace qui le
+# nécessite — écrit, daté, porté par ADR ») ; ADR-0012 D5 (R-8 en deux moitiés
+# qui ne se remplacent pas) ; ADR-0011 seuil 7.
+#
+# Ce fichier assouplit d'UNE licence par rapport à la racine, et il dit
+# laquelle, pourquoi, et ce qui borne l'assouplissement. Le périmètre couvert
+# est le workspace `fuzz/` : deux harnais d'enrobage, hors artefact livré, hors
+# D6, hors S-G2. `shogen-verifier` reste à zéro dépendance — l'arête va de la
+# cible fuzz VERS le vérificateur, et le contrôle est mécanique :
+# `cargo tree -p shogen-verifier -e normal` au dépôt racine reste à 2 lignes.
+#
+# MÉTHODE D'ÉCRITURE DE CE FICHIER, pour qu'aucun futur passage n'y laisse du
+# décoratif : chaque entrée qui s'écarte de la racine a été éprouvée EN LA
+# RETIRANT, et la mesure du rouge obtenu est consignée en regard. C'est la même
+# épreuve que la revue G2 a imposée au `deny.toml` du compagnon (« Entrée
+# OpenSSL retirée après mesure : décorative »).
+
+[graph]
+all-features = true
+# Même resserrage explicite qu'à la racine : les dépendances de développement
+# entrent dans le graphe contrôlé. Ce workspace n'en a aujourd'hui aucune ; la
+# ligne est déclarée pour que le jour où il en aura une, elle soit contrôlée
+# sans qu'il faille y repenser.
+exclude-dev = false
+
+[advisories]
+# Toute advisory connue casse la construction. Aucun délai de grâce.
+# La liste `ignore` est VIDE et ne se remplit pas sans ADR (ADR-0012 D5 :
+# « une advisory qu'on choisit de ne pas corriger n'est JAMAIS un ignore
+# silencieux »). Elle est vide ici PAR MESURE, pas par espoir : la sortie de
+# `cargo deny --locked check` du 2026-08-13 est copiée dans le rapport de
+# chantier.
+version = 2
+yanked = "deny"
+ignore = []
+
+[licenses]
+version = 2
+# Les deux paquets de ce workspace sont `publish = false` — même régime que la
+# racine (ADR-0014).
+private = { ignore = true }
+include-dev = true
+# LISTE RACINE + UNE SEULE ADDITION, nommée et motivée.
+allow = [
+    # ── Les sept entrées de la liste RACINE, reprises telles quelles. La
+    #    doctrine d'ADR-0015 pt 15 est « racine + ajouts nommés », jamais une
+    #    liste taillée sur mesure pour ce graphe-ci : une liste par graphe
+    #    dériverait à chaque bump et cesserait d'être comparable à la racine.
+    "Apache-2.0",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    # ── L'ADDITION, une seule : NCSA.
+    #    `libfuzzer-sys` 0.4.13 déclare « (MIT OR Apache-2.0) AND NCSA ». Le
+    #    `AND` est ce qui compte : ce n'est pas un choix entre licences, c'est
+    #    une conjonction — le paquet EST sous NCSA en plus du couple habituel,
+    #    parce qu'il embarque le runtime libFuzzer de LLVM, dont la licence
+    #    d'origine est la NCSA/University of Illinois Open Source License.
+    #    Aucune expression de la liste racine ne satisfait une conjonction qui
+    #    contient NCSA : sans cette ligne, la gate est ROUGE.
+    #    NCSA est PERMISSIVE (attribution + clause de non-endossement, famille
+    #    BSD/MIT) : l'addition ne change pas la nature de ce que le dépôt
+    #    accepte de redistribuer, elle la nomme.
+    #    CE QUI BORNE L'ASSOUPLISSEMENT, et c'est la raison pour laquelle il
+    #    vit ICI et pas à la racine : `libfuzzer-sys` n'entre dans AUCUN
+    #    artefact livré. Il n'est ni au graphe du cœur, ni à celui du
+    #    vérificateur, ni dans le double-build D6. Le motif 3 du rejet de la
+    #    forme α d'ADR-0015 refusait d'élargir la gate RACINE pour un confort
+    #    d'architecture ; ici le périmètre a changé, pas la doctrine.
+    #    ÉPREUVE PAR RETRAIT, mesurée le 2026-08-13 (cargo-deny 0.20.2) —
+    #    ligne commentée, puis `cargo deny --locked check licenses` :
+    #      error[rejected]: failed to satisfy license requirements
+    #        libfuzzer-sys-0.4.13/Cargo.toml:36:36
+    #        license = "(MIT OR Apache-2.0) AND NCSA"
+    #        rejected: license is not explicitly allowed
+    #        libfuzzer-sys v0.4.13 └── shogen-fuzz-libfuzzer v0.0.0
+    #    Ligne remise → `advisories ok, bans ok, licenses ok, sources ok`.
+    #    L'entrée n'est donc PAS décorative : elle porte un rouge réel.
+    "NCSA",
+]
+confidence-threshold = 0.93
+# VIDE, et éprouvé vide : `licenses ok` est obtenu SANS aucune exception
+# nominative et SANS aucune clause `clarify`. Le compagnon en a une
+# (`tlsn-attestation`, dont l'amont ne déclare aucun champ `license`) ; ici,
+# aucune crate du graphe n'en a eu besoin. Le graphe mesuré le 2026-08-13
+# (`grep -c '^name = ' Cargo.lock`) : 21 paquets, dont 4 locaux par chemin
+# (`shogen-core`, `shogen-verifier`, `shogen-fuzz-libfuzzer`,
+# `shogen-fuzz-afl`) et 17 du registre.
+exceptions = []
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Aucune dépendance de transport ni de réseau ne doit apparaître — même filet
+# qu'à la racine. La gate qui TIENT l'arête reste S-G2, sur le vérificateur ;
+# ce filet-ci constate que le harnais n'en fait pas entrer par la bande.
+deny = []
+skip = []
+skip-tree = []
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# Registre officiel, et lui seul. Aucune source git — c'est la différence de
+# fond avec le `deny.toml` du compagnon, qui doit en autoriser deux parce que
+# l'amont TLSNotary n'est pas publié sur crates.io. Ici, les 17 crates non
+# locales du graphe viennent toutes du registre officiel, liées par les
+# empreintes de `fuzz/Cargo.lock` (ADR-0012 D1/D4).
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

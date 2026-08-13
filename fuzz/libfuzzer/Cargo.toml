@@ -1,0 +1,59 @@
+# Cible libFuzzer de `shogen_verifier::eprouver` — pilotée par `cargo-fuzz`.
+#
+# Rattachement (G0) : ADR-0011 seuil 7 ; ADR-0009 point 3 (clarification du
+# 2026-08-13 : nightly épinglée par DATE, réservée à ce moteur) ;
+# docs/R-8-outillage.md § « Outillage de fuzz ».
+
+[package]
+name = "shogen-fuzz-libfuzzer"
+version = "0.0.0"
+description = "Cible libFuzzer de shogen_verifier::eprouver. Enrobage sans logique : les octets reçus sont transmis tels quels."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+# Marqueur que `cargo fuzz` lit pour reconnaître un paquet de cibles. Sans lui,
+# `cargo fuzz` refuse le répertoire.
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+# `libfuzzer-sys` — l'enrobage Rust du moteur libFuzzer de LLVM.
+# Contrôle registre R-8 du 2026-08-13, AVANT installation (API crates.io,
+# champs recopiés) : 0.4.13, licence « (MIT OR Apache-2.0) AND NCSA », non
+# yanked, 4 812 579 téléchargements de la version, 57 022 853 cumulés,
+# première publication 2019-09-10, propriétaires `frewsxcv`, `fitzgen`,
+# `nagisa`, `Manishearth`, `gedigi`. Version EXACTE (ADR-0012 D3).
+#
+# C'est cette crate qui rend NCSA nécessaire dans le `deny.toml` de CE
+# workspace — jamais dans celui de la racine, qui reste fermé (ADR-0015 pt 15).
+libfuzzer-sys = "=0.4.13"
+
+# La cible éprouvée, par CHEMIN : l'arête va d'ici vers le vérificateur.
+#
+# `version = "=0.0.0"` n'est pas décoratif : une dépendance de chemin SANS
+# contrainte de version est un WILDCARD pour `cargo deny`. Mesuré le
+# 2026-08-13, sans cette contrainte :
+#   error[wildcard]: found 1 wildcard dependency for crate 'shogen-fuzz-libfuzzer'
+#   bans FAILED
+# La contrainte exacte ferme `error[wildcard]` SANS clause d'exception au
+# `deny.toml` — exactement la forme retenue pour le compagnon (ADR-0015 pt 15,
+# « `error[wildcard]` fermé SANS clause par contrainte de version exacte »),
+# et la même forme que `shogen-core` au manifeste du vérificateur (ADR-0012 D3).
+shogen-verifier = { path = "../../crates/shogen-verifier", version = "=0.0.0" }
+
+# `arbitrary` n'est pas nommée ici, et ce n'est pas un oubli : `eprouver` a la
+# signature `fn(&[u8])`, il n'y a aucun type structuré à dériver — la tranche
+# est transmise telle quelle. Elle entre TOUT DE MÊME au graphe, en transitif
+# par `libfuzzer-sys`, et ce fichier ne le cache pas : mesure du 2026-08-13,
+# `cargo tree -p shogen-fuzz-libfuzzer -e normal` rend
+# `libfuzzer-sys v0.4.13 └── arbitrary v1.4.2`. Son contrôle R-8 était donc dû
+# et il est fait (docs/R-8-outillage.md, 1.4.2, MIT OR Apache-2.0).
+
+[[bin]]
+name = "eprouver"
+path = "fuzz_targets/eprouver.rs"
+test = false
+doc = false
+bench = false

@@ -1848,7 +1848,15 @@ affaiblissement est celui que le motif 3 du rejet de la forme α refusait :
 **le périmètre a changé, pas la doctrine** — il couvre un adapter hors
 artefact de confiance, jamais le vérificateur. Gate CI :
 `.github/workflows/compagnon.yml` (build --locked, rejeu du constat à
-l'octet, trois mutants aux codes exacts, deny local — deux plateformes).*
+l'octet, trois mutants aux codes exacts, deny local — deux plateformes).
+**Seconde application de la doctrine, même jour** (chantier fuzz
+instrumenté, ratification mainteneur) : `fuzz/deny.toml` — unique
+addition **NCSA**, exigée par `libfuzzer-sys` 0.4.13
+(« (MIT OR Apache-2.0) AND NCSA »), éprouvée par retrait (le check rougit
+sans elle, sortie consignée au fichier), bornée au workspace de la cible
+fuzz et nulle part ailleurs ; wildcard fermé par contrainte exacte
+`=0.0.0` sur les dépendances de chemin, `ignore=[]` et `exceptions=[]`
+éprouvés vides. La liste racine reste fermée.*
 
 *16. **Résidu de démonstration nommé** : la clé de signature du notaire du
 conducteur de session est dérivée d'une graine publique en clair dans le

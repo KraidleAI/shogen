@@ -1,0 +1,21 @@
+# Ce workspace est INDÉPENDANT du workspace racine : la règle `/target/` du
+# `.gitignore` racine est ancrée à la racine et ne couvre pas ce répertoire.
+# Cette règle-ci est locale et suffit — même mécanique que
+# `adapters/shogen-tlsn-verify/.gitignore`.
+#
+# Ce qui EST versionné ici, et doit le rester : `Cargo.lock` (ADR-0012 D1 — le
+# lockfile committé fait foi à la construction), les deux manifestes, les deux
+# harnais, `deny.toml`.
+target/
+
+# Sorties de moteur. Elles se régénèrent à chaque campagne, pèsent le poids
+# d'un corpus dérivé complet, et ne sont PAS ce que le dépôt promet de porter :
+# ADR-0011 seuil 7 exige un « corpus de graines committé et croissant », dont
+# les deux moitiés vivent dans `crates/shogen-verifier/fuzz-corpus/` — les
+# graines DIRIGÉES (régénérées par `cargo xtask fuzz-corpus`) et les
+# CONTRE-EXEMPLES (`panique-*.bin`, versés à la main). Un corpus dérivé brut de
+# plusieurs milliers d'entrées n'est ni l'un ni l'autre : seules les entrées
+# MINIMISÉES et adjugées remontent au corpus committé, par un acte de revue.
+artifacts/
+corpus/
+coverage/

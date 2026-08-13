@@ -1,0 +1,58 @@
+# Workspace `fuzz/` — les DEUX cibles de fuzz INSTRUMENTÉ du vérificateur.
+#
+# Rattachement (G0) :
+#   - ADR-0011 seuil 7 : « zéro panique sur toute suite d'octets » — seuil
+#     binaire ; budgets ≥ 15 min CI / ≥ 4 h nightly ; corpus committé et
+#     croissant. Le harnais en arbre (`xtask/src/fuzz.rs`) tient ces trois
+#     obligations mais PAS le mot « instrumenté » : il n'est pas guidé par la
+#     couverture. Ce workspace-ci l'est.
+#   - ADR-0009 point 3, clarification ratifiée du 2026-08-13 : le point
+#     interdit un canal FLOTTANT, pas une SECONDE toolchain épinglée. Une
+#     nightly épinglée par sa DATE exacte est un artefact figé, admise quand
+#     un outillage l'exige, RÉSERVÉE au job qui l'exige. Le mainteneur a
+#     ratifié le même jour les DEUX moteurs : `cargo-fuzz` (libFuzzer, sur
+#     cette nightly datée) ET `cargo-afl` (sur la stable du dépôt, 1.97.1).
+#   - ADR-0015 pt 15 : doctrine deny-par-workspace — ce répertoire porte SON
+#     `deny.toml` (voir le fichier, et son motif ligne à ligne).
+#   - docs/R-8-outillage.md § « Outillage de fuzz » : contrôles de registre
+#     faits AVANT installation, outils installés à version EXACTE `--locked`.
+#
+# POURQUOI CE RÉPERTOIRE N'EST PAS MEMBRE DU WORKSPACE RACINE. Même mécanique
+# que `adapters/` : ce fichier porte sa propre table `[workspace]`, donc son
+# propre `Cargo.lock`, et le manifeste racine ne le référence pas. La
+# conséquence est celle qui compte, et elle se MESURE :
+# `cargo tree -p shogen-verifier -e normal` au dépôt racine reste à 2 lignes.
+# L'arête va de la cible fuzz VERS le vérificateur, jamais l'inverse — le
+# vérificateur reste à zéro dépendance (ADR-0010 point 3, gate S-G2), et
+# `libfuzzer-sys` (qui embarque du C++ et porte `AND NCSA`) n'entre dans aucun
+# artefact livré.
+#
+# POURQUOI DEUX PAQUETS ET NON UN SEUL. `cargo afl build` compile TOUTES les
+# dépendances du paquet : un paquet unique ferait construire le runtime C++ de
+# `libfuzzer-sys` sous le job AFL, pour rien. La séparation rend aussi lisible
+# quel assouplissement de `deny.toml` appartient à quel moteur.
+#
+# CE QUE CE WORKSPACE N'AJOUTE PAS : de la logique. Les deux harnais passent
+# les octets reçus à `shogen_verifier::eprouver` et s'arrêtent là. Un harnais
+# qui filtrerait, normaliserait ou pré-décoderait les entrées changerait ce qui
+# est éprouvé sans le dire.
+
+[workspace]
+resolver = "3"
+members = ["libfuzzer", "afl"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97"
+publish = false
+license = "MIT OR Apache-2.0"
+
+[profile.release]
+# Aligné sur le profil release de la racine : un débordement arithmétique doit
+# rester un échec DÉTECTÉ ici aussi, sinon le fuzz éprouverait un binaire dont
+# le régime arithmétique n'est pas celui que le dépôt livre.
+overflow-checks = true
+# Les symboles de débogage sont ce qui rend un crash libFuzzer/AFL lisible :
+# sans eux, la trace d'un contre-exemple ne nomme pas la fonction fautive et
+# « l'évasion devient un test » (DEVOPS §3) coûte une seconde enquête.
+debug = true

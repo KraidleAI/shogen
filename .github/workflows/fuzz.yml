@@ -17,16 +17,55 @@
 #     est celui de `squelette`, au même SHA.
 #   - ADR-0012 D7 / ADR-0010 point 8 : zéro autorité ambiante.
 #
-# CE QUE CE WORKFLOW TIENT, ET CE QU'IL NE TIENT PAS — à lire avant de le
-# croire plus large qu'il n'est. Le harnais exécuté (`cargo xtask fuzz`) est
-# **aveugle** : il tire des mutations depuis un corpus committé, il n'est pas
-# guidé par la couverture. Il tient le seuil binaire (zéro panique), le corpus
-# croissant et les budgets ; il ne tient pas le mot « instrumenté ». La couche
-# guidée par la couverture (cargo-fuzz/libFuzzer, ou AFL) exige une toolchain
-# *nightly* supplémentaire — un choix qui engage ADR-0009 point 3 (« version
-# exacte (pas `stable`) … jamais un canal flottant »). Il fait l'objet d'une
-# demande de consultation formée (R-26) déposée le 2026-08-13 et n'est pas
-# tranché ici. Ce fichier sera étendu, pas remplacé, quand il le sera.
+# TROIS MOTEURS, ET CE QUE CHACUN TIENT — à lire avant de croire l'un d'eux
+# plus large qu'il n'est.
+#
+#   1. `cargo xtask fuzz` (jobs `pr` et `nightly` ci-dessous) — harnais EN
+#      ARBRE, **aveugle** : il tire des mutations depuis le corpus committé,
+#      il n'est pas guidé par la couverture. Il tient le seuil binaire (zéro
+#      panique), le corpus croissant et les budgets ; il ne tient pas le mot
+#      « instrumenté ». Sa contrepartie : zéro dépendance, zéro outil, zéro
+#      toolchain nouvelle, et il tourne sur les DEUX plateformes du critère de
+#      clôture (`squelette.yml`).
+#   2. `cargo fuzz` / libFuzzer (job `cargo-fuzz`) — guidé par la couverture,
+#      sur une toolchain **nightly épinglée par DATE**.
+#   3. `cargo afl` / AFL++ (job `cargo-afl`) — guidé par la couverture, sur la
+#      toolchain STABLE du dépôt.
+#
+# Les jobs 2 et 3 ont été ajoutés le 2026-08-13, sur ratification mainteneur
+# des DEUX moteurs (clarification d'ADR-0009 point 3 : le point interdit un
+# canal FLOTTANT, pas une SECONDE toolchain épinglée ; une nightly épinglée par
+# sa date exacte est un artefact figé, admise quand un outillage l'exige,
+# RÉSERVÉE au job qui l'exige). Le job 1 n'a pas bougé : les moteurs
+# s'additionnent, aucun ne remplace l'autre — la diversité de moteurs explore
+# ce qu'un seul rate, au coût publié de deux jobs de plus.
+#
+# ASYMÉTRIE DE PLATEFORME — MESURÉE LE 2026-08-13, PAS SUPPOSÉE (patron D6 :
+# l'asymétrie se publie, elle ne se subit pas). Les deux jobs instrumentés sont
+# **Linux seulement**. Les deux mesures qui le fondent, faites sur l'hôte
+# Windows 10 du mainteneur (msvc, nightly-2026-08-10) :
+#
+#   * `cargo fuzz build` : **VERT** — « Finished `release` profile
+#     [optimized + debuginfo] target(s) in 10.37s ». cargo-fuzz n'est donc PAS
+#     inapte à Windows, contrairement à ce qu'une lecture rapide de sa
+#     documentation laisserait croire.
+#   * `cargo fuzz run` sans préparation : **ROUGE** — « exit code: 0xc0000135,
+#     STATUS_DLL_NOT_FOUND ». Cause identifiée sur pièce et non devinée : la
+#     table d'imports du binaire produit nomme
+#     `clang_rt.asan_dynamic-x86_64.dll` (runtime AddressSanitizer), absent du
+#     `PATH` et absent de la toolchain rustup.
+#   * `cargo fuzz run` AVEC le répertoire du runtime MSVC au `PATH`
+#     (`…\VC\Tools\MSVC\14.44.35207\bin\Hostx64\x64`) : **VERT** — « Done
+#     349857 runs in 31 second(s) », code de sortie 0, zéro panique.
+#
+# Conclusion que ces trois mesures autorisent, et pas une de plus : ce qui
+# empêche un job cargo-fuzz Windows n'est pas une impossibilité, c'est une
+# dépendance à l'emplacement d'un runtime de l'installation Visual Studio de
+# l'hôte — un chemin qui porte un numéro de version de MSVC (14.44.35207) et
+# qui n'est donc pas un fait stable de l'image du runner. Le job reste Linux.
+# Pour `cargo afl`, la contrainte est d'une autre nature et n'admet pas de
+# contournement : AFL++ n'a **pas de cible Windows** (docs/R-8-outillage.md).
+# La couverture Windows du seuil 7 reste tenue par le moteur 1, qui y tourne.
 #
 # ZÉRO DÉPENDANCE, ZÉRO OUTIL : à la différence de `mutation` et de S-G7, ce
 # job n'installe RIEN. Le harnais est en arbre (`xtask/src/fuzz.rs`,
@@ -167,3 +206,385 @@ jobs:
           echo "graine dérivée du run : ${{ github.run_id }}"
           cargo run --locked --release --package xtask -- fuzz \
             --graine "${{ github.run_id }}" --duree 14400
+
+  # ── Moteur 2 : cargo-fuzz / libFuzzer, nightly ÉPINGLÉE PAR DATE ──────────
+  #
+  # Rattachement (G0) : ADR-0009 point 3, clarification ratifiée du 2026-08-13
+  # (« une nightly épinglée par sa date exacte est un artefact figé au même
+  # titre qu'une version stable ; elle est admise quand un outillage l'exige,
+  # RÉSERVÉE au job qui l'exige, déclarée là où elle tourne — la toolchain du
+  # dépôt reste seule par défaut partout ailleurs »).
+  #
+  # POURQUOI CETTE DATE. `nightly-2026-08-10` a été choisie et VÉRIFIÉE le
+  # 2026-08-13 : trois jours de recul — assez pour que l'artefact soit publié
+  # et stable, assez peu pour ne pas traîner un défaut déjà corrigé.
+  # Installation et construction mesurées le jour même en WSL2 :
+  # `rustup toolchain install nightly-2026-08-10 --profile minimal` a suffi —
+  # AUCUN composant supplémentaire n'a été nécessaire, `rust-src` compris (il
+  # ne le serait qu'avec `--build-std`, que ce job n'emploie pas).
+  # `cargo fuzz build` : 9,90 s. Le hash de rustc mesuré est celui que l'étape
+  # de vérification ci-dessous exige à l'octet.
+  #
+  # POURQUOI UN SEUL JOB POUR LES DEUX BUDGETS, à la différence de la paire
+  # `pr`/`nightly` ci-dessus : ces deux-là dupliqueraient ici quarante lignes
+  # d'installation d'outil pour une seule variable de durée. Le budget est donc
+  # calculé depuis le déclencheur, à l'étape « Budget », et il est IMPRIMÉ — un
+  # budget qu'on ne peut pas relire dans le journal n'est pas un budget. La
+  # paire existante n'est pas touchée (elle n'a aucun outil à installer).
+  cargo-fuzz:
+    name: fuzz instrumenté — cargo-fuzz / libFuzzer (Linux)
+    runs-on: ubuntu-latest
+    # Dimensionné sur le cas long (4 h de campagne) plus l'installation et la
+    # construction. Marges mesurées LOCALEMENT le 2026-08-13 (WSL2, 24 cœurs) :
+    # outil 19,3 s, construction 9,9 s. Le runner GitHub est plus lent ; les
+    # 60 min de marge l'absorbent, et ce n'est pas une mesure sur runner.
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Nightly épinglée PAR DATE — vérifiée, jamais espérée
+        env:
+          # La date ET le hash sont ici, en clair : une divergence est ROUGE.
+          # Même doctrine que l'étape « toolchain servie != épinglée » des jobs
+          # ci-dessus — la CI vérifie ce qu'on lui sert.
+          NIGHTLY: nightly-2026-08-10
+          RUSTC_ATTENDU: "rustc 1.99.0-nightly (969b803cb 2026-08-09)"
+        run: |
+          set -euo pipefail
+          rustup toolchain install "${NIGHTLY}" --profile minimal --no-self-update
+          SERVIE="$(rustc "+${NIGHTLY}" --version)"
+          echo "rustc servi : ${SERVIE}"
+          if [ "${SERVIE}" != "${RUSTC_ATTENDU}" ]; then
+            echo "::error::nightly servie « ${SERVIE} » != épinglée « ${RUSTC_ATTENDU} »"
+            exit 1
+          fi
+          # La toolchain du dépôt reste la toolchain PAR DÉFAUT : la nightly
+          # n'est atteinte que par le préfixe `+${NIGHTLY}` des commandes de ce
+          # job. C'est « réservée au job qui l'exige » rendu mécanique — et
+          # VÉRIFIÉ comme dans les trois jobs frères (revue G2 du chantier :
+          # la symétrie doctrinale revendiquée doit se lire dans les gardes).
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          STABLE_SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${STABLE_SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${STABLE_SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Outil à VERSION EXACTE (R-8, docs/R-8-outillage.md)
+        # `--locked` : le lockfile publié de l'outil fait foi, jamais une
+        # résolution du jour. `--version =0.13.2` : contrôle de registre fait
+        # AVANT installation le 2026-08-13 (MIT OR Apache-2.0, non yanked,
+        # propriétaires recopiés de l'API crates.io).
+        run: |
+          set -euo pipefail
+          cargo install cargo-fuzz --version =0.13.2 --locked
+          cargo fuzz --version
+
+      - name: Budget (≥ 15 min par CI, ≥ 4 h en nightly — ADR-0011 seuil 7)
+        id: budget
+        # COUPLAGE EXPLICITE (R-3, revue G2 du chantier) : cette étape existe
+        # à l'identique dans les jobs cargo-fuzz ET cargo-afl — toute édition
+        # se fait aux DEUX endroits, ou l'étape se factorise en job amont.
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            BUDGET=14400
+          else
+            BUDGET=900
+          fi
+          echo "budget de campagne : ${BUDGET} s"
+          echo "budget=${BUDGET}" >> "${GITHUB_OUTPUT}"
+
+      - name: Campagne libFuzzer — corpus committé en GRAINES, zéro panique
+        # Le PREMIER répertoire d'arguments est celui où libFuzzer ÉCRIT les
+        # entrées qu'il conserve ; les suivants sont lus comme graines. Le
+        # corpus committé est donc en SECONDE position, en lecture seule : un
+        # job qui écrirait dans `crates/shogen-verifier/fuzz-corpus/` ferait
+        # dériver ce que l'étape de fraîcheur du job `pr` compare — et
+        # `permissions: contents: read` interdit de toute façon de le rendre au
+        # dépôt. Le versement d'une entrée dérivée au corpus committé reste un
+        # acte humain, minimisé, dans une PR (« l'évasion devient un test »,
+        # DEVOPS §3).
+        env:
+          NIGHTLY: nightly-2026-08-10
+          BUDGET: ${{ steps.budget.outputs.budget }}
+        run: |
+          set -euo pipefail
+          # Le lockfile fait foi (ADR-0012 D1) — or `cargo fuzz` n'a PAS de
+          # drapeau `--locked` (revue G2 du chantier, démontré : il re-résout
+          # et réécrit le lock en silence). La garde est donc en deux temps :
+          # un contrôle `--locked` AVANT (la résolution ne doit rien vouloir
+          # changer), un `git diff` APRÈS (rien n'a bougé pendant).
+          cargo "+${NIGHTLY}" metadata --locked --manifest-path fuzz/Cargo.toml > /dev/null
+          # Graines : une COPIE FILTRÉE — README.md est le registre du corpus,
+          # pas une graine (même règle que le job AFL et le harnais en arbre ;
+          # revue G2 du chantier : les trois moteurs consomment le même corpus
+          # ou disent pourquoi).
+          mkdir -p "${RUNNER_TEMP}/libfuzzer-in" "${RUNNER_TEMP}/corpus-derive"
+          cp crates/shogen-verifier/fuzz-corpus/* "${RUNNER_TEMP}/libfuzzer-in/"
+          rm -f "${RUNNER_TEMP}/libfuzzer-in/README.md"
+          DEBUT=${SECONDS}
+          # `-seed` : la graine est consignée dans le journal et le rejeu est
+          # exact (ADR-0011 point 2, obligation 1 — tenue pour ce moteur ;
+          # l'asymétrie AFL est publiée à son job).
+          echo "graine libFuzzer consignée : ${{ github.run_id }}"
+          cargo "+${NIGHTLY}" fuzz run --fuzz-dir fuzz/libfuzzer eprouver \
+            "${RUNNER_TEMP}/corpus-derive" \
+            "${RUNNER_TEMP}/libfuzzer-in" \
+            -- -max_total_time="${BUDGET}" \
+               -seed=${{ github.run_id }} \
+               -print_final_stats=1
+          # Budget dépensé, vérifié (même règle que le verdict AFL : un vert
+          # qui atteste un budget jamais tenu est un vert à vide).
+          ECOULE=$(( SECONDS - DEBUT ))
+          PLANCHER=$(( BUDGET * 9 / 10 ))
+          echo "campagne : ${ECOULE} s écoulées (plancher ${PLANCHER} s)"
+          if [ "${ECOULE}" -lt "${PLANCHER}" ]; then
+            echo "::error::campagne terminée en ${ECOULE} s < plancher ${PLANCHER} s (90 % du budget ${BUDGET} s)"
+            exit 1
+          fi
+          # Le lockfile n'a pas bougé pendant la campagne.
+          git diff --exit-code -- fuzz/Cargo.lock
+
+      - name: Le contre-exemple, s'il y en a un, est DANS le journal
+        # Ce n'est PAS un `continue-on-error` : l'étape ne s'exécute que si la
+        # campagne a échoué, et le job reste rouge. Elle existe parce qu'un
+        # artefact de runner meurt avec le runner — sans ces octets imprimés,
+        # la panique trouvée serait perdue et le contre-exemple ne pourrait pas
+        # être versé au corpus committé.
+        if: failure()
+        run: |
+          set -euo pipefail
+          echo "artefacts libFuzzer (octets fautifs, en hexadécimal) :"
+          for f in fuzz/libfuzzer/artifacts/eprouver/*; do
+            [ -f "${f}" ] || continue
+            echo "--- ${f} ($(wc -c < "${f}") octet(s)) ---"
+            od -An -tx1 "${f}"
+          done
+
+  # ── Moteur 3 : cargo-afl / AFL++, toolchain STABLE du dépôt ──────────────
+  #
+  # Rattachement (G0) : ADR-0011 seuil 7 ; ratification mainteneur du
+  # 2026-08-13 (les DEUX moteurs) ; docs/R-8-outillage.md.
+  #
+  # Ce job n'introduit AUCUNE toolchain : `cargo-afl` tourne sur la 1.97.1 du
+  # dépôt. Son coût est ailleurs — il construit AFL++ DEPUIS LES SOURCES, ce
+  # qui exige une chaîne C sur le runner (présente sur `ubuntu-latest`).
+  # Mesures LOCALES du 2026-08-13 (WSL2, 24 cœurs, gcc 15.2.0), qui
+  # dimensionnent le `timeout-minutes` ci-dessous : `cargo install cargo-afl
+  # --version =0.18.2 --locked` = 49,0 s ; `cargo afl config --build --force`
+  # (AFL++ depuis les sources) = 38,8 s ; `cargo afl build --release` = 3,2 s.
+  # Le runner GitHub a bien moins de cœurs : la marge retenue est large, et
+  # elle est dite pour ce qu'elle est — une marge, pas une mesure sur runner.
+  cargo-afl:
+    name: fuzz instrumenté — cargo-afl / AFL++ (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Toolchain épinglée (rust-toolchain.toml fait foi)
+        run: |
+          set -euo pipefail
+          TOOLCHAIN="$(sed -n 's/^ *channel *= *"\(.*\)".*/\1/p' rust-toolchain.toml)"
+          if [ -z "${TOOLCHAIN}" ]; then
+            echo "::error::channel absent de rust-toolchain.toml"
+            exit 1
+          fi
+          rustup toolchain install "${TOOLCHAIN}" --profile minimal \
+            --component rustfmt --component clippy \
+            --target thumbv7em-none-eabi --no-self-update
+          rustup default "${TOOLCHAIN}"
+          rustc --version
+          SERVIE="$(rustc --version | cut -d' ' -f2)"
+          if [ "${SERVIE}" != "${TOOLCHAIN}" ]; then
+            echo "::error::toolchain servie ${SERVIE} != épinglée ${TOOLCHAIN}"
+            exit 1
+          fi
+
+      - name: Outil à VERSION EXACTE + AFL++ construit depuis les sources
+        # `cargo-afl` est une crate DISTINCTE de la bibliothèque `afl` ; les
+        # deux sont retenues au même numéro (0.18.2) pour qu'aucun appariement
+        # outil/runtime ne soit à deviner. Contrôle de registre fait AVANT
+        # installation le 2026-08-13 (docs/R-8-outillage.md).
+        run: |
+          set -euo pipefail
+          cargo install cargo-afl --version =0.18.2 --locked
+          cargo afl --version
+          # La version d'AFL++ réellement compilée s'imprime dans ce journal
+          # (et se re-lit après campagne dans fuzzer_stats, clé afl_version —
+          # c'est la commande qui fonde le chiffre du tableau de fuzz/README.md).
+          cargo afl config --build
+
+      - name: Deny du workspace fuzz (configuration locale, ADR-0015 pt 15)
+        # BLOQUANTE de la revue G2 du chantier : un deny.toml que la CI
+        # n'exécute pas est une configuration sans gate — 17 crates de
+        # registre entreraient au dépôt sans aucun contrôle mécanique
+        # (advisories, yanked, sources git, wildcards). Même patron que
+        # compagnon.yml : l'outil à version exacte, le check complet, local
+        # au workspace. Vérifié vert localement avant écriture.
+        run: |
+          set -euo pipefail
+          cargo install cargo-deny --locked --version 0.20.2
+          cargo deny --locked --manifest-path fuzz/Cargo.toml check
+
+      - name: Pré-vol AFL — le motif de core dump doit être « core »
+        # afl-fuzz REFUSE de démarrer si `kernel.core_pattern` désigne un
+        # gestionnaire de crash externe : il confondrait un plantage avec un
+        # simple retard. C'est un réglage du noyau, pas du dépôt ; les runners
+        # GitHub donnent un sudo sans mot de passe. (Sur la machine du
+        # mainteneur, la valeur mesurée le 2026-08-13 était déjà « core » :
+        # aucune élévation n'a été nécessaire pour les campagnes locales.)
+        run: |
+          set -euo pipefail
+          echo "core_pattern avant : $(cat /proc/sys/kernel/core_pattern)"
+          sudo sysctl -w kernel.core_pattern=core
+          echo "core_pattern après : $(cat /proc/sys/kernel/core_pattern)"
+
+      - name: Construction de la cible AFL (instrumentation à la compilation)
+        # Le binaire atterrit dans le `target/` DU WORKSPACE `fuzz/`, pas dans
+        # celui de la racine : `--manifest-path` fixe le workspace, et
+        # `fuzz/Cargo.toml` en est un. Mesuré le 2026-08-13 en exécutant cette
+        # commande exacte, sans `CARGO_TARGET_DIR` :
+        #   -rwxrwxrwx 5661392  fuzz/target/release/eprouver-afl
+        #   ls: cannot access 'target/release/eprouver-afl': No such file
+        # D'où le chemin de l'étape suivante.
+        run: cargo afl build --release --locked --manifest-path fuzz/afl/Cargo.toml
+
+      - name: Corpus de départ — une COPIE, jamais l'original
+        # POURQUOI UNE COPIE : le corpus committé ne doit être ni modifié ni
+        # écrit par ce job (`permissions: contents: read`, et l'étape de
+        # fraîcheur du job `pr` compare ce répertoire au dépôt). `README.md`
+        # est en outre le registre du corpus, pas une graine.
+        #
+        # LA LIGNE `-size 0` REND VISIBLE UN SILENCE, elle ne contourne pas un
+        # refus. Mesuré le 2026-08-13 (AFL++ via cargo-afl 0.18.2, campagne
+        # d'essai de 5 s sur le SOUS-ENSEMBLE des 12 graines `.bin` du corpus —
+        # cette étape-ci en fournit 16, .txt compris ; le comportement d'AFL
+        # sur les 4 graines `.txt` n'a pas fait l'objet d'un essai séparé,
+        # elles sont non vides et rien ne les distingue pour afl-fuzz) :
+        # afl-fuzz n'ABORTE PAS sur un fichier de taille nulle — il le SAUTE,
+        # sans un mot. 12 fichiers en entrée, 11 entrées dans la file
+        # (`afl-out/default/queue/`), `dirigee-cbor-vide.bin` absente.
+        # Or cette graine est LÉGITIME : l'entrée vide est un bord du décodeur
+        # CBOR que le vérificateur doit refuser sans paniquer, et les deux
+        # autres moteurs la consomment. Le `-print -delete` fait donc paraître
+        # dans le journal ce qu'AFL aurait retiré en silence — la couverture de
+        # ce moteur est plus étroite d'une graine, et le journal le dit.
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/afl-in"
+          cp crates/shogen-verifier/fuzz-corpus/* "${RUNNER_TEMP}/afl-in/"
+          rm -f "${RUNNER_TEMP}/afl-in/README.md"
+          find "${RUNNER_TEMP}/afl-in" -type f -size 0 -print -delete
+          echo "graines retenues : $(find "${RUNNER_TEMP}/afl-in" -type f | wc -l)"
+
+      - name: Budget (≥ 15 min par CI, ≥ 4 h en nightly — ADR-0011 seuil 7)
+        id: budget
+        # COUPLAGE EXPLICITE (R-3, revue G2 du chantier) : cette étape existe
+        # à l'identique dans les jobs cargo-fuzz ET cargo-afl — toute édition
+        # se fait aux DEUX endroits, ou l'étape se factorise en job amont.
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            BUDGET=14400
+          else
+            BUDGET=900
+          fi
+          echo "budget de campagne : ${BUDGET} s"
+          echo "budget=${BUDGET}" >> "${GITHUB_OUTPUT}"
+
+      - name: Campagne AFL++
+        # ASYMÉTRIE PUBLIÉE (patron D6, obligation 1 d'ADR-0011 point 2) : le
+        # rejeu exact à graine consignée n'est PAS disponible pour ce moteur —
+        # afl-fuzz n'expose aucune graine de générateur rejouable (son état
+        # évolue avec la file et l'horloge). L'obligation est tenue là où elle
+        # est tenable : par le harnais en arbre (graine SplitMix64 consignée)
+        # et par libFuzzer (-seed passé au job cargo-fuzz). Ce que CE moteur
+        # apporte est la diversité d'exploration, et ce qu'il ne tient pas est
+        # écrit ici plutôt que subi (adjudication R-26 du 2026-08-13).
+        env:
+          # Les runners virtualisés n'exposent pas la mise à l'échelle de
+          # fréquence ; sans cette variable, afl-fuzz s'arrête sur un
+          # avertissement de performance qui n'a pas de sens ici.
+          AFL_SKIP_CPUFREQ: "1"
+          # L'affinité de cœur échoue en conteneur ; l'ignorer coûte un peu de
+          # débit et rien d'autre.
+          AFL_NO_AFFINITY: "1"
+        run: |
+          set -euo pipefail
+          cargo afl fuzz \
+            -i "${RUNNER_TEMP}/afl-in" \
+            -o "${RUNNER_TEMP}/afl-out" \
+            -V ${{ steps.budget.outputs.budget }} \
+            -- fuzz/target/release/eprouver-afl
+
+      - name: Verdict — les stats AVANT le verdict, et zéro plantage
+        # AFL++ sort en CODE 0 même quand il a trouvé des plantages : c'est un
+        # fuzzer, pas une gate. Sans cette étape, le job serait VERT À VIDE sur
+        # un contre-exemple trouvé — la famille exacte de défaut que la revue
+        # G2 de la vague 1 a rendue bloquante. Le verdict est donc RECALCULÉ
+        # ici depuis `fuzzer_stats`, et les chiffres sont imprimés AVANT lui
+        # (ADR-0011 point 2 / ADR-0013 : la ligne de mesure passe avant le
+        # verdict). Le BUDGET aussi est vérifié dépensé (revue G2 du chantier :
+        # un vert qui atteste 15 min ou 4 h jamais tenues serait la même
+        # famille de défaut, portée au budget au lieu des plantages).
+        env:
+          BUDGET: ${{ steps.budget.outputs.budget }}
+        run: |
+          set -euo pipefail
+          STATS="${RUNNER_TEMP}/afl-out/default/fuzzer_stats"
+          if [ ! -f "${STATS}" ]; then
+            echo "::error::fuzzer_stats absent (${STATS}) — la campagne n'a produit aucune mesure, la gate refuse de conclure"
+            exit 1
+          fi
+          echo "--- stats AFL++ (imprimées AVANT le verdict) ---"
+          grep -E '^(run_time|execs_done|execs_per_sec|corpus_count|max_depth|stability|bitmap_cvg|saved_crashes|saved_hangs)' "${STATS}"
+          lire() { awk -v cle="$1" -F': *' '$1 ~ ("^"cle" *$") {print $2}' "${STATS}" | tr -d ' '; }
+          CRASHES="$(lire saved_crashes)"
+          HANGS="$(lire saved_hangs)"
+          if [ -z "${CRASHES}" ] || [ -z "${HANGS}" ]; then
+            echo "::error::saved_crashes ou saved_hangs illisible dans fuzzer_stats — la gate refuse de conclure sur une mesure absente"
+            exit 1
+          fi
+          RUN_TIME="$(lire run_time)"
+          EXECS="$(lire execs_done)"
+          if [ -z "${RUN_TIME}" ] || [ -z "${EXECS}" ]; then
+            echo "::error::run_time ou execs_done illisible dans fuzzer_stats — la gate refuse de conclure sur une mesure absente"
+            exit 1
+          fi
+          # 90 % du budget : la marge couvre le démarrage/arrêt d'afl-fuzz,
+          # pas une campagne écourtée.
+          PLANCHER=$(( BUDGET * 9 / 10 ))
+          if [ "${RUN_TIME}" -lt "${PLANCHER}" ]; then
+            echo "::error::run_time ${RUN_TIME} s < plancher ${PLANCHER} s (90 % du budget ${BUDGET} s) — la campagne s'est terminée trop tôt, le vert attesterait un budget jamais tenu"
+            exit 1
+          fi
+          if [ "${EXECS}" -eq 0 ]; then
+            echo "::error::execs_done = 0 — une campagne qui n'a rien exécuté n'a pas de verdict"
+            exit 1
+          fi
+          if [ "${CRASHES}" != "0" ] || [ "${HANGS}" != "0" ]; then
+            echo "::error::AFL++ a trouvé ${CRASHES} plantage(s) et ${HANGS} blocage(s) — seuil binaire d'ADR-0011 seuil 7 violé"
+            for f in "${RUNNER_TEMP}"/afl-out/default/crashes/* "${RUNNER_TEMP}"/afl-out/default/hangs/*; do
+              [ -f "${f}" ] || continue
+              echo "--- ${f} ($(wc -c < "${f}") octet(s)) ---"
+              od -An -tx1 "${f}"
+            done
+            exit 1
+          fi
+          echo "VERDICT : VERT — zéro plantage, zéro blocage sur $(lire execs_done) exécution(s)"
+          echo "ce que ce vert dit, et rien de plus : *tested* sur ces exécutions, avec leur compte, leur corpus de départ et leur budget, à la date. Il n'établit pas l'absence de panique (ADR-0010, §Coûts point 6)."

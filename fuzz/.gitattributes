@@ -1,0 +1,26 @@
+# Le `.gitattributes` racine pose `* text=auto eol=lf`. Il s'applique ici aussi,
+# et il est exactement ce qu'il ne faut pas pour des OCTETS.
+#
+# La règle ci-dessous est une DÉFENSE EN PROFONDEUR, et le dit : le corpus
+# committé de ce dépôt ne vit PAS dans ce répertoire — il vit dans
+# `crates/shogen-verifier/fuzz-corpus/`, que le `.gitattributes` racine couvre
+# déjà par `crates/shogen-verifier/fuzz-corpus/** -text`. Ce fichier-ci couvre
+# le cas où une graine, un contre-exemple minimisé ou une entrée de corpus
+# dérivée se retrouverait versée sous `fuzz/` : sans lui, la normalisation de
+# fins de ligne réécrirait toute graine contenant 0x0D 0x0A que l'heuristique
+# de Git ne classe pas binaire, et le cas qu'elle porte ne se rejouerait plus.
+#
+# Le fait qui fonde la précaution est mesuré et déjà consigné au dépôt : la
+# machine qui écrit ces lignes a `core.autocrlf = true`
+# (`git config --show-origin core.autocrlf` rend
+# `file:C:/Program Files/Git/etc/gitconfig  true`, mesure du 2026-08-13,
+# `adapters/shogen-tlsn-verify/.gitattributes`).
+*.bin -text -diff
+*.raw -text -diff
+corpus/** -text -diff
+artifacts/** -text -diff
+
+# Les manifestes, les harnais et la configuration deny sont du TEXTE.
+*.toml text=auto eol=lf
+*.rs text=auto eol=lf
+*.md text=auto eol=lf

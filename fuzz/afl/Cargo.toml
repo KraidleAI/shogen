@@ -1,0 +1,44 @@
+# Cible AFL++ de `shogen_verifier::eprouver` — pilotée par `cargo-afl`.
+#
+# Rattachement (G0) : ADR-0011 seuil 7 ; ratification mainteneur du 2026-08-13
+# (LES DEUX moteurs) ; docs/R-8-outillage.md § « Outillage de fuzz ».
+#
+# À la différence de la cible libFuzzer, celle-ci tourne sur la toolchain
+# STABLE du dépôt (1.97.1, `rust-toolchain.toml`) : `cargo-afl` n'exige aucune
+# nightly. Sa contrainte est ailleurs — il construit AFL++ depuis les sources
+# (chaîne C requise) et n'a PAS de cible Windows. C'est l'asymétrie de
+# plateforme publiée en commentaire du job CI, du même patron que D6.
+
+[package]
+name = "shogen-fuzz-afl"
+version = "0.0.0"
+description = "Cible AFL++ de shogen_verifier::eprouver. Enrobage sans logique : les octets reçus sont transmis tels quels."
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[dependencies]
+# `afl` — la BIBLIOTHÈQUE runtime. L'OUTIL est `cargo-afl`, crate distincte :
+# les deux sont contrôlées séparément dans docs/R-8-outillage.md, et retenues
+# au MÊME numéro (0.18.2) pour qu'aucun appariement outil/runtime ne soit à
+# deviner.
+# Contrôle registre R-8 du 2026-08-13, AVANT installation (API crates.io) :
+# `afl` 0.18.2, licence Apache-2.0 (seule), non yanked, 62 448 téléchargements
+# de la version, 2 098 864 cumulés, première publication 2016-01-31,
+# propriétaires `frewsxcv`, `smoelius`, `anishnaik`, équipe
+# `rust-fuzz:publishers`. Version EXACTE (ADR-0012 D3).
+afl = "=0.18.2"
+
+# La cible éprouvée, par CHEMIN — même arête, même sens que pour libFuzzer.
+# `version = "=0.0.0"` ferme `error[wildcard]` de `cargo deny` sans clause
+# d'exception (mesure du 2026-08-13 : sans elle, `bans FAILED`). Même forme
+# que pour la cible libFuzzer et que le compagnon (ADR-0015 pt 15).
+shogen-verifier = { path = "../../crates/shogen-verifier", version = "=0.0.0" }
+
+[[bin]]
+name = "eprouver-afl"
+path = "src/main.rs"
+test = false
+doc = false
+bench = false
