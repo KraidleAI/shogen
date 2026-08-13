@@ -75,6 +75,9 @@ devient un test permanent.
 | S-G6 `index-sum` | l'en-tête d'`INDEX.md` en désaccord avec le contenu réel de `biblio/` | un compte d'artefacts déclaré est déjà parti en dérive une fois |
 | S-G7 `deps` | version non exacte, licence non listée, advisory non traitée (`cargo-deny`) | R6 transposé |
 | D6 `double-build` (hors numérotation S-Gn : elle ne vit pas dans `verify` — trop coûteuse par exécution ; `cargo xtask double-build`, CI `reproductibilite.yml` bloquante sur la cible ratifiée) | deux builds release de `shogen-verifier` sous 6 variations d'environnement dont les octets divergent | ADR-0012 D6 — la promesse offline tient au rebuild indépendant |
+| gate `no_std` (dans `verify`, hors numérotation S-Gn, avec fmt et clippy ; instanciée 2026-08-13, phase C S3) | du `std` dans `shogen-core` ou la bibliothèque de `shogen-verifier` (construction `thumbv7em-none-eabi` rouge) | ADR-0009 pt 6, maintenue telle quelle par ADR-0015 pt 6 — le vérificateur vise les cibles contraintes |
+| gate `mutation` (hors numérotation S-Gn : trop coûteuse par exécution ; `cargo xtask mutation`, CI `mutation.yml` — PR `--in-diff` ≤ 10 min, nightly complet ; instanciée 2026-08-13) | score du cœur < 80 %, ou un survivant hors de la ligne de base justifiée `crates/shogen-core/survivants.txt` | ADR-0011 seuil 3 — mesuré 94,2857 % à l'instanciation (417 mutants, 22 survivants tous justifiés) |
+| gate `fuzz` (hors numérotation S-Gn ; `cargo xtask fuzz`, CI `fuzz.yml` — 15 min PR, 4 h nightly, corpus `crates/shogen-verifier/fuzz-corpus/` committé ; instanciée 2026-08-13) | une panique du vérificateur sur une suite d'octets | ADR-0011 seuil 7 — harnais en arbre (zéro dépendance) ; couche instrumentée en ratification R-26 |
 
 CI sur **Windows + Linux** dès le début (la leçon plateforme-dans-la-trace),
 sur chaque push, mêmes gates en local via `just verify` — une gate qui ne
@@ -85,9 +88,11 @@ l'orchestrateur — gates vues vertes, mutants vus tués)** :
 S-G1, S-G2, S-G3 instanciées dans `xtask/` (+ **S-G7a**, le volet
 « version exacte » de S-G7 porté par rôle, ADR-0012 D3), chacune avec
 sélection par chemins exacts, ligne de couverture avant verdict, et ses
-mutants permanents (`xtask/tests/mutants.rs` — au 2026-08-13 : 23 mutants +
-4 témoins, re-mesuré par `grep -c '#[test]'` ; 13 mutants de gates de code
-+ 10 de gates documentaires).
+mutants permanents (`xtask/tests/mutants.rs` — au 2026-08-13 phase C
+vague 1 : 28 tests re-mesurés par `grep -c '#[test]'`, soit 24 mutants +
+4 témoins ; le 28ᵉ est le mutant S-G3 « seconde racine de compilation »
+semé quand la scission no_std a donné deux racines à `shogen-verifier` —
+le champ `fichier_racine` de S-G3 est devenu la liste `fichiers_racines`).
 Entrée unique : `cargo xtask verify`. Le reste de S-G7 (licences, bans,
 sources, advisories) est tenu par `cargo deny --locked check`. **S-G4,
 S-G5, S-G6 et S-G8 instanciées le 2026-08-12 (ouverture de S3, unité

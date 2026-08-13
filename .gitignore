@@ -11,6 +11,18 @@ biblio/*
 # 2026-08-12 ; le pis-aller target/.gitignore posé par le worker devient
 # ainsi redondant mais inoffensif).
 /target/
+# Workspaces autonomes d'adapters/ (S3 phase C, 2026-08-13) : chaque paquet
+# porte déjà un .gitignore local — cette ligne est la défense en profondeur
+# au cas où un adapter futur oublierait le sien.
+adapters/*/target/
+
+# cargo-mutants — répertoire de sortie d'un run (journaux, arbres de scratch,
+# `outcomes.json`). Il se régénère à chaque exécution et pèse le poids des
+# journaux de 417 mutants : jamais versionné. Ce qui est versionné du régime de
+# mutation, c'est la ligne de base des survivants justifiés
+# (`crates/shogen-core/survivants.txt`), pas la sortie de l'outil.
+/mutants.out/
+/mutants.out.old/
 
 # Scratch local
 *.tmp

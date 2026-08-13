@@ -1,8 +1,8 @@
 # Shōgen — registre bibliographique
 
-**117 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
+**124 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
 dossier dans la passe qui écrit ce chiffre — mécanisé par la gate S-G6
-depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), +3 à la phase C (NIST), en bas
+depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), +3 à la phase C (NIST), +7 à la phase C vague 1 (2 RFC typeur + 5 sources amont épinglées), en bas
 de registre ; les `*.sidecar`, extractions texte locales des PDF pour la
 gate S-G5, ne comptent pas comme artefacts). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
@@ -293,3 +293,32 @@ par le worker de reprise, puis le mutant K0 vu tuer par l'orchestrateur.
 | `nist-cavp-sha-byte-test-vectors-2026-08-13.zip` | NIST CAVP, *SHA Test Vectors for Hashing Byte-Oriented Messages* (`shabytetestvectors.zip`, csrc.nist.gov) — les `.rsp` SHA256ShortMsg/LongMsg | vecteurs employés greppés aux `.rsp` | `929ef80b7b3418aca026643f6f248815913b60e01741a44bba9e118067f4c9b8` |
 | `nist-fips-180-4-secure-hash-standard-2026-08-13.pdf` | NIST, *FIPS PUB 180-4 — Secure Hash Standard (SHS)*, août 2015 (nvlpubs.nist.gov) — constantes §4.2.2, état initial §5.3.3, bourrage §5.1.1 | sections employées par empreinte.rs | `0455b406d89648d20cbde375561e19c245b9815e894164c2670772e3d54deb82` |
 | `nist-sha256-examples-intermediate-values-2026-08-13.pdf` | NIST CSRC, *SHA-256 Examples* (valeurs intermédiaires, csrc.nist.gov) — « abc » et le message à deux blocs | exemples employés | `7006b6549dad2fc8c6f29417a921f2e48208157ef496a7e1e1d7d17c5cc1e7db` |
+
+### Versés à la phase C de S3 (2026-08-13) — chantiers typeur et transport (vague 1)
+
+Deux origines, une même adjudication orchestrateur du 2026-08-13 :
+- **RFC du typeur** : acquises par le worker Y (chantier typeur) qui en avait
+  besoin pour la grammaire du dire (JSON) et de l'instant (date-time) — il ne
+  les a pas contournées, il les a acquises et a demandé le versement ;
+  **provenance re-établie par l'orchestrateur** : re-téléchargement depuis
+  rfc-editor.org, octets identiques (sha256 recalculés, concordants avec le
+  rapport du worker). Textes IETF : reproduction autorisée par le Trust Legal
+  Provisions pour usage de référence ; copies locales non redistribuées.
+- **Sources amont du chantier T** : cinq fichiers du dépôt `tlsnotary/tlsn`
+  au commit épinglé `0fe3c32d35382b3f290a43c4156399ca4512bb89` (le HEAD
+  courant au 2026-08-13, constaté par `git ls-remote`), réellement employés
+  par le conducteur de session et le compagnon — le worker T avait consigné
+  que cinq de ses affirmations reposaient sur le clone local et non sur le
+  registre ; **provenance établie par l'orchestrateur** : fetch
+  raw.githubusercontent.com au commit exact, sha256 recalculés, 5/5
+  concordants avec le rapport du worker.
+
+| fichier | ce que c'est (constaté) | lu | sha256 |
+|---|---|---|---|
+| `rfc-8259-json-2026-08-13.txt` | RFC 8259, T. Bray (ed.), Textuality, *The JavaScript Object Notation (JSON) Data Interchange Format*, IETF Standards Track, déc. 2017 (obsolète RFC 7159), 28 360 octets — sections lues et citées par le typeur : §4 (unicité des noms), §6 (nombres), §7 (chaînes et échappements), §8.1 (UTF-8) | sections employées (worker Y) | `61a5378f4255c720beb2a4b4a63b29540147c140f36988bf086291989b4cd2d7` |
+| `rfc-3339-datetime-2026-08-13.txt` | RFC 3339, G. Klyne (Clearswift) & C. Newman (Sun Microsystems), *Date and Time on the Internet: Timestamps*, Standards Track, juil. 2002, 35 064 octets — sections lues et citées : §5.6 (ABNF date-time, NOTE sur la casse de « T »/« Z »), §5.7 (bornes), Appendix C (bissextile) | sections employées (worker Y) | `9ab2b8864a85dca73a88f49b0927bc7bc85f596926e4fd1890905777924e700a` |
+| `tlsn-example-attestation-prove-rs-g0fe3c32d.rs` | exemple officiel attestation_prove (crates/examples/attestation/prove.rs), épinglé 0fe3c32d — la notarisation, pièce centrale du montage Notary, modèle du conducteur de session | non, sauf marqueurs | `7f913bc5d63e05214d281ae38531c8cea8acc219fb713f4d798e9524d05dcaa5` |
+| `tlsn-crate-examples-lib-rs-g0fe3c32d.rs` | crates/examples/src/lib.rs amont, épinglé 0fe3c32d — porte MAX_SENT_DATA/MAX_RECV_DATA repris par le conducteur | non, sauf marqueurs | `c77b526e0c1cce9c06477bdd544a4bdcb71aa940b265eb7a68ff85562a43183a` |
+| `tlsn-crate-core-webpki-rs-g0fe3c32d.rs` | crates/core/src/webpki.rs amont, épinglé 0fe3c32d — `RootCertStore::mozilla()`, le magasin de racines compilé dans le compagnon | non, sauf marqueurs | `24dc64efd9371b37739b0f22e01efba03b5e2762295c73dbbca8582ae9960bc2` |
+| `tlsn-crate-attestation-connection-rs-g0fe3c32d.rs` | crates/attestation/src/connection.rs amont, épinglé 0fe3c32d — la ligne qui établit que le certificat est validé à `connection_info.time` (les fixtures ne pourrissent pas à l'expiration du certificat) | non, sauf marqueurs | `7e54a13f969cb768cb270e2ab04360446d330745a501454d1bd3832515ebbeb3` |
+| `tlsn-crate-attestation-provider-rs-g0fe3c32d.rs` | crates/attestation/src/provider.rs amont, épinglé 0fe3c32d — `CryptoProvider::default()` = `ServerCertVerifier::mozilla()` | non, sauf marqueurs | `f4f964789075a7606f3a10cd5b8542d2ebf9a970dfd5098d9db18a1c5f044657` |
