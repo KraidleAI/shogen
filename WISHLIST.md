@@ -140,6 +140,75 @@ public sur `tlsn-mpc/1`.
 *(La taille d'un artefact `Presentation` n'est PAS ici : elle se résout
 par mesure en phase C — ADR-0015, manque 6.)*
 
+## Priorité 4 — GTM / marché (dossier Shōgen-GTP, ADR-0019, 2026-08-20)
+
+Procurements ouverts du dossier de stratégie (`F:\Shogen-GTP\docs\07` §3-4),
+versés ici à la consignation. Aucun n'est bloquant pour le code S2 ; les deux
+**décisionnels** (⚑) le sont pour un claim ou un séquencement de canal. Le budget
+WebSearch de la mission était épuisé (200/200) ; une relance à budget restauré
+clôt PS-03/06/07 (note d'outillage 07 §3, pas une dette).
+
+### Marché (série PS)
+
+- [ ] **PS-01 ⚑** — `docs.api3.org/oev-searchers/` (cessation de l'OEV Network
+  public ~nov. 2025). Bloqué : 404 curl (2 variantes). **Usage : confirmer sur
+  primaire le renversement de l'ancrage du canal 3 (API3 → Chainlink SVR)** —
+  impact décisionnel (D3).
+- [ ] **PS-02** — figure Venus « primes de liquidation année pleine 2024 »
+  auditée (candidat : rapport Messari). Bloqué : WebSearch épuisé. Usage :
+  trancher la contradiction 5,8 M$ vs 6,2 M$.
+- [ ] **PS-03** — état des opérateurs de nœuds RedStone en août 2026 (Guard
+  Program II ? AVS ?). Bloqué : WebSearch épuisé. Usage : borner l'actualité de
+  « 5 nœuds internes » (datée 2023/24).
+- [ ] **PS-04** — drill-down par validateur du dashboard Chronicle (exchanges
+  interrogés). Bloqué : 429 rate-limit. Usage : trancher la cellule S2 de
+  Chronicle.
+- [ ] **PS-05** — article WSJ sur le prix de rachat Messari (« >10 M$ »).
+  Bloqué : paywall. Usage : passer le montant de [2nd] à [lu] (PS-05 = source du
+  chiffre repris [2nd] en ADR-0019).
+- [ ] **PS-06 ⚑** — fiche + score S1–S5 de **Primus Labs** (omission de T1 ;
+  TEE Phala vérifié, AlphaNet en [2nd]). Bloqué : WebSearch épuisé. Usage :
+  compléter l'ensemble zkTLS avant publication (« unanime » actuellement
+  surétendu).
+- [ ] **PS-07** — leads d'institutions non bouclés : growthepie, Bluechip, DeFi
+  Safety ; frontière Chainlink DECO ; Pluto, Clique. Bloqué : WebSearch épuisé.
+  Usage : compléter la carte des institutions et des zkTLS.
+- [ ] **PS-08** — omissions CV1 §9 : cabinets adjacents (Re7, MEV Capital,
+  Apostro, Anthias) ; douleur OEV/liquidation côté Morpho/Euler/Spark ; identité
+  de l'oracle du glitch du 10/03/2026 (27 M$ liquidés). Bloqué : WebSearch
+  épuisé. Usage : compléter le périmètre demande + identifier une défaillance
+  d'oracle nommée (cœur de thèse).
+- [ ] **PS-09** — trajectoire de TVS RedStone (« ×46 depuis début 2023 ») sur
+  primaire daté. Bloqué : non re-tracée. Usage : adjuger la figure de croissance
+  de `07-gtm.md` (actuellement NON_VÉRIFIABLE).
+- [ ] **PS-10** — antériorité de marque **avant** branding public (registres
+  US/UE/FR/JP ; « 証言 » ; homonymes SaaS ; domaines). Non bloquante. Usage :
+  dégager la marque Shōgen avant exposition (D1/D10, leçon Vernier/Seilkal).
+
+### Académique (série PA-SH2 — chiffres portés en [2nd], sources primaires à acquérir)
+
+- [ ] **PA-SH2-01** — Gangwal, Valluri & Conti 2022 (« 31 nœuds / 7 sources »,
+  primaire). Usage : passer le chiffre porteur de [2nd] à [lu].
+- [ ] **PA-SH2-03** — **Messias et al., FC 2023** (« 98,68 % des liquidations
+  dépendent d'une MAJ Chainlink dans le même bloc »). Actuellement **[2nd] via
+  Gansäuer et al. 2025** (lu au PDF) ; à passer en [lu] direct. Usage : le
+  chiffre porteur du résultat central, repris [2nd] en ADR-0019 (annexe A).
+- [ ] **PA-SH2-06** — Slager, Gond & Moon 2012 (FTSE4Good). **Possiblement déjà
+  satisfait** via l'accès ouvert cité au doc 03 §3 — à adjuger sur pièce.
+- [ ] **PA-SH2-02 / 04 / 05 / 07** — paternité du terme « OEV » ; contrefactuel
+  d'échec de dashboard crypto ; textes intégraux restés [abs]. Usage : sourcer
+  les figures et affirmations correspondantes avant tout claim public.
+
+### Hors périmètre de ce versement (nommés pour zéro dette)
+
+- **Extrait KRS officiel de L2BEAT Sp. z o.o.** (`ekrs.ms.gov.pl`) — agrégateurs
+  KRS [2nd] concordants ; registre d'État direct non consulté (07 §4, CV2
+  Aff. 6). Confort : l'entité est établie.
+- **PA-01..PA-04** (07 §4) — corrections d'archive et confort **côté dossier GTP**
+  (venue Pontikes 2012 ; pairage titre/DOI « DORA » 2023 ; contre-littérature
+  open-core ; textes [abs]) : hors dépôt, laissés à la maintenance du dossier
+  source, pas des procurements du dépôt.
+
 ## Déjà réglé (pour mémoire)
 
 - ~~Knight & Leveson 1986, article complet~~ — apporté par le mainteneur.
