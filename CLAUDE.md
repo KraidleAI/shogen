@@ -17,6 +17,12 @@ Conséquences opérationnelles :
 4. PR petites et unitaires (R-25). TODO/FIXME nus interdits (R-13).
 5. Dépendance nouvelle : vérification registre AVANT installation (R-8).
 6. Clôture de passe : rapport-de-passe du corpus, section dettes vide ou en PR-x/recherches (G5).
-7. Workers `claude-opus-5`, orchestrateur `model: fable`, effort `high` (2026-08-12) ;
-   seul l'orchestrateur committe (R-19/R-20).
+7. Roster (mainteneur 2026-08-14, consigné ADR-0019) : workers **`claude-opus-4-8`
+   épinglés, effort `max`** ; chercheurs/lecteurs **`claude-sonnet-5`, effort `max`** ;
+   orchestrateur/planificateur **`model: fable` (Fable 5), effort `high`** ; advisors
+   Fable 5. **`claude-opus-5` est banni** ; jamais un tier `opus` nu (il résout vers le
+   modèle banni). Agent `chercheur.md` = Sonnet 5 + Write (recherche qui écrit son
+   archive au fil de l'eau, D4) ; `lecteur.md` reste lecteur pur (doc 03). Gate 0
+   (contrôle du modèle résolu) au premier worker de chaque passe. Seul l'orchestrateur
+   committe (R-19/R-20).
 8. **Audit d'entrée dû à la prochaine passe** : docs/AUDIT-ENTREE.md.

@@ -20,6 +20,7 @@
 | ADR-0016 | Canonicalisation de `subject` : forme construite à l'adapter, prédicat total au cœur, refus nommés, requête verbatim jamais triée — ferme la sous-décision ouverte d'ADR-0002 | acceptée (adjugée orchestrateur sur pièces — révision mainteneur ouverte) | 2026-08-13 |
 | ADR-0017 | Licence : « MIT OR Apache-2.0 » uniforme sur le workspace — échéance ADR-0014 soldée (décidée sur délégation explicite du mainteneur du 2026-08-13) | acceptée | 2026-08-13 |
 | ADR-0018 | Empreinte SHA-256 du cœur : manuelle pour S3 (zéro dépendance préservée, vecteurs NIST + contrôles croisés étiquetés), crate `sha2` rouverte en S4 sur pièces | acceptée (adjugée orchestrateur — position durable remontée au mainteneur) | 2026-08-13 |
+| ADR-0019 | Consignation de la stratégie GTM (dossier Shōgen-GTP) : décisions ratifiées D1–D5, implications produit D6–D11 portées à leurs registres, contrôle de traçabilité en annexe | acceptée (D1–D5 ratifiées mainteneur ; dossier accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections », portées) | 2026-08-20 |
 
 ---
 
@@ -2899,5 +2900,149 @@ aux comptes du pt 2.
   croisés, non-NIST » ajoutée à l'adjudication.
 - **`WISHLIST.md`** : rien — le contrôle R-8 de `sha2` n'est dû que si S4
   instruit la bascule.
+
+---
+
+## ADR-0019 — Consignation de la stratégie GTM (dossier Shōgen-GTP) : décisions ratifiées D1–D5, implications produit D6–D11
+
+**Statut** : acceptée — décisions D1–D5 ratifiées par le mainteneur
+(2026-08-14/19/20) ; dossier de stratégie accepté au checkpoint AgileGates 2
+par `validateur-humain` (Fable 5, 2026-08-20, « accepte-avec-corrections » — les
+quatre corrections portées) ; consignée par l'orchestrateur après contrôle de
+traçabilité 10/10 (annexe A) · 2026-08-20
+
+> **Note d'adjudication (2026-08-20).** Le dossier de stratégie concurrentielle
+> et de mise sur le marché **Shōgen-GTP** (mené hors dépôt, `F:\Shogen-GTP`,
+> 2026-08-19→20, méthode Vernier : recon Sonnet 5, contre-vérification Opus 4.8,
+> contrôle DOI, deux checkpoints AgileGates) a été soumis pour consignation.
+> `F:\Shogen` n'a pas été touché par la mission (`git status` propre à `58dc96e`,
+> antérieur). L'orchestrateur a re-contrôlé par sondage 10 affirmations porteuses
+> sur les archives (annexe A, aucune divergence bloquante), puis a fait exercer le
+> siège `validateur-humain` (acceptation du livrable) **avant** toute écriture —
+> verdict « accepte-avec-corrections », corrections 1–4 portées (1–3 au dossier
+> GTP hors dépôt ; 4 = étiquettes de niveau et dates de fetch, appliquée
+> ci-dessous). L'orchestrateur **consigne** ; il ne tranche pas la valeur.
+
+### Contexte
+
+Le GTM v0 du dépôt (`docs/07-gtm.md`) précède le vérificateur. La mission GTP
+l'enrichit sur pièces vérifiées, sans le refonder, et remonte cinq décisions
+ratifiées (D1–D5) plus six implications pour la feuille de route code (D6–D11).
+Aucune figure de seconde main n'est consommée nue : les figures porteuses sont
+contre-vérifiées (CV1/CV2/CV3, workers Opus 4.8) puis re-contrôlées par sondage
+(annexe A). Les décisions de valeur nouvelles (canal 2) ont suivi le circuit
+d'escalade AgileGates ; les décisions techniques du dépôt (rangs R1/R2/R3, k_eff,
+premier produit, verdict R-1) ne sont **pas** rouvertes (08 §3).
+
+### Décision — les cinq décisions ratifiées (D1–D5)
+
+1. **D1 — Nom « Shōgen » validé et retenu** (mainteneur, 2026-08-19) : le logiciel
+   s'appelle Shōgen, accessible sur le site Kraidle, **avec son propre site, sa
+   propre plateforme, ses propres réseaux sociaux**. Amende l'orientation « nom de
+   travail » ; conditionne le passage public (voir D10). Diligence non bloquante
+   PS-10 (antériorité de marque avant exposition) versée à WISHLIST.
+2. **D2 — Canal 2 (oracles challengers) accepté sous quatre verrous** (mainteneur,
+   2026-08-20) : benchmark public préalable non-sélectionnable ; service et non
+   verdict ; pool fixé par la méthodologie publique ; publication ex ante + pas
+   d'optimisation vendue. Le canal 2 est de l'issuer-pays — le modèle Messari
+   (décote −97 %, [CV2 Aff. 9]) — que ces verrous bornent sans l'annuler : la
+   parade ferme la dissimulation, pas le choix du pool (06 §1). Résidu publié : le
+   jeu sur les axes (voir D7).
+3. **D3 — Séquencement des canaux figé** (mainteneur, 2026-08-20) : benchmark
+   public (0) → cabinets (1) → oracles (2) → prêts (3) → assureurs (4) ; le gratuit
+   précède le payant. **Dépendance tracée** : l'ancrage du canal 3 (prêts) repose
+   sur le renversement API3 → Chainlink SVR (fait positif P1, Compound/Venus) ; la
+   confirmation de la cessation de l'OEV Network public est **PS-01**, le
+   procurement le plus décisionnel (annexe A ligne 10, non consommé comme fait).
+4. **D4 — Agent `chercheur.md` créé** (mainteneur, 2026-08-19) : Sonnet 5, effort
+   max, **avec Write** (recherche qui écrit son archive au fil de l'eau) ;
+   `lecteur.md` reste le lecteur pur (doc 03). Roster des passes futures ; recalé à
+   `CLAUDE.md` ligne 7 à cette consignation.
+5. **D5 — Opus 5 confirmé banni** (mainteneur, 2026-08-14/19) : workers Opus 4.8,
+   chercheurs/lecteurs Sonnet 5, orchestrateur Fable 5, jamais un tier `opus` nu.
+   Gate 0 au premier worker. Aligne `CLAUDE.md` ligne 7 (corrigée ici — deux points
+   périmés : le modèle `claude-opus-5` **et** l'effort `high` de 2026-08-12).
+
+### Les six implications produit (D6–D11) — portées à leurs registres
+
+Consignées **là où elles vivent** (pointeurs, pas duplication) :
+
+- **D6 / D8 — le benchmark public EST le prototype S2, publiable et recalculable** :
+  porté au critère de sortie S2 (`docs/05-roadmap.md`). Rien ne se vend ni ne se
+  publie avant que S2 ait produit ses n/K/z ; la sortie de S2 doit être
+  recalculable par un tiers (cohérent ADR-0003), pas un rapport interne.
+- **D7 — la liste des axes mesurés vs non mesurés = champ NON OPTIONNEL du
+  certificat** : porté à `docs/04-certificat-diversite.md` §4 (parade au seul canal
+  non fermé, le jeu sur les axes — 06 §1 ; exigence ferme en S4, candidate à un ADR
+  de spec).
+- **D9 — architecture free/paid + modèle DefiLlama** (freemium auto-financé) :
+  confirme `07-gtm.md` §5, ne l'invente pas (03 §1). Le gratuit (benchmark, scores,
+  vérificateur offline) ne dépend jamais de la confiance en Shōgen (ADR-0003) ; le
+  payant se pose au-dessus.
+- **D10 — le passage public (S3, DEVOPS §1) porte désormais une marque** : porté à
+  `docs/DEVOPS.md`.
+- **D11 — non-buts adossés à la preuve** : pas de token / pas de calcul on-chain
+  (ADR-0006) sont des **moats de neutralité** vérifiés — un acteur à token/à revenu
+  des mesurés devient partie prenante de la valeur qu'il mesure (cf. L2Beat, qui
+  touche l'argent des projets qu'il note, [CV2 Aff. 6]).
+
+### Alternative considérée
+
+Consigner D1–D11 en cinq ADR séparés. Non retenue : un seul ADR daté qui consigne
+les décisions ratifiées et pointe les implications vers leurs registres est plus
+traçable et évite la dispersion ; les implications D6–D11 vivent dans les docs
+qu'elles amendent (roadmap, spec du certificat, DEVOPS), pas dans un ADR chacune.
+
+### La source qui tranche
+
+Le dossier Shōgen-GTP (01–08 + archives `data/`), accepté au checkpoint AgileGates 2
+par `validateur-humain` (2026-08-20, modèle résolu `claude-fable-5`,
+« accepte-avec-corrections » : les dix CA tenus, aptitude à porter D6–D11
+confirmée) ; et le contrôle de traçabilité de l'orchestrateur (annexe A). Les
+décisions de valeur (D1–D5) sont ratifiées par le mainteneur aux dates citées.
+
+### Ce que la décision coûte
+
+1. **Le moat est de position, pas de structure** (contra Vernier, 06 E2) : rien
+   n'interdit à un oracle de publier ses amonts ni à un zkTLS d'ajouter le quorum ;
+   le fossé est vitesse + neutralité + archive historique. Plus mince, assumé.
+2. **Shōgen se note 0/5 à sa propre grille aujourd'hui** (02 §1 ; S3=0 sur ~30
+   acteurs, produit adversarialement CV3) : le critère vendu (diversité mesurée) est
+   le moins avancé, R1 n'a jamais tourné. Ce n'est pas une dette mais l'état qui fait
+   de D6/D8 une **contrainte commerciale**, pas seulement technique.
+3. **Péremption** : les figures du dossier sont des instantanés (TVS datées
+   2026-08-19) ; le monde a bougé en trois semaines (Chaos parti d'Aave, OEV API3
+   éteint). Toute reprise chiffrée garde sa date de fetch.
+
+### Registres touchés
+
+- **`docs/DECISIONS.md`** : cette ADR (D1–D5 ; pointeurs D6–D11 ; annexe A).
+- **`docs/05-roadmap.md`** : critère de sortie S2 (D6/D8).
+- **`docs/04-certificat-diversite.md`** §4 : champ non optionnel des axes (D7).
+- **`docs/DEVOPS.md`** : passage public sous marque (D10).
+- **`CLAUDE.md`** ligne 7 : roster recalé (D4/D5 — modèle et effort).
+- **`WISHLIST.md`** : procurements PS-01..10, PA-SH2-01..07, PS-10.
+- **Hors dépôt** : `F:\Shogen-GTP` (dossier source ; corrections 1–3 du validateur
+  portées ; non versionné par l'orchestrateur).
+
+### Annexe A — Contrôle de traçabilité avant consommation (orchestrateur, 2026-08-20)
+
+Sondage de 10 affirmations porteuses re-greppées sur `data/raw` et `data/academique`
+du dossier GTP ; verbatim et niveau confirmés sur pièce ; aucune divergence
+bloquante. Les comptes (« ~30 acteurs », « ~65 réf. ») sont lus à la phrase
+énumératrice du dossier, jamais recomptés par l'orchestrateur (leçon 2026-07-29).
+
+| # | Affirmation | Pièce (dossier GTP) | Niveau | Verdict |
+|---|---|---|---|---|
+| 1 | Chaos Labs = concurrent oracle (Edge), quitté Aave 6 avr. 2026 | CV1 §1 ; 01 | P1 gouv. Aave + P2 (Edge) | ✅ (TVS Edge corrigée 724→722 M$ ; existence Edge sur P2+DefiLlama, pages produit 404 — nature concurrent solide) |
+| 2 | Messari issuer-pays, décote −97 % | CV2 Aff. 9 | [lu] primaire (rachat Blockworks 12/06/2026) | ✅ |
+| 3 | L2Beat touche l'argent des projets qu'il note | CV2 Aff. 6 | [lu] verbatim (`l2beat.com/donate`, 2026-08-19) | ✅ |
+| 4 | Shōgen 0/5 à sa propre grille | CV3 tâche 2 ; 02 §1 | adversarial (worker Opus 4.8) | ✅ |
+| 5 | 98,68 % liquidations même-bloc Chainlink | A-verify:242 ; A-new2 | **[2nd] via Gansäuer 2025** (Messias FC 2023 = PA-SH2-03) | ✅ tag correct + procurement formé |
+| 6 | Personne ne mesure l'indépendance des sources — S3=0 sur ~30 acteurs | 02 §1 (phrase énumératrice) | recon + littérature A-new2 | ✅ |
+| 7 | Zéro DOI fabriquée sur ~65 références | A-verify | contrôle DOI | ✅ (2 défauts mineurs → PA-01/PA-02) |
+| 8 | 3/5 cabinets en conflit oracle | CV1 §1 ; 02 §3 | P1 | ✅ |
+| 9 | Modèle DefiLlama (freemium) vs L2Beat (grants) vs Messari (issuer-pays) | T2 ; CV2 | [lu] | ✅ |
+| 10 | PS-01 : cessation OEV Network API3 renverse l'ancrage canal 3 | 07 §3 ; D1 | **procurement (404), non consommé** ; renversement SVR sur P1 | ✅ traité en procurement |
 
 ---
