@@ -147,6 +147,17 @@ oracles inclus ; classe « BTC/USD-stable », devise marquée par flux ;
 lecture on-chain admise sous ADR-0006 ; règle `basis:doc` → ADR-0008
 (acceptée). **S2 passe à l'implémentation du harnais.**
 
+**Implication GTM (ADR-0019 D6/D8, 2026-08-20)** : la sortie de S2 est le
+**benchmark public** du projet — le rapport `11-mesures-pilotes.md` doit être
+**recalculable par un tiers** (cohérent ADR-0003), pas un artefact interne : un
+seul objet, trois fonctions (il tranche l'hypothèse R2 — le critère de sortie
+binaire ci-dessus reste inchangé —, il est la première mesure recalculable d'un
+phénomène que le marché cite sans le mesurer, et il date l'antériorité S5).
+**D8 — contrainte commerciale, pas seulement technique** : rien ne se vend ni ne
+se publie avant que S2 ait produit ses n/K/z (Shōgen se note 0/5 à sa propre
+grille aujourd'hui — dossier GTP, ADR-0019 §coût ; le critère vendu, la diversité
+mesurée, est le moins avancé). Le gratuit précède le payant (D3).
+
 ## S2.5 — Les fondations d'ingénierie *(gate d'entrée du code produit)*
 
 > Jalon inséré le 2026-08-12 (règle mainteneur du 2026-08-05 : aucun code

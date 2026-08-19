@@ -25,6 +25,14 @@
   existence (S3), pas sur un calendrier marketing. Avant S3, le dépôt privé
   protège la fenêtre R-1/S2 (antériorité académique via arXiv, pas via
   GitHub).
+  - **Le passage public porte désormais une marque** (ADR-0019 D10,
+    2026-08-20) : le nom **Shōgen** est validé et retenu, avec son propre site,
+    sa propre plateforme, ses propres réseaux sociaux (D1). Le passage
+    privé→public de S3 est donc aussi le lancement d'une marque publique.
+    **Diligence PS-10 (non bloquante)** : recherche d'antériorité de marque
+    (registres US/UE/FR/JP ; « 証言 » ; homonymes SaaS ; domaines) **avant**
+    exposition — le choix est fait, il reste à dégager la marque (leçon
+    Vernier/Seilkal).
 - **`biblio/` ne va PAS dans le dépôt public.** Les artefacts détenus
   incluent des copies d'articles (IEEE TSE…) dont la redistribution
   publique est une violation de droits. Règle : `biblio/` locale (ou

@@ -123,7 +123,12 @@ Chaque certificat embarque, en clair, son périmètre :
 1. Un axe non mesuré reste un mode commun possible. La liste des axes
    mesurés est exhaustive dans le certificat ; tout le reste est hors
    mesure. (Knight & Leveson appliqué à nous-mêmes : nos axes sont nos
-   deux universités.)
+   deux universités.) **Cette exhaustivité est un champ NON OPTIONNEL du
+   certificat** (ADR-0019 D7, GTM canal 2) : c'est la parade au seul canal de
+   conflit que ni la vérification offline ni le benchmark public ne ferment —
+   le jeu sur les axes ; le canal 2 payant (oracle certifiant son propre feed)
+   n'est défendable que si chaque certificat publie ce qu'il n'a **pas** mesuré.
+   Exigence ferme en S4, candidate à un ADR de spec du certificat.
 2. R1 mesure le passé ; il ne borne pas un adversaire qui ne s'est pas
    encore exprimé. Un pool à l'historique impeccable peut être capturé
    demain.
