@@ -304,6 +304,15 @@ Dong et al., PVLDB 3(1), 2010, identité re-établie en page de titre (V5),
 prédécesseur PVLDB 2009 (piste, non attribuée). (2c) ne cite pas ce
 précédent tant que le corps n'est pas lu.
 
+**Ratification du 2026-08-20 (adjudication M1c).** L'instrument retire le
+disjoint « ou staleness » du compte co-aberrant (2c) : K comptant les
+co-aberrances **de même sens** (lag ≤ ℓ), la staleness — qui n'a **pas de
+signe** — ne peut y entrer sans dénaturer le compte signé. La **co-staleness**
+reste captée ailleurs, sans perte de couverture : par l'écart (ii) de §5.2 (R1)
+et par la matrice de co-écarts φ/n₁₁ que le drapeau 2 (§5.6) consomme. Écart au
+texte littéral de (2c), déclaré au rapport (`COAB_STALENESS_NOTE`) et ratifié par
+l'orchestrateur (R-21).
+
 ### 4.3 (c) L'axe méthode commune — liens re-établis, règle `basis`
 
 Les cinq faits d'amont re-établis (V3, pages ouvertes le 2026-08-05 ; les
