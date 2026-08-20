@@ -3235,6 +3235,13 @@ au vendredi suivant** et c'est une **ESCALADE-INVESTISSEUR** (le reframe :3124-3
 lancement la variable de course — un glissement est un coût investisseur), **jamais** une compression de
 gates.
 
+> **Amendement 2026-08-20 (décision investisseur).** J0 fixé au **vendredi 21 août 2026, 00:00
+> UTC** (le vendredi proche, pas le suivant). La passe ayant été **adjugée et acceptée le
+> 2026-08-20** (verdict G7 + checkpoint #2), soit **à J0−1**, la règle C4 est **SATISFAITE** —
+> aucun glissement, aucune compression de gate. Dates aval : calibration 21→23 août, campagne
+> jusqu'à **J28 = 18 sept** (RUNBOOK §5/§9). La mention « 28 août » de la note d'adjudication
+> ci-dessus est le cadrage initial, superseded par cette décision.
+
 ### Verdict G7 (2026-08-20) — les deux gates passent, ratifications
 
 **Adjudication double, contexte frais :**
