@@ -3264,7 +3264,9 @@ gates.
    tests utilise un τ volontairement grand comme sentinelle « désactive l'axe enveloppe » (**mesuré** :
    la garde large cassait 2 tests légitimes → narrowed au fichier).
 
-**Résidus documentés (non bloquants, portés au certificat `04`) :**
+**Résidus documentés (non bloquants) — consignés ICI ; à échoir au rapport pilote
+`11-mesures-pilotes.md` (ce sont des résidus de l'**instrument pilote**, pas du produit),
+et au certificat `04`/`08` en S4 s'ils s'avèrent porteurs pour le produit :**
 - **A(discipline-de-segment)** procédurale, symétrique : ni `report` (sur un segment de calibration)
   ni `closure` (sur un segment de campagne) ne vérifie in-band le régime du dossier ; garde-fou = 2
   dossiers + label `harness_version` + RUNBOOK §3 (sain sous le reframe capture-sans-seuil).
