@@ -19,12 +19,15 @@ from __future__ import annotations
 
 import contextlib
 import io
+import json
 import os
 import tempfile
 import unittest
 from decimal import Decimal
 
-from shogen_s2 import collector, r1, records
+from datetime import datetime, timezone
+
+from shogen_s2 import collector, lm, r1, records, window
 from shogen_s2.model import Currency, Reading, Status
 from shogen_s2.sources import SPECS
 
@@ -216,6 +219,147 @@ class TestRunParamsConcordance(CollectorCase):
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with self.assertRaises(ValueError):
             r1.recompute_from_journal(self.control, self.journal)
+
+    def test_divergent_strate_calendar_fail_closed(self):
+        # Changement de calendrier de strates mi-campagne → recalcul refusé
+        # (strate_calendar est PORTEUR, §E/§5.3) : deux partitions ne se mélangent
+        # pas en silence dans le même n par strate.
+        self._collect()                                    # 1er démarrage : spec single
+        collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
+                          sigma_classe=SIGMA, tau_classe=TAU,
+                          strate_spec=window.WEEKEND_STRATE_SPEC,  # 2ᵉ : calendrier différent
+                          now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
+        with self.assertRaises(ValueError):
+            r1.recompute_from_journal(self.control, self.journal)
+
+    def test_missing_load_bearing_key_fail_closed(self):
+        # Journal amputé d'une clé PORTEUSE : le harnais recalculerait sous défaut
+        # silencieux là où un tiers refuse → présence fail-closed (§E). Les DEUX
+        # chemins de recompute (r1, lm) lèvent (report passe par la même garde).
+        self._collect()
+        with open(self.control, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        for i, ln in enumerate(lines):
+            obj = json.loads(ln)
+            if obj.get("record") == "run_params":
+                obj.pop("seuil_historique_valeur", None)   # clé porteuse retirée
+                lines[i] = json.dumps(obj, ensure_ascii=False)
+                break
+        with open(self.control, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        with self.assertRaises(ValueError):
+            r1.recompute_from_journal(self.control, self.journal)
+        with self.assertRaises(ValueError):
+            lm.recompute_lm_from_journal(self.control, self.journal)
+
+
+class TestTwoStrateCalendar(CollectorCase):
+    """Calendrier 2-strates ex ante (§5.3) collecté de bout en bout : étiquettes
+    de marqueur correctes, comptage PAR strate, et fail-closed sur trafiquage."""
+
+    @staticmethod
+    def _bucket(y, mo, d, h):
+        ws = int(datetime(y, mo, d, h, tzinfo=timezone.utc).timestamp())
+        return ws - ws % W
+
+    def _collect_weekend(self):
+        sat = self._bucket(2026, 8, 8, 12)     # samedi
+        sun = self._bucket(2026, 8, 9, 12)     # dimanche
+        mon = self._bucket(2026, 8, 10, 12)    # lundi
+        # Sanity via l'autorité datetime (jamais une constante crue).
+        self.assertEqual(datetime.fromtimestamp(sat, timezone.utc).weekday(), 5)
+        self.assertEqual(datetime.fromtimestamp(mon, timezone.utc).weekday(), 0)
+        buckets = [sat, sun, mon]
+        treads = [b + W - DELTA for b in buckets]
+        clock = [float(sat)]
+        for b, tr in zip(buckets, treads):
+            clock += [float(b) + 1.0, float(tr)]
+        collector.collect(
+            self.specs, self.control, self.journal, self.raw, n_windows=3,
+            sigma_classe=SIGMA, tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
+            now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
+        )
+        return sat, sun, mon
+
+    def test_markers_carry_calendar_strate_and_counts_per_strate(self):
+        sat, sun, mon = self._collect_weekend()
+        params_list, _c, markers = records.parse_control(self.control)
+        by_ws = {m["window_start"]: m["strate"] for m in markers}
+        self.assertEqual(by_ws[sat], "stress")
+        self.assertEqual(by_ws[sun], "stress")
+        self.assertEqual(by_ws[mon], "calme")
+        # run_params porte la spec (recalculable + porteuse, §E).
+        params = records.effective_run_params(params_list)
+        self.assertEqual(params["strate_calendar"]["kind"], "weekend_utc")
+        # Comptage PAR strate (§5.3) : la garde §5.4 et R1 se comptent par strate.
+        out = r1.recompute_from_journal(self.control, self.journal)
+        self.assertEqual(out["strates"]["stress"]["n"], 2)   # samedi + dimanche
+        self.assertEqual(out["strates"]["calme"]["n"], 1)    # lundi
+
+    def test_tampered_marker_strate_is_fail_closed(self):
+        sat, _sun, _mon = self._collect_weekend()
+        # Trafique l'étiquette d'un marqueur : samedi ré-étiqueté « calme » (≠ spec).
+        with open(self.control, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        for i, ln in enumerate(lines):
+            obj = json.loads(ln)
+            if obj.get("record") == "window_close" and obj["window_start"] == sat:
+                obj["strate"] = "calme"
+                lines[i] = json.dumps(obj, ensure_ascii=False)
+                break
+        with open(self.control, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        # Les TROIS points d'entrée « recalculable » rejettent la strate trafiquée.
+        with self.assertRaises(ValueError):
+            r1.recompute_from_journal(self.control, self.journal)
+        with self.assertRaises(ValueError):
+            lm.recompute_lm_from_journal(self.control, self.journal)
+
+
+class TestFullPool(CollectorCase):
+    """Pool complet — 11 sources répondantes / 12 flux (10 §3.1), sur fixtures."""
+
+    def setUp(self):
+        super().setUp()
+        self.specs = list(SPECS)                       # les 12 flux, décodeurs réutilisés
+
+    def test_collect_all_twelve_flux_clean(self):
+        completed = collector.collect(
+            self.specs, self.control, self.journal, self.raw, n_windows=3,
+            sigma_classe=Decimal("1e12"), tau_classe=Decimal("1e9"),
+            now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
+        )
+        self.assertEqual(completed, 3)
+        self.assertEqual(_count_lines(self.journal), 36)   # 3 fenêtres × 12 flux
+        blk = r1.recompute_from_journal(self.control, self.journal)["strates"]["calme"]
+        self.assertEqual(blk["n"], 3)
+        for f in [s.flux_id for s in SPECS]:               # σ/τ énormes → rien en écart
+            self.assertEqual(blk["per_source"][f]["ecart"], 0)
+        # Devise MARQUÉE par flux (§2, décision 4) : 10 USD / 2 USDT dans le pool.
+        readings = r1.parse_journal(self.journal)
+        cur = {r["flux_id"]: r["currency"] for r in readings}
+        self.assertEqual(cur["binance"], "USDT")
+        self.assertEqual(cur["okx_ticker"], "USDT")
+        self.assertEqual(sum(1 for c in cur.values() if c == "USDT"), 2)
+        self.assertEqual(sum(1 for c in cur.values() if c == "USD"), 10)
+
+    def test_horsenveloppe_on_mixed_class_flags_bitfinex(self):
+        # Classe « BTC/USD-stable », devise marquée (§2/§9.4) : l'enveloppe
+        # leave-one-out MÊLE USD et USDT. τ=60, σ énorme → seul bitfinex (max
+        # 64545, |dev| 69.25 > 60) sort ; kraken (≈médiane, |dev| 1.15) reste
+        # dedans (valeurs vérifiées sur les fixtures). Le démêlage peg-vs-copie
+        # est un résidu R2(2a) — DIFFÉRÉ M1c, jamais calculé ici.
+        collector.collect(
+            self.specs, self.control, self.journal, self.raw, n_windows=3,
+            sigma_classe=Decimal("1e12"), tau_classe=Decimal("60"),
+            now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
+        )
+        blk = r1.recompute_from_journal(self.control, self.journal)["strates"]["calme"]
+        self.assertEqual(blk["per_source"]["bitfinex"]["hors_enveloppe"], 3)
+        self.assertEqual(blk["per_source"]["kraken"]["hors_enveloppe"], 0)
+        self.assertEqual(blk["per_source"]["kraken"]["pas_ecart"], 3)
+        # Un flux USDT (okx_ticker, |dev| 54.95 < 60) reste dans l'enveloppe à ce τ.
+        self.assertEqual(blk["per_source"]["okx_ticker"]["hors_enveloppe"], 0)
 
 
 class TestTruncatedLine(CollectorCase):

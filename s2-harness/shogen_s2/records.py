@@ -33,13 +33,17 @@ from typing import Optional
 
 # Champs de run_params qui GOUVERNENT LA RECLASSIFICATION : un désaccord entre
 # démarrages ferait recalculer l'historique sous les derniers en silence (§E,
-# le mal visé). Ce sont exactement les entrées de compute_r1. `sample_lead`
+# le mal visé). Les sept premiers sont les entrées de compute_r1. `strate_calendar`
+# n'est PAS une entrée de compute_r1 mais gouverne les **étiquettes de strate**
+# des marqueurs que compute_r1/L&M groupent : un changement de calendrier
+# mi-campagne mélangerait DEUX partitions dans le même `n` par strate — même mal
+# visé (§E, anti-complaisance §5.3), donc fail-closed lui aussi. `sample_lead`
 # (instant d'échantillonnage), `started_*` et `n_windows_demande` diffèrent
-# LÉGITIMEMENT d'une reprise à l'autre et n'entrent pas dans compute_r1 → exclus
+# LÉGITIMEMENT d'une reprise à l'autre et n'entrent nulle part → exclus
 # (publiés/visibles, non fail-closed).
 LOAD_BEARING_KEYS = (
     "pool", "w", "sigma_classe", "tau_classe", "decimal_prec",
-    "seuil_historique_valeur", "n_min_hors_enveloppe",
+    "seuil_historique_valeur", "n_min_hors_enveloppe", "strate_calendar",
 )
 
 
@@ -76,12 +80,27 @@ def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
 
 
 def effective_run_params(params_list: list[dict]) -> dict:
-    """run_params effectif après contrôle de **concordance** entre démarrages
-    (fail-closed de recalculabilité, §E). Lève si la liste est vide ou si deux
-    démarrages divergent sur un champ porteur (LOAD_BEARING_KEYS)."""
+    """run_params effectif après contrôle de **présence** ET de **concordance** des
+    champs porteurs entre démarrages (fail-closed de recalculabilité, §E).
+
+    Lève si : la liste est vide ; un champ porteur (LOAD_BEARING_KEYS) est ABSENT
+    (ou nul) — sinon le harnais recalculerait sous un **défaut silencieux** là où un
+    tiers refuse : asymétrie fermée ; ou deux démarrages DIVERGENT sur un champ
+    porteur. La concordance garantissant que le dernier démarrage s'accorde au
+    premier sur les champs présents, contrôler la présence sur `base` suffit."""
     if not params_list:
         raise ValueError("run_params absent de control.jsonl — journal incomplet")
     base = params_list[0]
+    # PRÉSENCE des clés porteuses (symétrie avec l'oracle tiers, §E) : un journal
+    # amputé d'une clé qui GOUVERNE le calcul (pool, seuils, calendrier…) n'est pas
+    # recalculable — jamais un défaut deviné en silence.
+    missing = [k for k in LOAD_BEARING_KEYS if base.get(k) is None]
+    if missing:
+        raise ValueError(
+            f"run_params amputé de clé(s) porteuse(s) {missing} — recalcul refusé "
+            "(fail-closed de présence, §E) : un tiers ne devine pas un défaut sur une "
+            "clé qui gouverne le calcul"
+        )
     divergences = []
     for p in params_list[1:]:
         for k in LOAD_BEARING_KEYS:

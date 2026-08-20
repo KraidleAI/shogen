@@ -43,9 +43,14 @@ from .model import Reading
 # (recalculable depuis le journal seul, ADR-0003 ; source unique de vérité).
 from .r1 import DECIMAL_PREC, N_MIN_HORSENV, SEUIL_HIST
 from .sources import SourceSpec, read
-from .window import W_DEFAULT, default_strate, window_start
+from .window import (
+    SINGLE_STRATE_SPEC,
+    W_DEFAULT,
+    make_strate_fn,
+    window_start,
+)
 
-HARNESS_VERSION = "s2-harness/skeleton-S2A"  # version du code (§6.1 bloc Paramètres)
+HARNESS_VERSION = "s2-harness/S2A-M1b"  # version du code (§6.1 bloc Paramètres)
 SAMPLE_LEAD_DEFAULT = 5.0  # δ : échantillonnage à ws+w−δ (fin de fenêtre, §5.3/M-1)
 
 
@@ -99,7 +104,8 @@ def collect(
     tau_classe: Decimal,
     w: int = W_DEFAULT,
     sample_lead: float = SAMPLE_LEAD_DEFAULT,
-    strate_fn: Callable[[int], str] = default_strate,
+    strate_spec: Optional[dict] = None,
+    strate_fn: Optional[Callable[[int], str]] = None,
     now_fn: Callable[[], float] = time.time,
     sleep_fn: Callable[[float], None] = time.sleep,
     read_fn: Callable[[SourceSpec, float], Reading] = read,
@@ -123,6 +129,14 @@ def collect(
     """
     if not (0.0 < sample_lead < w):
         raise ValueError(f"sample_lead δ={sample_lead} doit vérifier 0 < δ < w={w}")
+    # Spec de calendrier committée = source de vérité (auditable ex ante,
+    # recalculable depuis run_params). La fermeture strate_fn en dérive ; un
+    # strate_fn explicite (injection de test) reste possible mais la spec
+    # enregistrée doit le décrire (vérif recompute==marqueur, §5.3).
+    if strate_spec is None:
+        strate_spec = SINGLE_STRATE_SPEC
+    if strate_fn is None:
+        strate_fn = make_strate_fn(strate_spec)
     start_ts = now_fn()
 
     # Bloc Paramètres (§6.1) dans le journal → recalculabilité littérale (ADR-0003).
@@ -134,6 +148,9 @@ def collect(
         "sigma_classe": str(sigma_classe),   # Decimal → chaîne exacte
         "tau_classe": str(tau_classe),
         "kappa": kappa_note,
+        # Calendrier de strates committé ex ante (§5.3) — clé PORTEUSE (§E,
+        # records.LOAD_BEARING_KEYS) : recalculable + immutable entre reprises.
+        "strate_calendar": strate_spec,
         # Seuils PORTEURS en champs numériques propres (§C) — décident le drapeau
         # et la porte hors-env ; ne pas les laisser dans la seule prose.
         "seuil_historique_valeur": int(SEUIL_HIST),   # 10 (10 §5.4)

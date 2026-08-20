@@ -11,11 +11,14 @@ bit-identique par l'oracle. Ne lit QUE les fichiers de journal
 (`control.jsonl` + `journal.jsonl`) : aucun accès à Shōgen, aucun paramètre
 hors-bande (σ_classe, τ_classe, w, pool viennent de `run_params`).
 
-**Portée skeleton (bornée, plan §3)** : PAS de queue binomiale exacte / Poisson
-(§5.4, extension du harnais complet) — le bloc R1 rend « `z`, ou historique
-insuffisant ». Chemin **par-strate**, strate unique par défaut. Le drapeau 2 de
-§5.6 (« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2), hors
-périmètre skeleton — seul le drapeau « historique insuffisant » est calculé.
+**Portée (skeleton étendu par M1b, plan §3)** : la **queue binomiale exacte**
+`P(K ≥ K_obs | Bin(n, P̂_more))` est ajoutée (§5.4, `binomial_tail_ge`) — sous la
+garde, le bloc R1 rend la queue exacte au lieu d'un `z` vide de sens ;
+« historique insuffisant » **nu** est réservé aux dégénérés `P̂_more ∈ {0,1}` ou
+`n = 0` (queue triviale, sans pouvoir de test). Chemin **par-strate** ; le
+calendrier 2-strates ex ante est dans `window.py` (M1b). Le drapeau 2 de §5.6
+(« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2) : **différé à
+M1c** — seul le drapeau « historique insuffisant » est calculé ici.
 
 **Identité élémentaire** (10 §5.1, indépendante de la citation, donc du calcul
 débloqué) :
@@ -40,12 +43,12 @@ fenêtres calendaires.
 from __future__ import annotations
 
 import enum
-import json
+import math
 from decimal import Decimal, localcontext
 from typing import Optional
 
 from . import records
-from .window import window_end
+from .window import verify_markers_against_spec, window_end
 
 DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique (oracle)
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
@@ -167,6 +170,43 @@ def z_score(n: int, k: int, p_more: Decimal) -> Decimal:
         mean = Decimal(n) * p_more
         var = Decimal(n) * p_more * (Decimal(1) - p_more)
         return +((Decimal(k) - mean) / var.sqrt())
+
+
+def binomial_tail_ge(k_obs: int, n: int, p_more: Decimal) -> Decimal:
+    """Queue binomiale exacte `P(K ≥ k_obs | K ~ Bin(n, P̂_more))` — la loi de K
+    (§5.1), publiée SOUS la garde §5.4 « au lieu d'un z vide de sens ».
+
+    Somme **directe** `Σ_{x=k_obs}^{n} C(n,x)·p^x·(1−p)^(n−x)` : termes positifs,
+    **zéro annulation** (contrairement à `1 − CDF`). Récurrence sur le terme
+    `pmf(x+1)/pmf(x) = ((n−x)/(x+1))·(p/(1−p))` → `O(n)` opérations Decimal, sans
+    grand entier hormis l'ancre `C(n,k_obs)` (`math.comb`, exacte ; `Decimal(int)`
+    est exact — l'arrondi prec ne vient que des produits). Précision FIXÉE
+    (`DECIMAL_PREC`) → recalcul bit-identique par l'oracle (ADR-0003).
+
+    **Pré-condition** : `0 < P̂_more < 1` (donc `q = 1 − p > 0`, la récurrence ne
+    divise jamais par zéro) et `n ≥ 1`. L'appelant écarte les dégénérés
+    `P̂_more ∈ {0,1}` et `n = 0` → « historique insuffisant » **nu** (§5.4 : la
+    queue y est triviale, sans pouvoir de test).
+
+    **Poisson `sans objet`** : le « ou Poisson(n·P̂_more) » de §5.4 est une
+    *alternative*, jamais une co-publication (l'arête nomme sa statistique, §4.2) ;
+    la queue exacte est toujours calculable à l'échelle de campagne (`n ≲ 2·10⁴`,
+    10 §9.5), donc Poisson serait du code mort — non implémenté à dessein."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        one = Decimal(1)
+        if k_obs <= 0:
+            return +one                          # P(K ≥ 0) = 1 (toutes les fenêtres)
+        if k_obs > n:
+            return +Decimal(0)                   # P(K ≥ k) = 0 pour k > n
+        q = one - p_more
+        # Ancre pmf(k_obs) = C(n,k_obs)·p^k_obs·q^(n−k_obs) ; puis récurrence O(n).
+        term = Decimal(math.comb(n, k_obs)) * (p_more ** k_obs) * (q ** (n - k_obs))
+        total = term
+        for x in range(k_obs, n):
+            term = term * Decimal(n - x) / Decimal(x + 1) * p_more / q
+            total += term
+        return +total
 
 
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
@@ -345,6 +385,23 @@ def compute_r1(
         gate = gate_value(n, p_more)
         insufficient = gate < seuil_hist
         z = None if insufficient else z_score(n, k_count, p_more)
+        # Sous la garde (§5.4) : au lieu d'un z vide de sens, la QUEUE BINOMIALE
+        # EXACTE P(K ≥ K_obs | Bin(n, P̂_more)). Dégénérés P̂_more ∈ {0,1} ou n=0 :
+        # queue triviale (0/1), sans pouvoir de test → « historique insuffisant » nu.
+        queue = None
+        queue_note = None
+        queue_applicable = False
+        if insufficient:
+            with localcontext() as ctx:
+                ctx.prec = DECIMAL_PREC
+                degenere = (n == 0) or (p_more == Decimal(0)) or (p_more == Decimal(1))
+            if degenere:
+                queue_note = ("dégénérée : P̂_more ∈ {0,1} ou n=0 — queue triviale, "
+                              "sans pouvoir de test ; « historique insuffisant » nu (10 §5.4)")
+            else:
+                queue = binomial_tail_ge(k_count, n, p_more)
+                queue_note = "P(K ≥ K_obs | Bin(n, P̂_more)) — loi de K, 10 §5.1/§5.4"
+                queue_applicable = True
         strates_out[st] = {
             "n": n,
             "K": k_count,
@@ -359,6 +416,10 @@ def compute_r1(
             "flag_historique_insuffisant": insufficient,
             "z": z,
             "seuil_z": SEUIL_Z,
+            # Queue exacte sous la garde (§5.4) — recalculable, publiée au bloc R1.
+            "queue_exacte_applicable": queue_applicable,
+            "queue_binomiale_P_K_ge_Kobs": queue,
+            "queue_note": queue_note,
             "A_window_stationarity": A_WINDOW_STATIONARITY,
         }
 
@@ -374,6 +435,16 @@ def recompute_from_journal(control_path: str, journal_path: str) -> dict:
     # redémarrage avec des seuils différents ne reclasse pas l'historique en
     # silence.
     params = records.effective_run_params(params_list)
+    # Strates journalées == calendrier committé ex ante (fail-closed, §5.3) : une
+    # étiquette de strate trafiquée (ou une spec incohérente) casse la partition
+    # anti-complaisance — recalculée depuis run_params seul (ADR-0003). Clé porteuse
+    # PRÉSENTE (garantie par effective_run_params), lue sans défaut silencieux.
+    div = verify_markers_against_spec(markers, params["strate_calendar"])
+    if div:
+        raise ValueError(
+            "strates journalées incohérentes avec le calendrier committé "
+            f"(fail-closed, §5.3) : {div[:5]}{' …' if len(div) > 5 else ''}"
+        )
     readings = parse_journal(journal_path)
     return compute_r1(
         markers=markers,
@@ -382,6 +453,6 @@ def recompute_from_journal(control_path: str, journal_path: str) -> dict:
         w=int(params["w"]),
         sigma=Decimal(str(params["sigma_classe"])),
         tau=Decimal(str(params["tau_classe"])),
-        seuil_hist=Decimal(str(params.get("seuil_historique_valeur", SEUIL_HIST))),
-        n_min=int(params.get("n_min_hors_enveloppe", N_MIN_HORSENV)),
+        seuil_hist=Decimal(str(params["seuil_historique_valeur"])),
+        n_min=int(params["n_min_hors_enveloppe"]),
     )

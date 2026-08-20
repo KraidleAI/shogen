@@ -91,6 +91,157 @@ class TestZScore(unittest.TestCase):
         self.assertEqual(r1.z_score(100, 19, D("0.1")), D(3))
 
 
+class TestBinomialTail(unittest.TestCase):
+    """Queue binomiale exacte P(K ≥ K_obs | Bin(n, P̂_more)) — §5.4 (sous la garde)."""
+
+    def test_k_ge_one_three_trials_hand_value(self):
+        # P(K≥1 | Bin(3, 1/9)) = 1 − (8/9)³ = 1 − 512/729 = 217/729 (exact).
+        # p ET ref construits à prec FIXÉE (comme P̂_more via poisson_binomial) :
+        # la précision de la queue est bornée par celle de son entrée p_more.
+        with localcontext() as ctx:
+            ctx.prec = r1.DECIMAL_PREC
+            p = D(1) / D(9)
+            ref = D(217) / D(729)
+        got = r1.binomial_tail_ge(1, 3, p)
+        self.assertLess(abs(got - ref), D("1e-45"))
+
+    def test_k_ge_zero_is_one(self):
+        # P(K ≥ 0) = 1 quelle que soit la loi (toutes les fenêtres).
+        self.assertEqual(r1.binomial_tail_ge(0, 100, D("0.3")), D(1))
+
+    def test_k_gt_n_is_zero(self):
+        # P(K ≥ k) = 0 pour k > n (aucune réalisation possible).
+        self.assertEqual(r1.binomial_tail_ge(5, 3, D("0.3")), D(0))
+
+    def test_full_support_sums_to_one(self):
+        # P(K ≥ 0) − P(K ≥ n+1) = 1 ; et P(K≥1)+P(K=0) = 1 par construction.
+        n, p = 7, D("0.25")
+        with localcontext() as ctx:
+            ctx.prec = r1.DECIMAL_PREC
+            pmf0 = (D(1) - p) ** n                       # P(K = 0)
+        self.assertLess(abs(r1.binomial_tail_ge(1, n, p) - (D(1) - pmf0)), D("1e-45"))
+
+    def test_symmetric_p_half_median(self):
+        # Bin(4, 0.5) : P(K≥2) = 1 − P(0) − P(1) = 1 − 1/16 − 4/16 = 11/16.
+        got = r1.binomial_tail_ge(2, 4, D("0.5"))
+        self.assertEqual(got, D("0.6875"))              # 11/16 exact à prec fixée
+
+    def test_recurrence_matches_bruteforce_comb(self):
+        # La récurrence O(n) doit égaler la somme brute C(n,x)p^x q^(n−x) (prec fixée).
+        import math
+        n, p = 40, D("0.05")
+        with localcontext() as ctx:
+            ctx.prec = r1.DECIMAL_PREC
+            q = D(1) - p
+            brute = sum((D(math.comb(n, x)) * (p ** x) * (q ** (n - x))
+                         for x in range(3, n + 1)), D(0))
+        self.assertLess(abs(r1.binomial_tail_ge(3, n, p) - brute), D("1e-45"))
+
+
+class TestQueueUnderGuard(unittest.TestCase):
+    """Intégration : sous la garde, compute_r1 publie la queue exacte (non dégénérée)
+    ou « historique insuffisant » nu (dégénéré P̂_more ∈ {0,1})."""
+
+    def test_queue_published_when_pmore_strict_interior(self):
+        # 3 fenêtres, a & b en panne dans 1 seule → P_more ∈ (0,1), garde franchie.
+        pool = ["a", "b", "c"]
+        markers, readings = [], []
+        for i, ws in enumerate((0, 60, 120)):
+            markers.append(mk(ws))
+            if i == 0:
+                readings += [rd(ws, "a", status="panne_http", price=None),
+                             rd(ws, "b", status="panne_http", price=None),
+                             rd(ws, "c", price="64000", source_ts=D(ws + 59))]
+            else:
+                readings += [rd(ws, "a", price="64000", source_ts=D(ws + 59)),
+                             rd(ws, "b", price="64000", source_ts=D(ws + 59)),
+                             rd(ws, "c", price="64000", source_ts=D(ws + 59))]
+        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=D("30"), tau=TAU)["strates"]["calme"]
+        self.assertTrue(blk["flag_historique_insuffisant"])   # garde levée (n petit)
+        self.assertTrue(blk["queue_exacte_applicable"])       # 0 < P_more < 1 → queue publiée
+        self.assertIsNotNone(blk["queue_binomiale_P_K_ge_Kobs"])
+        self.assertGreater(blk["queue_binomiale_P_K_ge_Kobs"], D(0))
+        self.assertLessEqual(blk["queue_binomiale_P_K_ge_Kobs"], D(1))
+
+    def test_bare_insufficient_when_pmore_degenerate(self):
+        # a & b en panne PARTOUT → P_more = 1 (dégénéré) → pas de queue, message nu.
+        pool = ["a", "b", "c"]
+        markers, readings = [], []
+        for ws in (0, 60, 120):
+            markers.append(mk(ws))
+            readings += [rd(ws, "a", status="panne_http", price=None),
+                         rd(ws, "b", status="panne_http", price=None),
+                         rd(ws, "c", price="64000", source_ts=D(ws + 59))]
+        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=D("30"), tau=TAU)["strates"]["calme"]
+        self.assertEqual(blk["P_more"], D(1))
+        self.assertTrue(blk["flag_historique_insuffisant"])
+        self.assertFalse(blk["queue_exacte_applicable"])      # dégénéré → pas de queue
+        self.assertIsNone(blk["queue_binomiale_P_K_ge_Kobs"])
+        self.assertIn("dégénérée", blk["queue_note"])
+
+    def _build_cofailure(self, n_windows, n_cofail):
+        # pool [a,b] ; a&b en panne ensemble dans `n_cofail` fenêtres, propres après.
+        # p̂_a=p̂_b=n_cofail/n_windows ; K=n_cofail (chaque co-panne = 2 écarts).
+        pool = ["a", "b"]
+        markers, readings = [], []
+        for i in range(n_windows):
+            ws = i * 60
+            markers.append(mk(ws))
+            if i < n_cofail:
+                readings += [rd(ws, "a", status="panne_http", price=None),
+                             rd(ws, "b", status="panne_http", price=None)]
+            else:
+                readings += [rd(ws, "a", price="64000", source_ts=D(ws + 1)),
+                             rd(ws, "b", price="64000", source_ts=D(ws + 1))]
+        return pool, markers, readings
+
+    def test_boundary_below_guard_publishes_queue(self):
+        # n=52, 26 co-pannes → p̂=0.5, P_more=0.25, garde=52·0.1875=9.75 < 10 → sous
+        # la garde : z NON publié, QUEUE EXACTE publiée (frontière §5.4).
+        pool, markers, readings = self._build_cofailure(52, 26)
+        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        self.assertEqual(blk["P_more"], D("0.25"))
+        self.assertEqual(blk["gate_value"], D("9.7500"))
+        self.assertTrue(blk["flag_historique_insuffisant"])
+        self.assertIsNone(blk["z"])
+        self.assertTrue(blk["queue_exacte_applicable"])
+        q = blk["queue_binomiale_P_K_ge_Kobs"]
+        self.assertIsNotNone(q)
+        self.assertGreater(q, D(0))
+        self.assertLessEqual(q, D(1))
+
+    def test_boundary_above_guard_publishes_z_not_queue(self):
+        # n=54, 27 co-pannes → p̂=0.5, P_more=0.25, garde=54·0.1875=10.125 ≥ 10 →
+        # au-dessus : z publié, queue non applicable. (Frontière juste franchie.)
+        pool, markers, readings = self._build_cofailure(54, 27)
+        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        self.assertEqual(blk["P_more"], D("0.25"))
+        self.assertEqual(blk["gate_value"], D("10.1250"))
+        self.assertFalse(blk["flag_historique_insuffisant"])
+        self.assertIsNotNone(blk["z"])
+        self.assertFalse(blk["queue_exacte_applicable"])
+        self.assertIsNone(blk["queue_binomiale_P_K_ge_Kobs"])
+
+    def test_no_queue_when_z_published(self):
+        # Historique suffisant (garde ≥ 10) : z publié, queue non applicable.
+        pool = ["a", "b"]
+        markers, readings = [], []
+        for i in range(60):
+            ws = i * 60
+            markers.append(mk(ws))
+            if i < 30:
+                readings += [rd(ws, "a", status="panne_http", price=None),
+                             rd(ws, "b", status="panne_http", price=None)]
+            else:
+                readings += [rd(ws, "a", price="64000", source_ts=D(ws + 1)),
+                             rd(ws, "b", price="64000", source_ts=D(ws + 1))]
+        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        self.assertFalse(blk["flag_historique_insuffisant"])
+        self.assertIsNotNone(blk["z"])
+        self.assertFalse(blk["queue_exacte_applicable"])
+        self.assertIsNone(blk["queue_binomiale_P_K_ge_Kobs"])
+
+
 class TestClassifyPrecedence(unittest.TestCase):
     def test_panne_beats_staleness_and_horsenv(self):
         # Panne : pas de valeur → écart (iii), précédence maximale, même si les

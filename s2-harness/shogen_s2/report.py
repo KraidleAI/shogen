@@ -1,22 +1,27 @@
-"""Table de sortie §6 — **minimale** (walking skeleton), recalculable offline.
+"""Table de sortie §6 — recalculable offline (ADR-0003). Étendue par M1b.
 
 Conception : docs/10-mesures-pilotes-design.md §6 (« tout chiffre du rapport se
 recalcule depuis le journal par un lecteur sans accès à Shōgen », ADR-0003).
-Plan S2 §3 (table §6 minimale : Paramètres + Journal brut + bloc R1).
 
-Trois blocs (les six blocs complets — L&M, R2, tête de certificat — viennent
-avec le harnais complet, hors périmètre skeleton) :
-  1. **Paramètres** — depuis `run_params` (dans le journal) : pool, w, seuils,
-     précision, version, dates, contrôle d'horloge consigné.
+Six blocs (§6). M1b calcule 1–4 ; **5–6 différés à M1c** (requièrent R2) :
+  1. **Paramètres** — depuis `run_params` : pool, w, seuils, précision, version,
+     dates, calendrier de strates committé, contrôle d'horloge, **composition de
+     devise du pool** (§2, devise marquée) + résidu de peg nommé (→ R2(2a), M1c).
   2. **Journal brut** — par fenêtre×source : valeur, devise, horodatage porté,
-     statut d'écart (ok / panne / staleness / hors-enveloppe / non évaluable),
-     sha256 des octets bruts (ADR-0005 : hash toujours).
-  3. **R1** — p̂ᵢ, n, K, P̂₀/P̂₁/P̂_more, z **ou** « historique insuffisant »,
-     comptes « hors-env non évaluable » par source, et A(window-stationarity).
+     statut d'écart, sha256 des octets bruts (ADR-0005 : hash toujours).
+  3. **R1** — p̂ᵢ, n, K par strate, P̂₀/P̂₁/P̂_more, z **ou** la **queue binomiale
+     exacte** sous la garde (§5.4) **ou** « historique insuffisant » nu (dégénéré),
+     comptes non évaluables, A(window-stationarity).
+  4. **L&M** — Ê(Θ), Ê(Θ²), Var̂(Θ) par strate, corrélations φ **signées** par
+     paire de flux ; renvois M1c nommés (clusters, agrégation flux→source).
+  5. **R2** — DIFFÉRÉ M1c (VIDE) : ASN/contenu/méthode, k_eff, les 7 résidus.
+  6. **Tête de certificat** — DIFFÉRÉ M1c (VIDE) : k_eff, k nominal, DRAPEAU 2
+     « co-défaillance non expliquée par R2 » (§5.6). Seul le drapeau « historique
+     insuffisant » (§5.4) est calculé ici (bloc 3).
 
 `render_report` ne lit QUE les fichiers de journal → recalculable par un tiers.
-Sortie **déterministe** (mêmes fichiers → même texte) : c'est la répétition
-générale du claim de recalculabilité (plan §5).
+Sortie **déterministe** (mêmes fichiers → même texte) : répétition générale du
+claim de recalculabilité (plan §5).
 """
 
 from __future__ import annotations
@@ -26,12 +31,14 @@ import sys
 from decimal import Decimal
 
 from . import records
+from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
     classify_cells,
     compute_r1,
     parse_journal,
 )
+from .window import verify_markers_against_spec
 
 
 def _fmt_dec(x) -> str:
@@ -44,13 +51,21 @@ def render_report(control_path: str, journal_path: str) -> str:
     # Concordance des run_params successifs (fail-closed, §E) — même garde que
     # l'oracle : une table depuis des seuils divergents serait un mensonge.
     params = records.effective_run_params(params_list)
+    # Strates journalées == calendrier committé (fail-closed, §5.3) — même garde
+    # que l'oracle : une table sur des strates trafiquées serait un mensonge. Clés
+    # porteuses PRÉSENTES (garanties par effective_run_params), lues sans défaut.
+    div = verify_markers_against_spec(markers, params["strate_calendar"])
+    if div:
+        raise ValueError(
+            f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
+        )
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])
     sigma = Decimal(str(params["sigma_classe"]))
     tau = Decimal(str(params["tau_classe"]))
-    seuil_hist = Decimal(str(params.get("seuil_historique_valeur", 10)))
-    n_min = int(params.get("n_min_hors_enveloppe", 4))
+    seuil_hist = Decimal(str(params["seuil_historique_valeur"]))
+    n_min = int(params["n_min_hors_enveloppe"])
 
     r1 = compute_r1(markers, readings, pool, w, sigma, tau, seuil_hist, n_min)
     cells = classify_cells(markers, readings, pool, w, sigma, tau, n_min)
@@ -61,7 +76,7 @@ def render_report(control_path: str, journal_path: str) -> str:
 
     # ── Bloc 1 : Paramètres ────────────────────────────────────────────────
     ap("=" * 78)
-    ap("TABLE §6 (skeleton S2 Phase A) — recalculable depuis le journal seul (ADR-0003)")
+    ap("TABLE §6 (S2 Phase A — M1b) — recalculable depuis le journal seul (ADR-0003)")
     ap("=" * 78)
     ap("\n[BLOC 1] PARAMÈTRES")
     for key in ("harness_version", "classe", "pool", "w", "sample_lead",
@@ -73,6 +88,23 @@ def render_report(control_path: str, journal_path: str) -> str:
             ap(f"  {key:24} = {params[key]}")
     ap(f"  {'run_params_demarrages':24} = {len(params_list)} (concordants sur les "
        f"champs porteurs — §E)")
+    if "strate_calendar" in params:
+        sc = params["strate_calendar"]
+        ap(f"  {'strate_calendar':24} = kind={sc.get('kind')} "
+           f"{sc.get('note', '')}".rstrip())
+    # Devise MARQUÉE par flux (§2, décision 4) : composition du pool + résidu peg
+    # nommé (le démêlage USDT/USD est R2(2a), DIFFÉRÉ M1c — jamais calculé ici).
+    cur_by_flux: dict = {}
+    for r in readings:
+        c = r.get("currency")
+        if c is not None:
+            cur_by_flux.setdefault(r["flux_id"], c)
+    n_usd = sum(1 for c in cur_by_flux.values() if c == "USD")
+    n_usdt = sum(1 for c in cur_by_flux.values() if c == "USDT")
+    ap(f"  {'devise_composition':24} = {n_usd} USD / {n_usdt} USDT (classe "
+       f"« BTC/USD-stable », devise marquée par flux — 10 §2/§9.4)")
+    ap(f"  {'residu_peg_usdt_usd':24} = écart de peg USDT/USD = résidu R2(2a) "
+       f"(ρ_resid) — DIFFÉRÉ M1c, nommé jamais calculé ici (10 §2/§9.4)")
     for cc in clock_checks:
         ap(f"  {'controle_horloge':24} = phase={cc['phase']} médiane_offset(s)="
            f"{_fmt_dec(cc['median_offset'])} "
@@ -121,13 +153,60 @@ def render_report(control_path: str, journal_path: str) -> str:
         ap(f"    n·P̂_more·(1−P̂_more) = {_fmt_dec(blk['gate_value'])} "
            f"(seuil {_fmt_dec(blk['seuil_historique'])})")
         if blk["flag_historique_insuffisant"]:
-            ap("    z       = HISTORIQUE INSUFFISANT (n·P̂_more·(1−P̂_more) < 10, 10 §5.4)"
-               " — pas de z publié ; aucun z non significatif n'est présenté comme "
-               "absence de dépendance (04 §2)")
+            ap("    z       = non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) — "
+               "aucun z non significatif présenté comme absence de dépendance (04 §2)")
+            if blk.get("queue_exacte_applicable"):
+                ap(f"    queue exacte P(K ≥ K_obs={blk['K']} | Bin(n={blk['n']}, P̂_more)) "
+                   f"= {_fmt_dec(blk['queue_binomiale_P_K_ge_Kobs'])} "
+                   f"({blk.get('queue_note', '')})")
+            else:
+                ap(f"    HISTORIQUE INSUFFISANT — queue {blk.get('queue_note', '')}")
         else:
             ap(f"    z       = {_fmt_dec(blk['z'])} (seuil {_fmt_dec(blk['seuil_z'])}, "
                f"unilatéral — 10 §5.1)")
     ap(f"\n  {A_WINDOW_STATIONARITY}")
+
+    # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
+    lm_out = compute_lm(markers, readings, pool, w, sigma, tau, n_min)
+    ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux (pool)")
+    for st, blk in lm_out["strates"].items():
+        ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}")
+        ap(f"    Ê(Θ)    = {_fmt_dec(blk['E_theta'])}  (= (1/N)·Σᵢ p̂ᵢ — cohérence R1)")
+        ap(f"    Ê(Θ²)   = {_fmt_dec(blk['E_theta2'])}  (forme par paires mⱼ(mⱼ−1)/(N(N−1)))")
+        ap(f"    Var̂(Θ)  = {_fmt_dec(blk['Var_theta'])}  (= Ê(Θ²) − Ê(Θ)² ; écart au "
+           "modèle d'indépendance, L&M éq.16 ; Cov<0 possible)")
+        pair_items = list(blk["pair_phi"].items())
+        n_defined = sum(1 for _, v in pair_items if v["phi"] is not None)
+        n_none = len(pair_items) - n_defined
+        n_coecart = sum(1 for _, v in pair_items if v["n11"] > 0)
+        ap(f"    corrélations φ signées (indicatrices d'écart) : {n_defined} définies, "
+           f"{n_none} non définies (indicatrice constante) / {len(pair_items)} paires de "
+           f"flux ; {n_coecart} paires à co-écart (n11>0)")
+        # Matrice de co-écarts COMPLÈTE (10 §6 bloc 4, l.544) : TOUTES les paires,
+        # y compris φ=None (indicatrice constante — ex. une source en panne partout,
+        # le co-écart le plus extrême) et φ=0. Sa CONSOMMATION par le DRAPEAU 2
+        # (§5.6) est DIFFÉRÉE M1c ; la donnée (n11..n00 sur 66 paires) est livrée ici.
+        ap("    matrice de co-écarts COMPLÈTE (§6 bloc 4 ; consommation drapeau 2 §5.6 "
+           "différée M1c) — par paire [n11 n10 n01 n00] φ (co-écarts en tête) :")
+        for k, v in sorted(pair_items, key=lambda kv: (-kv[1]["n11"], kv[0])):
+            phi_s = _fmt_dec(v["phi"]) if v["phi"] is not None else "non_définie"
+            ap(f"      {k:26} [{v['n11']} {v['n10']} {v['n01']} {v['n00']}] "
+               f"φ={phi_s} ({v['signe']})")
+        ap(f"    renvoi M1c : {blk['renvoi_m1c_clusters']}")
+        ap(f"    renvoi M1c : {blk['renvoi_m1c_flux_source']}")
+        ap(f"    caveat : {blk['caveat_non_eval']}")
+
+    # ── Bloc 5 : R2 — DIFFÉRÉ M1c ──────────────────────────────────────────
+    ap("\n[BLOC 5] R2 (ASN / contenu / méthode) — DIFFÉRÉ À M1c : VIDE cette passe")
+    ap("  axes §4.1–§4.3 (ASN croisé, ρ_raw/ρ_resid/T/(K,z)/δ par paire, arêtes "
+       "basis:doc|measured ADR-0008), k_eff côté livraison, les 7 résidus — hors "
+       "périmètre M1b (requièrent la collecte R2, non faite ici).")
+
+    # ── Bloc 6 : Tête de certificat — DIFFÉRÉ M1c ──────────────────────────
+    ap("\n[BLOC 6] TÊTE DE CERTIFICAT — DIFFÉRÉ À M1c : VIDE cette passe")
+    ap("  k_eff, k nominal, partition R2 nommée, et le DRAPEAU 2 « co-défaillance "
+       "observée non expliquée par les axes R2 » (§5.6) requièrent R2 (M1c). Seul "
+       "le drapeau « historique insuffisant » (§5.4) est calculé ici (bloc 3).")
     ap("=" * 78)
     return "\n".join(out)
 
