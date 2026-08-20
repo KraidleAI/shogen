@@ -18,9 +18,12 @@
   dérivé → **σ_chainlink = 5400 s** (plus de repli fail-closed).
 - ✅ **§10.9 (débits) vert** : ~1 req/min/source, marge min **60×** ; CoinGecko 429 →
   panne (iii) par conception.
-- ⬜ **PS-S2-02** (rapport Kaiko primaire) — non bloquant, dû avant tout claim public
-  de strate ; **PS-S2-01 heartbeat** dérivé du countdown (exact 3600s = feed docs si
-  précision voulue).
+- ✅ **PS-S2-02** (rapport Kaiko primaire) — **réglé (2026-08-20)** : abonnement premium
+  du mainteneur (le mur « Upgrade » est un bug d'affichage Kaiko signalé ; texte intégral
+  dû). Strate *week-end=stress* désormais **[lu] primaire** — Kaiko « Crypto's Collateral
+  Fragmentation Problem » (2026-04-07) : « weekday volumes consistently run 100% higher
+  than weekend levels », et les deux escalades de stress 2026 tombées un week-end.
+  **PS-S2-01 heartbeat** dérivé du countdown (exact 3600s = feed docs si précision voulue).
 
 ## 1. Machine et déploiement
 
@@ -125,8 +128,11 @@ Ne PAS lancer 48h à l'aveugle. D'abord, un smoke live court (minutes) :
 
 ## 7. Procurements et dettes ouverts (non bloquants pour J0, dus avant claim public)
 
-- **PS-S2-02** — rapport Kaiko primaire (volume week-end BTC post-ETF) : avant tout
-  ADR de strate définitif ou claim public ; les ~28 %→16-17 % à passer [lu].
+- **PS-S2-02** — rapport Kaiko primaire (volume week-end BTC post-ETF) : **réglé** —
+  *week-end=stress* fondé **[lu]** sur Kaiko primaire (débrief 2026-04-07 : « weekday
+  volumes consistently run 100% higher than weekend levels » ; abonnement premium
+  mainteneur). Reste **optionnel** : le chiffre historique ~28 %→16-17 % (The Block 2024,
+  [2nd]) si une antériorité chiffrée précise devient porteuse — paginer l'archive Kaiko 2024.
 - **Vérifs d'endpoints ASN octet-exact** (M1c frontière 3, dette 10 §10.4) : les 3
   pages (DoH/RIPEstat/Cymru) lues via résumeur = rang (b) ; ré-établir octet-exact
   avant un claim sur l'axe ASN.

@@ -214,17 +214,37 @@ clôt PS-03/06/07 (note d'outillage 07 §3, pas une dette).
 Deux procurements formés pour caler les paramètres ex ante de la campagne (ADR-0020) ;
 deadline = clôture de la calibration 48 h.
 
-- [ ] **PS-S2-01 ⚑ — heartbeat + seuil de déviation du feed Chainlink BTC/USD**
-  (Ethereum mainnet, `data.chain.link/feeds/ethereum/mainnet/btc-usd`). Bloqué :
-  **403** aux fetchs programmatiques (2 canaux + passe worker 2026-08-05 ; dette
-  10 §10.6). **Usage** : `run_params.sigma[chainlink] = 1,5 × heartbeat` (branche (i)
-  d'ADR-0020) et ancre de cohérence de τ ; sans lui, repli fail-closed (axe staleness
-  Chainlink « non évaluable »). Voie : **visite navigateur** (une vraie session peut
-  passer là où le fetch échoue), champs « deviation threshold » + « heartbeat » datés.
-- [ ] **PS-S2-02 — rapport Kaiko primaire** sur le volume/liquidité BTC du week-end
-  post-ETF (piste : `research.kaiko.com/reports` ; actuellement [2nd] via The Block).
-  **Usage** : fonder l'ADR de strate (week-end=stress) sur pièce primaire plutôt que
-  presse — les chiffres ~28 %→16-17 % à passer [lu].
+- [x] ~~**PS-S2-01 ⚑ — heartbeat + seuil de déviation du feed Chainlink BTC/USD**~~ —
+  **résolu 2026-08-20** par visite navigateur (`data.chain.link/feeds/ethereum/mainnet/btc-usd`,
+  une vraie session passe là où le fetch programmatique prend **403** ; dette 10 §10.6).
+  Constaté : **seuil de déviation 0,5 % [lu]** ; **heartbeat ~1 h dérivé** du compte à
+  rebours live (≈3600 s) → **`run_params.sigma[chainlink] = 5400 s`** (1,5 × heartbeat,
+  branche (i) d'ADR-0020) ; repli fail-closed levé. **Reste optionnel** : confirmer
+  3600 s exact aux feed docs si une précision au-delà de « ~1 h » devient porteuse
+  (RUNBOOK §7).
+- [x] ~~**PS-S2-02 — rapport Kaiko primaire**~~ sur le volume/liquidité BTC du week-end
+  post-ETF. **Réglé le 2026-08-20** via la session Kaiko authentifiée du mainteneur
+  (**abonnement premium actif** — le mur « Upgrade » vu à l'écran est un **bug
+  d'affichage Kaiko signalé par le mainteneur** ; le compte a droit au texte intégral,
+  qui a bien été rendu par la session). Récupération interactive au navigateur (non
+  délégable à un agent lecteur, qui n'a pas la session) ; méthode **autorisée par le
+  mainteneur** pour d'autres articles Kaiko au besoin. Débrief **« Crypto's Collateral
+  Fragmentation Problem »** (Kaiko Research, 2026-04-07, Laurens Fraussen —
+  `app.kaiko.com/data-debriefs/cryptos-fragmentation-problem`) :
+  - **[lu] qualitatif** : « weekend liquidity drops persist as institutional
+    participation reshapes 24/7 market structure ».
+  - **[lu] quantitatif (pièce primaire, données Kaiko)** : « weekday volumes consistently
+    run 100% higher than weekend levels » (§ *The Weekend Gap*, repris en conclusion) →
+    **volume week-end ≈ moitié du volume de semaine** (avril 2026 ; écart « doublé » à
+    mesure des allocations institutionnelles en 2025).
+  - **[lu] corroborant** : les deux escalades de stress 2026 (10 oct., mars) sont
+    **tombées un week-end**, sur une liquidité déjà mince — appui direct de *week-end=stress*.
+  → La strate *week-end=stress* d'ADR-0020 est désormais **fondée sur pièce primaire [lu]
+  et actuelle** (supérieure au [2nd] presse de 2024). **Reste optionnel** : le chiffre
+  historique exact ~28 %→16-17 % (part du volume hebdo, The Block 2024) n'a pas été
+  retrouvé cette passe (la recherche Kaiko n'indexe que les aperçus, pas le corps) — la
+  pièce primaire actuelle le supplée ; paginer l'archive 2024 reste possible si le nombre
+  historique précis devient porteur.
 
 ## Déjà réglé (pour mémoire)
 
