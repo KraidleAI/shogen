@@ -17,8 +17,9 @@ garde, le bloc R1 rend la queue exacte au lieu d'un `z` vide de sens ;
 « historique insuffisant » **nu** est réservé aux dégénérés `P̂_more ∈ {0,1}` ou
 `n = 0` (queue triviale, sans pouvoir de test). Chemin **par-strate** ; le
 calendrier 2-strates ex ante est dans `window.py` (M1b). Le drapeau 2 de §5.6
-(« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2) : **différé à
-M1c** — seul le drapeau « historique insuffisant » est calculé ici.
+(« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2) : **réalisé en M1c
+(`r2.drapeau_2`)** — ici (bloc R1) seul le drapeau « historique insuffisant » est
+calculé ; `r2.drapeau_2` consomme ce z par strate.
 
 **Identité élémentaire** (10 §5.1, indépendante de la citation, donc du calcul
 débloqué) :

@@ -1,23 +1,28 @@
-"""Table de sortie §6 — recalculable offline (ADR-0003). Étendue par M1b.
+"""Table de sortie §6 — recalculable offline (ADR-0003). COMPLÈTE (6 blocs) à M1c.
 
 Conception : docs/10-mesures-pilotes-design.md §6 (« tout chiffre du rapport se
 recalcule depuis le journal par un lecteur sans accès à Shōgen », ADR-0003).
 
-Six blocs (§6). M1b calcule 1–4 ; **5–6 différés à M1c** (requièrent R2) :
+Six blocs (§6), tous calculés à M1c :
   1. **Paramètres** — depuis `run_params` : pool, w, seuils, précision, version,
      dates, calendrier de strates committé, contrôle d'horloge, **composition de
-     devise du pool** (§2, devise marquée) + résidu de peg nommé (→ R2(2a), M1c).
+     devise du pool** (§2, devise marquée) + résidu de peg USDT/USD = R2(2a) ρ_resid,
+     CALCULÉ au bloc 5 (référence croisée).
   2. **Journal brut** — par fenêtre×source : valeur, devise, horodatage porté,
      statut d'écart, sha256 des octets bruts (ADR-0005 : hash toujours).
   3. **R1** — p̂ᵢ, n, K par strate, P̂₀/P̂₁/P̂_more, z **ou** la **queue binomiale
      exacte** sous la garde (§5.4) **ou** « historique insuffisant » nu (dégénéré),
      comptes non évaluables, A(window-stationarity).
   4. **L&M** — Ê(Θ), Ê(Θ²), Var̂(Θ) par strate, corrélations φ **signées** par
-     paire de flux ; renvois M1c nommés (clusters, agrégation flux→source).
-  5. **R2** — DIFFÉRÉ M1c (VIDE) : ASN/contenu/méthode, k_eff, les 7 résidus.
-  6. **Tête de certificat** — DIFFÉRÉ M1c (VIDE) : k_eff, k nominal, DRAPEAU 2
-     « co-défaillance non expliquée par R2 » (§5.6). Seul le drapeau « historique
-     insuffisant » (§5.4) est calculé ici (bloc 3).
+     paire de flux ; matrice de co-écarts complète (consommée par le drapeau 2 §5.6,
+     bloc 6) ; corrélations entre CLUSTERS et agrégation flux→source réalisées au
+     bloc 5 (requièrent la partition R2).
+  5. **R2** (r2.py) — table ASN datée (§4.1) ; les 5 statistiques de contenu par
+     paire (ρ_raw, ρ_resid, T/T_Δ, (K,z), δ), jamais fusionnées (§4.2) ; arêtes
+     méthode `basis:doc` avec doc_url/doc_fetched (§4.3) ; les 7 résidus §4.1.
+  6. **Tête de certificat** — partition NOMMÉE, **k_eff, k nominal**, les DEUX
+     drapeaux (« historique insuffisant » §5.4 ; « co-défaillance non expliquée par
+     R2 » §5.6, tri-état).
 
 `render_report` ne lit QUE les fichiers de journal → recalculable par un tiers.
 Sortie **déterministe** (mêmes fichiers → même texte) : répétition générale du
@@ -30,7 +35,7 @@ import os
 import sys
 from decimal import Decimal
 
-from . import records
+from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
@@ -46,11 +51,25 @@ def _fmt_dec(x) -> str:
     return "-" if x is None else str(x)
 
 
+def _iso_utc(ts) -> str:
+    """epoch → ISO-8601 UTC (déterministe) pour la colonne « heure » de la table ASN
+    (§6 bloc 5 : « résolveur, heure »). None → tiret."""
+    if ts is None:
+        return "-"
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
+
+
 def render_report(control_path: str, journal_path: str) -> str:
     params_list, clock_checks, markers = records.parse_control(control_path)
+    asn_records = records.parse_asn(control_path)
     # Concordance des run_params successifs (fail-closed, §E) — même garde que
-    # l'oracle : une table depuis des seuils divergents serait un mensonge.
-    params = records.effective_run_params(params_list)
+    # l'oracle. La table M1c calcule les 6 blocs → clés R1 **ET** R2 exigées présentes
+    # (un run_params amputé d'une clé de partition n'est pas recalculable, §E).
+    params = records.effective_run_params(
+        params_list,
+        load_bearing=records.LOAD_BEARING_KEYS + records.R2_LOAD_BEARING_KEYS,
+    )
     # Strates journalées == calendrier committé (fail-closed, §5.3) — même garde
     # que l'oracle : une table sur des strates trafiquées serait un mensonge. Clés
     # porteuses PRÉSENTES (garanties par effective_run_params), lues sans défaut.
@@ -70,13 +89,18 @@ def render_report(control_path: str, journal_path: str) -> str:
     r1 = compute_r1(markers, readings, pool, w, sigma, tau, seuil_hist, n_min)
     cells = classify_cells(markers, readings, pool, w, sigma, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
+    # R2 complet (partition/k_eff, contenu, méthode, clusters, drapeau 2) — recalculé
+    # depuis les mêmes enregistrements (ADR-0003). Le peg (bloc 1) le référence.
+    r2_out = r2.compute_r2(markers, readings, asn_records, pool, w, sigma, tau,
+                           params, n_min_horsenv=n_min)
 
     out: list[str] = []
     ap = out.append
 
     # ── Bloc 1 : Paramètres ────────────────────────────────────────────────
     ap("=" * 78)
-    ap("TABLE §6 (S2 Phase A — M1b) — recalculable depuis le journal seul (ADR-0003)")
+    ap("TABLE §6 (S2 Phase A — M1c, COMPLÈTE 6 blocs) — recalculable depuis le "
+       "journal seul (ADR-0003)")
     ap("=" * 78)
     ap("\n[BLOC 1] PARAMÈTRES")
     for key in ("harness_version", "classe", "pool", "w", "sample_lead",
@@ -93,7 +117,7 @@ def render_report(control_path: str, journal_path: str) -> str:
         ap(f"  {'strate_calendar':24} = kind={sc.get('kind')} "
            f"{sc.get('note', '')}".rstrip())
     # Devise MARQUÉE par flux (§2, décision 4) : composition du pool + résidu peg
-    # nommé (le démêlage USDT/USD est R2(2a), DIFFÉRÉ M1c — jamais calculé ici).
+    # (le démêlage USDT/USD est R2(2a) ρ_resid, CALCULÉ au bloc 5 — référencé ici).
     cur_by_flux: dict = {}
     for r in readings:
         c = r.get("currency")
@@ -103,8 +127,9 @@ def render_report(control_path: str, journal_path: str) -> str:
     n_usdt = sum(1 for c in cur_by_flux.values() if c == "USDT")
     ap(f"  {'devise_composition':24} = {n_usd} USD / {n_usdt} USDT (classe "
        f"« BTC/USD-stable », devise marquée par flux — 10 §2/§9.4)")
-    ap(f"  {'residu_peg_usdt_usd':24} = écart de peg USDT/USD = résidu R2(2a) "
-       f"(ρ_resid) — DIFFÉRÉ M1c, nommé jamais calculé ici (10 §2/§9.4)")
+    peg_keys = [k for k, v in r2_out["content"]["pairs"].items() if v["is_peg_usdt_usd"]]
+    ap(f"  {'residu_peg_usdt_usd':24} = écart de peg USDT/USD = résidu R2(2a) ρ_resid — "
+       f"CALCULÉ au bloc 5 (paires USDT×USD : {len(peg_keys)}) (10 §2/§9.4)")
     for cc in clock_checks:
         ap(f"  {'controle_horloge':24} = phase={cc['phase']} médiane_offset(s)="
            f"{_fmt_dec(cc['median_offset'])} "
@@ -184,29 +209,155 @@ def render_report(control_path: str, journal_path: str) -> str:
            f"flux ; {n_coecart} paires à co-écart (n11>0)")
         # Matrice de co-écarts COMPLÈTE (10 §6 bloc 4, l.544) : TOUTES les paires,
         # y compris φ=None (indicatrice constante — ex. une source en panne partout,
-        # le co-écart le plus extrême) et φ=0. Sa CONSOMMATION par le DRAPEAU 2
-        # (§5.6) est DIFFÉRÉE M1c ; la donnée (n11..n00 sur 66 paires) est livrée ici.
-        ap("    matrice de co-écarts COMPLÈTE (§6 bloc 4 ; consommation drapeau 2 §5.6 "
-           "différée M1c) — par paire [n11 n10 n01 n00] φ (co-écarts en tête) :")
+        # le co-écart le plus extrême) et φ=0. CONSOMMÉE par le DRAPEAU 2 (§5.6) au
+        # bloc 6 (localisation inter-clusters) ; la donnée (n11..n00) est livrée ici.
+        ap("    matrice de co-écarts COMPLÈTE (§6 bloc 4 ; consommée par le drapeau 2 "
+           "§5.6 au bloc 6) — par paire [n11 n10 n01 n00] φ (co-écarts en tête) :")
         for k, v in sorted(pair_items, key=lambda kv: (-kv[1]["n11"], kv[0])):
             phi_s = _fmt_dec(v["phi"]) if v["phi"] is not None else "non_définie"
             ap(f"      {k:26} [{v['n11']} {v['n10']} {v['n01']} {v['n00']}] "
                f"φ={phi_s} ({v['signe']})")
-        ap(f"    renvoi M1c : {blk['renvoi_m1c_clusters']}")
-        ap(f"    renvoi M1c : {blk['renvoi_m1c_flux_source']}")
+        ap(f"    réalisé M1c (bloc 5) : {blk['renvoi_m1c_clusters']}")
+        ap(f"    réalisé M1c (bloc 5) : {blk['renvoi_m1c_flux_source']}")
         ap(f"    caveat : {blk['caveat_non_eval']}")
 
-    # ── Bloc 5 : R2 — DIFFÉRÉ M1c ──────────────────────────────────────────
-    ap("\n[BLOC 5] R2 (ASN / contenu / méthode) — DIFFÉRÉ À M1c : VIDE cette passe")
-    ap("  axes §4.1–§4.3 (ASN croisé, ρ_raw/ρ_resid/T/(K,z)/δ par paire, arêtes "
-       "basis:doc|measured ADR-0008), k_eff côté livraison, les 7 résidus — hors "
-       "périmètre M1b (requièrent la collecte R2, non faite ici).")
+    # ── Bloc 5 : R2 (ASN / contenu / méthode) — §4.1/§4.2/§4.3 ─────────────
+    part = r2_out["partition"]
+    ap("\n[BLOC 5] R2 — observables de diversité (10 §4)")
 
-    # ── Bloc 6 : Tête de certificat — DIFFÉRÉ M1c ──────────────────────────
-    ap("\n[BLOC 6] TÊTE DE CERTIFICAT — DIFFÉRÉ À M1c : VIDE cette passe")
-    ap("  k_eff, k nominal, partition R2 nommée, et le DRAPEAU 2 « co-défaillance "
-       "observée non expliquée par les axes R2 » (§5.6) requièrent R2 (M1c). Seul "
-       "le drapeau « historique insuffisant » (§5.4) est calculé ici (bloc 3).")
+    # 5a. Table ASN datée (§4.1) — par hôte : IP, préfixe, ASN (2 bases), résolveur, heure
+    ap("\n  (a) AXE ASN (§4.1) — attribution croisée ≥ 2 bases BGP (RIPEstat, Team Cymru)")
+    if not part["asn_measured"]:
+        ap("      axe ASN NON MESURÉ : aucun enregistrement asn_attribution au journal "
+           "(collect_asn non lancé — c'est l'orchestrateur qui le lance à la campagne).")
+    ahdr = (f"      {'hôte':30} {'flux':18} {'résolveur':18} {'heure(UTC)':26} "
+            f"{'IP':16} {'préfixe':16} {'RIPEstat':9} {'Cymru':7} {'holder':14} {'état'}")
+    ap(ahdr)
+    ap("      " + "-" * (len(ahdr) - 6))
+    for h in part["hosts"]:
+        rec = part["attribution_by_host"].get(h, {})
+        st = part["asn_states"][h]
+        flux = ",".join(part["flux_by_host"].get(h, []))
+        ap(f"      {h:30} {flux:18} {str(rec.get('resolver') or '-'):18} "
+           f"{_iso_utc(rec.get('ts')):26} {str(rec.get('ip') or '-'):16} "
+           f"{str(rec.get('prefix') or '-'):16} {str(rec.get('asn_ripestat') or '-'):9} "
+           f"{str(rec.get('asn_cymru') or '-'):7} {str(rec.get('holder') or '-'):14} "
+           f"{st['kind']}")
+        chain = rec.get("cname_chain") or []
+        if chain:
+            # chaîne CNAME datée (résidu 7) — le narratif ex. Binance → CloudFront (§4.1)
+            ap(f"          CNAME: {h} → {' → '.join(chain)}")
+    for dv in part["asn_divergences"]:
+        ap(f"      DIVERGENCE ASN (résidu 4, instantanéité) hôte {dv['host']} : "
+           f"{dv['avant']} → {dv['apres']} (publiée, jamais écrasée)")
+    if part["merge_reasons"]:
+        ap("      recouvrements MEASURED (fusionnent — jamais basis:doc seul, ADR-0008) :")
+        for m in part["merge_reasons"]:
+            if m["axis"] == "asn_measured":
+                ap(f"        ASN partagé cross-confirmé AS{m['asn']} {m.get('holder') or ''} : "
+                   f"{m['hosts']}")
+            else:
+                ap(f"        identité-copie contenu : flux {m['flux_pair']} → hôtes {m['hosts']}")
+    else:
+        ap("      aucun recouvrement measured (partition = singletons sur cet axe)")
+
+    # 5b. Axe contenu (§4.2) — 5 statistiques PAR PAIRE, jamais fusionnées
+    content = r2_out["content"]
+    ap(f"\n  (b) AXE CONTENU (§4.2) — {content['n_windows']} fenêtres ; N_min = "
+       f"{content['n_min']} (Fisher)")
+    ap(f"      {content['grid_note']}")
+    ap(f"      critère de fusion contenu v0 : {content['merge_criterion']}")
+    ap(f"      {content['coab_staleness_note']}")
+    ap("      par paire [ρ_raw ρ_resid | T T_Δ | co-aberrance K,z | δ lag] — jamais fusionnées :")
+    for key in sorted(content["pairs"]):
+        pr = content["pairs"][key]
+        raw, res, tk, co, dl = (pr["rho_raw"], pr["rho_resid"], pr["tick"],
+                                pr["coaberrance"], pr["delta"])
+        tags = []
+        if pr["basis_doc_triggered"]:
+            tags.append("basis:doc→(b)")
+        if pr["is_peg_usdt_usd"]:
+            tags.append("peg USDT/USD=ρ_resid")
+        if tk["exact_copy_merge"]:
+            tags.append("COPIE-EXACTE→fusion")
+        tagstr = (" {" + ", ".join(tags) + "}") if tags else ""
+        if not raw["sufficient"] and not res["sufficient"]:
+            ap(f"      {key:26} historique de contenu insuffisant "
+               f"(ρ_raw n={raw['n']}, ρ_resid n={res['n']} < N_min){tagstr}")
+        else:
+            zc = (_fmt_dec(co['z']) if co.get('z') is not None
+                  else (f"queue={_fmt_dec(co['queue'])}" if co.get('queue') is not None
+                        else "insuff"))
+            ap(f"      {key:26} ρ_raw={_fmt_dec(raw['rho'])} ρ_resid={_fmt_dec(res['rho'])} | "
+               f"T={_fmt_dec(tk['T'])} T_Δ={_fmt_dec(tk['T_delta'])} | K={co['K']} z/{zc} | "
+               f"δlag={dl['best_lag']}{tagstr}")
+
+    # 5c. Axe méthode (§4.3) — 5 arêtes basis:doc, déclenchent (b), ne fusionnent pas
+    ap("\n  (c) AXE MÉTHODE (§4.3) — arêtes `basis:doc` (ADR-0008 : déclenchent (b), "
+       "ne partitionnent pas)")
+    for e in r2_out["method_edges"]:
+        if e["kind"] == "upstream":
+            ap(f"      {e['from']} → {e['to']} [basis:{e['basis']}] {e['relation']}")
+        else:
+            ap(f"      {e['node']} estimateur [basis:{e['basis']}] : {e['estimator']}")
+        ap(f"          doc_url={e['doc_url']} doc_fetched={e['doc_fetched']}")
+
+    # 5d. Corrélations entre CLUSTERS (§5.5 pt 4) — réalisées ici (partition requise)
+    cc = r2_out["cluster_correlations"]
+    ap(f"\n  (d) CORRÉLATIONS ENTRE CLUSTERS (§5.5 pt 4) — {cc['convention']}")
+    if cc["cluster_pairs"]:
+        for k, v in sorted(cc["cluster_pairs"].items()):
+            ap(f"      {k} : ρ(Θ̂)={_fmt_dec(v['rho'])} ({v['signe']}) [{v['note']}]")
+    else:
+        ap(f"      aucun cluster à ≥ 2 flux ({cc['n_multi_clusters']}) → tout reste au φ "
+           "par paire de flux (bloc 4)")
+
+    # 5e. Les 7 résidus de l'axe ASN (§4.1) — publiés avec l'observable
+    ap("\n  (e) LES 7 RÉSIDUS DE L'AXE ASN (§4.1) — un observable est un témoignage "
+       "avec ses résidus (04 §4) :")
+    for r in r2_out["residus_asn"]:
+        ap(f"      {r}")
+
+    # ── Bloc 6 : Tête de certificat — k_eff, k nominal, les 2 drapeaux ─────
+    ap("\n[BLOC 6] TÊTE DE CERTIFICAT (10 §5.6 / 04 §3)")
+    ap(f"  k nominal = {part['k_nominal']} (hôtes distincts du pool)")
+    if part.get("k_eff_is_upper_bound"):
+        # BORNE SUPÉRIEURE (C-A) : ≥1 hôte non attribué gonfle k_eff — jamais lu comme
+        # un compte d'indépendance CONFIRMÉ (04 §4.1).
+        ap(f"  k_eff     ≤ {_fmt_dec(part['k_eff'])}  (BORNE SUPÉRIEURE ; "
+           f"{part['n_unattributed']} hôte(s) non attribué(s) : {part['unattributed']}) "
+           f"— {part['k_eff_note']}")
+    else:
+        ap(f"  k_eff     = {_fmt_dec(part['k_eff'])}  — {part['k_eff_note']}")
+    ap("  R3 (déclaration : entité légale, juridiction, méthodologie annoncée) ne "
+       "modifie JAMAIS k_eff (§5.6 / 04 §3) — seuls les recouvrements R2 measured partitionnent.")
+    ap("  PARTITION NOMMÉE (ADR-0007 : nomme l'amont, jamais un compte anonyme) :")
+    for c in part["clusters"]:
+        ap(f"    cluster = {c['name']} ; flux = {c['flux']}")
+        for up in c["declared_upstreams"]:
+            ap(f"        amont déclaré (basis:doc, ne fusionne pas) : {up['from']} → "
+               f"{up['to']} ({up['doc_url']})")
+        for cav in c["caveats"]:
+            ap(f"        caveat : {cav}")
+    # Drapeau 1 : historique insuffisant (§5.4), par strate (déjà au bloc 3)
+    flags1 = {st: blk["flag_historique_insuffisant"]
+              for st, blk in r1.get("strates", {}).items()}
+    if r1.get("note"):
+        flags1["(global)"] = r1["flag_historique_insuffisant"]
+    ap(f"  DRAPEAU 1 « historique insuffisant » (§5.4) par strate : {flags1}")
+    # Drapeau 2 : co-défaillance non expliquée par R2 (§5.6), tri-état
+    d2 = r2_out["drapeau_2"]
+    ap(f"  DRAPEAU 2 « co-défaillance observée non expliquée par les axes R2 » (§5.6) : "
+       f"état = {d2['etat'].upper()}")
+    ap(f"      {d2['raison']}")
+    loc = d2.get("localisation_inter_clusters")
+    if loc:
+        ap(f"      localisation ({loc['note']}) — consomme la matrice de co-écarts M1b :")
+        for st, rows in loc["par_strate"].items():
+            top = rows[:5]
+            ap(f"        strate « {st} » : "
+               + (", ".join(f"{r['pair']}(n11={r['n11']})" for r in top) if top
+                  else "aucune paire inter-clusters à co-écart"))
     ap("=" * 78)
     return "\n".join(out)
 

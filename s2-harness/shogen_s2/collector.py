@@ -37,7 +37,7 @@ from decimal import Decimal
 from statistics import median
 from typing import Callable, Optional
 
-from . import journal, records
+from . import journal, r2, records
 from .model import Reading
 # Précision + seuils du calcul R1, enregistrés numériquement dans run_params
 # (recalculable depuis le journal seul, ADR-0003 ; source unique de vérité).
@@ -50,7 +50,7 @@ from .window import (
     window_start,
 )
 
-HARNESS_VERSION = "s2-harness/S2A-M1b"  # version du code (§6.1 bloc Paramètres)
+HARNESS_VERSION = "s2-harness/S2A-M1c"  # version du code (§6.1 bloc Paramètres)
 SAMPLE_LEAD_DEFAULT = 5.0  # δ : échantillonnage à ws+w−δ (fin de fenêtre, §5.3/M-1)
 
 
@@ -110,7 +110,8 @@ def collect(
     sleep_fn: Callable[[float], None] = time.sleep,
     read_fn: Callable[[SourceSpec, float], Reading] = read,
     harness_version: str = HARNESS_VERSION,
-    kappa_note: str = "5 (10 §4.2 (2c), paramètre R2 — non exercé par R1 skeleton)",
+    kappa_note: str = ("5 (10 §4.2 (2c), paramètre R2 co-aberrance — exercé par M1c "
+                       "via content_kappa_value)"),
 ) -> int:
     """Collecte `n_windows` fenêtres UTC-alignées, 1 relevé/source/fenêtre.
 
@@ -173,6 +174,25 @@ def collect(
         "note_skeleton": ("walking skeleton borné (plan §3) — PAS le run 24-48 h ; "
                           "hors-enveloppe (i) « non évaluable » quand N<n_min "
                           "répondantes (10 §5.2)"),
+        # ── Paramètres R2 (M1c) — PORTEURS (records.R2_LOAD_BEARING_KEYS, §E) : ils
+        # gouvernent la partition et les statistiques de contenu (§4.2), donc
+        # recalculables et fail-closed sur divergence mi-campagne. Valeurs = design
+        # §4.2, jamais inventées (source unique : r2.CONTENT_*).
+        "flux_hosts": r2.build_flux_hosts(specs),   # nœuds de partition ; k nominal = #hôtes
+        "content_n_min": r2.CONTENT_N_MIN,          # 300 (Fisher, §4.2)
+        "content_kappa_value": r2.CONTENT_KAPPA,    # 5 (co-aberrance, §4.2 (2c))
+        "content_jump_sigma": r2.CONTENT_JUMP_SIGMA,  # 4σ (δ, §4.2 (2d))
+        "content_delta_windows": max(1, round(r2.CONTENT_DELTA_SECONDS / w)),  # Δ=60s → fenêtres
+        "content_lag_l": r2.CONTENT_LAG_L,          # ℓ=0 (v0, enregistré)
+        "content_big_l": r2.CONTENT_BIG_L,          # L=3 (v0, enregistré)
+        "tick_rule": r2.TICK_RULE_DEFAULT,          # « exact » (identité octet-exacte)
+        "content_merge_criterion": r2.MERGE_CRITERION_V0,
+        # Informationnels (publiés, non fail-closed) :
+        # v0 : un résolveur documenté (Cloudflare DoH-JSON) ; multi-résolveurs DÛ à la
+        # campagne (résidu 3, plan §2 [C3]). Le résolveur EXACT est aussi journalisé
+        # par enregistrement asn_attribution (champ `resolver`).
+        "asn_resolvers": list(r2._DEFAULT_RESOLVERS),
+        "r2_grid_note": r2.GRID_NOTE,
     }
     journal.append_jsonl(control_path, records.run_params_record(params))
 

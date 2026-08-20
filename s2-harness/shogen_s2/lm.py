@@ -23,11 +23,13 @@ fenêtre j, via la MÊME classification que R1 (`r1.classify_cells`, helper part
 
 car Σ_j m_j = Σ_i écarts(i) = n·Σ_i p̂_i. Exercée par test (test_lm).
 
-**Différé à M1c (renvois nommés, jamais nus — doc 03)** :
+**Réalisé en M1c (r2.py) — ce module (bloc 4) reste au niveau FLUX** :
   - corrélations entre CLUSTERS R2 (≥2 membres) via (Θ̂_A,j, Θ̂_B,j), l'analogue
-    de l'éq. 35 — exigent la **partition R2**, non calculée ici (10 §5.5 pt 4) ;
-  - agrégation d'indicatrices flux→source (ex. okx_ticker+okx_index) — relève
-    aussi de la partition R2. Ici : phi par paire de **FLUX** (C(12,2)=66 paires).
+    de l'éq. 35 — exigent la partition R2, calculées par `r2.cluster_lm_correlations`
+    (bloc 5, 10 §5.5 pt 4) ; ici, la base commune φ par paire de flux ;
+  - agrégation d'indicatrices flux→source (okx_ticker+okx_index → hôte www.okx.com)
+    réalisée par la carte flux→hôte de r2 (bloc 5). Ici : phi par paire de **FLUX**
+    (C(12,2)=66 paires).
 
 `Decimal` partout, précision FIXÉE (`r1.DECIMAL_PREC`) sur TOUT chemin numérique
 → recalcul bit-identique par l'oracle (ADR-0003). Caveat publié : `m_j` ne compte
@@ -47,11 +49,13 @@ from .r1 import DECIMAL_PREC, ECARTS, build_window_strate, classify_cells
 
 RENVOI_M1C_CLUSTERS = (
     "corrélations entre CLUSTERS R2 (≥2 membres, analogue L&M éq. 35, séries "
-    "(Θ̂_A,j, Θ̂_B,j)) — exigent la partition R2 ; DIFFÉRÉ M1c (10 §5.5 pt 4)"
+    "(Θ̂_A,j, Θ̂_B,j)) — RÉALISÉ M1c (r2.cluster_lm_correlations, bloc 5) ; requièrent "
+    "la partition R2 (10 §5.5 pt 4). Ici (bloc 4) : φ par paire de FLUX, base commune."
 )
 RENVOI_M1C_FLUX_SOURCE = (
-    "agrégation d'indicatrices flux→source (ex. okx_ticker+okx_index) — relève de "
-    "la partition R2 ; DIFFÉRÉ M1c. Ici : phi par paire de FLUX (10 §5.5)"
+    "agrégation d'indicatrices flux→source (ex. okx_ticker+okx_index) — RÉALISÉ M1c : "
+    "les deux flux okx partagent l'hôte www.okx.com → un seul nœud de partition "
+    "(r2.build_flux_hosts, bloc 5). Ici (bloc 4) : φ par paire de FLUX (10 §5.5)."
 )
 CAVEAT_NON_EVAL = (
     "m_j ne compte que les vrais écarts (panne ∨ staleness ∨ hors-env) ; NON_EVAL "

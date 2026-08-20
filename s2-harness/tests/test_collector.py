@@ -348,7 +348,7 @@ class TestFullPool(CollectorCase):
         # leave-one-out MÊLE USD et USDT. τ=60, σ énorme → seul bitfinex (max
         # 64545, |dev| 69.25 > 60) sort ; kraken (≈médiane, |dev| 1.15) reste
         # dedans (valeurs vérifiées sur les fixtures). Le démêlage peg-vs-copie
-        # est un résidu R2(2a) — DIFFÉRÉ M1c, jamais calculé ici.
+        # est un résidu R2(2a) ρ_resid — calculé en M1c (r2.py), hors de CE test R1.
         collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
             sigma_classe=Decimal("1e12"), tau_classe=Decimal("60"),

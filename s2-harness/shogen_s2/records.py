@@ -46,6 +46,20 @@ LOAD_BEARING_KEYS = (
     "seuil_historique_valeur", "n_min_hors_enveloppe", "strate_calendar",
 )
 
+# Clés porteuses PROPRES À R2 (M1c) : elles gouvernent la PARTITION et les
+# statistiques de contenu — un changement mi-campagne re-partitionnerait en silence
+# (même mal §E que les seuils R1). `flux_hosts` définit les nœuds de partition et
+# donc k nominal ; les paramètres de contenu (N_min, κ, tick, Δ, ℓ/L, critère de
+# fusion) décident quelle paire fusionne. Vérifiées présentes+concordantes par
+# `effective_run_params(load_bearing=LOAD_BEARING_KEYS + R2_LOAD_BEARING_KEYS)` dans
+# les seuls chemins R2 (r2.recompute_r2_from_journal, report blocs 5-6) — les chemins
+# R1/L&M gardent le jeu R1 par défaut (découplage : R1 n'exige pas les clés R2).
+R2_LOAD_BEARING_KEYS = (
+    "flux_hosts", "content_n_min", "content_kappa_value", "content_lag_l",
+    "content_big_l", "content_delta_windows", "content_jump_sigma", "tick_rule",
+    "content_merge_criterion",
+)
+
 
 def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
     """Relit un JSONL en TOLÉRANT une **dernière** ligne tronquée (crash
@@ -79,22 +93,26 @@ def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
     return objs
 
 
-def effective_run_params(params_list: list[dict]) -> dict:
+def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS) -> dict:
     """run_params effectif après contrôle de **présence** ET de **concordance** des
     champs porteurs entre démarrages (fail-closed de recalculabilité, §E).
 
-    Lève si : la liste est vide ; un champ porteur (LOAD_BEARING_KEYS) est ABSENT
-    (ou nul) — sinon le harnais recalculerait sous un **défaut silencieux** là où un
-    tiers refuse : asymétrie fermée ; ou deux démarrages DIVERGENT sur un champ
-    porteur. La concordance garantissant que le dernier démarrage s'accorde au
-    premier sur les champs présents, contrôler la présence sur `base` suffit."""
+    Lève si : la liste est vide ; un champ porteur (`load_bearing`) est ABSENT (ou
+    nul) — sinon le harnais recalculerait sous un **défaut silencieux** là où un tiers
+    refuse : asymétrie fermée ; ou deux démarrages DIVERGENT sur un champ porteur. La
+    concordance garantissant que le dernier démarrage s'accorde au premier sur les
+    champs présents, contrôler la présence sur `base` suffit.
+
+    `load_bearing` par défaut = jeu R1 (LOAD_BEARING_KEYS) ; les chemins R2 (M1c)
+    passent `LOAD_BEARING_KEYS + R2_LOAD_BEARING_KEYS` — R1/L&M restent découplés des
+    clés R2 (un journal R1-seul recalcule R1 sans exiger flux_hosts/params contenu)."""
     if not params_list:
         raise ValueError("run_params absent de control.jsonl — journal incomplet")
     base = params_list[0]
     # PRÉSENCE des clés porteuses (symétrie avec l'oracle tiers, §E) : un journal
     # amputé d'une clé qui GOUVERNE le calcul (pool, seuils, calendrier…) n'est pas
     # recalculable — jamais un défaut deviné en silence.
-    missing = [k for k in LOAD_BEARING_KEYS if base.get(k) is None]
+    missing = [k for k in load_bearing if base.get(k) is None]
     if missing:
         raise ValueError(
             f"run_params amputé de clé(s) porteuse(s) {missing} — recalcul refusé "
@@ -103,7 +121,7 @@ def effective_run_params(params_list: list[dict]) -> dict:
         )
     divergences = []
     for p in params_list[1:]:
-        for k in LOAD_BEARING_KEYS:
+        for k in load_bearing:
             if p.get(k) != base.get(k):
                 divergences.append((k, base.get(k), p.get(k)))
     if divergences:
@@ -153,6 +171,34 @@ def window_close_record(ws: int, strate: str, harness_ts: float) -> dict:
     }
 
 
+def asn_attribution_record(host: str, flux: list, ts: float, resolvers: list,
+                           attribution: dict) -> dict:
+    """Table ASN datée (§6 bloc 5, R2 axe ASN §4.1) — un relevé par HÔTE, écrit dans
+    `control.jsonl` (`record:"asn_attribution"`, ignoré par `parse_control`, lu par
+    `parse_asn`). Porte l'hôte, les flux servis, l'heure, les résolveurs, et
+    l'attribution rendue par le seam (IP, préfixe, les DEUX bases BGP RIPEstat+Cymru,
+    holder pour le nommage ADR-0007, statut). Recalculable : la partition R2 se
+    recompute depuis ces lignes seules (r2.compute_partition)."""
+    return {"record": "asn_attribution", "host": host, "flux": list(flux),
+            "ts": ts, "resolvers": list(resolvers), **attribution}
+
+
+def append_asn(path: str, rec: dict) -> None:
+    """Écrit un enregistrement ASN au journal de contrôle (append-only, via
+    journal.append_jsonl — même contrat que les autres records de control.jsonl)."""
+    from . import journal
+    journal.append_jsonl(path, rec)
+
+
+def parse_asn(path: str) -> list[dict]:
+    """Relit les enregistrements `asn_attribution` de `control.jsonl` (les autres
+    types sont ignorés — symétrique de parse_control, qui ignore ceux-ci). Ordre
+    d'écriture préservé ; le last-wins par hôte et la détection de divergence d'ASN
+    (résidu 4, §4.1) sont faits en aval (r2.compute_partition). Tolérant à une
+    dernière ligne tronquée (§F)."""
+    return [o for o in read_jsonl_tolerant(path) if o.get("record") == "asn_attribution"]
+
+
 def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
     """Relit `control.jsonl` → (run_params_list, clock_checks, window_close).
 
@@ -174,4 +220,6 @@ def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
             clock_checks.append(obj)
         elif rt == "window_close":
             markers.append(obj)
+        # `asn_attribution` (M1c) est volontairement IGNORÉ ici (lu par parse_asn) —
+        # rétro-compatible : les trois consommateurs R1/L&M/rapport ne changent pas.
     return run_params_list, clock_checks, markers

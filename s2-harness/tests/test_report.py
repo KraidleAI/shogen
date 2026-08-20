@@ -66,17 +66,26 @@ class TestReport(unittest.TestCase):
         # Classe DÉRIVÉE du pool réel (D) : mentionne les 3 flux configurés, pas un hardcode.
         self.assertIn("pool configuré = 3 flux", txt)
 
-    def test_lm_and_deferred_blocks_present(self):
+    def test_lm_and_r2_blocks_present(self):
+        # M1c : les 6 blocs sont CALCULÉS (plus de placeholder « différé »).
         txt = report.render_report(self.control, self.journal)
         self.assertIn("[BLOC 4] L&M", txt)                    # estimateur L&M (§5.5)
         self.assertIn("Ê(Θ)", txt)
         self.assertIn("Var̂(Θ)", txt)
         self.assertIn("corrélations φ signées", txt)
-        self.assertIn("[BLOC 5] R2", txt)                     # R2 différé (VIDE)
-        self.assertIn("[BLOC 6] TÊTE DE CERTIFICAT", txt)     # certificat différé (VIDE)
-        self.assertIn("DIFFÉRÉ À M1c", txt)
-        self.assertIn("DRAPEAU 2", txt)                       # nommé, non calculé
-        self.assertIn("renvoi M1c", txt)                      # renvois L&M nommés
+        self.assertIn("[BLOC 5] R2", txt)                     # R2 calculé (§4)
+        self.assertIn("AXE ASN", txt)                         # §4.1
+        self.assertIn("AXE CONTENU", txt)                     # §4.2
+        self.assertIn("AXE MÉTHODE", txt)                     # §4.3 (basis:doc)
+        self.assertIn("basis:doc", txt)                       # ADR-0008
+        self.assertIn("LES 7 RÉSIDUS", txt)                   # §4.1 résidus
+        self.assertIn("[BLOC 6] TÊTE DE CERTIFICAT", txt)     # certificat calculé
+        self.assertIn("k nominal", txt)
+        self.assertIn("k_eff", txt)
+        self.assertIn("PARTITION NOMMÉE", txt)                # ADR-0007
+        self.assertIn("DRAPEAU 2", txt)                       # §5.6, tri-état
+        self.assertNotIn("DIFFÉRÉ À M1c", txt)                # plus aucun placeholder
+        self.assertIn("réalisé M1c", txt)                     # renvois L&M réalisés
 
     def test_currency_marked_class_published(self):
         txt = report.render_report(self.control, self.journal)
@@ -115,7 +124,7 @@ class TestReport(unittest.TestCase):
         # paramètre hors-bande) : c'est le claim de recalculabilité (ADR-0003).
         txt = report.render_report(self.control, self.journal)
         self.assertIn("coinbase", txt)
-        self.assertIn("s2-harness/S2A-M1b", txt)              # version depuis run_params
+        self.assertIn("s2-harness/S2A-M1c", txt)              # version depuis run_params
 
 
 class TestReportQueueExacte(unittest.TestCase):
