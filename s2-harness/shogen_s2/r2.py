@@ -914,14 +914,16 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     }
 
 
-def cluster_lm_correlations(partition, markers, readings, pool, w, sigma, tau, n_min) -> dict:
+def cluster_lm_correlations(partition, markers, readings, pool, w, sigma_by_class,
+                            sigma_class_of_flux, tau, n_min) -> dict:
     """Corrélations L&M entre CLUSTERS (§5.5 pt 4, analogue éq. 35) : Pearson des
     séries (Θ̂_A,j, Θ̂_B,j), Θ̂_A,j = m_A,j/N_A = (flux du cluster A en écart)/(flux de A).
     Calculée seulement pour les clusters à ≥ 2 flux ; les singletons restent au φ par
     paire de flux de M1b (lm.py) — convention publiée. Réutilise la classification R1
-    (r1.classify_cells) → zéro divergence."""
+    (r1.classify_cells, σ PAR CLASSE + τ RELATIF, ADR-0021) → zéro divergence."""
     from .r1 import ECARTS, classify_cells
-    cells = classify_cells(markers, readings, pool, w, sigma, tau, n_min)
+    cells = classify_cells(markers, readings, pool, w, sigma_by_class,
+                           sigma_class_of_flux, tau, n_min)
     win_strate = build_window_strate(markers)
     wins = sorted(win_strate)
 
@@ -1030,11 +1032,12 @@ def _localize_intercluster(partition, lm_out) -> dict:
 
 # ── Orchestration + point d'entrée recalculable (patron maison) ────────────────
 
-def compute_r2(markers, readings, asn_records, pool, w, sigma, tau, params,
-               n_min_horsenv=None) -> dict:
+def compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
+               sigma_class_of_flux, tau, params, n_min_horsenv=None) -> dict:
     """R2 complet : partition/k_eff (ASN + contenu), statistiques de contenu par paire,
     arêtes méthode, corrélations clusters, drapeau 2. Consomme R1 et L&M (mêmes
-    helpers, zéro divergence). `params` = run_params effectif (clés R2 présentes)."""
+    helpers, σ PAR CLASSE + τ RELATIF, zéro divergence). `params` = run_params
+    effectif (clés R2 présentes)."""
     if n_min_horsenv is None:
         n_min_horsenv = r1.N_MIN_HORSENV
     flux_hosts = params["flux_hosts"]
@@ -1044,12 +1047,15 @@ def compute_r2(markers, readings, asn_records, pool, w, sigma, tau, params,
     # Même seuil_hist que le bloc 3 du rapport (run_params) → le z consommé par le
     # drapeau 2 est EXACTEMENT celui publié au bloc 3, jamais un recalcul divergent.
     seuil_hist = Decimal(str(params.get("seuil_historique_valeur", SEUIL_HIST)))
-    r1_out = r1.compute_r1(markers, readings, pool, w, sigma, tau,
-                           seuil_hist=seuil_hist, n_min=n_min_horsenv)
+    r1_out = r1.compute_r1(markers, readings, pool, w, sigma_by_class,
+                           sigma_class_of_flux, tau, seuil_hist=seuil_hist,
+                           n_min=n_min_horsenv)
     from .lm import compute_lm
-    lm_out = compute_lm(markers, readings, pool, w, sigma, tau, n_min_horsenv)
+    lm_out = compute_lm(markers, readings, pool, w, sigma_by_class,
+                        sigma_class_of_flux, tau, n_min_horsenv)
     clusters_lm = cluster_lm_correlations(partition, markers, readings, pool, w,
-                                          sigma, tau, n_min_horsenv)
+                                          sigma_by_class, sigma_class_of_flux, tau,
+                                          n_min_horsenv)
     flag2 = drapeau_2(r1_out, partition, lm_out)
 
     return {
@@ -1080,14 +1086,16 @@ def recompute_r2_from_journal(control_path: str, journal_path: str) -> dict:
             f"(fail-closed, §5.3) : {div[:5]}"
         )
     readings = r1.parse_journal(journal_path)
+    sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_r2(
         markers=markers,
         readings=readings,
         asn_records=asn_records,
         pool=list(params["pool"]),
         w=int(params["w"]),
-        sigma=Decimal(str(params["sigma_classe"])),
-        tau=Decimal(str(params["tau_classe"])),
+        sigma_by_class=sigma_by_class,
+        sigma_class_of_flux=sigma_class_of_flux,
+        tau=tau,
         params=params,
         n_min_horsenv=int(params["n_min_hors_enveloppe"]),
     )

@@ -13,6 +13,19 @@ NOTES fixtures (§H, traçabilité) : les `.bin` gelées et `expected.json` sont
 2026-08-05T16:11:xx), PAS les payloads de la table doc 10 §3.1 (~12:03 UTC). Les
 valeurs STRUCTURELLES des décodeurs (positions, clés) sont épinglées séparément
 dans `test_sources.TestQuirks` sur des octets synthétiques, indépendants de l'heure.
+
+RÉVISION TRACÉE ADR-0021 [C2b] : `collector.collect` prend désormais `sigma_by_class`
+(mapping classe→plancher) au lieu de `sigma_classe` scalaire, et `tau_classe` est une
+FRACTION relative (au lieu d'un montant absolu). DEUX tests dépendaient du contrat
+scalaire/absolu et sont convertis EXPLICITEMENT (jamais affaiblis) :
+  - `test_no_false_staleness_realistic_sigma` : la source FIGÉE testée passe de
+    `kraken` (classe `sans_horodatage` → staleness « non évaluable » par fidélité
+    ADR-0020, quel que soit un source_ts injecté) à `bitstamp` (classe
+    `place_horodatee`, σ évaluable) ; on VÉRIFIE de plus que kraken reste non
+    évaluable même avec un horodatage injecté (le dispatch est PAR CLASSE) ;
+  - `test_horsenveloppe_on_mixed_class_flags_bitfinex` : τ absolu 60 $ → τ RELATIF
+    0,1 % (bitfinex rel 0.00107 > 0.001, seul hors-enveloppe ; okx_ticker 0.00085 et
+    kraken 0.0000178 dedans — écarts LOO recalculés sur les fixtures).
 """
 
 from __future__ import annotations
@@ -44,8 +57,19 @@ NOWS = [1785946291.0, 1785946321.0, 1785946381.0]  # « now » en tête de boucl
 START = 1785946290.0
 # now_fn est appelé 1 (start) + 2/fenêtre (now en tête, t_read après sommeil).
 CLOCK = [START, NOWS[0], TREADS[0], NOWS[1], TREADS[1], NOWS[2], TREADS[2]]
-SIGMA = Decimal("1e12")                            # jamais de staleness (tests « propres »)
-TAU = Decimal("50")
+
+# [C2b] Étaient `SIGMA = Decimal("1e12")` (σ SCALAIRE) et `TAU = Decimal("50")` (τ
+# ABSOLU). σ PAR CLASSE : planchers énormes → jamais de staleness ; sans_horodatage
+# = None (« non évaluable »). τ = FRACTION relative.
+SIGMA_HUGE = Decimal("1e12")
+TAU = Decimal("0.005")                             # τ RELATIF (fraction) — était 50 ABSOLU
+
+
+def sbc_huge() -> dict:
+    """sigma_by_class « propre » : aucune staleness possible (planchers énormes)."""
+    return {"place_horodatee": SIGMA_HUGE, "agregateur": SIGMA_HUGE,
+            "sans_horodatage": None, "oracle_pyth": SIGMA_HUGE,
+            "oracle_chainlink": SIGMA_HUGE}
 
 
 class FakeClock:
@@ -86,10 +110,10 @@ class CollectorCase(unittest.TestCase):
         self.raw = os.path.join(self.d, "raw.jsonl")
         self.specs = [BY_ID[f] for f in SKELETON]
 
-    def _collect(self, read_fn=frozen_read_fn, clock=None, sigma=SIGMA):
+    def _collect(self, read_fn=frozen_read_fn, clock=None, sigma_by_class=None):
         return collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_classe=sigma, tau_classe=TAU,
+            sigma_by_class=sigma_by_class or sbc_huge(), tau_classe=TAU,
             now_fn=FakeClock(clock or CLOCK), sleep_fn=lambda s: None, read_fn=read_fn,
         )
 
@@ -102,6 +126,10 @@ class TestCollectClean(CollectorCase):
         params_list, clocks, markers = records.parse_control(self.control)
         self.assertEqual(len(params_list), 1)
         self.assertEqual(params_list[-1]["pool"], SKELETON)
+        # σ PAR CLASSE écrit en run_params (mapping) + dispatch flux→classe (ADR-0021).
+        self.assertIsInstance(params_list[-1]["sigma_classe"], dict)
+        self.assertEqual(params_list[-1]["sigma_class_of_flux"]["kraken"], "sans_horodatage")
+        self.assertEqual(params_list[-1]["sigma_class_of_flux"]["coinbase"], "place_horodatee")
         self.assertEqual(len(clocks), 1)
         self.assertEqual(sorted(m["window_start"] for m in markers), BUCKETS)
         self.assertEqual(_count_lines(self.journal), 9)   # 3 fenêtres × 3 sources
@@ -134,9 +162,11 @@ class TestCollectClean(CollectorCase):
 
 class TestEndOfWindowSampling(CollectorCase):
     def test_no_false_staleness_realistic_sigma(self):
-        # LE test qui aurait attrapé M-1 : σ RÉALISTE (30 s), échantillonnage en
-        # fin de fenêtre. Sources fraîches (source_ts = instant de lecture) →
-        # staleness ≈ δ ≪ σ → 0 ; source figée (source_ts ancien) → stale.
+        # LE test qui aurait attrapé M-1 : σ RÉALISTE (place_horodatee=30 s),
+        # échantillonnage en fin de fenêtre. Source FIGÉE (bitstamp, classe évaluable)
+        # → stale ; sources fraîches → 0. [C2b] : bitstamp remplace kraken comme source
+        # figée (kraken est `sans_horodatage` → staleness non évaluable PAR CLASSE, ce
+        # qu'on vérifie AUSSI : un source_ts injecté ne la rend pas évaluable).
         w_r, delta_r = 60, 2.0
         buckets_r = [0, 60, 120]
         treads_r = [b + w_r - delta_r for b in buckets_r]      # 58, 118, 178
@@ -144,14 +174,17 @@ class TestEndOfWindowSampling(CollectorCase):
         clock_r = [1.0, nows_r[0], treads_r[0], nows_r[1], treads_r[1], nows_r[2], treads_r[2]]
 
         def read_fn(spec, ts):
-            src = 1.0 if spec.flux_id == "kraken" else ts      # kraken figé, autres frais
+            src = 1.0 if spec.flux_id == "bitstamp" else ts    # bitstamp figé, autres frais
             return Reading(flux_id=spec.flux_id, kind=spec.kind, endpoint=spec.endpoint,
                            fetch_ts=ts, status=Status.OK, http_status=200, raw=b"payload",
                            price=Decimal("64000"), currency=Currency.USD, source_ts=src)
 
         sleeps: list[float] = []
+        # place_horodatee = 30 s (coinbase, bitstamp) ; sans_horodatage = None (kraken).
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_classe=Decimal("30"), tau_classe=TAU, w=w_r, sample_lead=delta_r,
+                          sigma_by_class={"place_horodatee": Decimal("30"),
+                                          "sans_horodatage": None},
+                          tau_classe=TAU, w=w_r, sample_lead=delta_r,
                           now_fn=FakeClock(clock_r), sleep_fn=sleeps.append, read_fn=read_fn)
         # Épingle le MÉCANISME (pas seulement le comportement) : dors d'abord,
         # lis à ws+w−δ. sleep = (ws+w−δ) − now = 58−5 / 118−65 / 178−125 = 53 s.
@@ -160,10 +193,11 @@ class TestEndOfWindowSampling(CollectorCase):
         blk = r1.recompute_from_journal(self.control, self.journal)["strates"]["calme"]
         self.assertEqual(blk["n"], 3)
         self.assertEqual(blk["per_source"]["coinbase"]["staleness"], 0)   # fraîche → 0 (M-1)
-        self.assertEqual(blk["per_source"]["bitstamp"]["staleness"], 0)
-        self.assertEqual(blk["per_source"]["kraken"]["staleness"], 3)     # figée → stale
-        self.assertEqual(blk["per_source"]["kraken"]["phat"], Decimal(1))
+        self.assertEqual(blk["per_source"]["bitstamp"]["staleness"], 3)   # figée place → stale
+        self.assertEqual(blk["per_source"]["kraken"]["staleness"], 0)     # sans_horodatage → non éval.
+        self.assertEqual(blk["per_source"]["bitstamp"]["phat"], Decimal(1))
         self.assertEqual(blk["per_source"]["coinbase"]["phat"], Decimal(0))
+        self.assertEqual(blk["per_source"]["kraken"]["phat"], Decimal(0))  # jamais stale (classe)
 
     def test_read_instant_is_in_window_half_open(self):
         # Le t_read (fin de fenêtre) tombe bien DANS la fenêtre, jamais dans la
@@ -213,9 +247,11 @@ class TestAppendOnlyIdempotent(CollectorCase):
 class TestRunParamsConcordance(CollectorCase):
     def test_divergent_run_params_fail_closed(self):
         # 2 démarrages avec σ différents → recalcul refusé (fail-closed, §E).
-        self._collect(sigma=SIGMA)
+        self._collect(sigma_by_class=sbc_huge())
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_classe=Decimal("999"), tau_classe=TAU,
+                          sigma_by_class={"place_horodatee": Decimal("999"),
+                                          "sans_horodatage": None},
+                          tau_classe=TAU,
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with self.assertRaises(ValueError):
             r1.recompute_from_journal(self.control, self.journal)
@@ -226,7 +262,7 @@ class TestRunParamsConcordance(CollectorCase):
         # pas en silence dans le même n par strate.
         self._collect()                                    # 1er démarrage : spec single
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_classe=SIGMA, tau_classe=TAU,
+                          sigma_by_class=sbc_huge(), tau_classe=TAU,
                           strate_spec=window.WEEKEND_STRATE_SPEC,  # 2ᵉ : calendrier différent
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with self.assertRaises(ValueError):
@@ -250,6 +286,26 @@ class TestRunParamsConcordance(CollectorCase):
         with self.assertRaises(ValueError):
             r1.recompute_from_journal(self.control, self.journal)
         with self.assertRaises(ValueError):
+            lm.recompute_lm_from_journal(self.control, self.journal)
+
+    def test_legacy_scalar_sigma_classe_fail_closed(self):
+        # [C3] TEST NOMMÉ : un journal LEGACY portant un `sigma_classe` SCALAIRE, lu
+        # par le nouveau code, LÈVE via `effective_run_params` — jamais réinterprété
+        # en σ unique (la déviation silencieuse d'ADR-0020 déc. 3 que la passe supprime).
+        self._collect()
+        with open(self.control, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        for i, ln in enumerate(lines):
+            obj = json.loads(ln)
+            if obj.get("record") == "run_params":
+                obj["sigma_classe"] = "1000000000000"      # SCALAIRE legacy (str)
+                lines[i] = json.dumps(obj, ensure_ascii=False)
+                break
+        with open(self.control, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        with self.assertRaisesRegex(ValueError, "SCALAIRE legacy"):
+            r1.recompute_from_journal(self.control, self.journal)
+        with self.assertRaisesRegex(ValueError, "SCALAIRE legacy"):
             lm.recompute_lm_from_journal(self.control, self.journal)
 
 
@@ -276,7 +332,7 @@ class TestTwoStrateCalendar(CollectorCase):
             clock += [float(b) + 1.0, float(tr)]
         collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_classe=SIGMA, tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
+            sigma_by_class=sbc_huge(), tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
             now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         return sat, sun, mon
@@ -326,7 +382,7 @@ class TestFullPool(CollectorCase):
     def test_collect_all_twelve_flux_clean(self):
         completed = collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_classe=Decimal("1e12"), tau_classe=Decimal("1e9"),
+            sigma_by_class=sbc_huge(), tau_classe=Decimal("1e9"),   # τ relatif énorme → rien hors-env
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         self.assertEqual(completed, 3)
@@ -345,20 +401,24 @@ class TestFullPool(CollectorCase):
 
     def test_horsenveloppe_on_mixed_class_flags_bitfinex(self):
         # Classe « BTC/USD-stable », devise marquée (§2/§9.4) : l'enveloppe
-        # leave-one-out MÊLE USD et USDT. τ=60, σ énorme → seul bitfinex (max
-        # 64545, |dev| 69.25 > 60) sort ; kraken (≈médiane, |dev| 1.15) reste
-        # dedans (valeurs vérifiées sur les fixtures). Le démêlage peg-vs-copie
-        # est un résidu R2(2a) ρ_resid — calculé en M1c (r2.py), hors de CE test R1.
+        # leave-one-out MÊLE USD et USDT. [C2b] τ RELATIF 0,1 % (était τ=60 ABSOLU $) ;
+        # écarts LOO recalculés sur les fixtures (median_LOO par flux) :
+        #   bitfinex rel = 69.25/64475.75  = 0.00107405  > 0.001 → HORS-ENVELOPPE (seul) ;
+        #   okx_ticker rel = 54.95/64475.75 = 0.00085226 < 0.001 → dedans ;
+        #   kraken   rel = 1.15/64475.75    = 0.00001784 < 0.001 → dedans.
+        # (τ de test 0,1 % < τ campagne 0,5 % : les fixtures honnêtes ont un écart LOO
+        #  max de 0,107 % — bitfinex, cohérent avec ADR-0020 « 0,118 %, §3.1 » — donc
+        #  0,5 % ne flaggerait rien ; 0,1 % garde un hors-enveloppe à tester.)
         collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_classe=Decimal("1e12"), tau_classe=Decimal("60"),
+            sigma_by_class=sbc_huge(), tau_classe=Decimal("0.001"),
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         blk = r1.recompute_from_journal(self.control, self.journal)["strates"]["calme"]
         self.assertEqual(blk["per_source"]["bitfinex"]["hors_enveloppe"], 3)
         self.assertEqual(blk["per_source"]["kraken"]["hors_enveloppe"], 0)
         self.assertEqual(blk["per_source"]["kraken"]["pas_ecart"], 3)
-        # Un flux USDT (okx_ticker, |dev| 54.95 < 60) reste dans l'enveloppe à ce τ.
+        # Un flux USDT (okx_ticker, rel 0.00085 < 0.001) reste dans l'enveloppe à ce τ.
         self.assertEqual(blk["per_source"]["okx_ticker"]["hors_enveloppe"], 0)
 
 

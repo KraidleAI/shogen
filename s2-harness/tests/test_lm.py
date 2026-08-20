@@ -11,6 +11,13 @@ Familles (mission M1b + §5.5 + conseils ADVISOR) :
     indicatrice constante → None (jamais un 0 fabriqué) ;
   - par strate : les séries m_j se coupent par strate ;
   - dégénéré N < 2 → Ê(Θ²)/Var̂ non calculables (None), nommés.
+
+RÉVISION TRACÉE ADR-0021 [C2b] : étaient `SIGMA_HUGE = Decimal("1e12")` (σ scalaire)
+et `TAU = Decimal("50")` (τ ABSOLU $). `compute_lm`/`compute_r1` prennent désormais
+σ PAR CLASSE + τ RELATIF (ADR-0021) ; ces tests (co-défaillances par PANNE, sources
+au MÊME prix → jamais hors-enveloppe) sont orthogonaux à la représentation σ/τ et
+sont conservés via les adaptateurs `LM`/`R1` (classe de test unique). L'identité de
+cohérence R1↔L&M reste exacte car les DEUX passent par la même classification.
 """
 
 from __future__ import annotations
@@ -20,12 +27,20 @@ import unittest
 from decimal import Decimal, localcontext
 
 from shogen_s2 import lm, r1
-from tests.test_r1 import mk, rd
+from tests.test_r1 import R1, TCLASS, mk, rd
 
-SIGMA_HUGE = Decimal("1e12")
-TAU = Decimal("50")
+SIGMA_HUGE = Decimal("1e12")   # plancher de classe énorme → jamais de staleness
+TAU = Decimal("0.005")         # τ RELATIF (fraction) — était Decimal("50") ABSOLU
 D = Decimal
 PREC = r1.DECIMAL_PREC
+
+
+def LM(markers, readings, pool, *, sigma=SIGMA_HUGE, tau=TAU, w=60, n_min=4):
+    """Adaptateur [C2b] `compute_lm` : pool dans une classe de test unique (σ scalaire
+    par classe), exerce le VRAI `lm.compute_lm` (σ PAR CLASSE + τ RELATIF)."""
+    sbc = {TCLASS: (None if sigma is None else Decimal(str(sigma)))}
+    scof = {f: TCLASS for f in pool}
+    return lm.compute_lm(markers, readings, pool, w, sbc, scof, tau, n_min)
 
 
 def panne(ws, flux):
@@ -87,16 +102,16 @@ class TestConsistencyWithR1(unittest.TestCase):
 
     def test_sum_m_equals_sum_of_r1_ecarts_exactly(self):
         pool, markers, readings = self._build()
-        r1o = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
-        lmo = lm.compute_lm(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        r1o = R1(markers, readings, pool, sigma=SIGMA_HUGE)
+        lmo = LM(markers, readings, pool, sigma=SIGMA_HUGE)
         sum_ecart = sum(r1o["strates"]["calme"]["per_source"][f]["ecart"] for f in pool)
         self.assertEqual(lmo["strates"]["calme"]["sum_m"], sum_ecart)   # entier exact
         self.assertEqual(sum_ecart, 3)
 
     def test_e_theta_equals_mean_of_phats(self):
         pool, markers, readings = self._build()
-        r1o = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
-        lmo = lm.compute_lm(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        r1o = R1(markers, readings, pool, sigma=SIGMA_HUGE)
+        lmo = LM(markers, readings, pool, sigma=SIGMA_HUGE)
         blk_r1 = r1o["strates"]["calme"]
         blk_lm = lmo["strates"]["calme"]
         with localcontext() as ctx:
@@ -107,7 +122,7 @@ class TestConsistencyWithR1(unittest.TestCase):
 
     def test_e_theta2_var_hand_values(self):
         pool, markers, readings = self._build()
-        blk = lm.compute_lm(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        blk = LM(markers, readings, pool, sigma=SIGMA_HUGE)["strates"]["calme"]
         with localcontext() as ctx:
             ctx.prec = PREC
             e_theta2_ref = D(1) / D(12)          # (1/6 + 0)/2
@@ -129,7 +144,7 @@ class TestPhiSigned(unittest.TestCase):
             markers.append(mk(ws))
             readings.append(panne(ws, "a") if ap else clean(ws, "a"))
             readings.append(panne(ws, "b") if bp else clean(ws, "b"))
-        out = lm.compute_lm(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = LM(markers, readings, pool, sigma=SIGMA_HUGE)
         return out["strates"]["calme"]["pair_phi"]["a×b"]
 
     def test_perfect_co_failure_is_plus_one(self):
@@ -160,7 +175,7 @@ class TestPerStrate(unittest.TestCase):
             readings += [panne(ws, "a"), clean(ws, "b"), clean(ws, "c"), clean(ws, "d")]
         for ws in (120, 180):                   # stress : a,b,c panne (m=3)
             readings += [panne(ws, "a"), panne(ws, "b"), panne(ws, "c"), clean(ws, "d")]
-        out = lm.compute_lm(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = LM(markers, readings, pool, sigma=SIGMA_HUGE)
         calme, stress = out["strates"]["calme"], out["strates"]["stress"]
         self.assertEqual(calme["sum_m"], 2)     # 1+1
         self.assertEqual(stress["sum_m"], 6)    # 3+3
@@ -173,15 +188,14 @@ class TestPerStrate(unittest.TestCase):
 class TestDegenerate(unittest.TestCase):
     def test_n_lt_2_pool_e_theta2_none(self):
         # Pool à 1 flux → N=1 → forme par paires N(N−1) inexistante → None (nommé).
-        out = lm.compute_lm([mk(0)], [panne(0, "a")], ["a"], w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = LM([mk(0)], [panne(0, "a")], ["a"], sigma=SIGMA_HUGE)
         blk = out["strates"]["calme"]
         self.assertIsNone(blk["E_theta2"])
         self.assertIsNone(blk["Var_theta"])
         self.assertIsNotNone(blk["E_theta"])    # Ê(Θ) reste défini (N=1) : m/N = 1
 
     def test_renvois_m1c_present(self):
-        out = lm.compute_lm([mk(0)], [panne(0, "a"), clean(0, "b")], ["a", "b"],
-                            w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = LM([mk(0)], [panne(0, "a"), clean(0, "b")], ["a", "b"], sigma=SIGMA_HUGE)
         blk = out["strates"]["calme"]
         self.assertIn("CLUSTERS", blk["renvoi_m1c_clusters"])
         self.assertIn("flux→source", blk["renvoi_m1c_flux_source"])

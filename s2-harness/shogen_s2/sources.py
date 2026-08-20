@@ -290,6 +290,83 @@ EXCLUDED_CRYPTOCOMPARE = (
 )
 
 
+# ── Taxonomie σ/τ ADR-0020 — SOURCE UNIQUE DE VÉRITÉ (ADR-0021 item 2/8) ──────
+# La classe σ d'un flux est une PROPRIÉTÉ DE LA SOURCE : elle vit ici, avec SPECS
+# et les décodeurs qui décident de la disponibilité de source_ts. Auparavant
+# dupliquée en données dans `run_campaign.SIGMA_CLASS_OF_FLUX` (CONSTAT M2) ; ADR-0021
+# la centralise ICI (« ne le duplique pas »). `collector`, `run_campaign` et
+# `closure` l'importent ; `r1.classify_ecart` la reçoit VIA run_params (aucun
+# paramètre hors-bande, ADR-0003), écrite par `collector` depuis cette constante.
+
+# Flux → classe σ (ADR-0020 déc. 3, :3086-3094). CONCORDANCE mesurée avec les
+# décodeurs : les trois « sans_horodatage » sont EXACTEMENT les flux dont le
+# décodeur rend source_ts=None (_d_binance/_d_kraken/_d_bitfinex ci-dessus) ;
+# vérifiée sur fixtures par test_run_campaign (décodage réel, pas un ensemble crû).
+SIGMA_CLASS_OF_FLUX: dict = {
+    "binance": "sans_horodatage", "kraken": "sans_horodatage",
+    "bitfinex": "sans_horodatage",
+    "coinbase": "place_horodatee", "okx_ticker": "place_horodatee",
+    "okx_index": "place_horodatee", "bitstamp": "place_horodatee",
+    "gemini": "place_horodatee",
+    "coingecko": "agregateur", "defillama": "agregateur",
+    "pyth": "oracle_pyth", "chainlink": "oracle_chainlink",
+}
+
+# Planchers σ PAR CLASSE (ADR-0020 déc. 3, :3090-3094), en SECONDES. `None` =
+# axe (ii) staleness « non évaluable » pour la classe (jamais un seuil deviné).
+#   - place_horodatee : places à horodatage porté → 30 s ;
+#   - agregateur      : CoinGecko/DefiLlama → 300 s ;
+#   - sans_horodatage : Binance/Kraken/Bitfinex → « non évaluable » (déjà honoré
+#                       par la garde `src_ts is not None`, r1) ;
+#   - oracle_pyth     : Pyth = 1,5 × heartbeat établi → 30 s ;
+#   - oracle_chainlink: Chainlink = 1,5 × heartbeat 3600 s → 5400 s. PS-S2-01 RÉSOLU
+#                       (heartbeat ~1 h dérivé du countdown live ; repli fail-closed
+#                       levé — WISHLIST/RUNBOOK §7) : 5400 est la valeur COURANTE. La
+#                       confirmation feed-doc exacte (3600 s) reste un raffinement
+#                       ORCHESTRATEUR (navigateur) ; VALEUR INJECTABLE (ADR-0021 item 7),
+#                       `None` si un jour non confirmée. Point d'injection ICI et dans
+#                       `closure`/`run_campaign` (sigma_by_class committé), JAMAIS un
+#                       littéral dans `r1.classify_ecart` (lit sigma_by_class agnostiquement).
+SIGMA_FLOORS_ADR0020_SECONDS: dict = {
+    "place_horodatee": 30,
+    "agregateur": 300,
+    "sans_horodatage": None,
+    "oracle_pyth": 30,
+    "oracle_chainlink": 5400,
+}
+
+# τ RELATIF, une seule valeur pour la classe « BTC/USD-stable » (ADR-0020 déc. 2,
+# :3081-3085 : `|vᵢ − médiane_LOO| / médiane_LOO > τ`). FRACTION (0,5 % = 0.005),
+# ni un pourcentage « 0,5 » ni un montant en dollars (anti-piège 100×).
+TAU_CLASSE_ADR0020_FRACTION = Decimal("0.005")
+
+# Seuil de la clause de révision τ (ADR-0020 :3085-3086 : « Révisé par ADR avant
+# lancement si la calibration montre P99(|écart relatif|) > 0,25 % »). FRACTION.
+TAU_REVISION_THRESHOLD_FRACTION = Decimal("0.0025")
+
+
+def default_sigma_by_class() -> dict:
+    """σ par classe PROVISOIRE = les planchers ADR-0020 (Decimal ou None), avant la
+    clôture de calibration (`closure.compute_closure` calcule `max(plancher,
+    3×P99)`). Sert la phase `demo`/`calibration` du driver (capture SANS SEUIL,
+    ADR-0020 reframe : la valeur provisoire n'altère pas l'archive)."""
+    return {k: (None if v is None else Decimal(v))
+            for k, v in SIGMA_FLOORS_ADR0020_SECONDS.items()}
+
+
+def sigma_class_of_flux_for(pool: list) -> dict:
+    """flux→classe restreint au `pool`, écrit dans run_params par `collector`
+    (recalculable). LÈVE si un flux du pool n'a pas de classe déclarée
+    (fail-closed : jamais un dispatch σ deviné)."""
+    missing = [f for f in pool if f not in SIGMA_CLASS_OF_FLUX]
+    if missing:
+        raise ValueError(
+            f"flux sans classe σ déclarée dans SIGMA_CLASS_OF_FLUX : {missing} "
+            "— fail-closed (ADR-0021 : aucun dispatch σ deviné)"
+        )
+    return {f: SIGMA_CLASS_OF_FLUX[f] for f in pool}
+
+
 def read(spec: SourceSpec, fetch_ts: float,
          timeout: float = _DEFAULT_TIMEOUT) -> Reading:
     """Fait UNE lecture d'un flux et rend un Reading. Ne lève jamais : toute

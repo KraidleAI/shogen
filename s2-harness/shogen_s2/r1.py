@@ -92,12 +92,32 @@ def _median(values: list[Decimal]) -> Decimal:
         return +((s[m // 2 - 1] + s[m // 2]) / Decimal(2))
 
 
+def _sigma_floor_for_flux(
+    flux_id: str,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
+) -> Optional[Decimal]:
+    """σ (secondes) applicable au flux, par DISPATCH DE CLASSE (ADR-0020 déc. 3 /
+    ADR-0021 item 1) : flux → classe (`sigma_class_of_flux`) → plancher
+    (`sigma_by_class`). Rend `None` = axe (ii) staleness « non évaluable » pour
+    ce flux — soit sa classe porte un plancher `None` (ex. `sans_horodatage`, ou
+    `oracle_chainlink` non confirmé, ADR-0021 item 7), soit le flux n'a pas de
+    classe déclarée (fail-closed de dispatch : jamais un σ deviné). Aucun littéral
+    de classe ici — la VALEUR par classe est injectée via run_params."""
+    klass = sigma_class_of_flux.get(flux_id)
+    if klass is None:
+        return None
+    return sigma_by_class.get(klass)
+
+
 def classify_ecart(
     reading: Optional[dict],
     others_prices: list[Decimal],
     n_responding: int,
     win_end: int,
-    sigma: Decimal,
+    flux_id: str,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
     tau: Decimal,
     n_min: int = N_MIN_HORSENV,
 ) -> Ecart:
@@ -105,25 +125,45 @@ def classify_ecart(
     hors-enveloppe** (10 §5.2). `reading` est la ligne `journal.jsonl` parsée
     (ou None si absente d'une fenêtre complétée = non-réponse). `others_prices`
     = prix des AUTRES répondantes (leave-one-out) ; `n_responding` = nombre
-    total de répondantes de la fenêtre (OK avec prix). Toute l'arithmétique
-    Decimal est à précision FIXÉE (DECIMAL_PREC), comme les statistiques."""
+    total de répondantes de la fenêtre (OK avec prix).
+
+    **σ PAR CLASSE (ADR-0021 item 1)** : reçoit `flux_id` et dispatche σ selon la
+    CLASSE de la source (`sigma_by_class` classe→plancher, `sigma_class_of_flux`
+    flux→classe). σ=None → staleness non évaluable pour ce flux.
+
+    **τ RELATIF (ADR-0020 déc. 2, ADR-0021 item 1 [C2a])** : hors-enveloppe =
+    `|prix − médiane_LOO| / médiane_LOO > τ` (τ FRACTION). L'`abs()` reste au
+    NUMÉRATEUR ; c'est la DIVISION par la médiane qui définit le critère. GARDE
+    `médiane_LOO > 0` fail-closed : une médiane ≤ 0 rend l'enveloppe relative
+    indéfinie → « non évaluable », jamais « pas d'écart » (§5.2 ; jamais une
+    division par zéro ni un verdict fabriqué). Toute l'arithmétique Decimal est à
+    précision FIXÉE (DECIMAL_PREC), comme les statistiques."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
         # (iii) panne — précédence maximale : une panne n'a pas de valeur.
         if reading is None or reading.get("status") != "ok" or reading.get("price") is None:
             return Ecart.PANNE
         # (ii) staleness — sur l'horodatage PORTÉ (source_ts), jamais l'horloge
-        # harnais (03 §1). source_ts absent (ex. kraken) → staleness non
-        # évaluable : on passe à (i), sans flaguer (résidu fail-open publié §G).
+        # harnais (03 §1). σ dispatché PAR CLASSE. source_ts absent (ex. kraken) OU
+        # σ_classe None (classe non évaluable) → staleness non évaluable : on passe
+        # à (i), sans flaguer (résidu fail-open publié §G).
+        sigma = _sigma_floor_for_flux(flux_id, sigma_by_class, sigma_class_of_flux)
         src_ts = reading.get("source_ts")
-        if src_ts is not None and (Decimal(win_end) - _as_dec(src_ts)) > sigma:
+        if (sigma is not None and src_ts is not None
+                and (Decimal(win_end) - _as_dec(src_ts)) > sigma):
             return Ecart.STALENESS
         # (i) hors-enveloppe — l'enveloppe (médiane leave-one-out) exige N ≥ n_min
         # RÉPONDANTES (10 §5.2). Sinon « non évaluable », jamais « pas d'écart ».
         if n_responding >= n_min:
             m_loo = _median(others_prices)
+            # GARDE médiane_LOO > 0 (fail-closed [C2a]) : l'écart RELATIF est
+            # indéfini pour une médiane ≤ 0 (division par zéro / signe inversé sur
+            # une médiane de prix, structurellement dégénérée). Non évaluable —
+            # jamais « pas d'écart » (§5.2), jamais un crash du recalcul.
+            if m_loo <= 0:
+                return Ecart.NON_EVAL_HORSENV
             price = Decimal(reading["price"])
-            if abs(price - m_loo) > tau:
+            if abs(price - m_loo) / m_loo > tau:
                 return Ecart.HORS_ENVELOPPE
             return Ecart.PAS_ECART
         return Ecart.NON_EVAL_HORSENV
@@ -242,12 +282,14 @@ def _classify_window(
     reading_map: dict[tuple[int, str], dict],
     pool: list[str],
     w: int,
-    sigma: Decimal,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
     tau: Decimal,
     n_min: int = N_MIN_HORSENV,
 ) -> dict[str, Ecart]:
     """Classe chaque source du pool dans la fenêtre `ws`. Répondantes = OK avec
-    prix ; l'enveloppe leave-one-out se calcule sur elles (N ≥ n_min, §5.2)."""
+    prix ; l'enveloppe leave-one-out se calcule sur elles (N ≥ n_min, §5.2).
+    σ dispatché PAR CLASSE via `sigma_by_class`/`sigma_class_of_flux` (ADR-0021)."""
     responding = [
         f for f in pool
         if reading_map.get((ws, f)) is not None
@@ -260,7 +302,8 @@ def _classify_window(
     for f in pool:
         others = [resp_price[g] for g in responding if g != f]
         out[f] = classify_ecart(reading_map.get((ws, f)), others, n_resp,
-                                 window_end(ws, w), sigma, tau, n_min)
+                                 window_end(ws, w), f, sigma_by_class,
+                                 sigma_class_of_flux, tau, n_min)
     return out
 
 
@@ -269,7 +312,8 @@ def classify_cells(
     readings: list[dict],
     pool: list[str],
     w: int,
-    sigma: Decimal,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
     tau: Decimal,
     n_min: int = N_MIN_HORSENV,
 ) -> dict[tuple[int, str], Ecart]:
@@ -280,7 +324,8 @@ def classify_cells(
     reading_map = build_reading_map(readings)
     out: dict[tuple[int, str], Ecart] = {}
     for ws in sorted(win_strate):
-        cls = _classify_window(ws, reading_map, pool, w, sigma, tau, n_min)
+        cls = _classify_window(ws, reading_map, pool, w, sigma_by_class,
+                               sigma_class_of_flux, tau, n_min)
         for f in pool:
             out[(ws, f)] = cls[f]
     return out
@@ -291,7 +336,8 @@ def compute_r1(
     readings: list[dict],
     pool: list[str],
     w: int,
-    sigma: Decimal,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
     tau: Decimal,
     seuil_hist: Decimal = SEUIL_HIST,
     n_min: int = N_MIN_HORSENV,
@@ -329,7 +375,8 @@ def compute_r1(
         ok_windows = {f: 0 for f in pool}
         k_count = 0
         for ws in wins:
-            cls = _classify_window(ws, reading_map, pool, w, sigma, tau, n_min)
+            cls = _classify_window(ws, reading_map, pool, w, sigma_by_class,
+                                   sigma_class_of_flux, tau, n_min)
             win_ecarts = 0
             for f in pool:
                 rd = reading_map.get((ws, f))
@@ -447,13 +494,17 @@ def recompute_from_journal(control_path: str, journal_path: str) -> dict:
             f"(fail-closed, §5.3) : {div[:5]}{' …' if len(div) > 5 else ''}"
         )
     readings = parse_journal(journal_path)
+    # σ PAR CLASSE + τ RELATIF depuis run_params (ADR-0021 ; effective_run_params a
+    # déjà garanti que sigma_classe est un mapping, fail-closed sur scalaire legacy).
+    sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_r1(
         markers=markers,
         readings=readings,
         pool=list(params["pool"]),
         w=int(params["w"]),
-        sigma=Decimal(str(params["sigma_classe"])),
-        tau=Decimal(str(params["tau_classe"])),
+        sigma_by_class=sigma_by_class,
+        sigma_class_of_flux=sigma_class_of_flux,
+        tau=tau,
         seuil_hist=Decimal(str(params["seuil_historique_valeur"])),
         n_min=int(params["n_min_hors_enveloppe"]),
     )

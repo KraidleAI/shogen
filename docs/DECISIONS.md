@@ -3145,8 +3145,8 @@ déviation feed Chainlink ~0,5 % [2nd, page 403]) ; **ratification investisseur 
 
 **Statut** : acceptée — **voie 1 confirmée par l'investisseur le 2026-08-20** ; **plan accepté par le
 `validateur-humain` le 2026-08-20 « accepte-avec-corrections » (C1–C4 intégrées ci-dessous)**,
-checkpoint AgileGates #1. Implémentation en cours ; **acceptation du livrable due au checkpoint #2**
-(G7 orchestrateur + validateur-humain). · 2026-08-20
+checkpoint AgileGates #1. **Verdict G7 rendu le 2026-08-20** (les deux gates passent — §Verdict
+G7 ci-dessous) ; **acceptation du livrable au checkpoint #2** (validateur-humain) en cours. · 2026-08-20
 
 > **Note d'adjudication (2026-08-20).** La mission M2 (driver de lancement) a révélé que le harnais
 > M1c fermé/adjugé ne peut PAS représenter les deux paramètres qu'ADR-0020 rend normatifs. Le CONSTAT
@@ -3234,6 +3234,45 @@ Si la passe n'est **pas adjugée** (G7 + checkpoint #2) **avant J0−1 (mercredi
 au vendredi suivant** et c'est une **ESCALADE-INVESTISSEUR** (le reframe :3124-3129 fait de la date de
 lancement la variable de course — un glissement est un coût investisseur), **jamais** une compression de
 gates.
+
+### Verdict G7 (2026-08-20) — les deux gates passent, ratifications
+
+**Adjudication double, contexte frais :**
+- **G3 oracle de recalcul : CONCORDANT, bit-identique.** Réimplémentation indépendante (aucun
+  import de `shogen_s2` ; percentile écrit *autrement* = contrôle croisé) == code, chaîne Decimal
+  pour chaîne Decimal, sur fixtures ET journal réel. Déterminisme prouvé (double rendu §6 + clôture,
+  processus/seeds différents → octet-identiques, mêmes sha256). 3 contrôles négatifs OK (scalaire
+  legacy lève aux 5 portes + 2 CLIs ; forme absolue nue = 0 occurrence ; invariance d'échelle).
+- **G2 revue (réviseur ≠ générateur) :** fidèle, 8/8 items conformes, **aucun affaiblissement de
+  test** (vérifié adversarialement : seules suppressions = tests du chemin interim retiré), zéro
+  défaut majeur.
+- **Orchestrateur (R-21) :** **172 tests verts mesurés** ; forme relative en place, ancienne forme
+  absolue disparue (0 occurrence), `closure.py` déterministe et fail-closed.
+
+**Ratifications :**
+1. **Garde `m_loo ≤ 0 → NON_EVAL_HORSENV`** : ratifiée (fail-closed au bon sens — non évaluable,
+   jamais un faux « pas d'écart » ni un crash ; cohérente avec N < n_min).
+2. **P99 PAR CLASSE** (et non par source, lettre `σ_s` de :3090) : **ratifié par l'investisseur le
+   2026-08-20**, coût assumé et consigné — dans une classe peuplée (5 places, 2 agrégateurs) une
+   source rapide partage le σ tiré de la plus lente ; rattrapé par l'axe (i) enveloppe ; conservateur
+   pour l'inférence (moins de flags → ne fabrique pas de dépendance). Divergence de la lettre assumée
+   explicitement (choix de **représentation**, pas de paramètre).
+3. **Garde de plausibilité τ (`0 < τ < 1 → lève`)** : adoptée **au seul point d'entrée opérateur** —
+   le fichier σ/τ committé (`run_campaign._load_committed_sigma_tau`). Le chemin recompute
+   (`records.sigma_tau_from_params`) reste **sans garde** : le collecteur écrit toujours un τ
+   fractionnel (clé LOAD_BEARING) donc un journal réel ne peut porter un τ absolu, et la suite de
+   tests utilise un τ volontairement grand comme sentinelle « désactive l'axe enveloppe » (**mesuré** :
+   la garde large cassait 2 tests légitimes → narrowed au fichier).
+
+**Résidus documentés (non bloquants, portés au certificat `04`) :**
+- **A(discipline-de-segment)** procédurale, symétrique : ni `report` (sur un segment de calibration)
+  ni `closure` (sur un segment de campagne) ne vérifie in-band le régime du dossier ; garde-fou = 2
+  dossiers + label `harness_version` + RUNBOOK §3 (sain sous le reframe capture-sans-seuil).
+- **`decimal_prec`** : le recalcul consomme la constante `DECIMAL_PREC = 50`, pas la clé journalisée
+  (couplées par construction : le collecteur écrit toujours 50, clé LOAD_BEARING).
+- Bandeau `test_collector` : la propriété saut-par-classe est verrouillée dans
+  `test_r1.TestSigmaParClasse`, pas dans le test que le bandeau sur-affirmait (exactitude de
+  commentaire, couverture intacte).
 
 ### Registres touchés
 

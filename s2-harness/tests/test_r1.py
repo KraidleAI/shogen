@@ -9,6 +9,18 @@ Familles exigées (mission M1a + raffinements ADVISOR) :
   - last-wins par (fenêtre, flux) + dédup des marqueurs (§5.3) ;
   - porte hors-enveloppe sur les RÉPONDANTES (N ≥ 4), pas la taille du pool ;
   - dégénérés P_more ∈ {0, 1} et n = 0 (pas de division par zéro).
+
+RÉVISION TRACÉE ADR-0021 [C2b] (constantes ci-dessous + adaptateurs) : le contrat
+verrouillé jusqu'ici était **σ SCALAIRE** + **τ ABSOLU** (`SIGMA=1e12`, `TAU=50 $`).
+ADR-0021 rend le harnais fidèle à ADR-0020 : **σ PAR CLASSE** (classify reçoit le
+flux et dispatche σ selon sa classe) et **τ RELATIF** (`|prix − médiane_LOO| /
+médiane_LOO > τ`, τ FRACTION). Les tests de propriété historiques (précédence,
+garde §5.4, identité élémentaire, harnais-down…) sont ORTHOGONAUX à la
+représentation σ/τ : ils sont conservés à l'identique via les adaptateurs `classify`
+/ `R1` (qui rangent les flux synthétiques dans une classe de test unique et
+exercent le VRAI `classify_ecart`/`compute_r1`). Le nouveau contrat (τ relatif,
+garde médiane>0, σ par classe) est verrouillé EXPLICITEMENT par `TestTauRelatif`
+et `TestSigmaParClasse` — pas un affaiblissement silencieux.
 """
 
 from __future__ import annotations
@@ -18,10 +30,15 @@ from decimal import Decimal, localcontext
 
 from shogen_s2 import r1
 from shogen_s2.r1 import Ecart
+from shogen_s2.sources import SIGMA_FLOORS_ADR0020_SECONDS
 
-SIGMA_HUGE = Decimal("1e12")   # jamais de staleness
-TAU = Decimal("50")
+# [C2b] Étaient `SIGMA = Decimal("1e12")` (σ scalaire) et `TAU = Decimal("50")` (τ
+# ABSOLU en $). Désormais : SIGMA_HUGE = un plancher de classe énorme (jamais de
+# staleness) ; TAU = FRACTION relative 0,5 % (ADR-0020 déc. 2).
+SIGMA_HUGE = Decimal("1e12")   # plancher de classe énorme → jamais de staleness
+TAU = Decimal("0.005")         # τ RELATIF (fraction 0,5 %) — était Decimal("50") ABSOLU
 D = Decimal
+TCLASS = "place_horodatee"     # classe de test unique (horodatée, σ évaluable)
 
 
 def rd(ws, flux, status="ok", price="64000", source_ts=None, currency="USD"):
@@ -37,6 +54,32 @@ def rd(ws, flux, status="ok", price="64000", source_ts=None, currency="USD"):
 def mk(ws, strate="calme"):
     return {"record": "window_close", "window_start": ws, "strate": strate,
             "harness_ts": float(ws)}
+
+
+# ── Adaptateurs [C2b] : σ PAR CLASSE via une classe de test unique ────────────
+def _sbc(sigma):
+    """sigma_by_class à classe unique TCLASS ; `sigma=None` → classe « non
+    évaluable » (staleness sautée, comme `sans_horodatage`)."""
+    return {TCLASS: (None if sigma is None else Decimal(str(sigma)))}
+
+
+def _scof(pool):
+    """sigma_class_of_flux : tous les flux (synthétiques) rangés dans TCLASS."""
+    return {f: TCLASS for f in pool}
+
+
+def classify(reading, others, n_resp, win_end, sigma, tau=TAU, n_min=4, flux="a"):
+    """Adaptateur : exerce le VRAI `r1.classify_ecart` (σ PAR CLASSE + τ RELATIF)
+    en rangeant `flux` dans une classe unique de σ scalaire — conserve l'intention
+    des tests de précédence historiques sous le nouveau contrat."""
+    return r1.classify_ecart(reading, others, n_resp, win_end, flux,
+                             _sbc(sigma), {flux: TCLASS}, tau, n_min)
+
+
+def R1(markers, readings, pool, *, sigma, tau=TAU, w=60, n_min=4):
+    """Adaptateur `compute_r1` : pool dans une classe unique (σ scalaire par classe)."""
+    return r1.compute_r1(markers, readings, pool, w, _sbc(sigma), _scof(pool), tau,
+                         n_min=n_min)
 
 
 class TestPoissonBinomialIdentity(unittest.TestCase):
@@ -156,7 +199,7 @@ class TestQueueUnderGuard(unittest.TestCase):
                 readings += [rd(ws, "a", price="64000", source_ts=D(ws + 59)),
                              rd(ws, "b", price="64000", source_ts=D(ws + 59)),
                              rd(ws, "c", price="64000", source_ts=D(ws + 59))]
-        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=D("30"), tau=TAU)["strates"]["calme"]
+        blk = R1(markers, readings, pool, sigma=D("30"))["strates"]["calme"]
         self.assertTrue(blk["flag_historique_insuffisant"])   # garde levée (n petit)
         self.assertTrue(blk["queue_exacte_applicable"])       # 0 < P_more < 1 → queue publiée
         self.assertIsNotNone(blk["queue_binomiale_P_K_ge_Kobs"])
@@ -172,7 +215,7 @@ class TestQueueUnderGuard(unittest.TestCase):
             readings += [rd(ws, "a", status="panne_http", price=None),
                          rd(ws, "b", status="panne_http", price=None),
                          rd(ws, "c", price="64000", source_ts=D(ws + 59))]
-        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=D("30"), tau=TAU)["strates"]["calme"]
+        blk = R1(markers, readings, pool, sigma=D("30"))["strates"]["calme"]
         self.assertEqual(blk["P_more"], D(1))
         self.assertTrue(blk["flag_historique_insuffisant"])
         self.assertFalse(blk["queue_exacte_applicable"])      # dégénéré → pas de queue
@@ -199,7 +242,7 @@ class TestQueueUnderGuard(unittest.TestCase):
         # n=52, 26 co-pannes → p̂=0.5, P_more=0.25, garde=52·0.1875=9.75 < 10 → sous
         # la garde : z NON publié, QUEUE EXACTE publiée (frontière §5.4).
         pool, markers, readings = self._build_cofailure(52, 26)
-        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        blk = R1(markers, readings, pool, sigma=SIGMA_HUGE)["strates"]["calme"]
         self.assertEqual(blk["P_more"], D("0.25"))
         self.assertEqual(blk["gate_value"], D("9.7500"))
         self.assertTrue(blk["flag_historique_insuffisant"])
@@ -214,7 +257,7 @@ class TestQueueUnderGuard(unittest.TestCase):
         # n=54, 27 co-pannes → p̂=0.5, P_more=0.25, garde=54·0.1875=10.125 ≥ 10 →
         # au-dessus : z publié, queue non applicable. (Frontière juste franchie.)
         pool, markers, readings = self._build_cofailure(54, 27)
-        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        blk = R1(markers, readings, pool, sigma=SIGMA_HUGE)["strates"]["calme"]
         self.assertEqual(blk["P_more"], D("0.25"))
         self.assertEqual(blk["gate_value"], D("10.1250"))
         self.assertFalse(blk["flag_historique_insuffisant"])
@@ -235,7 +278,7 @@ class TestQueueUnderGuard(unittest.TestCase):
             else:
                 readings += [rd(ws, "a", price="64000", source_ts=D(ws + 1)),
                              rd(ws, "b", price="64000", source_ts=D(ws + 1))]
-        blk = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)["strates"]["calme"]
+        blk = R1(markers, readings, pool, sigma=SIGMA_HUGE)["strates"]["calme"]
         self.assertFalse(blk["flag_historique_insuffisant"])
         self.assertIsNotNone(blk["z"])
         self.assertFalse(blk["queue_exacte_applicable"])
@@ -247,16 +290,14 @@ class TestClassifyPrecedence(unittest.TestCase):
         # Panne : pas de valeur → écart (iii), précédence maximale, même si les
         # conditions de staleness et hors-enveloppe seraient réunies.
         reading = rd(0, "a", status="panne_transport", price=None, source_ts=None)
-        kind = r1.classify_ecart(reading, [D("1"), D("2"), D("3")], 5,
-                                 win_end=10 ** 9, sigma=D("60"), tau=TAU)
+        kind = classify(reading, [D("1"), D("2"), D("3")], 5, 10 ** 9, sigma=D("60"))
         self.assertIs(kind, Ecart.PANNE)
 
     def test_staleness_beats_horsenv(self):
         # OK mais horodatage porté vieux (win_end − src = 1000 > σ=60) → (ii),
         # même si le prix serait hors-enveloppe.
         reading = rd(0, "a", price="999999", source_ts=D("0"))
-        kind = r1.classify_ecart(reading, [D("100"), D("101"), D("102")], 5,
-                                 win_end=1000, sigma=D("60"), tau=TAU)
+        kind = classify(reading, [D("100"), D("101"), D("102")], 5, 1000, sigma=D("60"))
         self.assertIs(kind, Ecart.STALENESS)
 
     def test_horsenv_requires_four_responding(self):
@@ -264,19 +305,18 @@ class TestClassifyPrecedence(unittest.TestCase):
         others = [D("100"), D("101"), D("102")]
         # N=3 répondantes → enveloppe non définie → non évaluable (jamais « pas d'écart »).
         self.assertIs(
-            r1.classify_ecart(reading, others[:2], 3, win_end=1000, sigma=SIGMA_HUGE, tau=TAU),
+            classify(reading, others[:2], 3, 1000, sigma=SIGMA_HUGE),
             Ecart.NON_EVAL_HORSENV,
         )
         # N=4 répondantes, prix loin de la médiane → hors-enveloppe (i).
         self.assertIs(
-            r1.classify_ecart(reading, others, 4, win_end=1000, sigma=SIGMA_HUGE, tau=TAU),
+            classify(reading, others, 4, 1000, sigma=SIGMA_HUGE),
             Ecart.HORS_ENVELOPPE,
         )
 
     def test_horsenv_inside_envelope_is_pas_ecart(self):
         reading = rd(0, "a", price="101", source_ts=D("999"))
-        kind = r1.classify_ecart(reading, [D("100"), D("101"), D("102")], 4,
-                                 win_end=1000, sigma=SIGMA_HUGE, tau=TAU)
+        kind = classify(reading, [D("100"), D("101"), D("102")], 4, 1000, sigma=SIGMA_HUGE)
         self.assertIs(kind, Ecart.PAS_ECART)
 
     def test_staleness_nonevaluable_without_source_ts(self):
@@ -284,15 +324,121 @@ class TestClassifyPrecedence(unittest.TestCase):
         reading = rd(0, "a", price="101", source_ts=None)
         # N<4 → non évaluable hors-env (et pas de staleness) :
         self.assertIs(
-            r1.classify_ecart(reading, [D("100")], 3, win_end=10, sigma=D("1"), tau=TAU),
+            classify(reading, [D("100")], 3, 10, sigma=D("1")),
             Ecart.NON_EVAL_HORSENV,
         )
         # N≥4, prix dans l'enveloppe → pas d'écart (staleness sautée proprement) :
         self.assertIs(
-            r1.classify_ecart(reading, [D("100"), D("101"), D("102")], 4,
-                              win_end=10, sigma=D("1"), tau=TAU),
+            classify(reading, [D("100"), D("101"), D("102")], 4, 10, sigma=D("1")),
             Ecart.PAS_ECART,
         )
+
+
+class TestTauRelatif(unittest.TestCase):
+    """[C2a] Contrat NEUF τ RELATIF : `|prix − médiane_LOO| / médiane_LOO > τ`.
+    Le critère est la DIVISION par la médiane (l'`abs()` reste au NUMÉRATEUR) ;
+    garde `médiane_LOO > 0` fail-closed."""
+
+    def test_threshold_divides_by_median(self):
+        # médiane_LOO = 100 ; prix 101 → écart relatif = 1/100 = 0.01.
+        r = rd(0, "a", price="101", source_ts=None)
+        self.assertIs(classify(r, [D(100)] * 4, 5, 10, sigma=None, tau=D("0.005")),
+                      Ecart.HORS_ENVELOPPE)                 # 0.01 > 0.005
+        self.assertIs(classify(r, [D(100)] * 4, 5, 10, sigma=None, tau=D("0.02")),
+                      Ecart.PAS_ECART)                       # 0.01 < 0.02
+        # frontière EXACTE : 0.01 n'est PAS > 0.01 → pas_ecart (comparaison stricte).
+        self.assertIs(classify(r, [D(100)] * 4, 5, 10, sigma=None, tau=D("0.01")),
+                      Ecart.PAS_ECART)
+
+    def test_abs_stays_in_numerator_below_median_fires(self):
+        # prix SOUS la médiane : |99 − 100|/100 = 0.01 > 0.005 → hors-enveloppe.
+        r = rd(0, "a", price="99", source_ts=None)
+        self.assertIs(classify(r, [D(100)] * 4, 5, 10, sigma=None, tau=D("0.005")),
+                      Ecart.HORS_ENVELOPPE)
+
+    def test_is_relative_not_absolute_scale_invariance(self):
+        # PREUVE que le critère est RELATIF (pas la forme absolue nue) :
+        #  (a) grand prix, grand écart ABSOLU mais petit RELATIF → PAS hors-env
+        #      (|dev|=1e6 franchirait un τ absolu de 50 ; rel=1e6/1e9=1e-3 < 0.005).
+        big = rd(0, "a", price=str(Decimal("1000000000") + Decimal("1000000")),
+                 source_ts=None)
+        self.assertIs(classify(big, [D("1000000000")] * 4, 5, 10, sigma=None,
+                               tau=D("0.005")), Ecart.PAS_ECART)
+        #  (b) petit prix, petit écart absolu mais grand RELATIF → hors-env
+        #      (|dev|=0.1 NE franchirait PAS un τ absolu de 50 ; rel=0.1/10=0.01>0.005).
+        small = rd(0, "a", price="10.1", source_ts=None)
+        self.assertIs(classify(small, [D("10")] * 4, 5, 10, sigma=None,
+                               tau=D("0.005")), Ecart.HORS_ENVELOPPE)
+
+    def test_median_zero_guard_is_non_evaluable(self):
+        # médiane_LOO = 0 → écart relatif indéfini → NON ÉVALUABLE (garde [C2a]),
+        # jamais « pas d'écart », jamais une division par zéro.
+        r = rd(0, "a", price="101", source_ts=None)
+        self.assertIs(classify(r, [D(0)] * 4, 5, 10, sigma=None, tau=D("0.005")),
+                      Ecart.NON_EVAL_HORSENV)
+
+    def test_median_negative_guard_is_non_evaluable(self):
+        # médiane_LOO < 0 (prix dégénéré) → non évaluable (garde `m_loo <= 0`).
+        r = rd(0, "a", price="101", source_ts=None)
+        self.assertIs(classify(r, [D(-100)] * 4, 5, 10, sigma=None, tau=D("0.005")),
+                      Ecart.NON_EVAL_HORSENV)
+
+
+class TestSigmaParClasse(unittest.TestCase):
+    """Contrat NEUF σ PAR CLASSE : classify reçoit le flux et dispatche σ selon sa
+    CLASSE (mapping classe→plancher), jamais un scalaire unique."""
+
+    def test_same_staleness_different_class_verdict(self):
+        # staleness = win_end − src = 1000 − 900 = 100 s. place_horodatee (30 s) →
+        # stale ; agregateur (300 s) → pas stale. MÊME cellule, verdict PAR CLASSE.
+        sbc = {"place_horodatee": D(30), "agregateur": D(300)}
+        scof = {"p": "place_horodatee", "a": "agregateur"}
+        r = rd(0, "p", price="100", source_ts=D(900))
+        self.assertIs(
+            r1.classify_ecart(r, [D(100)] * 4, 5, 1000, "p", sbc, scof, TAU),
+            Ecart.STALENESS)
+        r2 = rd(0, "a", price="100", source_ts=D(900))
+        self.assertIs(
+            r1.classify_ecart(r2, [D(100)] * 4, 5, 1000, "a", sbc, scof, TAU),
+            Ecart.PAS_ECART)
+
+    def test_none_floor_class_skips_staleness(self):
+        # Classe à plancher None (ex. sans_horodatage, ou oracle_chainlink non
+        # confirmé) → staleness NON évaluable même avec un horodatage porté ancien.
+        sbc = {"sans": None}
+        scof = {"k": "sans"}
+        r = rd(0, "k", price="100", source_ts=D(0))       # très ancien
+        self.assertIs(
+            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "k", sbc, scof, TAU),
+            Ecart.PAS_ECART)                               # pas STALENESS
+
+    def test_real_adr0020_floors_dispatch(self):
+        # Dispatch sur les VRAIS planchers ADR-0020 (sources) : staleness = 40 s.
+        # place_horodatee(30)→stale ; oracle_pyth(30)→stale ; agregateur(300)→non ;
+        # oracle_chainlink(5400)→non ; sans_horodatage(None)→non évaluable.
+        floors = SIGMA_FLOORS_ADR0020_SECONDS
+        sbc = {k: (None if v is None else Decimal(v)) for k, v in floors.items()}
+        cases = {
+            "place_horodatee": Ecart.STALENESS,
+            "oracle_pyth": Ecart.STALENESS,
+            "agregateur": Ecart.PAS_ECART,
+            "oracle_chainlink": Ecart.PAS_ECART,
+            "sans_horodatage": Ecart.PAS_ECART,     # plancher None → staleness sautée
+        }
+        for klass, expected in cases.items():
+            r = rd(0, "f", price="100", source_ts=D(960))   # win_end 1000 → stale 40 s
+            got = r1.classify_ecart(r, [D(100)] * 4, 5, 1000, "f", sbc,
+                                    {"f": klass}, TAU)
+            self.assertIs(got, expected, f"classe {klass}")
+
+    def test_unknown_flux_staleness_non_evaluable(self):
+        # Flux absent du dispatch → classe None → staleness non évaluable (fail-open
+        # documenté ; le pipeline réel fail-close la couverture au WRITE, collector).
+        sbc = {"place_horodatee": D(30)}
+        r = rd(0, "z", price="100", source_ts=D(0))
+        self.assertIs(
+            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "z", sbc, {}, TAU),
+            Ecart.PAS_ECART)
 
 
 class TestComputeR1HarnessDown(unittest.TestCase):
@@ -305,7 +451,7 @@ class TestComputeR1HarnessDown(unittest.TestCase):
             rd(220, "a"), rd(220, "b"),              # lectures ORPHELINES (pas de marqueur)
             # fenêtre 280 : totalement absente (ni marqueur ni lecture)
         ]
-        out = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = R1(markers, readings, pool, sigma=SIGMA_HUGE)
         blk = out["strates"]["calme"]
         self.assertEqual(blk["n"], 2)                # 220 (orphelin) et 280 (absent) exclus
         for f in pool:
@@ -315,7 +461,7 @@ class TestComputeR1HarnessDown(unittest.TestCase):
             self.assertEqual(blk["per_source"][f]["phat"], D(0))
 
     def test_no_markers_is_degenerate_flag(self):
-        out = r1.compute_r1([], [rd(100, "a")], ["a"], w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = R1([], [rd(100, "a")], ["a"], sigma=SIGMA_HUGE)
         self.assertIn("aucune fenêtre complétée", out["note"])
         self.assertTrue(out["flag_historique_insuffisant"])
 
@@ -329,8 +475,7 @@ class TestComputeR1LastWins(unittest.TestCase):
         self.assertEqual(m[(100, "a")]["price"], "200")
 
     def test_duplicate_window_counted_once_end_to_end(self):
-        out = r1.compute_r1([mk(100), mk(100)], [rd(100, "a")], ["a"],
-                            w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = R1([mk(100), mk(100)], [rd(100, "a")], ["a"], sigma=SIGMA_HUGE)
         self.assertEqual(out["strates"]["calme"]["n"], 1)
 
 
@@ -344,7 +489,7 @@ class TestComputeR1RespondingGate(unittest.TestCase):
             rd(0, "d", status="panne_http", price=None),
             rd(0, "e", status="panne_http", price=None),
         ]
-        out = r1.compute_r1([mk(0)], readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = R1([mk(0)], readings, pool, sigma=SIGMA_HUGE)
         ps = out["strates"]["calme"]["per_source"]
         for f in ("a", "b", "c"):
             self.assertEqual(ps[f]["non_eval_hors_env"], 1)
@@ -354,10 +499,10 @@ class TestComputeR1RespondingGate(unittest.TestCase):
 
     def test_five_responding_horsenv_fires(self):
         pool = ["a", "b", "c", "d", "e"]
+        # 4 sources à 100, une à 999999 → médiane_LOO de « e » = 100, rel ≫ τ.
         readings = [rd(0, f, price=p, source_ts=D("999999999"))
                     for f, p in zip(pool, ["100", "100", "100", "100", "999999"])]
-        out = r1.compute_r1([mk(0)], readings, pool, w=60,
-                            sigma=SIGMA_HUGE, tau=TAU)
+        out = R1([mk(0)], readings, pool, sigma=SIGMA_HUGE)
         ps = out["strates"]["calme"]["per_source"]
         self.assertEqual(ps["e"]["hors_enveloppe"], 1)     # e loin de la médiane 100
         self.assertEqual(ps["a"]["pas_ecart"], 1)
@@ -375,7 +520,7 @@ class TestComputeR1FlagEndToEnd(unittest.TestCase):
                 rd(ws, "b", status="panne_http", price=None),
                 rd(ws, "c", price="64000", source_ts=D(ws + 59)),
             ]
-        out = r1.compute_r1(markers, readings, pool, w=60, sigma=D("30"), tau=TAU)
+        out = R1(markers, readings, pool, sigma=D("30"))
         blk = out["strates"]["calme"]
         self.assertEqual(blk["n"], 3)
         self.assertEqual(blk["K"], 3)                       # chaque fenêtre : 2 écarts
@@ -400,7 +545,7 @@ class TestComputeR1FlagEndToEnd(unittest.TestCase):
             else:
                 readings += [rd(ws, "a", price="64000", source_ts=D(ws + 1)),
                              rd(ws, "b", price="64000", source_ts=D(ws + 1))]
-        out = r1.compute_r1(markers, readings, pool, w=60, sigma=SIGMA_HUGE, tau=TAU)
+        out = R1(markers, readings, pool, sigma=SIGMA_HUGE)
         blk = out["strates"]["calme"]
         self.assertEqual(blk["n"], 60)
         self.assertEqual(blk["K"], 30)

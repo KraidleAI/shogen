@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import json
 import sys
+from decimal import Decimal
 from typing import Optional
 
 # Champs de run_params qui GOUVERNENT LA RECLASSIFICATION : un désaccord entre
@@ -42,9 +43,16 @@ from typing import Optional
 # LÉGITIMEMENT d'une reprise à l'autre et n'entrent nulle part → exclus
 # (publiés/visibles, non fail-closed).
 LOAD_BEARING_KEYS = (
-    "pool", "w", "sigma_classe", "tau_classe", "decimal_prec",
-    "seuil_historique_valeur", "n_min_hors_enveloppe", "strate_calendar",
+    "pool", "w", "sigma_classe", "sigma_class_of_flux", "tau_classe",
+    "decimal_prec", "seuil_historique_valeur", "n_min_hors_enveloppe",
+    "strate_calendar",
 )
+# `sigma_classe` est désormais un MAPPING classe→plancher (ADR-0021 item 2) et
+# `sigma_class_of_flux` un MAPPING flux→classe (nouveau, porteur : un dispatch σ
+# divergent entre démarrages reclasserait l'historique en silence, §E). `tau_classe`
+# reste un scalaire mais est désormais une FRACTION relative (ADR-0020 déc. 2). Un
+# journal legacy portant `sigma_classe` SCALAIRE lève (fail-closed, cf.
+# `effective_run_params`) : jamais réinterprété.
 
 # Clés porteuses PROPRES À R2 (M1c) : elles gouvernent la PARTITION et les
 # statistiques de contenu — un changement mi-campagne re-partitionnerait en silence
@@ -119,6 +127,18 @@ def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS
             "(fail-closed de présence, §E) : un tiers ne devine pas un défaut sur une "
             "clé qui gouverne le calcul"
         )
+    # FAIL-CLOSED SCALAIRE LEGACY (ADR-0021 item 6 [C3]) : `sigma_classe` DOIT être un
+    # mapping classe→plancher (σ PAR CLASSE). Un journal legacy portant un scalaire
+    # (ex. "1e12") LÈVE ici — jamais réinterprété comme un σ unique appliqué à tout
+    # (ce serait la déviation silencieuse d'ADR-0020 déc. 3 que cette passe supprime).
+    if "sigma_classe" in load_bearing and not isinstance(base.get("sigma_classe"), dict):
+        raise ValueError(
+            "sigma_classe est un SCALAIRE legacy "
+            f"({base.get('sigma_classe')!r}) — attendu : mapping classe→plancher "
+            "(σ par classe, ADR-0021 item 2/6). Recalcul refusé, jamais réinterprété "
+            "en σ unique (fail-closed) : un scalaire dévierait silencieusement "
+            "d'ADR-0020 déc. 3."
+        )
     divergences = []
     for p in params_list[1:]:
         for k in load_bearing:
@@ -130,6 +150,29 @@ def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS
             f"reclassé silencieusement (fail-closed, §E) : {divergences}"
         )
     return params_list[-1]
+
+
+def sigma_tau_from_params(params: dict):
+    """`(sigma_by_class, sigma_class_of_flux, tau)` depuis un run_params EFFECTIF
+    (ADR-0021) — source partagée par les 4 lecteurs recalculables (r1/lm/r2/report),
+    donc jamais de divergence de décodage. `sigma_classe` = mapping classe→secondes
+    (Decimal) ou `None` (« non évaluable ») ; `sigma_class_of_flux` = mapping
+    flux→classe ; `tau` = FRACTION relative (Decimal). Précondition : `params` est
+    passé par `effective_run_params` (qui garantit la présence porteuse ET que
+    `sigma_classe` est un mapping — fail-closed sur scalaire legacy)."""
+    sbc_raw = params["sigma_classe"]
+    sigma_by_class = {
+        k: (None if v is None else Decimal(str(v))) for k, v in sbc_raw.items()
+    }
+    sigma_class_of_flux = dict(params["sigma_class_of_flux"])
+    tau = Decimal(str(params["tau_classe"]))
+    # Pas de garde 0<τ<1 ICI (chemin recompute) : le collecteur écrit TOUJOURS un τ
+    # fractionnel (clé LOAD_BEARING, concordance fail-closed), donc un journal RÉEL ne
+    # peut porter un τ absolu ; et la suite de tests utilise un τ volontairement grand
+    # comme sentinelle « désactive l'axe enveloppe » (miroir du σ géant). La garde de
+    # plausibilité τ vit au POINT D'ENTRÉE OPÉRATEUR — le fichier σ/τ committé
+    # (`run_campaign._load_committed_sigma_tau`), seul endroit où une main humaine fixe τ.
+    return sigma_by_class, sigma_class_of_flux, tau
 
 
 def run_params_record(params: dict) -> dict:

@@ -81,18 +81,21 @@ def render_report(control_path: str, journal_path: str) -> str:
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])
-    sigma = Decimal(str(params["sigma_classe"]))
-    tau = Decimal(str(params["tau_classe"]))
+    # σ PAR CLASSE + τ RELATIF (ADR-0021) — même décodage partagé que les 3 autres
+    # lecteurs recalculables (records.sigma_tau_from_params), zéro divergence.
+    sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     seuil_hist = Decimal(str(params["seuil_historique_valeur"]))
     n_min = int(params["n_min_hors_enveloppe"])
 
-    r1 = compute_r1(markers, readings, pool, w, sigma, tau, seuil_hist, n_min)
-    cells = classify_cells(markers, readings, pool, w, sigma, tau, n_min)
+    r1 = compute_r1(markers, readings, pool, w, sigma_by_class, sigma_class_of_flux,
+                    tau, seuil_hist, n_min)
+    cells = classify_cells(markers, readings, pool, w, sigma_by_class,
+                           sigma_class_of_flux, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
     # R2 complet (partition/k_eff, contenu, méthode, clusters, drapeau 2) — recalculé
     # depuis les mêmes enregistrements (ADR-0003). Le peg (bloc 1) le référence.
-    r2_out = r2.compute_r2(markers, readings, asn_records, pool, w, sigma, tau,
-                           params, n_min_horsenv=n_min)
+    r2_out = r2.compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
+                           sigma_class_of_flux, tau, params, n_min_horsenv=n_min)
 
     out: list[str] = []
     ap = out.append
@@ -104,7 +107,8 @@ def render_report(control_path: str, journal_path: str) -> str:
     ap("=" * 78)
     ap("\n[BLOC 1] PARAMÈTRES")
     for key in ("harness_version", "classe", "pool", "w", "sample_lead",
-                "sigma_classe", "tau_classe", "kappa", "seuil_historique_valeur",
+                "sigma_classe", "sigma_class_of_flux", "tau_classe", "kappa",
+                "seuil_historique_valeur",
                 "n_min_hors_enveloppe", "strate_defaut", "decimal_prec",
                 "seuil_historique", "seuil_z", "residu_staleness",
                 "n_windows_demande", "started_utc", "note_skeleton"):
@@ -192,7 +196,8 @@ def render_report(control_path: str, journal_path: str) -> str:
     ap(f"\n  {A_WINDOW_STATIONARITY}")
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
-    lm_out = compute_lm(markers, readings, pool, w, sigma, tau, n_min)
+    lm_out = compute_lm(markers, readings, pool, w, sigma_by_class,
+                        sigma_class_of_flux, tau, n_min)
     ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux (pool)")
     for st, blk in lm_out["strates"].items():
         ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}")

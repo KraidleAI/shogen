@@ -37,7 +37,7 @@ from decimal import Decimal
 from statistics import median
 from typing import Callable, Optional
 
-from . import journal, r2, records
+from . import journal, r2, records, sources
 from .model import Reading
 # Précision + seuils du calcul R1, enregistrés numériquement dans run_params
 # (recalculable depuis le journal seul, ADR-0003 ; source unique de vérité).
@@ -100,7 +100,7 @@ def collect(
     raw_path: str,
     n_windows: int,
     *,
-    sigma_classe: Decimal,
+    sigma_by_class: dict,
     tau_classe: Decimal,
     w: int = W_DEFAULT,
     sample_lead: float = SAMPLE_LEAD_DEFAULT,
@@ -114,6 +114,14 @@ def collect(
                        "via content_kappa_value)"),
 ) -> int:
     """Collecte `n_windows` fenêtres UTC-alignées, 1 relevé/source/fenêtre.
+
+    **σ PAR CLASSE + τ RELATIF (ADR-0021)** : `sigma_by_class` est un mapping
+    classe→plancher (Decimal secondes, ou `None` = « non évaluable ») ; le dispatch
+    flux→classe est dérivé de `sources.SIGMA_CLASS_OF_FLUX` (source unique de vérité)
+    et écrit dans run_params (porteur, recalculable). `tau_classe` est une FRACTION
+    relative (0,5 % = 0.005), consommée par `r1.classify_ecart` en
+    `|prix − médiane_LOO| / médiane_LOO > τ`. La CAPTURE reste SANS SEUIL (ADR-0020
+    reframe) : ces paramètres ne gouvernent que le scoring DÉRIVÉ, pas l'archive.
 
     **Échantillonnage en FIN de fenêtre** (M-1) : on dort jusqu'à `ws+w−δ`
     (`δ = sample_lead`) puis on lit — « le DERNIER relevé de la fenêtre » (§5.3).
@@ -142,12 +150,31 @@ def collect(
 
     # Bloc Paramètres (§6.1) dans le journal → recalculabilité littérale (ADR-0003).
     pool = [s.flux_id for s in specs]
+    # σ PAR CLASSE (ADR-0021) : le dispatch flux→classe vient de la SOURCE UNIQUE DE
+    # VÉRITÉ (sources.SIGMA_CLASS_OF_FLUX), restreint au pool ; écrit dans run_params
+    # → recalculable, PORTEUR (§E). `sigma_by_class` (classe→plancher) doit couvrir
+    # toutes les classes du pool, sinon un flux aurait un σ deviné (fail-closed).
+    sigma_class_of_flux = sources.sigma_class_of_flux_for(pool)
+    classes_needed = set(sigma_class_of_flux.values())
+    classes_missing = [c for c in classes_needed if c not in sigma_by_class]
+    if classes_missing:
+        raise ValueError(
+            f"sigma_by_class ne couvre pas les classes du pool {classes_missing} "
+            "— fail-closed (ADR-0021 : aucun σ de classe deviné)"
+        )
+    # Decimal → chaîne exacte par classe ; None (« non évaluable ») préservé (null JSON).
+    sigma_classe_serialized = {
+        k: (None if v is None else str(v)) for k, v in sigma_by_class.items()
+    }
     params = {
         "pool": pool,
         "w": w,
         "sample_lead": sample_lead,          # δ (fin de fenêtre) — §M-1
-        "sigma_classe": str(sigma_classe),   # Decimal → chaîne exacte
-        "tau_classe": str(tau_classe),
+        # σ PAR CLASSE (mapping) + dispatch flux→classe (ADR-0021 item 2) — porteurs
+        # (§E, records.LOAD_BEARING_KEYS) : un scalaire legacy y lève au recalcul.
+        "sigma_classe": sigma_classe_serialized,
+        "sigma_class_of_flux": sigma_class_of_flux,
+        "tau_classe": str(tau_classe),       # FRACTION relative (ADR-0020 déc. 2)
         "kappa": kappa_note,
         # Calendrier de strates committé ex ante (§5.3) — clé PORTEUSE (§E,
         # records.LOAD_BEARING_KEYS) : recalculable + immutable entre reprises.

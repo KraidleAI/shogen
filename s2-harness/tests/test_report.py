@@ -25,10 +25,14 @@ from tests.test_collector import (
     FakeClock,
     frozen_read_fn,
     frozen_reading,
+    sbc_huge,
 )
 
-SIGMA = Decimal("1e12")
-TAU = Decimal("50")
+# [C2b] Étaient `SIGMA = Decimal("1e12")` (σ SCALAIRE) et `TAU = Decimal("50")` (τ
+# ABSOLU). σ PAR CLASSE (`sbc_huge()` : planchers énormes) + τ FRACTION relative
+# (ADR-0021). Ces tests portent sur la PRÉSENCE des blocs / le déterminisme ; les
+# valeurs σ/τ n'y sont pas discriminantes (SKELETON N=3<4 → hors-env non évaluable).
+TAU = Decimal("0.005")
 
 
 class TestReport(unittest.TestCase):
@@ -39,7 +43,7 @@ class TestReport(unittest.TestCase):
         self.raw = os.path.join(self.d, "raw.jsonl")
         collector.collect(
             [BY_ID[f] for f in SKELETON], self.control, self.journal, self.raw,
-            n_windows=3, sigma_classe=SIGMA, tau_classe=TAU,
+            n_windows=3, sigma_by_class=sbc_huge(), tau_classe=TAU,
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
 
@@ -145,7 +149,7 @@ class TestReportQueueExacte(unittest.TestCase):
             return frozen_reading(spec.flux_id, ts)
 
         collector.collect([BY_ID[f] for f in SKELETON], control, journal, raw, n_windows=3,
-                          sigma_classe=SIGMA, tau_classe=TAU,
+                          sigma_by_class=sbc_huge(), tau_classe=TAU,
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=read_fn)
         txt = report.render_report(control, journal)
         self.assertIn("queue exacte", txt)                    # publiée (non dégénérée)

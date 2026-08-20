@@ -112,18 +112,21 @@ def compute_lm(
     readings: list,
     pool: list,
     w: int,
-    sigma: Decimal,
+    sigma_by_class: dict,
+    sigma_class_of_flux: dict,
     tau: Decimal,
     n_min: int = r1.N_MIN_HORSENV,
 ) -> dict:
     """Estimateur L&M **par strate**, depuis les enregistrements du journal.
 
-    Consomme la MÊME classification (`r1.classify_cells`) et les MÊMES marqueurs
-    dédupliqués (`r1.build_window_strate`) que `compute_r1` — d'où l'identité de
-    cohérence `Ê(Θ) = (1/N)·Σ_i p̂_i`. Rien n'est re-classifié ici.
+    Consomme la MÊME classification (`r1.classify_cells`, σ PAR CLASSE + τ RELATIF,
+    ADR-0021) et les MÊMES marqueurs dédupliqués (`r1.build_window_strate`) que
+    `compute_r1` — d'où l'identité de cohérence `Ê(Θ) = (1/N)·Σ_i p̂_i`. Rien n'est
+    re-classifié ici.
     """
     win_strate = build_window_strate(markers)
-    cells = classify_cells(markers, readings, pool, w, sigma, tau, n_min)
+    cells = classify_cells(markers, readings, pool, w, sigma_by_class,
+                           sigma_class_of_flux, tau, n_min)
     N = len(pool)
 
     windows_by_strate: dict[str, list[int]] = {}
@@ -216,12 +219,14 @@ def recompute_lm_from_journal(control_path: str, journal_path: str) -> dict:
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
     readings = r1.parse_journal(journal_path)
+    sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_lm(
         markers=markers,
         readings=readings,
         pool=list(params["pool"]),
         w=int(params["w"]),
-        sigma=Decimal(str(params["sigma_classe"])),
-        tau=Decimal(str(params["tau_classe"])),
+        sigma_by_class=sigma_by_class,
+        sigma_class_of_flux=sigma_class_of_flux,
+        tau=tau,
         n_min=int(params["n_min_hors_enveloppe"]),
     )

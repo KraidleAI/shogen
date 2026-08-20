@@ -17,24 +17,44 @@ import json
 import os
 import tempfile
 import unittest
-from decimal import Decimal, localcontext
+from decimal import Decimal
 
 from shogen_s2 import collector, r2, records, report, window
 from shogen_s2.model import Reading, Status
-from shogen_s2.sources import SPECS
+from shogen_s2.sources import SIGMA_CLASS_OF_FLUX, SPECS
 from tests.test_collector import (
     BY_ID,
     CLOCK,
     SKELETON,
     FakeClock,
     frozen_read_fn,
+    sbc_huge,
 )
 from tests.test_r1 import mk, rd
 
 D = Decimal
-SIGMA = D("1e12")
-TAU = D("50")
+# [C2b] Étaient `SIGMA = D("1e12")` (σ SCALAIRE) et `TAU = D("50")` (τ ABSOLU).
+# σ PAR CLASSE + τ RELATIF (ADR-0021). Ces tests bâtissent des co-défaillances par
+# PANNE (prix identiques « 64000 » sinon) : σ/τ n'y produisent aucune staleness ni
+# hors-enveloppe. `_sbc()` donne un plancher énorme à TOUTES les classes (aucune
+# staleness, comme l'ancien 1e12) ; `_scof(pool)` mappe les flux réels par leur
+# classe (sources) et les flux SYNTHÉTIQUES (a1,a2…) vers une classe de test énorme.
+TAU = D("0.005")
 PREC = r2.DECIMAL_PREC
+
+
+def _sbc() -> dict:
+    """sigma_by_class « propre » : aucune staleness possible (planchers énormes),
+    plus une classe de test `tclass` pour les flux synthétiques."""
+    s = sbc_huge()
+    s["tclass"] = D("1e12")
+    return s
+
+
+def _scof(pool) -> dict:
+    """sigma_class_of_flux : flux réels par leur classe (source unique de vérité) ;
+    flux synthétiques → `tclass` (plancher énorme → jamais stale, comme l'ancien σ)."""
+    return {f: SIGMA_CLASS_OF_FLUX.get(f, "tclass") for f in pool}
 
 
 def r2_params(flux_hosts=None, n_min=300):
@@ -380,7 +400,7 @@ class TestDrapeau2(unittest.TestCase):
         recs = [asn_rec("api.binance.com", 10, 10),
                 asn_rec("api.exchange.coinbase.com", 20, 20)]
         out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            SIGMA, TAU, r2_params(fh))
+                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
         self.assertEqual(out["drapeau_2"]["etat"], "leve")
         self.assertGreaterEqual(out["drapeau_2"]["z_max"], r2.SEUIL_Z)
         self.assertIsNotNone(out["drapeau_2"]["localisation_inter_clusters"])
@@ -391,7 +411,7 @@ class TestDrapeau2(unittest.TestCase):
         recs = [asn_rec("api.binance.com", 13335, 13335, "CF"),
                 asn_rec("api.exchange.coinbase.com", 13335, 13335, "CF")]
         out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            SIGMA, TAU, r2_params(fh))
+                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
         self.assertEqual(out["partition"]["k_eff"], 1)
         self.assertEqual(out["drapeau_2"]["etat"], "eteint")
 
@@ -401,7 +421,7 @@ class TestDrapeau2(unittest.TestCase):
         recs = [asn_rec("api.binance.com", 10, 10),
                 asn_rec("api.exchange.coinbase.com", 20, 20)]
         out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            SIGMA, TAU, r2_params(fh))
+                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
         self.assertEqual(out["drapeau_2"]["etat"], "non_evaluable")
 
     def test_eteint_when_z_below_threshold(self):
@@ -468,7 +488,8 @@ class TestClusterCorrelations(unittest.TestCase):
                                 else rd(ws, f, price="64000", source_ts=D(ws)))
         content = {"exact_copy_pairs": []}
         part = r2.compute_partition(recs, fh, pool, content)
-        cc = r2.cluster_lm_correlations(part, markers, readings, pool, 60, SIGMA, TAU, 4)
+        cc = r2.cluster_lm_correlations(part, markers, readings, pool, 60,
+                                        _sbc(), _scof(pool), TAU, 4)
         self.assertEqual(cc["n_multi_clusters"], 2)
         self.assertEqual(len(cc["cluster_pairs"]), 1)
         v = next(iter(cc["cluster_pairs"].values()))
@@ -520,7 +541,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         self.raw = os.path.join(self.d, "raw.jsonl")
         specs = [BY_ID[f] for f in SKELETON]
         collector.collect(specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_classe=SIGMA, tau_classe=TAU, now_fn=FakeClock(CLOCK),
+                          sigma_by_class=_sbc(), tau_classe=TAU, now_fn=FakeClock(CLOCK),
                           sleep_fn=lambda s: None, read_fn=frozen_read_fn)
 
         def mock(host, resolvers):
@@ -562,7 +583,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         j = os.path.join(d, "journal.jsonl")
         raw = os.path.join(d, "raw.jsonl")
         specs = [BY_ID[f] for f in SKELETON]
-        collector.collect(specs, control, j, raw, n_windows=3, sigma_classe=SIGMA,
+        collector.collect(specs, control, j, raw, n_windows=3, sigma_by_class=_sbc(),
                           tau_classe=TAU, now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None,
                           read_fn=frozen_read_fn)
 
@@ -604,7 +625,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
                            fetch_ts=ts, status=Status.OK, http_status=200, raw=b"x",
                            price=price, currency=spec.currency, source_ts=ts)
 
-        collector.collect(specs, control, j, raw, n_windows=n, sigma_classe=SIGMA,
+        collector.collect(specs, control, j, raw, n_windows=n, sigma_by_class=_sbc(),
                           tau_classe=Decimal("1e9"), now_fn=FakeClock(clock),
                           sleep_fn=lambda s: None, read_fn=read_fn)
         out = r2.recompute_r2_from_journal(control, j)
@@ -643,7 +664,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         control = os.path.join(d, "control.jsonl")
         j = os.path.join(d, "journal.jsonl")
         raw = os.path.join(d, "raw.jsonl")
-        collector.collect(specs, control, j, raw, n_windows=3, sigma_classe=SIGMA,
+        collector.collect(specs, control, j, raw, n_windows=3, sigma_by_class=_sbc(),
                           tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
                           now_fn=FakeClock([float(1785000000 + 60 * i) for i in range(7)]),
                           sleep_fn=lambda s: None, read_fn=frozen_read_fn)

@@ -3,8 +3,10 @@
 Le driver est piloté par injection de dépendances (now_fn/sleep_fn/read_fn/
 resolve_fn), comme collector.collect : lectures = fixtures gelées, horloge
 scriptée, résolution ASN mockée. On exerce les propriétés PORTEUSES du driver :
-  - `resolve_sigma_tau` FAIL-CLOSED (le CONSTAT σ/τ : jamais un scalaire silencieux
-    présenté comme ADR-0020) ;
+  - `resolve_sigma_tau` FIDÈLE (ADR-0021) : demo/calibration → σ PAR CLASSE planchers
+    ADR-0020 provisoires + τ=0,5 %% relatif ; campagne → σ/τ FINAUX committés via
+    fichier (fail-closed si absent/malformé — ADR-0020 déc. 1) ; PLUS aucun scalaire
+    INTERIM (voie 2 écartée, ADR-0021 :3154-3156) ;
   - la boucle par chunks vise n_windows fenêtres DISTINCTES (dédup marqueurs),
     réécrit run_params + clock_check à CHAQUE chunk (concordance §E vérifiée par
     effective_run_params), et re-mesure l'axe ASN par chunk ;
@@ -12,16 +14,25 @@ scriptée, résolution ASN mockée. On exerce les propriétés PORTEUSES du driv
     collecte rien).
 On ne re-teste PAS le harnais fermé (collector/r1/r2/report) : on vérifie que le
 driver l'orchestre correctement et que la table §6 se rend de bout en bout.
+
+RÉVISION TRACÉE ADR-0021 [C2b] : les tests σ/τ SCALAIRE/INTERIM (`DEMO_SIGMA_SECONDS`,
+`DEMO_TAU_ABSOLUTE`, `--interim-*`) sont SUPPRIMÉS (C3 : aucun chemin scalaire ne
+survit). Remplacés par les tests σ PAR CLASSE (demo/calibration = planchers
+provisoires), le fail-closed de fourniture des σ/τ de campagne, et un test de
+concordance qui DÉCODE les fixtures (G2 mineur : pas un ensemble codé en dur).
 """
 
 from __future__ import annotations
 
+import contextlib
+import io
+import json
 import os
 import tempfile
 import unittest
 from decimal import Decimal
 
-from shogen_s2 import records, report, run_campaign
+from shogen_s2 import records, report, run_campaign, sources
 from shogen_s2.sources import SPECS
 
 BY_ID = {s.flux_id: s for s in SPECS}
@@ -59,50 +70,122 @@ def mock_resolve(host, resolvers=None):
             "asn_ripestat": 111, "asn_cymru": 111, "holder": "MOCK-AS"}
 
 
-class TestSigmaTauFailClosed(unittest.TestCase):
-    def test_demo_returns_labeled_demo_scalars(self):
-        sigma, tau, regime = run_campaign.resolve_sigma_tau("demo")
-        self.assertEqual(sigma, run_campaign.DEMO_SIGMA_SECONDS)
-        self.assertEqual(tau, run_campaign.DEMO_TAU_ABSOLUTE)
-        self.assertIn("DÉMO", regime)
-        self.assertIn("NON-ADR-0020", regime)
+class TestSigmaTauFidele(unittest.TestCase):
+    def test_demo_returns_per_class_provisional_floors(self):
+        # [C2b] Était : demo → scalaires DÉMO (non-ADR-0020). Désormais : σ PAR CLASSE
+        # = planchers ADR-0020 provisoires (mapping) + τ FRACTION relative.
+        sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("demo")
+        self.assertIsInstance(sigma_by_class, dict)
+        self.assertEqual(sigma_by_class, sources.default_sigma_by_class())
+        self.assertEqual(sigma_by_class["place_horodatee"], Decimal("30"))
+        self.assertIsNone(sigma_by_class["sans_horodatage"])
+        self.assertEqual(tau, sources.TAU_CLASSE_ADR0020_FRACTION)
+        self.assertEqual(tau, Decimal("0.005"))
+        self.assertIn("PROVISOIRES", regime)
 
-    def test_calibration_without_interim_fails_closed(self):
-        with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
-            run_campaign.resolve_sigma_tau("calibration")
+    def test_calibration_returns_per_class_provisional_floors(self):
+        # [C2b] Était : calibration SANS interim → fail-closed. Désormais : σ planchers
+        # provisoires (la capture est SANS SEUIL ; les σ finaux = clôture P99 post-hoc).
+        sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("calibration")
+        self.assertEqual(sigma_by_class, sources.default_sigma_by_class())
+        self.assertEqual(tau, Decimal("0.005"))
+        self.assertIn("CALIBRATION", regime)
 
-    def test_campagne_without_interim_fails_closed(self):
+    def test_campagne_without_file_fails_closed(self):
+        # [C2b] Était : campagne SANS interim → fail-closed. Toujours fail-closed, mais
+        # désormais parce que les σ/τ FINAUX committés (fichier) manquent (ADR-0020 déc. 1).
         with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
             run_campaign.resolve_sigma_tau("campagne")
 
-    def test_partial_interim_fails_closed(self):
-        with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
-            run_campaign.resolve_sigma_tau("campagne", interim_sigma="30")
-
-    def test_full_interim_is_declared_interim(self):
-        sigma, tau, regime = run_campaign.resolve_sigma_tau(
-            "calibration", interim_sigma="30", interim_tau="0.005")
-        self.assertEqual(sigma, Decimal("30"))
+    def test_campagne_with_committed_file_loads_per_class(self):
+        # σ/τ FINAUX committés (artefact `closure`) → chargés en σ PAR CLASSE + τ.
+        d = tempfile.mkdtemp(prefix="s2stf_")
+        path = os.path.join(d, "sigma_tau.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sigma_classe": {"place_horodatee": "390", "agregateur": "500",
+                                        "sans_horodatage": None},
+                       "tau_classe": "0.005"}, f)
+        sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("campagne", path)
+        self.assertEqual(sigma_by_class["place_horodatee"], Decimal("390"))
+        self.assertEqual(sigma_by_class["agregateur"], Decimal("500"))
+        self.assertIsNone(sigma_by_class["sans_horodatage"])
         self.assertEqual(tau, Decimal("0.005"))
-        self.assertIn("INTERIM", regime)
+        self.assertIn("CAMPAGNE", regime)
 
-    def test_main_calibration_returns_failclosed_code(self):
+    def test_campagne_file_scalar_sigma_fails_closed(self):
+        # Fichier committé avec `sigma_classe` SCALAIRE → fail-closed (jamais réinterprété).
+        d = tempfile.mkdtemp(prefix="s2stf_")
+        path = os.path.join(d, "bad.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sigma_classe": "1000000000000", "tau_classe": "0.005"}, f)
+        with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
+            run_campaign.resolve_sigma_tau("campagne", path)
+
+    def test_campagne_file_absolute_tau_fails_closed(self):
+        # [G7 durcissement ADR-0021] Fichier σ VALIDE (mapping) mais `tau_classe` HORS
+        # (0,1) — un τ ABSOLU legacy « 50 » → fail-closed, jamais relu en fraction 5000 %.
+        d = tempfile.mkdtemp(prefix="s2stf_")
+        path = os.path.join(d, "abstau.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sigma_classe": {"place_horodatee": "30"}, "tau_classe": "50"}, f)
+        with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
+            run_campaign.resolve_sigma_tau("campagne", path)
+
+    def test_campagne_file_tau_null_pending_revision_fails_closed(self):
+        # τ null = révision τ EN ATTENTE (clause ADR-0020) → la campagne ne peut lancer.
+        d = tempfile.mkdtemp(prefix="s2stf_")
+        path = os.path.join(d, "taunull.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"sigma_classe": {"place_horodatee": "30"}, "tau_classe": None}, f)
+        with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
+            run_campaign.resolve_sigma_tau("campagne", path)
+
+    def test_ignored_file_warning_helper(self):
+        # G2 mineur (seam d'avertissement, PROUVÉ sans réseau) : --sigma-tau-file n'a de
+        # sens qu'en 'campagne' ; fourni à demo/calibration → message ; sinon None.
+        self.assertIsNone(run_campaign._ignored_file_warning("campagne", "x.json"))
+        self.assertIsNone(run_campaign._ignored_file_warning("demo", None))
+        self.assertIn("IGNORÉ", run_campaign._ignored_file_warning("demo", "x.json"))
+        self.assertIn("IGNORÉ", run_campaign._ignored_file_warning("calibration", "x.json"))
+
+    def test_main_campagne_without_file_returns_failclosed_code(self):
+        # [C2b] Était : main calibration → code 3, rien écrit. Désormais : campagne SANS
+        # --sigma-tau-file → fail-closed AVANT toute collecte (code 3, aucun journal).
         d = tempfile.mkdtemp(prefix="s2drv_")
-        rc = run_campaign.main(["--phase", "calibration", "--journal-dir", d,
-                                "--windows", "1"])
+        # G2 mineur « bruit stderr » : le message fail-closed du driver va sur stderr
+        # (stdout réservé) ; on le CAPTURE ici pour ne pas polluer la sortie des tests,
+        # et on VÉRIFIE qu'il porte bien la raison (fail-closed lisible, pas muet).
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            rc = run_campaign.main(["--phase", "campagne", "--journal-dir", d,
+                                    "--windows", "1"])
         self.assertEqual(rc, 3)     # fail-closed, code distinct
-        # rien n'a été écrit (aucune fenêtre) : fail-closed AVANT toute collecte
+        self.assertIn("FAIL-CLOSED", buf.getvalue())
         self.assertFalse(os.path.exists(os.path.join(d, "control.jsonl")))
 
-    def test_adr0020_sigma_class_covers_pool_and_matches_source_ts(self):
-        # Le dispatch flux→classe σ couvre le pool ET les « sans_horodatage » sont
-        # EXACTEMENT les flux à source_ts=None (concordance CONSTAT).
+    def test_sigma_class_of_flux_covers_pool_matches_decoded_fixtures(self):
+        # G2 mineur : concordance « sans_horodatage ⟺ décodeur rend source_ts=None »
+        # VÉRIFIÉE en DÉCODANT les fixtures (pas un ensemble codé en dur). Le dispatch
+        # (sources.SIGMA_CLASS_OF_FLUX) couvre le pool ET s'accorde aux décodeurs.
+        from tests.test_collector import FIX
         pool = [s.flux_id for s in SPECS]
         for f in pool:
-            self.assertIn(f, run_campaign.SIGMA_CLASS_OF_FLUX)
-        sans = {f for f, c in run_campaign.SIGMA_CLASS_OF_FLUX.items()
-                if c == "sans_horodatage"}
-        self.assertEqual(sans, {"binance", "kraken", "bitfinex"})
+            self.assertIn(f, sources.SIGMA_CLASS_OF_FLUX)
+        # Décoder chaque fixture → source_ts None ?  (les décodeurs réels de sources.py)
+        decoded_none = set()
+        for s in SPECS:
+            path = os.path.join(FIX, s.flux_id + ".bin")
+            if not os.path.exists(path):
+                continue
+            with open(path, "rb") as fh:
+                _price, source_ts, _extra = s.decode(fh.read())
+            if source_ts is None:
+                decoded_none.add(s.flux_id)
+        declared_sans = {f for f, c in sources.SIGMA_CLASS_OF_FLUX.items()
+                         if c == "sans_horodatage"}
+        # L'ensemble « sans_horodatage » déclaré == l'ensemble MESURÉ (décodé) à None.
+        self.assertEqual(declared_sans, decoded_none)
+        self.assertEqual(declared_sans, {"binance", "kraken", "bitfinex"})
 
 
 class TestDistinctCompleted(unittest.TestCase):
@@ -118,10 +201,12 @@ class RunSegmentCase(unittest.TestCase):
         self.specs = [BY_ID[f] for f in SKELETON]
 
     def _run(self, n_windows, clock, chunk=1):
+        # [C2b] σ PAR CLASSE (planchers ADR-0020 provisoires, comme la phase demo réelle)
+        # au lieu des scalaires DEMO supprimés.
         return run_campaign.run_segment(
             self.specs, self.d, "demo", n_windows,
-            w=60, sample_lead=10.0, sigma=run_campaign.DEMO_SIGMA_SECONDS,
-            tau=run_campaign.DEMO_TAU_ABSOLUTE, regime="TEST", chunk_windows=chunk,
+            w=60, sample_lead=10.0, sigma_by_class=sources.default_sigma_by_class(),
+            tau=sources.TAU_CLASSE_ADR0020_FRACTION, regime="TEST", chunk_windows=chunk,
             now_fn=FakeClock(clock), sleep_fn=lambda s: None,
             read_fn=frozen_read_fn, resolve_fn=mock_resolve, log=lambda m: None,
         )
@@ -137,11 +222,14 @@ class RunSegmentCase(unittest.TestCase):
         self.assertEqual(len(clocks), 2)
         # 3 hôtes distincts × 2 chunks (cadence ASN ≥ 1/chunk)
         self.assertEqual(len(asn), 6)
-        # concordance §E : les 2 run_params s'accordent sur les champs porteurs
+        # concordance §E : les 2 run_params s'accordent sur les champs porteurs (dont
+        # sigma_classe MAPPING + sigma_class_of_flux — ADR-0021)
         eff = records.effective_run_params(
             params_list,
             load_bearing=records.LOAD_BEARING_KEYS + records.R2_LOAD_BEARING_KEYS)
         self.assertEqual(list(eff["pool"]), SKELETON)
+        self.assertIsInstance(eff["sigma_classe"], dict)
+        self.assertEqual(eff["sigma_class_of_flux"]["kraken"], "sans_horodatage")
         # 2 fenêtres distinctes journalées
         self.assertEqual(len({int(m["window_start"]) for m in markers}), 2)
 
