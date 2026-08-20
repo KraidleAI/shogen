@@ -381,11 +381,16 @@ il n'établit jamais la dépendance d'une paire précise (04 §2 ; 09).
 **Note de transcription** (V4, trouvaille transverse ; corroborée par le
 grep de rédaction) : les signes « − » des formules K&L sont tracés dans
 une police Symbol non embarquée — **perdus au rendu image, préservés par
-la couche texte** (U+002D) ; profil inverse chez L&M (couche texte
-brouillée sur les équations, rendu net) ; et le « ⩾ » de la source UConn
-(§5.4) tombe à l'extraction texte. Protocole pour toute
-relecture/sidecar : K&L au texte, L&M au rendu, et jamais un seul canal
-pour un signe.
+la couche texte** (**U+2212** MINUS SIGN — codepoint mesuré sur le sidecar le
+2026-08-20, dette 9b ; la première rédaction disait U+002D par inadvertance) ;
+profil inverse chez L&M (couche texte brouillée sur les équations, rendu net) ; et
+le « ⩾ » de la source UConn (§5.4) tombe à l'extraction texte. Protocole pour toute
+relecture/sidecar : K&L au texte, L&M au rendu, et jamais un seul canal pour un
+signe — **et pour les formules FRACTIONNAIRES de K&L (P₁), la structure
+numérateur/dénominateur se lit au RENDU et les signes au TEXTE : la couche texte
+seule linéarise les dénominateurs à part et donne un P₁ faux (dette 9b, fermée le
+2026-08-20 — la forme quotient imprimée `Σᵢ P₀pᵢ/(1−pᵢ)` = l'identité élémentaire
+de l'instrument, par équivalence algébrique exacte).**
 
 ### 5.2 Les définitions d'écart par classe [conception]
 

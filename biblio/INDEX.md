@@ -6,9 +6,12 @@ depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la ph
 de registre ; les `*.sidecar`, extractions texte locales des PDF pour la
 gate S-G5, ne comptent pas comme artefacts). Chaque
 entrée porte : ce que la page de titre dit, ce qui a été lu, et le statut
-de vérification des citations qui s'appuient dessus. Pas de sidecars encore
-(outillage à monter — les greps ci-dessous portent sur les fichiers bruts,
-les PDFs sur lectures visuelles).
+de vérification des citations qui s'appuient dessus. **Des `*.sidecar` existent
+désormais** (extractions texte locales des PDF pour la gate S-G5, cf. en-tête
+ci-dessus) : les greps portent sur ces sidecars là où ils existent, sinon sur les
+fichiers bruts ; les PDF sans sidecar restent sur lectures visuelles. (L'ancien
+« pas de sidecars encore » — incohérent avec l'en-tête — corrigé le 2026-08-20,
+dette 9b.)
 
 | fichier | ce que c'est (page de titre / en-tête) | lu | citations vérifiées |
 |---|---|---|---|

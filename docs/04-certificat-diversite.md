@@ -64,15 +64,23 @@ ans, détenu, au lieu d'une méthode inventée) :
   *why* programs fail on the same input, it merely matters that they *do* »,
   §5, lu au texte).
 
-**[À décider]** : définitions d'écart par classe de faits (le seuil
-« hors enveloppe » réutilise l'estimateur du verdict — lignée Chainlink OCR
-Lemme 8, détenu côté Kraidle) ; **stratification des fenêtres par régime**
-— son cas motivant est daté : l'ouverture de pré-marché illiquide du
-28 juillet 2026 (SK Hynix), régime où A(window-stationarity) casse et où
-un test agrégé sur des fenêtres de séance normale ne dit rien ;
-taille minimale d'historique avant qu'un certificat R1 soit émissible (en dessous : le certificat dit « historique
+**~~[À décider]~~ — conception reçue dans `docs/10-mesures-pilotes-design.md`
+(dette 11 portée le 2026-08-20)** : (a) **définitions d'écart par classe** — trois
+écarts : (i) hors-enveloppe (médiane leave-one-out, N ≥ 4 répondantes sinon « non
+évaluable », fail-closed de publication ; le seuil reste la lignée Chainlink OCR
+Lemme 8, détenu côté Kraidle), (ii) staleness sur l'horodatage **porté**, (iii)
+panne, précédence panne > staleness > hors-enveloppe (10 §5.2) ; (b)
+**stratification des fenêtres par régime** — 2 strates ex ante *calme/stress*
+fixées par calendrier **committé avant le lancement**, jamais déduites des données ;
+cas motivant SK Hynix (28 juillet 2026), régime où A(window-stationarity) casse
+(10 §5.3 — pour un actif 24/7 comme BTC/USD, le *contenu* du calendrier stress est
+une décision opérateur nommée, l'autorité SK Hynix portant le *pourquoi* stratifier,
+non le *quel* calendrier) ; (c) **taille minimale d'historique** — un z n'est publié
+que si `n·P̂_more·(1−P̂_more) ≥ 10` (forme produit-variance, UConn OER Math 3160
+p. 121), **par strate** ; en dessous, queue binomiale exacte ou « historique
 insuffisant », jamais un z non significatif présenté comme une absence de
-dépendance).
+dépendance (10 §5.4). L'instrument S2 les implémente (walking skeleton + extension
+M1b, sur `main`).
 
 **La forme statistique mûre du R1 est déjà publiée** (Littlewood & Miller,
 IEEE TSE 15(12), 1989 — détenu, lu pp. 1596-1604) : l'écart à
