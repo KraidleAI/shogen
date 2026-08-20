@@ -21,6 +21,7 @@
 | ADR-0017 | Licence : « MIT OR Apache-2.0 » uniforme sur le workspace — échéance ADR-0014 soldée (décidée sur délégation explicite du mainteneur du 2026-08-13) | acceptée | 2026-08-13 |
 | ADR-0018 | Empreinte SHA-256 du cœur : manuelle pour S3 (zéro dépendance préservée, vecteurs NIST + contrôles croisés étiquetés), crate `sha2` rouverte en S4 sur pièces | acceptée (adjugée orchestrateur — position durable remontée au mainteneur) | 2026-08-13 |
 | ADR-0019 | Consignation de la stratégie GTM (dossier Shōgen-GTP) : décisions ratifiées D1–D5, implications produit D6–D11 portées à leurs registres, contrôle de traçabilité en annexe | acceptée (D1–D5 ratifiées mainteneur ; dossier accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections », portées) | 2026-08-20 |
+| ADR-0020 | Paramètres ex ante de la campagne S2 : calibration 48 h, τ=0,5 % relatif, σ par classe de source, calendrier de strates week-end=stress (J0/J14/J28) — amende la décision 5 de `docs/10` §9 | acceptée (ratifiée investisseur le 2026-08-20 sur avis ADVISOR technique, adjugée orchestrateur) | 2026-08-20 |
 
 ---
 
@@ -3044,5 +3045,97 @@ bloquante. Les comptes (« ~30 acteurs », « ~65 réf. ») sont lus à la phras
 | 8 | 3/5 cabinets en conflit oracle | CV1 §1 ; 02 §3 | P1 | ✅ |
 | 9 | Modèle DefiLlama (freemium) vs L2Beat (grants) vs Messari (issuer-pays) | T2 ; CV2 | [lu] | ✅ |
 | 10 | PS-01 : cessation OEV Network API3 renverse l'ancrage canal 3 | 07 §3 ; D1 | **procurement (404), non consommé** ; renversement SVR sur P1 | ✅ traité en procurement |
+
+---
+
+## ADR-0020 — Paramètres ex ante de la campagne S2 : calibration 48 h, τ=0,5 % relatif, σ par classe, calendrier de strates week-end=stress
+
+**Statut** : acceptée — **ratifiée par l'investisseur (mainteneur) le 2026-08-20** sur
+avis sourcé de l'ADVISOR technique (`claude-fable-5`), adjugé par l'orchestrateur
+(R-21). Amende la décision 5 de `docs/10-mesures-pilotes-design.md` §9. · 2026-08-20
+
+> **Note d'adjudication (2026-08-20).** La Phase A code du harnais S2 est fermée
+> (skeleton + M1b + M1c sur `main`, recalculabilité prouvée à la mesure). Avant la
+> campagne, deux paramètres ex ante devaient être fixés — décisions **investisseur**
+> (les fixer *après* avoir vu les données fabriquerait le résultat, A(history-integrity),
+> 04 §5). L'ADVISOR technique a rendu un avis sourcé (tout recalculé depuis §3.1),
+> adjugé sain ; l'investisseur a ratifié le paquet (deux choix explicites) le 2026-08-20.
+
+### Contexte
+
+Les deux seuils définissent l'« écart » (τ hors-enveloppe, σ staleness) qui alimente
+toute la statistique R1 (p̂ᵢ, K, z) et L&M ; la stratification gouverne la validité du
+z (un régime non séparé peut masquer une dépendance). Mal réglés, ils fabriquent ou
+étouffent la dépendance mesurée. D'où : fixés **avant** toute fenêtre scorée, publiés
+en `run_params` (recalculable, auditable).
+
+### Décision
+
+1. **Mécanisme — calibration 48 h pré-committée, exclue de l'inférence.** Une
+   calibration de 48 h (lancée un **vendredi 00:00 UTC** pour couvrir un week-end)
+   **mesure** la concordance honnête et les cadences réelles ; ses fenêtres sont
+   **exclues à jamais de l'inférence** ; les seuils finaux sont committés (git) à sa
+   clôture, avant la campagne. Séparation calibration/test : cale les seuils sans
+   fabriquer le résultat.
+2. **τ_classe = 0,5 % RELATIF** — `|vᵢ − médiane_LOO| / médiane_LOO > τ`, un seul τ
+   pour la classe « BTC/USD-stable » (pas par devise : le peg USDT reste mesurable,
+   décision 4). Calé : écart LOO honnête max mesuré = **0,118 %** (Bitfinex, §3.1) →
+   0,5 % ≈ 4×, sous une vraie anomalie. Montant fixe **rejeté** (change de sens avec
+   le prix). Révisé par ADR avant lancement si la calibration montre
+   P99(|écart relatif|) > 0,25 %.
+3. **σ_classe PAR CLASSE de source** — un σ unique < w rendrait les sources lentes
+   *toujours* stale (à l'instant honnête de §3.1 : CoinGecko 129 s, DefiLlama 139 s,
+   Chainlink 72 s, tous > w=60 s → le z mesurerait la cadence, pas la dépendance).
+   Règle : `σ_s = max(plancher_classe, 3 × P99(staleness honnête mesurée en
+   calibration))`. Planchers : places à horodatage porté **30 s** ; agrégateurs
+   **300 s** ; **sources sans horodatage (Binance/Kraken/Bitfinex) → axe (ii)
+   « non évaluable »** (jamais l'en-tête HTTP `Date`) ; oracles **1,5 × heartbeat
+   établi** (Pyth 30 s ; Chainlink : heartbeat = procurement, sinon repli fail-closed
+   « non évaluable »).
+4. **Calendrier de strates — week-end UTC = stress**, avec calendrier de publication
+   **à date fixe** : **J0** lancement de la collecte (l'archive démarre là) +
+   calibration 48 h ; **J14** rapport intermédiaire (z calme publiable ; z stress
+   « historique insuffisant » + queue exacte — *premier chiffre opposable*) ; **J28**
+   rapport final (les deux strates au critère). **Fin à date fixe**, jamais « quand z
+   croise 2,33 » (l'arrêt optionnel gonfle l'erreur type-I — miroir de la fenêtre de
+   complaisance, 04 §5). **Trois z toujours publiés** (calme, stress, poolé — lecture
+   asymétrique du poolé écrite d'avance, §5.5). **Amende la décision 5 (§9,
+   « ≈ 2 semaines »)** : week-end=stress exige **~24-28 jours** (5 760 fenêtres
+   week-end en 14 j < 10 010 requises sous l'illustration P̂_more≈10⁻³ du design).
+
+### Alternative considérée
+
+Strate unique (~7 j, z poolé plus tôt) — abandonne la stratification que SK Hynix et
+04 §2 motivent, A(window-stationarity) portée nue ; non retenue par l'investisseur.
+
+### La source qui tranche
+
+Avis ADVISOR technique du 2026-08-20 (sourcé §3.1 [lu] : écart 0,118 %, staleness
+129/139/72 s ; Kaiko volume week-end BTC ~28 %→16-17 % [2nd, The Block] ; seuil de
+déviation feed Chainlink ~0,5 % [2nd, page 403]) ; **ratification investisseur du
+2026-08-20**. L'orchestrateur adjuge, l'investisseur ratifie (R-21).
+
+### Ce que la décision coûte
+
+1. **Campagne ~24-28 jours** (pas 2 semaines) — assumé pour la stratification honnête.
+2. **Axe staleness « non évaluable » sur 3-4 sources** (Binance/Kraken/Bitfinex sans
+   horodatage ; Chainlink si heartbeat non procuré) — A(axis-coverage) élargie, écrite
+   au certificat (04 §4 pt 1).
+3. **Reframe adjugé (divergence de l'avis-marché, vérifiée juste)** : l'**archive de
+   co-défaillances** — l'actif non copiable — **démarre au LANCEMENT de la collecte**,
+   pas au premier z (le journal brut est sans seuil, recalculable — ADR-0003 ; les
+   statuts d'écart sont dérivés). La stratification ne retarde que la *publication du
+   z*. La variable de course face à un copieur (Chaos Labs) est donc la **date de
+   lancement**, pas le calendrier de strates.
+
+### Registres touchés
+
+- `docs/DECISIONS.md` : cette ADR.
+- `docs/10-mesures-pilotes-design.md` §9 décision 5 : amendée (pointeur ADR-0020).
+- `WISHLIST.md` : PS — heartbeat/déviation du feed Chainlink BTC/USD (navigateur,
+  deadline = clôture calibration) ; rapport Kaiko primaire (volume week-end BTC
+  post-ETF).
+- `s2-harness/run_params` : τ/σ finaux committés à la clôture de calibration, avant
+  la première fenêtre scorée.
 
 ---

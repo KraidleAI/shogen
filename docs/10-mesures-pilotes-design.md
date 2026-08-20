@@ -623,7 +623,13 @@ compris la dernière, enregistrée cette passe :
 4. Homogénéité → **« BTC/USD-stable », devise marquée par flux** (§2) :
    garde les 2 flux USDT, l'écart de peg devient mesurable par (2a).
 5. Budget → **≈ 2 semaines, w = 60 s, 2 strates** (calme/stress) : n
-   bien au-delà du seuil §5.4 dans les deux régimes.
+   bien au-delà du seuil §5.4 dans les deux régimes. **Amendé par ADR-0020
+   (ratification investisseur 2026-08-20)** : « ≈ 2 semaines » et « week-end=stress »
+   sont incompatibles (la strate rare gouverne : 5 760 fenêtres week-end en 14 j
+   < 10 010 requises) — le calendrier réel est **week-end=stress → ~24-28 jours**,
+   avec **calibration 48 h ex ante** (vendredi, fenêtres exclues de l'inférence)
+   fixant les seuils, **τ_classe = 0,5 % relatif**, **σ par classe de source**, et un
+   calendrier de publication J0/J14/J28 à date fixe (3 z toujours publiés).
 6. Règle `basis:doc` → **ADR-0008, acceptée le 2026-08-05** (décision
    déléguée à l'orchestrateur, fondée sur INDaaS / Chainlink v1 / 04 §1),
    avec alternative et coût.

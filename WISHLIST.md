@@ -209,6 +209,23 @@ clôt PS-03/06/07 (note d'outillage 07 §3, pas une dette).
   open-core ; textes [abs]) : hors dépôt, laissés à la maintenance du dossier
   source, pas des procurements du dépôt.
 
+## Priorité 5 — campagne S2 (ADR-0020, ratifiée 2026-08-20)
+
+Deux procurements formés pour caler les paramètres ex ante de la campagne (ADR-0020) ;
+deadline = clôture de la calibration 48 h.
+
+- [ ] **PS-S2-01 ⚑ — heartbeat + seuil de déviation du feed Chainlink BTC/USD**
+  (Ethereum mainnet, `data.chain.link/feeds/ethereum/mainnet/btc-usd`). Bloqué :
+  **403** aux fetchs programmatiques (2 canaux + passe worker 2026-08-05 ; dette
+  10 §10.6). **Usage** : `run_params.sigma[chainlink] = 1,5 × heartbeat` (branche (i)
+  d'ADR-0020) et ancre de cohérence de τ ; sans lui, repli fail-closed (axe staleness
+  Chainlink « non évaluable »). Voie : **visite navigateur** (une vraie session peut
+  passer là où le fetch échoue), champs « deviation threshold » + « heartbeat » datés.
+- [ ] **PS-S2-02 — rapport Kaiko primaire** sur le volume/liquidité BTC du week-end
+  post-ETF (piste : `research.kaiko.com/reports` ; actuellement [2nd] via The Block).
+  **Usage** : fonder l'ADR de strate (week-end=stress) sur pièce primaire plutôt que
+  presse — les chiffres ~28 %→16-17 % à passer [lu].
+
 ## Déjà réglé (pour mémoire)
 
 - ~~Knight & Leveson 1986, article complet~~ — apporté par le mainteneur.
