@@ -22,6 +22,7 @@
 | ADR-0018 | Empreinte SHA-256 du cœur : manuelle pour S3 (zéro dépendance préservée, vecteurs NIST + contrôles croisés étiquetés), crate `sha2` rouverte en S4 sur pièces | acceptée (adjugée orchestrateur — position durable remontée au mainteneur) | 2026-08-13 |
 | ADR-0019 | Consignation de la stratégie GTM (dossier Shōgen-GTP) : décisions ratifiées D1–D5, implications produit D6–D11 portées à leurs registres, contrôle de traçabilité en annexe | acceptée (D1–D5 ratifiées mainteneur ; dossier accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections », portées) | 2026-08-20 |
 | ADR-0020 | Paramètres ex ante de la campagne S2 : calibration 48 h, τ=0,5 % relatif, σ par classe de source, calendrier de strates week-end=stress (J0/J14/J28) — amende la décision 5 de `docs/10` §9 | acceptée (ratifiée investisseur le 2026-08-20 sur avis ADVISOR technique, adjugée orchestrateur) | 2026-08-20 |
+| ADR-0021 | Fidélité σ/τ du harnais S2 : τ relatif + σ par classe + calcul de clôture P99 — résout le CONSTAT M2 (l'instrument gelé implémente τ absolu / σ scalaire, ≠ ADR-0020) ; voie 1 | acceptée (voie 1 confirmée investisseur le 2026-08-20 ; plan accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections » C1–C4 ; livrable dû au checkpoint #2) | 2026-08-20 |
 
 ---
 
@@ -3137,5 +3138,110 @@ déviation feed Chainlink ~0,5 % [2nd, page 403]) ; **ratification investisseur 
   post-ETF).
 - `s2-harness/run_params` : τ/σ finaux committés à la clôture de calibration, avant
   la première fenêtre scorée.
+
+---
+
+## ADR-0021 — Fidélité σ/τ du harnais S2 : τ relatif + σ par classe + calcul de clôture P99 (résout le CONSTAT M2)
+
+**Statut** : acceptée — **voie 1 confirmée par l'investisseur le 2026-08-20** ; **plan accepté par le
+`validateur-humain` le 2026-08-20 « accepte-avec-corrections » (C1–C4 intégrées ci-dessous)**,
+checkpoint AgileGates #1. Implémentation en cours ; **acceptation du livrable due au checkpoint #2**
+(G7 orchestrateur + validateur-humain). · 2026-08-20
+
+> **Note d'adjudication (2026-08-20).** La mission M2 (driver de lancement) a révélé que le harnais
+> M1c fermé/adjugé ne peut PAS représenter les deux paramètres qu'ADR-0020 rend normatifs. Le CONSTAT
+> a été **confirmé sur pièce** par un oracle de recalcul + une G2 indépendante à contexte frais +
+> l'orchestrateur (R-21). L'investisseur a confirmé la **voie 1** (rendre l'instrument fidèle, gates
+> G0–G7, avant J0), écartant la voie 2 (scalaires intérim) : le calendrier vendredi-ancré la rend sans
+> coût (J0 = vendredi 28 août dans les deux cas).
+
+### Contexte — le CONSTAT
+
+ADR-0020 rend normatifs **τ RELATIF** (`|vᵢ − médiane_LOO| / médiane_LOO > τ`, :3080-3085 ; le montant
+fixe y est **explicitement rejeté**, :3083-3084) et **σ PAR CLASSE** (planchers par classe, :3086-3094).
+Le harnais gelé implémente l'inverse :
+- **τ absolu** — `r1.py:126` `abs(price - m_loo) > tau` (jamais divisé par la médiane) ;
+- **σ scalaire unique** — `r1.py:119` ; `classify_ecart` (`r1.py:95-103`) ne reçoit pas le `flux_id`,
+  donc aucun dispatch par classe n'est structurellement possible ; les **4 points d'entrée** de
+  recalcul lisent un scalaire (`r1.py:455`, `lm.py:224`, `r2.py:1089`, `report.py:84`), routés par le
+  même `classify_cells` (`r1.py:267/283`, `lm.py:126`, `r2.py:924`, `report.py:90`) ;
+- **calcul de clôture P99 ABSENT** (grep-prouvé : « P99 » n'existe qu'en prose).
+
+Déjà honoré (à **préserver**) : « sans horodatage → non évaluable » (garde `r1.py:118` + décodeurs
+`sources.py:127/143/180` rendant `source_ts=None` inconditionnellement).
+
+Non bloquant pour l'**archive** (capture sans seuil, reframe ADR-0020 :3124-3129) mais **requis** pour
+tout **scoring** (table §6, J14/J28) et pour le **commit des σ/τ de clôture de calibration** (J0+48 h,
+dont le calcul P99 fait partie).
+
+**error_origin** (assigné au G7, CA-8) : ADR-0020 a été ratifié **sans contrôle de représentabilité de
+l'instrument gelé** — l'**étape ADVISOR incluse** (l'avis σ/τ était juste *comme design de mesure*, mais
+nul n'a demandé « l'instrument gelé peut-il l'exécuter ? »). Contrepoids factuel, non exculpatoire :
+**M2 l'a détecté avant lancement** (fail-close, pas déviation silencieuse) — le framework a fonctionné.
+
+### Décision — passe core-touching, gatée G0–G7
+
+1. **`classify_ecart`** reçoit l'**identité du flux** → **σ par classe** ; **τ relatif**
+   `abs(price − m_loo) / m_loo > τ` (garde `m_loo ≠ 0`, fail-closed). **[C2a]** Le critère n'est PAS
+   « plus d'`abs()` » — l'`abs()` subsiste légitimement au **numérateur** de la forme relative ; le
+   critère falsifiable est la **division par la médiane**, et l'**absence de la forme absolue nue**
+   `abs(price − m_loo) > tau`.
+2. **`run_params`** : σ = mapping **classe→plancher**, τ = **fraction relative** ; `LOAD_BEARING_KEYS`
+   mis à jour ; concordance fail-closed (`records.py:44-45/96`) — un run_params mal formé **lève**.
+   L'**écrivain** de run_params `collector.py:103-104/149-150` est dans le scope.
+3. **Les 4 lecteurs** (`r1.py:455`, `lm.py:224`, `r2.py:1089`, `report.py:84`) + **les consommateurs de
+   `classify_cells`** (`r1.py:267/283`, `lm.py:126`, `r2.py:924`, **`report.py:90`**) : router la
+   nouvelle représentation.
+4. **Calcul de clôture de calibration (neuf)** : depuis les fenêtres de calibration seules,
+   `P99(|écart LOO relatif| honnête)` (clause de révision τ, :3084-3085) et `P99(staleness honnête PAR
+   CLASSE)` → `σ_s = max(plancher_classe, 3 × P99)` (:3089). Recalculable (ADR-0003).
+5. **[C2b] Révision TRACÉE des tests verrouillant le contrat scalaire/absolu — les SIX fichiers** :
+   `test_collector.py:47-48`, `test_r1.py:22-23`, `test_lm.py:25-26`, `test_r2.py:35-36`,
+   `test_report.py:30-31`, `test_run_campaign.py:64-86/123-124`. Mise à jour **tracée** (jamais un
+   affaiblissement silencieux) + **tests neufs** : τ relatif, σ par classe, P99 de clôture, fail-closed
+   sur run_params mal formé.
+6. **[C3] Régimes scalaires demo/interim** — statués ici : `DEMO_SIGMA_SECONDS`/`DEMO_TAU_ABSOLUTE` et
+   `--interim-sigma`/`--interim-tau` (`run_campaign.py:53-55/102-107`) sont **migrés ou supprimés** ;
+   **aucun chemin scalaire survivant** ne doit pouvoir alimenter le pipeline fidèle. Critère falsifiable :
+   **un test nommé** où un journal legacy portant un `sigma_classe` scalaire, lu par le nouveau code,
+   **lève** via `effective_run_params` — jamais réinterprété.
+7. **Chainlink** — confirmer le heartbeat **aux feed docs** (navigateur, ~5 min) AVANT que
+   `σ_chainlink = 5400` n'entre dans des run_params fidèles ; sinon **« non évaluable »** (fidélité
+   :3092-3094). Tension **PS-S2-01-résolu** (heartbeat countdown-dérivé, WISHLIST) vs texte ADR-0020
+   (« heartbeat établi ») : **tranchée ici** — on cite la chaîne de provenance (countdown live ~1 h,
+   non feed-doc-exact) ; **ADR-0020 n'est pas retouchée**.
+8. **`run_campaign.py`** : appel `collector.collect` adapté (σ par classe) ; **3 mineurs G2** soldés
+   (avertissement demo+interim ; test de concordance décodant les fixtures ; bruit stderr).
+
+### Gates G0–G7 — [C1] corrigés (doc 02 :29-70 ; R-22 : aucun ne se suspend)
+
+ADR-0021 (**G0**) → journal de provenance (**G1**) → revue 100 % checklist, réviseur ≠ générateur
+(**G2**) → **G3 vérification automatique** : oracle d'exécution (recalcul bit-identique sans import +
+contrôle négatif) → **G4 santé architecturale** → **G5 dette** (zéro / procurements formés : Chainlink
+feed-doc) → **G6 compliance** (R-8 zéro dépendance nouvelle ; provenance/licences des artefacts
+touchés) → **G7 verdict** orchestrateur + acceptation validateur-humain (checkpoint #2).
+
+### Missions et roster (ADR-0019)
+
+Implémenteur worker **`claude-opus-4-8`, effort max** (R-1 déclaré au premier worker) ; adjudication
+double à contexte frais (**oracle de recalcul** structurellement indépendant — réimplémentation sans
+import + contrôle négatif — et **G2** réviseur ≠ générateur) ; verdict G7 orchestrateur ; **seul
+l'orchestrateur committe** (R-19/R-20).
+
+### Règle anti-compression — glissement de J0 [C4, R-22]
+
+Si la passe n'est **pas adjugée** (G7 + checkpoint #2) **avant J0−1 (mercredi 27 août)**, **J0 glisse
+au vendredi suivant** et c'est une **ESCALADE-INVESTISSEUR** (le reframe :3124-3129 fait de la date de
+lancement la variable de course — un glissement est un coût investisseur), **jamais** une compression de
+gates.
+
+### Registres touchés
+
+- `docs/DECISIONS.md` : cette ADR.
+- `s2-harness/shogen_s2/` : `r1.py`, `collector.py`, `records.py`, `report.py`, `lm.py`, `r2.py`,
+  `run_campaign.py` (représentation σ/τ propagée ; calcul de clôture P99 neuf).
+- `s2-harness/tests/` : les 6 fichiers verrouillant le contrat (révision tracée) + tests neufs.
+- `WISHLIST.md` : PS-S2-01 (heartbeat Chainlink feed-doc, replié dans cette passe).
+- `s2-harness/RUNBOOK-campagne.md` : σ/τ fidèles remplacent les valeurs proposées ; prep option A.
 
 ---
