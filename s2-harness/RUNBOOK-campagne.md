@@ -1,0 +1,159 @@
+# Runbook — lancement de la campagne S2 (calibration → mesures pilotes)
+
+> **Statut : plan opérationnel.** Régit le lancement du harnais S2 en temps réel,
+> selon **ADR-0020** (paramètres ex ante ratifiés le 2026-08-20) et
+> `docs/10-mesures-pilotes-design.md`. Le harnais (skeleton + M1b + M1c) est sur
+> `main`, adjugé (recalculabilité prouvée). Ce runbook **ne lance rien** : il décrit
+> la procédure ; le déclenchement temps réel (plusieurs semaines) appartient à
+> l'investisseur.
+
+## 0. Pré-conditions (état au 2026-08-20)
+
+- ✅ **Code Phase A fermé** : `collect` (fenêtré UTC, fin-de-fenêtre), R1/L&M/queue
+  exacte, R2 (ASN/contenu/méthode), k_eff par hôtes, drapeau 2, table §6 complète —
+  recalculable (ADR-0003, 4033 chiffres bit-identiques adjugés).
+- ✅ **ADR-0020 ratifié** : calibration 48h ; τ=0,5 % relatif ; σ par classe ;
+  calendrier week-end=stress, J0/J14/J28.
+- ✅ **PS-S2-01 résolu** : deviation Chainlink 0,5 % [lu] ; heartbeat ~1 h (3600 s)
+  dérivé → **σ_chainlink = 5400 s** (plus de repli fail-closed).
+- ✅ **§10.9 (débits) vert** : ~1 req/min/source, marge min **60×** ; CoinGecko 429 →
+  panne (iii) par conception.
+- ⬜ **PS-S2-02** (rapport Kaiko primaire) — non bloquant, dû avant tout claim public
+  de strate ; **PS-S2-01 heartbeat** dérivé du countdown (exact 3600s = feed docs si
+  précision voulue).
+
+## 1. Machine et déploiement
+
+- **Machine persistante** (la « machine de campagne ») — PAS une session éphémère.
+  **Historique de coupures de courant** (memstack 2026-07-29) → la reprise (§5) est
+  obligatoire, pas optionnelle.
+- **Python ≥ 3.9, stdlib seule** (R-8 : aucune dépendance ; à re-vérifier :
+  `pip list` doit être sans rapport avec le harnais).
+- **Code** : `git clone`/`pull` de `origin/main` (révision épinglée committée au
+  journal de la campagne, pour la reproductibilité du binaire d'analyse).
+- **Horloge** : NTP actif ; le contrôle d'horloge du harnais (§4 exigence 2) journalise
+  l'offset au démarrage et à chaque reprise — non bloquant, mais tracé.
+- **Réseau sortant** vers les 11 endpoints (`docs/10` §3.1) + DNS/RIPEstat/Cymru pour
+  l'axe ASN. Aucune clé, aucun token, aucun cookie (« strictement sans clé »).
+
+## 2. Le driver de lancement — spécification (mission code M2, à adjuger avant J0)
+
+Le harnais expose déjà `collector.collect(...)` (read path) et `collector.collect_asn(...)`
+(axe ASN). Le driver est une **glu opératoire mince** (jetable, R-22) qui :
+
+1. **Fixe le `run_params`** committé ex ante : `pool` = 11 sources (§3.1), `w=60`,
+   `strate_calendar` = week-end UTC (spec `WEEKEND_STRATE_SPEC`), `decimal_prec=50`,
+   `seuil_historique_valeur=10`, `n_min_hors_enveloppe=4`. **σ/τ : voir §3** (fixés à
+   la clôture de calibration, pas au lancement).
+2. **Câble le read path réel** : `read_fn = sources.read` (les 12 décodeurs, déjà
+   *tested* + smoke live 12/12).
+3. **Câble l'axe ASN réel** : `resolve_fn = r2.resolve_host_real` (**non exercé en
+   réseau à ce jour — M1c frontière 1** : à smoke-tester en §4 AVANT J0).
+4. **Boucle de collecte restart-tolérante** : `now_fn = time.time`, `sleep_fn =
+   time.sleep` ; journal **append-only** ; à chaque reprise, ré-écrit `run_params`
+   (concordance fail-closed vérifiée) + contrôle d'horloge ; fenêtres UTC-alignées
+   (personne ne choisit ses bords) ; last-wins + dédup marqueurs (reprise idempotente,
+   testée).
+5. **Cadence ASN** : re-mesure de l'axe ASN à intervalle (au moins une fois par
+   fenêtre de rapport ; l'attribution est un instantané daté, §4.1 résidu 4/7).
+
+**M2 (code) est une mission worker adjugée** (oracle de recalcul + G2 sur le driver +
+la vérification live), comme le skeleton/M1b/M1c — le driver ne se promeut pas sans
+G0–G7.
+
+## 3. Les seuils σ/τ — fixés à la CLÔTURE de calibration, pas au lancement
+
+Rappel du reframe (ADR-0020) : le **journal brut est sans seuil à la capture** ; σ/τ
+n'affectent que les **statuts d'écart dérivés** (recalculés au rapport, ADR-0003).
+Donc :
+
+- **J0** : la collecte démarre avec les valeurs **proposées** d'ADR-0020 (τ=0,5 % ;
+  σ = {places 30 s, agrégateurs 300 s, sans-horodatage « non évaluable »,
+  Chainlink 5400 s, Pyth 30 s}) écrites au `run_params`.
+- **J0+48h (clôture calibration)** : depuis les **fenêtres de calibration seules**
+  (exclues à jamais de l'inférence), calculer `P99(|écart LOO relatif| honnête)` et
+  `P99(staleness honnête par classe)`. **Réviser par ADR** avant la campagne SI :
+  `P99(concordance) > 0,25 %` (⇒ τ) ou `σ_floor < 3·P99(staleness_s)` (⇒ σ_s remonté).
+  Sinon les valeurs proposées tiennent. **Committer (git) les σ/τ finaux** avant la
+  première fenêtre scorée.
+- **Fail-closed run_params** : la calibration et la campagne portent des `run_params`
+  potentiellement différents (σ/τ) → **deux segments de journal** (calibration /
+  campagne), la calibration marquée exclue. L'archive brute est continue depuis J0 ;
+  l'**inférence** ne consomme que le segment campagne.
+
+## 4. Vérification live AVANT J0 (dé-risquage, quelques fenêtres)
+
+Ne PAS lancer 48h à l'aveugle. D'abord, un smoke live court (minutes) :
+
+1. `python -m shogen_s2.smoke` → 12/12 (read path — déjà vert).
+2. **`collect_asn` en réseau réel sur 2-3 hôtes** (le trou de M1c frontière 1) : la
+   chaîne DNS→RIPEstat→Cymru répond-elle ? l'attribution croisée concorde-t-elle
+   (≥ 2 bases) ? Consigner le résultat ; si RIPEstat/Cymru rate, l'axe ASN dégrade en
+   « non évaluable » (fail-closed) et k_eff porte « borne supérieure » (C-A) — pas un
+   casseur, mais à savoir avant J0.
+3. Un run de collecte de ~10 fenêtres (10 min) → la table §6 se rend de bout en bout,
+   recalculable ; contrôle d'horloge journalisé.
+
+## 5. Calendrier de la campagne (ADR-0020)
+
+| jalon | date | action | livrable |
+|---|---|---|---|
+| **J0** | **vendredi 00:00 UTC** | lancement de la collecte (l'**archive** démarre — l'actif non copiable) ; les 48 premières h = **calibration** | journal brut append-only |
+| J0+48h | dimanche 00:00 UTC | clôture calibration → **commit σ/τ** (§3) ; début du segment campagne | `run_params` scellés, git |
+| **J14** | +14 j | **rapport intermédiaire** : z calme probablement publiable ; z stress « historique insuffisant » + queue exacte — **premier chiffre opposable** | `11-mesures-pilotes.md` v1 (recalculé par l'oracle) |
+| **J28** | +28 j (**date fixe**) | **rapport final** : les deux strates au critère (week-end : 8 j ≥ 6,95 j) | `11-mesures-pilotes.md` final |
+
+- **Fin à DATE FIXE, jamais « quand z croise 2,33 »** (l'arrêt optionnel gonfle
+  l'erreur type-I, 04 §5).
+- **Trois z toujours publiés** (calme, stress, poolé) — lecture asymétrique du poolé
+  écrite d'avance (§5.5) ; risque famille ~3 % publié.
+- Si `P̂_more` réel s'écarte d'un ordre de grandeur de l'illustration 10⁻³, J14/J28
+  se recalculent depuis l'estimée de calibration **avant** que les dates ne soient
+  promises publiquement.
+
+## 6. Monitoring et reprise
+
+- **Journal append-only, fenêtres UTC-alignées** → reprise idempotente (dédup marqueurs
+  + last-wins, testé). Redémarrage après coupure : relancer le driver, il reprend.
+- **Contrôle d'horloge** au démarrage/reprise (offset NTP ou plausibilité croisée des
+  `source_ts`) — journalisé, non bloquant ; une dérive silencieuse corromprait n.
+- **Harnais-down ≠ source-en-panne** (déjà codé) : une fenêtre non tentée n'entre ni
+  dans n ni en panne — le monitoring distingue « harnais tombé » de « source tombée ».
+- **Surveiller** : uptime de collecte, taux de 429 (CoinGecko attendu → panne (iii)),
+  bans (Bitfinex — mais 10× sous le seuil), échecs de résolution ASN, événements de
+  reprise. Aucun de ces états ne se « corrige » en silence : ils se journalisent.
+
+## 7. Procurements et dettes ouverts (non bloquants pour J0, dus avant claim public)
+
+- **PS-S2-02** — rapport Kaiko primaire (volume week-end BTC post-ETF) : avant tout
+  ADR de strate définitif ou claim public ; les ~28 %→16-17 % à passer [lu].
+- **Vérifs d'endpoints ASN octet-exact** (M1c frontière 3, dette 10 §10.4) : les 3
+  pages (DoH/RIPEstat/Cymru) lues via résumeur = rang (b) ; ré-établir octet-exact
+  avant un claim sur l'axe ASN.
+- **Heartbeat Chainlink exact** (3600 s) : dérivé du countdown ; confirmer aux feed
+  docs si une précision au-delà de « ~1 h » devient porteuse.
+- **Multi-résolveurs / multi-vantage ASN** (§4.1) : v0 = 1 résolveur ; résidu publié,
+  dû à la campagne mûre.
+
+## 8. Ce que la campagne NE fait PAS
+
+- **Ne publie rien.** D6 = « publiable », pas « publié » : l'acte de publier
+  `11-mesures-pilotes.md` (et l'exposition du benchmark) est une **décision
+  investisseur** (percute DEVOPS §1 dépôt privé jusqu'à S3, S5 antériorité arXiv,
+  D10/PS-10 marque). Les rapports J14/J28 sont produits et vérifiés ; leur diffusion
+  attend.
+- **Ne promeut pas le harnais** (R-22 : jetable, mort après le rapport).
+- **Ne consomme pas les fenêtres de calibration dans l'inférence.**
+- **Ne s'arrête pas à un z favorable** (date fixe).
+
+## 9. Séquence de déclenchement (résumé pour l'opérateur)
+
+1. **Avant J0** : mission M2 (driver + smoke ASN live) adjugée ; machine persistante
+   prête ; PS-S2-02 idéalement acquis.
+2. **J0 (vendredi 00:00 UTC)** : lancer le driver → collecte + calibration 48h.
+3. **J0+48h** : commit σ/τ (git) depuis la calibration ; segment campagne démarre.
+4. **J14 / J28** : générer + faire recalculer les rapports ; ne rien publier sans
+   décision investisseur.
+5. À la clôture : rapport de passe (zéro dette ou procurements formés), adjudication
+   du critère de sortie S2 (les axes R2 discriminent-ils ? — n, K, z, partition,
+   k_eff vs k nominal).
