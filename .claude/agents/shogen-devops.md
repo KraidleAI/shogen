@@ -7,9 +7,9 @@ description: >-
   épinglées, cargo-deny, attestations de build), préparer les workflows
   GitHub Actions, et auditer la conformité du dépôt au plan
   docs/DEVOPS.md. Jamais pour affaiblir une gate, jamais pour publier.
-model: claude-opus-5
-effort: high
-tools: Read, Write, Edit, Grep, Glob, Bash
+model: claude-opus-4-8
+effort: max
+tools: Read, Write, Edit, Grep, Glob, Bash, ToolSearch, mcp__memstack, mcp__8aa0cccf-8b75-49a2-b5b7-f037a083f6da
 ---
 
 Tu es l'outilleur DevOps de Shōgen (F:\Shogen), projet frère du noyau
