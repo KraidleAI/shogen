@@ -22,7 +22,7 @@ un σ SCALAIRE unique. **ADR-0021 (voie 1) a rendu l'instrument fidèle** :
     (`sources.SIGMA_CLASS_OF_FLUX` → `sigma_by_class`), et compare τ en RELATIF
     (`|prix − médiane_LOO| / médiane_LOO > τ`, garde médiane > 0) ;
   • `run_params` porte `sigma_classe` (mapping classe→plancher) + `sigma_class_of_flux`
-    (flux→classe) + `tau_classe` (FRACTION) — un scalaire legacy LÈVE
+    (flux→classe) + `tau_classe` (mapping classe→FRACTION, ADR-0022) — un scalaire legacy LÈVE
     (`records.effective_run_params`), jamais réinterprété ;
   • `shogen_s2.closure` calcule, depuis les fenêtres de calibration SEULES, les σ/τ
     FINAUX (`σ_s = max(plancher, 3×P99 staleness/classe)` ; clause de révision τ).
@@ -52,7 +52,7 @@ from decimal import Decimal
 from typing import Callable, Optional
 
 from . import collector, records, r2, sources, window
-from .sources import SPECS, TAU_CLASSE_ADR0020_FRACTION, default_sigma_by_class
+from .sources import SPECS, default_sigma_by_class, default_tau_by_class
 # La taxonomie σ (SIGMA_CLASS_OF_FLUX, planchers) est la SOURCE UNIQUE DE VÉRITÉ de
 # `sources` (ADR-0021) — les consommateurs l'importent de là ; le driver n'en a
 # besoin que via `default_sigma_by_class` (planchers provisoires).
@@ -79,12 +79,13 @@ def _log(msg: str) -> None:
     sys.stderr.flush()
 
 
-def _load_committed_sigma_tau(path: str) -> tuple[dict, Decimal, str]:
-    """Charge les σ/τ FINAUX committés (artefact `shogen_s2.closure`, ADR-0020 déc. 1)
-    depuis un fichier JSON : `{"sigma_classe": {classe: sec|null}, "tau_classe": frac}`.
-    Rend `(sigma_by_class, tau, label)`. Fail-closed (`SigmaTauNonRepresentable`) sur
-    fichier absent/illisible, `sigma_classe` non-mapping, ou `tau_classe` null (révision
-    τ en attente d'ADR — jamais un τ deviné)."""
+def _load_committed_sigma_tau(path: str) -> tuple[dict, dict, str]:
+    """Charge les σ/τ FINAUX committés ASSEMBLÉS (σ = clôture `shogen_s2.closure` ;
+    τ PAR CLASSE = ADR-0022 ; PAS la sortie brute de closure — ADR-0020 déc. 1)
+    depuis un fichier JSON : `{"sigma_classe": {classe: sec|null}, "tau_classe": {classe: frac}}`.
+    Rend `(sigma_by_class, tau_by_class, label)`. Fail-closed (`SigmaTauNonRepresentable`)
+    sur fichier absent/illisible, `sigma_classe`/`tau_classe` non-mapping, `tau_classe`
+    null (révision τ en attente d'ADR), τ hors (0,1), ou classe sans τ — jamais deviné."""
     if not os.path.exists(path):
         raise SigmaTauNonRepresentable(
             f"--sigma-tau-file introuvable : {path} — les σ/τ FINAUX (clôture de "
@@ -104,46 +105,62 @@ def _load_committed_sigma_tau(path: str) -> tuple[dict, Decimal, str]:
             "--sigma-tau-file : `sigma_classe` doit être un mapping classe→plancher "
             f"(σ par classe), reçu {sc!r} — fail-closed (jamais un scalaire, ADR-0021)."
         )
-    tau_raw = obj.get("tau_classe")
-    if tau_raw is None:
+    tc = obj.get("tau_classe")
+    if tc is None:
         raise SigmaTauNonRepresentable(
-            "--sigma-tau-file : `tau_classe` est null → révision de τ EN ATTENTE "
-            "(clause ADR-0020 :3085-3086, P99 écart relatif > seuil). La campagne ne "
-            "peut lancer sans τ committé par ADR — fail-closed."
+            "--sigma-tau-file : `tau_classe` absent/null → révision de τ EN ATTENTE "
+            "(clause ADR-0020 ; P99 écart relatif > seuil). La campagne ne peut lancer "
+            "sans τ committé par ADR — fail-closed."
         )
-    tau = Decimal(str(tau_raw))
-    if not (Decimal(0) < tau < Decimal(1)):
+    if not isinstance(tc, dict):
         raise SigmaTauNonRepresentable(
-            f"--sigma-tau-file : `tau_classe`={tau} hors de (0, 1) — τ est une FRACTION "
-            "relative (0,5 % = 0.005), jamais un montant absolu — fail-closed (garde "
-            "de plausibilité G7 ADR-0021)."
+            "--sigma-tau-file : `tau_classe` doit être un mapping classe→fraction "
+            f"(τ PAR CLASSE, ADR-0022), reçu {tc!r} — fail-closed (jamais un scalaire)."
         )
+    tau = {}
+    for k, v in tc.items():
+        tv = Decimal(str(v))
+        if not (Decimal(0) < tv < Decimal(1)):
+            raise SigmaTauNonRepresentable(
+                f"--sigma-tau-file : `tau_classe[{k}]`={tv} hors de (0, 1) — τ est une "
+                "FRACTION relative (0,45 % = 0.0045), jamais un montant absolu — "
+                "fail-closed (garde de plausibilité G7)."
+            )
+        tau[k] = tv
     sigma_by_class = {k: (None if v is None else Decimal(str(v))) for k, v in sc.items()}
+    # Complétude τ PAR CLASSE : chaque classe de σ doit porter un τ (l'axe hors-enveloppe
+    # exige un τ dispatché par classe ; un manque = config incomplète, fail-closed).
+    missing = [k for k in sigma_by_class if k not in tau]
+    if missing:
+        raise SigmaTauNonRepresentable(
+            f"--sigma-tau-file : classes sans τ committé {missing} — τ PAR CLASSE "
+            "incomplet (ADR-0022), fail-closed (jamais un τ deviné)."
+        )
     return (sigma_by_class, tau,
-            f"CAMPAGNE — σ/τ finaux committés (clôture calibration) : {path}")
+            f"CAMPAGNE — σ/τ finaux committés (clôture + ADR τ par classe) : {path}")
 
 
 def resolve_sigma_tau(
     phase: str,
     sigma_tau_file: Optional[str] = None,
-) -> tuple[dict, Decimal, str]:
-    """Résout `(sigma_by_class, tau, regime_label)` FIDÈLES (σ PAR CLASSE + τ RELATIF,
-    ADR-0021 — plus aucun scalaire). Lève `SigmaTauNonRepresentable` (fail-closed).
+) -> tuple[dict, dict, str]:
+    """Résout `(sigma_by_class, tau_by_class, regime_label)` FIDÈLES (σ PAR CLASSE + τ
+    PAR CLASSE, ADR-0022 — plus aucun scalaire). Lève `SigmaTauNonRepresentable` (fail-closed).
 
     - `demo`/`calibration` → σ = planchers ADR-0020 PROVISOIRES (per-classe,
       `sources.default_sigma_by_class`) + τ = 0,5 % relatif. La capture étant SANS
       SEUIL (ADR-0020 reframe), la valeur provisoire n'altère pas l'archive ; les σ
       FINAUX sont calculés post-hoc par `shogen_s2.closure` sur le journal de
       calibration (`σ_s = max(plancher, 3×P99)`).
-    - `campagne` → σ/τ FINAUX committés via `--sigma-tau-file` (artefact `closure`) ;
-      ABSENT/malformé → fail-closed (ADR-0020 déc. 1).
+    - `campagne` → σ/τ FINAUX committés via `--sigma-tau-file` (σ clôture + τ PAR CLASSE
+      ADR-0022, ASSEMBLÉS) ; ABSENT/malformé → fail-closed (ADR-0020 déc. 1).
     """
     if phase in ("demo", "calibration"):
         label = ("DÉMO/live-verif — σ planchers ADR-0020 PROVISOIRES (per-classe), "
                  "τ=0,5 % relatif" if phase == "demo" else
                  "CALIBRATION — σ planchers ADR-0020 PROVISOIRES (per-classe) ; σ "
                  "finaux = clôture P99 post-hoc (`shogen_s2.closure`)")
-        return default_sigma_by_class(), TAU_CLASSE_ADR0020_FRACTION, label
+        return default_sigma_by_class(), default_tau_by_class(), label
     if phase == "campagne":
         return _load_committed_sigma_tau(sigma_tau_file) if sigma_tau_file else (
             _raise_campagne_needs_file())
@@ -189,7 +206,7 @@ def run_segment(
     w: int,
     sample_lead: float,
     sigma_by_class: dict,
-    tau: Decimal,
+    tau: dict,
     regime: str,
     chunk_windows: int,
     resolvers: tuple = r2._DEFAULT_RESOLVERS,

@@ -68,17 +68,23 @@ def _scof(pool):
     return {f: TCLASS for f in pool}
 
 
+def _tbc(tau):
+    """tau_by_class à classe unique TCLASS (miroir de `_sbc`) : exerce le contrat τ PAR
+    CLASSE (ADR-0022) avec les τ scalaires des tests de précédence historiques."""
+    return {TCLASS: tau}
+
+
 def classify(reading, others, n_resp, win_end, sigma, tau=TAU, n_min=4, flux="a"):
-    """Adaptateur : exerce le VRAI `r1.classify_ecart` (σ PAR CLASSE + τ RELATIF)
-    en rangeant `flux` dans une classe unique de σ scalaire — conserve l'intention
-    des tests de précédence historiques sous le nouveau contrat."""
+    """Adaptateur : exerce le VRAI `r1.classify_ecart` (σ PAR CLASSE + τ PAR CLASSE)
+    en rangeant `flux` dans une classe unique — conserve l'intention des tests de
+    précédence historiques sous le nouveau contrat."""
     return r1.classify_ecart(reading, others, n_resp, win_end, flux,
-                             _sbc(sigma), {flux: TCLASS}, tau, n_min)
+                             _sbc(sigma), {flux: TCLASS}, _tbc(tau), n_min)
 
 
 def R1(markers, readings, pool, *, sigma, tau=TAU, w=60, n_min=4):
-    """Adaptateur `compute_r1` : pool dans une classe unique (σ scalaire par classe)."""
-    return r1.compute_r1(markers, readings, pool, w, _sbc(sigma), _scof(pool), tau,
+    """Adaptateur `compute_r1` : pool dans une classe unique (σ + τ par classe)."""
+    return r1.compute_r1(markers, readings, pool, w, _sbc(sigma), _scof(pool), _tbc(tau),
                          n_min=n_min)
 
 
@@ -395,11 +401,11 @@ class TestSigmaParClasse(unittest.TestCase):
         scof = {"p": "place_horodatee", "a": "agregateur"}
         r = rd(0, "p", price="100", source_ts=D(900))
         self.assertIs(
-            r1.classify_ecart(r, [D(100)] * 4, 5, 1000, "p", sbc, scof, TAU),
+            r1.classify_ecart(r, [D(100)] * 4, 5, 1000, "p", sbc, scof, {c: TAU for c in scof.values()}),
             Ecart.STALENESS)
         r2 = rd(0, "a", price="100", source_ts=D(900))
         self.assertIs(
-            r1.classify_ecart(r2, [D(100)] * 4, 5, 1000, "a", sbc, scof, TAU),
+            r1.classify_ecart(r2, [D(100)] * 4, 5, 1000, "a", sbc, scof, {c: TAU for c in scof.values()}),
             Ecart.PAS_ECART)
 
     def test_none_floor_class_skips_staleness(self):
@@ -409,7 +415,7 @@ class TestSigmaParClasse(unittest.TestCase):
         scof = {"k": "sans"}
         r = rd(0, "k", price="100", source_ts=D(0))       # très ancien
         self.assertIs(
-            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "k", sbc, scof, TAU),
+            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "k", sbc, scof, {c: TAU for c in scof.values()}),
             Ecart.PAS_ECART)                               # pas STALENESS
 
     def test_real_adr0020_floors_dispatch(self):
@@ -428,17 +434,18 @@ class TestSigmaParClasse(unittest.TestCase):
         for klass, expected in cases.items():
             r = rd(0, "f", price="100", source_ts=D(960))   # win_end 1000 → stale 40 s
             got = r1.classify_ecart(r, [D(100)] * 4, 5, 1000, "f", sbc,
-                                    {"f": klass}, TAU)
+                                    {"f": klass}, {klass: TAU})
             self.assertIs(got, expected, f"classe {klass}")
 
-    def test_unknown_flux_staleness_non_evaluable(self):
-        # Flux absent du dispatch → classe None → staleness non évaluable (fail-open
-        # documenté ; le pipeline réel fail-close la couverture au WRITE, collector).
+    def test_unknown_flux_both_axes_non_evaluable(self):
+        # Flux absent du dispatch → classe None → NI staleness NI hors-enveloppe
+        # évaluables (ADR-0022 : sans classe, pas de τ dispatché → NON_EVAL, fail-closed ;
+        # le pipeline réel fail-close la couverture au WRITE, collector).
         sbc = {"place_horodatee": D(30)}
         r = rd(0, "z", price="100", source_ts=D(0))
         self.assertIs(
-            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "z", sbc, {}, TAU),
-            Ecart.PAS_ECART)
+            r1.classify_ecart(r, [D(100)] * 4, 5, 10 ** 9, "z", sbc, {}, {TCLASS: TAU}),
+            Ecart.NON_EVAL_HORSENV)
 
 
 class TestComputeR1HarnessDown(unittest.TestCase):

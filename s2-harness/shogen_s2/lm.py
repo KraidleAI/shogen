@@ -114,7 +114,7 @@ def compute_lm(
     w: int,
     sigma_by_class: dict,
     sigma_class_of_flux: dict,
-    tau: Decimal,
+    tau: dict,
     n_min: int = r1.N_MIN_HORSENV,
 ) -> dict:
     """Estimateur L&M **par strate**, depuis les enregistrements du journal.

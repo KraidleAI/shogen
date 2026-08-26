@@ -35,6 +35,12 @@ from tests.test_collector import (
 TAU = Decimal("0.005")
 
 
+def _taumap(t):
+    """τ PAR CLASSE (ADR-0022) : diffuse un τ scalaire sur les 5 classes (adaptateur test)."""
+    return {c: t for c in ("oracle_pyth", "oracle_chainlink", "agregateur",
+                           "place_horodatee", "sans_horodatage")}
+
+
 class TestReport(unittest.TestCase):
     def setUp(self):
         self.d = tempfile.mkdtemp(prefix="s2rep_")
@@ -43,7 +49,7 @@ class TestReport(unittest.TestCase):
         self.raw = os.path.join(self.d, "raw.jsonl")
         collector.collect(
             [BY_ID[f] for f in SKELETON], self.control, self.journal, self.raw,
-            n_windows=3, sigma_by_class=sbc_huge(), tau_classe=TAU,
+            n_windows=3, sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU),
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
 
@@ -149,7 +155,7 @@ class TestReportQueueExacte(unittest.TestCase):
             return frozen_reading(spec.flux_id, ts)
 
         collector.collect([BY_ID[f] for f in SKELETON], control, journal, raw, n_windows=3,
-                          sigma_by_class=sbc_huge(), tau_classe=TAU,
+                          sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU),
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=read_fn)
         txt = report.render_report(control, journal)
         self.assertIn("queue exacte", txt)                    # publiée (non dégénérée)

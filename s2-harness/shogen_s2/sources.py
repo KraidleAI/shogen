@@ -354,6 +354,14 @@ def default_sigma_by_class() -> dict:
             for k, v in SIGMA_FLOORS_ADR0020_SECONDS.items()}
 
 
+def default_tau_by_class() -> dict:
+    """τ par classe PROVISOIRE = `TAU_CLASSE_ADR0020_FRACTION` uniforme sur les classes
+    de σ, pour la phase `demo`/`calibration` (capture SANS SEUIL, ADR-0020 reframe : la
+    valeur provisoire n'altère pas l'archive). Le τ FINAL PAR CLASSE est committé par
+    ADR (ADR-0022) via `--sigma-tau-file`, jamais deviné ici."""
+    return {k: TAU_CLASSE_ADR0020_FRACTION for k in SIGMA_FLOORS_ADR0020_SECONDS}
+
+
 def sigma_class_of_flux_for(pool: list) -> dict:
     """flux→classe restreint au `pool`, écrit dans run_params par `collector`
     (recalculable). LÈVE si un flux du pool n'a pas de classe déclarée

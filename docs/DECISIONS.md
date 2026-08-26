@@ -23,6 +23,7 @@
 | ADR-0019 | Consignation de la stratégie GTM (dossier Shōgen-GTP) : décisions ratifiées D1–D5, implications produit D6–D11 portées à leurs registres, contrôle de traçabilité en annexe | acceptée (D1–D5 ratifiées mainteneur ; dossier accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections », portées) | 2026-08-20 |
 | ADR-0020 | Paramètres ex ante de la campagne S2 : calibration 48 h, τ=0,5 % relatif, σ par classe de source, calendrier de strates week-end=stress (J0/J14/J28) — amende la décision 5 de `docs/10` §9 | acceptée (ratifiée investisseur le 2026-08-20 sur avis ADVISOR technique, adjugée orchestrateur) | 2026-08-20 |
 | ADR-0021 | Fidélité σ/τ du harnais S2 : τ relatif + σ par classe + calcul de clôture P99 — résout le CONSTAT M2 (l'instrument gelé implémente τ absolu / σ scalaire, ≠ ADR-0020) ; voie 1 | acceptée (voie 1 confirmée investisseur le 2026-08-20 ; plan accepté par `validateur-humain` le 2026-08-20 « accepte-avec-corrections » C1–C4 ; livrable dû au checkpoint #2) | 2026-08-20 |
+| ADR-0022 | Révision de τ : seuils PAR CLASSE (BTC/USD, campagne S2) — clause d'ADR-0020 déclenchée (P99 écart relatif 0,375 % > 0,25 %) ; τ scalaire→mapping (pyth 0,15 / place 0,45 / sans 0,45 / chainlink 1,65 / agreg 2,60 %), règle 1,5×max honnête (2 strates) < CAPO 2,85 % — **texte intégral + annexes recalculables : `docs/adr-0022/`** | acceptée (décision déléguée à l'orchestrateur par l'investisseur le 2026-08-26 ; plan accepté `validateur-humain` checkpoint #1 « accepte-avec-corrections » C1–C7 ; livrable accepté checkpoint #2 « accepte-avec-corrections », 5 conditions de durabilité soldées au commit) | 2026-08-26 |
 
 ---
 
@@ -3293,3 +3294,11 @@ et au certificat `04`/`08` en S4 s'ils s'avèrent porteurs pour le produit :**
 - `s2-harness/RUNBOOK-campagne.md` : σ/τ fidèles remplacent les valeurs proposées ; prep option A.
 
 ---
+
+## ADR-0022 — Révision de τ : seuils PAR CLASSE (BTC/USD, campagne S2)
+
+**Statut** : acceptée · 2026-08-26 (décision déléguée investisseur ; checkpoints #1 et #2 `validateur-humain` « accepte-avec-corrections », toutes corrections soldées au commit).
+
+Texte intégral, méthode, vérification adversariale (3 réfutants R-21), conséquences, alternatives et **provenance recalculable** : **`docs/adr-0022/ADR-0022.md`**, avec les annexes durables (`derive_tau_v2.py`, `REFUTE-{arith,contraintes,methode}.md`, `TAU-recherche.md`, `chainlink-signature.py`, `G2-review.md`, `g2_probe.py`, pré-vol, `cloture-finale.json`, `oracle-post-d2.txt`) dans le même dossier. Scripts recalculables contre le tag `adr-0022-pre-tau-mapping` (`36593b6` — le code post-changement fail-close sur le journal de calibration scalaire, C4).
+
+**Décision en bref** : τ devient PAR CLASSE (spec doc 10 §5.2 dit `τ_classe` depuis l'origine ; le drapeau τ nourrit `drapeau_2` co-défaillance). Valeurs de DÉPART : oracle_pyth 0,15 % · place_horodatee 0,45 % · sans_horodatage 0,45 % · oracle_chainlink 1,65 % · agregateur 2,60 %. Règle uniforme `grid-ceil(1,5 × max honnête sur les 2 strates, 0,05 %)`, bornée `> max honnête` et `< CAPO 2,85 %` (plus petit événement réel documenté, post-mortem Aave [lu]). σ reste par-classe (clôture P99). τ de 48 h = seuil de DÉPART → re-dérivation par `closure.tau_revision_needed` (fail-closed) après le 1er vrai week-end + rapport J14. Le volet « clause de révision par-classe dans `closure` » est reporté à l'ADR de re-dérivation (report déclaré, cf. ADR §« Report du volet closure »).

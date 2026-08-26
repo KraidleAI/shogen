@@ -64,7 +64,7 @@ class ClosureJournalCase(unittest.TestCase):
         raw = os.path.join(d, "raw.jsonl")
         collector.collect(specs, control, journal, raw, n_windows=len(buckets),
                           sigma_by_class=sigma_by_class or sources.default_sigma_by_class(),
-                          tau_classe=Decimal("0.005"), w=w, sample_lead=delta,
+                          tau_classe=sources.default_tau_by_class(), w=w, sample_lead=delta,
                           now_fn=FakeClock(_clock(buckets, w, delta)),
                           sleep_fn=lambda s: None, read_fn=read_fn)
         return control, journal
@@ -194,25 +194,48 @@ class TestClosureRecalculable(ClosureJournalCase):
         with self.assertRaisesRegex(ValueError, "SCALAIRE legacy"):
             closure.compute_closure(control, journal)
 
+    def test_legacy_scalar_tau_classe_fails_closed(self):
+        # Miroir τ (ADR-0022, C5/MAST) : un journal legacy portant `tau_classe` SCALAIRE
+        # → clôture refusée (via effective_run_params), jamais réinterprété en τ unique.
+        control, journal = self._clean()
+        with open(control, encoding="utf-8") as fh:
+            lines = fh.read().splitlines()
+        for i, ln in enumerate(lines):
+            obj = json.loads(ln)
+            if obj.get("record") == "run_params":
+                obj["tau_classe"] = "0.005"         # SCALAIRE legacy (str), plus un mapping
+                lines[i] = json.dumps(obj, ensure_ascii=False)
+                break
+        with open(control, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + "\n")
+        with self.assertRaisesRegex(ValueError, "SCALAIRE legacy"):
+            closure.compute_closure(control, journal)
+
     def test_roundtrip_closure_to_campagne_resolve(self):
-        # Round-trip RÉEL — le chemin exact que l'oracle rejoue (calibration → closure
-        # → sérialisation → --sigma-tau-file → resolve_sigma_tau("campagne")). Prouve
-        # que la sortie `closure` est consommable telle quelle par le driver.
+        # Round-trip RÉEL (ADR-0022) — le sigma-tau.json committé est ASSEMBLÉ : σ vient
+        # de la clôture, τ PAR CLASSE vient de l'ADR-0022 (le τ SCALAIRE de la clôture est
+        # désormais REJETÉ par le loader, fail-closed). Prouve que l'assemblage réel
+        # (calibration → clôture σ + τ ADR → --sigma-tau-file → resolve) est consommable.
         from shogen_s2 import run_campaign
         control, journal = self._clean()
         res = closure.compute_closure(control, journal)
-        self.assertFalse(res["tau_revision_needed"])           # τ non null → campagne OK
+        self.assertFalse(res["tau_revision_needed"])
+        tau_adr = {"oracle_pyth": "0.0015", "place_horodatee": "0.0045",
+                   "sans_horodatage": "0.0045", "oracle_chainlink": "0.0165",
+                   "agregateur": "0.026"}                      # valeurs ADR-0022 (par classe)
+        assembled = {"sigma_classe": closure._jsonable(res)["sigma_classe"],
+                     "tau_classe": tau_adr}
         d = tempfile.mkdtemp(prefix="s2rt_")
         path = os.path.join(d, "sigma_tau.json")
         with open(path, "w", encoding="utf-8") as f:
-            json.dump(closure._jsonable(res), f, ensure_ascii=False)
+            json.dump(assembled, f, ensure_ascii=False)
         sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("campagne", path)
-        # σ/τ chargés == σ/τ calculés (Decimal round-trip via chaîne exacte).
+        # σ chargés == σ calculés par la clôture ; τ == τ PAR CLASSE de l'ADR.
         self.assertEqual(sigma_by_class["place_horodatee"],
                          res["sigma_classe"]["place_horodatee"])
         self.assertIsNone(sigma_by_class["sans_horodatage"])
-        self.assertEqual(tau, res["tau_classe"])
-        self.assertEqual(tau, Decimal("0.005"))
+        self.assertEqual(tau["agregateur"], Decimal("0.026"))
+        self.assertEqual(tau["oracle_chainlink"], Decimal("0.0165"))
         self.assertIn("CAMPAGNE", regime)
 
     def test_cli_emits_json(self):

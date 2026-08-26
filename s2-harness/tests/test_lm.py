@@ -40,7 +40,7 @@ def LM(markers, readings, pool, *, sigma=SIGMA_HUGE, tau=TAU, w=60, n_min=4):
     par classe), exerce le VRAI `lm.compute_lm` (σ PAR CLASSE + τ RELATIF)."""
     sbc = {TCLASS: (None if sigma is None else Decimal(str(sigma)))}
     scof = {f: TCLASS for f in pool}
-    return lm.compute_lm(markers, readings, pool, w, sbc, scof, tau, n_min)
+    return lm.compute_lm(markers, readings, pool, w, sbc, scof, {TCLASS: tau}, n_min)
 
 
 def panne(ws, flux):

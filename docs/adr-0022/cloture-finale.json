@@ -1,0 +1,40 @@
+{
+  "floors_by_class": {
+    "agregateur": 300,
+    "oracle_chainlink": 5400,
+    "oracle_pyth": 30,
+    "place_horodatee": 30,
+    "sans_horodatage": null
+  },
+  "n_ecart_relatif_evaluables": 34533,
+  "n_fenetres_calibration": 2880,
+  "n_staleness_par_classe": {
+    "agregateur": 5756,
+    "oracle_chainlink": 2878,
+    "oracle_pyth": 2875,
+    "place_horodatee": 14390
+  },
+  "note": "Clôture de calibration (ADR-0021 item 4) : σ_s = max(plancher, 3×P99 staleness honnête PAR CLASSE) ; τ committé = τ_base sauf clause de révision (P99 écart relatif > seuil → révision par ADR, fail-closed). Recalculable depuis le journal de calibration seul (ADR-0003).",
+  "p99_ecart_relatif": "0.0037515767875929715838013535511088546110241660691012",
+  "p99_staleness_par_classe": {
+    "agregateur": "380.0",
+    "oracle_chainlink": "3565.0",
+    "oracle_pyth": "11.0",
+    "place_horodatee": "60.0",
+    "sans_horodatage": null
+  },
+  "percentile": 99,
+  "percentile_method": "nearest-rank (rank=ceil(p/100*N), 1-indexe) — Wikipedia Percentile",
+  "sigma_classe": {
+    "agregateur": "1140.0",
+    "oracle_chainlink": "10695.0",
+    "oracle_pyth": "33.0",
+    "place_horodatee": "180.0",
+    "sans_horodatage": null
+  },
+  "staleness_multiplier": 3,
+  "tau_base": "0.005",
+  "tau_classe": null,
+  "tau_revision_needed": true,
+  "tau_revision_threshold": "0.0025"
+}

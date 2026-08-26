@@ -79,8 +79,8 @@ class TestSigmaTauFidele(unittest.TestCase):
         self.assertEqual(sigma_by_class, sources.default_sigma_by_class())
         self.assertEqual(sigma_by_class["place_horodatee"], Decimal("30"))
         self.assertIsNone(sigma_by_class["sans_horodatage"])
-        self.assertEqual(tau, sources.TAU_CLASSE_ADR0020_FRACTION)
-        self.assertEqual(tau, Decimal("0.005"))
+        self.assertEqual(tau, sources.default_tau_by_class())
+        self.assertEqual(tau["place_horodatee"], Decimal("0.005"))
         self.assertIn("PROVISOIRES", regime)
 
     def test_calibration_returns_per_class_provisional_floors(self):
@@ -88,7 +88,7 @@ class TestSigmaTauFidele(unittest.TestCase):
         # provisoires (la capture est SANS SEUIL ; les σ finaux = clôture P99 post-hoc).
         sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("calibration")
         self.assertEqual(sigma_by_class, sources.default_sigma_by_class())
-        self.assertEqual(tau, Decimal("0.005"))
+        self.assertEqual(tau, sources.default_tau_by_class())
         self.assertIn("CALIBRATION", regime)
 
     def test_campagne_without_file_fails_closed(self):
@@ -104,12 +104,14 @@ class TestSigmaTauFidele(unittest.TestCase):
         with open(path, "w", encoding="utf-8") as f:
             json.dump({"sigma_classe": {"place_horodatee": "390", "agregateur": "500",
                                         "sans_horodatage": None},
-                       "tau_classe": "0.005"}, f)
+                       "tau_classe": {"place_horodatee": "0.0045", "agregateur": "0.026",
+                                      "sans_horodatage": "0.0045"}}, f)
         sigma_by_class, tau, regime = run_campaign.resolve_sigma_tau("campagne", path)
         self.assertEqual(sigma_by_class["place_horodatee"], Decimal("390"))
         self.assertEqual(sigma_by_class["agregateur"], Decimal("500"))
         self.assertIsNone(sigma_by_class["sans_horodatage"])
-        self.assertEqual(tau, Decimal("0.005"))
+        self.assertEqual(tau["agregateur"], Decimal("0.026"))
+        self.assertEqual(tau["place_horodatee"], Decimal("0.0045"))
         self.assertIn("CAMPAGNE", regime)
 
     def test_campagne_file_scalar_sigma_fails_closed(self):
@@ -127,7 +129,7 @@ class TestSigmaTauFidele(unittest.TestCase):
         d = tempfile.mkdtemp(prefix="s2stf_")
         path = os.path.join(d, "abstau.json")
         with open(path, "w", encoding="utf-8") as f:
-            json.dump({"sigma_classe": {"place_horodatee": "30"}, "tau_classe": "50"}, f)
+            json.dump({"sigma_classe": {"place_horodatee": "30"}, "tau_classe": {"place_horodatee": "50"}}, f)
         with self.assertRaises(run_campaign.SigmaTauNonRepresentable):
             run_campaign.resolve_sigma_tau("campagne", path)
 
@@ -206,7 +208,7 @@ class RunSegmentCase(unittest.TestCase):
         return run_campaign.run_segment(
             self.specs, self.d, "demo", n_windows,
             w=60, sample_lead=10.0, sigma_by_class=sources.default_sigma_by_class(),
-            tau=sources.TAU_CLASSE_ADR0020_FRACTION, regime="TEST", chunk_windows=chunk,
+            tau=sources.default_tau_by_class(), regime="TEST", chunk_windows=chunk,
             now_fn=FakeClock(clock), sleep_fn=lambda s: None,
             read_fn=frozen_read_fn, resolve_fn=mock_resolve, log=lambda m: None,
         )

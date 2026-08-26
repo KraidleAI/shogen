@@ -65,6 +65,12 @@ SIGMA_HUGE = Decimal("1e12")
 TAU = Decimal("0.005")                             # τ RELATIF (fraction) — était 50 ABSOLU
 
 
+def _taumap(t):
+    """τ PAR CLASSE (ADR-0022) : diffuse un τ scalaire sur les 5 classes (adaptateur test)."""
+    return {c: t for c in ("oracle_pyth", "oracle_chainlink", "agregateur",
+                           "place_horodatee", "sans_horodatage")}
+
+
 def sbc_huge() -> dict:
     """sigma_by_class « propre » : aucune staleness possible (planchers énormes)."""
     return {"place_horodatee": SIGMA_HUGE, "agregateur": SIGMA_HUGE,
@@ -113,7 +119,7 @@ class CollectorCase(unittest.TestCase):
     def _collect(self, read_fn=frozen_read_fn, clock=None, sigma_by_class=None):
         return collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_by_class=sigma_by_class or sbc_huge(), tau_classe=TAU,
+            sigma_by_class=sigma_by_class or sbc_huge(), tau_classe=_taumap(TAU),
             now_fn=FakeClock(clock or CLOCK), sleep_fn=lambda s: None, read_fn=read_fn,
         )
 
@@ -184,7 +190,7 @@ class TestEndOfWindowSampling(CollectorCase):
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
                           sigma_by_class={"place_horodatee": Decimal("30"),
                                           "sans_horodatage": None},
-                          tau_classe=TAU, w=w_r, sample_lead=delta_r,
+                          tau_classe=_taumap(TAU), w=w_r, sample_lead=delta_r,
                           now_fn=FakeClock(clock_r), sleep_fn=sleeps.append, read_fn=read_fn)
         # Épingle le MÉCANISME (pas seulement le comportement) : dors d'abord,
         # lis à ws+w−δ. sleep = (ws+w−δ) − now = 58−5 / 118−65 / 178−125 = 53 s.
@@ -251,7 +257,7 @@ class TestRunParamsConcordance(CollectorCase):
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
                           sigma_by_class={"place_horodatee": Decimal("999"),
                                           "sans_horodatage": None},
-                          tau_classe=TAU,
+                          tau_classe=_taumap(TAU),
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with self.assertRaises(ValueError):
             r1.recompute_from_journal(self.control, self.journal)
@@ -262,7 +268,7 @@ class TestRunParamsConcordance(CollectorCase):
         # pas en silence dans le même n par strate.
         self._collect()                                    # 1er démarrage : spec single
         collector.collect(self.specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_by_class=sbc_huge(), tau_classe=TAU,
+                          sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU),
                           strate_spec=window.WEEKEND_STRATE_SPEC,  # 2ᵉ : calendrier différent
                           now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with self.assertRaises(ValueError):
@@ -332,7 +338,7 @@ class TestTwoStrateCalendar(CollectorCase):
             clock += [float(b) + 1.0, float(tr)]
         collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_by_class=sbc_huge(), tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
+            sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU), strate_spec=window.WEEKEND_STRATE_SPEC,
             now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         return sat, sun, mon
@@ -382,7 +388,7 @@ class TestFullPool(CollectorCase):
     def test_collect_all_twelve_flux_clean(self):
         completed = collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_by_class=sbc_huge(), tau_classe=Decimal("1e9"),   # τ relatif énorme → rien hors-env
+            sigma_by_class=sbc_huge(), tau_classe=_taumap(Decimal("1e9")),   # τ relatif énorme → rien hors-env
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         self.assertEqual(completed, 3)
@@ -411,7 +417,7 @@ class TestFullPool(CollectorCase):
         #  0,5 % ne flaggerait rien ; 0,1 % garde un hors-enveloppe à tester.)
         collector.collect(
             self.specs, self.control, self.journal, self.raw, n_windows=3,
-            sigma_by_class=sbc_huge(), tau_classe=Decimal("0.001"),
+            sigma_by_class=sbc_huge(), tau_classe=_taumap(Decimal("0.001")),
             now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None, read_fn=frozen_read_fn,
         )
         blk = r1.recompute_from_journal(self.control, self.journal)["strates"]["calme"]

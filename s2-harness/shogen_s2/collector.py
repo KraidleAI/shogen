@@ -101,7 +101,7 @@ def collect(
     n_windows: int,
     *,
     sigma_by_class: dict,
-    tau_classe: Decimal,
+    tau_classe: dict,
     w: int = W_DEFAULT,
     sample_lead: float = SAMPLE_LEAD_DEFAULT,
     strate_spec: Optional[dict] = None,
@@ -118,8 +118,8 @@ def collect(
     **σ PAR CLASSE + τ RELATIF (ADR-0021)** : `sigma_by_class` est un mapping
     classe→plancher (Decimal secondes, ou `None` = « non évaluable ») ; le dispatch
     flux→classe est dérivé de `sources.SIGMA_CLASS_OF_FLUX` (source unique de vérité)
-    et écrit dans run_params (porteur, recalculable). `tau_classe` est une FRACTION
-    relative (0,5 % = 0.005), consommée par `r1.classify_ecart` en
+    et écrit dans run_params (porteur, recalculable). `tau_classe` est un MAPPING
+    classe→fraction relative (ADR-0022), consommé par `r1.classify_ecart` en
     `|prix − médiane_LOO| / médiane_LOO > τ`. La CAPTURE reste SANS SEUIL (ADR-0020
     reframe) : ces paramètres ne gouvernent que le scoring DÉRIVÉ, pas l'archive.
 
@@ -174,7 +174,7 @@ def collect(
         # (§E, records.LOAD_BEARING_KEYS) : un scalaire legacy y lève au recalcul.
         "sigma_classe": sigma_classe_serialized,
         "sigma_class_of_flux": sigma_class_of_flux,
-        "tau_classe": str(tau_classe),       # FRACTION relative (ADR-0020 déc. 2)
+        "tau_classe": {k: str(v) for k, v in tau_classe.items()},  # MAPPING classe→fraction (ADR-0022)
         "kappa": kappa_note,
         # Calendrier de strates committé ex ante (§5.3) — clé PORTEUSE (§E,
         # records.LOAD_BEARING_KEYS) : recalculable + immutable entre reprises.

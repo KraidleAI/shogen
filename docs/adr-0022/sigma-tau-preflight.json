@@ -1,0 +1,17 @@
+{
+  "sigma_classe": {
+    "agregateur": "1140.0",
+    "oracle_chainlink": "10695.0",
+    "oracle_pyth": "33.0",
+    "place_horodatee": "180.0",
+    "sans_horodatage": null
+  },
+  "tau_classe": {
+    "oracle_pyth": "0.0015",
+    "place_horodatee": "0.0045",
+    "sans_horodatage": "0.0045",
+    "oracle_chainlink": "0.0165",
+    "agregateur": "0.026"
+  },
+  "_provenance": "ADR-0022 : σ = clôture calibration ; τ PAR CLASSE = ADR-0022"
+}

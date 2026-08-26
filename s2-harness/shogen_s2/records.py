@@ -50,8 +50,8 @@ LOAD_BEARING_KEYS = (
 # `sigma_classe` est désormais un MAPPING classe→plancher (ADR-0021 item 2) et
 # `sigma_class_of_flux` un MAPPING flux→classe (nouveau, porteur : un dispatch σ
 # divergent entre démarrages reclasserait l'historique en silence, §E). `tau_classe`
-# reste un scalaire mais est désormais une FRACTION relative (ADR-0020 déc. 2). Un
-# journal legacy portant `sigma_classe` SCALAIRE lève (fail-closed, cf.
+# est désormais un MAPPING classe→fraction relative (ADR-0022) — plus un scalaire. Un
+# journal legacy portant `sigma_classe` OU `tau_classe` SCALAIRE lève (fail-closed, cf.
 # `effective_run_params`) : jamais réinterprété.
 
 # Clés porteuses PROPRES À R2 (M1c) : elles gouvernent la PARTITION et les
@@ -139,6 +139,16 @@ def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS
             "en σ unique (fail-closed) : un scalaire dévierait silencieusement "
             "d'ADR-0020 déc. 3."
         )
+    # FAIL-CLOSED SCALAIRE LEGACY τ (ADR-0022) : `tau_classe` DOIT être un mapping
+    # classe→fraction (τ PAR CLASSE). Un journal legacy portant un scalaire (ex.
+    # "0.005") LÈVE ici — jamais réinterprété comme un τ unique appliqué à tout.
+    if "tau_classe" in load_bearing and not isinstance(base.get("tau_classe"), dict):
+        raise ValueError(
+            "tau_classe est un SCALAIRE legacy "
+            f"({base.get('tau_classe')!r}) — attendu : mapping classe→fraction "
+            "(τ par classe, ADR-0022). Recalcul refusé, jamais réinterprété en τ unique "
+            "(fail-closed) : un scalaire dévierait silencieusement d'ADR-0022."
+        )
     divergences = []
     for p in params_list[1:]:
         for k in load_bearing:
@@ -157,7 +167,7 @@ def sigma_tau_from_params(params: dict):
     (ADR-0021) — source partagée par les 4 lecteurs recalculables (r1/lm/r2/report),
     donc jamais de divergence de décodage. `sigma_classe` = mapping classe→secondes
     (Decimal) ou `None` (« non évaluable ») ; `sigma_class_of_flux` = mapping
-    flux→classe ; `tau` = FRACTION relative (Decimal). Précondition : `params` est
+    flux→classe ; `tau` = mapping classe→fraction (Decimal, ADR-0022). Précondition : `params` est
     passé par `effective_run_params` (qui garantit la présence porteuse ET que
     `sigma_classe` est un mapping — fail-closed sur scalaire legacy)."""
     sbc_raw = params["sigma_classe"]
@@ -165,14 +175,15 @@ def sigma_tau_from_params(params: dict):
         k: (None if v is None else Decimal(str(v))) for k, v in sbc_raw.items()
     }
     sigma_class_of_flux = dict(params["sigma_class_of_flux"])
-    tau = Decimal(str(params["tau_classe"]))
-    # Pas de garde 0<τ<1 ICI (chemin recompute) : le collecteur écrit TOUJOURS un τ
-    # fractionnel (clé LOAD_BEARING, concordance fail-closed), donc un journal RÉEL ne
-    # peut porter un τ absolu ; et la suite de tests utilise un τ volontairement grand
-    # comme sentinelle « désactive l'axe enveloppe » (miroir du σ géant). La garde de
-    # plausibilité τ vit au POINT D'ENTRÉE OPÉRATEUR — le fichier σ/τ committé
-    # (`run_campaign._load_committed_sigma_tau`), seul endroit où une main humaine fixe τ.
-    return sigma_by_class, sigma_class_of_flux, tau
+    # τ PAR CLASSE (ADR-0022) : mapping classe→fraction, miroir de `sigma_by_class`.
+    tau_by_class = {k: Decimal(str(v)) for k, v in params["tau_classe"].items()}
+    # Pas de garde 0<τ<1 ICI (chemin recompute) : le collecteur écrit TOUJOURS des τ
+    # fractionnels (clé LOAD_BEARING, concordance fail-closed) ; et la suite de tests
+    # utilise un τ volontairement grand comme sentinelle « désactive l'axe enveloppe »
+    # (miroir du σ géant). La garde de plausibilité τ vit au POINT D'ENTRÉE OPÉRATEUR —
+    # le fichier σ/τ committé (`run_campaign._load_committed_sigma_tau`, PAR CLASSE),
+    # seul endroit où une main humaine fixe τ.
+    return sigma_by_class, sigma_class_of_flux, tau_by_class
 
 
 def run_params_record(params: dict) -> dict:

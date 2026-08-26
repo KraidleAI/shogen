@@ -43,6 +43,12 @@ TAU = D("0.005")
 PREC = r2.DECIMAL_PREC
 
 
+def _taumap(t):
+    """τ PAR CLASSE (ADR-0022) : diffuse un τ scalaire sur les 5 classes (adaptateur test)."""
+    return {c: t for c in ("oracle_pyth", "oracle_chainlink", "agregateur",
+                           "place_horodatee", "sans_horodatage")}
+
+
 def _sbc() -> dict:
     """sigma_by_class « propre » : aucune staleness possible (planchers énormes),
     plus une classe de test `tclass` pour les flux synthétiques."""
@@ -541,7 +547,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         self.raw = os.path.join(self.d, "raw.jsonl")
         specs = [BY_ID[f] for f in SKELETON]
         collector.collect(specs, self.control, self.journal, self.raw, n_windows=3,
-                          sigma_by_class=_sbc(), tau_classe=TAU, now_fn=FakeClock(CLOCK),
+                          sigma_by_class=_sbc(), tau_classe=_taumap(TAU), now_fn=FakeClock(CLOCK),
                           sleep_fn=lambda s: None, read_fn=frozen_read_fn)
 
         def mock(host, resolvers):
@@ -584,7 +590,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         raw = os.path.join(d, "raw.jsonl")
         specs = [BY_ID[f] for f in SKELETON]
         collector.collect(specs, control, j, raw, n_windows=3, sigma_by_class=_sbc(),
-                          tau_classe=TAU, now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None,
+                          tau_classe=_taumap(TAU), now_fn=FakeClock(CLOCK), sleep_fn=lambda s: None,
                           read_fn=frozen_read_fn)
 
         def mock(host, resolvers):
@@ -626,7 +632,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
                            price=price, currency=spec.currency, source_ts=ts)
 
         collector.collect(specs, control, j, raw, n_windows=n, sigma_by_class=_sbc(),
-                          tau_classe=Decimal("1e9"), now_fn=FakeClock(clock),
+                          tau_classe=_taumap(Decimal("1e9")), now_fn=FakeClock(clock),
                           sleep_fn=lambda s: None, read_fn=read_fn)
         out = r2.recompute_r2_from_journal(control, j)
         peg = out["content"]["peg_pairs"]
@@ -665,7 +671,7 @@ class TestRecomputeHousePattern(unittest.TestCase):
         j = os.path.join(d, "journal.jsonl")
         raw = os.path.join(d, "raw.jsonl")
         collector.collect(specs, control, j, raw, n_windows=3, sigma_by_class=_sbc(),
-                          tau_classe=TAU, strate_spec=window.WEEKEND_STRATE_SPEC,
+                          tau_classe=_taumap(TAU), strate_spec=window.WEEKEND_STRATE_SPEC,
                           now_fn=FakeClock([float(1785000000 + 60 * i) for i in range(7)]),
                           sleep_fn=lambda s: None, read_fn=frozen_read_fn)
         with open(control, encoding="utf-8") as fh:

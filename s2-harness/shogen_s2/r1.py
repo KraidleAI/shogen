@@ -110,6 +110,23 @@ def _sigma_floor_for_flux(
     return sigma_by_class.get(klass)
 
 
+def _tau_for_flux(
+    flux_id: str,
+    tau_by_class: dict,
+    sigma_class_of_flux: dict,
+) -> Optional[Decimal]:
+    """τ RELATIF applicable au flux, par DISPATCH DE CLASSE (ADR-0022 : τ PAR CLASSE ;
+    miroir exact de `_sigma_floor_for_flux`) : flux → classe (`sigma_class_of_flux`) →
+    τ (`tau_by_class` classe→fraction). Rend `None` si le flux n'a pas de classe
+    déclarée OU si sa classe ne porte pas de τ — l'axe (i) hors-enveloppe devient « non
+    évaluable » pour ce flux (fail-closed : jamais un τ deviné). Le loader campagne
+    (`run_campaign._load_committed_sigma_tau`) garantit la complétude au lancement."""
+    klass = sigma_class_of_flux.get(flux_id)
+    if klass is None:
+        return None
+    return tau_by_class.get(klass)
+
+
 def classify_ecart(
     reading: Optional[dict],
     others_prices: list[Decimal],
@@ -118,7 +135,7 @@ def classify_ecart(
     flux_id: str,
     sigma_by_class: dict,
     sigma_class_of_flux: dict,
-    tau: Decimal,
+    tau: dict,
     n_min: int = N_MIN_HORSENV,
 ) -> Ecart:
     """Classe un couple (fenêtre, source), précédence **panne > staleness >
@@ -131,8 +148,10 @@ def classify_ecart(
     CLASSE de la source (`sigma_by_class` classe→plancher, `sigma_class_of_flux`
     flux→classe). σ=None → staleness non évaluable pour ce flux.
 
-    **τ RELATIF (ADR-0020 déc. 2, ADR-0021 item 1 [C2a])** : hors-enveloppe =
-    `|prix − médiane_LOO| / médiane_LOO > τ` (τ FRACTION). L'`abs()` reste au
+    **τ RELATIF PAR CLASSE (ADR-0022 ; ADR-0020 déc. 2, ADR-0021 item 1 [C2a])** :
+    hors-enveloppe = `|prix − médiane_LOO| / médiane_LOO > τ_classe`, `τ_classe`
+    dispatché par `_tau_for_flux(flux_id, tau, sigma_class_of_flux)` (`tau` = mapping
+    classe→fraction ; `None` → axe non évaluable). L'`abs()` reste au
     NUMÉRATEUR ; c'est la DIVISION par la médiane qui définit le critère. GARDE
     `médiane_LOO > 0` fail-closed : une médiane ≤ 0 rend l'enveloppe relative
     indéfinie → « non évaluable », jamais « pas d'écart » (§5.2 ; jamais une
@@ -163,7 +182,12 @@ def classify_ecart(
             if m_loo <= 0:
                 return Ecart.NON_EVAL_HORSENV
             price = Decimal(reading["price"])
-            if abs(price - m_loo) / m_loo > tau:
+            tau_flux = _tau_for_flux(flux_id, tau, sigma_class_of_flux)
+            if tau_flux is None:
+                # classe sans τ committé → axe (i) NON évaluable (fail-closed :
+                # jamais « pas d'écart » ni « hors-enveloppe » sans τ dispatché).
+                return Ecart.NON_EVAL_HORSENV
+            if abs(price - m_loo) / m_loo > tau_flux:
                 return Ecart.HORS_ENVELOPPE
             return Ecart.PAS_ECART
         return Ecart.NON_EVAL_HORSENV
@@ -284,7 +308,7 @@ def _classify_window(
     w: int,
     sigma_by_class: dict,
     sigma_class_of_flux: dict,
-    tau: Decimal,
+    tau: dict,
     n_min: int = N_MIN_HORSENV,
 ) -> dict[str, Ecart]:
     """Classe chaque source du pool dans la fenêtre `ws`. Répondantes = OK avec
@@ -314,7 +338,7 @@ def classify_cells(
     w: int,
     sigma_by_class: dict,
     sigma_class_of_flux: dict,
-    tau: Decimal,
+    tau: dict,
     n_min: int = N_MIN_HORSENV,
 ) -> dict[tuple[int, str], Ecart]:
     """Écart de chaque cellule (fenêtre×source) des fenêtres complétées — pour
@@ -338,7 +362,7 @@ def compute_r1(
     w: int,
     sigma_by_class: dict,
     sigma_class_of_flux: dict,
-    tau: Decimal,
+    tau: dict,
     seuil_hist: Decimal = SEUIL_HIST,
     n_min: int = N_MIN_HORSENV,
 ) -> dict:
