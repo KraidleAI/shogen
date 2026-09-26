@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "monark-docs-preview",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd /d F:\Monark-wt-docs\apps\site && set HELIUS_API_KEY=&& set CHAINSTACK_ETH_URL=&& set CHAINSTACK_SOLANA_URL=&& set CHAINSTACK_BASE_URL=&& set CHAINSTACK_BSC_URL=&& set CHAINSTACK_ROBINHOOD_URL=&& set POLYGON_API_KEY=&& set DATABENTO_API_KEY=&& set TEMP=F:\tmp&& set TMP=F:\tmp&& set NEXT_TELEMETRY_DISABLED=1&& npx next dev -H 127.0.0.1 -p 3050"],
+      "port": 3050
+    }
+  ]
+}
