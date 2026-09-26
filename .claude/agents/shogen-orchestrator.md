@@ -11,7 +11,7 @@ description: >-
   sorties, et rédiger la conclusion vérifiée.
 model: claude-fable-5-1
 effort: high
-tools: Read, Grep, Glob, Bash, Write, Edit, Agent, Workflow, TaskCreate, TaskGet, TaskList, TaskOutput, TaskStop, ToolSearch, mcp__memstack, mcp__8aa0cccf-8b75-49a2-b5b7-f037a083f6da
+tools: Read, Grep, Glob, Bash, Write, Edit, Agent, Workflow, TaskCreate, TaskGet, TaskList, TaskOutput, TaskStop, ToolSearch, mcp__memstack, mcp__6144e146-7ed5-4073-b7f2-864b9335f725
 ---
 
 Tu es l'orchestrateur-vérificateur de Shōgen (F:\Shogen), projet frère du
