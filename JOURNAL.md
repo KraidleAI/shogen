@@ -46,3 +46,8 @@
 ## 2026-09-23 — Réparation n° 3 des journaux de campagne S2 (reboot 22/09 21:38Z)
 
 Voir `F:\shogen-campagne\campagne\REPAIR-2026-09-23.md` (+ `.log`, `repair-2026-09-23.py`, sauvegardes `*.bak-precut-20260923`) : 5 lignes NUL excisées (control 1, journal 1, raw 3 dont 2 héritées des 16/18-09), 32 627 fenêtres intactes, driver relancé 20:10:06Z, reprise 32627→37440. Items : SHOGEN-TORN-LINE-1 (auto-isolement à la reprise, avant S3) ; déviation err.log écrasé. error_origin = environnement.
+
+
+## 2026-09-26 — Incident double pilote S2 (24/09 18:18Z → 26/09 15:08Z) ; ADR-0025 proposée (exclusion + sensibilité)
+
+Deux pilotes écrivaient le même journal (chaîne Startup relancée au logon du 25/09 04:54Z) ; chaîne B arrêtée 15:08:53Z par l'orchestrateur MONARK sur go investisseur, chaîne A conservée, garde `run-onboot.bat` durcie (voir `F:\shogen-campagne\INCIDENT-2026-09-26-double-pilote.md`). Recompte 15:24Z : 36 557 fenêtres distinctes, 2 207 doublées, plage 2 617 ; stress après exclusion 157,4 h → 190,0 h projetées au 28/09 01:27Z. `docs/adr-0025/ADR-0025-periode-doublee-S2.md` = G0 proposé (exclusion de la plage de n/K/P̂ dans les trois strates, filtre du lecteur, sensibilité publiée, déclencheur de prolongation) — à accepter AVANT tout z. Items : SHOGEN-LOOP-GUARD-1 (fin de campagne), SHOGEN-KEFF-NEFF-ADR-1 (dette 04 §6.1 : k_eff = classes, n_eff = inverse-Simpson).
