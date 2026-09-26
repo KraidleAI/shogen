@@ -1,0 +1,281 @@
+claude-opus-5-5[1m]
+
+# 15 — Étude Shōgen × Pocket Network — synthèse (2026-09-25/26)
+
+## 0. En-tête
+
+- **Titre** : Ce que Pocket Network (Shannon) prouve et ne prouve pas au code ; ce que nous avons réellement ; ce qui reste à décider.
+- **Date de rédaction** : 2026-09-26 (worker de synthèse, contexte frais).
+- **Modèle résolu (R-1)** : `claude-opus-5-5[1m]` — préfixe `claude-opus-5-5` conforme (décision investisseur 133 du 2026-09-22). Effort max.
+- **STATUT — USAGE INTERNE.** Aucun usage public d'un constat marqué sensible avant test ET préavis privé (`07-gtm.md` §6.3). Le dépôt de gouvernance MONARK est PUBLIC (ETAT-DOJO §3) : ce rapport reste NON committé jusqu'à relecture adversariale de l'orchestrateur (R-21), et la section 5 est isolée.
+- **Périmètre** : synthèse des 8 archives de chercheurs (Opus 5.5, 25-26/09), de la campagne de réfutation W1 (160 réfutations), des FAITS de l'orchestrateur (21/09, 23/09, 25/09) et de l'avis advisor-marché du 23/09. Objet mesuré = le réseau **Pocket Network Shannon** (protocole poktroll, passerelles PATH/SAGE, portail agentique, indexeur, registre LCD) et son adjacence à Shōgen/MONARK. **Aucune donnée de marché n'est un fait** (valeurs du jour). Ce rapport est une **donnée brute pour l'orchestrateur**, à vérifier avant consommation.
+- **Ce que je n'ai PAS lu / établi** (détail §12, §14) : les fichiers `lcd/suppliers-q*.json` bruts (34 Mo × 18 ; je m'appuie sur `RESULTATS-concentration.txt` reproduit byte-identique par deux archives) ; `refutations/RESULTATS.json` intégralement (14 champs lus par script, 16 claims porteuses extraites) ; les données/scripts par chercheur ; les PDF `biblio/` ; le journal du sentinel sur le VPS ; les corps des réponses Pocket discordantes (jamais capturés) ; les votes Snapshot ; les P&L Google Drive de PNF ; toute page en direct (aucun réseau ici).
+- **ERRATUM d'horodatage (hérité, orchestrateur)** : les heures « UTC » du FAITS 25/09 non suffixées « Z » sont l'heure **locale UTC+1** ; `lcd/READ-AT.txt` (20:47:39Z) fait foi. Contradictions X-11 / K-8 / 7-1 / 7-6 levées par cet erratum ; `error_origin` orchestrateur.
+
+## 1. Résumé exécutif (≤ 40 lignes)
+
+- **Ce que Pocket EST** : un réseau RPC permissionless (Cosmos SDK, poktroll v0.1.35 déployé, commit `a109dd0`), 4 484 suppliers on-chain, 204 propriétaires, 246 services, 8 gateways, tarif de gros 1 $/milliard de CU (FAITS §1-§2 [lu] ; protocole §1ter [lu+mesure]). Il **prouve qu'UN relay a été servi** dans une session (existence), signé par la clé d'**opérateur** du supplier.
+- **Ce que Pocket N'A PAS** : (a) aucune vérification du **contenu** d'une réponse — une réponse fausse bien formée est payée comme une vraie (protocole §4.4 [lu]) ; (b) aucune **identité/indépendance** d'opérateur on-chain (un seul champ observable : l'URL d'endpoint ; protocole §7 [lu]) ; (c) l'échantillonneur de preuves **ne tire quasiment rien** : ≈ 764 sélections observables sur ≈ 1 465 attendues en 7 jours (protocole §4.5 [mesure], corrigé P-10) ; (d) une **concentration** que son propre standard ERC-8294 exige de publier, mais qu'il ne publie pas (juridique §14 H-1 ; agentique §20 [lu]).
+- **Ce que NOUS avons RÉELLEMENT** (règle Branchement — « servi » = README MONARK « What is served today ») : `attest·gate·cascade·calibrate` **servis** (MCP+HTTP), Narabi **servi** avec Pocket compté UN opérateur dans un quorum de 2 (`operatorOf {nodies,pocket}`), Bell **servi** (Solana). **Câblé, hors registre public** : le compteur de concordance L-4. **Spec seulement** : le certificat de diversité 04 (S2 en campagne, **aucun z publié**). Les scripts de cette étude sont des **prototypes de mesure**, jamais un instrument servi (shogen-interne §5, §16.1 ; ecosysteme §11 ; gateways §13 ; agentique §21).
+- **La donnée R1 Pocket honnête** : 9 lectures d'archive `eth_getLogs` identiques rejouées ⇒ **7 concordantes, 1 erreur d'élagage, 1 valeur discordante sans erreur** ; n ≤ 12, une méthode, une chaîne, un jour ⇒ **anecdote documentée, aucun taux** (shogen-interne §2.2, SI-15 [lu]).
+- **DÉCISION INVESTISSEUR 230 (2026-09-26 15:4x UTC, verbatim « shogen est une pièce dans monark, pas de jeton »)** : Shōgen est un composant de MONARK, aucun jeton propre ; le seul jeton est MONARK. L'arbitrage « qui propose à PNF » est TRANCHÉ — le proposant est **MONARK** (Shōgen y est une pièce) ; la neutralité D11 s'applique à **MONARK entier** : aucun revenu venant de Pocket tant qu'une mesure de Pocket est publiée. Lève les contradictions SI-10/SI-11, juridique X-10, shogen-interne 7-3 (voir §4 ligne 16).
+- **Décisions qui restent à l'investisseur** (détail §9, §7) : **(1)** hackathon (dépôt 12/10) — l'orchestrateur (avis advisor-marché) tranche « **ne pas soumettre** ; lire la sélection des lauréats après le 12/10 comme sonde gratuite » ; go/no-go final = investisseur (gain = app stake PNF + 2,5 % « source owner » = revenu du mesuré, D11 ; entité non constituée) ; **(2)** publier ou non une mesure de concentration tirée de la LCD/indexeur PNF (§9.6 : usage interne libre, publication future = agrégats sans nom) ; **(3)** traitement R1 de la période S2 doublée — tranché « exclure + sensibilité » (§9.7), reste à valider dans l'ADR-0025 avant tout z ; **(4)** achat/stake de POKT (acte investisseur) après création de société (LEGAL-ATLAS).
+
+## 2. Le protocole tel que lu au code (protocole §1-§8, [lu] sauf mention ; commit déployé `a109dd0` = tête `main` `2b45ff9` sur 17 fichiers porteurs, protocole §1ter)
+
+- **Signature d'opérateur (Q1, protocole §2, corrigé W1 P-01/P-02/D-18)** : le RelayMiner signe la `RelayResponse` avec la clé de l'**adresse d'opérateur** du supplier ; ECDSA secp256k1 (défaut du keyring, non imposé par le code) sur **SHA-256(SHA-256(M))** (double SHA-256), M = réponse sérialisée avec signature à nil ET **charge utile à nil SI `payload_hash` présent** (chaîne ≥ v0.1.25). La signature **couvre** : en-tête de session (app, service, session_id, hauteurs début/fin), `payload_hash` (SHA-256 de la réponse HTTP), `relay_miner_error`. Elle **ne couvre PAS** : la requête (aucun hash de requête), l'instant hors des bornes de session (20 blocs ≈ 20,4 min), la charge utile autrement que par son hash. Les réponses d'ERREUR ne sont PAS signées (protocole §2.1, P-01 note [lu]).
+- **Ce qu'elle ne relie pas — arbitrage protocole §12.6 vs donnees §Q5-2, tranché au CODE** : le chercheur *donnees* écrivait qu'avec l'enveloppe on prouve « l'opérateur X a répondu P à la requête R dans la session S ». **Le code tranche** (`relay.go` L66-101 ; `RelayResponseMetadata` sans champ de requête ; SDK `ValidateRelayResponse` ne compare jamais SHA-256(payload)=payload_hash) : la signature de réponse **ne lie pas la requête R** ni les octets livrés (quand `payload_hash` présent). MAIS — précision du réfutant D-18 — la **requête** arrive on-chain AVEC sa charge utile dans la feuille de preuve (signée en anneau), donc « sans contenu » est faux : c'est le payload de **réponse** qui est omis. **Formule exacte (tranché au code, orchestrateur 26/09)** : protocole §2.1/§12.6 est exact ; **donnees §Q5-2 est corrigé par erratum daté** ⇒ formulation licite : « **l'opérateur X a signé `payload_hash` H dans la session S** » (le lien P↔`payload_hash` n'est contrôlé ni par le SDK ni par PATH) ; le contenu de la **requête** est bien sur la chaîne pour les claims prouvés (protocole §12 pt 6 [lu] ; D-18 corrigé [lu]).
+- **Claims / preuves (Q3, protocole §4)** : montant réclamé = racine SMST (compte de feuilles × difficulté × CUTTM), **entièrement déclarée par le supplier** ; preuve exigée si montant ≥ seuil (`THRESHOLD`) ou par tirage `≤ 0,001` (`PROBABILISTIC`) ; une preuve porte UNE relation « closest » (chemin pseudo-aléatoire), sans le payload de réponse. Claims/preuves **élagués** de l'état courant après règlement (protocole §7.1 [lu]).
+- **Session de 50 (Q4, protocole §5)** : candidats = configs de service actives à la hauteur ; poids = SHA3-256(sessionIDBz ‖ adresse d'opérateur), tri, **50 premiers**. **Confirmé au code** : aucun dédoublonnage par propriétaire/URL, aucune pondération par stake (P-13 confirmé sur le fond [lu]) ; **contredit** la page `/governance/parameters/` (« may be selected more frequently »), concorde avec `/node-operators/rewards-economics/` et le code déployé.
+- **Difficulté / sur-service (Q5, protocole §6)** : cible par service, EMA α=0,1 des relations réglées ; eth EMA 316 458, `target_num_relays` 100 000 ⇒ multiplicateur ×3,165 (protocole §6.1 [lu+mesure]) ; plancher de paiement = budget app / N **claimants** (pas 50 sièges) ; `overservicing_bonus_multiplier` vivant = 2 (défaut du code 1).
+- **Ce qu'un tiers peut ÉTABLIR sans confiance dans la PNF (protocole §7.4)** : recalculer les 50 d'une session ; le montant réclamé/réglé et la décision « preuve exigée ou non » par claim ; re-vérifier hors ligne les deux signatures de chaque relation **prouvée**. **Ne peut PAS établir** : le contenu des réponses (jamais publié), la gateway signataire (anneau), les ≥ 96 % de claims sans relation révélée, la qualité hors chaîne, l'utilisateur final.
+
+## 3. Les mesures (toutes [mesure] sauf mention ; scripts et sha cités en §14)
+
+Registre complet (`lcd/RESULTATS-concentration.txt`, sha `6fb175dc…`, LCD 20:47:39Z ; reproduit byte-identique par *donnees* Q2.1 et par *shogen-interne* §13) : **4 484 suppliers** = 4 484 opérateurs distincts, **204 propriétaires**, 246 services, 8 gateways, 204 applications ; stake total 269 105 422 POKT, médian 60 001 (min 59 500, max 100 000) ; 157 en désengagement.
+
+**Nommage (tranché par l'orchestrateur le 26/09, avis advisor Q2)** : « **k_eff** » est réservé au **nombre de classes nommées** d'une partition R2 (Shōgen 04 §3). L'inverse de Simpson 1/Σp² (employé par `RESULTATS` et ERC-8275 A.3.5) s'appelle « **n_eff (inverse-Simpson)** » partout ; **n_eff ≤ k_eff** (égalité à parts égales). **Aucune partition R2 n'est établie sur Pocket** ⇒ aucun chiffre Pocket ne porte le nom « k_eff » ; tout ce qui suit est du n_eff (inverse-Simpson). Dénominateur normatif (tranché, avis advisor Q3) : **suppliers avec endpoint courant = 4 319** (165 suppliers sans endpoint EXCLUS et signalés) ; unité par service = **supplier candidat**, jamais l'endpoint ; le domaine d'endpoint est un rang **R2 « couche RelayMiner »** (déclaré on-chain et servi), pas l'origine de la réponse.
+
+| grandeur | estimateur | dénominateur | valeur | source |
+|---|---|---|---|---|
+| propriétaires, registre | n_eff (inverse-Simpson) | 4 484 suppliers | **14,85** | RESULTATS ; donnees D-04 |
+| domaines d'endpoint, registre | n_eff (inverse-Simpson) | **4 319 suppliers avec endpoint** (en tête ; 165 exclus signalés) | **3,08** | ecosysteme §6quater |
+| domaines d'endpoint, registre | n_eff (inverse-Simpson) | 4 484 suppliers (1 par domaine utilisé) | 3,3 (HHI 0,3012) — dénominateur non normatif | RESULTATS |
+| domaine eth | n_eff (inverse-Simpson) | 4 158 **suppliers candidats** eth (unité normative) | **2,86** ; 1er nodefleet 55,5 % | protocole §5.2 ; donnees Q2.4 |
+| domaine eth | n_eff (inverse-Simpson) | 7 587 endpoints eth — **PÉRIMÉ** (pondération par endpoint, pas un siège) | 2,51 ; 1er nodefleet 60,8 % | RESULTATS ; donnees Q2.4 |
+| domaine, session eth de 50 | n_eff (inverse-Simpson, Monte Carlo 20 000) | sièges d'une session | **2,85** (p05 2,10 ; p95 3,77) | protocole §5.2 |
+| domaines distincts par session eth | **compte de classes** (sens k_eff 04 §3, mais partition R2 NON établie ici) | sièges | ≈ 7,42 (owner ≈ 26,4) | donnees Q2.5 |
+| domaine, trafic réglé 24/09 | n_eff (inverse-Simpson) | relais estimés (20 groupes) | **4,55** (corrigé ; « 4,57 sur 21 » abandonné) | gateways §4bis ; GW-C16 |
+| propriétaire (R3), trafic réglé 24/09 | n_eff (inverse-Simpson) | relais estimés (195) | 20,39 (R3 déclaratif, ne fusionne pas les classes) | gateways §4bis |
+| domaine, trafic réglé 7 j | n_eff (inverse-Simpson) | relais estimés | **4,11** | gateways §4 |
+| pool de prix Shōgen (**seul vrai k_eff**, compte de classes R2) | **compte de classes** | 5 hôtes d'API de prix, 2026-08-05 | **k_eff = 2** pour k nominal 5 | shogen-interne §12/SI-07 [lu] |
+
+Autres mesures porteuses :
+- **P(un domaine ≥ 26/50 sièges)** par service (inverse-Simpson non concerné ; probabilité hypergéométrique) : eth 0,7403 ; solana 0,9532 ; base 0,9991 ; bsc 0,8837 ; robinhood 0,8712 ; l'owner n'atteint jamais la majorité (≤ 0,0028) (donnees D-01 ; protocole §5.2). **87/100 sessions RÉELLES** (LCD `get_session`) ont un domaine ≥ 26/50 (donnees D-02, Q2.12).
+- **Réalisé vs sièges (24/09)** : le domaine majoritaire en sièges obtient 0,43 (robinhood) à 0,85 (eth) de sa part ; d'autres jusqu'à 3,72× ⇒ **la diversité effective dépend d'une décision de routage non publiée**, pas du protocole (donnees Q2.8 ; D-11 corrigé : ne se généralise pas — le 14/09 solana réalisé 1,07 < sièges 2,30).
+- **Preuves probabilistes** : 7 j (blocs 926 600→936 520), 1 520 982 claims réglés ; NOT_REQUIRED 1 464 554 (96,29 %) ; THRESHOLD 56 428 ; **`PROBABILISTIC` = 0**. Corrigé (P-10) : **≈ 764 sélections observables** (763 NOT_REQUIRED avec preuve validée + 1 expirée sous seuil) contre ≈ 1 465 attendues à p=0,001 (ratio 0,52) ; l'étiquette `PROBABILISTIC` manque au règlement, **cause non établie** (protocole §4.5 ; SENSIBLE, §5).
+- **F-Chains II** : 88 026 660 POKT publiés sur 9 portefeuilles (02/06/2025) ; au 25/09, **3 détiennent 356 suppliers = 21 361 780 POKT (7,9 % du stake supplier)** ; 6 n'ont aucun rôle supplier — MAIS Nodefleet 9,36 M + Space Belt 6,06 M POKT **liquides** (E04 corrigé : « 6 à zéro » faux en POKT détenus ; ≈ 51 M non localisés) contre « ~96 M » annoncés (ecosysteme §6.2 ; economie §6.2).
+- **Gateways** : le 24/09, **99,92 %** des relais estimés réglés passent par des applications déléguées à la paire `pokt1lf0kekv…`/`pokt1swj0e…` (gateways §8.1, GW-C12) ; sur 5 chaînes, 99,3-100 % de la demande vient d'**UNE application par chaîne** (donnees §Q3-bis, D-12 : `lf0kekv…` = « Grove Master Gateway » [lu doc poktroll] ; `swj0e…` non trouvée).
+- **Agentique** : les 60 services agentiques de `pokt10a8l4nc…` (dont les 7 SEC/finance) ont **1 seul supplier** (`pokt1vjd93…`, 60 000 POKT, `services.supnodes.com`) (agentique §14.1 confirmé). Corrigé (SEC-01) : au **portail**, cet opérateur sert **55** services (pas 60) ; les 60 services du portail à opérateur unique se répartissent entre **3** opérateurs. « 60 du portail par 1 opérateur » abandonné.
+- **Économie** : burn ≈ **445 997 POKT/j** (29 j) ≈ **3 614 $/j** au tarif 1 $/milliard de CU (economie §1.2, E01/E02) ; **les entrées du portefeuille W1 qui recharge les app stakes publics ≈ le burn total du réseau depuis PIP-41** — ratio annoncé 0,99, **corrigé à 0,97** à fenêtres égales (economie §6.6(g), E03) : le « revenu protocolaire » est essentiellement une dépense circulaire DAO/PNF (attribution des portefeuilles P1/W0/W1 = **inférée**, non étiquetée on-chain).
+
+## 4. Contradictions consolidées (fusion des 8 archives)
+
+| # | Énoncé A (source) | Énoncé B (source) | archive § | tranché par |
+|---|---|---|---|---|
+| 1 | Sélection pondérée par le stake « may be selected more frequently » (docs governance) | « no stake weighting » (docs rewards + code `session_hydrator.go`) | protocole §5.1, §12 ; FAITS §10.2 | **OUI** — code : aucune lecture du stake |
+| 2 | Signature prouve « op. X a répondu P à la requête R » (donnees Q5-2) | signature couvre session+`payload_hash`, jamais la requête (protocole §2.1) | protocole §12 pt 6 ; §9 arbitrage 1 | **le code ; orchestrateur 26/09** (erratum donnees §Q5-2 ; requête on-chain via la preuve, D-18) |
+| 3 | Pénalité de preuve manquante 320 POKT (défaut code) ; ≈ 2 000 (doc Shannon) ; 46 030 (règle Morse) | 1 upokt vivant (LCD) | protocole §4.1, §4 addenda | **OUI** — LCD : 1 upokt |
+| 4 | `pokt1lf0kekv…` = « hypothèse PNF » (gateways CQ-2) | = « Grove Master Gateway » (doc poktroll `1_service_cheatsheet.md`, D-12) | gateways §8.2 ; donnees D-12 | partiel — nom lu, attribution PNF inférée ; `swj0e…` non trouvée |
+| 5 | « 45 lignes » le 24/09 (juridique C19) | 411 lignes (service, domaine), 129 services (donnees) | juridique §12.4 ; C19 [valeur abandonnée] | **OUI** — 45 = filtre 5 services |
+| 6 | « 60 services du portail par 1 opérateur » (agentique) | 55 par `pokt1vjd93…` ; les 60 mono-opérateur = 3 opérateurs (SEC-01) | agentique §14.1 ; §27 | **OUI** — mesure corrigée |
+| 7 | « 26 domaines » (RESULTATS) | 21 eTLD+1 + 5 IP nues + `com.ar` mal découpé (ecosysteme E01, juridique C20) | ecosysteme R-ERRATA ; donnees §Q2.7 | **OUI** — heuristique « 2 derniers labels » |
+| 8 | CUTTM « ≈ 495 picoPOKT » / « 121 240 » (docs) | 111 877 (LCD 25/09) ; historique 70 162→145 990→111 877 | economie §2.3 ; agentique §11 ; FAITS §10.3 | **OUI** — LCD, docs périmées |
+| 9 | Part « Source Owner » 3 % « of all traffic » (board 04/09) | `source_owner` 0,025 = 2,4375 % du minté (LCD, docs) | economie §7 C3 ; juridique X-13 ; E14 | **OUI** — LCD ; écart 0,5625 pt |
+| 10 | Lava sanctionne les divergences (README `x/conflict`) | `JailEntry`/`SlashEntry`/`CreditStakeEntry` ébauches sans effet sur `main` (audit nodefleet HIGH) | ecosysteme §1bis, §7bis-14 | **OUI** — code Lava : stubs |
+| 11 | « 5,000+ Independent nodes » (docs) | 4 484 suppliers, 204 owners, un domaine à 51,4 % | FAITS §10.8 ; gateways §9-6 | **OUI** — LCD |
+| 12 | Round-robin « across PNF and community gateways » (roadmap, T4 2025) | 99,92 % via 1 paire de gateways le 24/09 | gateways §9-1 | non — compatible si round-robin HTTP fait signer les apps PNF (non établi) |
+| 13 | Supermajorité DAO 80 % (Constitution) | 75 % + 14 j + quorum 25 % (Articles Jan-2023) | juridique X-12 | non — versions/documents distincts |
+| 14 | IP « none / tracking none » (Chainlist, PNF) | « logs may include IP addresses » (politique BlockchainQuery PNF, 2026-03-18) | juridique X-2 | non — déclarations PNF datées divergentes |
+| 15 | n_eff domaine 3,3 (RESULTATS, dénom. 4 484) vs 3,08 (dénom. 4 319) ; par endpoint vs par supplier | — | donnees §K-2 ; ecosysteme §6quater | **orchestrateur 26/09** — dénom. normatif 4 319, unité supplier, endpoint périmé (§9.3) |
+| 16 | Shōgen « pas de token — jamais, sur ce projet comme sur ses frères » (ADR-0006/roadmap) | MONARK « single token, single ticker », Shōgen « built » dans MONARK (SI-10/SI-11 ; juridique X-10 ; shogen-interne 7-3) | shogen-interne §7-3/§7-4 ; juridique §5.5 | **décision investisseur 230 (26/09)** — Shōgen est une pièce de MONARK, aucun jeton propre ; le seul jeton = MONARK |
+
+## 5. SENSIBLE — usage interne, préavis privé avant toute mention publique (`07-gtm.md` §6.3)
+
+> Cette section reprend les constats que leurs auteurs ont marqués sensibles. Aucun n'est publiable en l'état. « Une attestation prouve ce que la source a dit, jamais que la source dit vrai. »
+
+| id | fait | niveau | ce qui manque pour le publier |
+|---|---|---|---|
+| protocole §4.3 / §9 P6 / §10 C-1 (P-11 confirmé *conditionnel*) | aucun contrôle lu ne lie le chemin de la feuille prouvée au hash de la relation, ni une requête à une réponse unique ⇒ la preuve établirait l'EXISTENCE d'une relation, pas le COMPTE | [lu + **déduction non testée**] | (a) test Go local non destructif (jamais mainnet) ; (b) consultation C-1 ; (c) divulgation privée PNF si confirmé |
+| protocole §4.5 (P-10 réfuté) | ≈ 764 sélections probabilistes observables / ≈ 1 465 attendues sur 1 464 554 claims sous seuil (ratio 0,52) ; `PROBABILISTIC` absent du règlement | [mesure], **cause non établie** | porter la version corrigée, JAMAIS « 0 preuve » ; consultation C-2 ; recoupement `block_results` |
+| protocole §4.3 ter / P-09 | regroupement des feuilles fausses sous un préfixe commun ⇒ gonflement partiel payé ≈ 99,99 % du temps (simulation) | [calcul du réfutant, **hors claim, non reproduit**] | test de falsification ; ne pas citer comme mesure |
+| protocole §2.2 / P-02 (avis advisor Q1 iv) | un intermédiaire entre RelayMiner et gateway pourrait substituer `payload` en gardant `payload_hash` et la signature, et passer `ValidateRelayResponse` (SDK/PATH ne comparent pas SHA-256(payload)=payload_hash) | [lu + **déduction non testée**] | test de falsification de charge utile (protocole §11 pt 2, ne pas dupliquer) ; préavis privé — faiblesse potentielle d'un système tiers |
+| donnees §Q3-bis / §NT-1 / §P-1 | 99,3-100 % de la demande de 5 chaînes vient d'1 application par chaîne, 2 gateways ; identité des gateways (`lf0kekv`/`swj0e`) NON TROUVÉE | [mesure] + identité inférée | procurement P-1 (page PNF nommant les adresses) ; ne pas inférer « PNF » nu |
+| economie §6.6(g) / §7 C1 / §9 CR-1 | burn du réseau financé ≈ 97-99 % par des portefeuilles alimentés par la DAO/PNF (flux mesurés, attribution P1/W0/W1 **inférée**) | [mesure] + attribution inférée | CR-1 (advisor) : formule « flux mesurés, attribution inférée » ; P-E2/P-E11 (identité des comptes) |
+| gateways §8.2-§8.4 / §12 CQ-2 | un seul acteur (probable PNF) tiendrait la gateway à 99,92 % du trafic, les 156 services de chaîne et la part source_owner ; la « réputation » PATH/SAGE serait la politique d'un seul opérateur, non publiée | [mesure] + [lu doc] ; **attribution nominative non publiée** | P-G1 (registre adresse→opérateur) avant tout usage public |
+| ecosysteme §1bis / §6.2 / §6ter | nodefleet = opérateur n°1 (51,4 %) ET libellé au registre dRPC ET auditeur publié de Pocket Shannon (2025-03-01) et de Lava ; conflit d'intérêts structurel | [lu] + [mesure] | PE-4 (commanditaire de l'audit) ; classer l'audit P2-avec-conflit |
+| agentique §14.1 | les 7 services SEC/finance (adjacence MONARK Bell) = 1 supplier, 1 domaine, cartes `results: variable`, descripteurs portail divergents | [mesure] + [lu] | ne pas transformer en fait de couverture ; préavis avant toute mention Bell↔Pocket |
+| juridique §1.2 (ToS §5.B) / §13 P-10 / §16 C-1 | publier une mesure nominative tirée de la LCD/indexeur PNF tombe dans le champ littéral de « Record, process, or mine information about other companies… publicly display… Site Content… except as authorized » | [lu ToS] ; **portée non qualifiée juridiquement** | C-1 (juriste Caïmans) ; source hors Services PNF (nœud propre) OU autorisation écrite OU agrégats sans nom |
+
+## 6. Ce que nous avons réellement (règle Branchement : « servi » = README MONARK « What is served today » + test d'intégration non-LLM)
+
+| Pièce | État Branchement | Phrase LICITE | Phrase INTERDITE |
+|---|---|---|---|
+| Harnais MCP/HTTP (`attest·gate·cascade·calibrate`) | **built** (servi + `probe_harness_records_real_decision`, `mcp_tools_have_no_side_effects` rejoués ✔) — shogen-interne §3.1 | « un point MCP/HTTP public rendant `commit/defer/abstain` et des régions auditables » | « prix attesté en direct » ; tout mot de validation |
+| `attest` (Shōgen via MONARK) | **built au registre, entrée = 1 fixture** (Binance BTCUSDT auto-notarisée, vérifieur non exécuté à l'appel) — shogen-interne §3.2 | « projection d'un témoignage committé, octets + hash + hypothèses résiduelles nommées » | « Shōgen atteste les lectures RPC de Pocket » |
+| Shōgen cœur + vérifieur (Rust) | **testé** (205 + 48 tests ✔ le 25/09, non servi hors fixture) — shogen-interne §1.5 | « format canonique CBOR + vérifieur offline, un transport TLSNotary (attestor auto-hébergé) » | « zkTLS sur Pocket » (aucun adaptateur JSON-RPC) |
+| Narabi (timeline) | **built** ; Pocket membre du pool servi depuis le run E-5 (22/09 00:42Z) — shogen-interne §2.1, SI-12 | « lecture quotidienne par quorum de 2 fournisseurs distincts dont Pocket, rejouable » | « validé par Pocket » ; concordance par fournisseur (non servie) |
+| `quorum2` + `operatorOf {nodies,pocket}=1` | **code+test** (Ukemi/course) ; `quorumTwo` **servi** (Narabi) — ADR-POOL-RPC-1 C-2 | « quorum-2 par opérateurs distincts, fail-closed ; {nodies, pocket} = 1 opérateur » | « lecture certifiée » |
+| Compteur de concordance (L-4) | **ni built ni upcoming** — « DANS AUCUN REGISTRE PUBLIC » (ADR-POOL-RPC-1 l.41) ; seul consommateur = un test | « instrument câblé en CLI de course » | tout taux de concordance Pocket (1 observation) |
+| Certificat de diversité 04 | **upcoming** (spec + harnais S2 jetable) — shogen-interne §1.3 | « spec à trois rangs ; une mesure ASN datée 2026-08-05 : k_eff (compte de classes) = 2 pour k = 5 sur 5 hôtes d'API de prix » | « Shōgen certifie la diversité de Pocket » ; tout z |
+| Campagne S2 (R1) | **en cours** ; recompte 26/09 15:24Z : **36 557 fenêtres distinctes, 2 207 doublées** (24/09 18:18Z → 26/09 15:07Z) ; chaîne B arrêtée 15:08:53Z ; période doublée **exclue de n** (toutes strates, tranché §9.7) ; stress après exclusion 157,4 h aujourd'hui, **190,0 h projetées au 28/09 01:27Z** ; **aucun z** — ETAT-DOJO §1.1 ; INCIDENT | « une mesure R1 de 11 sources de prix est en cours, fin ≈ 28/09 ; période à deux pilotes exclue, sensibilité à publier » | tout chiffre R1 avant rapport + décision investisseur |
+| MONARK Bell | **built** (Solana ; jambe Ethereum et Robinhood = code non lancé par le lanceur servi) — shogen-interne §3.3 | « publications signées Ed25519, chaînées, ancrées OTS » | « Bell tourne sur Pocket » (Pocket absent du chemin de production) |
+| Validateur ERC-8004/8294 | **absent** — 0 ligne `erc-8004/8294/validationResponse` dans nos dépôts (mesure) — shogen-interne §5, SI-23 | « nos artefacts Narabi/Bell sont rejouables » | « MONARK est validateur ERC-8004/8294 » |
+
+**Donnée R1 Pocket honnête** (shogen-interne §2.2, SI-15 [lu]) : ledger prober `pocket.network.jsonl` = 22 lignes ; **9 requêtes d'archive identiques ⇒ 7 concordantes, 1 erreur « pruning », 1 valeur discordante silencieuse** (corps jamais lu, A-7) ; la seule ligne discordante jamais écrite par le compteur est `pocket|tenderly.co` 0/1 (SI-16). n ≤ 12, une méthode, une chaîne, un jour ⇒ **anecdote documentée, aucun taux publiable** ; sonde L-5 du 21/09 : 2 272 logs Pocket byte-identiques à MEV Blocker.
+
+## 7. Voies d'entrée V1..V8 (agentique §21) + contraintes juridiques + calendrier
+
+| # | Voie | Rôle | Coût POKT (LCD 25/09) | Décideur côté Pocket | Ce que nous avons |
+|---|---|---|---|---|---|
+| V1 | Hackathon « agentic services » (Beta, dépôt **12/10/2026**) | SERVICE ; top 3 → « Source Owners » | 0 POKT réel (faucet Beta) ; top 3 : app stakes financés par PNF (montant non publié) | jury PNF (critères NON publiés) | harnais servi ; `/calibrate` seul candidat `deterministic` ; ni carte, ni RelayMiner, ni supplier |
+| V2 | Listing portail MainNet | SERVICE | 1 000 (enreg.) + 59 500 (supplier, retrait ≈ 20,1 j) + ≥ 1 000 (app) | relecteur PNF + opérateur de gateway | idem V1 |
+| V3 | 2ᵉ supplier d'un service agentique | SERVICE (opérateur) | 59 500 | personne (permissionless) | rien ; hors thèse (exécuterait LEUR backend) |
+| V4 | Consommateur-témoin du RPC public (statu quo) | TÉMOIN | 0 (RPC public) ; payant ≥ 1 000 (app stake) | PNF (« free tier will be throttled down ») | **BUILT** : `pocket` compté 1 opérateur dans Narabi (servi) |
+| V5 | Validateur ERC-8004/8294 | VALIDATEUR | n/a | éditeurs ERCs ; auteurs 8294/8275 (PNF) | **bloqué** : aucun ValidationRegistry canonique ; #1808 sans 2ᵉ revue depuis 03/09 ; 0 ligne chez nous |
+| V6 | Connecteur MCP distant (répertoire Anthropic) | distribution | 0 | Anthropic (pas Pocket) | serveur servi `mcp.monarkgate.tech/mcp` ; non soumis (voie MCPB locale fermée) |
+| V7 | x402/MPP direct + Bazaar/MPPScan/402index | vente à l'appel | 0 ; CDP compte requis | Coinbase/Tempo (pas Pocket) | rien (aucun 402 servi) |
+| V8 | Témoin des services agentiques (acheter 0,005 $ et attester le dire) | TÉMOIN | 0 POKT ; 0,005 $ USDC/appel | personne (paiement à l'appel) | `attest` servi (octets+hash, sans signature) |
+
+**Contraintes juridiques BLOQUANTES (juridique §13.A P-1..P-20 ; §13.B S-1..S-15)** : **P-1** entité non constituée (« Stripe Atlas KraidleAI » = « Plus tard ») ; **P-2** qui propose — **tranché par la décision investisseur 230** (MONARK propose, Shōgen pièce sans jeton ; D11 sur MONARK entier) ; **P-3/P-4** aucun revenu du mesuré si Shōgen publie une mesure, et rien avant les n/K/z de S2 ; **P-5** tout envoi à PNF = « Feedback » sous licence irrévocable (ToS §8) ⇒ publier d'abord sous notre licence ; **P-7** un contrat PNF « material or major or long term » = transaction spéciale ⇒ **avis DAO public ≥ 4 semaines** + fenêtre de rejet (Articles Jan-2023) ; **P-10** mesure LCD sous ToS §5.B ; **P-11** noms = observables/déclarations PNF citées, jamais une identité inférée, préavis privé ; **P-13** vocabulaire (jamais « verified/guarantee/partner/autonomous », pas de logo PNF) ; **P-16/S-12** OFAC si entité US (Delaware) ; **P-20** hackathon = « contest » PNF, règlement/PI NON TROUVÉS. Côté service : **S-5** `abstain`/`defer` en 200/4xx JSON jamais 5xx ; **S-8** détenir/staker du POKT = actif du réseau mesuré (BLOQUANT D11).
+
+**Décision marché (tranché par l'orchestrateur le 26/09, avis advisor-marché Q2)** : **ne pas soumettre au hackathon** ; la voie SERVICE est de la distribution, pas du revenu (1 155 appels/7 j pour 99 services ; 55/99 servis par un opérateur, 60/99 à opérateur unique répartis sur 3 — §3), et l'app stake = revenu du mesuré (D11) ; **lire la sélection des lauréats après le 12/10** comme sonde de demande gratuite (procurement pour l'orchestrateur). Créneau « reçu + SHA-256 » déjà servi par un tiers sans acheteur (`jsymen1290/pocket-agents`) ⇒ gap de packaging à prix nul, pas une rareté (avis advisor-marché Q3).
+
+**Calendrier** : S2 fin ≈ **2026-09-28 ~01:30Z** (rapport final puis publication = décision investisseur, D8) ; hackathon dépôt **2026-10-12** ; #1808 (ERC-8294) lecture au **2026-12-10** (Open, 1 revue d'éditeur manquante, immobile depuis 03/09) ; PR #7 `deterministic-replay-v1` muette depuis 01/08 ; contrat PNF spécial ≥ 4 semaines d'avis DAO.
+
+## 8. Confrontation de l'avis advisor-marché du 23/09 (O1..O4) aux faits 25-26/09
+
+| élément | avis 23/09 | faits 25-26/09 | statut |
+|---|---|---|---|
+| **O1** Shōgen vend la méthodologie | fort sur le texte ; **acheteur nommé AUCUN** | aucune demande 2025-2026 d'indépendance des suppliers ; PNF « 100% focused on agentic », runway → mars 2027 ; seul précédent PAYÉ analogue = Lido→Rated 60 000 $ (2023) / 35 000 $ (2022), payé par l'ALLOCATEUR ; l'allocateur Pocket (DAO/PNF) est partie intéressée | **inchangé — non ouverte** (ecosysteme §5ter O1) |
+| **O2** MONARK = profil `deterministic-replay-v1` | exact pour Narabi, FAUX pour la porte | PR #7 Open, **aucune réponse PNF depuis 01/08** ; aucun ValidationRegistry canonique | **inchangé** (agentique §15 ; ecosysteme §5ter O2) |
+| **O3** note non normative sur l'item n°3 | position, compatible « rien avant S2 » | **renforcée sur le fond** : vecteurs `attester-diversity-v0` publiés le 30/07 fixent l'ARITHMÉTIQUE (inverse-Simpson) et **réservent l'inférence de `trueOperator` à un v1 tiers nommé** ; ERC-8275 A.3.5 « fails-closed » normatif, co-signé par le groupe VNI de Pocket ; **déplacée sur la forme** : le fil vivant est #1774, pas le dépôt compagnon (muet) | **renforcée fond / déplacée forme** (agentique §20 ; ecosysteme §5ter O3) |
+| **O4** article seul | nul en coût | signal « tueur » n°3 (A.3.5 méthodologie de fait) **partiellement réalisé AVANT l'avis** (v0 du 30/07) ; matériau nouveau : transposition « fails-closed » au registre Pocket — **n_eff (inverse-Simpson) 2,72 sur 4 047 suppliers** après exclusion de 272 (le critère d'exclusion « site web muet » est AJOUTÉ à l'ERC, pas dans A.3.5 ; ecosysteme §6quater, E03) ; et Lava non sanctionné | **nul en coût, matériau nouveau** (ecosysteme §5ter O4) |
+| Signaux datés | n°1 #1808, n°2 PR #7, n°3 concentration Pocket, n°4 #1774, n°5 premier réseau publiant, n°6 volume `validationRequest` | n°1 Open sans 2ᵉ revue (dernier 03/09 ; lecture 10/12) ; n°2 absent ; n°3 aucune publication PNF ; n°4 #1774 actif (dernier 21/09), A.3.5 normatif, v0 publiée, v1 réservé ; n°5 aucun ; n°6 non mesurable (aucun registre canonique) | tous consignés (agentique §4, §20) |
+| H5 économie | — | portail : **1 155 appels facturés / 7 j** pour 99 services (≈ 11,7/service/semaine), 5,79 $ ; seuil PNF 1 M/j = ×6 061 ; 55/99 servis par un opérateur, 60/99 à opérateur unique répartis sur 3 (§3) | economie §3 ; agentique §10 |
+
+## 9. Arbitrages — TRANCHÉS par l'orchestrateur le 26/09 (avis advisor / advisor-marché, archivés `AVIS-advisor-2026-09-26.md`, `AVIS-advisor-marche-2026-09-26.md`) ; le « qui propose » par décision investisseur 230
+
+> Ces points ne sont plus des propositions worker. Chaque ligne porte l'autorité qui a tranché. G7 et R-21 restent à l'orchestrateur.
+
+1. **Couverture de la signature d'opérateur — tranché par l'orchestrateur le 26/09 (avis advisor Q1).** **Le code tranche** : la signature couvre en-tête de session + `payload_hash` + `relay_miner_error`, **jamais la requête**. donnees §Q5-2 est **corrigé par erratum daté** ⇒ formulation licite : « l'opérateur X a signé `payload_hash` H dans la session S » (ajouter : le lien P↔H n'est contrôlé ni par le SDK ni par PATH). La requête (avec payload) arrive on-chain via la feuille de preuve (un relay par preuve) — hors signature (protocole §2.3). Procurement de test : protocole §11 pt 2 (ne pas dupliquer).
+2. **Nommage k_eff / n_eff — tranché par l'orchestrateur le 26/09 (avis advisor Q2).** « k_eff » = nombre de classes nommées (04 §3) ; « n_eff (inverse-Simpson) » = 1/Σp² (RESULTATS, ERC-8275) partout ; **n_eff ≤ k_eff**. **Aucune partition R2 n'est établie sur Pocket ⇒ aucun « k_eff » Pocket** (uniquement du n_eff). ADR Shōgen dû (dette 04 §6.1) : définitions des deux objets, lacune honnête, renommage global dans RESULTATS et doc 15 (fait ici, §3).
+3. **Dénominateur normatif — tranché par l'orchestrateur le 26/09 (avis advisor Q3).** Dénominateur = **suppliers avec endpoint courant (4 319)**, 165 exclus signalés ; unité par service = **supplier candidat**, jamais l'endpoint (les valeurs par endpoint de RESULTATS sont citées comme telles et **périmées**) ; domaine d'endpoint = rang **R2 « couche RelayMiner »** ; « R3 ne modifie jamais k_eff » (04 §3). Correction d'`analyse-suppliers.py` (endpoint→supplier) due ; ASN = dette (P-3).
+4. **Résolution DNS (donnees CONSULT-2) — tranché par l'orchestrateur le 26/09 (avis advisor Q4).** **Acceptée comme mesure R2 déclarée** (résolveur système, amont non identifié, aucune API tierce, aucun ASN). Amendement d'une ligne à la règle 2026-09-20 : « résolution de noms publiés ≠ API de données ». **Ne jamais reproduire les IP par hôte** (`dns-hosts.json`) : seulement les comptes /24 et « quatre domaines derrière un même frontal » **sans nommer de CDN** (cartographie d'attaque, arXiv 2411.18401 §8.3). ASN sous go seulement (conditions RIPEstat/Cymru lues).
+5. **Robinhood — tranché par l'orchestrateur le 26/09 (avis advisor Q10).** **Erratum daté** de CHANTIERS l.413 : « absente de la page publique (vrai au 19/09 et 25/09) ; service `robinhood` on-chain depuis le 17/07, trafic réglé depuis le 20/07 ; `robinhood.api.pocket.network` répond (sonde n = 1, 25/09 21:17Z, `0x1237`) ; date d'ouverture NON TROUVÉE (P-2) ; carte `sync: full`, pas archive ». Item BELL-POCKET-ROBINHOOD-1 (admission sous ADR-POOL-RPC-1 + lecture des conditions) ; n = 1 jamais transformé en couverture.
+6. **Qui propose (juridique C-2 / shogen-interne C-SI-3 / D11) — TRANCHÉ par décision investisseur 230 (26/09).** Le proposant est **MONARK** ; Shōgen y est une pièce, **aucun jeton propre** (le seul jeton = MONARK). La neutralité D11 s'applique à **MONARK entier** : aucun revenu venant de Pocket tant qu'une mesure de Pocket est publiée. (Avant la décision 230, l'orchestrateur avait qualifié ce point d'escalade investisseur avec « seule une position de témoin gratuit sans revenu Pocket est propre » — la décision 230 le confirme et le fixe.)
+7. **C-SI-2 — période S2 doublée — tranché par l'orchestrateur le 26/09 (avis advisor Q6).** **Exclure la période de n (toutes strates)** comme « harnais-dégradé » ; **sensibilité publiée** (table des trois z × {exclu, inclus}). Recompte 15:24Z : **36 557 distinctes, 2 207 doublées** (24/09 18:18Z → 26/09 15:07Z) ; stress après exclusion **157,4 h aujourd'hui, 190,0 h projetées au 28/09 01:27Z** (> critère 166,8 h ⇒ l'exclusion ne vide pas la strate). ADR-0025 AVANT tout z : bornes par `window_start`, filtre paramétré couvert par l'oracle non-LLM (jamais une excision), `error_origin` harnais ; « ok si l'une l'est » **rejeté** (sélection dépendante des données) ; prolongation d'un week-end = déclencheur conditionnel seulement si la strate retombe sous 166,8 h.
+8. **CQ-1 — unité d'opérateur RPC — tranché par l'orchestrateur le 26/09 (avis advisor Q5).** **Domaine eTLD+1 en tête** (n_eff ≈ 4,5) ; fusions par propriétaire/commission **en sensibilité** (4,47) ; **propriétaire = R3** (20,4, ne fusionne pas les classes) ; **Igniter = R3** ; ASN (P-G6) = axe R2 additionnel après lecture des conditions.
+9. **C-4 agentique — signature dans `data` — tranché par l'orchestrateur le 26/09 (avis advisor Q8) : conception SPEC.** **Octets exacts en base64 + signature Ed25519 détachée + identifiant de clé + identifiant de méthode figé** (+ keccak256 des mêmes octets pour un vérificateur EVM, compatible #1808). Le harnais ne signe rien aujourd'hui ⇒ ajouter une signature à `/attest` = évolution d'un contrat gelé par **ADR M001 (sémver)** + **test de bout en bout sur Beta AVANT toute annonce** (règle Branchement).
+10. **C-1 agentique — service Pocket — tranché par l'orchestrateur le 26/09 (avis advisor Q9) : conception, rien exécuté avant S2 + D11.** `/calibrate` seul (déterministe) + **adaptateur strictement additif** (routes `/v1/version`, `/v1/health`, zéro octet modifié) ; `upstream_timeout` vit dans `/gate`, pas `/calibrate`. Aucune annonce « service Pocket MONARK », aucune soumission hackathon avant P-1/P-2/D11. Statut « upcoming » jusqu'à un relay A7 réglé + test d'intégration non-LLM.
+
+## 10. Procurements consolidés (dédupliqués)
+
+| id | objet | tentatives | voie | propriétaire |
+|---|---|---|---|---|
+| P-1 / P-G1 / P-A3 | identité des gateways `lf0kekv…` (« Grove Master Gateway » lu) et `swj0e…`, opérateur `supnodes.com` | WebSearch (0), explorer (sans étiquette), robots `supnodes` (tout interdit) | lecture sur place orchestrateur ; puis `directors@pokt.foundation` | orchestrateur/investisseur |
+| P-2 | date d'ouverture de `robinhood.api.pocket.network` (proxy public) | page (absent), configs PATH/SAGE (absent) ; dates on-chain seules | Web Archive (conditions à lire) ou PNF | orchestrateur |
+| P-3 / P-G6 | attribution ASN des 24 préfixes /24 (`dns-hosts.json`) | résolution DNS faite ; ASN non fait (interdit) | RIPEstat + Team Cymru, conditions lues, sous go | investisseur |
+| P-4 | décodage d'un échantillon de preuves on-chain (`gob`, ≈ 15,3 M) | lecture seule | worker Go (`smt` + `poktroll`) | orchestrateur |
+| P-5 / P-E5 | politique d'usage chiffrée de `data.pocket.network` et « fair use policy » (ai.txt renvoie à une page introuvable) | `/terms`, `/privacy` = 404 | question PNF/équipe indexeur | orchestrateur |
+| P-6 / P-G2 / P-E6 | adresses des stakes supplier de la DAO (~96 M POKT) et contrats F-Chains II | docs (aucune adresse), forum 5522/5525 | rapports transparence ; P&L Drive (acte investisseur) | investisseur |
+| P-E1 | P&L trimestriels PNF (Q1 2025 → Q2 2026, liens Drive) | liens extraits, non ouverts | téléchargement = acte investisseur | investisseur |
+| P-E4 / PE-4 | commanditaire et montant de l'audit Nodefleet « Shannon » (2025-03-01) | PDF (non indiqué) | forum/PNF | investisseur |
+| PE-1 / PE-5 | tarif dollar Rated API ; honoraires LlamaRisk×YieldNest | pages `/pricing` 404 | session investisseur (lecture seule) | investisseur |
+| PE-2 / G-2 | résultats des votes Snapshot (PEP-68/69/71/73, PIP-38, PEP-74) | fils sans annonce ; Snapshot conditions illisibles | lecture sur place orchestrateur | orchestrateur |
+| G-1r / G-6 | version en vigueur des Articles/Constitution PNF ; avis juridique (Caïmans, RGPD, OFAC) | MoA + Articles Jan-2023 lus ; aucun avocat détenu | secrétaire PNF ; conseil mandaté | investisseur |
+| G-10 / P-A2 / P-20 | règlement du hackathon (critères, jury, PI, montant app stake) | WebSearch (0), forum (0), formulaire Google non ouvert | formulaire ou PNF = acte investisseur | investisseur |
+| P-A1 | rapport « Audit 01 (AGT-01) » du portail (mitigation response-injection) | 3 WebSearch, sitemap, dépôts : rien | `directors@pokt.foundation` | orchestrateur |
+| P-A5 / G-8 | paramètres Beta TestNet (`add_service_fee`, `min_stake`) | non lus (hors liste) | LCD Beta (conditions) ou PNF | orchestrateur |
+| PR-SI-1 | journal du sentinel Narabi sur le VPS (appels servis à Pocket) | aucune (pas de réseau) | lecture SSH orchestrateur | orchestrateur |
+| PR-SI-2 / POOL-RPC-1b | accrual 30 j de concordance côté sentinel (temps 2 décision 100) | déclaré, non construit ; 2ᵉ redéploiement | go investisseur puis lot G0→G7 | orchestrateur/investisseur |
+
+## 11. Consultations formées consolidées (canal 2)
+
+| id | destinataire | question (une phrase) |
+|---|---|---|
+| C-1 (protocole) | advisor + investisseur | la validation on-chain lie-t-elle la position de la feuille prouvée au hash de la relation, et une requête à une réponse unique ? (SENSIBLE, test avant tout usage) |
+| C-2 (protocole) | advisor + orchestrateur | pourquoi 0 sélection probabiliste au règlement en 7 jours ? (recalcul `SeededFloat64` / `block_results`) |
+| CQ-1 (gateways) | advisor | quelle unité d'« opérateur » pour transposer le rang R2 aux réseaux RPC (domaine / Igniter / ASN) ? |
+| CQ-2 (gateways) | lecture-advisor | niveau de l'attribution « paire `lf0kekv`/`swj0e` = PNF » (garder « hypothèse forte » ou exiger P-G1) ? |
+| CR-1 (economie) | advisor | peut-on écrire « burn financé ≈ 97-99 % par la DAO/PNF » hors de l'archive (flux mesurés, attribution inférée) ? |
+| CR-2 (economie) | advisor-marché | soumettre au hackathon (12/10) ou attendre Developer Grants (T4 2026) / incubateur (T2 2027) ? |
+| CONSULT-1 (donnees) | advisor | quelle grandeur publier comme mesure d'un pool Pocket ? — **TRANCHÉ (avis advisor Q2) : « n_eff (inverse-Simpson) » ; aucun « k_eff » Pocket (partition R2 non établie)** |
+| CONSULT-2 (donnees) | orchestrateur | la résolution DNS système de 254 hôtes entre-t-elle dans « aucune autre API sans lecture des conditions » ? |
+| CONSULT-3 (donnees) | advisor | publier l'exposition protocolaire (sièges) ou le réalisé (CU routés, routage non publié) ? |
+| C-4 (agentique) | advisor | comment porter une signature de contenu dans `data` compatible #1808 (octets exacts) et Bell (Ed25519) ? |
+| C-5 (agentique) | lecture-advisor | libellé pour ne pas confondre k_eff (04 §3) et `attestationCountEffective` (8275) ? — **TRANCHÉ (avis advisor Q2) : k_eff = classes ; n_eff (inverse-Simpson) = 1/Σp²** |
+| C-1..C-5 (juridique) | juriste / advisor / investisseur | ToS §5.B (publier une mesure LCD) ; qui propose (D11) ; niveau transposition arXiv §8.3 ; « reçus » déjà servi ; MOU = « material contract » (avis DAO ≥ 4 sem.) ? — **« qui propose » TRANCHÉ par décision 230** ; C-1 tranché §9.6 ; juriste Caïmans reste dû (G-6) |
+| C-SI-2 (shogen-interne) | advisor + oracle | traitement R1 de la période S2 doublée — **TRANCHÉ (avis advisor 26/09) : exclure + sensibilité** (§9.7 ; ADR-0025) |
+| C-SI-3 (shogen-interne) | advisor-marché + advisor | D11 : revenu venant de Pocket vs neutralité ; qui porte — **TRANCHÉ par décision 230 : MONARK porte, aucun revenu Pocket si mesure publiée** |
+| CR-2 (economie) / V1 | advisor-marché | soumettre au hackathon ? — **TRANCHÉ (avis advisor-marché 26/09) : ne pas soumettre ; lire les lauréats après 12/10** |
+
+## 12. NON TROUVÉ consolidé
+
+- Mécanisme on-chain de contestation d'une réponse (seul un TODO) ; comparaison SHA-256(payload)=`payload_hash` dans poktroll/SDK/PATH ; contrôle « chemin de feuille = H(relation) » et unicité requête↔réponse (protocole §13).
+- Claims réglés `PROBABILISTIC` sur 7 j : 0 ; audit formel publié de `x/proof`/`x/tokenomics` hors Nodefleet (protocole §13).
+- Identité des gateways `lf0kekv…`/`swj0e…` (nom « Grove Master Gateway » lu, attribution PNF inférée) ; opérateur `supnodes.com` ; date d'ouverture `robinhood.api.pocket.network` (donnees §NT).
+- Identités civiles : propriétaire n°1 `pokt1ndn42…` (1 027 suppliers, 61,6 M POKT ; **absent de la liste PNF t/5525** — ne pas inférer), rpcgate/lexiscan `pokt14dvky…`, les 22 bénéficiaires rev_share (donnees §NT ; economie §8).
+- Devenir du stake des 6 portefeuilles F-Chains II absents ; adresses des ~96 M POKT DAO (ecosysteme §8bis).
+- Version de Lava en production (les stubs de sanction sont-ils déployés ?) ; export DataReporter/BigQuery de Grove (date de retrait) (ecosysteme §9bis ; gateways §10).
+- AGT-01 (audit response-injection du portail) ; règlement du hackathon ; conditions d'admission au registre du portail (règles A1-A9 lues via MCP) (agentique §22 ; juridique §17).
+- Résultats des votes Snapshot ; version en vigueur des Articles/Constitution PNF ; certification DPF ; « fair use policy » (juridique §17).
+- Tarif dollar Rated API ; honoraires LlamaRisk ; clauses de qualité du programme PNF « Foundation Partnership » Radix↔Stakenodes (ecosysteme §8bis).
+- Volume `validationRequest` ERC-8004 mainnet : non mesurable (aucun ValidationRegistry canonique déployé) (agentique §4.4).
+- Corps des réponses Pocket discordantes : jamais capturés (A-7) ; appels servis Narabi→Pocket : non comptables sans lecture du VPS (shogen-interne §8.1).
+- **Outil firecrawl** : absent de la session des 8 chercheurs (ToolSearch « firecrawl » → aucun outil) — consigné, non contourné (toutes archives §0).
+
+## 13. Tally des réfutations (SYNTHESE-REFUTATION, reproduit sans réinterprétation) et Q-ORCH-1
+
+Schéma W1 = `confirmed | refuted | unverifiable` (recopié tel quel, jamais reclassé). **Signification exacte** (SYNTHESE §Verdicts) : chaque affirmation `refuted` porte une version **corrigée** du réfutant ; « la faiblesse est presque toujours de forme, de provenance ou de niveau, pas du fond mesuré » ; les rares abandons de valeur sont marqués **[valeur abandonnée]** (4 : `gateways:GW-C16` « 4,57 par domaine », `agentique:SEC-01` « 60 par 1 opérateur », `juridique:C19` « 45 lignes », `gateways:GW-C16` déjà cité). Un `refuted` **n'est pas** un rejet de la mesure.
+
+- **Global (160 soumises)** : **54 confirmées / 106 réfutées / 0 invérifiables**. Par niveau soumis : 107 [lu], 53 [mesure], 0 [abs], 0 [2nd]. Non soumises (rangs > 20) : 35 ; total affirmations 195.
+
+| Famille | conf. | réf. | invér. | non soumises |
+|---|---|---|---|---|
+| protocole | 6 | 14 | 0 | 2 |
+| gateways | 6 | 14 | 0 | 5 |
+| economie | 9 | 11 | 0 | 5 |
+| agentique | 3 | 17 | 0 | 5 |
+| ecosysteme | 8 | 12 | 0 | 5 |
+| donnees | 12 | 8 | 0 | 3 |
+| juridique | 4 | 16 | 0 | 5 |
+| shogen-interne | 6 | 14 | 0 | 5 |
+
+- **Contrôles de modèle** (SYNTHESE §Contrôles) : **168/168 agents conformes** au préfixe `claude-opus-5-5` (auto-déclaration + `workflowProgress[].model = claude-opus-5-5[1m]`, `state=done`, `attempt=1`) ; 0 non conforme ; `claude-opus-5` (banni) absent.
+- **Intégrité** (SYNTHESE §Forme) : diff journal vs fichier de résultat = 0 ; fichier W1 = 1 289 973 octets ; écart de discipline consigné (chercheur *donnees* a exécuté `git log` en lecture seule) ; « aucun `GIT_DIR`, aucun `--write-tree`, aucun git, aucun réseau, rien sur C: ».
+
+**Q-ORCH-1 (reproduite telle quelle, non tranchée ici)** : « W2 n'autorise que les affirmations *confirmées* et les [mesure] rejouées. Les **106 `corrected`** de réfutants Opus 5.5 portent souvent une valeur mesurée survivante : sont-ils consommables par W2, et sous quel niveau ? Décision non prise (R-20/R-21). » — Ce rapport a consommé des valeurs **corrigées** (nommées « corrigé » à chaque emploi, ex. k_eff 4,55 domaine, ratio 0,97, 764 sélections, 55 services) ; **Tranché par l'orchestrateur (R-21, 2026-09-26 15:5x UTC)** : une valeur `corrected` est consommable au niveau de sa mesure d'origine ([mesure] ou [lu]) **à condition** d'être citée sous sa forme corrigée, marquée « corrigé » avec l'identifiant du réfutant, et jamais sous sa forme d'origine ; les quatre **[valeur abandonnée]** ne sont consommables sous aucune forme. Ce rapport respecte cette règle ; toute consommation aval (W2, note publique) la reprend telle quelle.
+
+## 14. Sources, provenance et rapport de mission
+
+**Archives et livrables (sha256 recalculés par moi, 2026-09-26 ~15:24Z UTC)** :
+
+| fichier | sha256 |
+|---|---|
+| chercheurs/protocole/ARCHIVE-protocole.md | `27608e7536f93d307839ee480ce16435443163d1fafc5515d34556cf64d6e523` |
+| chercheurs/donnees/ARCHIVE-donnees.md | `84d3da91067ef17a337cd70ab6d8edeb5f3ea6c6d31362ec12d6d2b3e7e4c2cc` |
+| chercheurs/economie/ARCHIVE-economie.md | `79df8da43ccec13080cf8f588072b1329c2d0d60311f740c3e56c91e8f22489a` |
+| chercheurs/ecosysteme/ARCHIVE-ecosysteme.md | `528ee40ecc68351ad27a8b766814b3a1fe53ad1c819abcaa314b566507994a6a` |
+| chercheurs/gateways/ARCHIVE-gateways.md | `87ccf99b6795f2de83e78be9283abe7cb266a96690d4b3a1b63eb17eaeda588a` |
+| chercheurs/juridique/ARCHIVE-juridique.md | `ab7c05ebecb2391fc5a1aade326bbabc56b092139faee9ea2b6a8e6e23bda8b4` |
+| chercheurs/agentique/ARCHIVE-agentique.md | `5a27268675169976a5ad2b3fdd773d3d239fa0072431f24884b18b3f796af802` |
+| chercheurs/shogen-interne/ARCHIVE-shogen-interne.md | `eda1ebebeb006eaaac3c3e7baa0da5975e2b15e954dc403552c31ef19ffad996` |
+| FAITS-pocket-lecture-sur-place-2026-09-25.md | `9328d5e73c9261682e72421ce8de4f8221851ddecc7097174f7213dc934542e6` |
+| REPRISE-apres-redemarrage.md | `210b0f76250ba767cab7743fdf4cf6fa961e166270498dc396f8d48ea1d3d3ce` |
+| refutations/SYNTHESE-REFUTATION.md | `15b37011d0ddb7e6bc80b1552fcec478dd26dd408ff66186bc70e32a4136defb` |
+| refutations/RESULTATS.json | `51ae25e4bdf35a9be5a5575592aab122961f032894bc13e9e0ad5b4a664cda18` |
+| lcd/RESULTATS-concentration.txt | `6fb175dcd1b4f14a9160ab015c622f4ad5b1b1a3cb15af25b32d4381fe0b43f6` |
+| lcd/RESULTATS-etendue.txt | `e125ff32c0b451b489911d2b1aa5495139d01fa1b72019a91fb818117fa26630` |
+| lcd/RESULTATS-etendue-services.csv | `d77dace9cf478a181cdc63f84567ac4b4d1c5401ee18ac6d14f7b229deee57fd` |
+| etude-2026-09-23-erc8294/AVIS-advisor-marche-…2026-09-23.md | `3fe9e8ff9e3369c3bf455eb626e874be96b388734ae45424657f6845e0cb5697` |
+| etude-2026-09-23-erc8294/FAITS-erc-8294-pocket-2026-09-23.md | `ce7022d47c6efc7a0cf4e08054cf463345034d7dd712e3d5e0f1a72ef70b5f4f` |
+| etude-2026-09-23-erc8294/FAITS-pokt-agentic-hackathon-2026-09-23.md | `428add119293c91b31ff53bc9f5c2f129dd203afff57e53e4e314fdbf7b98913` |
+| etude-2026-09-21/conf-src-2/12-pocket-network-FAITS-navigateur.md | `e2e8964717a2e9d6422d133c67cebb65c7a3c83696e9d3bf3e1c6dc73c3744aa` |
+| AVIS-advisor-2026-09-26.md (adjudications appliquées) | `5f30e1d4985081a7ab6ab0e88a26f08479de8c05703955db293f5f24055cb015` |
+| AVIS-advisor-marche-2026-09-26.md (adjudications appliquées) | `b996a8baf4ad1322ee142682b1e738758c22b71ee203c28f5f2f3782e05ad711` |
+| shogen-campagne/INCIDENT-2026-09-26-double-pilote.md | `aac525e737ddb2cbce47d21f97a2ce6595a1df127444ba6b3fbc68c04ca191b2` |
+| Monark/docs/ETAT-DOJO-POCKET-2026-09-26.md | `ba68719d049680ddf1ec200dca2e14c42699f7e5918f1cc9255c3995d676d45b` |
+| Monark/docs/adr/ADR-POOL-RPC-1.md | `a58d080abb76db38a1d98c22bd714db3e54f48746aa96fdc2125e4916de9e6e9` |
+| Shogen/docs/04-certificat-diversite.md | `b282f09f7b3e69e990b6e84897e1591a44ced07f98a18e360a5fe4616f3f2e8a` |
+| Shogen/docs/09-vocabulaire.md | `1b1432f0eeccf3b38e2121e646ecce7a808a6f60c6a27d415d0290a1a5577c20` |
+| Shogen/docs/07-gtm.md | `bcdff0116fe340d500fb82fbea9c1f540fec7c745a8fa0fabfeba8f17c69a61a` |
+| Shogen/docs/DECISIONS.md | `8608c7ef503e06db588ace8c2eb70f1566e2f7e8ac85572a0b2231d5e379fa16` |
+
+- **Heures** : lecture des entrées et recalcul des sha256 le 2026-09-26 entre ~15:16Z et ~15:24Z UTC (horloge `date -u`). Les faits datés à l'intérieur des archives portent l'horodatage de leur auteur (25-26/09).
+- **Modèle** : worker `claude-opus-5-5[1m]`, effort max, contexte frais.
+- **Ce que je n'ai pas lu / établi** (rappel §0, §12) : `lcd/suppliers-q*.json` bruts et `lcd/*.json` de paramètres (lus via les résultats agrégés reproduits) ; `refutations/RESULTATS.json` intégralement (extraction ciblée de 16 claims + meta/tally par script Python en lecture seule) ; PDF `biblio/`, données/scripts par chercheur ; journal VPS du sentinel ; corps discordants Pocket ; votes Snapshot ; P&L Drive PNF ; toute page en direct (aucun réseau). Le rapport S2 n/K/z de Shōgen **n'existe pas encore** (aucun `11-mesures-pilotes*` sur F:) ⇒ aucun chiffre R1 citable.
+- **Adjudications mid-task appliquées (2026-09-26)** : après le premier jet complet, l'orchestrateur a rendu ses arbitrages (avis advisor `AVIS-advisor-2026-09-26.md` + advisor-marché `AVIS-advisor-marche-2026-09-26.md`, lus par moi) et l'investisseur la **décision 230**. Appliqués : nommage k_eff/n_eff (§3, §9.2) ; dénominateur 4 319 en tête, endpoint périmé (§3, §9.3) ; DNS acceptée en R2, IP par hôte jamais reproduite (§9.4) ; C-SI-2 = exclusion + sensibilité, recompte 15:24Z (36 557 / 2 207 doublées) (§1, §6, §9.7) ; signature dans `data` = SPEC (§9.9) ; service Pocket = conception `/calibrate` + adaptateur additif, rien avant S2/D11 (§9.10) ; Robinhood = erratum daté (§9.5) ; hackathon = ne pas soumettre (§7) ; **qui propose = MONARK, Shōgen pièce sans jeton (décision 230)** (§1, §4 ligne 16, §9.6). Chaque point est marqué « tranché par l'orchestrateur le 26/09 » ou « décision investisseur 230 ».
+- **Advisor intégré** : NON appelé pendant l'extraction/rédaction (filtre de régurgitation 2026-09-05). **Appelé UNE fois après le premier jet complet et durable** (conforme mission) : il a relevé un bloquant (formulation « 60/99 par 1 opérateur » recopiée de l'avis-marché en §7/§8, contraire à SEC-01 [valeur abandonnée]) et 4 alignements ; **corrections appliquées** : §7/§8 « 55/99 servis par un opérateur, 60/99 à opérateur unique répartis sur 3 » ; §8 O4 n_eff (inverse-Simpson) 2,72 sur 4 047 étiqueté (critère d'exclusion ajouté hors A.3.5) ; §2 formule licite « l'opérateur X a signé `payload_hash` H dans la session S » + « corrigé par erratum daté » ; §4 ligne 2 colonne « le code ; orchestrateur 26/09 » ; §5 ligne protocole §2.2/P-02 (substitution de charge utile, préavis) ; vocabulaire 09 (« non vérifié »→« non établi », « partenariat Radix »→terme PNF cité). Le transcript ne porte aucun extrait long de document sous droits (artefacts internes + lectures docs/code publiques citées ≤ 25 mots) ; sortie advisor non bloquée.
+- **Isolation (2026-09-25)** : aucune variable `GIT_DIR` ni `GIT_WORK_TREE` posée, aucun `git merge-tree --write-tree`, aucune commande git, aucun réseau ; un seul fichier écrit (`F:\Shogen\docs\15-etude-pocket-network-2026-09-25.md`, dépôt Shōgen, NON committé) + fichiers temporaires sous `F:\tmp\claude\…\scratchpad\` ; rien écrit sur C:. Commandes Bash tenues < 6 Ko.
+- **Rapport de mission (worker)** : 8 archives + FAITS (21/09, 23/09, 25/09) + REPRISE + SYNTHESE-REFUTATION (+ RESULTATS.json) + RESULTATS lcd + ETAT-DOJO §3 + ADR-POOL-RPC-1 + Shōgen 04/09/07/DECISIONS + README MONARK + incident double-pilote lus intégralement ou par extraction ciblée sourcée. Discipline tenue : niveaux et pointeur `archive §` à chaque affirmation, citations ≤ 25 mots, estimateur k_eff + dénominateur nommés à chaque emploi (§3, §9.2/§9.3), section SENSIBLE isolée (§5), arbitrages proposés mais non tranchés (§9), règle Branchement (§6), vocabulaire 09 (jamais « vérifié/garantit/partenaire/autonome/sources indépendantes » nu, jamais un score de justesse). Ce fichier est une donnée brute pour l'orchestrateur (R-21).
