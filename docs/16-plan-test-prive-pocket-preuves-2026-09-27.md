@@ -130,3 +130,16 @@ Chaîne de vérification consommée : worker Opus 5.5 (RAPPORT) → **workflow d
 **Gates restants avant toute soumission** (aucun clôturable par l'orchestrateur seul) : (1) **checkpoint-2** validateur-humain + rejeu complet des tests ; (2) **C4** — lecture sur place des conditions de l'indexeur/`block_results` pour l'attribution T-B ; (3) **oracle 128 graines** — FAIT (orchestrateur) ; (4) **investisseur** — termes de l'accord signé (canal, format, critère de « prouvé ») + confirmation D11/bounty (décisions 248/250). Le code de test reste local sous `F:\tmp\pocket-test\`, jamais poussé.
 
 **Provenance** : RAPPORT worker (sha au JOURNAL) ; workflow `wf_759534a9-512` (transcripts `subagents/workflows/wf_759534a9-512/journal.jsonl`) ; oracle G7 `F:\tmp\pocket-test\g7check\main.go` (sortie 03:23Z) ; avis advisor T-B (option C, `claude-fable-5-1`). Advisor intégré indisponible dans la session — canal 2 utilisé (worker→panel→advisor).
+
+## 13. CLÔTURE de la passe de vérification (orchestrateur, 2026-09-27 ~03:5x UTC)
+
+**Gate 1 (checkpoint-2 + rejeu complet) : FERMÉ.**
+- **Checkpoint-2 (validateur-humain `claude-fable-5-1`) : ACCEPTE-AVEC-CORRECTIONS** (C-CP2-1 appliquée : tableau §5 doc 15 aligné sur les verdicts G7). Rejeu indépendant concordant, isolation prouvée (`git status` MONARK vide avant/après ; rien sur C:). Aucune divergence avec G7.
+- **Rejeu complet G2 (worker `claude-opus-5-5` séparé) : REPRODUCTION TOTALE.** 7/7 SHA MATCH (base bit-identique) ; les 4 tests + oracle 128 graines reproduits `-count=1` (T-B ratio 0,5045 ; oracle prédiction 0,501 ‰). Cartographie G7→rejeu : T-A, COUNT/gonflement, P-09, substitution payload (mécanisme), T-B (mécanisme) = **tous REPRODUITS ; aucun NON REPRODUIT, aucun DIVERGENT**.
+- **P-09 confirmé de façon indépendante** : contrôle non-groupé ajouté par G2 (renforcé de `VerifyClosestProof`, verifyFail=0) : GROUPÉ 0,9846 vs NON-GROUPÉ 0,0165, somme engagée identique (4160), **gain 59,6×** (≈ 57,8× panel, ≈ 58,6× G7). La « correction » du worker initial est infirmée. Oracle T-A keeper durci (`require.NoError`/`require.Equal`/`require.Error`) : le PASS est désormais l'oracle.
+
+**Gates encore OUVERTS avant toute soumission au bounty (aucun clôturable par l'orchestrateur seul)** :
+1. **C4 — attribution T-B** : lecture sur place des conditions d'usage de l'indexeur/`block_results` (procurement P-5), puis rejeu déterministe par claim pour clore l'attribution de 764/1465. Le **mécanisme** T-B est établi ; seule l'attribution du chiffre on-chain reste ouverte.
+2. **Investisseur** : termes de l'accord signé (canal, format, critère de « prouvé » déclenchant les 15K£) + confirmation D11/bounty (décisions 248/250). La rédaction et l'envoi de la soumission sont un acte sortant sous go, contenu validé mot pour mot.
+
+**État** : constats établis au code (T-A, gonflement count/sum borné par budget app, P-09, T-B mécanisme) et vérifiés à trois niveaux indépendants (panel adversarial, oracle orchestrateur, rejeu G2) + acceptés au checkpoint-2. Substitution payload : mécanisme établi, portée pratique conditionnelle. **Rien de soumis, rien de public.** Code de test local `F:\tmp\pocket-test`, jamais poussé.
