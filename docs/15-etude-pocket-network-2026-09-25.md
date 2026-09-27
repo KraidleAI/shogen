@@ -85,6 +85,8 @@ Autres mesures porteuses :
 
 > Cette section reprend les constats que leurs auteurs ont marqués sensibles. Aucun n'est publiable en l'état. « Une attestation prouve ce que la source a dit, jamais que la source dit vrai. »
 
+> **MISE À JOUR G7 datée 2026-09-27 (test privé, décisions 248/249 ; verdicts complets `docs/16` §12).** Les lignes ci-dessous ont été testées en local (bac à sable, commit déployé `a109dd0`, aucun réseau Pocket) puis vérifiées adversarialement (workflow `wf_759534a9-512`) : **protocole §4.3/P-11 (position ≠ hash) = CONFIRMÉ** ; **§4.5/P-10 (échantillonneur) = mécanisme ÉTABLI** (oracle 128 graines, 0,501 ‰ ≈ on-chain 0,52 ; attribution du 764/1465 non close) ; **§4.3ter/P-09 (feuilles groupées) = RÉHABILITÉ** (gain ≈ 58,6× dû au regroupement ; la « correction » du worker était une erreur de balayage) ; **§2.2/P-02 (substitution de charge utile) = mécanisme CONFIRMÉ, portée pratique conditionnelle** (PATH ne comble pas ; système tiers, divulgation gatée). Gonflement count/sum **réel mais borné par le budget de l'app** (jamais « vol illimité »). Rien de public : checkpoint-2 + termes de l'accord signé + go investisseur requis avant toute soumission.
+
 | id | fait | niveau | ce qui manque pour le publier |
 |---|---|---|---|
 | protocole §4.3 / §9 P6 / §10 C-1 (P-11 confirmé *conditionnel*) | aucun contrôle lu ne lie le chemin de la feuille prouvée au hash de la relation, ni une requête à une réponse unique ⇒ la preuve établirait l'EXISTENCE d'une relation, pas le COMPTE | [lu + **déduction non testée**] | (a) test Go local non destructif (jamais mainnet) ; (b) consultation C-1 ; (c) divulgation privée PNF si confirmé |
