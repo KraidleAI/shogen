@@ -34,3 +34,6 @@
 ## Provenance
 
 Recompte : script de session (lecture seule de `control.jsonl`, 15:24Z) ; avis advisor archivé `F:\PRODUITS\etude-2026-09-25-pocket\AVIS-advisor-2026-09-26.md` (Q6) ; CHANTIERS MONARK 2026-09-26 15:1x / 15:3x UTC. Aucune ligne de journal modifiée ; aucun processus autre que la chaîne B touché.
+
+## Statut — 2026-09-28 03:00 UTC : ACCEPTÉE (investisseur, décision MONARK 269 : « go pour ADR-0025, exclusion de la plage entière »)
+Décision 1 retenue telle quelle (plage entière 2026-09-24T18:18:00Z → 2026-09-26T15:07:00Z exclue de n, K, P̂_more, trois strates) ; point 2 (filtre paramétré, jamais d excision) = lot « filtre d exclusion » (cp-1 bref → G1 → G2), mission `F:/tmp/shogen-j28/mission-adr0025-filtre.md` ; point 5 = fait à mesurer après la clôture (campagne close le 2026-09-28 01:27Z, journaux scellés). Publication du z inchangée : décision investisseur.
