@@ -200,7 +200,7 @@ def compute_lm(
     return {"pool": pool, "N": N, "strates": strates_out}
 
 
-def recompute_lm_from_journal(control_path: str, journal_path: str) -> dict:
+def recompute_lm_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
     """Point d'entrée « recalculable depuis le journal seul » (ADR-0003) pour le
     bloc L&M (§6 bloc 4), jumeau de `r1.recompute_from_journal` : lit les paramètres
     de `run_params` et les lectures, calcule L&M par strate."""
@@ -218,6 +218,8 @@ def recompute_lm_from_journal(control_path: str, journal_path: str) -> dict:
         raise ValueError(
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
+    # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
+    markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = r1.parse_journal(journal_path)
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_lm(

@@ -498,7 +498,7 @@ def compute_r1(
     return {"pool": pool, "strates": strates_out, "A_window_stationarity": A_WINDOW_STATIONARITY}
 
 
-def recompute_from_journal(control_path: str, journal_path: str) -> dict:
+def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
     """Point d'entrée « recalculable depuis le journal seul » (ADR-0003) :
     lit les paramètres de `run_params` et les lectures, calcule R1. C'est ce que
     rejoue l'oracle de recalcul (worker à contexte frais, plan §5)."""
@@ -517,6 +517,8 @@ def recompute_from_journal(control_path: str, journal_path: str) -> dict:
             "strates journalées incohérentes avec le calendrier committé "
             f"(fail-closed, §5.3) : {div[:5]}{' …' if len(div) > 5 else ''}"
         )
+    # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
+    markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = parse_journal(journal_path)
     # σ PAR CLASSE + τ RELATIF depuis run_params (ADR-0021 ; effective_run_params a
     # déjà garanti que sigma_classe est un mapping, fail-closed sur scalaire legacy).

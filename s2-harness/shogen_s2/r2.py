@@ -1069,7 +1069,7 @@ def compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
     }
 
 
-def recompute_r2_from_journal(control_path: str, journal_path: str) -> dict:
+def recompute_r2_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
     """Point d'entrée « recalculable depuis le journal seul » (ADR-0003), jumeau de
     r1/lm : mêmes gardes fail-closed (effective_run_params sur R1+R2, strates ==
     calendrier committé). C'est ce que rejoue l'oracle de recalcul (contexte frais)."""
@@ -1085,6 +1085,8 @@ def recompute_r2_from_journal(control_path: str, journal_path: str) -> dict:
             "strates journalées incohérentes avec le calendrier committé "
             f"(fail-closed, §5.3) : {div[:5]}"
         )
+    # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
+    markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = r1.parse_journal(journal_path)
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_r2(

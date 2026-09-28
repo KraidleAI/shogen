@@ -31,6 +31,7 @@ claim de recalculabilité (plan §5).
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from decimal import Decimal
@@ -60,7 +61,8 @@ def _iso_utc(ts) -> str:
     return datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
 
 
-def render_report(control_path: str, journal_path: str) -> str:
+def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> str:
+    ranges = records.exclusion_ranges(exclude_ranges)   # ADR-0025 ; défaut : aucune
     params_list, clock_checks, markers = records.parse_control(control_path)
     asn_records = records.parse_asn(control_path)
     # Concordance des run_params successifs (fail-closed, §E) — même garde que
@@ -78,6 +80,8 @@ def render_report(control_path: str, journal_path: str) -> str:
         raise ValueError(
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
+    # Filtre d'analyse APRÈS la garde §5.3 : blocs 2-6 sur les fenêtres retenues.
+    markers = records.exclude_window_start_ranges(markers, ranges)
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])
@@ -120,6 +124,10 @@ def render_report(control_path: str, journal_path: str) -> str:
         sc = params["strate_calendar"]
         ap(f"  {'strate_calendar':24} = kind={sc.get('kind')} "
            f"{sc.get('note', '')}".rstrip())
+    for a, b in ranges:        # uniquement si filtre (sans option : aucune ligne ajoutée)
+        ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
+           f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
+           "strates (filtre du lecteur, journal intact) — harnais dégradé, ADR-0025")
     # Devise MARQUÉE par flux (§2, décision 4) : composition du pool + résidu peg
     # (le démêlage USDT/USD est R2(2a) ρ_resid, CALCULÉ au bloc 5 — référencé ici).
     cur_by_flux: dict = {}
@@ -368,12 +376,16 @@ def render_report(control_path: str, journal_path: str) -> str:
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 2:
-        print("usage: python -m shogen_s2.report <journal_dir>", file=sys.stderr)
-        return 2
-    d = argv[1]
+    p = argparse.ArgumentParser(prog="python -m shogen_s2.report")
+    p.add_argument("journal_dir")
+    p.add_argument("--exclude-window-start-range", nargs=2, type=int, action="append",
+                   default=[], metavar=("FROM_EPOCH", "TO_EPOCH"),
+                   help="plage FERMEE de window_start hors n, K, P_more (repetable, ADR-0025)")
+    args = p.parse_args(argv[1:])
+    d = args.journal_dir
     text = render_report(os.path.join(d, "control.jsonl"),
-                         os.path.join(d, "journal.jsonl"))
+                         os.path.join(d, "journal.jsonl"),
+                         exclude_ranges=args.exclude_window_start_range)
     # Émission UTF-8 explicite : la table porte la notation de doc 10 (P̂₀, p̂ᵢ…)
     # dont des diacritiques combinants qu'une console cp1252 (Windows) ne peut
     # encoder ; l'artefact recalculable est UTF-8, indépendant du code-page.

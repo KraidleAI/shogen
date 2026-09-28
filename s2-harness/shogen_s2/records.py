@@ -277,3 +277,24 @@ def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
         # `asn_attribution` (M1c) est volontairement IGNORÉ ici (lu par parse_asn) —
         # rétro-compatible : les trois consommateurs R1/L&M/rapport ne changent pas.
     return run_params_list, clock_checks, markers
+
+
+def exclusion_ranges(ranges=()) -> list:
+    """Plages d'exclusion du lecteur (ADR-0025 déc. 2) : entières, FERMÉES `[from, to]`,
+    TRIÉES (déterminisme) ; `from > to` LÈVE (fail-closed, jamais une exclusion vide
+    silencieuse). Fournies par l'appelant (CLI du rapport), jamais par une constante."""
+    out = sorted((int(a), int(b)) for a, b in ranges)
+    inversees = [r for r in out if r[0] > r[1]]
+    if inversees:
+        raise ValueError(f"plage(s) d'exclusion inversée(s) {inversees} (from > to) — "
+                         "fail-closed, jamais une exclusion vide silencieuse")
+    return out
+
+
+def exclude_window_start_ranges(markers: list, ranges=()) -> list:
+    """Filtre d'ANALYSE (ADR-0025 déc. 2), jamais une excision du journal : retire les
+    marqueurs `window_close` dont le `window_start` ∈ `[from, to]` (bornes incluses), à
+    appeler APRÈS `verify_markers_against_spec` ; leurs lectures deviennent orphelines,
+    donc hors n, K, P̂_more de toutes les strates (RUNBOOK §6). Sans plage : inchangé."""
+    rs = exclusion_ranges(ranges)
+    return [m for m in markers if not any(a <= int(m["window_start"]) <= b for a, b in rs)]
