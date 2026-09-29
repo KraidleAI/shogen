@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import enum
 import math
+from collections import Counter
 from decimal import Decimal, localcontext
 from typing import Optional
 
@@ -301,6 +302,26 @@ def build_reading_map(readings: list[dict]) -> dict[tuple[int, str], dict]:
     return reading_map
 
 
+def analysis_pools(markers: list[dict], readings: list[dict], pool: list[str]) -> tuple:
+    """Pool d'analyse (ADR-0028 D1) sur les fenêtres RETENUES (après garde §5.3 et exclusion) et
+    leurs lectures last-wins, orphelines exclues ; ok = statut ok ET prix (le prédicat de réponse
+    de `classify_ecart`). Rend (pool par strate, pool du segment [cas a], retraits (strate, flux,
+    ok, lectures, n)) ; sans fenêtre retenue, aucun retrait."""
+    win_strate = build_window_strate(markers)
+    n = Counter(win_strate.values())
+    ok: Counter = Counter()
+    tot: Counter = Counter()
+    for (ws, f), rd in build_reading_map(readings).items():
+        if ws in win_strate:
+            tot[win_strate[ws], f] += 1
+            ok[win_strate[ws], f] += rd.get("status") == "ok" and rd.get("price") is not None
+    by_strate = {st: [f for f in pool if ok[st, f]] for st in sorted(n)}
+    segment = [f for f in pool if not n or any(ok[st, f] for st in n)]
+    retraits = [(st, f, ok[st, f], tot[st, f], n[st]) for st in sorted(n) for f in pool
+                if not ok[st, f]]
+    return by_strate, segment, retraits
+
+
 def _classify_window(
     ws: int,
     reading_map: dict[tuple[int, str], dict],
@@ -365,13 +386,15 @@ def compute_r1(
     tau: dict,
     seuil_hist: Decimal = SEUIL_HIST,
     n_min: int = N_MIN_HORSENV,
+    pool_by_strate: Optional[dict] = None,
 ) -> dict:
     """Calcule R1 par strate depuis les enregistrements du journal.
 
     - **Dédup des marqueurs** par `window_start` (reprise idempotente, §5.3).
     - **Last-wins** par (fenêtre, flux) : re-collecte d'une fenêtre → la
       dernière lecture gagne (« le dernier de la fenêtre », §5.3).
-    - `n` = fenêtres complétées **par strate**.
+    - `n` = fenêtres complétées **par strate** ; `pool_by_strate` : pool de chaque strate
+      (ADR-0028 D1, cas b), `pool` par défaut.
     """
     win_strate = build_window_strate(markers)      # dédup par window_start (§5.3)
     reading_map = build_reading_map(readings)       # last-wins par (fenêtre, flux)
@@ -393,16 +416,17 @@ def compute_r1(
     strates_out: dict[str, dict] = {}
     for st, wins in windows_by_strate.items():
         n = len(wins)
+        ps = pool if pool_by_strate is None else pool_by_strate[st]
         # Compteurs par source.
-        tally = {f: {k: 0 for k in Ecart} for f in pool}
-        stale_evaluable = {f: 0 for f in pool}
-        ok_windows = {f: 0 for f in pool}
+        tally = {f: {k: 0 for k in Ecart} for f in ps}
+        stale_evaluable = {f: 0 for f in ps}
+        ok_windows = {f: 0 for f in ps}
         k_count = 0
         for ws in wins:
-            cls = _classify_window(ws, reading_map, pool, w, sigma_by_class,
+            cls = _classify_window(ws, reading_map, ps, w, sigma_by_class,
                                    sigma_class_of_flux, tau, n_min)
             win_ecarts = 0
-            for f in pool:
+            for f in ps:
                 rd = reading_map.get((ws, f))
                 if rd is not None and rd.get("status") == "ok" and rd.get("price") is not None:
                     ok_windows[f] += 1
@@ -418,7 +442,7 @@ def compute_r1(
         per_source = {}
         phats: list[Decimal] = []
         residu_fail_open: list[str] = []
-        for f in pool:
+        for f in ps:
             t = tally[f]
             ecart = t[Ecart.PANNE] + t[Ecart.STALENESS] + t[Ecart.HORS_ENVELOPPE]
             # p̂ᵢ à la précision FIXÉE (pas le contexte ambiant) → recalcul
@@ -520,13 +544,15 @@ def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=
     # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
     markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = parse_journal(journal_path)
+    pools, pool, _retraits = analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     # σ PAR CLASSE + τ RELATIF depuis run_params (ADR-0021 ; effective_run_params a
     # déjà garanti que sigma_classe est un mapping, fail-closed sur scalaire legacy).
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_r1(
         markers=markers,
         readings=readings,
-        pool=list(params["pool"]),
+        pool=pool,
+        pool_by_strate=pools,
         w=int(params["w"]),
         sigma_by_class=sigma_by_class,
         sigma_class_of_flux=sigma_class_of_flux,

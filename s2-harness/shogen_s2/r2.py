@@ -1033,11 +1033,12 @@ def _localize_intercluster(partition, lm_out) -> dict:
 # ── Orchestration + point d'entrée recalculable (patron maison) ────────────────
 
 def compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
-               sigma_class_of_flux, tau, params, n_min_horsenv=None) -> dict:
+               sigma_class_of_flux, tau, params, n_min_horsenv=None, pool_by_strate=None) -> dict:
     """R2 complet : partition/k_eff (ASN + contenu), statistiques de contenu par paire,
     arêtes méthode, corrélations clusters, drapeau 2. Consomme R1 et L&M (mêmes
     helpers, σ PAR CLASSE + τ RELATIF, zéro divergence). `params` = run_params
-    effectif (clés R2 présentes)."""
+    effectif (clés R2 présentes). ADR-0028 D1 : R2 porte sur `pool` (cas a seul) ; R1 et L&M
+    du drapeau 2 reçoivent `pool_by_strate` (cas b), comme les blocs 3 et 4."""
     if n_min_horsenv is None:
         n_min_horsenv = r1.N_MIN_HORSENV
     flux_hosts = params["flux_hosts"]
@@ -1049,10 +1050,10 @@ def compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
     seuil_hist = Decimal(str(params.get("seuil_historique_valeur", SEUIL_HIST)))
     r1_out = r1.compute_r1(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, seuil_hist=seuil_hist,
-                           n_min=n_min_horsenv)
+                           n_min=n_min_horsenv, pool_by_strate=pool_by_strate)
     from .lm import compute_lm
     lm_out = compute_lm(markers, readings, pool, w, sigma_by_class,
-                        sigma_class_of_flux, tau, n_min_horsenv)
+                        sigma_class_of_flux, tau, n_min_horsenv, pool_by_strate)
     clusters_lm = cluster_lm_correlations(partition, markers, readings, pool, w,
                                           sigma_by_class, sigma_class_of_flux, tau,
                                           n_min_horsenv)
@@ -1088,12 +1089,14 @@ def recompute_r2_from_journal(control_path: str, journal_path: str, exclude_rang
     # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
     markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = r1.parse_journal(journal_path)
+    pools, pool, _retraits = r1.analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_r2(
         markers=markers,
         readings=readings,
         asn_records=asn_records,
-        pool=list(params["pool"]),
+        pool=pool,
+        pool_by_strate=pools,
         w=int(params["w"]),
         sigma_by_class=sigma_by_class,
         sigma_class_of_flux=sigma_class_of_flux,

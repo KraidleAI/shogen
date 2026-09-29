@@ -40,6 +40,7 @@ from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
+    analysis_pools,
     classify_cells,
     compute_r1,
     parse_journal,
@@ -90,16 +91,20 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     seuil_hist = Decimal(str(params["seuil_historique_valeur"]))
     n_min = int(params["n_min_hors_enveloppe"])
+    # Pool d'analyse (ADR-0028 D1) APRÈS l'exclusion : blocs 3-6 ; bloc 2 (journal brut) : pool.
+    pools, pool_an, retraits = analysis_pools(markers, readings, pool)
+    cas_b = any(ps != pool_an for ps in pools.values())
 
-    r1 = compute_r1(markers, readings, pool, w, sigma_by_class, sigma_class_of_flux,
-                    tau, seuil_hist, n_min)
+    r1 = compute_r1(markers, readings, pool_an, w, sigma_by_class, sigma_class_of_flux,
+                    tau, seuil_hist, n_min, pools)
     cells = classify_cells(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
     # R2 complet (partition/k_eff, contenu, méthode, clusters, drapeau 2) — recalculé
     # depuis les mêmes enregistrements (ADR-0003). Le peg (bloc 1) le référence.
-    r2_out = r2.compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
-                           sigma_class_of_flux, tau, params, n_min_horsenv=n_min)
+    r2_out = r2.compute_r2(markers, readings, asn_records, pool_an, w, sigma_by_class,
+                           sigma_class_of_flux, tau, params, n_min_horsenv=n_min,
+                           pool_by_strate=pools)
 
     out: list[str] = []
     ap = out.append
@@ -128,12 +133,20 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
         ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
            f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
            "strates (filtre du lecteur, journal intact) — harnais dégradé, ADR-0025")
+    for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
+        cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
+        ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "
+           f"lectures, n = {n_s} — hors R1 et L&M de la strate, cas {cas} (ADR-0028 D1)")
+    for st, ps in (pools.items() if retraits else ()):
+        ap(f"  {'k_nominal_strate':24} = « {st} » : "
+           f"{len(r2.hosts_of_pool(params['flux_hosts'], ps))} sources / {len(ps)} "
+           "flux (pool d'analyse, ADR-0028 D1)")
     # Devise MARQUÉE par flux (§2, décision 4) : composition du pool + résidu peg
     # (le démêlage USDT/USD est R2(2a) ρ_resid, CALCULÉ au bloc 5 — référencé ici).
     cur_by_flux: dict = {}
     for r in readings:
         c = r.get("currency")
-        if c is not None:
+        if c is not None and r["flux_id"] in pool_an:   # pool d'analyse (ADR-0028 D1)
             cur_by_flux.setdefault(r["flux_id"], c)
     n_usd = sum(1 for c in cur_by_flux.values() if c == "USD")
     n_usdt = sum(1 for c in cur_by_flux.values() if c == "USDT")
@@ -175,7 +188,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
               f"{'panne':>6} {'stale':>6} {'horsE':>6} {'nonÉv':>6} "
               f"{'axes évaluables'}")
         ap(ph)
-        for f in pool:
+        for f in blk["per_source"]:            # pool d'analyse de la strate (ADR-0028 D1)
             s = blk["per_source"][f]
             ap(f"    {f:10} {_fmt_dec(s['phat']):>26} {s['ecart']:>6} "
                f"{s['panne']:>6} {s['staleness']:>6} {s['hors_enveloppe']:>6} "
@@ -204,11 +217,13 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
     ap(f"\n  {A_WINDOW_STATIONARITY}")
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
-    lm_out = compute_lm(markers, readings, pool, w, sigma_by_class,
-                        sigma_class_of_flux, tau, n_min)
-    ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux (pool)")
+    lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
+                        sigma_class_of_flux, tau, n_min, pools)
+    ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux "
+       + ("(pool d'analyse ; N par strate ci-dessous, ADR-0028 D1)" if cas_b else "(pool)"))
     for st, blk in lm_out["strates"].items():
-        ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}")
+        ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}"
+           + (f" ; N = {blk['N']}" if cas_b else ""))
         ap(f"    Ê(Θ)    = {_fmt_dec(blk['E_theta'])}  (= (1/N)·Σᵢ p̂ᵢ — cohérence R1)")
         ap(f"    Ê(Θ²)   = {_fmt_dec(blk['E_theta2'])}  (forme par paires mⱼ(mⱼ−1)/(N(N−1)))")
         ap(f"    Var̂(Θ)  = {_fmt_dec(blk['Var_theta'])}  (= Ê(Θ²) − Ê(Θ)² ; écart au "

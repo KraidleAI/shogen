@@ -12,7 +12,9 @@ Littlewood & Miller 1989, TSE 1989 — formules re-établies aux pages du PDF) :
     corrélations **signées** par paire de sources — Cov<0 possible (L&M p.j.1601 :
     un pool anti-corrélé fait *mieux* que l'indépendance), publié avec son signe.
 
-**N = taille du pool (nombre de FLUX), constant** (résolution ADVISOR, M1b) : le
+**N = taille du pool (nombre de FLUX), constant** (résolution ADVISOR, M1b) — amendé le
+2026-09-29 par ADR-0028 D1 (lot B0) : N = taille du POOL D'ANALYSE de la strate, qui diffère
+d'une strate à l'autre au cas (b) (`pool_by_strate`). Motif d'origine : le
 design écrit un N sans indice et `m_j | θ_j ~ Binomiale(N, θ_j)` — l'analogue
 exact des N versions de K&L. Chaque flux étant toujours évaluable pour la panne
 (iii), « N évaluables » = le pool entier. `m_j` = nombre de flux EN ÉCART dans la
@@ -116,18 +118,18 @@ def compute_lm(
     sigma_class_of_flux: dict,
     tau: dict,
     n_min: int = r1.N_MIN_HORSENV,
+    pool_by_strate: Optional[dict] = None,
 ) -> dict:
     """Estimateur L&M **par strate**, depuis les enregistrements du journal.
 
     Consomme la MÊME classification (`r1.classify_cells`, σ PAR CLASSE + τ RELATIF,
     ADR-0021) et les MÊMES marqueurs dédupliqués (`r1.build_window_strate`) que
     `compute_r1` — d'où l'identité de cohérence `Ê(Θ) = (1/N)·Σ_i p̂_i`. Rien n'est
-    re-classifié ici.
+    re-classifié ici. `pool_by_strate` (ADR-0028 D1, cas b) : N = taille du pool de la strate.
     """
     win_strate = build_window_strate(markers)
     cells = classify_cells(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, n_min)
-    N = len(pool)
 
     windows_by_strate: dict[str, list[int]] = {}
     for ws, st in sorted(win_strate.items()):
@@ -136,12 +138,14 @@ def compute_lm(
     strates_out: dict[str, dict] = {}
     for st, wins in windows_by_strate.items():
         n = len(wins)
+        ps = pool if pool_by_strate is None else pool_by_strate[st]
+        N = len(ps)
         # m_j et indicatrices d'écart par flux (réutilise la classification R1).
         m_by_win: dict[int, int] = {}
-        ind: dict[str, list[int]] = {f: [] for f in pool}
+        ind: dict[str, list[int]] = {f: [] for f in ps}
         for ws in wins:
             mj = 0
-            for f in pool:
+            for f in ps:
                 b = _ecart_indicator(cells[(ws, f)])
                 ind[f].append(b)
                 mj += b
@@ -166,7 +170,7 @@ def compute_lm(
 
         # Corrélations phi SIGNÉES par paire de FLUX (66 paires pour 12).
         pair_phi: dict[str, dict] = {}
-        for a, b in combinations(pool, 2):
+        for a, b in combinations(ps, 2):
             n11 = n10 = n01 = n00 = 0
             for ia, ib in zip(ind[a], ind[b]):
                 if ia and ib:
@@ -197,7 +201,7 @@ def compute_lm(
             "caveat_non_eval": CAVEAT_NON_EVAL,
         }
 
-    return {"pool": pool, "N": N, "strates": strates_out}
+    return {"pool": pool, "N": len(pool), "strates": strates_out}
 
 
 def recompute_lm_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
@@ -221,11 +225,13 @@ def recompute_lm_from_journal(control_path: str, journal_path: str, exclude_rang
     # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
     markers = records.exclude_window_start_ranges(markers, exclude_ranges)
     readings = r1.parse_journal(journal_path)
+    pools, pool, _retraits = r1.analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)
     return compute_lm(
         markers=markers,
         readings=readings,
-        pool=list(params["pool"]),
+        pool=pool,
+        pool_by_strate=pools,
         w=int(params["w"]),
         sigma_by_class=sigma_by_class,
         sigma_class_of_flux=sigma_class_of_flux,
