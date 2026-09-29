@@ -1,0 +1,76 @@
+# G0 — Claims register & outline for the Pocket / poktroll white-hat disclosure report
+
+Status: **G0 proposed** (orchestrator `claude-fable-5-1`, 2026-09-29). Submitted to validateur-humain checkpoint-1 before any drafting.
+Mandate (investor, 2026-09-29): a complete, academic, white-hat report to submit to the Pocket team; motivation includes a wish to collaborate with Pocket on agentic services. Report language: **English** (investor, 2026-09-29). The report is a **gated outbound deliverable**: the orchestrator prepares it; the investor submits it. Nothing is sent by any agent.
+**Attaching ADR (C-3, CA-3): ADR-0028** — S2 exit decisions and the PAROXYSME Shōgen→MONARK sequence (G0 accepted at cp-1 and cp-1 bis; `docs/adr-0028/`). No plan without an attaching ADR.
+
+**AUTHORIZATION BASIS — corrected 2026-09-29 (investor, verbatim: « aucun accord; on ne parle d'aucun accord, juste la team MONARK qui voulait étudier le projet en profondeur, étant de la communauté de POCKET depuis des années. on passe par github privé »).** There is NO agreement of any kind. Do NOT mention any signed agreement, bounty, prize (15K£), PNF authorization, or decision 249 anywhere. Framing: **independent, good-faith security research by the MONARK team, long-time members of the Pocket community**, disclosed responsibly and privately. Channel: **GitHub private security advisory**.
+Consequence, non-negotiable: (a) the CODE-level findings (F1 mechanism, F2, F3, F4) rest solely on reading PUBLIC open-source code at a pinned commit — no authorization is needed or claimed. (b) The disclosure report must NOT republish any on-chain aggregate we collected (e.g. the 4,484-supplier concentration): that stays in the internal market study (doc 15), out of this report. (c) F1's real-world rate is presented as MECHANISM + PREDICTION, **verifiable by Pocket against their own on-chain data**; we do not present ourselves as the authority that mined it. Any empirical consistency is stated as an observation a maintainer can reproduce, at most citing normal-volume reads of publicly-served endpoints, never « mining information » under ToS §5.B.
+
+Sources of truth (do not re-derive; may be contradicted only on first-hand evidence):
+- `docs/16-plan-test-prive-pocket-preuves-2026-09-27.md` §12 (G7 verdict), §13 (verification closure), §14 (T-B attribution closed at 3 lenses). **CAUTION (C-4, CA-1): doc 16 §12/§13/§14 still carry the now-FORBIDDEN bounty/agreement framing** (section headers "…bounty"; mentions "accord signé / 15K£ / décisions 248/250" at l.130/143/164), **SUPERSEDED by the corrected AUTHORIZATION BASIS above and NOT to be reported.** Draw from doc 16 ONLY the verdict levels, panel votes, honest bounds, and code mechanisms — never its framing, and never its on-chain figures.
+- `docs/15-etude-pocket-network-2026-09-25.md` §1-§8 (protocol as read at code), §5.
+- Test artifacts (C-2, CA-8/CA-11 — **resealed, sha-pinned custody in place, confirmed present 2026-09-29**): `F:\PRODUITS\etude-2026-09-25-pocket\test-evidence-2026-09-29\` = `RAPPORT.md`, `REPLAY-TB.md`, `REJEU-G2.md`, `main.go` (g7check oracle), `keeper-tests/` (`g7check__main.go`, `p09verif__main.go`, `verif-p2__relay_3e1b2ab.go`), `MISSION-*.md`, all sealed by `SHA256SUMS-2026-09-29.txt`. Reproduction-by-reference (report §8) anchors on THESE sha, never on `F:\tmp` (volatile).
+- Compliance facts (for what the report must NOT do): `F:\PRODUITS\etude-2026-09-25-pocket\FAITS-indexer-conditions-2026-09-27.md` (Pocket ToS §5.B restricts mining info about other companies; §8 Feedback licence). No agreement exists — see AUTHORIZATION BASIS above.
+- Patch status (first-hand, GitHub, 2026-09-29): see §Patch-status below.
+
+## Scope & versions (all [lu]/[mesure], to cite at commit `a109dd0`)
+- Repo `github.com/pokt-network/poktroll`, release **v0.1.35 = commit `a109dd0bae65c1d96b010d65f4cdc5bc77a50fc2`** (GitHub release page, 2026-08-12; re-checked 2026-09-29).
+- `smt` library pinned **v0.14.1** by `go.mod`; `shannon-sdk` at its pinned rev; Go **1.26.5**.
+- The v0.1.35 line was the deployed mainnet consensus-breaking release from height **883667** (2026-08-18) onward (verifiable by the maintainers against their own chain/plan history; established internally doc 16 §14). Present this as a fact the maintainers can confirm, not as our mined datum.
+
+## Patch status (first-hand, 2026-09-29, GitHub) — to state as [mesure]
+- No release newer than v0.1.35 (releases page, 2026-09-29).
+- No published security advisory (`/security/advisories` empty, 2026-09-29).
+- `x/proof/keeper/proof_validation.go` (poktroll `main`): last change **2026-01-27**, before v0.1.35 → unchanged since the analyzed commit.
+- `proofs.go` / `VerifyClosestProof` (`smt` `main`): last change **2025-07-15** → unchanged.
+- `relay.go` (`shannon-sdk` `main`): only post-window change is commit `9bf0b02` (2026-08-27), a **build/import optimization** (replaces `poktroll/app` import with a local `const accountAddressPrefix = "pokt"`, Go bump, pin poktroll v0.1.35); **response-validation logic unchanged** (patch read in full, 2026-09-29).
+- Reserve: histories read on GitHub; embargoed/private fixes not visible. `a109dd0..main` byte-diff of the three files is a nice-to-have to state "unchanged" as full [mesure] rather than history-based.
+
+## Claims register — one row per assertion the report will make
+Verdict levels: **CONFIRMED** (code + reproduced), **MECHANISM ESTABLISHED / CONDITIONAL EXPLOITABILITY**, **ATTRIBUTED** (on-chain figure), **LEAD (untested)**.
+
+| # | Claim (report finding) | Level | Panel vote | Evidence (at a109dd0) | Honest bound (verbatim) | Forbidden phrasing |
+|---|---|---|---|---|---|---|
+| F1 | Proof-sampler entropy collapse: `SeededFloat64` seed entropy folds (via `binary.Varint`) so the effective draw probability is far below the intended parameter; predicted effective rate ≈ **0.5‰** vs an intended ≈ **1‰** | MECHANISM ESTABLISHED (code) + PREDICTION verifiable by maintainers | advisor-adjudicated; reproduced 3 lenses | Code + local oracle only: `g7check/main.go` (128-seed enumeration) predicts ≈0.5 of the intended rate; entropy collapse to ~7 bits shown at code. The maintainers can confirm the effective on-chain draw rate against their own data. | Present as CODE MECHANISM + PREDICTION. Do NOT present ourselves as having mined the on-chain figure; frame empirical consistency as maintainer-reproducible. The internal denominator/attribution detail (doc 16 §14) stays internal. | never "we established the on-chain cause"; never republish mined aggregates |
+| F2 | Claim-inflation cluster: a claim's count/sum is not bound to distinct served work, and the mandatory-proof guard is bypassable — composed of T-A (leaf position not bound to relation hash in `VerifyClosestProof`), T-A′ (duplicate valid leaves), P-09 (false leaves grouped under a prefix) | CONFIRMED | 3/0 (T-A); P-09 1/1 orchestrator tie-break, then reproduced | doc 16 §12 (T-A, COUNT/SUM), §13 (P-09 independent: grouped 0.9846 vs non-grouped 0.0165, gain ≈59×); floor `= appStake/numSessions/numSuppliers` (`token_logic_modules.go` L385, `settlement_context.go` L720-724); burn=mint (`tlm_relay_burn_equals_mint.go` L83-141) | Bounded by the application-budget floor (≤ floor per supplier); the victim is the application's burned stake, not "unlimited". T-A is not the only lever (canonical-key grinding also inflates count); T-A's marginal value = grinding cost avoided. | never "unlimited theft"; never "T-A is THE lever" |
+| F3 | Response-integrity check absent: `ValidateRelayResponse` (shannon-sdk) does not compare `H(payload) == payload_hash`; the served path (PATH, main 4606957) returns raw bytes without the comparison | MECHANISM ESTABLISHED, CONDITIONAL EXPLOITABILITY | 2/1 | doc 16 §12 (payload substitution); commented code is a presence check (`len==0`), not an equality check | Third-party system (shannon-sdk); exploitability assumes an intermediary on RelayMiner→gateway or a malicious supplier; no served consumer established at code (only pinned caller = a test CLI). Weakest of the four. | never state exploitability as unconditional |
+| F4 | Lead (untested): the settlement re-draw (validation writing `ProofValidationStatus` changes the claim hash, re-drawing the requirement) plausibly also applies to an INVALID proof — a well-formed but invalid proof would likely be re-drawn and settled | LEAD (UNTESTED) | n/a | doc 16 §14 §6 (mechanism at code only). **In the REPORT, F4 is an untested CODE lead** — validation writes `ProofValidationStatus` (field 4) into the claim, changing the `Marshal` bytes and therefore the claim hash that drives the settlement re-draw (`settle_pending_claims.go` L1056/L1153-1164; `validate_proofs.go` L197-198), so a well-formed-but-INVALID proof would plausibly be re-drawn (likely to an INVALID proof again) and, unless re-drawn ≤ p, settled. **The on-chain counterfactual figures (764 real claims; 0/764 "required"; INVALID=0) STAY INTERNAL (doc 16 §14)** — same regime as F1's "never republish mined aggregates". **Never tested at the keeper.** | Present as a hypothesis / future work, never as a finding. Item POCKET-SETTLEMENT-REDRAW-1. | never a "finding"; never "confirmed" |
+
+## Methodology to narrate (Section 4 — "how we did it", a genuine contribution)
+- Code-first reading at pinned sha (no reliance on running mainnet for the mechanism).
+- Local keeper tests at `a109dd0` (isolated, no network, no POKT, nothing on mainnet).
+- Adversarial verification panel (11 verifiers + 1 advisor lens) before consuming any finding.
+- First-hand oracle: 128-seed enumeration by the orchestrator.
+- Full independent reproduction: 7/7 SHA match on the base, 4 tests + oracle reproduced `-count=1`.
+- Human-acceptance checkpoints; `error_origin` tracking. Tell the P-09 episode honestly: a first agent's "correction" was itself refuted by the panel (0.984 vs 0.0165). State plainly that LLM agents did the analysis under this discipline; the reproduction evidence is what answers the obvious distrust.
+
+## Good-faith research & responsible-disclosure statement (Section 0)
+Independent, good-faith security research by the MONARK team, long-time members of the Pocket community, who set out to study poktroll in depth. **No agreement, no bounty, no special authorization is claimed or implied.** The findings rest on reading the public open-source code at a pinned commit; all mechanism testing was local (no network, no POKT, nothing written on mainnet, nothing made public). Disclosure is private, via a GitHub private security advisory, so maintainers can remediate before any public discussion. We publish no on-chain aggregates about network participants.
+
+## Outline (English)
+Abstract · 0 Good-faith research & responsible-disclosure statement · 1 Motivation (long-time Pocket community; Shōgen measures source co-failure; Pocket as a data-supply substrate for agentic services; why we read the code) · 2 Scope & versions (+ dated patch status) · 3 Threat model (malicious supplier; intermediary on RelayMiner→gateway; application stake as victim) · 4 Methodology (the "how", with the reproduction evidence and the honest P-09 episode) · 5 Findings F1–F4 · 6 Impact & severity (economic bound; who pays) · 7 Remediation (bind leaf position to relation hash; bind count/sum to distinct served work; add `H(payload)==payload_hash`; fix seed derivation; exclude `ProofValidationStatus` from the hash driving the re-draw) · 8 Reproduction package (by reference: tree sha, commands, deterministic environment) · 9 Limitations & non-claims (the forbidden-phrasing list as explicit non-claims) · 10 Proposed coordination & disclosure timeline · Appendices: A claims register; B verification chain with run ids.
+The collaboration proposal (agentic services; MONARK harness as an MCP service) is **severable** — a separate cover letter/annex, D11 acknowledged (no Pocket revenue while a Pocket measure is published; decision 230), never inside the disclosure body (ToS §8 Feedback licence).
+
+## MAST residual failure modes — DRAFTING / DISCLOSURE topology (C-5, CA-5)
+doc 16 §10 covers the residual MAST modes of the TEST topology only. The residual modes of the *report* (drafting + private disclosure) are distinct; countermeasures are already wired into this register and the outline:
+
+| MAST mode | risk in the report | countermeasure (in this register) |
+|---|---|---|
+| **Over-claiming / report infidelity** | the report says more than the evidence supports (e.g. "unlimited theft", "T-A is THE lever", exploitability stated as unconditional) | the per-finding **forbidden-phrasing column** + a **§9 explicit non-claims** section that turns every forbidden phrasing into a NON-CLAIM + verbatim preservation of verdict **levels/votes/honest bounds** + **reproduction proof by reference** (sha, test names) |
+| **On-chain aggregate leak** | the report republishes a figure we mined (4,484-supplier concentration; the 764/1465 selection count; INVALID=0) | AUTHORIZATION BASIS **(b)/(c)**: F1 = code MECHANISM + PREDICTION only, maintainer-verifiable; F4 = code lead with NO on-chain counterfactual figures; §8 cites only code sha + local oracle |
+| **Premature closure** | an untested lead is stated as a finding (F4), or a conditional finding as unconditional (F3) | F4 kept **LEAD (UNTESTED)**; F3 kept **CONDITIONAL EXPLOITABILITY**; verdict levels preserved verbatim; §9 |
+| **Framing drift** | the forbidden bounty/agreement language creeps back in from doc 16 | §0 good-faith statement; C-4 caution above; no number without provenance; the forbidden REFERENTS (a signed agreement, a bounty/prize, 15K£, PNF authorization, decision 249) are ASSERTED NOWHERE in the report — its only related statements are explicit disclaimers that MONARK acts under no contract, reward, or permission |
+| **Scope creep beyond code** | claiming a served victim/vector for F3 that the code does not establish | Threat model §3 names the *assumed* intermediary; F3 states "no served consumer established at code (only pinned caller = a test CLI)" |
+
+## Non-LLM oracle for this document
+`cargo xtask verify` if under `docs/` (S-G4 vocabulary, S-G5 sources, S-G8 ISO dates): code and ToS quotes in backticks, no « » of the poktroll tarball (not in biblio/), 09 vocabulary respected. Custody: private repo, never pushed, bundled to D: (SHOGEN-BUNDLE-CLOTURE-1) — same regime as docs 15/16.
+
+## Resolved by the investor (2026-09-29)
+1. **No agreement** — good-faith community research; do not mention any agreement/bounty/authorization.
+2. **Channel: GitHub private security advisory.**
+3. Entity = **MONARK** (Shōgen the analysis piece, decision 230); collaboration proposal severable in a separate cover letter.
+
+## Open judgment calls (orchestrator → investor, non-blocking)
+- The on-chain attribution detail (doc 16 §14) is kept internal; the report presents F1 as code mechanism + prediction, maintainer-verifiable. Confirm this is the intended posture, or say if the report should stay purely code-level with no empirical rate at all.
+- Optional (nice-to-have, not blocking): a byte-diff `a109dd0..main` of the three files to state "unpatched" as full [mesure]; today it rests on GitHub file history + the read shannon-sdk patch.
