@@ -1,5 +1,7 @@
 # ADR-0025 — Période à double pilote de la campagne S2 (24/09 18:18Z → 26/09 15:07Z) : exclusion de n, sensibilité publiée, déclencheur de prolongation
 
+> **Errata (2026-09-29, orchestrateur Shōgen, revue G2 du lot A Q-G2-2)** : la borne haute RATIFIÉE est **2026-09-26T15:08:00Z incluse** (décision 272) — plage [2026-09-24T18:18:00Z ; 2026-09-26T15:08:00Z] = **2 618 fenêtres** (calme 1 709, stress 909), n = **35 982**, stress après exclusion 189,95 h. Les valeurs 15:07Z / 2 617 / 908 du titre et du corps sont celles du G0 du 26/09, **supersédées** ; commande J28 : `--exclude-window-start-range 1790273880 1790435280`. Le corps n'est pas réécrit (traçabilité).
+
 - **Statut** : **G0 proposé** (rédigé par l'orchestrateur MONARK `claude-fable-5-1` sur go investisseur « règle tout ça », 2026-09-26 15:3x UTC, avis `advisor` Q6 du même jour — conseil suivi) ; à accepter par le validateur-humain / `shogen-orchestrator` **avant tout calcul de z**. Aucune implémentation dans ce commit.
 - **Rattachement** : RUNBOOK-campagne §6 (« harnais-down ≠ source-en-panne »), §8 (« ne publie rien ; D6 = publiable »), critère strate stress 6,95 j = 166,8 h ; ADR-0020 (fail-closed) ; ADR-0024 (38 600 fenêtres, fin ≈ 28/09) ; 04 §5 (« fenêtre de complaisance ») ; incident `F:\shogen-campagne\INCIDENT-2026-09-26-double-pilote.md` ; archive chercheur `F:\PRODUITS\etude-2026-09-25-pocket\chercheurs\shogen-interne\ARCHIVE-shogen-interne.md` §10.2, §15.1, §15.2 (C-SI-2).
 

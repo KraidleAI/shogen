@@ -121,3 +121,9 @@ Mesure faite avec le code du lot (`mesure_declencheur.py`) sur la copie de `cont
 - Scripts : `capture_golden_base.py` (rejoue le sha du test (iv) sur l'arbre de base), `mesure_declencheur.py` (point 4), `mutants.py` (campagne).
 - `sorties\` : `baseline_step0.caviardee.out`, `base-sha256.txt`, `post-lot-sha256.txt`, `golden-render-base.txt`, `mutants.out`, `suite-sans-variable.out`, `suite-avec-variable.out`, `declencheur.out`.
 - Non fait, par mandat : le rapport J28 complet n'a pas été lancé ; aucun git écrivant ; rien sur C: ; aucun réseau.
+
+## Erratum (2026-09-29, revue G2 du lot A, correction C-3 — ajout daté, lignes précédentes inchangées)
+- (a) l.34 : la borne haute ratifiée est 15:08Z (décision 272) ; commande J28 : `--exclude-window-start-range 1790273880 1790435280`.
+- (b) l.52, 55, 77 : après C-1, le test (ii) vaut 2 618 fenêtres (stress 909) ; stress après exclusion 11 397 fenêtres = 189,95 h.
+- (c) l.105 (§10-4) : l'affirmation qu'un nombre négatif serait lu comme une option est **fausse** — mesuré par la revue G2 : `--exclude-window-start-range -5 10` rend rc 0 avec la ligne `[-5 ; 10]` au bloc 1 (comportement accepté sans effet ; refus rc 2 porté au lot B, Q-G2-5).
+Source : `F:\tmp\shogen-g2-lotA\G2-lot-A-ADR-0025.md` (sha256 39f2b8dd…) §9.

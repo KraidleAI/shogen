@@ -69,7 +69,12 @@ class TestExclusionFixture(unittest.TestCase):
         self.assertEqual(out_r2["content"]["n_windows"], sum(n.values()))
         txt = report.render_report(c, j, exclude_ranges=ranges)
         for st, k in n.items():
-            self.assertIn(f"strate « {st} » : n = {k} fenêtres complétées", txt)
+            self.assertIn(f"strate « {st} » : n = {k} fenêtres complétées", txt)  # bloc 3
+            self.assertIn(f"strate « {st} » : n = {k} ; Σ", txt)                   # bloc 4
+        self.assertIn(f"(b) AXE CONTENU (§4.2) — {sum(n.values())} fenêtres", txt)  # bloc 5
+        b2 = txt.split("[BLOC 2]")[1].split("[BLOC 3]")[0]                         # bloc 2
+        ws2 = {int(t[0]) for t in map(str.split, b2.splitlines()) if t and t[0].isdigit()}
+        self.assertEqual(len(ws2), sum(n.values()))
         return n
 
     def test_i_n_exact_bornes_fermees_doublons(self):
@@ -101,6 +106,7 @@ class TestExclusionFixture(unittest.TestCase):
         octets, = l'API ; bloc 1 : chaque plage en epoch ET ISO-8601 UTC, avec le motif.
         Rougit si : tri des plages retiré ; paramètres absents du bloc 1 ; option non transmise."""
         deux = [(WS[4], WS[4]), (WS[2], WS[3])]
+        self.assertEqual(self._n(deux), {"calme": 2, "stress": 1})  # union des deux plages
         out = cli(self.d, *deux, seed="1")
         self.assertEqual(out, cli(self.d, *deux[::-1], seed="2"))
         api = report.render_report(self.control, self.journal, exclude_ranges=deux)
@@ -121,10 +127,11 @@ class TestExclusionFixture(unittest.TestCase):
 
 
 class TestExclusionJournalReel(unittest.TestCase):
-    def test_ii_plage_adr0025_retire_2617_fenetres(self):
+    def test_ii_plage_adr0025_retire_2618_fenetres(self):
         """(ii) control.jsonl RÉEL scellé (copie ; n = marqueurs) via SHOGEN_S2_CAMPAGNE_CONTROL,
-        sinon SkipTest explicite. ADR-0025 déc. 1 [2026-09-24T18:18Z ; 2026-09-26T15:07Z] : 38 600
-        → 35 983 (−2 617 = 1 709 + 908). Rougit si : borne exclusive (2 616) ; strate ignorée."""
+        sinon SkipTest explicite. ADR-0025 déc. 1, borne haute amendée (décision 272) [2026-09-24T18:18Z
+        ; 2026-09-26T15:08Z] : 38 600 → 35 982 (−2 618 = 1 709 + 909). Rougit si : borne exclusive
+        (2 617) ; strate ignorée."""
         path = os.environ.get("SHOGEN_S2_CAMPAGNE_CONTROL")
         if not path:
             raise unittest.SkipTest("SHOGEN_S2_CAMPAGNE_CONTROL absente : copie du control.jsonl"
@@ -135,13 +142,13 @@ class TestExclusionJournalReel(unittest.TestCase):
         params = records.effective_run_params(params_list)
         self.assertEqual(window.verify_markers_against_spec(markers, params["strate_calendar"]), [])
         a, b = (int(datetime(2026, 9, d, h, m, tzinfo=timezone.utc).timestamp())
-                for d, h, m in ((24, 18, 18), (26, 15, 7)))
+                for d, h, m in ((24, 18, 18), (26, 15, 8)))
         avant = Counter(r1.build_window_strate(markers).values())
         apres = Counter(r1.build_window_strate(
             records.exclude_window_start_ranges(markers, [(a, b)])).values())
         self.assertEqual(avant, Counter(calme=26294, stress=12306))       # 38 600
-        self.assertEqual(apres, Counter(calme=24585, stress=11398))       # 35 983
-        self.assertEqual(avant - apres, Counter(calme=1709, stress=908))  # 2 617
+        self.assertEqual(apres, Counter(calme=24585, stress=11397))       # 35 982
+        self.assertEqual(avant - apres, Counter(calme=1709, stress=909))  # 2 618
 
 
 if __name__ == "__main__":
