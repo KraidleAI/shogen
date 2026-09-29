@@ -1,10 +1,22 @@
 # Gates VibeGates — Shogen, instanciation pilote (audit d'entrée du 2026-08-12).
 # Référentiel : corpus « Compliance et ingénierie logicielle et architecturale », doc 02.
-# Périmètre honnête : Shogen n'a pas encore de code produit (gate d'entrée « fondations
-# d'ingénierie » en préparation, docs/12) et s2-harness est JETABLE (R-22, quarantaine
-# déclarée dans son README). Le gate mécanisable réel aujourd'hui est G5 ; G3/G4/G6
-# s'instancieront avec le premier code produit (voir docs/AUDIT-ENTREE.md).
-# Invariant : jobs bloquants, jamais de continue-on-error.
+# Périmètre (en-tête réécrit le 2026-09-29, lot CI-S2, ADR-0028 D6 (iii)) : ce
+# workflow porte G5 (g5-no-naked-todo, R-13) et le G3 du chemin de recalcul S2
+# (s2-harness-unittest). Les gates de forge du code Rust vivent dans squelette.yml,
+# mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
+# s2-harness a deux périmètres (ADR-0028 D6 (i)) :
+#   - chemin de recalcul : records (hors append_asn), window, r1, lm, r2 (hors
+#     collect_asn), report et les points d'entrée recompute_*. Qualité produit,
+#     sous G0-G7 complets (R-22) ;
+#   - collecte : collector, sources, run_campaign, closure, smoke, journal, model,
+#     r2.collect_asn et records.append_asn. Jetable, en quarantaine (campagne
+#     scellée). Ses tests tournent dans le même job, sur fixtures.
+# Invariant : jobs bloquants dans ce workflow, jamais de continue-on-error. Ils ne
+# sont pas requis à la fusion : la protection de main n'a pas de
+# required_status_checks (GC-09). La forge ne démarre plus les jobs (GC-01) : le G3
+# opérant est l'oracle local, rejoué par l'orchestrateur (ADR-0028 D6 (iii), §4.11).
+# Required check et premier run sur la forge : item SHOGEN-CI-S2-FORGE-1 (ADR-0028,
+# annexe B.4).
 
 name: gates
 on:
@@ -38,3 +50,43 @@ jobs:
             exit 1
           fi
           echo "OK: aucun marqueur de dette nu."
+
+  s2-harness-unittest:
+    # Lot CI-S2 (2026-09-29, ADR-0028 D6 (iii) ; cp-1 bref C-1..C-8) : la suite
+    # unittest de s2-harness (bibliothèque standard seule, fixtures gelées), tests
+    # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
+    # l'oracle local la rejoue sous garde réseau (0 tentative). Le job ne coupe pas
+    # le réseau du runner (item SHOGEN-CI-S2-FORGE-1).
+    # name: = identifiant du job, un seul nom pour le futur required check.
+    name: s2-harness-unittest
+    # Image épinglée : ubuntu-latest bascule vers Ubuntu 26 à partir du 2026-10-19
+    # (annotation de forge, GC-11). Python de l'image : 3.12.3 au manifeste
+    # runner-images Ubuntu2404-Readme (image 20260920.314.1, lu le 2026-09-29) ;
+    # que python3 le désigne est inféré, la ligne python3 --version le mesure au
+    # premier run.
+    runs-on: ubuntu-24.04
+    # Suite mesurée à moins de 10 s en local (188 tests, 2026-09-29) : 10 min
+    # bornent un blocage sans couper un run normal.
+    timeout-minutes: 10
+    steps:
+      # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1,
+      # le SHA de squelette.yml l.52-55 (résolu le 2026-08-12 par
+      # `gh api repos/actions/checkout/tags` ; commit daté 2026-07-17T18:45:11Z).
+      # Aucune action nouvelle, pas de setup-python (R-8) : l'interpréteur est
+      # celui de l'image.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: suite unittest de s2-harness (fixtures, sans variable scellée)
+        # shell: bash, soit bash --noprofile --norc -eo pipefail {0} (syntaxe des
+        # workflows GitHub, table du mot-clé shell).
+        # SHOGEN_S2_CAMPAGNE_CONTROL n'est pas posée par ce job, et unset la retire
+        # si l'environnement la portait : sans elle, le test (ii) de test_exclusion,
+        # seul lecteur du control.jsonl scellé (ADR-0028, annexe D.2 pt 7), lève
+        # SkipTest. L'option -v imprime chaque test et le motif de ce saut.
+        shell: bash
+        run: |
+          unset SHOGEN_S2_CAMPAGNE_CONTROL
+          python3 --version
+          cd s2-harness
+          python3 -B -m unittest discover -s tests -t . -v
