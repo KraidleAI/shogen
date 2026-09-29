@@ -1,5 +1,21 @@
 # TAU — recherche des faits externes fondant une décision de seuil τ (campagne S2 Shōgen)
 
+> **Révision du 2026-09-29 (étape 1 « verify au vert »)** — worker `claude-opus-5-5` (effort
+> max), mission de l'orchestrateur Shōgen `claude-fable-5-1` ; réviseur : l'orchestrateur
+> (R-21). Archive d'origine : `claude-sonnet-5`, 2026-08-26, lisible telle quelle au commit
+> `51e59f3`. Portée, et rien d'autre : (1) **S-G5** — les extraits entre guillemets français
+> dont la source n'est pas détenue au corpus `biblio/` sont rendus en **paraphrase fidèle**,
+> marquée à chaque site (« rév. 2026-09-29, S-G5 » ou « même révision ») ; niveaux
+> [lu]/[lu-extrait]/[abs] et chiffres inchangés. Les extraits issus de WebFetch n'avaient pas de verbatim établi (texte
+> passé par le modèle d'extraction de l'outil) : leur paraphrase est définitive. Les extraits
+> de texte brut (firecrawl, PDF lu) pourront être rétablis en verbatim après versement des
+> pièces et contrôle sur octets : demandes V1-V9 formées en fin de document. Les six
+> extraits de la méthodologie CoinGecko résolvent sur la copie détenue : repliés sur une
+> ligne, texte inchangé. (2) **S-G4** — « sources indépendantes » devient « sources
+> distinctes (indépendance non testée) » (09-vocabulaire, quatre sites, correction en classe :
+> trois relevés par la gate, un quatrième coupé par un retour à la ligne, que la gate ne voit
+> pas).
+
 ## Gate 0
 Modèle résolu : `claude-sonnet-5` (Sonnet 5), effort max. Préfixe conforme à l'attendu
 (`claude-sonnet-5`). Poursuite autorisée.
@@ -94,7 +110,7 @@ contenu, mais une imprécision de référence à corriger dans le brief source.
   aujourd'hui** : `description()` → `"BTC / USD"`, agrégateur courant →
   `0x4a3411ac2948b33c69666b35cc6d055b27ea84f1`. [lu, primaire, on-chain, ce jour]
 - **Piège de collision explicitement documenté par la source elle-même** (docs.chain.link,
-  verbatim ci-dessous) : la même paire d'actifs a des heartbeat/seuils DIFFÉRENTS selon le
+  paraphrasé ci-dessous [rév. 2026-09-29, S-G5]) : la même paire d'actifs a des heartbeat/seuils DIFFÉRENTS selon le
   réseau. Confirmé empiriquement : ETH/USD Base Mainnet = seuil 0,15% (pas 0,5%) ; ETH/USD
   Arbitrum Mainnet = seuil 0,05% ; BTC/USD Polygon Mainnet = seuil 0,1%. **Seul « Ethereum
   Mainnet » est pertinent pour Shōgen** — vérifié à chaque extraction ci-dessous.
@@ -102,28 +118,28 @@ contenu, mais une imprécision de référence à corriger dans le brief source.
 ### Mécanisme documenté (docs.chain.link, page "Chainlink Data Feeds", section "Monitoring
 data feeds" — [lu] via firecrawl_search, texte retourné brut, pas une synthèse IA)
 
-Verbatim exact (≤30 mots par extrait, source : `https://docs.chain.link/data-feeds`) :
-> « the aggregator updates its latestAnswer when the value deviates beyond a specified
-> threshold or when the heartbeat idle time has passed »
-
-> « When the node detects that the heartbeat is reached, it initiates the latest round.
-> Depending on congestion and network conditions, there may be a slight delay for the latest
-> round to get onchain. »
-
-> « Heartbeat and deviation thresholds can also differ for the same asset across different
-> blockchains. Combining data from multiple feeds, even those with a common denominator,
-> might result in a margin of error that users must account for in their risk mitigation
-> practices. »
+Paraphrase fidèle (source : `https://docs.chain.link/data-feeds`) — [rév. 2026-09-29, S-G5 :
+verbatim d'origine de trois extraits ≤30 mots, source non détenue au corpus ; versement V1] :
+- l'agrégateur met à jour sa valeur `latestAnswer` quand la valeur s'écarte au-delà d'un seuil
+  spécifié, ou quand le délai d'inactivité du heartbeat est écoulé ;
+- quand le nœud détecte que le heartbeat est atteint, il lance le round le plus récent ; selon
+  la congestion et les conditions du réseau, l'arrivée on-chain de ce round peut subir un léger
+  retard ;
+- les seuils de heartbeat et de déviation peuvent aussi différer, pour un même actif, d'une
+  blockchain à l'autre ; combiner les données de plusieurs feeds, même de dénominateur commun,
+  peut produire une marge d'erreur que les utilisateurs doivent intégrer à leurs pratiques de
+  maîtrise du risque.
 
 Complément, page « Getting Historical Data » (`https://docs.chain.link/data-feeds/historical-
-data`), table à deux lignes, [lu] verbatim :
-> « Deviation Threshold | Chainlink nodes are monitoring data offchain. The deviation of the
-> real-world data beyond a certain interval triggers all the nodes to update. »
-> « Heartbeat Threshold | If the data values stay within the deviation parameters, it will
-> only trigger an update every X minutes / hours. »
+data`), table à deux lignes, [lu] — paraphrase fidèle [rév. 2026-09-29, S-G5 ; versement V1] :
+- *Deviation Threshold* : les nœuds Chainlink surveillent les données hors chaîne ; une
+  déviation de la donnée du monde réel au-delà d'un certain intervalle déclenche la mise à
+  jour par tous les nœuds ;
+- *Heartbeat Threshold* : si les valeurs restent dans les paramètres de déviation, une mise à
+  jour n'est déclenchée que toutes les X minutes / heures.
 
 **Portée de ce constat pour le P99 mesuré S2 (~0,53% pour Chainlink)** : la phrase sur le
-« slight delay... depending on congestion » explique MÉCANIQUEMENT pourquoi un écart mesuré
+léger retard selon la congestion (paraphrasée ci-dessus) explique MÉCANIQUEMENT pourquoi un écart mesuré
 peut légèrement DÉPASSER le seuil nominal de 0,5% — le déclenchement a lieu quand le prix
 off-chain franchit 0,5% par rapport à la DERNIÈRE valeur on-chain, mais le prix continue de
 bouger pendant la latence de transaction jusqu'à l'écriture effective on-chain. Ceci est
@@ -248,8 +264,8 @@ indépendante de l'interface web).
 (seuil 0,5%) explique la quasi-totalité de la masse du P99 mesuré, PAS du bruit. Le petit
 excédent au-delà de 0,5% (jusqu'à 0,53% au P99, jusqu'à 0,76%/1,14% observés dans cet
 échantillon pour les cas extrêmes) est lui-même documenté et expliqué mécaniquement par le
-délai de congestion entre déclenchement du seuil off-chain et écriture on-chain — verbatim
-docs.chain.link cité plus haut, PAS une anomalie.
+délai de congestion entre déclenchement du seuil off-chain et écriture on-chain — texte
+docs.chain.link paraphrasé plus haut [rév. 2026-09-29, S-G5], PAS une anomalie.
 
 ### Journal des URL — Q1
 - `firecrawl_search` "Chainlink ETH/USD price feed deviation threshold heartbeat mainnet",
@@ -260,7 +276,8 @@ docs.chain.link cité plus haut, PAS une anomalie.
   `maxContentLength size of 10485760 exceeded` (page trop volumineuse).
 - `firecrawl_search` "Chainlink price feed contract addresses ETH/USD mainnet heartbeat
   deviation table", domaine `docs.chain.link` → succès partiel : a retourné la page
-  `docs.chain.link/data-feeds` (mécanisme complet, verbatim ci-dessus) et
+  `docs.chain.link/data-feeds` (mécanisme complet, extraits paraphrasés ci-dessus [rév.
+  2026-09-29, S-G5]) et
   `docs.chain.link/data-feeds/historical-data` (table Deviation/Heartbeat Threshold), mais PAS
   la table d'adresses elle-même.
 - `firecrawl_search` "BTC/USD price feed deviation threshold heartbeat mainnet", domaine
@@ -285,22 +302,19 @@ docs.chain.link cité plus haut, PAS une anomalie.
 Intervals » — [lu-extrait, brut] via firecrawl_search, texte retourné intégralement,
 pas une synthèse IA)
 
-Verbatim (extraits ≤30 mots chacun, source : `https://docs.pyth.network/price-feeds/core/
-best-practices#confidence-intervals`) :
+Paraphrase fidèle (source : `https://docs.pyth.network/price-feeds/core/
+best-practices#confidence-intervals`) — [rév. 2026-09-29, S-G5 : verbatim d'origine de quatre
+extraits ≤30 mots, source non détenue au corpus ; versement V2] :
 
-> « At every point in time, Pyth publishes both a price and a confidence interval for each
-> product. [...] Pyth may publish the current price of bitcoin as $50000 ± $10. »
-
-> « Pyth publishes a confidence interval because, in real markets, there is no one single
-> price for a product. »
-
-> « In a Pyth feed, each publisher specifies an interval (p_i-c_i, p_i+c_i) [...] This
-> interval is intended to achieve 95% coverage, i.e. the publisher expresses the belief that
-> this interval contains the "true" price with 95% probability. »
-
-> « The resulting aggregate interval (μ-σ, μ+σ), where μ represents the aggregate price and σ
-> represents the aggregate confidence, is a good estimate of a range in which the true price
-> lies. »
+- à tout instant, Pyth publie pour chaque produit à la fois un prix et un intervalle de
+  confiance ; (passage élidé) Pyth peut publier le prix courant du bitcoin à 50 000 $ ± 10 $ ;
+- Pyth publie un intervalle de confiance parce que, sur les marchés réels, il n'existe pas un
+  prix unique pour un produit ;
+- dans un feed Pyth, chaque publisher spécifie un intervalle (p_i-c_i, p_i+c_i) ; (passage
+  élidé) cet intervalle vise une couverture de 95 % : le publisher exprime la croyance qu'il contient le
+  « vrai » prix (terme de la doc) avec une probabilité de 95 % ;
+- l'intervalle agrégé qui en résulte, (μ-σ, μ+σ), où μ est le prix agrégé et σ la confiance
+  agrégée, est une bonne estimation d'une plage contenant le « vrai » prix (terme de la doc).
 
 **Deux régimes explicitement distingués par la doc (paraphrase fidèle, pas verbatim continu)** :
 1. **Recouvrement total des intervalles publishers** (« normal operating conditions ») →
@@ -308,13 +322,14 @@ best-practices#confidence-intervals`) :
 2. **Intervalles disjoints entre publishers** (« atypical scenario », cité comme survenant
    « during market volatility or unusual events ») → l'intervalle agrégé se comporte comme un
    analogue d'un **écart interquartile** (IQR) sur l'ensemble des 3 points soumis par chaque
-   publisher (prix, prix+conf, prix-conf) — **propriété anti-manipulation explicite** : « this
-   property is necessary to ensure that a small group of publishers cannot manipulate the
-   aggregate confidence interval » [lu, verbatim].
+   publisher (prix, prix+conf, prix-conf) — **propriété anti-manipulation explicite** : la doc
+   la dit nécessaire pour qu'un petit groupe de publishers ne puisse pas manipuler
+   l'intervalle de confiance agrégé [lu — paraphrase, rév. 2026-09-29, S-G5 ; versement V2].
 
-**Recommandation d'usage — LE point directement pertinent pour un seuil τ**, verbatim :
-> « It can decide that there is too much uncertainty when σ/μ exceeds some threshold and
-> choose to pause any new activity that depends on the price of this asset. »
+**Recommandation d'usage — LE point directement pertinent pour un seuil τ** — paraphrase
+fidèle [rév. 2026-09-29, S-G5 ; versement V2] :
+- le protocole consommateur peut juger l'incertitude trop grande quand σ/μ dépasse un certain
+  seuil, et choisir de suspendre toute nouvelle activité qui dépend du prix de cet actif.
 
 **Distinction conceptuelle à ne pas fondre avec τ Shōgen (franchise imposée)** : ce σ/μ Pyth
 est l'incertitude AGRÉGÉE INTERNE À UNE SEULE SOURCE (dispersion entre publishers Pyth,
@@ -326,16 +341,18 @@ relatif comparé à un seuil pour déclencher une action) mais mesurant des chos
 majeur formalise déjà l'idée d'un seuil relatif d'incertitude »), pas comme une preuve
 directe transposable telle quelle.
 
-Autre usage documenté (même page, [lu] verbatim) — asymétrie de valorisation collatéral/dette :
-> « a lending protocol valuing a user's collateral can use the lower valuation price μ-σ. [...]
-> it can use the higher end of the interval by using the price μ+σ. »
+Autre usage documenté (même page, [lu] — paraphrase fidèle [rév. 2026-09-29, S-G5 ; versement
+V2]) — asymétrie de valorisation collatéral/dette :
+- un protocole de prêt qui valorise le collatéral d'un utilisateur peut retenir le prix bas
+  μ-σ ; (passage élidé dans l'extrait d'origine) il peut retenir le haut de l'intervalle, en
+  utilisant le prix μ+σ.
 
 ### Magnitude typique — deux sources convergentes
 
-**(a) Exemple illustratif de la doc elle-même** (même page, [lu] verbatim, PAS daté
-explicitement sur la page) :
-> « Note that $1000 is an unusually large confidence interval for bitcoin; the confidence
-> interval is typically $50 dollars ».
+**(a) Exemple illustratif de la doc elle-même** (même page, [lu] — paraphrase fidèle [rév.
+2026-09-29, S-G5 ; versement V2], PAS daté explicitement sur la page) :
+- la doc note que 1 000 $ est un intervalle de confiance inhabituellement large pour le
+  bitcoin, l'intervalle étant typiquement de 50 $.
 Sur un prix illustratif de $50 000, cela correspond à un ratio σ/μ ≈ **0,1%** — mais ceci est un
 chiffre D'EXEMPLE dans la documentation, pas nécessairement calé sur le marché actuel (page non
 datée explicitement).
@@ -392,25 +409,20 @@ capturer un phénomène inter-sources plus large que le simple bruit de collecte
 ### CoinGecko — méthodologie ([lu-extrait, brut] via firecrawl_search sur
 `www.coingecko.com/en/methodology`, texte retourné quasi intégralement, pas une synthèse IA)
 
-Verbatim (≤30 mots par extrait) :
-> « By aggregating data across multiple tickers through a comprehensive algorithm, we
-> calculate the market price of each coin. »
+Verbatim (≤30 mots par extrait) — [rév. 2026-09-29, S-G5 : chaque extrait replié sur une
+seule ligne, texte inchangé ; les six résolvent sur la copie détenue
+`biblio/coingecko-methodology-2026-08-12.html`] :
+> « By aggregating data across multiple tickers through a comprehensive algorithm, we calculate the market price of each coin. »
 
-> « an initial ticker set is constructed based on the top 600 tickers by volume of a
-> particular coin »
+> « an initial ticker set is constructed based on the top 600 tickers by volume of a particular coin »
 
-> « For coins with three tickers or more, CoinGecko applies an outlier detection algorithm
-> by calculating the lower and upper bounds based on the median absolute deviation (MAD). »
+> « For coins with three tickers or more, CoinGecko applies an outlier detection algorithm by calculating the lower and upper bounds based on the median absolute deviation (MAD). »
 
-> « For coins with less than three tickers, any ticker price change that is greater than
-> 100x from the previous price will be classified as an outlier. »
+> « For coins with less than three tickers, any ticker price change that is greater than 100x from the previous price will be classified as an outlier. »
 
-> « Once outliers have been removed, we calculate the VWAP of all remaining tickers in the
-> ticker set to arrive at the final aggregated price. »
+> « Once outliers have been removed, we calculate the VWAP of all remaining tickers in the ticker set to arrive at the final aggregated price. »
 
-> « In certain cases, our operations team may intervene to exclude outliers if the team
-> believes a certain ticker price to be anomalous but was not excluded by our outlier
-> detection algorithm. »
+> « In certain cases, our operations team may intervene to exclude outliers if the team believes a certain ticker price to be anomalous but was not excluded by our outlier detection algorithm. »
 
 **Résumé méthodologique fidèle (paraphrase)** : (1) construction d'un ensemble initial jusqu'à
 600 tickers par volume ; (2) filtrage des outliers par MAD (Median Absolute Deviation, ≥3
@@ -429,9 +441,11 @@ rapportés séparément, non fondus (contradiction à consigner)**
    `/simple/price`), [lu-extrait, brut], verbatim : « Cache / Update Frequency: Every 20
    seconds (Paid API) — Every 60 seconds (Demo / Keyless API) »
 2. `support.coingecko.com` (FAQ support, article « How often does data get updated or
-   refreshed? »), [lu-extrait, brut], verbatim : « Most endpoints are cached for around 1 to 5
-   minutes [...] Pro API (paid plans) generally have equal or faster update frequency, i.e.,
-   30 sec for simple/price endpoint. »
+   refreshed? »), [lu-extrait, brut], paraphrase fidèle [rév. 2026-09-29, S-G5 : verbatim
+   d'origine, source non détenue au corpus ; versement V3] : la plupart des endpoints sont
+   mis en cache pendant environ 1 à 5 minutes ; (passage élidé) l'API Pro (plans payants) a
+   en général une fréquence de mise à jour égale ou plus rapide, soit 30 s pour l'endpoint
+   simple/price.
 3. `www.coingecko.com/en/faq` (FAQ publique du site), [lu-extrait, brut], verbatim : « Price,
    trading volume, market capitalization - Updated every 1 to 10 minutes »
    Même page : « Circulating supply - Updated every 5 minutes » ; « Blockchain information
@@ -447,10 +461,11 @@ laquelle est la plus à jour ; toutes trois sont d'accès libre aujourd'hui (202
 ### DefiLlama — méthodologie de prix ([lu-extrait, brut] via firecrawl_search, page
 `https://docs.llama.fi/`, section « Our Methodology » / « Valuing different tokens »)
 
-Verbatim exact :
-> « Almost all tokens are priced using CoinGecko's API. Where this can't be done, we can
-> accommodate using on-chain methods to quantify the value of a token. This is most commonly
-> done by comparing the pool weights of a very liquid Uniswap V2 market. »
+Paraphrase fidèle [rév. 2026-09-29, S-G5 : verbatim d'origine, source non détenue au
+corpus ; versement V4] :
+- presque tous les tokens sont valorisés via l'API de CoinGecko ; quand ce n'est pas possible,
+  DefiLlama peut recourir à des méthodes on-chain pour quantifier la valeur d'un token — le
+  plus souvent en comparant les poids des pools d'un marché Uniswap V2 très liquide.
 
 **Implication directe pour Q3** : DefiLlama n'est PAS une source de prix indépendante au sens
 strict pour la majorité des actifs — elle **hérite structurellement de CoinGecko** comme source
@@ -584,22 +599,27 @@ de seuil numérique UNIVERSEL d'alerte pour l'écart relatif de prix — chacun 
 
 **(1) « Oracle Data Freshness, Accuracy, Latency Pt. 5 »**, Chaos Labs, auteur Omer Goldberg,
 **16 septembre 2024** (hors fenêtre 2025-2026 stricte, mais série méthodologique de référence
-citée pour son contenu). [lu-extrait via WebFetch, prompt ciblé, portions entre guillemets
-présentées comme verbatim par l'outil] :
-> « We expect this value to be less than the asset's fee floor on its most liquid DEX pools
-> (e.g. 5 bps for an ETH/USD oracle, corresponding to Uniswap V3's 0.05% WETH/USDC fee
-> floor) »
+citée pour son contenu). [lu-extrait via WebFetch, prompt ciblé ; les portions que l'outil
+présentait comme verbatim sont rendues en paraphrase — rév. 2026-09-29, S-G5 : verbatim jamais
+établi (sortie du modèle d'extraction de WebFetch), paraphrase définitive ; lecture sur octets :
+versement V8] :
+- Chaos Labs attend que cette valeur reste inférieure au plancher de frais de l'actif sur ses
+  pools DEX les plus liquides (par ex. 5 bps pour un oracle ETH/USD, correspondant au plancher
+  de frais de 0,05 % du pool WETH/USDC d'Uniswap V3).
+
 Ceci est un objectif/cible D'EXACTITUDE (accuracy target), PAS un seuil d'ALERTE au sens strict
 — présenté comme la précision attendue en régime normal, avec un raisonnement économique
-(arbitrage CEX/DEX) plutôt qu'un chiffre arbitraire. Méthode citée : « percentage deviation
-from the benchmark [...] across multiple data point samples ».
+(arbitrage CEX/DEX) plutôt qu'un chiffre arbitraire. Méthode citée (paraphrase, même
+révision) : écart en pourcentage au benchmark, sur plusieurs échantillons de points de données.
 
 **(2) « Oracle Risk Portal »**, Chaos Labs, auteur Omer Goldberg, **8 mai 2024** (hors fenêtre).
 [lu-extrait via WebFetch] : le portail rapporte les déviations de prix en **percentiles
 statistiques (moyenne, médiane, P75, P95)** — méthodologiquement proche de l'approche P99 de
-S2 — mais **« no specific numeric thresholds, percentages, or basis points are defined to
-classify oracle risk levels or trigger alerts »** (constat du fetch, pas un verbatim direct de
-la page). Défini comme un choix EXPLICITE de ne pas figer de seuil universel.
+S2 — mais **aucun seuil numérique, pourcentage ou nombre de points de base n'y est défini
+pour classer les niveaux de risque d'oracle ou déclencher des alertes** (constat du fetch, pas
+un verbatim direct de la page — guillemets retirés le 2026-09-29, S-G5 : ils prêtaient à la
+page un texte de l'outil ; lecture sur octets : versement V8). Défini comme un choix EXPLICITE
+de ne pas figer de seuil universel.
 
 **(3) « Risk Oracles: One Step Beyond Price Oracles »**, Chaos Labs, **22 août 2025** (DANS la
 fenêtre demandée). [lu-extrait via WebFetch] : cite le OWASP Smart Contract Top 10 (édition
@@ -621,13 +641,14 @@ propre produit oracle de Chaos Labs utilise des seuils du MÊME ORDRE DE GRANDEU
 
 **« When Pricing Breaks: A USDe Case »**, LlamaRisk, **18 octobre 2025** (DANS la fenêtre,
 8 jours après l'incident USDe du 10 octobre 2025). [lu-extrait via WebFetch, deux fetches
-indépendantes convergentes, portions entre guillemets présentées comme verbatim par l'outil] :
+indépendantes convergentes ; les portions que l'outil présentait comme verbatim sont rendues en
+paraphrase — rév. 2026-09-29, S-G5 : verbatim jamais établi (sortie du modèle d'extraction de
+WebFetch), paraphrase définitive ; lecture intégrale : procurement P2 ci-dessous, versement V9] :
 
-> « The Chainlink oracle deviated by a maximum of 65 bps. The Pyth oracle deviated by a
-> maximum of 430 bps (4.3%). The Binance Spot Price deviated by over 3,500 bps (35%). »
-
-> « A deviation of 65 bps is well within the safety parameters of a well-configured lending
-> protocol. »
+- l'oracle Chainlink a dévié au plus de 65 bps ; l'oracle Pyth, au plus de 430 bps (4,3 %) ;
+  le prix spot de Binance, de plus de 3 500 bps (35 %) ;
+- une déviation de 65 bps est largement dans les paramètres de sécurité d'un protocole de prêt
+  bien configuré.
 
 **C'est le jugement le plus direct et le plus concrètement daté trouvé dans toute cette
 question** : un moniteur de risque nommé, 8 jours après un incident RÉEL de grande ampleur,
@@ -647,8 +668,10 @@ intégrale de la page.
   methodology and internal tooling for monitoring Oracle setups using Curve AMM as price
   source » — [abs, titre/extrait seulement, PAS ouvert intégralement].
 - `llamarisk.com/research/risk-alternative-prisma-oracles-comparative-analysis` — décrit une
-  étude comparative « using historical data to determine the mean and standard deviation of
-  Oracle deviations against a reference spot price » — approche statistique proche de SPC
+  étude comparative qui s'appuie sur des données historiques pour déterminer la moyenne et
+  l'écart-type des déviations d'oracle par rapport à un prix spot de référence [abs —
+  paraphrase, rév. 2026-09-29, S-G5 : extrait de moteur de recherche, verbatim jamais établi ;
+  versement V9] — approche statistique proche de SPC
   (moyenne/écart-type), potentiellement pertinente pour Q6, **NON ouverte intégralement dans
   cette passe** faute de budget — piste signalée, pas creusée.
 
@@ -656,8 +679,9 @@ intégrale de la page.
 
 `governance.aave.com/t/bgd-correlated-asset-price-oracle/16133/4` (réponse de Gauntlet au fil
 de gouvernance BGD sur CAPO), **22 janvier 2024** (hors fenêtre 2025-2026). [lu-extrait via
-WebFetch] : Gauntlet soutient l'introduction de CAPO, recommande « a mechanism to prevent
-upward price dislocations from the expected fixed value » pour les stablecoins mais déconseille
+WebFetch] : Gauntlet soutient l'introduction de CAPO, recommande un mécanisme empêchant les
+dislocations de prix à la hausse par rapport à la valeur fixe attendue [paraphrase, rév.
+2026-09-29, S-G5 : sortie WebFetch, verbatim jamais établi ; versement V7] pour les stablecoins mais déconseille
 un plancher (downward threshold) pour ne pas bloquer les liquidations en cas de dépeg réel.
 **Aucun chiffre numérique de seuil trouvé dans ce post.** Utile comme contexte de conception
 CAPO pour Q5, pas comme réponse chiffrée à Q4.
@@ -670,7 +694,7 @@ Gauntlet). L'ancrage empirique le plus concret et le mieux daté est le jugement
 18 octobre 2025 : **65 bps (0,65%) qualifié explicitement de « bien dans les paramètres de
 sécurité »** pour un oracle décentralisé pendant un épisode de stress RÉEL et sévère. Ceci est
 cohérent d'ordre de grandeur avec le seuil de déviation Chainlink documenté en Q1 (0,5%) et les
-seuils Chaos Labs Edge observés live (0,25-0,5%) — trois sources indépendantes convergent sur
+seuils Chaos Labs Edge observés live (0,25-0,5%) — trois sources distinctes (indépendance non testée) convergent sur
 un ordre de grandeur de quelques dixièmes de pourcent comme « normal/sûr », sans qu'aucune ne
 le formalise comme un seuil d'ALERTE universel chiffré et publié comme tel.
 
@@ -726,13 +750,14 @@ Faits confirmés, avec mécanisme PRÉCIS (plus détaillé que SONDE) :
   every 3 days »** — ce plafond a empêché d'atteindre en une seule transaction la cible réelle
   (vieille de 7 jours), tandis que le paramètre d'horodatage (`snapshotTimestamp`), lui, a
   avancé sans validation correspondante → désynchronisation ratio/horodatage. Caractérisation
-  officielle verbatim (via le fetch, celle-ci ENTRE guillemets dans la sortie de l'outil) : « The
-  root cause was differing update constraints at the smart contract level, which ultimately
-  resulted in a misalignment between the snapshot ratio and snapshot timestamp onchain. »
+  officielle (via le fetch, ENTRE guillemets dans la sortie de l'outil — paraphrase, rév.
+  2026-09-29, S-G5 : sortie WebFetch, verbatim jamais établi ; lecture sur octets : versement
+  V7) : la cause racine tient à des contraintes de mise à jour différentes au niveau du smart
+  contract, qui ont fini par désaligner on-chain le ratio et l'horodatage du snapshot.
 - **Impact** : ~$26-27M de liquidations, **10 938 wstETH liquidés**, **34 comptes** touchés.
 - **Déviation effective du taux de change** : **≈2,85%** — chiffre identique à celui déjà
   trouvé par SONDE en [2nd] (`spendnode.io`, `finance.yahoo.com` : « undervalued wstETH by
-  2.85% ») — **trois sources indépendantes convergent sur 2,85%** (2 presse [2nd] + 1 primaire
+  2.85% ») — **trois sources distinctes (indépendance non testée) convergent sur 2,85%** (2 presse [2nd] + 1 primaire
   [lu, non-verbatim] désormais).
 - **Caractérisation officielle** : « configuration issue », explicitement PAS un piratage/
   exploit malveillant d'oracle.
@@ -787,11 +812,11 @@ un prix plancher de ~$0,65-0,657 sur Binance spécifiquement, pendant la même f
 que celle déjà notée par SONDE (~21:36-22:16 UTC).
 
 **(b) Déviation D'ORACLE mesurée pendant le même incident** — LlamaRisk, « When Pricing Breaks:
-A USDe Case », 18 octobre 2025 (déjà établi en Q4 ci-dessus, réutilisé ici pour Q5) : «
-Chainlink oracle deviated by a maximum of 65 bps [...] Pyth oracle deviated by a maximum of
-430 bps (4.3%) [...] Binance Spot Price deviated by over 3,500 bps (35%). » **Le chiffre «
+A USDe Case », 18 octobre 2025 (déjà établi en Q4 ci-dessus, réutilisé ici pour Q5 ; même
+paraphrase, rév. 2026-09-29, S-G5) : l'oracle Chainlink a dévié au plus de 65 bps, l'oracle
+Pyth au plus de 430 bps (4,3 %), le prix spot de Binance de plus de 3 500 bps (35 %). **Le chiffre «
 35% » de LlamaRisk pour Binance CONCORDE EXACTEMENT avec le « 35% below peg » de CoinGecko** —
-deux sources indépendantes et nommées, [lu-extrait] toutes les deux, convergent sur la même
+deux sources distinctes et nommées (indépendance non testée), [lu-extrait] toutes les deux, convergent sur la même
 valeur au point de pourcentage près.
 
 **Distinction cruciale à ne jamais fondre (répétée de SONDE, confirmée par cette re-
@@ -873,22 +898,25 @@ intégralement (tableaux compris), PAS une synthèse IA. Organisme : NIST (agenc
 américaine de normalisation) + SEMATECH — référence manuel/survey canonique du domaine, pas un
 article de recherche isolé.
 
-**Limites de contrôle — formule et convention k=3, verbatim** :
-> « UCL=μw+kσw, Center Line = μw, LCL=μw−kσw where k is the distance of the control limits
-> from the center line, expressed in terms of standard deviation units. When k is set to 3,
-> we speak of 3-sigma control charts. Historically, k=3 has become an accepted standard in
-> industry. »
+**Limites de contrôle — formule et convention k=3** — paraphrase fidèle, formule recopiée en
+notation propre [rév. 2026-09-29, S-G5 : verbatim d'origine, source non détenue au corpus ;
+versement V5] :
+- UCL = μw + kσw, ligne centrale = μw, LCL = μw − kσw, où k est la distance des limites de
+  contrôle à la ligne centrale, exprimée en unités d'écart-type ; avec k = 3, on parle de
+  cartes de contrôle 3-sigma ; historiquement, k = 3 est devenu un standard accepté dans
+  l'industrie.
 
-**ARL — définition et valeur numérique canonique, verbatim** :
-> « For an X̄ chart, with no change in the process, we wait on the average 1/p points before
-> a false alarm takes place, with p denoting the probability of an observation plotting
-> outside the control limits. For a normal distribution, p=0.0027 and the ARL is
-> approximately 371. »
+**ARL — définition et valeur numérique canonique** — paraphrase fidèle [même révision ;
+versement V5] :
+- pour une carte X̄, sans changement du processus, on attend en moyenne 1/p points avant
+  qu'une fausse alarme survienne, p désignant la probabilité qu'une observation tombe hors des
+  limites de contrôle ; pour une loi normale, p = 0,0027 et l'ARL vaut environ 371.
 
-Complément sur le compromis sensibilité/fausses-alarmes (règles WECO), même page, verbatim :
-> « you will have "false alarms" every 371 points on the average [...] Adding the WECO rules
-> increases the frequency of false alarms to about once in every 91.75 points, on the average
-> (see Champ and Woodall, 1987). »
+Complément sur le compromis sensibilité/fausses-alarmes (règles WECO), même page — paraphrase
+fidèle [même révision ; versement V5] :
+- en moyenne, une fausse alarme tous les 371 points ; (passage élidé) l'ajout des règles WECO
+  porte la fréquence des fausses alarmes à environ une tous les 91,75 points en moyenne (renvoi
+  de la page : Champ et Woodall, 1987).
 
 **Calibration depuis une période préliminaire** (paraphrase fidèle, formules lues) : σ est
 estimé à partir de `m` échantillons préliminaires de taille `n`, en moyennant les écarts-types
@@ -909,7 +937,7 @@ lui-même)
 **Citation canonique** : Stuart Coles, *An Introduction to Statistical Modeling of Extreme
 Values*, Springer Series in Statistics, Springer-Verlag/Springer London, 2001, 208 pages, DOI
 10.1007/978-1-4471-3675-0. Identité bibliographique confirmée par recoupement de 3 sources
-indépendantes : listing officiel Springer (`link.springer.com/book/10.1007/978-1-4471-3675-0`,
+distinctes (indépendance non testée) : listing officiel Springer (`link.springer.com/book/10.1007/978-1-4471-3675-0`,
 « Cited by 12931 » — confirme le statut de référence la plus citée du domaine), Google Books,
 catalogue de bibliothèque universitaire (East Carolina University). [lu-extrait, brut] pour
 l'identité bibliographique seulement — **livre NON lu** (voir ci-dessous, non requis).
@@ -934,9 +962,11 @@ explicitée
 
 **Identité bibliographique de l'article fondateur**, triple-confirmée indépendamment (JSTOR,
 Wiley/RSS, PMC — tous consultés en page d'index/abstract, pas le texte intégral) : Benjamini,
-Y., & Hochberg, Y. (1995). « Controlling the False Discovery Rate: A Practical and Powerful
-Approach to Multiple Testing. » *Journal of the Royal Statistical Society, Series B
-(Methodological)*, 57(1), 289-300. DOI 10.1111/j.2517-6161.1995.tb02031.x. JSTOR stable ID
+Y., & Hochberg, Y. (1995). *Controlling the False Discovery Rate: A Practical and Powerful
+Approach to Multiple Testing*. Journal of the Royal Statistical Society, Series B
+(Methodological), 57(1), 289-300 [rév. 2026-09-29, S-G5 : titre d'article en italique,
+convention de `biblio/INDEX.md`, au lieu de guillemets ; article non détenu, identité par
+DOI]. DOI 10.1111/j.2517-6161.1995.tb02031.x. JSTOR stable ID
 2346101. **Accès direct à l'article original : ÉCHOUÉ** (WebFetch sur
 `rss.onlinelibrary.wiley.com/doi/10.1111/j.2517-6161.1995.tb02031.x` → HTTP 403 Forbidden).
 
@@ -950,25 +980,29 @@ STA2212, `utstat.toronto.edu/reid/sta2212s/2021/EfronLSIChapter4.pdf`). **[lu] i
 technique productive que celle documentée dans C1-attaques.md) — un vrai chapitre de manuel de
 référence lu page par page, PAS un résumé d'outil.
 
-**Règle BH — formule exacte, [lu] verbatim, p.43, éq. 4.9-4.10** :
-> « The Benjamini–Hochberg (BH) algorithm uses this rule: for a fixed value of q in (0,1),
-> let i_max be the largest index for which p_(i) ≤ (i/N)q, and reject H_0(i) [...] if
-> i ≤ i_max, accepting H_0(i) otherwise. »
+**Règle BH — formule exacte, [lu], p.43, éq. 4.9-4.10** — paraphrase fidèle, formule recopiée
+en notation propre [rév. 2026-09-29, S-G5 : verbatim d'origine, PDF non détenu au corpus ;
+versement V6] :
+- l'algorithme de Benjamini–Hochberg (BH) applique la règle suivante : pour une valeur fixée de
+  q dans (0,1), soit i_max le plus grand indice tel que p_(i) ≤ (i/N)q ; on rejette H_0(i)
+  (passage élidé) si i ≤ i_max, et on accepte H_0(i) sinon.
 
-**Théorème de contrôle du FDR, [lu] verbatim, p.43, éq. 4.11** :
-> « If the p-values corresponding to the correct null hypotheses are independent of each
-> other, then the rule BH(q) [...] controls the expected false discovery proportion at q,
-> E{Fdp_BH(q)} = π0 q ≤ q where π0 = N0/N. »
+**Théorème de contrôle du FDR, [lu], p.43, éq. 4.11** — paraphrase fidèle [même révision ;
+versement V6] :
+- si les p-valeurs correspondant aux hypothèses nulles vraies sont indépendantes entre elles,
+  la règle BH(q) (passage élidé) contrôle la proportion attendue de fausses découvertes au
+  niveau q : E{Fdp_BH(q)} = π0 q ≤ q, où π0 = N0/N.
 
-**Condition d'indépendance et sa relaxation, [lu] verbatim, p.45** :
-> « Theorem 4.1 depends on independence among the p-values of the null cases [...] usually an
-> unrealistic assumption. This limitation can be removed if the rejection boundary [...] is
-> lowered [...] The independence condition in Theorem 4.1 can be weakened to positive
-> regression dependence (PRD) »
+**Condition d'indépendance et sa relaxation, [lu], p.45** — paraphrase fidèle [même révision ;
+versement V6] :
+- le théorème 4.1 repose sur l'indépendance des p-valeurs des cas nuls (passage élidé),
+  hypothèse d'ordinaire irréaliste ; cette limite peut être levée si la frontière de rejet
+  (passage élidé) est abaissée (passage élidé) ; la condition d'indépendance du théorème 4.1
+  peut être affaiblie en dépendance de régression positive (PRD).
 
-**Calibration pratique de q, [lu] verbatim, p.45** :
-> « How should q be chosen? The literature hasn't agreed upon a conventional choice, such as
-> α = 0.05 for single-case testing, though q = 0.1 seems to be popular. »
+**Calibration pratique de q, [lu], p.45** — paraphrase fidèle [même révision ; versement V6] :
+- comment choisir q ? la littérature ne s'est pas accordée sur un choix conventionnel
+  comparable à α = 0,05 pour un test unique, bien que q = 0,1 semble répandu.
 
 **Applicabilité à Shōgen, appliquant le critère posé par la mission elle-même** (« pertinent
 SEULEMENT si les drapeaux sont posés comme tests simultanés ») : le chapitre lu distingue
@@ -998,7 +1032,8 @@ Trois citations obtenues, niveau de preuve élevé pour deux des trois :
 ### Journal des URL — Q6
 - `firecrawl_search` "NIST SEMATECH engineering statistics handbook control charts average run
   length false alarm rate", domaine itl.nist.gov → succès, 6 résultats, texte quasi intégral
-  des pages pmc32.htm et pmc321.htm obtenu directement (verbatim ci-dessus).
+  des pages pmc32.htm et pmc321.htm obtenu directement (extraits paraphrasés ci-dessus [rév.
+  2026-09-29, S-G5]).
 - `firecrawl_search` "Benjamini Hochberg 1995 false discovery rate controlling procedure
   definition" → succès, 6 résultats (JSTOR, Wiley, Columbia Mailman, Springer, PMC, r-bloggers)
   — identité bibliographique triple-confirmée, définition partielle obtenue via sources
@@ -1107,6 +1142,50 @@ Statistical Modeling of Extreme Values*, identifié en Q6(b), n'est PAS demandé
 dans cette passe : son usage n'est pas requis par la décision τ actuelle (critère
 d'applicabilité EVT/POT non atteint, N≈34 500 suffisant jusqu'à P99,95 — voir Q6(b)). À
 demander formellement seulement si une passe future décide d'extrapoler au-delà de P99,95.
+
+### Demandes de versement formées (révision du 2026-09-29, S-G5)
+
+Acte de l'orchestrateur : lecture sur place de la page primaire, puis versement (octets dans
+`biblio/`, sha256, entrée à `biblio/INDEX.md`, compte d'en-tête tenu par S-G6). Un verbatim ne
+revient dans ce document qu'après grep sur les octets détenus. Cette révision n'a rien récupéré
+(aucun appel réseau).
+
+- **V1 — Chainlink, documentation Data Feeds** : `https://docs.chain.link/data-feeds` (section
+  *Monitoring data feeds*) et `https://docs.chain.link/data-feeds/historical-data` (table
+  *Deviation Threshold* / *Heartbeat Threshold*). Rétablit les cinq extraits de Q1 (texte brut
+  firecrawl du 2026-08-26). Usage : ancre documentaire du seuil 0,5 % et du heartbeat repris par
+  ADR-0022 (la mesure on-chain de Q1 reste la preuve primaire).
+- **V2 — Pyth, *Best Practices*, section *Confidence Intervals*** :
+  `https://docs.pyth.network/price-feeds/core/best-practices#confidence-intervals`. Rétablit
+  les extraits de Q2 (sémantique de l'intervalle, recommandation σ/μ, exemple 50 $ / 1 000 $).
+- **V3 — CoinGecko, FAQ support**, article *How often does data get updated or refreshed?*
+  (`support.coingecko.com`, URL exacte à relever à la lecture sur place). Rétablit l'extrait
+  n° 2 de la cadence (Q3).
+- **V4 — DefiLlama, documentation** : `https://docs.llama.fi/` (section *Valuing different
+  tokens*). Rétablit l'extrait de méthodologie (Q3).
+- **V5 — NIST/SEMATECH, *e-Handbook of Statistical Methods*, §6.3.2 et §6.3.2.1** :
+  `https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc32.htm` et `.../pmc321.htm` (page
+  publique d'une agence fédérale ; `biblio/` détient déjà une autre section du même manuel,
+  `nist-sematech-ehandbook-prc24.html`). Rétablit les trois extraits SPC/ARL de Q6(a), dont
+  ARL₀≈371 repris par ADR-0022.
+- **V6 — Efron, *Large-Scale Inference*, Cambridge University Press / IMS Monographs, 2010,
+  chapitre 4** : copie de cours en accès libre
+  `https://utstat.toronto.edu/reid/sta2212s/2021/EfronLSIChapter4.pdf` (droit d'auteur de
+  l'éditeur : octets locaux seulement, jamais versionnés — DEVOPS §1 ; sidecar par
+  `just sidecars`). Rétablit les quatre extraits de Q6(c) (pp. 43 et 45). Le PDF sauvegardé par
+  WebFetch le 2026-08-26 n'a pas été retrouvé par cette révision (recherche par nom sur
+  `F:\claude-archive` et `F:\claude-config` : aucun résultat).
+- **V7 — Aave, forum de gouvernance** : post-mortem
+  `https://governance.aave.com/t/post-mortem-exchange-rate-misallignment-on-wsteth-core-and-prime-instances/24269`
+  et réponse de Gauntlet `https://governance.aave.com/t/bgd-correlated-asset-price-oracle/16133/4`.
+  Aucun verbatim n'avait été établi (sorties WebFetch) : la lecture sur octets établirait pour la
+  première fois le texte du post-mortem qui porte le chiffre CAPO 2,85 % repris par ADR-0022.
+- **V8 — Chaos Labs, billets** : `https://chaoslabs.xyz/posts/oracle-data-freshness-accuracy-latency-pt-5`
+  et `https://chaoslabs.xyz/posts/oracle-risk-portal`. Même statut que V7.
+- **V9 — LlamaRisk** : `https://llamarisk.com/research/when-pricing-breaks-usde` (fusionne avec
+  le procurement P2 ci-dessus) et
+  `https://llamarisk.com/research/risk-alternative-prisma-oracles-comparative-analysis` ([abs]
+  seulement). Même statut que V7.
 
 ## Journal des URL — synthèse
 Le détail complet (succès et échecs, avec URL exactes) est consigné en fin de chaque section
