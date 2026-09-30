@@ -47,11 +47,15 @@ class TestG2Adversarial(unittest.TestCase):
 
     def test_plage_hors_campagne_sans_effet_ligne_bloc1_seule(self):
         """Plages avant w0 et apres w5 : n inchange ; le rendu ne differe du rendu sans option
-        QUE par les lignes du bloc 1 (B-SEG-2 : comptes à 0 visibles, tests/test_bloc1.py)."""
+        QUE par les lignes du bloc 1 (B-SEG-2 : comptes à 0 visibles, tests/test_bloc1.py) et par la section
+        [SENSIBILITÉ] (lot B : variantes égales, tests/test_sensibilite.py)."""
         rs = [(WS[0] - 10 * W, WS[0] - W), (WS[5] + W, WS[5] + 9 * W)]
         self.assertEqual(self._n(rs), SANS)
         avec = report.render_report(self.control, self.journal, exclude_ranges=rs)
         sans = report.render_report(self.control, self.journal)
+        i = avec.find("\n\n[SENSIBILITÉ]")
+        self.assertGreater(i, 0)                                  # lot B : section imprimée même sans retrait
+        avec = avec[:i] + avec[avec.rindex("\n" + "=" * 78):]
         lignes = [ln for ln in avec.split("\n") if not ln.startswith("  exclusion_")]   # 4 clés (B-SEG-2)
         self.assertEqual("\n".join(lignes), sans)
         self.assertEqual(avec.count("exclusion_window_start"), 2)

@@ -24,8 +24,9 @@ MORT, VIFS = SKELETON[0], SKELETON[1:]
 WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
       for i in range(64)]                                     # w0-w2 calme (ven.), w3-w63 stress
 # Épingle (CA-13 bis) : sha256 du rendu AVEC l'option [w2 ; w4] de la fixture d'exclusion, arbre ce2f107,
-# re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1 (avant : a4dd4c00…537520).
-SHA_BASE_AVEC_OPTION = "677b1bfcba168e015b0af282c45c4457a34f8f893a0a6bc1eabd81a30a422114"
+# re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1 (avant : a4dd4c00…537520), puis de B
+# (B-a1 : section [SENSIBILITÉ], avant 677b1bfc…422114 ; P2P texte : docs/G1-lot-B-sensibilite.md).
+SHA_BASE_AVEC_OPTION = "7a4ff05c297c74aae9825a6d8f108ea24c1c4460cd46dd1807fc88cd2d663734"
 
 
 class Coupure(Exception):

@@ -34,19 +34,20 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
+    DECIMAL_PREC,
     analysis_pools,
     build_window_strate,
     classify_cells,
     compute_r1,
     parse_journal,
 )
-from .window import verify_markers_against_spec
+from .window import STRATE_DEFAUT, verify_markers_against_spec
 
 
 def _fmt_dec(x) -> str:
@@ -74,6 +75,19 @@ def _retires(avant, apres, strates) -> str:
     d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
     fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d)) or "0 (aucune fenêtre au journal)"
     return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
+
+
+def _ligne_variante(st: str, nom: str, blk) -> str:
+    """Une ligne de la table de sensibilité (R1 seul) ; `blk` None : strate absente de la variante."""
+    tete = f"  {st:8} {nom:22} : "
+    if blk is None:
+        return tete + "absente (0 fenêtre retenue)"
+    zs = f"z = {_fmt_dec(blk['z'])}" if blk["z"] is not None else (
+        "z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) ; " + (
+            f"queue exacte P(K ≥ K_obs | Bin(n, P̂_more)) = {_fmt_dec(blk['queue_binomiale_P_K_ge_Kobs'])}"
+            if blk["queue_exacte_applicable"] else "queue dégénérée (P̂_more ∈ {0,1})"))
+    return (tete + f"n = {blk['n']} ; K = {blk['K']} ; P̂_more = {_fmt_dec(blk['P_more'])} ; {zs} ; "
+            f"drapeau 1 = {blk['flag_historique_insuffisant']}")
 
 
 def render_report(control_path: str, journal_path: str, exclude_ranges=(), segment=None) -> str:
@@ -428,6 +442,34 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             ap(f"        strate « {st} » : "
                + (", ".join(f"{r['pair']}(n11={r['n11']})" for r in top) if top
                   else "aucune paire inter-clusters à co-écart"))
+
+    # ── Sensibilité (ADR-0025 déc. 4 ; ADR-0028 D2 pt 7, §1 bis.1 pt 9) : avec une plage seulement (C-6) ──
+    if ranges:
+        pools_i, pool_i, _r = analysis_pools(dans_seg[0], readings, pool)   # D1 mécanique sur la variante
+        r1_i = compute_r1(dans_seg[0], readings, pool_i, w, sigma_by_class, sigma_class_of_flux, tau,
+                          seuil_hist, n_min, pools_i)
+        sc = params["strate_calendar"]
+        we = sc.get("kind") == "weekend_utc"
+        ap("\n[SENSIBILITÉ] PLAGE D'EXCLUSION INCLUSE — ADR-0025 déc. 4 ; ADR-0028 D2 pt 7 (liste fermée), "
+           "§1 bis.1 pt 9 : hors décision")
+        ap("  variante « exclue » = principale (blocs 1-6) ; variante « incluse » = sensibilité — biaisée "
+           "vers le haut par construction ; documente l'exclusion D5 ; pas un estimateur alternatif")
+        ap("  motif de l'exclusion (harnais dégradé, ADR-0025) : causalité non établie")
+        ap("  assiette : fenêtres du segment (bloc 1), dédoublonnées (last-wins) ; R1 seul par variante, "
+           "pool d'analyse D1 de la variante ; ni L&M ni R2 ; écart de z = z(incluse) − z(exclue)")
+        for st in (sorted({sc["calme"], sc["stress"]}) if we else [sc.get("strate", STRATE_DEFAUT)]):
+            e, i = r1.get("strates", {}).get(st), r1_i.get("strates", {}).get(st)
+            ap(_ligne_variante(st, "exclue (principale)", e))
+            ap(_ligne_variante(st, "incluse (sensibilité)", i))
+            if e is None or i is None or e["z"] is None or i["z"] is None:
+                ap(f"  {st:8} écart de z : non calculable (z non publié ou strate absente d'une variante)")
+            else:
+                with localcontext() as ctx:
+                    ctx.prec = DECIMAL_PREC
+                    dz = +(i["z"] - e["z"])
+                ap(f"  {st:8} écart de z = {_fmt_dec(dz) if dz else '0'}")
+            if e is not None and i is not None and pools[st] != pools_i[st]:
+                ap(f"  {st:8} pool d'analyse D1 : exclue {pools[st]} ; incluse {pools_i[st]} (diffèrent)")
     ap("=" * 78)
     return "\n".join(out)
 
