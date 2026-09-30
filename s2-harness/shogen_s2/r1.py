@@ -56,6 +56,7 @@ DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
 N_MIN_HORSENV = 4                 # N ≥ 4 répondantes pour l'enveloppe leave-one-out (10 §5.2)
 SEUIL_Z = Decimal("2.33")         # point 99% normale standard (K&L — 10 §5.1)
+ETIQUETTE_POOLEE = "exploratoire, hors famille, hors décision"   # strate poolée (ADR-0028 D2 pt 4)
 A_WINDOW_STATIONARITY = (
     "A(window-stationarity) engagée par le test agrégé (10 §5.3 ; ancre "
     "Eckhardt & Lee TM-86369 p. fichier 2, hyp. (ii) « stationary input series ») "
@@ -275,6 +276,21 @@ def binomial_tail_ge(k_obs: int, n: int, p_more: Decimal) -> Decimal:
         return +total
 
 
+def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
+    """Strate poolée en forme stratifiée (ADR-0028 D2 pt 4), `termes` = [(n_s, K_s, P̂_more,s)] :
+    (Σ_s (K_s − n_s·P̂_s), Σ_s n_s·P̂_s·(1 − P̂_s), z_pool = premier / √second). Jamais l'union brute
+    des fenêtres. Un seul terme : la valeur de `z_score`. Dénominateur ≤ 0 : ValueError, jamais une
+    valeur fabriquée."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        num = sum((Decimal(k) - Decimal(n) * p for n, k, p in termes), Decimal(0))
+        var = sum((Decimal(n) * p * (Decimal(1) - p) for n, k, p in termes), Decimal(0))
+        if var <= 0:
+            raise ValueError("strate poolée : Σ_s n_s·P̂_s·(1 − P̂_s) ≤ 0, z_pool non défini "
+                             "(ADR-0028 D2 pt 4)")
+        return +num, +var, +(num / var.sqrt())
+
+
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
 
 def parse_journal(path: str) -> list[dict]:
@@ -376,6 +392,25 @@ def classify_cells(
     return out
 
 
+def strate_poolee(strates: dict) -> dict:
+    """Strate poolée (ADR-0028 D2 pt 4 ; §1 bis.1 pt 9 ; §1 bis.11 item 14) : hors de `strates`, donc
+    hors z_max, drapeau 2 et famille. Entrées par strate : n, K, P̂_more, pool d'analyse D1 et sa taille.
+    z_pool publié si au moins deux strates et si chacune publie son z (garde §5.4 tenue) ; sinon None
+    et motif."""
+    ent = {st: {"n": b["n"], "K": b["K"], "P_more": b["P_more"], "pool": list(b["per_source"]),
+                "N": len(b["per_source"])} for st, b in strates.items()}
+    sous = [f"« {st} »" + ("" if b["queue_exacte_applicable"] else " (dégénérée : P̂_more ∈ {0,1})")
+            for st, b in strates.items() if b["z"] is None]
+    motif = ("aucune fenêtre complétée (n = 0)" if not strates else
+             f"une seule strate au segment (« {next(iter(strates))} ») : la forme stratifiée somme au moins "
+             "deux strates" if len(strates) < 2 else
+             "strate(s) sous la garde §5.4, z de strate non publié : " + " ; ".join(sous) if sous else None)
+    num, var, z = (None,) * 3 if motif else z_pool_stratifie(
+        [(b["n"], b["K"], b["P_more"]) for b in strates.values()])
+    return {"etiquette": ETIQUETTE_POOLEE, "strates": ent, "numerateur": num, "variance": var, "z_pool": z,
+            "motif": motif}
+
+
 def compute_r1(
     markers: list[dict],
     readings: list[dict],
@@ -405,6 +440,7 @@ def compute_r1(
             "strates": {},
             "note": "aucune fenêtre complétée (n = 0)",
             "flag_historique_insuffisant": True,
+            "poolee": strate_poolee({}),
             "A_window_stationarity": A_WINDOW_STATIONARITY,
         }
 
@@ -519,7 +555,8 @@ def compute_r1(
             "A_window_stationarity": A_WINDOW_STATIONARITY,
         }
 
-    return {"pool": pool, "strates": strates_out, "A_window_stationarity": A_WINDOW_STATIONARITY}
+    return {"pool": pool, "strates": strates_out, "poolee": strate_poolee(strates_out),   # clé à part
+            "A_window_stationarity": A_WINDOW_STATIONARITY}
 
 
 def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
