@@ -1,11 +1,18 @@
-# s2-harness — l'instrument de mesure pilote S2 (jetable)
+# s2-harness — l'instrument de mesure pilote S2 (chemin de recalcul sous G0-G7 ; collecte en quarantaine « jetable »)
 
 Conception : [`docs/10-mesures-pilotes-design.md`](../docs/10-mesures-pilotes-design.md).
 
 Cet instrument tranche la question de S2 (`05-roadmap.md` §S2) : les axes R2
 sont-ils observables en pratique, et le test R1 discrimine-t-il quelque chose
-sur données réelles ? **Il est jetable** (10 §1) : il meurt après le rapport
-`11-mesures-pilotes.md`, il n'est pas un ancêtre du produit.
+sur données réelles ?
+
+**Statut (ADR-0028 D6, 2026-09-29)** : le **chemin de recalcul** (`records`
+hors `append_asn`, `window`, `r1`, `lm`, `r2` hors `collect_asn`, `report`, et leurs tests) est de
+qualité produit, sous G0-G7 complets (R-22) ; la **collecte** (`collector`,
+`sources`, `run_campaign`, `closure`, `smoke`, `journal`, `model`,
+`r2.collect_asn`, `records.append_asn`) reste en quarantaine, **« jetable »** au sens de 10 §1 : elle
+meurt après le rapport `11-mesures-pilotes.md`, sauf décision de l'investisseur
+après le rendu (ADR-0028 D6 vi). Frontière : ADR-0028 D6 (i).
 
 - **Zéro dépendance** hors bibliothèque standard Python (≥ 3.9) : `urllib` +
   décodage hex à la main. Aucune clé, aucun token, aucun cookie (décision
@@ -30,8 +37,20 @@ sur données réelles ? **Il est jetable** (10 §1) : il meurt après le rapport
 cd s2-harness
 python -m shogen_s2.smoke                       # une lecture live des 12 flux
 python -m unittest discover -s tests -t . -v    # tests déterministes
+python -m shogen_s2.report <dir> --exclude-window-start-range FROM TO   # rapport recalculé
 python -m tests.capture                         # re-geler les fixtures
 ```
+
+`<dir>` porte `control.jsonl` et `journal.jsonl`. `--exclude-window-start-range FROM TO`
+(répétable ; `FROM`, `TO` = epoch UTC, plage **fermée** de `window_start`) retire ces fenêtres de n, K et P̂_more
+(ADR-0025 déc. 1 ; bornes du rendu principal : ADR-0028 D4 et D5) ; l'exclusion vaut pour tout
+enregistrement horodaté : `window_start`, et `ts` / `harness_ts` (`asn_attribution` / `clock_check`) sur la
+même plage étendue à la durée de la dernière fenêtre (ADR-0028 D5). `--segment-from T0_EPOCH` avec
+`--segment-to T_FIN_EPOCH` (fin exclue) ou `--segment-n-fixe N` (fin = `window_start` de la N-ième fenêtre
+distincte ≥ T0, plus w ; ADR-0024) restreint l'analyse au segment semi-ouvert [T0 ; fin), tous types
+d'enregistrement (ADR-0028 D4, D2 pt 6) ; les deux formes de fin s'excluent, et `--segment-from` exige l'une
+des deux. Sans option, aucune ligne d'exclusion ni de segment n'est ajoutée ; le rendu est épinglé octet pour
+octet (`SHA_BASE_SANS_OPTION`, `tests/test_exclusion.py`, test iv).
 
 ## État
 
@@ -60,8 +79,18 @@ python -m tests.capture                         # re-geler les fixtures
   **drapeau 2 tri-état** (levé/éteint/non évaluable) consommant la matrice de
   co-écarts M1b ; corrélations L&M entre **clusters** ; résidu de **peg USDT/USD**
   = R2(2a) ρ_resid ; **rapport §6 COMPLET (6 blocs)**. `HARNESS_VERSION` = S2A-M1c.
-  Tests : `python -m unittest discover -s tests -t .` (**136 verts**) + smoke 12/12.
+  Tests et smoke 12/12 de cet incrément ; le compte courant est la mesure datée ci-dessous.
 
-À venir : le **run réel 24–48 h** (orchestrateur — pas ce worker ; `collect_asn`
-et `collector.collect` lancés au réseau) produisant la table §6 complète, recalculée
-à l'identique par l'oracle ; puis `11-mesures-pilotes.md` (Phase C).
+- **2026-09-30 — mesure** (arbre `main` au commit de DOCS-S2-a, après B-SEG-1/B-SEG-2 et E1, TMP sous
+  `F:/tmp`, `SHOGEN_S2_CAMPAGNE_CONTROL` non posée ; re-mesurée par l'orchestrateur au commit, C-5 du cp-1) :
+  `python -B -m unittest discover -s tests -t .` → « Ran 216 tests … OK (skipped=2) »
+  (le G1 avait mesuré « Ran 207 » sur `aa0afdc` + a1, b, a2 ; DOCS-S2-b n'est pas encore commis).
+  Les deux tests sautés sont les deux tests (ii) de `TestExclusionJournalReel`
+  (`tests/test_exclusion.py`), qui lisent la copie scellée de la campagne (comptes seulement) : la
+  variable n'est posée que par l'orchestrateur seul, sur copie (ADR-0028 annexe D.4 a). `aa0afdc`
+  seul : 206 (DOCS-S2-b ajoute le test `test_v_ligne_nmin_suit_le_journal`). Ce compte se re-mesure à
+  chaque lot qui change le compte.
+
+À venir : le rendu servi de la sortie S2 (`docs/11-mesures-pilotes.md`), par la
+chaîne de lots de l'ADR-0028 (annexe A : segments, pool d'analyse, rendu, paquet de
+pré-enregistrement, exécution unique). Ce fichier ne porte aucun résultat de campagne.

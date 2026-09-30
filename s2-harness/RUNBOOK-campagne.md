@@ -135,6 +135,8 @@ le 2026-08-20, tout vert** (§0) ; procédure reproductible :
 | **J14** | **jeudi 4 sept** | **rapport intermédiaire** : z calme probablement publiable ; z stress « historique insuffisant » + queue exacte — **premier chiffre opposable** | `11-mesures-pilotes.md` v1 (recalculé par l'oracle) |
 | **J28** | **jeudi 18 sept** (**date fixe**) | **rapport final** : les deux strates au critère (week-end : 8 j ≥ 6,95 j) | `11-mesures-pilotes.md` final |
 
+*Amendement 2026-09-30 : ce tableau est le calendrier d'ADR-0020 ; la coupe du J14 rendue est celle d'ADR-0028 D4 (voir §9 e).*
+
 - **Fin à DATE FIXE, jamais « quand z croise 2,33 »** (l'arrêt optionnel gonfle
   l'erreur type-I, 04 §5).
 - **Trois z toujours publiés** (calme, stress, poolé) — lecture asymétrique du poolé
@@ -175,9 +177,9 @@ le 2026-08-20, tout vert** (§0) ; procédure reproductible :
 - **Ne publie rien.** D6 = « publiable », pas « publié » : l'acte de publier
   `11-mesures-pilotes.md` (et l'exposition du benchmark) est une **décision
   investisseur** (percute DEVOPS §1 dépôt privé jusqu'à S3, S5 antériorité arXiv,
-  D10/PS-10 marque). Les rapports J14/J28 sont produits et vérifiés ; leur diffusion
-  attend.
-- **Ne promeut pas le harnais** (R-22 : jetable, mort après le rapport).
+  D10/PS-10 marque). Les rapports J14/J28 sont produits par l'exécution unique (annexe D.4 b d'ADR-0028) et recalculés par
+  l'oracle tiers ; leur diffusion attend.
+- **Ne promeut pas la collecte** (ADR-0028 D6 : la collecte reste en quarantaine, « jetable » ; seul le chemin de recalcul est sous G0-G7).
 - **Ne consomme pas les fenêtres de calibration dans l'inférence.**
 - **Ne s'arrête pas à un z favorable** (date fixe).
 
@@ -204,16 +206,25 @@ python -m shogen_s2.run_campaign --phase calibration --journal-dir F:\shogen-cam
 (la capture est SANS SEUIL — la valeur provisoire n'altère pas l'archive, §3). L'**archive
 démarre ICI** (l'actif non copiable). Sous auto-restart (§1).
 
-**c) J0+48h — dimanche 23 août 00:00 UTC — CLÔTURE de calibration (fixe les σ/τ finaux) :**
+**c) J0+48h — dimanche 23 août 00:00 UTC — CLÔTURE de calibration (fixe les σ ; τ vient d'ADR-0022) :**
+
+*Procédure corrigée (ADR-0028 HS2-10, 2026-09-30) : l'ancienne séquence `closure > sigma-tau.json`
+n'est plus consommable.* Chaîne réelle : `closure` → `cloture-finale.json` → **assemblage manuel**
+(σ de la clôture + τ par classe d'ADR-0022) → `sigma-tau.json` → `run_campaign --sigma-tau-file`.
 
 ```
-python -m shogen_s2.closure F:\shogen-campagne\calibration > F:\shogen-campagne\sigma-tau.json
-type F:\shogen-campagne\sigma-tau.json
+python -m shogen_s2.closure F:\shogen-campagne\calibration > F:\shogen-campagne\cloture-finale.json
+type F:\shogen-campagne\cloture-finale.json
 ```
 
 LIRE le JSON : si `tau_revision_needed` = true (P99 écart relatif > 0,25 %) ou un `sigma_classe`
-remonté surprend → **révision par ADR AVANT la campagne** (fail-closed : `tau_classe` = null
-bloque la campagne). Sinon **committer `sigma-tau.json`** (git) — σ/τ scellés, reproductibles.
+remonté surprend → **révision par ADR AVANT la campagne**. Sinon **assembler `sigma-tau.json`** à la
+main : `sigma_classe` recopié de `cloture-finale.json`, `tau_classe` = τ **par classe** d'ADR-0022
+(`docs/adr-0022/ADR-0022.md`). Le τ scalaire émis par la clôture est **refusé** par le chargeur
+(`--sigma-tau-file` : `tau_classe` doit être un mapping classe→fraction ; absent ou null, la campagne
+fail-close). Preuve de l'assemblage : `tests/test_closure.py`, `test_roundtrip_closure_to_campagne_resolve`
+(l.214-239) ; pré-vol : `docs/adr-0022/preflight-sigmatau.py`. **Committer `cloture-finale.json` et
+`sigma-tau.json`** (git) — σ/τ scellés, reproductibles.
 
 **d) J0+48h → J28 — lancer la CAMPAGNE (segment scoré DISTINCT) :**
 
@@ -225,12 +236,26 @@ python -m shogen_s2.run_campaign --phase campagne --journal-dir F:\shogen-campag
 `--sigma-tau-file`, la campagne **fail-close** (rc=3). Dossier de segment **distinct** de la
 calibration (§3 : l'inférence ne consomme que ce segment).
 
-**e) J14 (~4 sept) / J28 (18 sept) — rapports** (recalculés, NON publiés sans décision
-investisseur, §8) :
+**e) Rapports J14 / J28** (recalculés, NON publiés sans décision investisseur, §8). Les dates de coupe
+ne sont pas fixées ici : **J14 = coupe ex ante d'ADR-0022 pt 5, J28 = segment d'ADR-0028 D2 pt 6 ; bornes
+de rendu : ADR-0028 D4 et D5** (la coupe « jeudi 4 sept » du §5 cesse d'être la coupe principale : ADR-0028 D4 la rend en **second rendu,
+déclaré d'avance**, décision 270) :
 
 ```
 python -m shogen_s2.report F:\shogen-campagne\campagne
+python -m shogen_s2.report F:\shogen-campagne\campagne --exclude-window-start-range FROM_EPOCH TO_EPOCH
+python -m shogen_s2.report F:\shogen-campagne\campagne --segment-from T0_EPOCH --segment-to T_FIN_EPOCH
+python -m shogen_s2.report F:\shogen-campagne\campagne --segment-from T0_EPOCH --segment-n-fixe N
 ```
+
+L'option `--exclude-window-start-range FROM_EPOCH TO_EPOCH` (répétable, epoch UTC, plage **fermée** de
+`window_start`) retire ces fenêtres de n, K et P̂_more, et, sur `ts` / `harness_ts`, la même plage étendue à
+la durée de la dernière fenêtre (ADR-0028 D5). `--segment-from T0_EPOCH` avec `--segment-to T_FIN_EPOCH`
+(fin exclue) ou `--segment-n-fixe N` (fin = `window_start` de la N-ième fenêtre distincte ≥ T0, plus w ;
+ADR-0024) restreint l'analyse au segment semi-ouvert [T0 ; fin), tous types d'enregistrement ; les deux
+formes de fin s'excluent. Sans option, aucune ligne d'exclusion ni de segment n'est ajoutée ; le rendu est
+épinglé octet pour octet (`SHA_BASE_SANS_OPTION`, `tests/test_exclusion.py`, test iv). Bornes de la plage :
+ADR-0025 déc. 1 (amendée) ; bornes de la coupe et du segment : ADR-0028 D4 et D5. Aucun compte de fenêtres ne figure ici : le rapport imprime les siens (bloc 1).
 
 **f) Clôture** : rapport de passe (zéro dette), critère de sortie S2 (les axes R2
 discriminent-ils ? — n, K, z, partition, k_eff vs k nominal).

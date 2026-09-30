@@ -282,6 +282,20 @@ les flux de place, 10 s pour les agrégats. Cible N_min = 300 fenêtres
 communes par paire (transformation de Fisher : SE = 1/√(N−3) ≈ 0,058 →
 IC ≈ ±0,11 sur ρ ; source de manuel à enregistrer, dette §10.7).
 
+**Erratum du 2026-09-30 (SHOGEN-REPORT-FISHER-1, ADR-0028 D3) — ajout daté : les lignes qui précèdent
+sont conservées telles qu'écrites le 2026-08-05 (précédent : ADR-0023 l.3).** Le mot « Fisher » de la
+rédaction du 2026-08-05 désigne la **transformation z′ = artanh(r)** (Fisher 1921, *Metron* 1:3-32 ;
+primaire en procurement L-46, non détenu). Forme de manuel détenue : `biblio/INDEX.md` l.328 (Penn
+State STAT 509, leçon 7, §7.8) : z′ suit approximativement N(ζ, sd = 1/√(n−3)), n étant la taille de
+l'échantillon ; l'intervalle sur ζ est z′ ± t(n−3 ; 1 − α/2)/√(n−3) (quantile de Student à n−3 degrés
+de liberté), soit à 95 % z′ ± t(n−3 ; 0,975)/√(n−3). À N = 300 : SE(z′) = 1/√297 ≈ 0,058 et
+t(297 ; 0,975)/√297 ≈ 0,114 [calculé], soit ≈ ±0,11 **sur l'échelle z′**. Sur ρ, l'IC s'obtient par la
+transformation inverse (tanh) et n'est de l'ordre de ±0,11 que près de ρ = 0 : il se resserre quand
+|ρ| croît. L'énoncé antérieur « IC ≈ ±0,11 sur ρ » est **corrigé par cet erratum** (il vaut sur z′, non
+sur ρ). N_min = 300 est un **choix de conception**, fixé ex ante dans ce document, non dérivé d'un
+calcul de puissance (à porter au paquet de pré-enregistrement, ADR-0028 D2). Le rapport n'a jamais
+publié d'IC sur ρ ; le point est corrigé avant le paquet (l'erratum doit y figurer avant son scellement).
+
 | stat | définition | ce qu'elle capte |
 |---|---|---|
 | (1) ρ_raw | Pearson des log-rendements `r_s(j) = ln p_s(j) − ln p_s(j−1)`, par paire | plancher commun, PAS discriminant : ≈ 1 pour toute paire honnête de la classe (facteur marché) ; un ρ_raw *bas* est le signal étrange |
@@ -670,13 +684,13 @@ ci-dessous, telles qu'écrites avant la décision.
 
 | # | dette | ce qui la décharge |
 |---|---|---|
-| 1 | **Dong et al. 2010**, « Global Detection of Complex Copying Relationships Between Sources », PVLDB 3(1), pp. 1358–1369 — identité re-établie en page de titre (V5), URL `vldb.org/pvldb/vol3/R120.pdf` (**R120**, pas R121), octets en scratchpad de passe (`vldb_R120.pdf`), **corps non lu** | fetch dans `biblio/` + INDEX + lecture du corps avant que (2c) ne le cite comme précédent ; et trancher 2009 (« Integrating Conflicting Data: The Role of Source Dependence », PVLDB 2 — le mécanisme y naît ; non lu) vs 2010 comme citation porteuse |
-| 2 | **Seuil produit-variance** : source lue et citée (UConn OER Math 3160, ch. 9, p. 121 ; octets `uconn_ch9.pdf`) — déchargée sur le fond ; voisines détenues en garde-fou (`nist_prc24.html`, `psu_8111.html`) | enregistrement `biblio/` + INDEX, avec la note des trois formes (§5.4) |
+| 1 | **Dong et al. 2010**, « Global Detection of Complex Copying Relationships Between Sources », PVLDB 3(1), pp. 1358–1369 — identité re-établie en page de titre (V5), URL `vldb.org/pvldb/vol3/R120.pdf` (**R120**, pas R121), octets en scratchpad de passe (`vldb_R120.pdf`), **corps non lu** | fetch dans `biblio/` + INDEX + lecture du corps avant que (2c) ne le cite comme précédent ; et trancher 2009 (« Integrating Conflicting Data: The Role of Source Dependence », PVLDB 2 — le mécanisme y naît ; non lu) vs 2010 comme citation porteuse — **Re-statuée le 2026-09-30 : ouverte, périmètre résiduel nommé** : identité re-établie et corps non lu (`biblio/INDEX.md` l.57) ; prédécesseur PVLDB 2009 non détenu. Items formés : SHOGEN-DONG-CORPS-1 (lecture du corps ; demande de procurement du PVLDB 2009), annexe B d'ADR-0028 ; la dépendance de (2c) à ce précédent reste conditionnelle (aucune citation avant lecture) |
+| 2 | ~~**Seuil produit-variance** : source lue et citée (UConn OER Math 3160, ch. 9, p. 121 ; octets `uconn_ch9.pdf`) — déchargée sur le fond ; voisines détenues en garde-fou (`nist_prc24.html`, `psu_8111.html`)~~ — **barrée le 2026-09-30 (condition remplie depuis le 2026-08-05)** : les trois sources sont enregistrées à `biblio/INDEX.md` (UConn l.54, NIST l.55, Penn State STAT 200 l.56), la note des trois formes est à §5.4 | — |
 | 3 | **Roster des publishers du feed Pyth BTC/USD** — l'arête Pyth ← Coinbase n'est établie qu'au niveau réseau | fetch de la page du feed (ou du roster via l'API Hermes) ; jusque-là l'arête reste `basis:doc`, granularité réseau |
-| 4 | **Copies octets-exacts des 4 pages HTML** citées §4.3 (citations passées par le résumeur de fetch) | re-fetch brut (navigateur) dans `biblio/` avant tout enregistrement ou ADR citant verbatim |
+| 4 | **Copies octets-exacts des 4 pages HTML** citées §4.3 (citations passées par le résumeur de fetch) | re-fetch brut (navigateur) dans `biblio/` avant tout enregistrement ou ADR citant verbatim — **Re-statuée le 2026-09-30 : ouverte, périmètre résiduel 3/4** : détenue, la page méthodologie de CoinGecko (`biblio/INDEX.md` l.264, copie du 2026-08-12) ; restent la page « exchanges/binance » de CoinGecko, la page « price-aggregation » de Pyth et la page « publishers » de Pyth. Item formé SHOGEN-BIBLIO-PAGES-4-3-1 (annexe B d'ADR-0028), sous SHOGEN-FETCH-AVANT-PUB-1 |
 | 5 | **docs.llama.fi/coin-prices-api** : page JS, illisible par fetch (404) ; le verdict est porté par `llms-full.txt` | re-tenter par navigateur si le libellé exact devient porteur |
 | 6 | **Chainlink** : paramètres du feed (déviation/heartbeat) et composition d'amont non établis (`data.chain.link` 403, doc volumineuse en échec — passe worker) | établir sur pièce, ou laisser le nœud sans arête d'amont et le dire (§3.2) |
-| 7 | **Transformation de Fisher** (SE = 1/√(N−3), §4.2) | source de manuel fetchée et enregistrée avant publication d'IC sur ρ dans le rapport |
+| 7 | ~~**Transformation de Fisher** (SE = 1/√(N−3), §4.2)~~ — **fermée le 2026-09-30** pour la forme de manuel : source enregistrée à `biblio/INDEX.md` l.328 (Penn State STAT 509 L7 §7.8) ; erratum daté à §4.2 (b) (l'IC vaut sur l'échelle z′, pas sur ρ) ; le primaire (Fisher 1921, *Metron* 1:3-32) reste en procurement L-46 | — |
 | 8 | ~~**Registre** : « asn-attribution » à résoudre dans `08-assumptions.md`~~ — **fermée le 2026-08-05** : A(asn-attribution) enregistrée (résidus de couche), citée à §8 et §4.1 | — |
 | 9 | **Relectures avant implémentation** : limites de débit (§3.3, lectures worker non re-établies) ; forme imprimée de P₁ chez K&L (§5.1, non re-vérifiée) | re-lire les docs de débit à l'implémentation ; relire P₁ au PDF à l'implémentation du calcul |
 | 10 | ~~**Collision de nommage** du rapport (05 §S2 : `07-mesures-pilotes.md` vs `07-gtm.md`)~~ — **fermée le 2026-08-05** : 05 §S2 réconcilié en `11-mesures-pilotes.md` (le nom de fichier, jamais le critère) | — |

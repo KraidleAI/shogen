@@ -3,7 +3,7 @@
 Familles exigées (mission M1c) et couverture :
   - ρ_raw ≈ 1 pour paire HONNÊTE, bas = signal (§4.2 (1)) ;
   - T = 1 sur copie EXACTE, T > T_Δ (§4.2 (2b)) ;
-  - « historique de contenu insuffisant » sous N_min=300 (garde Fisher, §4.2) ;
+  - « historique de contenu insuffisant » sous N_min=300 (garde de conception, §4.2 ; SE de la transformation de Fisher : STAT 509 L7 §7.8) ;
   - k_eff = nombre de classes de la partition, clusters NOMMÉS (§5.6, ADR-0007) ;
   - drapeau 2 tri-état : levé (z≥2,33 + partition propre) / éteint / non évaluable (§5.6) ;
   - résolution ASN MOCKÉE (injection de dépendances) ;

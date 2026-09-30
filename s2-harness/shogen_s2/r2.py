@@ -179,7 +179,8 @@ CAVEAT_RPC_READ_PATH = (
 # run_params (PORTEUSES) → publiées et recalculables. Les paramètres laissés
 # symboliques par le doc (ℓ, L) sont fixés en v0 et enregistrés : un balayage
 # enregistré n'est pas un chiffre inventé (arbitrage ADVISOR 2026-08-20).
-CONTENT_N_MIN = 300          # §4.2 « Cible N_min = 300 fenêtres communes par paire » (Fisher)
+CONTENT_N_MIN = 300          # §4.2 : choix de conception (fenêtres communes par paire), non dérivé ;
+                             # SE(artanh r) = 1/√(N−3) : biblio/INDEX.md, STAT 509 L7 §7.8 ; la valeur ici fait foi
 CONTENT_KAPPA = 5            # §4.2 (2c) κ = 5 : aberrant si |e_s(j)| > κ·MAD_j(pool)
 CONTENT_JUMP_SIGMA = 4       # §4.2 (2d) sauts |r_s(j)| > 4σ
 CONTENT_DELTA_SECONDS = 60   # §4.2 (2b) contrôle décalé Δ = 60 s
@@ -502,7 +503,7 @@ def log_returns(wins: list[int], lnp: dict, f: str, w: int) -> dict[int, Decimal
 def rho_raw(wins, lnp, a, b, w, n_min) -> dict:
     """(1) ρ_raw : Pearson des log-rendements par paire (§4.2). ≈ 1 pour toute paire
     HONNÊTE (facteur marché) — un ρ_raw *bas* est le signal étrange. Garde N_min
-    (Fisher) : sous le seuil, « historique de contenu insuffisant », jamais un ρ vide."""
+    (choix de conception ; SE(artanh r) = 1/√(N−3), STAT 509 L7 §7.8) : sous le seuil, « historique de contenu insuffisant », jamais un ρ vide."""
     ra, rb = log_returns(wins, lnp, a, w), log_returns(wins, lnp, b, w)
     common = sorted(set(ra) & set(rb))
     if len(common) < n_min:
