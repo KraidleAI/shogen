@@ -103,6 +103,12 @@ class TestExclusionFixture(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._n([PLAGE[::-1]])
 
+    def test_v_window_start_bornes_a_une_seconde(self):
+        """(v) G2 B-SEG-1 : [w3 + 1 ; w4] garde w3 (= A − 1) ; [w2 ; w3 − 1] garde w3 (= B + 1), aux quatre
+        points. Rougit si : A − 1 ou B + 1 inclus sur la branche window_start (prédicat fermé propre)."""
+        self.assertEqual(self._n([(WS[3] + 1, WS[4])]), {"calme": 3, "stress": 2})
+        self.assertEqual(self._n([(WS[2], WS[3] - 1)]), {"calme": 2, "stress": 3})
+
     def test_garde_53_voit_les_marqueurs_exclus(self):
         """w3 (samedi, DANS la plage) ré-étiqueté « calme » lève toujours, aux quatre points
         d'entrée. Rougit si : filtre appliqué AVANT verify_markers_against_spec."""
@@ -177,6 +183,15 @@ class TestExclusionTousTypes(unittest.TestCase):
         self.assertEqual(cli(self.d, PLAGE), (txt + "\n").encode("utf-8"))
         with self.assertRaises(ValueError):                 # type sans règle d'horodatage : fail-closed
             records.exclude_window_start_ranges([{"record": "autre", "window_start": A}], [PLAGE])
+
+    def test_d5_deux_plages_sur_ts_et_harness_ts(self):
+        """G2 B-SEG-1 : [w0 ; w0] et [B ; B] retirent horloges et sondes de [w0 ; w0 + w) et de
+        [B ; B + w) seulement. Rougit si : any remplacé par all (plusieurs plages) sur ts/harness_ts."""
+        p, clocks, markers = records.parse_control(self.control)
+        _m, c, s, _ = records.filtre_lecture(records.effective_run_params(p), markers, clocks,
+                                             records.parse_asn(self.control), [(WS[0], WS[0]), (B, B)])
+        self.assertEqual(sorted({x["harness_ts"] for x in c}), [WS[1], A - 1, A, B + 60])
+        self.assertEqual(sorted({x["ts"] for x in s}), [A - 1, A, B + 60])
 
     def test_type_vide_rendu_sans_asn_ni_horloge(self):
         """C-15 : [WS[0] ; WS[5] − 1] retire tout clock_check et tout asn (t < WS[5] + 59) mais garde w5

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from itertools import count
 
 from shogen_s2 import collector, lm, r1, r2, records, report, window
 from tests.test_collector import BY_ID, SKELETON, TAU, FakeClock, _taumap, frozen_read_fn, sbc_huge
@@ -134,6 +135,41 @@ class TestSegment(unittest.TestCase):
             with self.assertRaises(ValueError):
                 f(self.c, self.j, segment=SEG)
 
+
+WS120 = [WS[0] - 60 + 120 * i for i in range(6)]   # G2 B-SEG-1 : grille à w = 120 s (23:56Z, multiple de 120)
+
+
+def fixture_w120(d, instants):
+    """Campagne du collecteur réel à w = 120 s, puis démarrages sans fenêtre et sondes ASN aux instants."""
+    c, j, raw = (os.path.join(d, n) for n in ("control.jsonl", "journal.jsonl", "raw.jsonl"))
+    specs, asn = [BY_ID[f] for f in SKELETON], count(64512)
+    kw = dict(w=120, sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU), sleep_fn=lambda s: None,
+              strate_spec=window.WEEKEND_STRATE_SPEC, read_fn=frozen_read_fn)
+    clock = [float(WS120[0])] + [t for b in WS120 for t in (b + 1.0, b + 115.0)]
+    collector.collect(specs, c, j, raw, n_windows=6, now_fn=FakeClock(clock), **kw)
+    for t in map(float, instants):
+        collector.collect(specs, c, j, raw, n_windows=0, now_fn=FakeClock([t]), **kw)
+        a = next(asn)
+        r2.collect_asn(specs, c, now_fn=lambda t=t: t,
+                       resolve_fn=lambda h, r, a=a: {"status": "ok", "asn_ripestat": a, "asn_cymru": a})
+    return c, j
+
+
+class TestSegmentW120(unittest.TestCase):
+    def test_w_lu_de_run_params_exclusion_et_n_fixe(self):
+        """G2 B-SEG-1 : w = 120 (run_params). [ws2 ; ws3] retire horloges et sondes jusqu'à B + 119, garde
+        B + 120 ; n fixe = 2 depuis ws1 : t_fin = ws2 + 120, garde ws2 + 90. Rougit si : w codé en dur à 60
+        (outil ou n fixe)."""
+        A, B = WS120[2], WS120[3]
+        c, _j = fixture_w120(tempfile.mkdtemp(prefix="s2w120_"), (A - 1, A + 90, B + 60, B + 119, B + 120))
+        p, clocks, markers = records.parse_control(c)
+        params, asn = records.effective_run_params(p), records.parse_asn(c)
+        _m, k, s, _ = records.filtre_lecture(params, markers, clocks, asn, [(A, B)])
+        self.assertEqual(sorted({x["harness_ts"] for x in k}), [WS120[0], A - 1, B + 120])
+        self.assertEqual(sorted({x["ts"] for x in s}), [A - 1, B + 120])
+        _m, k, _s, seg = records.filtre_lecture(params, markers, clocks, asn,
+                                                segment={"t0": WS120[1], "n_fixe": 2})
+        self.assertEqual((seg, sorted({x["harness_ts"] for x in k})), ((WS120[1], B), [A - 1, A + 90]))
 
 if __name__ == "__main__":
     unittest.main()
