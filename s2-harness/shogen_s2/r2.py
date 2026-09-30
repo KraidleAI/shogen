@@ -1070,7 +1070,8 @@ def compute_r2(markers, readings, asn_records, pool, w, sigma_by_class,
     }
 
 
-def recompute_r2_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
+def recompute_r2_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
+                              segment=None) -> dict:
     """Point d'entrée « recalculable depuis le journal seul » (ADR-0003), jumeau de
     r1/lm : mêmes gardes fail-closed (effective_run_params sur R1+R2, strates ==
     calendrier committé). C'est ce que rejoue l'oracle de recalcul (contexte frais)."""
@@ -1087,8 +1088,8 @@ def recompute_r2_from_journal(control_path: str, journal_path: str, exclude_rang
             f"(fail-closed, §5.3) : {div[:5]}"
         )
     # Filtre de lecture unique (ADR-0025 amendée par ADR-0028 D5) APRÈS la garde §5.3 ; journal intact.
-    markers, _clock, asn_records = records.filtre_lecture(params, markers, asn=asn_records,
-                                                          ranges=exclude_ranges)
+    markers, _clock, asn_records, _seg = records.filtre_lecture(params, markers, asn=asn_records,
+                                                                ranges=exclude_ranges, segment=segment)
     readings = r1.parse_journal(journal_path)
     pools, pool, _retraits = r1.analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)

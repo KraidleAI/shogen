@@ -296,19 +296,22 @@ HORODATAGE = {"window_close": "window_start", "asn_attribution": "ts", "clock_ch
               "run_params": None}
 
 
-def filtre_horodatage(recs: list, ranges=(), w=None) -> list:
-    """UN SEUL outil de lecture par horodatage, pour tous les types (ADR-0028 D5 ; HS2-08) : filtre
+def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
+    """UN SEUL outil de lecture par horodatage, pour tous les types (ADR-0028 D4, D5 ; HS2-08) : filtre
     d'ANALYSE, jamais une excision du journal. Exclusion d'ADR-0025 déc. 1 amendée par D5 : `window_start`
     dans la plage FERMÉE [A ; B] ; `ts` et `harness_ts` dans [A ; B + w), durée de la dernière fenêtre
-    (w de run_params) ; run_params conservé ; type sans règle : ValueError. Sans plage : inchangé."""
+    (w de run_params) ; run_params conservé ; type sans règle : ValueError. Segment `(t0, t_fin)`, avant
+    l'exclusion : [t0 ; t_fin) semi-ouvert, MÊME borne, tous types (D4). Sans plage ni segment : inchangé."""
     rs = exclusion_ranges(ranges)
-    if not rs:
+    if not rs and segment is None:
         return list(recs)
     out = []
     for r in recs:
         if r.get("record") not in HORODATAGE:
             raise ValueError(f"type {r.get('record')!r} sans champ d'horodatage connu — fail-closed")
         champ = HORODATAGE[r["record"]]
+        if champ is not None and segment is not None and not segment[0] <= r[champ] < segment[1]:
+            continue
         if champ == "window_start":
             dedans = any(a <= int(r[champ]) <= b for a, b in rs)
         else:
@@ -318,12 +321,31 @@ def filtre_horodatage(recs: list, ranges=(), w=None) -> list:
     return out
 
 
-def filtre_lecture(params: dict, markers: list, clock_checks=(), asn=(), ranges=()) -> tuple:
-    """Point d'application UNIQUE (ADR-0028 D5) des quatre points d'entrée, APRÈS `effective_run_params`
+def t_fin_n_fixe(markers: list, t0, n: int, w: int) -> int:
+    """Règle d'arrêt à n fixe (ADR-0024 déc. 1 et 4 ; ADR-0028 D2 pt 6) : `window_start` de la n-ième fenêtre
+    DISTINCTE, en ordre croissant, parmi les marqueurs à window_start ≥ t0, comptés AVANT segment et
+    exclusion, + w. Aucun défaut (n vient du paquet, w de run_params) ; moins de n fenêtres : ValueError."""
+    ws = sorted({int(m["window_start"]) for m in markers if int(m["window_start"]) >= t0})
+    if not 1 <= n <= len(ws):
+        raise ValueError(f"n fixe = {n} hors de [1 ; {len(ws)}] (fenêtres distinctes ≥ t0) — fail-closed")
+    return ws[n - 1] + w
+
+
+def filtre_lecture(params: dict, markers: list, clock_checks=(), asn=(), ranges=(), segment=None) -> tuple:
+    """Point d'application UNIQUE (ADR-0028 D4, D5) des quatre points d'entrée, APRÈS `effective_run_params`
     (run_params conservés) et la garde §5.3 sur TOUS les marqueurs ; w = run_params. Rend (marqueurs,
     clock_checks, asn) filtrés ; journal.jsonl n'est jamais filtré : les lectures d'un marqueur retiré
-    deviennent orphelines (hors n, K, P̂_more)."""
-    return tuple(filtre_horodatage(list(x), ranges, params["w"]) for x in (markers, clock_checks, asn))
+    deviennent orphelines (hors n, K, P̂_more). `segment` : {"t0", et "t_fin" OU "n_fixe"} ; à n fixe, t_fin
+    est lu des marqueurs AVANT segment et exclusion ; t0 ≥ t_fin : ValueError ; bornes (ou None) en 4e."""
+    w, seg = params["w"], None
+    if segment is not None:
+        t0, t_fin, n = segment["t0"], segment.get("t_fin"), segment.get("n_fixe")
+        if (t_fin is None) == (n is None):
+            raise ValueError("segment : une fin et une seule, t_fin ou n_fixe — fail-closed")
+        seg = (t0, t_fin if n is None else t_fin_n_fixe(markers, t0, n, w))
+        if not seg[0] < seg[1]:
+            raise ValueError(f"segment [{seg[0]} ; {seg[1]}) vide ou inversé — fail-closed")
+    return tuple(filtre_horodatage(list(x), ranges, w, seg) for x in (markers, clock_checks, asn)) + (seg,)
 
 
 def exclude_window_start_ranges(markers: list, ranges=()) -> list:

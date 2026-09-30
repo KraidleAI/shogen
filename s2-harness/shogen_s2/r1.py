@@ -522,7 +522,8 @@ def compute_r1(
     return {"pool": pool, "strates": strates_out, "A_window_stationarity": A_WINDOW_STATIONARITY}
 
 
-def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=()) -> dict:
+def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
+                           segment=None) -> dict:
     """Point d'entrée « recalculable depuis le journal seul » (ADR-0003) :
     lit les paramètres de `run_params` et les lectures, calcule R1. C'est ce que
     rejoue l'oracle de recalcul (worker à contexte frais, plan §5)."""
@@ -542,7 +543,8 @@ def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=
             f"(fail-closed, §5.3) : {div[:5]}{' …' if len(div) > 5 else ''}"
         )
     # Filtre de lecture unique (ADR-0025 amendée par ADR-0028 D5) APRÈS la garde §5.3 ; journal intact.
-    markers, _clock, _asn = records.filtre_lecture(params, markers, ranges=exclude_ranges)
+    markers, _clock, _asn, _seg = records.filtre_lecture(params, markers, ranges=exclude_ranges,
+                                                         segment=segment)
     readings = parse_journal(journal_path)
     pools, pool, _retraits = analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     # σ PAR CLASSE + τ RELATIF depuis run_params (ADR-0021 ; effective_run_params a

@@ -62,7 +62,7 @@ def _iso_utc(ts) -> str:
     return datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
 
 
-def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> str:
+def render_report(control_path: str, journal_path: str, exclude_ranges=(), segment=None) -> str:
     ranges = records.exclusion_ranges(exclude_ranges)   # ADR-0025 ; défaut : aucune
     params_list, clock_checks, markers = records.parse_control(control_path)
     asn_records = records.parse_asn(control_path)
@@ -82,8 +82,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
     # Filtre de lecture unique APRÈS la garde §5.3 (ADR-0028 D5) : blocs 1-6 sur les enregistrements retenus.
-    markers, clock_checks, asn_records = records.filtre_lecture(params, markers, clock_checks,
-                                                                asn_records, ranges)
+    markers, clock_checks, asn_records, seg = records.filtre_lecture(params, markers, clock_checks,
+                                                                     asn_records, ranges, segment)
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])
@@ -130,6 +130,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
         sc = params["strate_calendar"]
         ap(f"  {'strate_calendar':24} = kind={sc.get('kind')} "
            f"{sc.get('note', '')}".rstrip())
+    if seg is not None:        # uniquement si segment (sans option : aucune ligne ajoutée)
+        ap(f"  {'segment':24} = [{seg[0]} ; {seg[1]}) = [{_iso_utc(seg[0])} ; {_iso_utc(seg[1])}) "
+           "semi-ouvert, fin exclue, même borne sur window_start, ts, harness_ts (run_params conservés) ; "
+           f"n fixe = {_fmt_dec(segment.get('n_fixe'))} — ADR-0028 D4, D2 pt 6")
     for a, b in ranges:        # uniquement si filtre (sans option : aucune ligne ajoutée)
         ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
            f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
@@ -397,11 +401,20 @@ def main(argv: list[str]) -> int:
     p.add_argument("--exclude-window-start-range", nargs=2, type=int, action="append",
                    default=[], metavar=("FROM_EPOCH", "TO_EPOCH"),
                    help="plage FERMEE de window_start hors n, K, P_more (repetable, ADR-0025)")
+    p.add_argument("--segment-from", type=int, metavar="T0_EPOCH", help="segment [T0 ; fin) (ADR-0028 D4)")
+    fin = p.add_mutually_exclusive_group()
+    fin.add_argument("--segment-to", type=int, metavar="T_FIN_EPOCH", help="fin exclue du segment")
+    fin.add_argument("--segment-n-fixe", type=int, metavar="N",
+                     help="fin = window_start de la N-ieme fenetre distincte >= T0, + w (ADR-0024)")
     args = p.parse_args(argv[1:])
+    if (args.segment_from is None) != (args.segment_to is None and args.segment_n_fixe is None):
+        p.error("segment : --segment-from avec --segment-to ou --segment-n-fixe (ADR-0028 D4)")
+    seg = None if args.segment_from is None else {
+        "t0": args.segment_from, "t_fin": args.segment_to, "n_fixe": args.segment_n_fixe}
     d = args.journal_dir
     text = render_report(os.path.join(d, "control.jsonl"),
                          os.path.join(d, "journal.jsonl"),
-                         exclude_ranges=args.exclude_window_start_range)
+                         exclude_ranges=args.exclude_window_start_range, segment=seg)
     # Émission UTF-8 explicite : la table porte la notation de doc 10 (P̂₀, p̂ᵢ…)
     # dont des diacritiques combinants qu'une console cp1252 (Windows) ne peut
     # encoder ; l'artefact recalculable est UTF-8, indépendant du code-page.
