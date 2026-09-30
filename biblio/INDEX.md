@@ -1,6 +1,6 @@
 # Shōgen — registre bibliographique
 
-**124 artefacts détenus** au 2026-08-13 (compte re-mesuré par listing du
+**125 artefacts détenus** au 2026-09-30 (+1 le 2026-09-30 : psu-stat509-lesson07 ; 124 au 2026-08-13) (compte re-mesuré par listing du
 dossier dans la passe qui écrit ce chiffre — mécanisé par la gate S-G6
 depuis S3 ; +21 fetchés à la passe S2.5, +67 à l'ouverture de S3, +5 à la phase B (RFC + WHATWG), +3 à la phase C (NIST), +7 à la phase C vague 1 (2 RFC typeur + 5 sources amont épinglées), en bas
 de registre ; les `*.sidecar`, extractions texte locales des PDF pour la
