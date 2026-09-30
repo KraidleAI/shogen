@@ -48,3 +48,5 @@ en « plus tard » sans registre.
 Auditeur : orchestrateur (session Compliance-Ingenierie), sur autorisation mainteneur.
 Modifications non commitées d'une session concurrente (roadmap, DEVOPS, docs/12, agents)
 constatées et **non touchées** par cet audit.
+
+**Note datée du 2026-09-30 (lot E1 d'ADR-0028 ; lignes précédentes inchangées)** : l'écart G0 du modèle de menace, non formalisé en document unique (l.13 et l.41), est soldé par `docs/17-modele-de-menace.md` : surface servie, transport, vérificateur, chaîne d'approvisionnement, méthode et chemin S2, sous revue G2 et cp-2 ; ses items et exigences sont à l'annexe B d'ADR-0028.
