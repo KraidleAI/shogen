@@ -281,9 +281,12 @@ def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
 
 def exclusion_ranges(ranges=()) -> list:
     """Plages d'exclusion du lecteur (ADR-0025 déc. 2) : entières, FERMÉES `[from, to]`,
-    TRIÉES (déterminisme) ; `from > to` LÈVE (fail-closed, jamais une exclusion vide
-    silencieuse). Fournies par l'appelant (CLI du rapport), jamais par une constante."""
-    out = sorted((int(a), int(b)) for a, b in ranges)
+    TRIÉES (déterminisme) ; `from > to` ou borne < 0 LÈVE (fail-closed, jamais une exclusion vide
+    silencieuse ; SHOGEN-NEG-EPOCH-1). Fournies par l'appelant (CLI du rapport), jamais par une constante."""
+    brutes = [tuple(r) for r in ranges]
+    if any(float(x) < 0 for r in brutes for x in r):     # avant int() : -0,5 tronqué à 0 passerait
+        raise ValueError(f"epoch négatif dans les plages {brutes} — fail-closed (SHOGEN-NEG-EPOCH-1)")
+    out = sorted((int(a), int(b)) for a, b in brutes)
     inversees = [r for r in out if r[0] > r[1]]
     if inversees:
         raise ValueError(f"plage(s) d'exclusion inversée(s) {inversees} (from > to) — "
@@ -336,12 +339,15 @@ def filtre_lecture(params: dict, markers: list, clock_checks=(), asn=(), ranges=
     (run_params conservés) et la garde §5.3 sur TOUS les marqueurs ; w = run_params. Rend (marqueurs,
     clock_checks, asn) filtrés ; journal.jsonl n'est jamais filtré : les lectures d'un marqueur retiré
     deviennent orphelines (hors n, K, P̂_more). `segment` : {"t0", et "t_fin" OU "n_fixe"} ; à n fixe, t_fin
-    est lu des marqueurs AVANT segment et exclusion ; t0 ≥ t_fin : ValueError ; bornes (ou None) en 4e."""
+    est lu des marqueurs AVANT segment et exclusion ; t0 ≥ t_fin : ValueError ; bornes (ou None) en 4e.
+    t0 < 0 : ValueError (SHOGEN-NEG-EPOCH-1) ; t_fin < 0 ≤ t0 : segment inversé, ValueError aussi."""
     w, seg = params["w"], None
     if segment is not None:
         t0, t_fin, n = segment["t0"], segment.get("t_fin"), segment.get("n_fixe")
         if (t_fin is None) == (n is None):
             raise ValueError("segment : une fin et une seule, t_fin ou n_fixe — fail-closed")
+        if t0 < 0:
+            raise ValueError(f"segment à epoch négatif (t0 = {t0}) — fail-closed (SHOGEN-NEG-EPOCH-1)")
         seg = (t0, t_fin if n is None else t_fin_n_fixe(markers, t0, n, w))
         if not seg[0] < seg[1]:
             raise ValueError(f"segment [{seg[0]} ; {seg[1]}) vide ou inversé — fail-closed")

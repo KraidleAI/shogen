@@ -1,7 +1,8 @@
-"""Lot B-SEG-2 (ADR-0028 D5, D6 iv ; SHOGEN-EXCL-COMPTE-1, HS2-05), sous-lot 2a : bloc 1 du rendu. Dates de
-campagne sur le journal entier ; segment, « aucun » sans option ; par plage, bornes par type et retraits par
-strate et par type, puis l'union. Fixture de l'exclusion + poser (D5). Chaque test nomme la mutation qui le
-rougit."""
+"""Lot B-SEG-2 (ADR-0028 D5, D6 iv ; SHOGEN-EXCL-COMPTE-1, SHOGEN-NEG-EPOCH-1, HS2-05) : bloc 1 du rendu.
+Sous-lot 2a : dates de campagne sur le journal entier ; segment, « aucun » sans option ; par plage, bornes par
+type et retraits par strate et par type, puis l'union. Sous-lot 2b : epoch négatif (ValueError à l'API, rc 2 à
+la CLI), bloc 5, portée des run_params. Fixture de l'exclusion + poser (D5). Chaque test nomme la mutation
+qui le rougit."""
 
 from __future__ import annotations
 
@@ -11,10 +12,10 @@ import sys
 import tempfile
 import unittest
 
-from shogen_s2 import collector, report, window
+from shogen_s2 import collector, records, report, window
 from tests.test_collector import BY_ID, SKELETON, TAU, W, FakeClock, _taumap, frozen_read_fn, sbc_huge
 from tests.test_exclusion import HARNESS, WS, build_fixture, comptes_outil, poser, recompte_independant
-from tests.test_segment import HOTES, WS120, fixture_w120
+from tests.test_segment import HOTES, POINTS, WS120, fixture_w120
 
 A, B = WS[2], WS[4]                   # plage D5 de la fixture : w2 calme, w3 et w4 stress
 H = len(HOTES)                        # poser : une sonde asn_attribution par hôte et par instant
@@ -80,9 +81,9 @@ class TestBloc1(unittest.TestCase):
     def test_dates_de_campagne_avant_filtre_et_retraits_du_segment(self):
         """Segment [w1 ; w4) et plage [w3 ; w5] : dates de campagne au journal entier (6 fenêtres distinctes
         malgré les doublons), identiques sans option ; retraits du segment ; plage comptée sur l'assiette du
-        segment. Rougit si : dates après filtre ; doublons comptés ; première et dernière inversées ; plage
-        comptée sur le journal entier ; « segment = aucun » ou segment_retraits absents ; « aucun » aussi
-        sous segment."""
+        segment ; (e) : started_utc = dernier démarrage (B + w, hors segment), portée déclarée. Rougit si :
+        dates après filtre ; doublons comptés ; première et dernière inversées ; plage comptée sur le journal
+        entier ; « segment = aucun », portée ou segment_retraits absents ; « aucun » aussi sous segment."""
         iso = report._iso_utc
         sans = report.render_report(self.c, self.j)
         txt = report.render_report(self.c, self.j, segment={"t0": WS[1], "t_fin": B},
@@ -91,6 +92,10 @@ class TestBloc1(unittest.TestCase):
             self.assertEqual(ligne(t, "campagne_fenetres"), [
                 f"6 {CAMP} : première {WS[0]} = {iso(WS[0])} ; "
                 f"dernière {WS[5]} = {iso(WS[5])} (window_start) — HS2-05"])
+            self.assertEqual(ligne(t, "portee_run_params"), [
+                "journal entier, jamais segmenté ni exclu (§E) : run_params_demarrages = tous les "
+                "démarrages ; started_utc, n_windows_demande = dernier démarrage (HS2-05)"])
+        self.assertEqual(ligne(txt, "started_utc"), [iso(B + W)])
         self.assertEqual(ligne(sans, "segment"), ["aucun (journal entier) — ADR-0028 D4"])
         self.assertEqual(len(ligne(txt, "segment")), 1)          # sous segment : [t0 ; t_fin) seule
         self.assertEqual(ligne(txt, "segment_retraits"), [
@@ -122,6 +127,37 @@ class TestBloc1(unittest.TestCase):
         open(j, "a", encoding="utf-8").close()
         self.assertEqual(ligne(report.render_report(c, j), "campagne_fenetres"), [
             f"0 {CAMP} — HS2-05"])
+
+    def test_epoch_negatif_rc2_cli_et_valueerror_api(self):
+        """SHOGEN-NEG-EPOCH-1 (Q-G2-5), étendu au segment ((d), G2 de B-SEG-1) : CLI rc 2, message sur stderr,
+        stdout vide ; API : ValueError aux quatre points d'entrée et dans l'outil ; n fixe négatif : rc 1 (C-4
+        iv : n n'est pas un epoch). Rougit si : rc 1 au lieu de 2 ; segment négatif accepté (CLI ou API) ;
+        plage négative acceptée à l'API ; -0,5 tronqué en 0 ; n fixe refusé comme un epoch (rc 2)."""
+        for args in (("--segment-from", -5, "--segment-to", B), ("--segment-from", 0, "--segment-to", -1),
+                     ("--exclude-window-start-range", -5, 10), ("--exclude-window-start-range", 5, -1)):
+            rc, out, err = cli(self.d, *args)
+            self.assertEqual((rc, out), (2, b""), args)
+            self.assertIn(b"SHOGEN-NEG-EPOCH-1", err)
+        self.assertEqual(cli(self.d, "--segment-from", WS[0], "--segment-n-fixe", -1)[:2], (1, b""))
+        for kw in ({"exclude_ranges": [(-5, 10)]}, {"segment": {"t0": -5, "t_fin": B}},
+                   {"segment": {"t0": -5, "n_fixe": 2}}, {"segment": {"t0": 0, "t_fin": -1}}):
+            for f in POINTS:
+                with self.assertRaises(ValueError, msg=(f.__qualname__, kw)):
+                    f(self.c, self.j, **kw)
+        for r in ((-0.5, 10), (0, -0.5)):         # int() tronquerait -0,5 en 0 : contrôle avant
+            with self.assertRaises(ValueError, msg=r):
+                records.exclusion_ranges([r])
+
+    def test_bloc5_sondes_toutes_retirees_message_vrai(self):
+        """(c), G2 de B-SEG-1 : [w0 ; w5 − 1] retire toutes les sondes ; le bloc 5 le dit, avec ses deux
+        comptes ; journal sans sonde : message d'origine. Rougit si : ancien message gardé après un filtre
+        total ; message neuf sur un journal sans sonde."""
+        txt = report.render_report(self.c, self.j, exclude_ranges=[(WS[0], WS[5] - 1)])
+        self.assertIn(f"retenu pour les hôtes du pool — {5 * H} au journal, 0 retenus par le filtre", txt)
+        self.assertNotIn("collect_asn non lancé", txt)
+        sans = report.render_report(*build_fixture(tempfile.mkdtemp(prefix="s2bloc1n_")))
+        self.assertIn("aucun enregistrement asn_attribution au journal (collect_asn non lancé", sans)
+        self.assertNotIn("retenu pour les hôtes du pool", sans)
 
 
 if __name__ == "__main__":

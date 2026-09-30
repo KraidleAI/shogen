@@ -149,6 +149,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     ap(f"  {'campagne_fenetres':24} = {len(deb)} fenêtres distinctes au journal (window_close, avant "
        "segment et exclusion)" + (f" : première {deb[0]} = {_iso_utc(deb[0])} ; dernière {deb[-1]} = "
                                   f"{_iso_utc(deb[-1])} (window_start)" if deb else "") + " — HS2-05")
+    ap(f"  {'portee_run_params':24} = journal entier, jamais segmenté ni exclu (§E) : run_params_demarrages"
+       " = tous les démarrages ; started_utc, n_windows_demande = dernier démarrage (HS2-05)")
     dans_seg = records.filtre_lecture(params, *tous, (), segment)[:3]   # assiette des comptes par plage
     if seg is not None:
         ap(f"  {'segment':24} = [{seg[0]} ; {seg[1]}) = [{_iso_utc(seg[0])} ; {_iso_utc(seg[1])}) "
@@ -292,9 +294,12 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # 5a. Table ASN datée (§4.1) — par hôte : IP, préfixe, ASN (2 bases), résolveur, heure
     ap("\n  (a) AXE ASN (§4.1) — attribution croisée ≥ 2 bases BGP (RIPEstat, Team Cymru)")
-    if not part["asn_measured"]:
+    if not part["asn_measured"] and not tous[2]:
         ap("      axe ASN NON MESURÉ : aucun enregistrement asn_attribution au journal "
            "(collect_asn non lancé — c'est l'orchestrateur qui le lance à la campagne).")
+    elif not part["asn_measured"]:     # des sondes au journal, aucune retenue pour le pool (G2 B-SEG-1, (c))
+        ap(f"      axe ASN NON MESURÉ : aucun enregistrement asn_attribution retenu pour les hôtes du pool — "
+           f"{len(tous[2])} au journal, {len(asn_records)} retenus par le filtre de lecture (bloc 1).")
     ahdr = (f"      {'hôte':30} {'flux':18} {'résolveur':18} {'heure(UTC)':26} "
             f"{'IP':16} {'préfixe':16} {'RIPEstat':9} {'Cymru':7} {'holder':14} {'état'}")
     ap(ahdr)
@@ -441,6 +446,10 @@ def main(argv: list[str]) -> int:
     args = p.parse_args(argv[1:])
     if (args.segment_from is None) != (args.segment_to is None and args.segment_n_fixe is None):
         p.error("segment : --segment-from avec --segment-to ou --segment-n-fixe (ADR-0028 D4)")
+    neg = [x for x in [args.segment_from, args.segment_to, *sum(args.exclude_window_start_range, [])]
+           if x is not None and x < 0]
+    if neg:                    # avant l'API (ValueError, rc 1) : rc 2, rien sur stdout (SHOGEN-NEG-EPOCH-1)
+        p.error(f"epoch negatif refuse {neg} (segment ou exclusion ; SHOGEN-NEG-EPOCH-1, ADR-0028 D5)")
     seg = None if args.segment_from is None else {
         "t0": args.segment_from, "t_fin": args.segment_to, "n_fixe": args.segment_n_fixe}
     d = args.journal_dir

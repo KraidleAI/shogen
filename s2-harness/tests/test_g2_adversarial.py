@@ -66,12 +66,12 @@ class TestG2Adversarial(unittest.TestCase):
         self.assertIn("inversée", p.stderr)
         self.assertEqual(p.stdout, "")
 
-    def test_cli_non_entier_rc2_et_negatif_accepte(self):
+    def test_cli_non_entier_et_negatif_rc2(self):
         for a in ("1.5", "abc"):
             self.assertEqual(_cli(self.d, "--exclude-window-start-range", a, "2").returncode, 2)
-        p = _cli(self.d, "--exclude-window-start-range", "-5", "10")   # G1 §10-4 : faux
-        self.assertEqual(p.returncode, 0)
-        self.assertIn("exclusion_window_start   = [-5 ; 10]", p.stdout)
+        p = _cli(self.d, "--exclude-window-start-range", "-5", "10")   # G1 §10-4 ; refusé (B-SEG-2, Q-G2-5)
+        self.assertEqual((p.returncode, p.stdout), (2, ""))
+        self.assertIn("SHOGEN-NEG-EPOCH-1", p.stderr)
 
     def test_fenetre_a_cheval_bornes_hors_grille(self):
         """[w2+30 ; w4+30] : w2 (a cheval sur la borne basse) RETENUE, w3 et w4 exclues."""
