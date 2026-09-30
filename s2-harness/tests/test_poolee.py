@@ -6,13 +6,15 @@ la fenêtre dans sa strate. Chaque test nomme la mutation qui le rougit."""
 
 from __future__ import annotations
 
+import os
+import re
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 
-from shogen_s2 import r1, records
-from tests.test_exclusion import WS, build_fixture
+from shogen_s2 import r1, records, report, window
+from tests.test_exclusion import WS, build_fixture, cli
 from tests.test_sensibilite import fixture
 
 T0 = int(datetime(2026, 8, 7, 21, 4, tzinfo=timezone.utc).timestamp())
@@ -141,6 +143,49 @@ class TestPooleeGardes(unittest.TestCase):
         po = r1.recompute_from_journal(*build_fixture(tempfile.mkdtemp(prefix="s2poolee_")),
                                        exclude_ranges=[(WS[3], WS[5])])["poolee"]
         self.assertEqual((po["z_pool"], po["motif"]), (None, seule))
+
+
+class TestPooleeRendu(unittest.TestCase):
+    """Bloc 3 (sous-lot POOLEE-b) : ligne de famille puis strate poolée, après les strates confirmatoires,
+    avant A(window-stationarity) ; chemin servi (CLI) = API."""
+    FAM = ("  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : m = 2 tests confirmatoires (calme, "
+           "stress), chacun unilatéral au seuil 2,33 ; borne P(au moins un rejet à tort) ≤ 2 × 0,01 = 0,02")
+    TETE = ("  ── strate poolée (ADR-0028 D2 pt 4 ; exploratoire, hors famille, hors décision) : forme "
+            "stratifiée, jamais l'union brute des fenêtres")
+    FORME = ("    z_pool = Σ_s (K_s − n_s·P̂_more,s) / √(Σ_s n_s·P̂_more,s·(1 − P̂_more,s)), chaque strate "
+             "sur son pool d'analyse D1")
+    LIGNE = "    « {} » : n = {} ; K = {} ; P̂_more = {} ; pool d'analyse D1 = 3 flux"
+
+    def test_bloc3_ordre_etiquette_famille_valeurs_cli(self):
+        """Fixture nominale. Rougit si : étiquette manquante ou réécrite ; famille (m, seuil, borne) fausse ;
+        poolée avant les strates ; valeur imprimée arrondie ou autre que 264/√1395 ; sommes absentes ;
+        CLI ≠ API."""
+        c, j = journal(True)
+        txt = report.render_report(c, j)
+        b3 = txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0].split("\n")
+        self.assertIn(self.FAM, b3)
+        i = b3.index(self.FAM)
+        self.assertLess(max(k for k, ln in enumerate(b3) if ln.startswith("  ── strate «")), i)
+        self.assertEqual(b3[i + 1:i + 6], ["", self.TETE, self.FORME,
+                                           self.LIGNE.format("calme", 176, 44, "0.0625"),
+                                           self.LIGNE.format("stress", 64, 49, "0.765625")])
+        self.assertEqual(b3[i + 8:i + 10], ["", "  " + r1.A_WINDOW_STATIONARITY])
+        v = [Decimal(x) for x in re.findall(r"= ([0-9.E+-]+)", b3[i + 6] + " " + b3[i + 7])]
+        self.assertEqual(v[:2], [33, Decimal("21.796875")])
+        self.assertLess(abs(v[2] - a_sur_racine(264, 1395)), E)
+        self.assertTrue(b3[i + 7].endswith(" — exploratoire, hors famille, hors décision"), b3[i + 7])
+        self.assertEqual(cli(os.path.dirname(c)), (txt + "\n").encode("utf-8"))
+
+    def test_bloc3_non_publie_motif_et_mono_strate(self):
+        """Rougit si : motif absent du rendu ; famille « m = 2 » imprimée sous un calendrier mono-strate."""
+        txt = report.render_report(*build_fixture(tempfile.mkdtemp(prefix="s2poolee_")))
+        self.assertIn(f"\n    z_pool  = non publié : {GARDE}« calme »{DEG} ; « stress »{DEG}\n", txt)
+        mono = report.render_report(*fixture(tempfile.mkdtemp(prefix="s2poolee_"), window.SINGLE_STRATE_SPEC,
+                                             [range(T0, T0 + 180, 60)], 60, lambda f, ws: False))
+        self.assertIn("\n  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : non applicable "
+                      "(calendrier mono-strate)\n", mono)
+        self.assertIn("\n    z_pool  = non publié : une seule strate au segment (« calme ») : la forme "
+                      "stratifiée somme au moins deux strates\n", mono)
 
 
 if __name__ == "__main__":

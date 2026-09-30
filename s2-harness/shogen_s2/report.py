@@ -41,6 +41,7 @@ from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
     DECIMAL_PREC,
+    ETIQUETTE_POOLEE,
     analysis_pools,
     build_window_strate,
     classify_cells,
@@ -295,6 +296,25 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         else:
             ap(f"    z       = {_fmt_dec(blk['z'])} (seuil {_fmt_dec(blk['seuil_z'])}, "
                f"unilatéral — 10 §5.1)")
+    sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6) : lot CRITERE
+    ap("\n  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : " + (
+        f"m = 2 tests confirmatoires ({sc['calme']}, {sc['stress']}), chacun unilatéral au seuil 2,33 ; "
+        "borne P(au moins un rejet à tort) ≤ 2 × 0,01 = 0,02" if sc.get("kind") == "weekend_utc"
+        else "non applicable (calendrier mono-strate)"))
+    po = r1["poolee"]                   # hors de r1["strates"] : ni z_max, ni drapeau 2, ni famille
+    ap(f"\n  ── strate poolée (ADR-0028 D2 pt 4 ; {ETIQUETTE_POOLEE}) : forme stratifiée, jamais l'union "
+       "brute des fenêtres")
+    ap("    z_pool = Σ_s (K_s − n_s·P̂_more,s) / √(Σ_s n_s·P̂_more,s·(1 − P̂_more,s)), chaque strate sur son "
+       "pool d'analyse D1")
+    for st, e in po["strates"].items():
+        ap(f"    « {st} » : n = {e['n']} ; K = {e['K']} ; P̂_more = {_fmt_dec(e['P_more'])} ; pool d'analyse "
+           f"D1 = {e['N']} flux")
+    if po["z_pool"] is None:
+        ap(f"    z_pool  = non publié : {po['motif']}")
+    else:
+        ap(f"    Σ_s (K_s − n_s·P̂_more,s) = {_fmt_dec(po['numerateur'])} ; "
+           f"Σ_s n_s·P̂_more,s·(1 − P̂_more,s) = {_fmt_dec(po['variance'])}")
+        ap(f"    z_pool  = {_fmt_dec(po['z_pool'])} — {ETIQUETTE_POOLEE}")
     ap(f"\n  {A_WINDOW_STATIONARITY}")
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
