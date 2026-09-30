@@ -510,6 +510,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                + ("stress_weekdays sans borne de week-end)" if we else "calendrier mono-strate)"))
         else:
             ex, inc = (_week_ends(build_window_strate(m), sc) for m in (markers, dans_seg[0]))
+            jrs = sorted(build_window_strate(dans_seg[0]))    # G2 C-5 : week-ends calendaires de l'assiette
+            cal = _week_ends({d * 86400: sc["stress"] for d in range(jrs[0] // 86400, jrs[-1] // 86400 + 1)
+                              if weekday_utc(d * 86400) in jours}, sc) if jrs else {}
+            inc = {k: inc.get(k, 0) for k in sorted(set(inc) | set(cal))}
             plein = {k: len(range(-(-k[0] // w) * w, k[1], w)) for k in inc}
             ap(f"  couverture par week-end (fenêtres « {sc['stress']} », stress_weekdays = {sorted(jours)} "
                f"UTC ; w = {w} s de run_params ; durée = fenêtres × w) :"
@@ -522,7 +526,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             tot = [sum(1 for k in inc if d.get(k, 0) == plein[k]) for d in (ex, inc)]
             par = [sum(1 for k in inc if 0 < d.get(k, 0) < plein[k]) for d in (ex, inc)]
             ap(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue {par[0]}, "
-               f"incluse {par[1]} ; retirés en totalité par la plage : {sum(1 for k in inc if k not in ex)}")
+               f"incluse {par[1]} ; retirés en totalité par la plage : "
+               f"{sum(1 for k in inc if inc[k] and k not in ex)}")
+            ap("    non couverts (0 fenêtre dans les deux variantes, entre la première et la dernière "
+               f"fenêtre de l'assiette) : {sum(1 for k in inc if not inc[k])}")
     ap("=" * 78)
     return "\n".join(out)
 
