@@ -41,6 +41,7 @@ from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
     analysis_pools,
+    build_window_strate,
     classify_cells,
     compute_r1,
     parse_journal,
@@ -60,6 +61,19 @@ def _iso_utc(ts) -> str:
         return "-"
     from datetime import datetime, timezone
     return datetime.fromtimestamp(float(ts), timezone.utc).isoformat()
+
+
+def _comptes(recs, strates) -> list:
+    """(marqueurs, clock_checks, asn) → fenêtres DISTINCTES par strate (dédup de n), asn, horloges."""
+    ws = build_window_strate(recs[0])
+    return [sum(1 for s in ws.values() if s == st) for st in strates] + [len(recs[2]), len(recs[1])]
+
+
+def _retires(avant, apres, strates) -> str:
+    """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1)."""
+    d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
+    fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d))
+    return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
 
 
 def render_report(control_path: str, journal_path: str, exclude_ranges=(), segment=None) -> str:
@@ -82,8 +96,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
     # Filtre de lecture unique APRÈS la garde §5.3 (ADR-0028 D5) : blocs 1-6 sur les enregistrements retenus.
-    markers, clock_checks, asn_records, seg = records.filtre_lecture(params, markers, clock_checks,
-                                                                     asn_records, ranges, segment)
+    tous = (markers, clock_checks, asn_records)      # assiette des comptes et dates du bloc 1 (avant filtre)
+    markers, clock_checks, asn_records, seg = records.filtre_lecture(params, *tous, ranges, segment)
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])
@@ -130,14 +144,32 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         sc = params["strate_calendar"]
         ap(f"  {'strate_calendar':24} = kind={sc.get('kind')} "
            f"{sc.get('note', '')}".rstrip())
-    if seg is not None:        # uniquement si segment (sans option : aucune ligne ajoutée)
+    ws_tous = build_window_strate(tous[0])          # HS2-05 : journal entier, avant segment et exclusion
+    strates, deb = sorted(set(ws_tous.values())), sorted(ws_tous)
+    ap(f"  {'campagne_fenetres':24} = {len(deb)} fenêtres distinctes au journal (window_close, avant "
+       "segment et exclusion)" + (f" : première {deb[0]} = {_iso_utc(deb[0])} ; dernière {deb[-1]} = "
+                                  f"{_iso_utc(deb[-1])} (window_start)" if deb else "") + " — HS2-05")
+    dans_seg = records.filtre_lecture(params, *tous, (), segment)[:3]   # assiette des comptes par plage
+    if seg is not None:
         ap(f"  {'segment':24} = [{seg[0]} ; {seg[1]}) = [{_iso_utc(seg[0])} ; {_iso_utc(seg[1])}) "
            "semi-ouvert, fin exclue, même borne sur window_start, ts, harness_ts (run_params conservés) ; "
            f"n fixe = {_fmt_dec(segment.get('n_fixe'))} — ADR-0028 D4, D2 pt 6")
+        ap(f"  {'segment_retraits':24} = hors segment : {_retires(tous, dans_seg, strates)} — ADR-0028 D4")
+    else:
+        ap(f"  {'segment':24} = aucun (journal entier) — ADR-0028 D4")
     for a, b in ranges:        # uniquement si filtre (sans option : aucune ligne ajoutée)
         ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
            f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
            "strates (filtre du lecteur, journal intact) — harnais dégradé, ADR-0025")
+        ap(f"  {'exclusion_ts_harness_ts':24} = [{a} ; {b + w}) = [{_iso_utc(a)} ; {_iso_utc(b + w)}) "
+           "semi-ouvert : asn_attribution (ts), clock_check (harness_ts), "
+           f"w = {w} s de run_params — ADR-0028 D5")
+        seule = records.filtre_lecture(params, *dans_seg, [(a, b)])[:3]
+        ap(f"  {'exclusion_retraits':24} = [{a} ; {b}] seule (assiette : ligne segment) : "
+           f"{_retires(dans_seg, seule, strates)}")
+    if ranges:                 # C-4 (i) : chaque plage seule, puis l'union (chevauchement compté une fois)
+        ap(f"  {'exclusion_retraits_union':24} = {len(ranges)} plage(s), union (assiette : ligne segment) : "
+           f"{_retires(dans_seg, (markers, clock_checks, asn_records), strates)} — SHOGEN-EXCL-COMPTE-1")
     for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
         cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
         ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "

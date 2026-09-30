@@ -25,8 +25,9 @@ from tests.test_collector import (BY_ID, DELTA, SKELETON, TAU, W, FakeClock, _ta
 WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
       for i in range(6)]
 PLAGE = (WS[2], WS[4])
-# (iv) sha256 du rendu SANS option sur l'arbre de BASE (capture_golden_base.py, livrables G1).
-SHA_BASE_SANS_OPTION = "a4ffc3e58ec5bc16159b4d90eabfc035094256c3ae1efcbdde598dde75f649a5"
+# (iv) sha256 du rendu SANS option, re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1
+# (P2P ligne à ligne : insertions seules, docs/G1-lot-B-SEG-2-bloc1.md) ; lot A : a4ffc3e5…f649a5.
+SHA_BASE_SANS_OPTION = "510dd28e89bbe0b3dc7c5414229d5d50c219200e82835729e4014aa4d3597e4f"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 
@@ -141,9 +142,9 @@ class TestExclusionFixture(unittest.TestCase):
         self.assertEqual(bloc1.count("harnais dégradé, ADR-0025"), 2)
 
     def test_iv_sans_option_octets_d_avant_le_lot(self):
-        """(iv) Sans option : les octets d'AVANT le lot (sha de l'arbre de base), et la CLI
-        RUNBOOK §9 e les émet telle quelle. Rougit si : une ligne est ajoutée sans filtre
-        (ex. « exclusion : aucune ») ; la CLI sans option change de sortie."""
+        """(iv) Sans option : les octets épinglés (lot A ; re-capture justifiée de B-SEG-2, HS2-05), et la
+        CLI RUNBOOK §9 e les émet telle quelle. Rougit si : une ligne du rendu sans option change sans
+        re-capture justifiée (ex. « exclusion : aucune ») ; la CLI sans option change de sortie."""
         txt = report.render_report(self.control, self.journal)
         self.assertEqual(hashlib.sha256(txt.encode("utf-8")).hexdigest(), SHA_BASE_SANS_OPTION)
         self.assertEqual(cli(self.d), (txt + "\n").encode("utf-8"))

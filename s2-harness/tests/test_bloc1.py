@@ -1,0 +1,128 @@
+"""Lot B-SEG-2 (ADR-0028 D5, D6 iv ; SHOGEN-EXCL-COMPTE-1, HS2-05), sous-lot 2a : bloc 1 du rendu. Dates de
+campagne sur le journal entier ; segment, « aucun » sans option ; par plage, bornes par type et retraits par
+strate et par type, puis l'union. Fixture de l'exclusion + poser (D5). Chaque test nomme la mutation qui le
+rougit."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+
+from shogen_s2 import collector, report, window
+from tests.test_collector import BY_ID, SKELETON, TAU, W, FakeClock, _taumap, frozen_read_fn, sbc_huge
+from tests.test_exclusion import HARNESS, WS, build_fixture, comptes_outil, poser, recompte_independant
+from tests.test_segment import HOTES, WS120, fixture_w120
+
+A, B = WS[2], WS[4]                   # plage D5 de la fixture : w2 calme, w3 et w4 stress
+H = len(HOTES)                        # poser : une sonde asn_attribution par hôte et par instant
+FEN, ASS = "fenêtres distinctes (window_close)", "seule (assiette : ligne segment) :"
+UNI, EXC = "plage(s), union (assiette : ligne segment) :", "— SHOGEN-EXCL-COMPTE-1"
+CAMP = "fenêtres distinctes au journal (window_close, avant segment et exclusion)"
+
+
+def cli(d, *args):
+    """Chemin SERVI (RUNBOOK §9 e), processus neuf : (code de retour, stdout, stderr)."""
+    p = subprocess.run([sys.executable, "-B", "-m", "shogen_s2.report", d, *map(str, args)], cwd=HARNESS,
+                       capture_output=True)
+    return p.returncode, p.stdout, p.stderr
+
+
+def ligne(txt: str, cle: str) -> list:
+    """Valeurs des lignes du bloc 1 à la clé `cle`, dans l'ordre."""
+    b1 = txt.split("[BLOC 2]")[0].splitlines()
+    return [ln.split(" = ", 1)[1] for ln in b1 if ln.startswith(f"  {cle:24} = ")]
+
+
+class TestBloc1(unittest.TestCase):
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="s2bloc1_")
+        self.c, self.j = build_fixture(self.d)
+        poser(self.d, (A - 1, A, B, B + 59, B + 60))
+
+    def test_plage_bornes_par_type_et_retraits_par_strate_et_type(self):
+        """[w2 ; w4] : ts et harness_ts sur [A ; B + w) ; retirés calme 1, stress 2, 3 × H sondes, 3 horloges,
+        égaux aux deux voies du test nommé rejouées sur fixture (C-2 du cp-1) ; CLI = API. Rougit si : strate
+        confondue ; type oublié ou interverti ; B sans + w ; ligne d'union absente."""
+        txt, iso = report.render_report(self.c, self.j, exclude_ranges=[(A, B)]), report._iso_utc
+        self.assertEqual(ligne(txt, "exclusion_ts_harness_ts"), [
+            f"[{A} ; {B + W}) = [{iso(A)} ; {iso(B + W)}) semi-ouvert : asn_attribution (ts), clock_check "
+            f"(harness_ts), w = {W} s de run_params — ADR-0028 D5"])
+        cpt = f"{FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 3"
+        self.assertEqual(ligne(txt, "exclusion_retraits"), [f"[{A} ; {B}] {ASS} {cpt}"])
+        self.assertEqual(ligne(txt, "exclusion_retraits_union"), [f"1 {UNI} {cpt} {EXC}"])
+        voie = {"window_close": 3, "asn_attribution": 3 * H, "clock_check": 3}
+        self.assertEqual([f(self.c, A, B, W) for f in (comptes_outil, recompte_independant)], [voie, voie])
+        self.assertEqual(cli(self.d, "--exclude-window-start-range", A, B)[:2], (0, f"{txt}\n".encode()))
+
+    def test_plages_chevauchantes_chaque_plage_seule_puis_union(self):
+        """[w2 ; w4] et [w1 ; w3] : chaque plage seule (ordre trié), puis l'union comptée une fois ; la somme
+        dépasse l'union (C-4 i). Rougit si : union = somme des plages ; plage comptée après une autre."""
+        txt = report.render_report(self.c, self.j, exclude_ranges=[(A, B), (WS[1], WS[3])])
+        self.assertEqual(ligne(txt, "exclusion_retraits"), [
+            f"[{WS[1]} ; {WS[3]}] {ASS} {FEN} calme 2, stress 1 ; asn_attribution {2 * H} ; clock_check 3",
+            f"[{A} ; {B}] {ASS} {FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 3"])
+        self.assertEqual(ligne(txt, "exclusion_retraits_union"), [
+            f"2 {UNI} {FEN} calme 2, stress 2 ; asn_attribution {4 * H} ; clock_check 5 {EXC}"])
+
+    def test_plage_vide_comptes_a_zero_visibles_rc0(self):
+        """Plage avant la campagne : aucun enregistrement dedans, lignes de la plage et de l'union à 0, rc 0
+        (C-4 v). Rougit si : ligne omise quand tout est à 0 ; plage vide refusée."""
+        a, b = WS[0] - 10 * W, WS[0] - W
+        rc, out, _err = cli(self.d, "--exclude-window-start-range", a, b)
+        self.assertEqual(rc, 0)
+        zero = f"{FEN} calme 0, stress 0 ; asn_attribution 0 ; clock_check 0"
+        self.assertEqual(ligne(out.decode(), "exclusion_retraits"), [f"[{a} ; {b}] {ASS} {zero}"])
+        self.assertEqual(ligne(out.decode(), "exclusion_retraits_union"), [f"1 {UNI} {zero} {EXC}"])
+
+    def test_dates_de_campagne_avant_filtre_et_retraits_du_segment(self):
+        """Segment [w1 ; w4) et plage [w3 ; w5] : dates de campagne au journal entier (6 fenêtres distinctes
+        malgré les doublons), identiques sans option ; retraits du segment ; plage comptée sur l'assiette du
+        segment. Rougit si : dates après filtre ; doublons comptés ; première et dernière inversées ; plage
+        comptée sur le journal entier ; « segment = aucun » ou segment_retraits absents ; « aucun » aussi
+        sous segment."""
+        iso = report._iso_utc
+        sans = report.render_report(self.c, self.j)
+        txt = report.render_report(self.c, self.j, segment={"t0": WS[1], "t_fin": B},
+                                   exclude_ranges=[(WS[3], WS[5])])
+        for t in (sans, txt):
+            self.assertEqual(ligne(t, "campagne_fenetres"), [
+                f"6 {CAMP} : première {WS[0]} = {iso(WS[0])} ; "
+                f"dernière {WS[5]} = {iso(WS[5])} (window_start) — HS2-05"])
+        self.assertEqual(ligne(sans, "segment"), ["aucun (journal entier) — ADR-0028 D4"])
+        self.assertEqual(len(ligne(txt, "segment")), 1)          # sous segment : [t0 ; t_fin) seule
+        self.assertEqual(ligne(txt, "segment_retraits"), [
+            f"hors segment : {FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 4 "
+            "— ADR-0028 D4"])
+        self.assertEqual(ligne(txt, "exclusion_retraits"), [
+            f"[{WS[3]} ; {WS[5]}] {ASS} {FEN} calme 0, stress 1 ; asn_attribution 0 ; clock_check 0"])
+
+    def test_bornes_ts_harness_ts_w_lu_de_run_params(self):
+        """w = 120 s (fixture du G2 de B-SEG-1) : [A ; B + 120) et les retraits sur cette borne. Rougit si :
+        + 60 codé en dur."""
+        a, b = WS120[2], WS120[3]
+        c, j = fixture_w120(tempfile.mkdtemp(prefix="s2bloc1w_"), (a - 1, a + 90, b + 60, b + 119, b + 120))
+        txt, iso = report.render_report(c, j, exclude_ranges=[(a, b)]), report._iso_utc
+        self.assertEqual(ligne(txt, "exclusion_ts_harness_ts"), [
+            f"[{a} ; {b + 120}) = [{iso(a)} ; {iso(b + 120)}) semi-ouvert : asn_attribution (ts), "
+            "clock_check (harness_ts), w = 120 s de run_params — ADR-0028 D5"])
+        self.assertEqual(ligne(txt, "exclusion_retraits"), [
+            f"[{a} ; {b}] {ASS} {FEN} calme 0, stress 2 ; asn_attribution {3 * H} ; clock_check 3"])
+
+    def test_journal_sans_fenetre_dates_de_campagne_sans_lever(self):
+        """Un démarrage sans fenêtre (0 marqueur) : la ligne sort, sans première ni dernière. Rougit si : la
+        première fenêtre est lue sur une liste vide."""
+        d = tempfile.mkdtemp(prefix="s2bloc1z_")
+        c, j, raw = (os.path.join(d, n) for n in ("control.jsonl", "journal.jsonl", "raw.jsonl"))
+        collector.collect([BY_ID[f] for f in SKELETON], c, j, raw, n_windows=0, sigma_by_class=sbc_huge(),
+                          tau_classe=_taumap(TAU), strate_spec=window.WEEKEND_STRATE_SPEC,
+                          now_fn=FakeClock([float(WS[0])]), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
+        open(j, "a", encoding="utf-8").close()
+        self.assertEqual(ligne(report.render_report(c, j), "campagne_fenetres"), [
+            f"0 {CAMP} — HS2-05"])
+
+
+if __name__ == "__main__":
+    unittest.main()

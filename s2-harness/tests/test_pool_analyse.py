@@ -23,8 +23,9 @@ from tests.test_exclusion import PLAGE, build_fixture, cli
 MORT, VIFS = SKELETON[0], SKELETON[1:]
 WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
       for i in range(64)]                                     # w0-w2 calme (ven.), w3-w63 stress
-# Épingle (CA-13 bis) : sha256 du rendu AVEC l'option [w2 ; w4] de la fixture d'exclusion, arbre ce2f107.
-SHA_BASE_AVEC_OPTION = "a4dd4c00e8fdcdbdfb5665139f0fa0ec597359bc0f1357e123a7a4c2fb537520"
+# Épingle (CA-13 bis) : sha256 du rendu AVEC l'option [w2 ; w4] de la fixture d'exclusion, arbre ce2f107,
+# re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1 (avant : a4dd4c00…537520).
+SHA_BASE_AVEC_OPTION = "c627719ed3083f3bdec71a166a51d63cf17143501aea18bc1eb539258db8539c"
 
 
 class Coupure(Exception):
@@ -173,8 +174,8 @@ class TestPoolAnalyse(unittest.TestCase):
         self.assertIn("ok = 0 / 60 lectures, n = 60 — hors R1 et L&M de la strate, cas (a)", txt)
 
     def test_epingle_sans_flux_mort_octets_de_base_avec_option(self):
-        """Épingle (CA-13 bis ; passe sur la base par construction) : sans flux mort, le rendu AVEC
-        l'option garde les octets de ce2f107 (sans option : test_exclusion iv) ; S vide, aucun retrait.
+        """Épingle (CA-13 bis ; re-captures B-SEG-2 : lignes ajoutées au bloc 1) : sans flux mort, le rendu
+        AVEC l'option garde les octets épinglés (sans option : test_exclusion iv) ; S vide, aucun retrait.
         Rougit si : ligne de retrait ou de k nominal sans retrait ; S vide lu comme « tout est mort »."""
         c, j = build_fixture(self.d)
         txt = report.render_report(c, j, exclude_ranges=[PLAGE])
