@@ -36,3 +36,17 @@ Statuts :
 | E-D10a | advisor Q10, l.159-165 | E1 et fuzz maintenant ; le reste après S2 ; ADR « passage public par export filtré » | D10 | suivi |
 | E-D10b | advisor Q10, l.174 | mécanisme du passage public (export filtré ou bascule) : investisseur | D10 le tranchait (export filtré) | tranché autrement (cp-1 C-8) : décision de l'investisseur (§4.10 b) |
 | E-§4 | advisor-marché §8, l.113-120 | sept décisions de l'investisseur | §4, points 4, 5, 7, 8 et 9, et §4.10 | suivi. PXP-20, demandé par cet avis, est livré (JOURNAL l.92), ce n'est donc pas une omission |
+
+## Amendement daté du 2026-09-30 (décisions A-1 à A-12 ; ADR §1 bis)
+
+Rédaction : 2026-09-30, rédacteur `claude-opus-5-5` (contexte frais). Statut ajouté : **non suivi (A-n)** : l'orchestrateur, sous la délégation du 2026-09-30, tranche le point autrement sur le fond, par la décision A-n de DECISIONS-orchestrateur (`c082036f…`). Les points suivis sont dans la table de traçabilité de l'ADR (§1 bis). Les avis cités sont ceux du 2026-09-30 : AVIS-advisor (`fe6e4a8e…`) et AVIS-advisor-defi (`5619e2ac…`).
+
+| id | avis (fichier, question) | recommandation de l'avis | dans ADR-0028 | statut |
+|---|---|---|---|---|
+| E-A1 | advisor, Q2 | règle à z_s seul ; z_bloc et sensibilités hors décision ; une discordance est une « fragilité déclarée » | règle à plancher d'erreur-type (§1 bis.1). Forme de l'avis suivie : renommage, z_s principal, « ≥ », valeur non arrondie, garde §5.4 dans la règle, non évaluable distinct du négatif, drapeau 2 hors règle, 2,576 offert sans recommandation. La règle de l'avis devient le repli (§1 bis.3) | non suivi sur le fond (A-1) ; suivi sur la forme (A-3, A-5) |
+| E-A2 | advisor-defi, Q1 et Q2 | l'étiquette « sensibilité » reste à z_bloc, qui entre pourtant dans la décision | z_bloc est le plancher d'erreur-type de la règle ; amendement déclaré de D2 pt 7 (§1 bis.2) | non suivi (A-1 ; CV2-34) |
+| E-A3 | advisor-defi, Q2 (texte, pt 2) | strate « non testée » dès que z_bloc n'est pas publiable | NE REJETTE PAS dès que z_s < 2,33 ; NON ÉVALUABLE réservé à la strate sous la garde §5.4 (non testée) et au rejet non qualifiable (§1 bis.1 pt 5) | non suivi (A-1 ; RECONCILIATION-Q2-advisor-defi §5 (ii) ; CV2-10) |
+| E-A4 | advisor-defi, Q2 (texte, pt 3) | « niveau ≤ 0,01 » par strate, sans qualification | niveau asymptotique, conservateur sous fenêtres iid, non démontré en échantillon fini ; mesuré par SIM-NIVEAU avant le scellement (§1 bis.1 pt 7) | non suivi (A-1 ; RECONCILIATION-Q2-advisor-defi §5 (i)) |
+| E-A5 | advisor-defi, Q4 (item 3) | bornes de censure « extérieures » à P̂_more fixé, avec la lecture « identifié sous censure arbitraire » | bornes à P̂ fixé étiquetées « non extérieures », sans lecture d'identification ; les bornes extérieures deviennent SHOGEN-CENSURE-INFO-2 (annexe D.5 amendée ; annexe B.6) | non suivi (A-6 ; CV2-24) |
+
+E-D1b (ci-dessus, « à ratifier ») : ratifié par l'orchestrateur le 2026-09-29 (CB-8, rappelé par la DEMANDE Q4), confirmé par l'avis advisor-defi Q4 (item 6), avec la limite « flux presque mort » déclarée à l'annexe D.5 (amendement du 2026-09-30) et son item PAROXYSME SHOGEN-FLUX-QUASI-MORT-1 (annexe B.6 ; C-4 du cp-1 de l'amendement).
