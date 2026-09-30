@@ -25,8 +25,9 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
       for i in range(64)]                                     # w0-w2 calme (ven.), w3-w63 stress
 # Épingle (CA-13 bis) : sha256 du rendu AVEC l'option [w2 ; w4] de la fixture d'exclusion, arbre ce2f107,
 # re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1 (avant : a4dd4c00…537520), puis de B
-# (B-a1 : section [SENSIBILITÉ], avant 677b1bfc…422114 ; P2P texte : docs/G1-lot-B-sensibilite.md).
-SHA_BASE_AVEC_OPTION = "7a4ff05c297c74aae9825a6d8f108ea24c1c4460cd46dd1807fc88cd2d663734"
+# (B-a1 : section [SENSIBILITÉ], avant 677b1bfc…422114 ; B-a2 : couverture par week-end, avant
+# 7a4ff05c…663734 ; P2P texte : docs/G1-lot-B-sensibilite.md).
+SHA_BASE_AVEC_OPTION = "30f5c0fb6d0877bd8412b13e3668267b53ff5bf17cfed428c6ed8d205d9ff0e1"
 
 
 class Coupure(Exception):

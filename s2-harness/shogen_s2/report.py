@@ -47,7 +47,7 @@ from .r1 import (
     compute_r1,
     parse_journal,
 )
-from .window import STRATE_DEFAUT, verify_markers_against_spec
+from .window import STRATE_DEFAUT, verify_markers_against_spec, weekday_utc
 
 
 def _fmt_dec(x) -> str:
@@ -75,6 +75,26 @@ def _retires(avant, apres, strates) -> str:
     d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
     fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d)) or "0 (aucune fenêtre au journal)"
     return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
+
+
+def _duree(s: int) -> str:
+    """Durée exacte de `s` secondes (fenêtres × w) : « H h MM min », puis « SS s » si non nul."""
+    return f"{s // 3600} h {s % 3600 // 60:02d} min" + (f" {s % 60:02d} s" if s % 60 else "")
+
+
+def _week_ends(ws_strate: dict, spec: dict) -> dict:
+    """{(début, fin) : fenêtres distinctes de la strate stress} ; week-end = suite maximale de jours UTC
+    dont le jour (lundi = 0) est dans `stress_weekdays` (ADR-0025 déc. 4) ; ni vide ni plein (appelant)."""
+    jours, j, out = set(spec["stress_weekdays"]), 86400, {}
+    for ws, st in ws_strate.items():
+        if st == spec["stress"]:
+            a = b = ws // j
+            while weekday_utc((a - 1) * j) in jours:
+                a -= 1
+            while weekday_utc((b + 1) * j) in jours:
+                b += 1
+            out[a * j, (b + 1) * j] = out.get((a * j, (b + 1) * j), 0) + 1
+    return out
 
 
 def _ligne_variante(st: str, nom: str, blk) -> str:
@@ -449,7 +469,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         r1_i = compute_r1(dans_seg[0], readings, pool_i, w, sigma_by_class, sigma_class_of_flux, tau,
                           seuil_hist, n_min, pools_i)
         sc = params["strate_calendar"]
-        we = sc.get("kind") == "weekend_utc"
+        we, jours = sc.get("kind") == "weekend_utc", set(sc.get("stress_weekdays", ()))
         ap("\n[SENSIBILITÉ] PLAGE D'EXCLUSION INCLUSE — ADR-0025 déc. 4 ; ADR-0028 D2 pt 7 (liste fermée), "
            "§1 bis.1 pt 9 : hors décision")
         ap("  variante « exclue » = principale (blocs 1-6) ; variante « incluse » = sensibilité — biaisée "
@@ -470,6 +490,24 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                 ap(f"  {st:8} écart de z = {_fmt_dec(dz) if dz else '0'}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
                 ap(f"  {st:8} pool d'analyse D1 : exclue {pools[st]} ; incluse {pools_i[st]} (diffèrent)")
+        if not (we and 0 < len(jours) < 7):
+            ap("  couverture par week-end : non applicable ("
+               + ("stress_weekdays sans borne de week-end)" if we else "calendrier mono-strate)"))
+        else:
+            ex, inc = (_week_ends(build_window_strate(m), sc) for m in (markers, dans_seg[0]))
+            plein = {k: len(range(-(-k[0] // w) * w, k[1], w)) for k in inc}
+            ap(f"  couverture par week-end (fenêtres « {sc['stress']} », stress_weekdays = {sorted(jours)} "
+               f"UTC ; w = {w} s de run_params ; durée = fenêtres × w) :"
+               + ("" if inc else " aucun week-end"))
+            for (a, b), n_i in sorted(inc.items()):
+                n_e = ex.get((a, b), 0)
+                ap(f"    week-end {_iso_utc(a)[:10]} [{a} ; {b}) : complet = {plein[a, b]} fenêtres = "
+                   f"{_duree(plein[a, b] * w)} ; exclue {n_e} = {_duree(n_e * w)} ; incluse {n_i} = "
+                   f"{_duree(n_i * w)} ; retirées par la plage {n_i - n_e}")
+            tot = [sum(1 for k in inc if d.get(k, 0) == plein[k]) for d in (ex, inc)]
+            par = [sum(1 for k in inc if 0 < d.get(k, 0) < plein[k]) for d in (ex, inc)]
+            ap(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue {par[0]}, "
+               f"incluse {par[1]} ; retirés en totalité par la plage : {sum(1 for k in inc if k not in ex)}")
     ap("=" * 78)
     return "\n".join(out)
 

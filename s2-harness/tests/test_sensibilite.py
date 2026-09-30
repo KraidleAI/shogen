@@ -1,26 +1,28 @@
 """Lot B d'ADR-0028 (ADR-0025 déc. 4 ; D2 pt 7, §1 bis.1 pt 9) : section [SENSIBILITÉ], variante « plage
-incluse » (R1 seul, pool D1 de la variante). Oracle hors du doré (C-4 du cp-1 de B) : cellules =
-r1.recompute_from_journal avec et sans plages (même segment), écart recalculé ici en Decimal. Fixture :
+incluse » (R1 seul, pool D1 de la variante), couverture par week-end. Oracle hors du doré (C-4 du cp-1
+de B) : cellules = r1.recompute_from_journal avec et sans plages (même segment), écart recalculé ici en
+Decimal, week-ends recomptés en bibliothèque standard depuis control.jsonl (B-a2). Fixture :
 collecteur réel à w = 3600 s, statuts scriptés ; blocs ven. 08-07 22:00Z → lun. 08-10 01:00Z, ven. 08-14
 23:00Z → sam. 08-15 05:00Z, sam. 08-22 00:00Z → 02:00Z, puis reprise de sam. 08-08 00:00Z et 01:00Z.
 Chaque test nomme la mutation qui le rougit."""
 
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import localcontext
 
 from shogen_s2 import collector, r1, report, window
 from shogen_s2.model import Reading, Status
 from tests.test_collector import BY_ID, DELTA, SKELETON, TAU, FakeClock, _taumap, frozen_reading, sbc_huge
-from tests.test_exclusion import HARNESS
+from tests.test_exclusion import HARNESS, PLAGE, build_fixture
 
-H = 3600                                            # w de la fixture (run_params)
+H, PLEIN = 3600, 2 * 86400 // 3600       # w de la fixture (run_params) ; fenêtres d'un week-end complet
 
 
 def t(jour: int, heure: int) -> int:
@@ -66,9 +68,10 @@ def section(txt: str) -> list:
 
 def cellule(blk) -> str:
     """Ligne attendue, écrite depuis une sortie de r1.recompute_from_journal, jamais depuis le rendu."""
+    q = (f"queue exacte P(K ≥ K_obs | Bin(n, P̂_more)) = {blk['queue_binomiale_P_K_ge_Kobs']}"
+         if blk["queue_exacte_applicable"] else "queue dégénérée (P̂_more ∈ {0,1})")
     z = f"z = {blk['z']}" if blk["z"] is not None else (
-        "z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) ; queue exacte P(K ≥ K_obs | "
-        f"Bin(n, P̂_more)) = {blk['queue_binomiale_P_K_ge_Kobs']}")
+        f"z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) ; {q}")
     return (f"n = {blk['n']} ; K = {blk['K']} ; P̂_more = {blk['P_more']} ; {z} ; "
             f"drapeau 1 = {blk['flag_historique_insuffisant']}")
 
@@ -96,6 +99,38 @@ class TestSensibilite(unittest.TestCase):
                 dz = +(i["z"] - e["z"])
             self.assertIn(f"  {st:8} écart de z = {dz if dz else 0}", sens)
         return ex, inc
+
+    def recompte(self, ranges, segment=None) -> dict:
+        """{samedi : (exclue, incluse)} : window_close distincts de sam. et dim. (datetime.weekday), plages
+        fermées sur window_start, segment [t0 ; n-ième fenêtre distincte ≥ t0, + w) ; incluse sans plages."""
+        with open(self.c, encoding="utf-8") as f:
+            ws = {o["window_start"] for o in map(json.loads, f) if o.get("record") == "window_close"}
+        if segment:
+            fin = sorted(x for x in ws if x >= segment["t0"])[segment["n_fixe"] - 1] + H
+            ws = {x for x in ws if segment["t0"] <= x < fin}
+        out: dict = {}
+        for x in ws:
+            dt = datetime.fromtimestamp(x, timezone.utc)
+            if dt.weekday() >= 5:
+                sam = (dt - timedelta(days=dt.weekday() - 5)).date()
+                e, i = out.get(sam, (0, 0))
+                out[sam] = (e + (not any(a <= x <= b for a, b in ranges)), i + 1)
+        return out
+
+    def week_ends(self, txt, ranges, segment=None) -> list:
+        rc, sens = self.recompte(ranges, segment), section(txt)
+        for sam, (e, i) in rc.items():
+            a = int(datetime(sam.year, sam.month, sam.day, tzinfo=timezone.utc).timestamp())
+            self.assertIn(f"    week-end {sam} [{a} ; {a + 2 * 86400}) : complet = {PLEIN} fenêtres = "
+                          f"{PLEIN} h 00 min ; exclue {e} = {e} h 00 min ; incluse {i} = {i} h 00 min ; "
+                          f"retirées par la plage {i - e}", sens)
+        self.assertEqual(sum(ln.startswith("    week-end ") for ln in sens), len(rc))
+        tot, par = ([sum(f(v[k]) for v in rc.values()) for k in (0, 1)]
+                    for f in (lambda n: n == PLEIN, lambda n: 0 < n < PLEIN))
+        self.assertIn(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue "
+                      f"{par[0]}, incluse {par[1]} ; retirés en totalité par la plage : "
+                      f"{sum(not v[0] for v in rc.values())}", sens)
+        return sorted(rc.values())
 
     def test_table_cellules_ecart_pools_etiquettes(self):
         """C-3, C-4, C-5 : stress, z publié dans les deux variantes ; calme sous la garde, queue exacte ;
@@ -129,16 +164,43 @@ class TestSensibilite(unittest.TestCase):
         txt = report.render_report(self.c, self.j, exclude_ranges=[RA, RB], segment=SEG)
         self.assertEqual((p.returncode, p.stdout), (0, f"{txt}\n".encode()))
         self.table(self.c, self.j, txt, [RA, RB], SEG)
+        self.assertEqual(self.week_ends(txt, [RA, RB], SEG), [(0, 1), (1, 6), (PLEIN, PLEIN)])
 
     def test_plage_sans_effet_variantes_egales_ecart_0(self):
-        """C-5 (iv) : une plage hors campagne ne retire rien : lignes exclue et incluse égales, écart 0.
-        Rougit si : écart imprimé « 0E-49 » ou non nul ; table omise quand la plage ne retire rien."""
+        """C-5 (iv) : une plage hors campagne ne retire rien : lignes exclue et incluse égales, écart 0,
+        retirées 0 (B-a2). Rougit si : écart imprimé « 0E-49 » ou non nul ; table omise quand la plage ne
+        retire rien."""
         txt = report.render_report(self.c, self.j, exclude_ranges=[(t(1, 0), t(1, 5))])
         sens = section(txt)
         for st in ("calme", "stress"):
             self.assertEqual(*[[ln.split(" : ", 1)[1] for ln in sens if ln.startswith(f"  {st:8} {v}")]
                                for v in ("exclue", "incluse")])
         self.assertIn("  stress   écart de z = 0", sens)
+        self.assertEqual(self.week_ends(txt, [(t(1, 0), t(1, 5))]), [(3, 3), (6, 6), (PLEIN, PLEIN)])
+
+    def test_couverture_week_ends_recomptee(self):
+        """ADR-0025 déc. 4, C-2 : 08-08 complet, 08-15 partiel (5 retirées), 08-22 retiré en totalité ;
+        heures = fenêtres × w, w = 3600 s de run_params. Rougit si : complet codé 2880 ou durée à w = 60 ;
+        doublons de la reprise comptés ; borne de week-end fausse ; variantes inversées ; catégories
+        fausses."""
+        txt = report.render_report(self.c, self.j, exclude_ranges=[RA, RB])
+        self.assertEqual(self.week_ends(txt, [RA, RB]), [(0, 3), (1, 6), (PLEIN, PLEIN)])
+
+    def test_mono_strate_sans_week_end_ni_exception(self):
+        """C-2 : calendrier mono-strate : table de sa seule strate, couverture « non applicable », jamais une
+        exception. Rougit si : strates d'un calendrier weekend_utc supposées ; week-ends cherchés sur une
+        spec single."""
+        c, j = fixture(tempfile.mkdtemp(prefix="s2sens1_"), spec=window.SINGLE_STRATE_SPEC)
+        txt = report.render_report(c, j, exclude_ranges=[RA, RB])
+        self.table(c, j, txt, [RA, RB], strates=("calme",))
+        self.assertEqual(sum("(principale)" in ln for ln in section(txt)), 1)
+        self.assertIn("  couverture par week-end : non applicable (calendrier mono-strate)", section(txt))
+
+    def test_queue_degeneree_fixture_d_exclusion(self):
+        """Garde §5.4 à P̂_more = 0 dans les deux variantes (fixture de test_exclusion, [w2 ; w4]) : « queue
+        dégénérée », jamais une queue vide. Rougit si : branche dégénérée imprimée comme une queue exacte."""
+        c, j = build_fixture(tempfile.mkdtemp(prefix="s2sens0_"))
+        self.table(c, j, report.render_report(c, j, exclude_ranges=[PLAGE]), [PLAGE])
 
 
 if __name__ == "__main__":
