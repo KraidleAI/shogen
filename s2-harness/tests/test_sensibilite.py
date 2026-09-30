@@ -165,6 +165,8 @@ class TestSensibilite(unittest.TestCase):
         self.assertEqual((p.returncode, p.stdout), (0, f"{txt}\n".encode()))
         self.table(self.c, self.j, txt, [RA, RB], SEG)
         self.assertEqual(self.week_ends(txt, [RA, RB], SEG), [(0, 1), (1, 6), (PLEIN, PLEIN)])
+        for x in ("\n  définition d'écart (10 §5.2 ; r1.classify_ecart)", "\n  date de la partition, axe"):
+            self.assertEqual(txt.count(x), 1)                                  # blocs 3 et 6 (B-b)
 
     def test_plage_sans_effet_variantes_egales_ecart_0(self):
         """C-5 (iv) : une plage hors campagne ne retire rien : lignes exclue et incluse égales, écart 0,

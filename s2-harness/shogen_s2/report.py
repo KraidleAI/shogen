@@ -251,6 +251,14 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # ── Bloc 3 : R1 ────────────────────────────────────────────────────────
     ap("\n[BLOC 3] R1 (test K&L §5 transposé — 10 §5.1/§5.2/§5.4)")
+    ap("  définition d'écart (10 §5.2 ; r1.classify_ecart), par fenêtre et par flux du pool d'analyse, "
+       "précédence panne > staleness > hors-enveloppe : panne = lecture absente, statut ≠ ok ou prix "
+       "absent ; staleness = win_end − source_ts > σ_classe de la classe du flux (σ_classe ou source_ts "
+       "absent : non évaluée) ; hors-enveloppe = |p − médiane_LOO|/médiane_LOO > τ_classe, N ≥ n_min "
+       "répondantes ; N < n_min, médiane_LOO ≤ 0 ou τ_classe absent : non évaluable (pas un écart) ; sinon "
+       "pas d'écart ; K = fenêtres à ≥ 2 écarts — HS2-06")
+    ap(f"  paramètres (run_params, bloc 1) : σ_classe = {params['sigma_classe']} ; τ_classe = "
+       f"{params['tau_classe']} ; n_min = {n_min}")
     if r1.get("note"):
         ap(f"  {r1['note']}")
         ap(f"  drapeau « historique insuffisant » = {r1['flag_historique_insuffisant']}")
@@ -433,6 +441,13 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            f"— {part['k_eff_note']}")
     else:
         ap(f"  k_eff     = {_fmt_dec(part['k_eff'])}  — {part['k_eff_note']}")
+    hs = [h for h in part["hosts"] if h in part["attribution_by_host"]]      # hôtes du pool, relevé retenu
+    ts = sorted(part["attribution_by_host"][h]["ts"] for h in hs)
+    ap("  date de la partition, axe ASN (ADR-0026 déc. 1 ; HS2-07) = " + (
+        f"relevé asn_attribution retenu (dernier par hôte, après filtre de lecture) : min {ts[0]} = "
+        f"{_iso_utc(ts[0])} ; max {ts[-1]} = {_iso_utc(ts[-1])} ; {len(hs)} / {len(part['hosts'])} hôtes "
+        "du pool" if ts else "non mesurée (aucun hôte du pool n'a de relevé asn_attribution retenu)")
+       + " — descriptif seulement (ADR-0028 annexe D.5)")
     ap("  R3 (déclaration : entité légale, juridiction, méthodologie annoncée) ne "
        "modifie JAMAIS k_eff (§5.6 / 04 §3) — seuls les recouvrements R2 measured partitionnent.")
     ap("  PARTITION NOMMÉE (ADR-0007 : nomme l'amont, jamais un compte anonyme) :")

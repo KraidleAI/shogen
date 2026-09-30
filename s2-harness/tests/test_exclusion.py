@@ -26,8 +26,9 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
       for i in range(6)]
 PLAGE = (WS[2], WS[4])
 # (iv) sha256 du rendu SANS option, re-capturé à chaque sous-lot de B-SEG-2 qui ajoute une ligne au bloc 1
-# (P2P ligne à ligne : insertions seules, docs/G1-lot-B-SEG-2-bloc1.md) ; lot A : a4ffc3e5…f649a5.
-SHA_BASE_SANS_OPTION = "b054a0f4fe74fc1b7c65afdc480b9fbca56172dc1a3ba5b9ef18d2f8669ac01e"
+# (P2P ligne à ligne : insertions seules, docs/G1-lot-B-SEG-2-bloc1.md) ; lot A : a4ffc3e5…f649a5 ; puis au
+# sous-lot B-b (blocs 3 et 6 ; avant b054a0f4…69ac01e ; P2P texte : docs/G1-lot-B-sensibilite.md).
+SHA_BASE_SANS_OPTION = "9518d21b412eda7205e79869c867fb73cf319e69eb5001a030be7bf2c4b62a92"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 
