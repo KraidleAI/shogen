@@ -13,7 +13,7 @@ import unittest
 from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 
-from shogen_s2 import r1, records, report, window
+from shogen_s2 import r1, r2, records, report, window
 from tests.test_exclusion import WS, build_fixture, cli
 from tests.test_sensibilite import fixture
 
@@ -186,6 +186,66 @@ class TestPooleeRendu(unittest.TestCase):
                       "(calendrier mono-strate)\n", mono)
         self.assertIn("\n    z_pool  = non publié : une seule strate au segment (« calme ») : la forme "
                       "stratifiée somme au moins deux strates\n", mono)
+
+
+class TestPooleeG2(unittest.TestCase):
+    """Revue G2 du lot (C-1 à C-3) : garde côté r2 (z_max, drapeau 2), signe, D1 cas (b). A = coinbase en
+    écart pour j < a, B = kraken pour j ∈ [a − K ; 2a − K) : K co-écarts exacts, p̂ = 1/2, P̂_more = 1/4
+    (a = 88 en calme, 32 en stress) ; bitstamp jamais, sauf `mort` : en panne sur tout le stress (D1 cas b).
+    Valeurs à la main au rapport G2 (recalcul en fractions exactes depuis les octets du journal)."""
+
+    @staticmethod
+    def jour(kc: int, ks: int, mort: bool = False) -> tuple:
+        def en_panne(f, ws):
+            st = ws >= SAM
+            j, a, k = (ws - (SAM if st else T0)) // 60, 32 if st else 88, ks if st else kc
+            return j < a if f == "coinbase" else (a - k <= j < 2 * a - k if f == "kraken" else st and mort)
+        return fixture(tempfile.mkdtemp(prefix="s2poolee_"), blocs=[range(T0, SAM + 64 * 60, 60)], w=60,
+                       en_panne=en_panne)
+
+    def test_g2_poolee_franchit_strates_non_drapeau2_zmax(self):
+        """Kc = 56, Ks = 23 : z_calme = 12/√33 = 2,08… et z_stress = 7/√12 = 2,02… < 2,33 ≤ z_pool = 19/√45
+        = 2,83…. Rougit si : z_pool entre dans z_max ou dans les entrées de r2.drapeau_2 (ADR-0028 §1 bis.1
+        pt 9)."""
+        c, j = self.jour(56, 23)
+        out = r1.recompute_from_journal(c, j)
+        zc, zs, zp = out["strates"]["calme"]["z"], out["strates"]["stress"]["z"], out["poolee"]["z_pool"]
+        self.assertLess(abs(zc - a_sur_racine(12, 33)) + abs(zs - a_sur_racine(7, 12)), E)
+        self.assertLess(abs(zp - a_sur_racine(19, 45)), E)
+        self.assertTrue(max(zc, zs) < r1.SEUIL_Z <= zp)
+        self.assertEqual(r2.recompute_r2_from_journal(c, j)["drapeau_2"]["z_max"], zc)
+        d2 = r2.drapeau_2(out, {"k_eff": 3, "k_nominal": 3, "clusters": []}, {"strates": {}})
+        self.assertEqual((d2["etat"], d2["z_max"]), ("eteint", zc))
+
+    def test_g2_numerateur_negatif_signe_conserve(self):
+        """Kc = 30, Ks = 10 : numérateurs −14 et −6 ; z_pool = −20/√45 = −2,98…, imprimé avec son signe.
+        Rougit si : signe perdu (valeur absolue du numérateur) dans z_pool_stratifie ou au rendu."""
+        c, j = self.jour(30, 10)
+        po = r1.recompute_from_journal(c, j)["poolee"]
+        self.assertEqual((po["numerateur"], po["variance"]), (-20, 45))
+        self.assertLess(abs(po["z_pool"] + a_sur_racine(20, 45)), E)
+        z = [x for x in report.render_report(c, j).split("\n") if x.startswith("    z_pool  = ")]
+        self.assertEqual(len(z), 1)
+        v = z[0].split(" = ")[1].split(" ")[0]
+        self.assertTrue(v.startswith("-"), z)
+        self.assertLess(abs(Decimal(v) + a_sur_racine(20, 45)), E)
+
+    def test_g2_cas_b_pools_distincts_par_strate(self):
+        """D1 cas (b) : bitstamp sans lecture ok en stress seulement : pool de 3 flux en calme, de 2 en
+        stress ; numérateur et variance = Σ des (n, K, P̂_more) de chaque strate sur SON pool (19 ; 45).
+        Rougit si : pool ou taille du pool d'une strate recopiés sur l'autre (entrée de r1 ou rendu)."""
+        c, j = self.jour(56, 23, mort=True)
+        out = r1.recompute_from_journal(c, j)
+        po = out["poolee"]
+        pools = {"calme": ["coinbase", "kraken", "bitstamp"], "stress": ["coinbase", "kraken"]}
+        self.assertEqual({st: list(b["per_source"]) for st, b in out["strates"].items()}, pools)
+        self.assertEqual({st: (e["pool"], e["N"]) for st, e in po["strates"].items()},
+                         {st: (p, len(p)) for st, p in pools.items()})
+        self.assertEqual((po["numerateur"], po["variance"]), (19, 45))
+        txt = report.render_report(c, j)
+        for st, n, k in (("calme", 176, 56), ("stress", 64, 23)):
+            self.assertIn(f"\n    « {st} » : n = {n} ; K = {k} ; P̂_more = 0.25 ; pool d'analyse D1 = "
+                          f"{len(pools[st])} flux\n", txt)
 
 
 if __name__ == "__main__":
