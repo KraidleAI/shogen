@@ -72,7 +72,7 @@ def _comptes(recs, strates) -> list:
 def _retires(avant, apres, strates) -> str:
     """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1)."""
     d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
-    fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d))
+    fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d)) or "0 (aucune fenêtre au journal)"
     return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
 
 

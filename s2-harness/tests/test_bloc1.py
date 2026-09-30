@@ -13,7 +13,8 @@ import tempfile
 import unittest
 
 from shogen_s2 import collector, records, report, window
-from tests.test_collector import BY_ID, SKELETON, TAU, W, FakeClock, _taumap, frozen_read_fn, sbc_huge
+from tests.test_collector import (BY_ID, DELTA, SKELETON, TAU, W, FakeClock, _taumap, frozen_read_fn,
+                                  sbc_huge)
 from tests.test_exclusion import HARNESS, WS, build_fixture, comptes_outil, poser, recompte_independant
 from tests.test_segment import HOTES, POINTS, WS120, fixture_w120
 
@@ -83,7 +84,8 @@ class TestBloc1(unittest.TestCase):
         malgré les doublons), identiques sans option ; retraits du segment ; plage comptée sur l'assiette du
         segment ; (e) : started_utc = dernier démarrage (B + w, hors segment), portée déclarée. Rougit si :
         dates après filtre ; doublons comptés ; première et dernière inversées ; plage comptée sur le journal
-        entier ; « segment = aucun », portée ou segment_retraits absents ; « aucun » aussi sous segment."""
+        entier ; « segment = aucun », portée ou segment_retraits absents ; « aucun » aussi sous segment ;
+        union comptée hors de l'assiette du segment (G2 de B-SEG-2)."""
         iso = report._iso_utc
         sans = report.render_report(self.c, self.j)
         txt = report.render_report(self.c, self.j, segment={"t0": WS[1], "t_fin": B},
@@ -103,6 +105,8 @@ class TestBloc1(unittest.TestCase):
             "— ADR-0028 D4"])
         self.assertEqual(ligne(txt, "exclusion_retraits"), [
             f"[{WS[3]} ; {WS[5]}] {ASS} {FEN} calme 0, stress 1 ; asn_attribution 0 ; clock_check 0"])
+        self.assertEqual(ligne(txt, "exclusion_retraits_union"), [
+            f"1 {UNI} {FEN} calme 0, stress 1 ; asn_attribution 0 ; clock_check 0 {EXC}"])
 
     def test_bornes_ts_harness_ts_w_lu_de_run_params(self):
         """w = 120 s (fixture du G2 de B-SEG-1) : [A ; B + 120) et les retraits sur cette borne. Rougit si :
@@ -118,7 +122,8 @@ class TestBloc1(unittest.TestCase):
 
     def test_journal_sans_fenetre_dates_de_campagne_sans_lever(self):
         """Un démarrage sans fenêtre (0 marqueur) : la ligne sort, sans première ni dernière. Rougit si : la
-        première fenêtre est lue sur une liste vide."""
+        première fenêtre est lue sur une liste vide ; sous plage, compte de fenêtres vide au lieu d'un 0
+        visible (G2 de B-SEG-2)."""
         d = tempfile.mkdtemp(prefix="s2bloc1z_")
         c, j, raw = (os.path.join(d, n) for n in ("control.jsonl", "journal.jsonl", "raw.jsonl"))
         collector.collect([BY_ID[f] for f in SKELETON], c, j, raw, n_windows=0, sigma_by_class=sbc_huge(),
@@ -127,6 +132,24 @@ class TestBloc1(unittest.TestCase):
         open(j, "a", encoding="utf-8").close()
         self.assertEqual(ligne(report.render_report(c, j), "campagne_fenetres"), [
             f"0 {CAMP} — HS2-05"])
+        txt = report.render_report(c, j, exclude_ranges=[(WS[0] - W, WS[0] + W)])
+        self.assertEqual(ligne(txt, "exclusion_retraits_union"), [
+            f"1 {UNI} {FEN} 0 (aucune fenêtre au journal) ; asn_attribution 0 ; clock_check 1 {EXC}"])
+
+    def test_premiere_et_derniere_fenetre_hors_ordre_du_journal(self):
+        """Premières occurrences écrites hors ordre (w3-w5, puis w0-w2 ; collecteur réel, horloge scriptée) :
+        première = min, dernière = max des window_start (G2 de B-SEG-2). Rougit si : ordre d'écriture lu."""
+        paths = [os.path.join(tempfile.mkdtemp(prefix="s2bloc1o_"), n)
+                 for n in ("control.jsonl", "journal.jsonl", "raw.jsonl")]
+        for wins in (WS[3:6], WS[0:3]):
+            clock = [float(wins[0])] + [t for b in wins for t in (b + 1.0, b + W - DELTA)]
+            collector.collect([BY_ID[f] for f in SKELETON], *paths, n_windows=len(wins),
+                              sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU),
+                              strate_spec=window.WEEKEND_STRATE_SPEC,
+                              now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=frozen_read_fn)
+        self.assertEqual(ligne(report.render_report(*paths[:2]), "campagne_fenetres"), [
+            f"6 {CAMP} : première {WS[0]} = {report._iso_utc(WS[0])} ; dernière {WS[5]} = "
+            f"{report._iso_utc(WS[5])} (window_start) — HS2-05"])
 
     def test_epoch_negatif_rc2_cli_et_valueerror_api(self):
         """SHOGEN-NEG-EPOCH-1 (Q-G2-5), étendu au segment ((d), G2 de B-SEG-1) : CLI rc 2, message sur stderr,
@@ -147,6 +170,18 @@ class TestBloc1(unittest.TestCase):
         for r in ((-0.5, 10), (0, -0.5)):         # int() tronquerait -0,5 en 0 : contrôle avant
             with self.assertRaises(ValueError, msg=r):
                 records.exclusion_ranges([r])
+
+    def test_epoch_zero_accepte_t0_fractionnaire_refuse(self):
+        """Bord de SHOGEN-NEG-EPOCH-1 (G2 de B-SEG-2) : 0 n'est pas négatif, accepté à la CLI et à l'API ;
+        t0 = -0,5 refusé aux quatre points. Rougit si : <= au lieu de < (CLI, plage, segment) ; t0 tronqué."""
+        for args in (("--exclude-window-start-range", 0, 5), ("--segment-from", 0, "--segment-to", B)):
+            self.assertEqual(cli(self.d, *args)[0], 0, args)
+        self.assertEqual(records.exclusion_ranges([(0, 0)]), [(0, 0)])
+        for f in POINTS:
+            f(self.c, self.j, segment={"t0": 0, "t_fin": B})
+            for seg in ({"t0": -0.5, "t_fin": B}, {"t0": -0.5, "n_fixe": 2}):
+                with self.assertRaisesRegex(ValueError, "SHOGEN-NEG-EPOCH-1", msg=(f.__qualname__, seg)):
+                    f(self.c, self.j, segment=seg)
 
     def test_bloc5_sondes_toutes_retirees_message_vrai(self):
         """(c), G2 de B-SEG-1 : [w0 ; w5 − 1] retire toutes les sondes ; le bloc 5 le dit, avec ses deux
