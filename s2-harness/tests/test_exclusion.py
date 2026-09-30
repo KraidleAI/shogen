@@ -16,6 +16,7 @@ import tempfile
 import unittest
 from collections import Counter
 from datetime import datetime, timezone
+from itertools import count
 
 from shogen_s2 import collector, lm, r1, r2, records, report, window
 from tests.test_collector import (BY_ID, DELTA, SKELETON, TAU, W, FakeClock, _taumap,
@@ -51,6 +52,22 @@ def cli(d: str, *ranges, seed: str = "0") -> bytes:
         args += ["--exclude-window-start-range", str(a), str(b)]
     return subprocess.run(args, cwd=HARNESS, env=dict(os.environ, PYTHONHASHSEED=seed),
                           capture_output=True, check=True).stdout
+
+
+def poser(d: str, instants) -> None:
+    """Sur chaque instant t : démarrage sans fenêtre du collecteur réel (run_params, clock_check à
+    harness_ts = t) et sonde ASN datée t (r2.collect_asn), un AS distinct par appel et par hôte."""
+    c, j, raw = (os.path.join(d, n) for n in ("control.jsonl", "journal.jsonl", "raw.jsonl"))
+    specs, asn = [BY_ID[f] for f in SKELETON], count(64512)
+
+    def resolve(host, resolvers):
+        a = next(asn)
+        return {"status": "ok", "asn_ripestat": a, "asn_cymru": a}
+    for t in map(float, instants):
+        collector.collect(specs, c, j, raw, n_windows=0, sigma_by_class=sbc_huge(), tau_classe=_taumap(TAU),
+                          strate_spec=window.WEEKEND_STRATE_SPEC, now_fn=FakeClock([t]),
+                          sleep_fn=lambda s: None, read_fn=frozen_read_fn)
+        r2.collect_asn(specs, c, resolve_fn=resolve, now_fn=lambda t=t: t)
 
 
 class TestExclusionFixture(unittest.TestCase):
@@ -124,6 +141,52 @@ class TestExclusionFixture(unittest.TestCase):
         txt = report.render_report(self.control, self.journal)
         self.assertEqual(hashlib.sha256(txt.encode("utf-8")).hexdigest(), SHA_BASE_SANS_OPTION)
         self.assertEqual(cli(self.d), (txt + "\n").encode("utf-8"))
+
+
+A, B = PLAGE                                   # D5 : clock_check et asn posés sur A − 1, A, B, B + 59, B + 60
+
+
+class TestExclusionTousTypes(unittest.TestCase):
+    """ADR-0028 D5 (SHOGEN-EXCL-TOUS-TYPES-1) : la plage [A ; B] retire aussi clock_check (harness_ts) et
+    asn_attribution (ts) de [A ; B + w) ; window_start reste fermé [A ; B] (tests (i) et à cheval du G2)."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp(prefix="s2d5_")
+        self.control, self.journal = build_fixture(self.d)
+        poser(self.d, (A - 1, A, B, B + 59, B + 60))
+
+    def test_d5_bornes_par_type_aux_points_d_entree_et_cli(self):
+        """Gardés : A − 1, B + 60 (et les démarrages w0, w1) ; retirés : A, B, B + 59. Rougit si : borne
+        ±1 ; ts ou harness_ts fermé sans + w ; asn ou clock_check non filtré (outil, r2, rendu) ;
+        run_params filtré ; type sans règle accepté."""
+        c, j = self.control, self.journal
+        self.assertEqual(TestExclusionFixture._n(self, [PLAGE]), {"calme": 2, "stress": 1})
+        txt = report.render_report(c, j, exclude_ranges=[PLAGE])
+        bloc1 = txt.split("[BLOC 2]")[0]
+        horloges = records.parse_control(c)[1]
+        self.assertEqual(len({h["median_offset"] for h in horloges}), 7)      # lignes discernables
+        for h in horloges:
+            self.assertEqual(f"médiane_offset(s)={h['median_offset']} sources" in bloc1,
+                             h["harness_ts"] in (WS[0], WS[1], A - 1, B + 60), h["harness_ts"])
+        self.assertIn(f"{'run_params_demarrages':24} = 7 ", bloc1)            # run_params conservés
+        hotes = sorted(set(r2.build_flux_hosts([BY_ID[f] for f in SKELETON]).values()))
+        part = r2.recompute_r2_from_journal(c, j, exclude_ranges=[PLAGE])["partition"]
+        self.assertEqual([(v["host"], v["avant"][2], v["apres"][2]) for v in part["asn_divergences"]],
+                         [(h, A - 1, B + 60) for h in hotes])
+        self.assertEqual(txt.count("DIVERGENCE ASN"), len(hotes))
+        self.assertEqual(cli(self.d, PLAGE), (txt + "\n").encode("utf-8"))
+        with self.assertRaises(ValueError):                 # type sans règle d'horodatage : fail-closed
+            records.exclude_window_start_ranges([{"record": "autre", "window_start": A}], [PLAGE])
+
+    def test_type_vide_rendu_sans_asn_ni_horloge(self):
+        """C-15 : [WS[0] ; WS[5] − 1] retire tout clock_check et tout asn (t < WS[5] + 59) mais garde w5
+        (fermée sur window_start) : le rendu sort, axe ASN NON MESURÉ, aucune ligne controle_horloge.
+        Rougit si : asn ou clock_check non filtré ; window_start traité en [A ; B + w) (w5 retirée)."""
+        rg = [(WS[0], WS[5] - 1)]
+        txt = report.render_report(self.control, self.journal, exclude_ranges=rg)
+        self.assertEqual((txt.count("controle_horloge"), txt.count("axe ASN NON MESURÉ")), (0, 2))
+        self.assertEqual(txt.count("strate « stress » : n = 1 fenêtres complétées"), 1)
+        self.assertEqual(cli(self.d, *rg), (txt + "\n").encode("utf-8"))
 
 
 class TestExclusionJournalReel(unittest.TestCase):

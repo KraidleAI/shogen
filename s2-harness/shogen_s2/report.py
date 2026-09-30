@@ -81,8 +81,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=()) -> st
         raise ValueError(
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
-    # Filtre d'analyse APRÈS la garde §5.3 : blocs 2-6 sur les fenêtres retenues.
-    markers = records.exclude_window_start_ranges(markers, ranges)
+    # Filtre de lecture unique APRÈS la garde §5.3 (ADR-0028 D5) : blocs 1-6 sur les enregistrements retenus.
+    markers, clock_checks, asn_records = records.filtre_lecture(params, markers, clock_checks,
+                                                                asn_records, ranges)
     readings = parse_journal(journal_path)
     pool = list(params["pool"])
     w = int(params["w"])

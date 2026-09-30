@@ -541,8 +541,8 @@ def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=
             "strates journalées incohérentes avec le calendrier committé "
             f"(fail-closed, §5.3) : {div[:5]}{' …' if len(div) > 5 else ''}"
         )
-    # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
-    markers = records.exclude_window_start_ranges(markers, exclude_ranges)
+    # Filtre de lecture unique (ADR-0025 amendée par ADR-0028 D5) APRÈS la garde §5.3 ; journal intact.
+    markers, _clock, _asn = records.filtre_lecture(params, markers, ranges=exclude_ranges)
     readings = parse_journal(journal_path)
     pools, pool, _retraits = analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     # σ PAR CLASSE + τ RELATIF depuis run_params (ADR-0021 ; effective_run_params a

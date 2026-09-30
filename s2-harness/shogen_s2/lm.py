@@ -222,8 +222,8 @@ def recompute_lm_from_journal(control_path: str, journal_path: str, exclude_rang
         raise ValueError(
             f"strates journalées incohérentes avec le calendrier committé (§5.3) : {div[:5]}"
         )
-    # Filtre ADR-0025 (plages FERMÉES, défaut aucune) APRÈS la garde §5.3 ; journal intact.
-    markers = records.exclude_window_start_ranges(markers, exclude_ranges)
+    # Filtre de lecture unique (ADR-0025 amendée par ADR-0028 D5) APRÈS la garde §5.3 ; journal intact.
+    markers, _clock, _asn = records.filtre_lecture(params, markers, ranges=exclude_ranges)
     readings = r1.parse_journal(journal_path)
     pools, pool, _retraits = r1.analysis_pools(markers, readings, list(params["pool"]))  # ADR-0028 D1
     sigma_by_class, sigma_class_of_flux, tau = records.sigma_tau_from_params(params)

@@ -291,10 +291,44 @@ def exclusion_ranges(ranges=()) -> list:
     return out
 
 
+# Champ d'horodatage de chaque type de control.jsonl (ADR-0028 D4, D5 ; HS2-08) ; run_params n'en a pas.
+HORODATAGE = {"window_close": "window_start", "asn_attribution": "ts", "clock_check": "harness_ts",
+              "run_params": None}
+
+
+def filtre_horodatage(recs: list, ranges=(), w=None) -> list:
+    """UN SEUL outil de lecture par horodatage, pour tous les types (ADR-0028 D5 ; HS2-08) : filtre
+    d'ANALYSE, jamais une excision du journal. Exclusion d'ADR-0025 déc. 1 amendée par D5 : `window_start`
+    dans la plage FERMÉE [A ; B] ; `ts` et `harness_ts` dans [A ; B + w), durée de la dernière fenêtre
+    (w de run_params) ; run_params conservé ; type sans règle : ValueError. Sans plage : inchangé."""
+    rs = exclusion_ranges(ranges)
+    if not rs:
+        return list(recs)
+    out = []
+    for r in recs:
+        if r.get("record") not in HORODATAGE:
+            raise ValueError(f"type {r.get('record')!r} sans champ d'horodatage connu — fail-closed")
+        champ = HORODATAGE[r["record"]]
+        if champ == "window_start":
+            dedans = any(a <= int(r[champ]) <= b for a, b in rs)
+        else:
+            dedans = champ is not None and any(a <= r[champ] < b + w for a, b in rs)
+        if not dedans:
+            out.append(r)
+    return out
+
+
+def filtre_lecture(params: dict, markers: list, clock_checks=(), asn=(), ranges=()) -> tuple:
+    """Point d'application UNIQUE (ADR-0028 D5) des quatre points d'entrée, APRÈS `effective_run_params`
+    (run_params conservés) et la garde §5.3 sur TOUS les marqueurs ; w = run_params. Rend (marqueurs,
+    clock_checks, asn) filtrés ; journal.jsonl n'est jamais filtré : les lectures d'un marqueur retiré
+    deviennent orphelines (hors n, K, P̂_more)."""
+    return tuple(filtre_horodatage(list(x), ranges, params["w"]) for x in (markers, clock_checks, asn))
+
+
 def exclude_window_start_ranges(markers: list, ranges=()) -> list:
-    """Filtre d'ANALYSE (ADR-0025 déc. 2), jamais une excision du journal : retire les
-    marqueurs `window_close` dont le `window_start` ∈ `[from, to]` (bornes incluses), à
+    """Cas `window_close` de `filtre_horodatage` (ADR-0025 déc. 2 ; ADR-0028 D5), jamais une excision
+    du journal : retire les marqueurs dont le `window_start` ∈ `[from, to]` (bornes incluses), à
     appeler APRÈS `verify_markers_against_spec` ; leurs lectures deviennent orphelines,
     donc hors n, K, P̂_more de toutes les strates (RUNBOOK §6). Sans plage : inchangé."""
-    rs = exclusion_ranges(ranges)
-    return [m for m in markers if not any(a <= int(m["window_start"]) <= b for a, b in rs)]
+    return filtre_horodatage(markers, ranges)
