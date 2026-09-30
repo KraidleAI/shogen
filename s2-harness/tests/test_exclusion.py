@@ -204,6 +204,35 @@ class TestExclusionTousTypes(unittest.TestCase):
         self.assertEqual(cli(self.d, *rg), (txt + "\n").encode("utf-8"))
 
 
+CLES = ("record", "window_start", "ts", "harness_ts")   # seules clés lues et affichées (ADR-0028 D.4 a pt 2)
+
+
+def _proj(objs) -> list:
+    return [{k: o[k] for k in CLES if k in o} for o in objs]
+
+
+def comptes_outil(path: str, a: int, b: int, w: int) -> dict:
+    """Retirés par l'outil (filtre_lecture) des listes de parse_control et parse_asn, projetées sur CLES."""
+    _p, clocks, markers = records.parse_control(path)
+    m, c, s = _proj(markers), _proj(clocks), _proj(records.parse_asn(path))
+    m2, c2, s2 = records.filtre_lecture({"w": w}, m, c, s, ranges=[(a, b)])[:3]
+    fen = lambda ms: len({x["window_start"] for x in ms})
+    return {"window_close": fen(m) - fen(m2), "asn_attribution": len(s) - len(s2),
+            "clock_check": len(c) - len(c2)}
+
+
+def recompte_independant(path: str, a: int, b: int, w: int) -> dict:
+    """Recompte en bibliothèque standard, sans records : chaque ligne projetée sur CLES dès son décodage."""
+    with open(path, encoding="utf-8") as f:
+        objs = _proj(json.loads(ln) for ln in f if ln.strip())
+    champ = {"asn_attribution": "ts", "clock_check": "harness_ts"}
+    out = Counter(o["record"] for o in objs
+                  if o.get("record") in champ and a <= o[champ[o["record"]]] < b + w)
+    out["window_close"] = len({o["window_start"] for o in objs
+                               if o.get("record") == "window_close" and a <= o["window_start"] <= b})
+    return dict(out)
+
+
 class TestExclusionJournalReel(unittest.TestCase):
     def test_ii_plage_adr0025_retire_2618_fenetres(self):
         """(ii) control.jsonl RÉEL scellé (copie ; n = marqueurs) via SHOGEN_S2_CAMPAGNE_CONTROL,
@@ -227,6 +256,28 @@ class TestExclusionJournalReel(unittest.TestCase):
         self.assertEqual(avant, Counter(calme=26294, stress=12306))       # 38 600
         self.assertEqual(apres, Counter(calme=24585, stress=11397))       # 35 982
         self.assertEqual(avant - apres, Counter(calme=1709, stress=909))  # 2 618
+
+    def test_ii_plage_adr0025_comptes_par_type(self):
+        """(ii bis) Comptes par type de la plage ADR-0025 sur le control.jsonl RÉEL scellé (copie, via
+        SHOGEN_S2_CAMPAGNE_CONTROL, sinon SkipTest ; ADR-0028 annexe D.4 a pt 2). Attendus :
+        docs/adr-0028/ADR-0028-decisions-sortie-S2.md l.56-57 (D5 : asn_attribution 5 313, clock_check
+        483 sur [1790273880 ; 1790435340)) ; window_close 2 618 fenêtres distinctes sur [A ; B] (ADR-0025
+        l.3 et l.44 ; test (ii)). Lignes brutes pour asn et clock_check ; repère de rejeu : 5 313 = 11 × 483.
+        Outil ET recompte indépendant ; aucune autre clé que record, window_start, ts, harness_ts n'est lue
+        ni affichée ; w = 60 s (ADR-0028 l.35), jamais lu de run_params. Divergence au rejeu : escalade,
+        jamais le test ajusté à l'outil."""
+        path = os.environ.get("SHOGEN_S2_CAMPAGNE_CONTROL")
+        if not path:
+            raise unittest.SkipTest("SHOGEN_S2_CAMPAGNE_CONTROL absente : copie du control.jsonl scellé non"
+                                    " fournie, test de comptes par type NON exécuté")
+        with open(path, "rb") as f:
+            self.assertEqual(hashlib.sha256(f.read()).hexdigest(), SHA_CONTROL_SCELLE)
+        a, b = (int(datetime(2026, 9, d, h, m, tzinfo=timezone.utc).timestamp())
+                for d, h, m in ((24, 18, 18), (26, 15, 8)))
+        self.assertEqual((a, b, b + 60), (1790273880, 1790435280, 1790435340))   # D5 l.57
+        attendu = {"window_close": 2618, "asn_attribution": 5313, "clock_check": 483}
+        self.assertEqual(recompte_independant(path, a, b, 60), attendu)
+        self.assertEqual(comptes_outil(path, a, b, 60), attendu)
 
 
 if __name__ == "__main__":
