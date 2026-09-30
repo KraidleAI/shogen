@@ -1,0 +1,201 @@
+{
+ "oracle": "(4a) et (4b) SHOGEN-SIM-NIVEAU-1 : r1 ; recalcul indépendant ; invariants",
+ "commit_r1": "f5b82693b8f1a99d6cc2fb53a5e3edd35b4e0a78",
+ "blob_r1": "1d6a908cb2872ae261e09f1870bbaba5afca174c",
+ "sha256_r1": "992f841c018185b3031bbbdcc44a68fd6147c85f9b2e306af1e886a806ca07b9",
+ "p": "0.02",
+ "script_sha256": {
+  "sim_niveau.py": "4fe7ea29248744dac59a3cebad665ab1977e8fa602f96b233b28d80519ffff88",
+  "sim_niveau_calc.py": "815ffd6d98603929ead4d3f4b6ee520a82f3e1340e4b8a728b4512e53e8eacbf",
+  "sim_niveau_oracle_r1.py": "cb844d5b724223def91cd2d3397b4deebef9f6a7353d9aa41e30b3361ca2c11d"
+ },
+ "comparaison": "Decimal : == et str() identiques ; booléen : == ; (4b) (i) : type, == et str() identiques",
+ "constantes": 3,
+ "egalites_total": 1363,
+ "cas": [
+  {
+   "L": 1,
+   "n": 10000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 1,
+   "n": 25000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 5,
+   "n": 10000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 5,
+   "n": 25000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 20,
+   "n": 10000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 20,
+   "n": 25000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 60,
+   "n": 10000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  },
+  {
+   "L": 60,
+   "n": 25000,
+   "replications": 10,
+   "egalites": 170,
+   "egalites_4b": 200
+  }
+ ],
+ "oracle_4b": {
+  "champs": [
+   "e",
+   "runs",
+   "K",
+   "phats",
+   "P0",
+   "P1",
+   "P_more",
+   "garde",
+   "tenue",
+   "z",
+   "N",
+   "z_bloc",
+   "valeur",
+   "ok2",
+   "ok2b",
+   "FIV",
+   "R_centrage",
+   "FIV_serie",
+   "runs_I",
+   "rmax"
+  ],
+  "fixtures": [
+   {
+    "p": "0.02",
+    "L": 60,
+    "n": 5000,
+    "r": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9,
+     10,
+     11,
+     12,
+     13,
+     14,
+     15,
+     16,
+     17,
+     18,
+     19
+    ],
+    "egalites_4b": 400
+   },
+   {
+    "p": "0.003",
+    "L": 1,
+    "n": 10000,
+    "r": [
+     0,
+     1,
+     2,
+     3,
+     4,
+     5,
+     6,
+     7,
+     8,
+     9
+    ],
+    "egalites_4b": 200
+   },
+   {
+    "p": "0.02",
+    "L": 1,
+    "n": 10000,
+    "r": [
+     1056,
+     1292
+    ],
+    "egalites_4b": 40
+   },
+   {
+    "p": "0.02",
+    "L": 1,
+    "n": 25000,
+    "r": [
+     358
+    ],
+    "egalites_4b": 20
+   },
+   {
+    "p": "0.02",
+    "L": 60,
+    "n": 10000,
+    "r": [
+     174
+    ],
+    "egalites_4b": 20
+   }
+  ],
+  "egalites_total": 2280,
+  "json": [
+   {
+    "json": "F:/tmp/shogen-lots/SIM-NIVEAU/sortie/sim_niveau.json",
+    "sha256": "d17c51219751d24738127e6f8a99de06e3f7f00c0e29f659c2028e4d54d9350e",
+    "cas": 8,
+    "invariants": 64
+   },
+   {
+    "json": "F:/tmp/shogen-lots/SIM-NIVEAU/sortie/execution-B/sim_niveau.json",
+    "sha256": "d17c51219751d24738127e6f8a99de06e3f7f00c0e29f659c2028e4d54d9350e",
+    "cas": 8,
+    "invariants": 64
+   },
+   {
+    "json": "F:/tmp/shogen-lots/SIM-NIVEAU/sortie/oracle-1b/processus-1/sim_niveau.json",
+    "sha256": "3a5b91ce114bb85ae4039406078690aa8cefc13f0c57e0858dedc465d88c69df",
+    "cas": 8,
+    "invariants": 64
+   },
+   {
+    "json": "F:/tmp/shogen-lots/SIM-NIVEAU/sortie/oracle-1b/processus-12/sim_niveau.json",
+    "sha256": "3a5b91ce114bb85ae4039406078690aa8cefc13f0c57e0858dedc465d88c69df",
+    "cas": 8,
+    "invariants": 64
+   }
+  ]
+ },
+ "oracle_4": "absente à f5b8269 : r1.block_long_run_variance ; oracle (4) non exécutable, item SHOGEN-SIM-NIVEAU-ORACLE4-1, déclencheur : commit de B-DEP-1"
+}

@@ -1,0 +1,757 @@
+{
+ "schema": "shogen.sim-niveau.v1",
+ "item": "SHOGEN-SIM-NIVEAU-1",
+ "script_sha256": {
+  "sim_niveau.py": "4fe7ea29248744dac59a3cebad665ab1977e8fa602f96b233b28d80519ffff88",
+  "sim_niveau_calc.py": "815ffd6d98603929ead4d3f4b6ee520a82f3e1340e4b8a728b4512e53e8eacbf"
+ },
+ "parametres": {
+  "N": 11,
+  "p": "0.02",
+  "R": 100000,
+  "cas": [
+   [
+    1,
+    10000
+   ],
+   [
+    1,
+    25000
+   ],
+   [
+    5,
+    10000
+   ],
+   [
+    5,
+    25000
+   ],
+   [
+    20,
+    10000
+   ],
+   [
+    20,
+    25000
+   ],
+   [
+    60,
+    10000
+   ],
+   [
+    60,
+    25000
+   ]
+  ],
+  "ell": 240,
+  "seuil_z": "2.33",
+  "comparaison": "≥, Decimal non arrondi",
+  "garde_seuil": "10",
+  "garde_blocs_n_min": 7200,
+  "graine": 20260930,
+  "chaine_graine": "SHOGEN-SIM-NIVEAU-1|{g}|p={p!r}|L={L}|n={n}|r={r}",
+  "chaine_effective_r0": "SHOGEN-SIM-NIVEAU-1|20260930|p=0.02|L=1|n=10000|r=0",
+  "derivation": "entier big-endian des 8 premiers octets de sha256(chaîne ASCII) -> random.Random ; 11·n appels à random() par réplication, flux i = 1..11 puis t = 1..n",
+  "decimal_prec": 50
+ },
+ "alpha_nominal": 0.009903075559164254,
+ "consequence_predeclaree": "Conséquence pré-déclarée (ADR-0028 §1 bis.1 pt 7 ; C-6 du cp-1 de l'amendement) : cette sortie ne modifie ni ℓ, ni le seuil, ni la règle ; elle est imprimée avec l'erreur-type de Monte-Carlo de chaque cas ; tout changement de ℓ après sa lecture est un nouvel amendement daté, sous le veto §4.10 a. Ni p, ni R, ni la graine, ni les cas, ni les définitions des taux ne changent après la lecture d'une sortie (G0 §1). Niveau sous un modèle nul synthétique : rien n'est établi sur des sources réelles (doc 09).",
+ "cas": [
+  {
+   "L": 1,
+   "n": 10000,
+   "a": 0.02,
+   "b": 0.02,
+   "rho": 0.0,
+   "rho_puissance_ell": 0.0,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 265,
+    "z_bloc ≥ 2,33": 208,
+    "REJETTE": 159,
+    "NE REJETTE PAS (z < 2,33)": 99735,
+    "NE REJETTE PAS (discordance)": 106,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 216,
+    "z_bloc ≤ −2,33": 598,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 265,
+     "r": 0.00265,
+     "SE": 0.0001625723685009233,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 208,
+     "r": 0.00208,
+     "SE": 0.00014407198200899437,
+     "borne95_si_x_nul": null
+    },
+    "regle": {
+     "x": 159,
+     "r": 0.00159,
+     "SE": 0.00012599491656412176,
+     "borne95_si_x_nul": null
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.0021694877805890174,
+    "z_sd": 0.8279820113686048,
+    "z_bloc_moyenne": -0.026575315858828667,
+    "z_bloc_sd": 0.8546535852851971,
+    "FIV_mediane": 0.9606475090313156,
+    "FIV_serie_mediane": 0.9629120129007414,
+    "R_centrage_mediane": 0.9994861047669581,
+    "runs_I_moyen": 191.25701,
+    "run_I_longueur_moyenne": 1.019903845615907,
+    "run_I_max_moyen": 2.04715,
+    "K_sur_n_moyen": 0.019506376
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.019506376,
+      "theorie": 0.019512631734943733,
+      "SE": 4.3633069856152115e-06,
+      "ecart_en_SE": -1.4337141448809738
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.01999826772727273,
+      "theorie": 0.02,
+      "SE": 1.330793831927159e-06,
+      "ecart_en_SE": -1.3016837662702319
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 1.0203832435942177,
+      "theorie": 1.0204060808039168,
+      "SE": 9.774777945864982e-06,
+      "ecart_en_SE": -2.3363405108092516,
+      "limite_n_infini": 1.0204081632653061
+     }
+    ]
+   },
+   "empreinte_sha256": "1813c6af274675bd6acb1c5f525edda3f94b9eced6b63ad395d8379d60e1e176"
+  },
+  {
+   "L": 1,
+   "n": 25000,
+   "a": 0.02,
+   "b": 0.02,
+   "rho": 0.0,
+   "rho_puissance_ell": 0.0,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 257,
+    "z_bloc ≥ 2,33": 206,
+    "REJETTE": 181,
+    "NE REJETTE PAS (z < 2,33)": 99743,
+    "NE REJETTE PAS (discordance)": 76,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 241,
+    "z_bloc ≤ −2,33": 408,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 257,
+     "r": 0.00257,
+     "SE": 0.00016010606172159753,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 206,
+     "r": 0.00206,
+     "SE": 0.00014337909192068418,
+     "borne95_si_x_nul": null
+    },
+    "regle": {
+     "x": 181,
+     "r": 0.00181,
+     "SE": 0.0001344144300289221,
+     "borne95_si_x_nul": null
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.0010604714102112763,
+    "z_sd": 0.8302455692670427,
+    "z_bloc_moyenne": -0.016616565834363547,
+    "z_bloc_sd": 0.8412764815445715,
+    "FIV_mediane": 0.9835994226613065,
+    "FIV_serie_mediane": 0.9843465510238263,
+    "R_centrage_mediane": 0.9998387308873273,
+    "runs_I_moyen": 478.27672,
+    "run_I_longueur_moyenne": 1.0198663443205014,
+    "run_I_max_moyen": 2.1702,
+    "K_sur_n_moyen": 0.0195111332
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.0195111332,
+      "theorie": 0.019512631734943733,
+      "SE": 2.767476826977505e-06,
+      "ecart_en_SE": -0.5414805750589962
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.01999969410909091,
+      "theorie": 0.02,
+      "SE": 8.421240186653062e-07,
+      "ecart_en_SE": -0.36323736446431387
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 1.0204079346449966,
+      "theorie": 1.0204073302797303,
+      "SE": 6.215184290883303e-06,
+      "ecart_en_SE": 0.09724012000148383,
+      "limite_n_infini": 1.0204081632653061
+     }
+    ]
+   },
+   "empreinte_sha256": "c0600a2a1a2dcf0f8b566355661157eee1aa790ea785edb7bb7950dcde36cdc1"
+  },
+  {
+   "L": 5,
+   "n": 10000,
+   "a": 0.8,
+   "b": 0.004081632653061224,
+   "rho": 0.7959183673469388,
+   "rho_puissance_ell": 1.6160190629703196e-24,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 8374,
+    "z_bloc ≥ 2,33": 6,
+    "REJETTE": 6,
+    "NE REJETTE PAS (z < 2,33)": 91626,
+    "NE REJETTE PAS (discordance)": 8368,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 7962,
+    "z_bloc ≤ −2,33": 666,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 8374,
+     "r": 0.08374,
+     "SE": 0.0008759429912956664,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 6,
+     "r": 6e-05,
+     "SE": 2.4494162569885914e-05,
+     "borne95_si_x_nul": null
+    },
+    "regle": {
+     "x": 6,
+     "r": 6e-05,
+     "SE": 2.4494162569885914e-05,
+     "borne95_si_x_nul": null
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.0022061311112272744,
+    "z_sd": 1.6703004177768321,
+    "z_bloc_moyenne": -0.07469889962349967,
+    "z_bloc_sd": 0.7663595522712923,
+    "FIV_mediane": 5.113312892118884,
+    "FIV_serie_mediane": 5.1239238798154325,
+    "R_centrage_mediane": 0.9980298181401169,
+    "runs_I_moyen": 65.03383,
+    "run_I_longueur_moyenne": 2.999564688101562,
+    "run_I_max_moyen": 12.69842,
+    "K_sur_n_moyen": 0.019507318
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.019507318,
+      "theorie": 0.019512631734943733,
+      "SE": 1.0293563233555252e-05,
+      "ecart_en_SE": -0.5162191967124001
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.019998951909090908,
+      "theorie": 0.02,
+      "SE": 3.969802395952543e-06,
+      "ecart_en_SE": -0.26401588909346413
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 4.997277045476786,
+      "theorie": 4.998000799680128,
+      "SE": 0.0006753761071429298,
+      "ecart_en_SE": -1.0716313409473288,
+      "limite_n_infini": 5.0
+     }
+    ]
+   },
+   "empreinte_sha256": "f847ae32405cc516105ee46d6fa1b422ab9e3a014fec7a029c4083591bbdfdb9"
+  },
+  {
+   "L": 5,
+   "n": 25000,
+   "a": 0.8,
+   "b": 0.004081632653061224,
+   "rho": 0.7959183673469388,
+   "rho_puissance_ell": 1.6160190629703196e-24,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 8205,
+    "z_bloc ≥ 2,33": 7,
+    "REJETTE": 7,
+    "NE REJETTE PAS (z < 2,33)": 91795,
+    "NE REJETTE PAS (discordance)": 8198,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 8107,
+    "z_bloc ≤ −2,33": 283,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 8205,
+     "r": 0.08205,
+     "SE": 0.0008678582689587051,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 7,
+     "r": 7e-05,
+     "SE": 2.6456587081481237e-05,
+     "borne95_si_x_nul": null
+    },
+    "regle": {
+     "x": 7,
+     "r": 7e-05,
+     "SE": 2.6456587081481237e-05,
+     "borne95_si_x_nul": null
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.011321922556967616,
+    "z_sd": 1.6731599047705705,
+    "z_bloc_moyenne": -0.049883364280197975,
+    "z_bloc_sd": 0.7354659052107898,
+    "FIV_mediane": 5.3308372583962615,
+    "FIV_serie_mediane": 5.334675817534806,
+    "R_centrage_mediane": 0.9988080541023849,
+    "runs_I_moyen": 162.65149,
+    "run_I_longueur_moyenne": 2.9985649070906146,
+    "run_I_max_moyen": 15.14872,
+    "K_sur_n_moyen": 0.019508842
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.019508842,
+      "theorie": 0.019512631734943733,
+      "SE": 6.541764243470882e-06,
+      "ecart_en_SE": -0.5793138980080673
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.020003178836363638,
+      "theorie": 0.02,
+      "SE": 2.5125338874888336e-06,
+      "ecart_en_SE": 1.2651914385977452
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 4.9995026558045526,
+      "theorie": 4.999200127979523,
+      "SE": 0.0004263845782060573,
+      "ecart_en_SE": 0.7095186845226015,
+      "limite_n_infini": 5.0
+     }
+    ]
+   },
+   "empreinte_sha256": "dca42d7652565cc90eaaa25bc4991b3341ecd046c7dd3579616f17cb57e234b0"
+  },
+  {
+   "L": 20,
+   "n": 10000,
+   "a": 0.95,
+   "b": 0.001020408163265306,
+   "rho": 0.9489795918367346,
+   "rho_puissance_ell": 3.4805629007972696e-06,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 24234,
+    "z_bloc ≥ 2,33": 0,
+    "REJETTE": 0,
+    "NE REJETTE PAS (z < 2,33)": 75766,
+    "NE REJETTE PAS (discordance)": 24234,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 25888,
+    "z_bloc ≤ −2,33": 2828,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 24234,
+     "r": 0.24234,
+     "SE": 0.0013550325619703758,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    },
+    "regle": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.01935632188988409,
+    "z_sd": 3.4456352957420013,
+    "z_bloc_moyenne": -0.18916596254176346,
+    "z_bloc_sd": 0.9377098997972388,
+    "FIV_mediane": 19.52949464839586,
+    "FIV_serie_mediane": 19.614573238924514,
+    "R_centrage_mediane": 0.9891404350802431,
+    "runs_I_moyen": 17.82725,
+    "run_I_longueur_moyenne": 10.932475283624788,
+    "run_I_max_moyen": 37.82215,
+    "K_sur_n_moyen": 0.019489597
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.019489597,
+      "theorie": 0.019512631734943733,
+      "SE": 2.133472597623965e-05,
+      "ecart_en_SE": -1.0796827186524987
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.02000303909090909,
+      "theorie": 0.02,
+      "SE": 8.237925300013564e-06,
+      "ecart_en_SE": 0.36891459905373264
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 19.957065269642477,
+      "theorie": 19.962072063080146,
+      "SE": 0.00585849708244502,
+      "ecart_en_SE": -0.8546207956084912,
+      "limite_n_infini": 20.0
+     }
+    ]
+   },
+   "empreinte_sha256": "874f45e283f17e6f8945afce917c8fcc410169c20cbe210a35f321b63938eb08"
+  },
+  {
+   "L": 20,
+   "n": 25000,
+   "a": 0.95,
+   "b": 0.001020408163265306,
+   "rho": 0.9489795918367346,
+   "rho_puissance_ell": 3.4805629007972696e-06,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 24627,
+    "z_bloc ≥ 2,33": 3,
+    "REJETTE": 3,
+    "NE REJETTE PAS (z < 2,33)": 75373,
+    "NE REJETTE PAS (discordance)": 24624,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 25453,
+    "z_bloc ≤ −2,33": 1095,
+    "run maximal de I ≥ ℓ": 0
+   },
+   "taux": {
+    "z": {
+     "x": 24627,
+     "r": 0.24627,
+     "SE": 0.0013624282993978068,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 3,
+     "r": 3e-05,
+     "SE": 1.732024826611905e-05,
+     "borne95_si_x_nul": null
+    },
+    "regle": {
+     "x": 3,
+     "r": 3e-05,
+     "SE": 1.732024826611905e-05,
+     "borne95_si_x_nul": null
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": 0.0036429479678999296,
+    "z_sd": 3.456169044123951,
+    "z_bloc_moyenne": -0.09952691439302344,
+    "z_bloc_sd": 0.7953132186560078,
+    "FIV_mediane": 21.23969830604549,
+    "FIV_serie_mediane": 21.24670690810866,
+    "R_centrage_mediane": 0.9959807307299082,
+    "runs_I_moyen": 44.5066,
+    "run_I_longueur_moyenne": 10.955709040906292,
+    "run_I_max_moyen": 48.21254,
+    "K_sur_n_moyen": 0.0195040544
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.0195040544,
+      "theorie": 0.019512631734943733,
+      "SE": 1.3523490738208973e-05,
+      "ecart_en_SE": -0.6342545064564916
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.01999362658181818,
+      "theorie": 0.02,
+      "SE": 5.241437718710886e-06,
+      "ecart_en_SE": -1.2159675500994114
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 19.982644120609496,
+      "theorie": 19.98481154322715,
+      "SE": 0.003712983264231642,
+      "ecart_en_SE": -0.5837415531958843,
+      "limite_n_infini": 20.0
+     }
+    ]
+   },
+   "empreinte_sha256": "97780efae62be713d8344a9b88d8627755fb2a758b4c27c9920119cfb8e304f8"
+  },
+  {
+   "L": 60,
+   "n": 10000,
+   "a": 0.9833333333333333,
+   "b": 0.00034013605442176874,
+   "rho": 0.9829931972789115,
+   "rho_puissance_ell": 0.01629757403752203,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 437,
+    "z_bloc non publiée": 437,
+    "z ≥ 2,33": 32717,
+    "z_bloc ≥ 2,33": 0,
+    "REJETTE": 0,
+    "NE REJETTE PAS (z < 2,33)": 67283,
+    "NE REJETTE PAS (discordance)": 32717,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 37939,
+    "z_bloc ≤ −2,33": 8855,
+    "run maximal de I ≥ ℓ": 489
+   },
+   "taux": {
+    "z": {
+     "x": 32717,
+     "r": 0.32717,
+     "SE": 0.0014836771586163886,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    },
+    "regle": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": -0.01374855276370302,
+    "z_sd": 5.964474233035371,
+    "z_bloc_moyenne": -0.6404155102326365,
+    "z_bloc_sd": 3.3576054118840792,
+    "FIV_mediane": 45.57802182827196,
+    "FIV_serie_mediane": 46.41156905806219,
+    "R_centrage_mediane": 0.9655076329295686,
+    "runs_I_moyen": 6.063,
+    "run_I_longueur_moyenne": 32.118749793831434,
+    "run_I_max_moyen": 76.9062,
+    "K_sur_n_moyen": 0.019473598
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.019473598,
+      "theorie": 0.019512631734943733,
+      "SE": 3.726326919174254e-05,
+      "ecart_en_SE": -1.0475123570849088
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.01998855918181818,
+      "theorie": 0.02,
+      "SE": 1.4308539437159905e-05,
+      "ecart_en_SE": -0.7995797357280631
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 59.648434634558164,
+      "theorie": 59.648076349537725,
+      "SE": 0.03075848400628957,
+      "ecart_en_SE": 0.011648331574673501,
+      "limite_n_infini": 60.0
+     }
+    ]
+   },
+   "empreinte_sha256": "535cb024b92778e07a8a21407ca5c83c6f6f833344fd9e538bfe2d6827d7dbde"
+  },
+  {
+   "L": 60,
+   "n": 25000,
+   "a": 0.9833333333333333,
+   "b": 0.00034013605442176874,
+   "rho": 0.9829931972789115,
+   "rho_puissance_ell": 0.01629757403752203,
+   "P_more_theorique": 0.019512631734943733,
+   "comptes": {
+    "R": 100000,
+    "garde non tenue": 0,
+    "σ̂² = 0": 0,
+    "z_bloc non publiée": 0,
+    "z ≥ 2,33": 33730,
+    "z_bloc ≥ 2,33": 0,
+    "REJETTE": 0,
+    "NE REJETTE PAS (z < 2,33)": 66270,
+    "NE REJETTE PAS (discordance)": 33730,
+    "NON ÉVALUABLE (garde §5.4)": 0,
+    "NON ÉVALUABLE (rejet non qualifiable)": 0,
+    "z ≤ −2,33": 36551,
+    "z_bloc ≤ −2,33": 3519,
+    "run maximal de I ≥ ℓ": 1237
+   },
+   "taux": {
+    "z": {
+     "x": 33730,
+     "r": 0.3373,
+     "SE": 0.0014950876562931019,
+     "borne95_si_x_nul": null
+    },
+    "z_bloc": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    },
+    "regle": {
+     "x": 0,
+     "r": 0.0,
+     "SE": 0.0,
+     "borne95_si_x_nul": 2.995687401941005e-05
+    }
+   },
+   "diagnostics": {
+    "z_moyenne": 0.005462511425877093,
+    "z_sd": 6.000125734159398,
+    "z_bloc_moyenne": -0.21164868281767,
+    "z_bloc_sd": 1.0305799416336558,
+    "FIV_mediane": 53.96855629145536,
+    "FIV_serie_mediane": 54.301854680385375,
+    "R_centrage_mediane": 0.9880038806813796,
+    "runs_I_moyen": 15.15869,
+    "run_I_longueur_moyenne": 32.192673641323886,
+    "run_I_max_moyen": 108.49126,
+    "K_sur_n_moyen": 0.0195199504
+   },
+   "oracles": {
+    "(2) n²γ̂₀ = n·K(n − K)": "100000/100000",
+    "(2b) N_lag = N_bloc": "100000/100000",
+    "(5)": [
+     {
+      "controle": "K/n contre P_more(p)",
+      "moyenne": 0.0195199504,
+      "theorie": 0.019512631734943733,
+      "SE": 2.3489720547616407e-05,
+      "ecart_en_SE": 0.31156884312141675
+     },
+     {
+      "controle": "p̄ = Σe/(11n) contre p",
+      "moyenne": 0.020004897854545456,
+      "theorie": 0.02,
+      "SE": 9.05415337542138e-06,
+      "ecart_en_SE": 0.5409511350615396
+     },
+     {
+      "controle": "run d'écart moyen Σe/Σruns contre L_n = nL/(n + L − 1), L = 1 : n/(1 + (n − 1)(1 − p))",
+      "moyenne": 59.85684562020447,
+      "theorie": 59.85873338920148,
+      "SE": 0.019459480802156648,
+      "ecart_en_SE": -0.09701024483685886,
+      "limite_n_infini": 60.0
+     }
+    ]
+   },
+   "empreinte_sha256": "81708ee3d0f40fcf863949560480c724df43e98df1d249b9bb776f5e651ebec6"
+  }
+ ]
+}
