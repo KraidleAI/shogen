@@ -10,6 +10,7 @@
 # un .claude/agents/ du dépôt, que Claude Code chargerait comme agent. B, l'identifiant
 # banni, est construit à l'exécution. Chaque cas vérifie la sortie ET le jeton ; un cas
 # « 0 » exige le message OK et son compte de fichiers. Un seul résumé fait foi.
+# Lot D8c (ADR-0028 D8) : cas T-77 à T-92, table du G0 de D8c §7.4 (docs/adr-0028/G0-lot-D8c.md) ; T-93 à T-95 (revue G2).
 # Usage : run-fixtures-model-pinning.sh [lint]   Sortie : 0 tout passe, 1 un cas échoue,
 # 3 erreur fatale.
 
@@ -132,6 +133,27 @@ arbre D; ins 10 "'model': opus"; cas T-73 2 R-1/cle-model
 arbre D; md .claude/skills/s/SKILL.md '# c' '  name: s' '  "model": opus'; cas T-74 2 R-1/cle-model
 arbre D; md sub/.claude/skills/s/SKILL.md 'name: s' "model: $B"; cas T-75 2 R-1/ban
 arbre D; md sub/.claude/commands/c.md 'description: c' 'model: opus'; cas T-76 2 R-1/tier-nu
+# Lot D8c (2026-09-30, G0 de D8c §7.4) : formes imbriquées, CH-12 (T-77 à T-84, T-92) ; lecture JSON à
+# jetons et garde de résidu, CH-13 (T-85 à T-91). Barres obliques inverses écrites en octal par printf.
+arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 '    - model: opus'; cas T-77 2 R-1/tier-nu
+arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 '    - model: claude-opus-5-5'; cas T-78 0 1
+arbre D; ins 12 'hooks: {Stop: [{type: prompt, model: opus}]}'; cas T-79 2 R-1/cle-model
+arbre D; ins 12 'hooks:'; ins 13 '  s:'; ins 14 '    "model": opus'; cas T-80 2 R-1/cle-model
+arbre D; ins 12 'hooks:'; ins 13 '  - {model: opus}'; cas T-81 2 R-1/cle-model
+arbre D; ins 12 'hooks:'; ins 13 '  s:'; ins 14 '    model: claude-opus-5-5'; ins 15 '      x'; cas T-82 2 R-1/hors-liste
+arbre D; ins 12 'hooks:'; ins 13 '  s:'; ins 14 '    model: claude-opus-5-5'; ins 15 '    # c'; ins 16 '      x'; cas T-83 2 R-1/hors-liste
+arbre D; ins 9 '  choisir le model: opus pour ce cas.'; cas T-84 0 1
+arbre D; printf '{"permissions": {"allow": ["Bash(python -c \134"d={\134\134\134"a\134\134\134": 1}\134")"]}, "advisorModel": "claude-fable-5-1"}\n' > "$T/.claude/settings.local.json"; cas T-85 0 2
+arbre D; printf '{ "mod\134u0065l": "opus" }\n' > "$T/.claude/settings.local.json"; cas T-86 2 R-1/hors-liste
+arbre D; printf '{ "advisorModel": "claude-fable-5-1", // note\n "model": "opus" }\n' > "$T/.claude/settings.local.json"; cas T-87 2 R-1/hors-liste
+arbre D; printf '{ "advisorModel": "claude-fable-5-1", // it"s\n "model": "opus" }\n' > "$T/.claude/settings.local.json"; cas T-88 2 R-1/hors-liste
+arbre D; printf '{ model: "opus", "advisorModel": "claude-fable-5-1" }\n' > "$T/.claude/settings.local.json"; cas T-89 2 R-1/hors-liste
+arbre D; printf '{ "a": "x\134"y", "advisorModel": "claude-fable-5-1" }\n' > "$T/.claude/settings.local.json"; cas T-90 0 2
+arbre D; printf '{ "advisorModel": "claude-fable-5-1", }\n' > "$T/.claude/settings.local.json"; cas T-91 0 2
+arbre D; ins 10 '# c'; ins 11 '  x'; cas T-92 2 R-1/hors-liste
+arbre D; ins 12 'hooks: [model: opus]'; cas T-93 2 R-1/cle-model
+arbre D; ins 12 'hooks: {Stop: [model: opus]}'; cas T-94 2 R-1/cle-model
+arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 '    - model: claude-opus-5-5'; ins 15 '      type: prompt'; cas T-95 0 1
 
 echo "model-pinning : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]
