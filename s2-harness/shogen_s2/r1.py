@@ -309,8 +309,9 @@ def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
         raise ValueError(f"variance par blocs : w = {w!r} et ℓ = {ell!r} doivent être des entiers ≥ 1")
     serie, pres, val = list(serie), 0, 0
     for i, (ws, it) in enumerate(serie):
-        d = ws - serie[i - 1][0] if i else w
-        if not (isinstance(ws, int) and isinstance(it, int) and it in (0, 1) and d > 0 and d % w == 0):
+        ok = isinstance(ws, int) and isinstance(it, int) and it in (0, 1)
+        d = ws - serie[i - 1][0] if ok and i else w             # types contrôlés avant la soustraction
+        if not (ok and d > 0 and d % w == 0):
             raise ValueError(f"variance par blocs : couple n° {i} ({ws!r}, {it!r}) refusé (window_start "
                              f"entier, strictement croissant, écart multiple de w = {w} ; I_t ∈ {{0, 1}})")
         pres |= 1 << (ws - serie[0][0]) // w
@@ -341,6 +342,7 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
     tenue ou non (le NON ÉVALUABLE du pt 5 relève du lot CRITERE) ; sinon None et z_bloc_motif. runs (pt 9,
     descriptif) : un run = positions de grille consécutives à I_t = 1 ; une fenêtre absente ou d'une autre
     strate le coupe ; longueur_moyenne = K/nombre, None si nombre = 0."""
+    serie = list(serie)                                   # deux parcours (variance, runs) : itérateur admis
     v = block_long_run_variance(serie, w, ell)
     n, k1, g0, s2 = v["n"], v["K"], v["gamma0"], v["sigma2_bloc"]
     nombre = run_max = c = 0

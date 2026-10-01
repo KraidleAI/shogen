@@ -16,7 +16,7 @@ from fractions import Fraction
 from unittest import mock
 
 from shogen_s2 import r1
-from tests.test_sensibilite import fixture         # module de tests du lot B (couplage déclaré au G1)
+from tests.test_sensibilite import H, fixture      # module de tests du lot B (couplage déclaré au G1)
 
 W = 60
 S1 = (0, 1, 1, 0, 0, 0, 1, 0, 0, 1)                # CRITIQUE v2 §4.1, recopiées de la commande
@@ -125,7 +125,8 @@ class TestVarianceBlocsPure(unittest.TestCase):
         à None. Rougit si : écart non multiple de w accepté ; doublon accepté."""
         for s, w, ell in (([(0, 1), (30, 0)], 60, 3), ([(0, 1), (90, 0)], 60, 3),
                           ([(0, 1), (0, 0)], 60, 3), ([(120, 1), (60, 0)], 60, 3), ([(0, 2)], 60, 3),
-                          ([(0.0, 1)], 60, 3), ([(0, 1)], 0, 3), ([(0, 1)], 60, 0)):
+                          ([(0.0, 1)], 60, 3), ([(0, 1)], 0, 3), ([(0, 1)], 60, 0),
+                          ([(0, 1), ("60", 0)], 60, 3), ([(0, 1), (None, 0)], 60, 3)):  # G2 C-4
             with self.assertRaises(ValueError, msg=(s, w, ell)):
                 r1.block_long_run_variance(s, w, ell)
         self.assertEqual(r1.block_long_run_variance([], W),
@@ -231,6 +232,13 @@ class TestBlocStrate(unittest.TestCase):
             b = r1.bloc_strate(s, w, P3, r1.gate_value(len(s), P3), ell)
             self.assertTrue(demi_ulp(b["sigma2_bloc"], enum_sigma2(s, w, ell)), (cas, s, ell))
 
+    def test_serie_iterateur(self):
+        """G2 C-3 (D-15) : un itérateur donne la même clé `bloc` qu'une liste (deux parcours : variance,
+        runs). Rougit si : bloc_strate parcourt deux fois l'objet de l'appelant."""
+        s = serie((1, 1, 1, 1, 1, 0), pos=(0, 1, 2, 4, 5, 7))
+        g = r1.gate_value(len(s), P3)
+        self.assertEqual(r1.bloc_strate(iter(s), W, P3, g, 3), r1.bloc_strate(s, W, P3, g, 3))
+
 
 class TestBlocIntegration(unittest.TestCase):
     def test_integration_fixture_recompute(self):
@@ -253,6 +261,12 @@ class TestBlocIntegration(unittest.TestCase):
             s, w = appel.args[0], appel.args[1]
             st = strate_de[s[0][0]]
             blk, ell = out["strates"][st], r1.ELL_BLOC
+            self.assertEqual((len(appel.args), appel.kwargs), (4, {}))         # G2 C-1 : ℓ par défaut
+            self.assertEqual(appel.args[1:], (H, blk["P_more"], blk["gate_value"]))   # w, P̂_more, garde
+            b, g = blk["bloc"], blk["gate_value"]
+            self.assertEqual((b["FIV"], b["R_centrage"], b["FIV_serie"]),
+                             (d50(b["sigma2_bloc"], g), d50(b["gamma0"], g),
+                              d50(b["sigma2_bloc"], b["gamma0"])))
             self.assertEqual([x for x, _ in s], sorted(x for x in strate_de if strate_de[x] == st))
             self.assertEqual((len(s), sum(i for _, i in s)), (blk["n"], blk["K"]))
             self.assertEqual((set(blk["bloc"]), blk["bloc"]["z_bloc"]), (SCHEMA, None))
@@ -260,6 +274,30 @@ class TestBlocIntegration(unittest.TestCase):
             self.assertTrue(demi_ulp(blk["bloc"]["sigma2_bloc"], enum_sigma2(s, w, ell)))
             autres = sorted(s + [(x, 0) for x in strate_de if strate_de[x] != st])
             self.assertNotEqual(enum_sigma2(autres, w, ell), enum_sigma2(s, w, ell))
+
+    def test_z_bloc_publie_par_compute_r1(self):
+        """G2 C-2 : z_bloc publié par compute_r1 (n = 30·ℓ = 7 200, une strate, deux flux, co-pannes par
+        runs) : même numérateur K − n·P̂_more que z_s (P̂_more de la strate), FIV = σ̂²/garde ; n = 7 199 :
+        motif de garde de blocs. Rougit si : P̂_more ou garde d'une autre source passés à bloc_strate."""
+        from tests.test_r1 import R1, SIGMA_HUGE, mk, rd
+        for n in (7200, 7199):
+            ws = [1786147200 + 60 * t for t in range(n)]
+            down = [2 if (t // 40) % 9 == 0 else (1 if t % 3 == 0 else 0) for t in range(n)]
+            rds = [rd(x, f, status="panne_http" if j < m else "ok") for x, m in zip(ws, down)
+                   for j, f in enumerate("ab")]
+            blk = R1([mk(x) for x in ws], rds, ["a", "b"], sigma=SIGMA_HUGE)["strates"]["calme"]
+            b = blk["bloc"]
+            if n < 7200:
+                self.assertEqual((b["z_bloc"], b["z_bloc_motif"]),
+                                 (None, "garde de blocs : n_s = 7199 < 30·ℓ = 7200"))
+                continue
+            num = blk["K"] - n * Fraction(blk["P_more"])
+            self.assertIsNone(b["z_bloc_motif"])
+            for z, var in ((b["z_bloc"], b["sigma2_bloc"]), (blk["z"], blk["gate_value"])):
+                ecart = Fraction(z) ** 2 * Fraction(var) / (num * num) - 1
+                self.assertLess(abs(ecart), Fraction(1, 10 ** 45))
+                self.assertGreater(Fraction(z) * num, 0)
+            self.assertEqual(b["FIV"], d50(b["sigma2_bloc"], blk["gate_value"]))
 
 
 if __name__ == "__main__":
