@@ -329,6 +329,44 @@ def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
                 "sigma2_bloc": +(Decimal(num) / Decimal(ell * n * n))}
 
 
+def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BLOC) -> dict:
+    """Clé `bloc` d'une strate (ADR-0028 §1 bis.1 pts 3 et 9 ; A-2), schéma fermé de 12 clés : ell, gamma0,
+    sigma2_bloc, cv_theorique, FIV, R_centrage, FIV_serie, FIV_motif, FIV_serie_motif, z_bloc, z_bloc_motif,
+    runs. `serie` : celle de `block_long_run_variance` ; `p_more`, `gate` : P̂_more et n·P̂_more(1 − P̂_more)
+    (`gate_value`) de la strate. FIV = σ̂²_bloc/garde, R_centrage = γ̂₀/garde (= Ī(1 − Ī)/(P̂(1 − P̂))),
+    FIV_serie = σ̂²_bloc/γ̂₀ : une division Decimal chacune, sur les valeurs publiées ; garde ≤ 0 : FIV et
+    R_centrage à None (FIV_motif) ; γ̂₀ = 0 : FIV_serie à None (FIV_serie_motif). cv_theorique = √(4ℓ/(3n))
+    [inféré : dérivation AVIS-advisor-defi Q1 (iv), pas un énoncé de Künsch]. z_bloc = (K − n·P̂_more)/
+    σ̂_bloc, numérateur de z_s, publié si σ̂²_bloc > 0 et n ≥ GARDE_BLOCS·ℓ (pt 3), que la garde §5.4 soit
+    tenue ou non (le NON ÉVALUABLE du pt 5 relève du lot CRITERE) ; sinon None et z_bloc_motif. runs (pt 9,
+    descriptif) : un run = positions de grille consécutives à I_t = 1 ; une fenêtre absente ou d'une autre
+    strate le coupe ; longueur_moyenne = K/nombre, None si nombre = 0."""
+    v = block_long_run_variance(serie, w, ell)
+    n, k1, g0, s2 = v["n"], v["K"], v["gamma0"], v["sigma2_bloc"]
+    nombre = run_max = c = 0
+    avant = None
+    for ws, it in serie:
+        c = (c + 1 if avant == ws - w else 1) if it else 0
+        nombre, run_max, avant = nombre + (c == 1), max(run_max, c), ws
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        if n == 0:
+            mz = mf = ms = "aucune fenêtre (n = 0)"
+        else:
+            garde_b = f"garde de blocs : n_s = {n} < {GARDE_BLOCS}·ℓ = {GARDE_BLOCS * ell}"
+            mz = " ; ".join(m for m, oui in (("σ̂²_bloc = 0 (K ∈ {0, n})", s2 == 0),
+                                             (garde_b, n < GARDE_BLOCS * ell)) if oui) or None
+            mf = None if gate > 0 else "garde n·P̂_more·(1 − P̂_more) ≤ 0 : FIV, R_centrage indéfinis"
+            ms = None if g0 != 0 else "γ̂₀ = 0 (K ∈ {0, n}) : FIV_serie indéfini"
+        moy = +(Decimal(k1) / Decimal(nombre)) if nombre else None
+        return {"ell": ell, "gamma0": g0, "sigma2_bloc": s2,
+                "cv_theorique": +(Decimal(4 * ell) / Decimal(3 * n)).sqrt() if n else None,
+                "FIV": None if mf else +(s2 / gate), "R_centrage": None if mf else +(g0 / gate),
+                "FIV_serie": None if ms else +(s2 / g0), "FIV_motif": mf, "FIV_serie_motif": ms,
+                "z_bloc": None if mz else +((Decimal(k1) - Decimal(n) * p_more) / s2.sqrt()),
+                "z_bloc_motif": mz, "runs": {"nombre": nombre, "longueur_moyenne": moy, "run_max": run_max}}
+
+
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
 
 def parse_journal(path: str) -> list[dict]:
@@ -496,6 +534,7 @@ def compute_r1(
         stale_evaluable = {f: 0 for f in ps}
         ok_windows = {f: 0 for f in ps}
         k_count = 0
+        serie = []                                 # (window_start, I_t) de la strate (ADR-0028 §1 bis.1 pt 3)
         for ws in wins:
             cls = _classify_window(ws, reading_map, ps, w, sigma_by_class,
                                    sigma_class_of_flux, tau, n_min)
@@ -512,6 +551,7 @@ def compute_r1(
                     win_ecarts += 1
             if win_ecarts >= 2:
                 k_count += 1
+            serie.append((ws, int(win_ecarts >= 2)))  # même sommande que K
 
         per_source = {}
         phats: list[Decimal] = []
@@ -591,6 +631,7 @@ def compute_r1(
             "queue_binomiale_P_K_ge_Kobs": queue,
             "queue_note": queue_note,
             "A_window_stationarity": A_WINDOW_STATIONARITY,
+            "bloc": bloc_strate(serie, w, p_more, gate),   # ℓ = ELL_BLOC (ADR-0028 §1 bis.1 pt 3)
         }
 
     return {"pool": pool, "strates": strates_out, "poolee": strate_poolee(strates_out),   # clé à part
