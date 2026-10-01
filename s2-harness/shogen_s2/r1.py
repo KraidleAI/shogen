@@ -56,6 +56,8 @@ DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
 N_MIN_HORSENV = 4                 # N ≥ 4 répondantes pour l'enveloppe leave-one-out (10 §5.2)
 SEUIL_Z = Decimal("2.33")         # point 99% normale standard (K&L — 10 §5.1)
+ELL_BLOC = 240                    # ℓ, fenêtres : choix de conception, seule valeur rendue (ADR-0028 §1 bis.2)
+GARDE_BLOCS = 30                  # garde de blocs : z_bloc publié si n_s ≥ 30·ℓ (ADR-0028 §1 bis.1 pt 3)
 ETIQUETTE_POOLEE = "exploratoire, hors famille, hors décision"   # strate poolée (ADR-0028 D2 pt 4)
 A_WINDOW_STATIONARITY = (
     "A(window-stationarity) engagée par le test agrégé (10 §5.3 ; ancre "
@@ -289,6 +291,42 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
             raise ValueError("strate poolée : Σ_s n_s·P̂_s·(1 − P̂_s) ≤ 0, z_pool non défini "
                              "(ADR-0028 D2 pt 4)")
         return +num, +var, +(num / var.sqrt())
+
+
+def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
+    """Variance de long terme par blocs d'UNE strate (ADR-0028 §1 bis.1 pt 3 ; A-2) :
+    σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} (1 − k/ℓ)·γ̂_k, γ̂_k = Σ (I_t − Ī)(I_{t+k} − Ī) sur les paires de la
+    grille, Ī = K/n. Forme de Künsch 1989 (P-01, OCR seul, [2nd]) : blocs mobiles, noyau de Bartlett, non
+    restreinte. Elle égale (1/ℓ)·Σ_j B_j² (sommes de blocs de la série centrée complétée par des 0), d'où
+    σ̂² ≥ 0 et σ̂² = 0 ⇔ K ∈ {0, n} (CRITIQUE v2 §4.1). `serie` : couples (window_start, I_t), window_start
+    entiers strictement croissants, écarts multiples de `w`, I_t ∈ {0, 1} ; sinon ValueError. Lag k ⇔ écart
+    k·w : une fenêtre absente, exclue ou d'une autre strate ne forme pas de paire. Comptes entiers par lag sur
+    masques de bits (bit t : position de grille (ws − ws₀)/w) : M_k paires, C_k = Σ I_t·I_{t+k}, S_g et S_d
+    sommes des I des deux membres ; N = ℓ·n²·σ̂² = ℓ·n·K(n − K)
+    + Σ_{k=1}^{ℓ−1} 2(ℓ − k)·(n²·C_k − n·K·(S_g + S_d) + M_k·K²), puis une division Decimal par valeur
+    (DECIMAL_PREC). Rend n, K, `numerateur` (N), `gamma0`, `sigma2_bloc` ; n = 0 : ces trois-là à None."""
+    if not (isinstance(w, int) and isinstance(ell, int) and w >= 1 and ell >= 1):
+        raise ValueError(f"variance par blocs : w = {w!r} et ℓ = {ell!r} doivent être des entiers ≥ 1")
+    serie, pres, val = list(serie), 0, 0
+    for i, (ws, it) in enumerate(serie):
+        d = ws - serie[i - 1][0] if i else w
+        if not (isinstance(ws, int) and isinstance(it, int) and it in (0, 1) and d > 0 and d % w == 0):
+            raise ValueError(f"variance par blocs : couple n° {i} ({ws!r}, {it!r}) refusé (window_start "
+                             f"entier, strictement croissant, écart multiple de w = {w} ; I_t ∈ {{0, 1}})")
+        pres |= 1 << (ws - serie[0][0]) // w
+        val |= it << (ws - serie[0][0]) // w
+    n, k1 = len(serie), val.bit_count()
+    if n == 0:
+        return {"n": 0, "K": 0, "numerateur": None, "gamma0": None, "sigma2_bloc": None}
+    num = ell * n * k1 * (n - k1)                                  # lag 0 : ℓ·n²·γ̂₀
+    for k in range(1, ell):
+        pk, vk = pres >> k, val >> k                               # bit t : position t + k
+        num += 2 * (ell - k) * (n * n * (val & vk).bit_count() + (pres & pk).bit_count() * k1 * k1
+                                - n * k1 * ((val & pk).bit_count() + (pres & vk).bit_count()))   # n²·γ̂_k
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        return {"n": n, "K": k1, "numerateur": num, "gamma0": +(Decimal(n * k1 - k1 * k1) / Decimal(n)),
+                "sigma2_bloc": +(Decimal(num) / Decimal(ell * n * n))}
 
 
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
