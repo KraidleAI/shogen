@@ -3053,6 +3053,28 @@ bloquante. Les comptes (« ~30 acteurs », « ~65 réf. ») sont lus à la phras
 
 ## ADR-0020 — Paramètres ex ante de la campagne S2 : calibration 48 h, τ=0,5 % relatif, σ par classe, calendrier de strates week-end=stress
 
+> **Note datée du 2026-09-30 — collision de numéro (ADR-0028 D8, lot D8c ; `error_origin` :
+> orchestrateur).** Le numéro ADR-0020 a été attribué deux fois le 2026-08-20. Seule l'ADR-0020
+> ci-dessous (paramètres ex ante de la campagne S2, commit `2d02276`, 16:54:27+01:00) appartient
+> à ce registre ; elle n'est pas renumérotée. L'homonyme vit au commit `adb2213`
+> (06:20:27+01:00, `docs/DECISIONS.md` l.3051 de ce commit), tête de la branche
+> `roster-ban-alignment-2026-08-20`, jamais fusionnée, que conserve le tag annoté
+> `archive/roster-ban-2026-08-20` : il consignait l'application d'AgileGates, le roster aligné
+> du 2026-08-14 et le câblage des gates VibeGates g1, g3 et g5 élargi. Cause mesurée : deux
+> sessions concurrentes sur le même arbre de travail. Le journal de refs de la branche, relevé
+> le 2026-09-30 avant sa suppression (G0 de D8c §5.5), montrait la branche créée et `adb2213` à
+> 06:20:27, un commit d'une autre session (`60fd8e1`, harnais S2) posé sur cette branche à
+> 08:20:27, puis à 12:44:40 la branche ramenée à `adb2213` ; le journal de refs `HEAD` de
+> l'arbre principal montre aussi, à 12:44:22, le retour à `main` et le report de ce commit par
+> cherry-pick (`f11bdca`). Devenir du contenu : le roster qu'il consignait est supplanté
+> (`36593b6`, puis les décisions de roster du 2026-09-22 au 2026-09-28) ; ses gates et la copie
+> versionnée du hook pre-commit sont portées sous ADR-0028 D8, lots D8a, D8b et D8c (commits au
+> JOURNAL). La décision de l'investisseur du 2026-08-20 a été prise et exécutée sur la branche ;
+> elle a commencé d'entrer sur `main` avec le lot D8a (2026-09-30, job g1), et ses gates et le
+> hook y sont tous au commit de D8c. L'investisseur l'a confirmée explicitement le 2026-09-30 à
+> 23:33 UTC (forme (a) du §2 du G0 de D8a, ADR-0028 §4.10 a ; JOURNAL) ; l'orchestrateur a alors
+> posé le tag (23:33:51 UTC), puis supprimé la branche : SHOGEN-D8-PC-1 est fermé.
+
 **Statut** : acceptée — **ratifiée par l'investisseur (mainteneur) le 2026-08-20** sur
 avis sourcé de l'ADVISOR technique (`claude-fable-5`), adjugé par l'orchestrateur
 (R-21). Amende la décision 5 de `docs/10-mesures-pilotes-design.md` §9. · 2026-08-20
