@@ -1,6 +1,6 @@
 # Méthode de travail par parties (texte de l'investisseur, versé tel quel)
 
-Statut : adoptée pour Shōgen le 2026-10-01 (JOURNAL), application « maintenant, sur la suite de S2 » ; les lots déjà lancés finissent leur circuit. L'adaptation au dépôt (découpage des lots restants d'ADR-0028 en parties, siège de la « session propriétaire de la production », PR et fusion, messagerie) est fixée par une ADR dédiée après avis des advisors (règle 6 : le fondateur ne tranche rien de technique).
+Statut : adoptée pour Shōgen le 2026-10-01 (JOURNAL), **sauf la section 5 (messagerie entre sessions)** : investisseur, 2026-10-01 00:08 UTC, verbatim « non, pas de messagerie pour toi », application « maintenant, sur la suite de S2 » ; les lots déjà lancés finissent leur circuit. L'adaptation au dépôt (découpage des lots restants d'ADR-0028 en parties, siège de la « session propriétaire de la production », PR et fusion) est fixée par une ADR dédiée après avis des advisors (règle 6 : le fondateur ne tranche rien de technique).
 
 ---
 
