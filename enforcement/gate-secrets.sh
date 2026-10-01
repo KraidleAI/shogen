@@ -8,19 +8,25 @@
 # PORTÉE : blobs réguliers (100644, 100755) connus de git, lus dans l'index comme des OCTETS,
 #   octets NUL retirés : un NUL ne coupe pas le balayage, l'UTF-16 devient lisible, une forme
 #   dans un binaire bloque. Sans argument : contenu indexé ENTIER de chaque fichier touché par
-#   le commit en préparation (suppressions exclues) ; --tree : tous les fichiers suivis.
-#   Lancement ramené à la racine du dépôt, quel que soit le dossier courant.
+#   le commit en préparation (suppressions exclues) ; --tree : tous les fichiers suivis ;
+#   --history (fonction neuve, absente du blob) : lignes ajoutées de tout l'historique atteint
+#   depuis les refs et les HEAD des arbres de travail (--all), en un seul flux git log -p aux
+#   drapeaux forcés contre la config locale ; verdict par grep seul, attribution par awk pour
+#   le message seulement. Lancement ramené à la racine du dépôt, quel que soit le dossier courant.
 #   Objets réels, ceux que la poussée transmet : objets de remplacement (refs/replace) ignorés.
 # HORS PORTÉE, déclaré : fichiers de garde (enforcement/gate-*, enforcement/lint-*) et
 #   enforcement/tests/, dans tous les modes (ils nomment leurs motifs ; avis à chaque lancement ;
 #   le reste d'enforcement/ est balayé) ; liens symboliques (120000) et gitlinks (160000),
 #   ignorés avec un avis ; secret coupé sur deux lignes ; formats nouveaux ; entropie. Aucun
 #   scanner dédié ne tourne dans Shōgen (items SHOGEN-SECRETS-SCANNER-DEDIE-1 et
-#   SHOGEN-FORGE-SECRET-SCANNING-1) : ce plancher n'a aucun filet derrière lui.
+#   SHOGEN-FORGE-SECRET-SCANNING-1) : ce plancher n'a aucun filet derrière lui. Objets hors
+#   refs (inatteignables, journaux de refs, bundles) : item SHOGEN-SECRETS-HORS-REFS-1.
 # ÉCHEC FERMÉ (sortie 2) : erreur git, hors d'un dépôt, échec de mktemp, exclusion refusée,
-#   argument inconnu (écart au blob, où un argument inconnu retombait sur le mode indexé).
+#   argument inconnu (écart au blob, où un argument inconnu retombait sur le mode indexé),
+#   historique superficiel ou greffé (info/grafts, GIT_GRAFT_FILE), ref vers un blob ou un
+#   arbre, directe ou par un tag (hors du flux d'historique).
 # SORTIE MASQUÉE PAR CONSTRUCTION : aucun octet de contenu n'est dirigé vers la sortie ; seuls
-#   le chemin et la ligne que la gate calcule ; troncature annoncée.
+#   le chemin, la ligne et, en historique, le commit que la gate calcule ; troncature annoncée.
 #   Chemin en forme d'identifiant : masqué dans les constats et les avis non-blob, en clair dans
 #   les messages d'exclusion et d'échec (item SHOGEN-SECRETS-MASQUE-EXCLUSION-1).
 # Amont : versions 1 à 4 rejetées en revue G2 dans VibeGates (ADR-0004 de VibeGates,
@@ -30,8 +36,9 @@
 #   marqueur ADR- dans .vibegates-secretscan-exclude (marqueur d'attribution, non contrôlé comme
 #   référence ; fichier SUIVI ; formes globales refusées ; chaque exclusion annoncée avec son
 #   compte : règles de l'ADR-0004 de VibeGates) ; valeur factice : la sortir de la forme.
-# Usage : gate-secrets.sh [--tree]   Sortie : 0 propre, 2 blocage. Jetons ASCII sur stderr :
-#   SECRETS/forme, SECRETS/exclusion, SECRETS/echec.
+# Usage : gate-secrets.sh [--tree|--history]   Sortie : 0 propre, 2 blocage. Jetons ASCII sur
+#   stderr : SECRETS/forme, SECRETS/historique, SECRETS/exclusion, SECRETS/tronque (historique
+#   superficiel ou greffé), SECRETS/echec.
 
 set -u
 export LC_ALL=C   # grep, awk, sed et tr en octets ASCII, sous Git Bash comme sur l'image (CH-8)
@@ -42,7 +49,7 @@ EXCL_FILE=".vibegates-secretscan-exclude"
 
 refus() { echo "REFUS (SECRETS/$1) : $2" >&2; exit 2; }
 echec() { refus echec "le balayage ne peut pas tourner : $1 ; échec fermé"; }
-case "$#:$MODE" in 0:|1:--tree) ;; *) echec "argument inconnu ; usage : gate-secrets.sh [--tree]" ;; esac
+case "$#:$MODE" in 0:|1:--tree|1:--history) ;; *) echec "argument inconnu ; usage : gate-secrets.sh [--tree|--history]" ;; esac
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || echec "hors d'un arbre de travail git"
 TOP="$(git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$TOP" ] || echec "racine du dépôt introuvable"
 cd "$TOP" || echec "cd vers la racine du dépôt impossible"
@@ -75,6 +82,31 @@ echo "AVIS (secrets) : fichiers de garde (enforcement/gate-*, enforcement/lint-*
 TMP="$(mktemp)" && [ -n "$TMP" ] && [ -w "$TMP" ] || echec "mktemp a échoué"
 trap 'rm -f "$TMP"' EXIT
 PS=(-- . ':(exclude)enforcement/gate-*' ':(exclude)enforcement/lint-*' ':(exclude)enforcement/tests/' ${EXCLUDES[@]+"${EXCLUDES[@]}"})
+if [ "$MODE" = --history ]; then
+  [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = false ] ||
+    refus tronque "historique superficiel ou illisible : le balayage exige tout l'historique (fetch-depth: 0 en CI)"
+  GF="$(git rev-parse --git-path info/grafts 2>/dev/null)" && [ -n "$GF" ] || echec "erreur git (greffes)"
+  [ ! -e "$GF" ] || refus tronque "greffes ($GF) : l'historique affiché n'est pas celui des objets"
+  NX="$( set -o pipefail; git for-each-ref --format='%(objecttype) %(*objecttype)' | awk '!/^(commit |tag commit)$/ { n++ } END { print n + 0 }' )" || echec "erreur git (refs)"
+  [ "$NX" = 0 ] || echec "$NX ref(s) vers un blob ou un arbre, hors du flux d'historique"
+  NC="$(git rev-list --count --all 2>/dev/null)" || echec "erreur git (compte des commits)"
+  # Un seul flux ; drapeaux forcés contre la config locale ; NUL retirés ; verdict par grep seul (CH-2 du G0).
+  ( set -o pipefail; git --no-optional-locks -c core.quotePath=false -c log.showRoot=true -c color.ui=never \
+    -c diff.noprefix=false -c diff.mnemonicPrefix=false -c diff.dstPrefix=b/ -c diff.suppressBlankEmpty=false log -p --text --no-color \
+    --no-ext-diff --no-textconv --no-renames --diff-merges=first-parent --full-history --no-notes --no-show-signature \
+    --format='commit %H' --all "${PS[@]}" 2>/dev/null | tr -d '\000' ) >"$TMP" || echec "erreur git (historique)"
+  HITS="$( { grep -an '^+' "$TMP" | grep -aE "$VENDOR"; grep -an '^+' "$TMP" | grep -aiE "$GENERIC"; } | cut -d: -f1 | sort -un )"
+  [ -z "$HITS" ] && { echo "OK (secrets) : historique, $NC commit(s) (--all), sans forme d'identifiant ajoutée."; exit 0; }
+  echo "REFUS (SECRETS/historique) : $(printf '%s\n' "$HITS" | wc -l) ligne(s) ajoutée(s) en forme d'identifiant (sortie masquée ; 20 au plus, commit:chemin:ligne) :" >&2
+  # Attribution, pour le message seulement : en-têtes commit, +++ hors hunk, compteurs des @@ (ligne vide = contexte).
+  printf '%s\n' "$HITS" | head -20 | awk 'NR == FNR { h[$1] = 1; next }
+    !o && !m && /^commit / { c = substr($2, 1, 12); next }
+    !o && !m && /^\+\+\+ / { p = substr($0, 5); sub(/^b\//, "", p); sub(/\t$/, "", p); if (FNR in h) print c ":" p ":(chemin)"; next }
+    !o && !m && /^@@ -/ { split($2, x, ","); split($3, y, ","); o = (x[2] == "") ? 1 : x[2] + 0; m = (y[2] == "") ? 1 : y[2] + 0; l = substr(y[1], 2) + 0; next }
+    o || m { t = substr($0, 1, 1); if (t == "+") { if (FNR in h) print c ":" p ":" l; l++; m-- } else if (t == "-") o--; else if (t == " " || t == "") { l++; o--; m-- } }' - "$TMP" | masque >&2
+  echo "Remèdes : vrai secret : le révoquer (l'historique n'est pas réécrit, ADR-0028 D7 : item SHOGEN-SECRETS-REVOQUE-1) ; fixture : pathspec avec marqueur ADR- dans $EXCL_FILE." >&2
+  exit 2
+fi
 if [ "$MODE" = --tree ]; then
   git ls-files -z "${PS[@]}" >"$TMP" 2>/dev/null || echec "erreur git (liste des fichiers)"
 else

@@ -85,29 +85,39 @@ jobs:
   g3-secrets:
     # Lot D8b (2026-09-30, ADR-0028 D8 ; G0 docs/adr-0028/G0-lot-D8b.md, journal
     # docs/G1-lot-D8b.md) : gate G3 des secrets, plancher de motifs porté du blob 6789a30
-    # (adb2213), sur les fichiers suivis. Étape 1 : les cas de la gate, dans des dépôts
-    # jetables mktemp, valeurs formées à l'exécution depuis des fragments tronqués ; étape 2 :
-    # l'arbre du dépôt. Aucune action ni installation nouvelle (R-8) : bash, git et les
-    # outils de l'image (grep, awk, tr, mktemp, iconv : item SHOGEN-G3-FORGE-1 (c)).
+    # (adb2213), sur les fichiers suivis et sur l'historique. Étape 1 : les cas de la gate, dans
+    # des dépôts jetables mktemp, valeurs formées à l'exécution depuis des fragments tronqués ;
+    # étape 2 : l'arbre du dépôt ; étape 3 : les lignes ajoutées de tout l'historique récupéré
+    # (toutes les branches et tous les tags, --all). Aucune action ni installation nouvelle
+    # (R-8) : bash, git et les outils de l'image (grep, awk, tr, mktemp, iconv : item
+    # SHOGEN-G3-FORGE-1 (c)).
     # name: = identifiant du job, un seul nom pour le futur required check.
     name: g3-secrets
     # Image épinglée, comme les autres jobs (GC-11 ; SHOGEN-CI-RUNNERS-1).
     runs-on: ubuntu-24.04
-    # Étapes mesurées en local (Git Bash, 2026-09-30, après la revue G2) : 84 cas en 91 à 92 s,
-    # l'arbre du dépôt (302 fichiers, boucle par fichier) en 63 s. 15 min bornent un blocage.
+    # Étapes mesurées en local (Git Bash) : 113 cas en 136 à 139 s (2026-10-01, re-revue rr1) ;
+    # l'arbre du dépôt (302 à 304 fichiers, boucle par fichier du moteur porté) en 63 à 68 s et
+    # l'historique (141 commits, --all) en 1,5 à 1,6 s (2026-09-30, après la revue G2). 15 min
+    # bornent un blocage sans couper un run normal.
     timeout-minutes: 15
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
-      # SHA des jobs g1-model-pinning et s2-harness-unittest.
+      # SHA des jobs g1-model-pinning et s2-harness-unittest. fetch-depth: 0 récupère tout
+      # l'historique, branches et tags compris ; sans lui, un seul commit et la gate refuse
+      # l'historique superficiel (SECRETS/tronque).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: cas de la gate des secrets (dépôts jetables, valeurs formées à l'exécution)
         shell: bash
         run: bash enforcement/tests/run-fixtures-secrets.sh
       - name: secrets des fichiers suivis (plancher de motifs, G3)
         shell: bash
         run: bash enforcement/gate-secrets.sh --tree
+      - name: secrets de l'historique (lignes ajoutées, toutes les refs récupérées, G3)
+        shell: bash
+        run: bash enforcement/gate-secrets.sh --history
 
   s2-harness-unittest:
     # Lot CI-S2 (2026-09-29, ADR-0028 D6 (iii) ; cp-1 bref C-1..C-8) : la suite

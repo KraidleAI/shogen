@@ -30,14 +30,14 @@ OK=0; KO=0; K=0; D=; A=
 # forme ID : valeur de la sonde ID (p1 p2, remplissage répété n fois, suffixe), formée à l'exécution.
 forme() { awk -F '\t' -v i="$1" '$1 == i { s = $2 $3; for (k = 0; k < $5; k++) s = s $4; print s $6; t = 1 } END { exit !t }' "$FX"; }
 V="$(forme V-01)" && G="$(forme G-06)" || fatal "sondes V-01 ou G-06 introuvables"
-# r : dépôt jetable neuf $R (isolé, sans crochets, sans signature), commit initial base.txt.
+# r [-] : dépôt jetable neuf $R (isolé, sans crochets, sans signature), commit initial base.txt (sauf avec -).
 r() {
   K=$((K + 1)); R="$W/r$K"; mkdir "$R" && git -C "$R" init -q -b main || fatal "init"
   [ -z "$(git -C "$R" rev-parse --show-prefix)" ] || fatal "préfixe non vide"
   for c in user.name=t user.email=t@example.invalid commit.gpgsign=false core.autocrlf=false "core.hooksPath=$W/nh"; do
     git -C "$R" config "${c%%=*}" "${c#*=}" || fatal "config"
   done
-  echo base > "$R/base.txt"; ci init
+  [ "${1-}" = - ] || { echo base > "$R/base.txt"; ci init; }
 }
 ci() { git -C "$R" add -A && git -C "$R" commit -q -m "$1" || fatal "commit"; }
 st() { git -C "$R" add -- "$@" || fatal "add"; }
@@ -106,6 +106,59 @@ for id in $(awk -F '\t' '!/^#/ { print $1 }' "$FX"); do
   r; forme "$id" > "$R/p.txt" || fatal "sonde $id"; st p.txt
   if [ "$(awk -F '\t' -v i="$id" '$1 == i { print $7 }' "$FX")" = 0 ]; then cas "$l" 0 '1 fichier(s)'; else cas "$l" 2 SECRETS/forme; fi
 done
+# Mode --history (T-51 à T-67, T-69, T-70 ; revue G2 : T-73 à T-76, T-74b ; re-revue : T-75b) ; h : les 12 premiers caractères du commit courant.
+h() { git -C "$R" rev-parse --short=12 HEAD; }
+r; printf 'k = "%s"\n' "$V" | tr A-Z a-z > "$R/c.py"; ci c; A=--history; cas T-51 0 'historique, 2 commit(s)'
+r; printf 'l1\nk = "%s"\n' "$V" > "$R/résumé.py"; ci ajout; c1=$(h); git -C "$R" rm -q résumé.py || fatal rm; ci retrait
+A=--tree; cas T-52a 0 '1 fichier(s)'; A=--history; cas T-52 2 SECRETS/historique "^$c1:résumé\.py:2\$" QQQQ
+r; printf 'a\n\nc\nd\ne\n' > "$R/f.txt"; ci cinq; { printf 'a\n\nc\n'; printf '%s\n' "$G" | tr a-z A-Z; echo e; } > "$R/f.txt"; ci modif
+A=--history; cas T-53 2 SECRETS/historique "^$(h):f\.txt:4\$"
+r; git -C "$R" checkout -q -b cote; echo x > "$R/d.txt"; ci cote; git -C "$R" checkout -q main; echo m > "$R/e.txt"; ci m
+git -C "$R" merge -q --no-ff --no-commit cote >/dev/null 2>&1; forme G-09 > "$R/f.env"; ci fusion; A=--history; cas T-54 2 SECRETS/historique
+r; git -C "$R" checkout -q -b lat; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r
+git -C "$R" checkout -q main; echo m > "$R/e.txt"; ci m; git -C "$R" merge -q --no-ff -m fus lat >/dev/null 2>&1 || fatal fusion
+git -C "$R" branch -q -D lat || fatal branche; A=--history; cas T-55 2 SECRETS/historique
+r -; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci racine; git -C "$R" rm -q c.py || fatal rm; ci retrait; git -C "$R" config log.showRoot false
+A=--history; cas T-56 2 SECRETS/historique
+r; printf '*.bin -diff\n' > "$R/.gitattributes"; printf 'x\000y %s\n' "$V" > "$R/g.bin"; ci bin; A=--history; cas T-57 2 SECRETS/historique
+r; printf '*.txt diff=cache\n' > "$R/.gitattributes"; git -C "$R" config diff.cache.textconv 'sed d'; printf 'k = "%s"\n' "$V" > "$R/h.txt"; ci tc
+A=--history; cas T-58 2 SECRETS/historique
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci ajout; git -C "$R" rm -q c.py || fatal rm; ci retrait
+git -C "$W" clone -q --no-local --depth 1 "$R" sup 2>/dev/null && [ "$(git -C "$W/sup" rev-parse --is-shallow-repository)" = true ] ||
+  fatal "clone superficiel (C-7)"
+D="$W/sup"; A=--history; cas T-59 2 SECRETS/tronque
+r; printf '%s\n' '++i;' '++ b/HIJACK.txt' "$G" > "$R/f.c"; ci f; A=--history; cas T-60 2 SECRETS/historique "^$(h):f\.c:3\$" HIJACK
+r; printf 'k = "%s"\n' "$V" | iconv -f UTF-8 -t UTF-16LE > "$R/w.ps1" || fatal iconv; ci u; git -C "$R" rm -q w.ps1 || fatal rm; ci rm
+A=--history; cas T-61 2 SECRETS/historique
+r; mkdir -p "$R/enforcement/tests"; printf 'k = "%s"\n' "$V" > "$R/enforcement/tests/x.py"; ci t; A=--history; cas T-62a 0 'historique, 2 commit(s)'
+mkdir "$R/enforcementX"; git -C "$R" mv enforcement/tests/x.py enforcementX/x.py || fatal mv; ci x; A=--history; cas T-62b 2 SECRETS/historique
+r; git -C "$R" checkout -q -b cote; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci c; git -C "$R" checkout -q main; A=--history; cas T-63 2 SECRETS/historique
+r; git -C "$R" notes add -m '+ligne' -m 'commit 0000' HEAD || fatal notes; A=--history; cas T-64a 0 'historique, 2 commit(s)'
+r; printf 'l1\nk = "%s"\n' "$V" > "$R/résumé.py"; ci ajout; c1=$(h); git -C "$R" notes add -m '+ligne' -m 'commit 0000' HEAD || fatal notes
+git -C "$R" rm -q résumé.py || fatal rm; ci retrait; A=--history; cas T-64b 2 SECRETS/historique "^$c1:résumé\.py:2\$"
+r; for c in color.ui=always diff.noprefix=true diff.suppressBlankEmpty=true core.quotePath=true diff.mnemonicPrefix=true diff.dstPrefix=zz/; do
+  git -C "$R" config "${c%%=*}" "${c#*=}" || fatal config; done
+mkdir "$R/b"; printf 'l1\nk = "%s"\n' "$V" > "$R/b/résumé.py"; ci ajout; c1=$(h); git -C "$R" rm -q b/résumé.py || fatal rm; ci retrait
+A=--history; cas T-65 2 SECRETS/historique "^$c1:b/résumé\.py:2\$"
+r; for i in $(seq 1 25); do printf '%s\n' "$G"; done > "$R/g.py"; ci g; c1=$(h)
+A=--history; cas T-66 2 SECRETS/historique ': 25 ligne\(s\) ajoutée' ':g\.py:21$'; A=--history; cas T-66b 2 SECRETS/historique "^$c1:g\.py:20\$"
+r; mkdir "$R/fx"; printf 'k = "%s"\n' "$V" > "$R/fx/l.py"; printf 'fx/  # ADR-0001 fixtures\n' > "$R/.vibegates-secretscan-exclude"; ci fx
+A=--history; cas T-67 0 'historique, 2 commit(s)' "l'exclusion 'fx/' retire 1 fichier"
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci c; b="$(git -C "$R" rev-parse HEAD:c.py)" && rm -f "$R/.git/objects/${b:0:2}/${b:2}" || fatal objet
+A=--history; cas T-69 2 SECRETS/echec 'erreur git \(historique\)'
+r; git -C "$R" config diff.suppressBlankEmpty true; printf 'a\n\nc\nd\ne\n' > "$R/f.txt"; ci cinq
+{ printf 'a\n\nc\n'; printf '%s\n' "$G"; echo e; } > "$R/f.txt"; ci modif; A=--history; cas T-70 2 SECRETS/historique "^$(h):f\.txt:4\$"
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; c1=$(h); git -C "$R" rm -q c.py || fatal rm; ci r
+p="$(git -C "$R" commit-tree 'HEAD~2^{tree}' -p HEAD~2 -m p)" && git -C "$R" replace "$(git -C "$R" rev-parse HEAD~1)" "$p" || fatal replace
+A=--history; cas T-73 2 SECRETS/historique "^$c1:c\.py:1\$"
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r
+mkdir -p "$R/.git/info" && printf '%s %s\n' "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD~2)" > "$R/.git/info/grafts" || fatal greffe; A=--history; cas T-74 2 SECRETS/tronque greffes
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r; g="$W/greffes-$K"
+printf '%s %s\n' "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD~2)" > "$g" || fatal greffe; A=--history; GIT_GRAFT_FILE="$g" cas T-74b 2 SECRETS/tronque greffes
+r; git -C "$R" tag tb "$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" || fatal tag; A=--history; cas T-75 2 SECRETS/echec 'blob ou un arbre'
+r; echo x > "$R/$V.txt"; ci nom; git -C "$R" rm -q -- "$V.txt" || fatal rm; ci r
+A=--history; cas T-76 2 SECRETS/historique ':\[forme masquée\];\.txt:\(chemin\)$' QQQQ
+r; git -C "$R" tag -a ta -m t || fatal tag; A=--history; cas T-75b 0 'historique, 1 commit(s)'
 
 echo "secrets : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]
