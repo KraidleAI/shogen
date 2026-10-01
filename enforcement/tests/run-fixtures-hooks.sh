@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Shōgen, lot D8c (ADR-0028 D8) : cas du hook pre-commit versionné et de son installeur, table du §7 du G0
 # (docs/adr-0028/G0-lot-D8c.md) : H-01 à H-20 (étape R-13), I-01 à I-13 (installeur) ; ajoutés au G1 :
-# H-21 (git grep en erreur), H-22 (lancement direct depuis un sous-dossier), I-14 (argument inconnu).
+# H-21 (git grep en erreur), H-22 (lancement direct depuis un sous-dossier), I-14 (argument inconnu) ;
+# C-01 à C-12 (branchement du lint d'épinglage de D8a et de la gate des secrets de D8b), C-13 (ajouté au
+# G1 : extraction de l'index en échec), C-14 (ajouté au G1 : lancement direct, index inchangé, forme d'O-13).
 # Ajouté à la revue G2 (2026-10-01) : H-23 (git commit --amend, consommateur 1 du G0 §10).
 # Dépôt modèle sous mktemp, hors de tout dépôt : git init -b main, identité factice, commit.gpgsign=false,
-# core.autocrlf=false ; commit de base avec deux agents valides (fixtures de D8a), le hook et l'installeur
-# sous test, dont ATTENDU est remplacé par le sha256 du hook sous test (identité pour les vrais : I-10).
+# core.autocrlf=false ; un commit avec deux agents valides (fixtures de D8a), puis le commit de base qui
+# ajoute le lint et la gate de l'arbre, le hook et l'installeur sous test, dont ATTENDU est remplacé par
+# le sha256 du hook sous test (identité pour les vrais : I-10). Formes d'identifiant : sondes de D8b.
 # Chaque cas travaille sur une copie du modèle, hook installé par l'installeur (I-01), puis git commit réel :
 # sortie ET jeton vérifiés. Marqueurs formés à l'exécution ; ce fichier n'en porte aucun, ni les octets du
 # hook local (I-03 emploie un double de test). Isolation : refus si une variable GIT_* de dépôt est posée ;
@@ -21,9 +24,9 @@ done
 H="$(cd "$(dirname "$0")" && pwd)" || exit 3
 HOOK="${1:-$H/../hooks/pre-commit}"; INST="${2:-$H/../hooks/install-pre-commit.sh}"
 HOOK="$(cd "$(dirname "$HOOK")" && pwd)/$(basename "$HOOK")" && INST="$(cd "$(dirname "$INST")" && pwd)/$(basename "$INST")" || exit 3
-GY="$H/../../.github/workflows/gates.yml"; FX="$H/fixtures/model-pinning"
-[ -f "$HOOK" ] && [ -f "$INST" ] && [ -f "$GY" ] && [ -f "$FX/shogen-devops.md" ] && [ -f "$FX/shogen-orchestrator.md" ] ||
-  fatal "hook, installeur, gates.yml ou fixtures introuvables"
+GY="$H/../../.github/workflows/gates.yml"; FX="$H/fixtures/model-pinning"; SO="$H/fixtures/secrets/sondes.tsv"
+for x in "$HOOK" "$INST" "$GY" "$FX/shogen-devops.md" "$FX/shogen-orchestrator.md" "$H/../lint-model-pinning.sh" "$H/../gate-secrets.sh" "$SO"; do
+  [ -f "$x" ] || fatal "pièce introuvable : $x"; done
 W="$(mktemp -d)" || fatal "mktemp -d"
 trap 'rm -rf "$W"' EXIT
 git -C "$W" rev-parse --is-inside-work-tree >/dev/null 2>&1 && fatal "dossier de travail dans un dépôt"
@@ -33,17 +36,21 @@ res() { if [ "$2" = 0 ]; then OK=$((OK + 1)); else KO=$((KO + 1)); echo "ÉCHEC 
 # m0 : commit de base, sans hook ; m1 : m0 puis hook installé (I-01). c0, c1 : copies neuves de m0, de m1.
 m="$W/m0"; mkdir -p "$m/.claude/agents" "$m/enforcement/hooks" && git -C "$m" init -q -b main || fatal init
 for c in user.name=t user.email=t@example.invalid commit.gpgsign=false core.autocrlf=false; do git -C "$m" config "${c%%=*}" "${c#*=}" || fatal config; done
-cp "$FX/shogen-devops.md" "$FX/shogen-orchestrator.md" "$m/.claude/agents/" && cp "$HOOK" "$m/enforcement/hooks/pre-commit" &&
+cp "$FX/shogen-devops.md" "$FX/shogen-orchestrator.md" "$m/.claude/agents/" && git -C "$m" add -A && git -C "$m" commit -qm agents &&
+  cp "$H/../lint-model-pinning.sh" "$H/../gate-secrets.sh" "$m/enforcement/" && cp "$HOOK" "$m/enforcement/hooks/pre-commit" &&
   sed "s/^ATTENDU=.*/ATTENDU='$(sha "$HOOK")'/" "$INST" > "$m/enforcement/hooks/install-pre-commit.sh" &&
   git -C "$m" add -A && git -C "$m" commit -qm base && cp -r "$m" "$W/m1" || fatal "dépôt modèle"
 c0() { K=$((K + 1)); R="$W/r$K"; D=; cp -r "$W/m0" "$R" || fatal copie; }
 c1() { K=$((K + 1)); R="$W/r$K"; D=; cp -r "$W/m1" "$R" || fatal copie; }
-# f chemin texte : écrit le fichier sous ${D:-$R} et l'indexe. ci attendu jeton [arguments] : git commit réel.
+# f chemin texte : écrit le fichier sous ${D:-$R} et l'indexe. ci attendu jeton[+jeton...] [arguments] :
+# git commit réel ; 0 exige OK (hook), 1 exige chaque jeton. forme ID : valeur de la sonde ID de D8b.
 f() { p="${D:-$R}/$1"; mkdir -p "${p%/*}" && printf '%s\n' "$2" > "$p" && git -C "${D:-$R}" add -- "$1" || fatal add; }
-ci() { a="$1"; j="$2"; shift 2; o="$(cd "${D:-$R}" && git commit -qm c "$@" 2>&1)"; r=$?
-  [ "$a" = 0 ] && e="OK (hook)" || e="REFUS ($j)"
-  [ "$r" = "$a" ] && printf '%s\n' "$o" | grep -qF "$e" && return 0
-  E="commit : attendu $a, $e ; obtenu $r, $(printf '%s\n' "$o" | grep -m1 -E 'REFUS|OK|fatal|error')"; return 1; }
+ci() { a="$1"; j="$2"; shift 2; o="$(cd "${D:-$R}" && git commit -qm c "$@" 2>&1)"; r=$?; E=
+  [ "$r" = "$a" ] || E=" sortie $r au lieu de $a ;"
+  if [ "$a" = 0 ]; then l="OK (hook)"; else l="$(printf 'REFUS (%s)\n' ${j//+/ })"; fi
+  while IFS= read -r e; do printf '%s\n' "$o" | grep -qF "$e" || E="$E $e absent ;"; done <<< "$l"
+  [ -z "$E" ] && return 0; E="commit :$E $(printf '%s\n' "$o" | grep -m1 -E 'REFUS|OK|fatal|error')"; return 1; }
+forme() { awk -F '\t' -v i="$1" '$1 == i { s = $2 $3; for (k = 0; k < $5; k++) s = s $4; print s $6; t = 1 } END { exit !t }' "$SO"; }
 # inst attendu fragment [arguments] : installeur lancé depuis ${D:-$R} ; sortie et fragment du message vérifiés.
 inst() { a="$1"; t="$2"; shift 2; o="$(cd "${D:-$R}" && bash enforcement/hooks/install-pre-commit.sh "$@" 2>&1)"; r=$?
   [ "$r" = "$a" ] && printf '%s\n' "$o" | grep -qF "$t" && return 0
@@ -101,6 +108,27 @@ c0; e0="$(etat)"; o="$(cd "$R" && GIT_INDEX_FILE="$W/nulle" bash enforcement/hoo
 mkdir "$W/hors2" && cp "$INST" "$W/hors2/i.sh" || fatal hors2; o="$(cd "$W/hors2" && bash i.sh 2>&1)"; [ $? = 2 ] && printf '%s\n' "$o" | grep -qF "hors d'un dépôt"; res I-12 $?
 c0; echo "# x" >> "$R/enforcement/hooks/install-pre-commit.sh"; inst 2 "installeur différent" && [ -z "$(ho)" ]; res I-13 $?
 c0; e0="$(etat)"; inst 2 "argument inconnu" --verify && [ "$(etat)" = "$e0" ]; res I-14 $?
+# Branchement (§7.3) : lint d'épinglage et gate des secrets, pris dans l'index du commit.
+A=.claude/agents/shogen-devops.md; B="claude-opus-""5"; V="$(forme V-01)" || fatal "sonde V-01 introuvable"
+op() { sed 's/^model: .*/model: opus/' "$FX/shogen-devops.md" > "$R/$A"; }
+c1; op && git -C "$R" add -- "$A" && cp "$FX/shogen-devops.md" "$R/$A" && ci 1 HOOK/lint+R-1/tier-nu; res C-01 $?
+c1; f docs/y.md propre && op && ci 0 -; res C-02 $?
+c1; op && git -C "$R" add -- "$A" && echo 'exit 0' > "$R/enforcement/lint-model-pinning.sh" && ci 1 HOOK/lint; res C-03 $?
+c1; f docs/y.md propre && printf '{ "model": "%s" }\n' "$B" > "$R/.claude/settings.local.json" && ci 0 -; res C-04 $?
+c1; f s.py "k = \"$V\"" && ci 1 HOOK/secrets+SECRETS/forme; res C-05 $?
+c1; f s.py "k = \"$V\"" && echo 'exit 0' > "$R/enforcement/gate-secrets.sh" && ci 1 HOOK/secrets; res C-06 $?
+c1; git -C "$R" rm -q --cached enforcement/lint-model-pinning.sh && f docs/y.md propre && ci 1 HOOK/echec && printf '%s\n' "$o" | grep -qF "avancer la base"; res C-07 $?
+c1; git -C "$R" rm -q --cached enforcement/gate-secrets.sh && f docs/y.md propre && ci 1 HOOK/echec; res C-08 $?
+c1; f docs/x.md "# $M1" && f s.py "k = \"$V\"" && op && git -C "$R" add -- "$A" && ci 1 HOOK/g5+HOOK/lint+HOOK/secrets; res C-09 $?
+c1; git -C "$R" worktree add -q -b wt "$R.wt" || fatal worktree; D="$R.wt"; f docs/y.md propre && ci 0 -; res C-10 $?
+c1; op && ci 1 HOOK/lint+R-1/tier-nu -a; res C-11 $?
+c1; git -C "$R" worktree add -q -b vieux "$R.wt" HEAD~1 || fatal worktree; D="$R.wt"; f docs/y.md propre && ci 1 HOOK/echec &&
+  printf '%s\n' "$o" | grep -qF "avancer la base"; res C-12 $?
+c1; f .claude/agents/b.md "$(cat "$FX/shogen-devops.md"; echo corps)" && x="$(git -C "$R" ls-files -s -- .claude/agents/b.md | cut -d' ' -f2)" &&
+  rm -f "$R/.git/objects/${x:0:2}/${x:2}" && o="$(cd "$R" && bash "$HOOK" < /dev/null 2>&1)"; [ $? = 2 ] &&
+  printf '%s\n' "$o" | grep -qF "REFUS (HOOK/echec) : extraction"; res C-13 $?
+c1; E="index réécrit ou refus"; x="$(sha "$R/.git/index")"; o="$(cd "$R" && GIT_OPTIONAL_LOCKS=0 bash .git/hooks/pre-commit < /dev/null 2>&1)"; [ $? = 0 ] &&
+  printf '%s\n' "$o" | grep -qF "OK (hook)" && [ "$(sha "$R/.git/index")" = "$x" ]; res C-14 $?
 
 echo "hooks : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]

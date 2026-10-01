@@ -14,7 +14,7 @@
 # Usage : install-pre-commit.sh [--verifier]   Sortie : 0 installé ou conforme ; 2 refus (stderr).
 
 set -u
-ATTENDU='b8705ae822acab458e3ae50c32b0e9fce4e6ba873845673fe5555c7edcbe6198'
+ATTENDU='0013187283815cac3ebdc3312c374f84f8946020c127533b69414e6041fc826b'
 CONNUS='1da91c723b7f4747edb35dcc2cce7492e334b648c5e00c41f239cca5ab61277d'   # hook local, blob 9c4c846
 refus() { echo "REFUS (HOOK/installation) : $1" >&2; exit 2; }
 sha() { sha256sum < "$1" | cut -d' ' -f1; }

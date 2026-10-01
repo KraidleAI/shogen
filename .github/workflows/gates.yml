@@ -45,7 +45,7 @@ jobs:
     # Image épinglée et checkout v7.0.1 : part de g5 dans SHOGEN-CI-RUNNERS-1, tirée en
     # avance par le lot D8c (le job porte désormais des tests).
     runs-on: ubuntu-24.04
-    # Étapes mesurées en local (Git Bash, 2026-10-01) : 37 cas du hook en 36 à 41 s, balayage
+    # Étapes mesurées en local (Git Bash, 2026-10-01) : 51 cas du hook en 93 à 98 s, balayage
     # de l'arbre en 68 à 78 ms. 10 min bornent un blocage sans couper un run normal.
     timeout-minutes: 10
     steps:
