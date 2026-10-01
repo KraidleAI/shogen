@@ -1,8 +1,9 @@
 # Gates VibeGates — Shogen, instanciation pilote (audit d'entrée du 2026-08-12).
 # Référentiel : corpus « Compliance et ingénierie logicielle et architecturale », doc 02.
 # Périmètre (en-tête réécrit le 2026-09-29, lot CI-S2, ADR-0028 D6 (iii) ; g1 ajouté le
-# 2026-09-30, lot D8a, ADR-0028 D8) : ce workflow porte G5 (g5-no-naked-todo, R-13),
-# G1 (g1-model-pinning, R-1 : épinglage des modèles) et le G3 du chemin de recalcul S2
+# 2026-09-30, lot D8a, et g3 le même jour, lot D8b, ADR-0028 D8) : ce workflow porte G5
+# (g5-no-naked-todo, R-13), G1 (g1-model-pinning, R-1 : épinglage des modèles), le G3 des
+# secrets (g3-secrets, plancher de motifs) et le G3 du chemin de recalcul S2
 # (s2-harness-unittest). Les gates de forge du code Rust vivent dans squelette.yml,
 # mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
 # s2-harness a deux périmètres (ADR-0028 D6 (i)) :
@@ -17,7 +18,7 @@
 # required_status_checks (GC-09). La forge ne démarre plus les jobs (GC-01) : le G3
 # opérant est l'oracle local, rejoué par l'orchestrateur (ADR-0028 D6 (iii), §4.11).
 # Required check et premier run sur la forge : items SHOGEN-CI-S2-FORGE-1 (ADR-0028,
-# annexe B.4) et SHOGEN-G1-FORGE-1 (lot D8a).
+# annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a) et SHOGEN-G3-FORGE-1 (lot D8b).
 
 name: gates
 on:
@@ -80,6 +81,33 @@ jobs:
       - name: épinglage des modèles de l'arbre (liste blanche exacte, R-1)
         shell: bash
         run: bash enforcement/lint-model-pinning.sh .
+
+  g3-secrets:
+    # Lot D8b (2026-09-30, ADR-0028 D8 ; G0 docs/adr-0028/G0-lot-D8b.md, journal
+    # docs/G1-lot-D8b.md) : gate G3 des secrets, plancher de motifs porté du blob 6789a30
+    # (adb2213), sur les fichiers suivis. Étape 1 : les cas de la gate, dans des dépôts
+    # jetables mktemp, valeurs formées à l'exécution depuis des fragments tronqués ; étape 2 :
+    # l'arbre du dépôt. Aucune action ni installation nouvelle (R-8) : bash, git et les
+    # outils de l'image (grep, awk, tr, mktemp, iconv : item SHOGEN-G3-FORGE-1 (c)).
+    # name: = identifiant du job, un seul nom pour le futur required check.
+    name: g3-secrets
+    # Image épinglée, comme les autres jobs (GC-11 ; SHOGEN-CI-RUNNERS-1).
+    runs-on: ubuntu-24.04
+    # Étapes mesurées en local (Git Bash, 2026-09-30, après la revue G2) : 84 cas en 91 à 92 s,
+    # l'arbre du dépôt (302 fichiers, boucle par fichier) en 63 s. 15 min bornent un blocage.
+    timeout-minutes: 15
+    steps:
+      # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
+      # SHA des jobs g1-model-pinning et s2-harness-unittest.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas de la gate des secrets (dépôts jetables, valeurs formées à l'exécution)
+        shell: bash
+        run: bash enforcement/tests/run-fixtures-secrets.sh
+      - name: secrets des fichiers suivis (plancher de motifs, G3)
+        shell: bash
+        run: bash enforcement/gate-secrets.sh --tree
 
   s2-harness-unittest:
     # Lot CI-S2 (2026-09-29, ADR-0028 D6 (iii) ; cp-1 bref C-1..C-8) : la suite

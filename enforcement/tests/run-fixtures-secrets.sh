@@ -67,6 +67,45 @@ r; b="$(printf 'cible' | git -C "$R" hash-object -w --stdin)" && git -C "$R" upd
 cas T-12 0 '0 fichier(s)' "'lien' ignoré, entrée non-blob"
 D="$W/nh"; cas T-13 2 SECRETS/echec "hors d.un arbre de travail"
 r; A=--hstory; cas T-14 2 SECRETS/echec 'argument inconnu'
+# Bornes, mode indexé, contrat d'exclusion (T-15 à T-30, T-68). Le fichier d'exclusion est suivi (ajouté à l'index)
+# sauf en T-25 : dans l'amont, les cas 12 et 13 le laissaient non suivi et touchaient la branche « non suivi ».
+r; printf 'k = "%s"\n' "$V" > "$R/l.py"; st l.py; TMPDIR="$W/absent" cas T-15 2 SECRETS/echec 'mktemp a échoué'
+r; for i in 1 2 3 4 5 6 7 8 9 10 11 12; do printf '%s\n' "$G"; done > "$R/n.py"; st n.py; cas T-16 2 SECRETS/forme '\(\+4 ligne\(s\) non listée'
+r; printf 'k = "%s"\n2\n3\n4\n5\n' "$V" > "$R/m.py"; ci m; printf 'k = "%s"\n2\n3\n4\ncinq\n' "$V" > "$R/m.py"; st m.py
+cas T-17 2 SECRETS/forme '^m\.py:1: '
+r; printf 'k = "%s"\n' "$V" > "$R/d.py"; ci d; git -C "$R" rm -q d.py || fatal rm; cas T-18 0 '0 fichier(s)'
+r; forme G-09 > "$R/.env.example"; st .env.example; cas T-19 2 SECRETS/forme
+ex() { printf '%s\n' "$1" > "$R/.vibegates-secretscan-exclude"; [ "${2-}" = - ] || st .vibegates-secretscan-exclude; }
+r; printf 'k = "%s"\n' "$V" > "$R/l.py"; st l.py; ex '../out  # ADR-0001'; cas T-20 2 SECRETS/exclusion
+ex 'fx/'; cas T-21 2 SECRETS/exclusion 'sans marqueur ADR-'
+mkdir "$R/fx"; git -C "$R" mv l.py fx/l.py || fatal mv; ex 'fx/  # ADR-0001 fixtures'; cas T-22 0 '1 fichier(s)'
+r; mkdir -p "$R/enforcement/tests" "$R/enforcementX"; printf 'k = "%s"\n' "$V" | tee "$R/enforcement/tests/f.py" > "$R/enforcementX/c.py"
+st enforcement/tests/f.py; cas T-23 0 '0 fichier(s)' 'exclus par contrat'; st enforcementX/c.py; cas T-24 2 SECRETS/forme
+r; printf 'k = "%s"\n' "$V" > "$R/l.py"; st l.py; ex 'fx/  # ADR-0001' -; cas T-25 2 SECRETS/exclusion 'sans être suivi'
+r; printf 'k = "%s"\n' "$V" > "$R/l.py"; st l.py; ex '.  # ADR-0001 global'; cas T-26 2 SECRETS/exclusion 'pathspec global'
+r; mkdir "$R/fx"; printf 'k = "%s"\n' "$V" > "$R/fx/l.py"; st fx/l.py; ex 'fx/  # ADR-0001 fixtures'
+cas T-27 0 '1 fichier(s)' "l'exclusion 'fx/' retire 1 fichier\(s\) suivi"
+r; printf 'k = "%s"\n' "$V" > "$R/l.py"; st l.py; ex './/  # ADR-0001'; cas T-28 2 SECRETS/exclusion 'pathspec global'
+r; mkdir -p "$R/enforcement/policies"; printf 'k = "%s"\n' "$V" > "$R/enforcement/policies/p.py"; st enforcement; cas T-29 2 SECRETS/forme
+r; mkdir "$R/fx"; printf 'k = "%s"\n' "$V" > "$R/fx/l.py"; st fx/l.py; ex 'fx/../fx/  # ADR-0001'; cas T-30a 2 SECRETS/exclusion traversant
+ex '?*  # ADR-0001'; cas T-30b 2 SECRETS/exclusion 'toute la portée'; ex '/abs  # ADR-0001'; cas T-68 2 SECRETS/exclusion inutilisable
+# Revue G2, chemins et objets : glob (T-71, T-71b), blob remplacé (T-72), nom masqué (T-77, T-79, T-80), casse des pathspecs (T-78).
+r; b="$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" && l="$(printf 'c' | git -C "$R" hash-object -w --stdin)" || fatal objets
+git -C "$R" update-index --add --cacheinfo "100644,$b,[A]x.py" --cacheinfo "120000,$l,Ax.py" || fatal index
+cas T-71 2 SECRETS/forme '^\[A\]x\.py:1: '; A=--tree; cas T-71b 2 SECRETS/forme '^\[A\]x\.py:1: '
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci c; p="$(printf 'x' | git -C "$R" hash-object -w --stdin)" && git -C "$R" replace -f "$(git -C "$R" rev-parse HEAD:c.py)" "$p" || fatal replace
+A=--tree; cas T-72 2 SECRETS/forme '^c\.py:1: '
+r; printf 'k = "%s"\n' "$V" > "$R/$V.txt"; st "$V.txt"; cas T-77 2 SECRETS/forme '^\[forme masquée\];\.txt:1: ' QQQQ
+r; b="$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" && git -C "$R" update-index --add --cacheinfo "100644,$b,Enforcement/Tests/x.py" || fatal index
+A=--tree; GIT_ICASE_PATHSPECS=1 cas T-78 2 SECRETS/forme '^Enforcement/Tests/x\.py:1: '
+r; l="$(printf 'c' | git -C "$R" hash-object -w --stdin)" && git -C "$R" update-index --add --cacheinfo "120000,$l,$V.lnk" || fatal lien; cas T-79 0 '0 fichier(s)' "'\[forme masquée\];\.lnk' ignoré" QQQQ
+r; n="$(forme G-09)" || fatal "sonde G-09"; printf 'k = "%s"\n' "$V" > "$R/$n.txt"; st "$n.txt"; cas T-80 2 SECRETS/forme '^\[forme masquée\];\.txt:1: ' QQQQ
+# Table des sondes (T-31 : VENDOR, par alternative ; T-32 : GENERIC, par forme ; T-33 à T-35 : seuils ajoutés au G1).
+for id in $(awk -F '\t' '!/^#/ { print $1 }' "$FX"); do
+  case "$id" in V-*) l="T-31/$id" ;; G-*) l="T-32/$id" ;; *) l="$id" ;; esac
+  r; forme "$id" > "$R/p.txt" || fatal "sonde $id"; st p.txt
+  if [ "$(awk -F '\t' -v i="$id" '$1 == i { print $7 }' "$FX")" = 0 ]; then cas "$l" 0 '1 fichier(s)'; else cas "$l" 2 SECRETS/forme; fi
+done
 
 echo "secrets : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]
