@@ -343,3 +343,17 @@ Réponses de l'orchestrateur au rapport G1 de P0 : Q-1 `PERIMETRE` reste dans `s
 | SHOGEN-SENS-PLAGES-2 | sous plusieurs plages, les lignes de week-end disent encore « retirées par la plage » et « retirés en totalité par la plage » au singulier | orch. | relecture G2 de la partie 2 | ≈ 3 lignes et une re-capture [inféré] | G1 étape A, Q2 |
 
 Réponses de l'orchestrateur : Q1 coupe au segment gardée ; Q3 écart 2 (entiers des p̂ᵢ publiés) et constante `AX` de `test_critere` acceptés (énoncé de la construction (b), B.18 ; valeurs de la règle inchangées).
+
+## B.22 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B0 à B2 (journal `docs/G1-partie-2-etape-B-1.md` §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-FMT-CONTEXTE-1 | `str()` et `_fmt_dec` suivent `capitals` de l'appelant (`2E-75` écrit `2e-75` sous `capitals = 0`). Construction : `_fmt_dec` écrit sous `CONTEXTE_DECIMAL` | orch. | sous-lot B3 (partie 2) | ≈ 3 lignes et un test [inféré] | G1 B-1, L1 ; Q1 |
+| SHOGEN-CLOSURE-CONTEXTE-1 | le `localcontext` de `closure.py` (quarantaine) copie le contexte de l'appelant | orch. | tout G0 qui promeut la collecte (D6 vi) | ≈ 2 lignes [inféré] | G1 B-1, L2 |
+| SHOGEN-BLOC6-TS-NUM-1 | la ligne « sans ts » du bloc 6 ne compte que les relevés retenus des hôtes du pool ; un `ts` présent mais non numérique n'est pas traité | orch. | relecture G2 de la partie 2 | ≈ 5 lignes et un test [inféré] | G1 B-1, L4 |
+| SHOGEN-RAW-FIN-1 | l'oracle `raw.jsonl` refuse sur une lecture finale sans contrepartie (dernière ligne tronquée, arrêt entre les deux écritures du collecteur) ; verdict sur les journaux scellés inconnu (D.4 a). **Décision** : l'oracle reste strict ; l'exécution unique imprime et enregistre son verdict sans qu'il ferme l'exécution (la liste des gardes de D.4 b est fermée) ; conduite écrite au paquet | orch. | G0 du PAQUET (texte) ; exécution unique (verdict) | 0 ligne de code ; ≈ 3 lignes de texte [inféré] | G1 B-1, L5 ; Q3, Q5 |
+| SHOGEN-RAW-REDECODAGE-1 | l'oracle recalcule le sha256 des octets, pas le prix décodé (parseurs de `sources`, quarantaine) : la promesse de `journal.py` n'est tenue que pour l'intégrité des octets. SHOGEN-RAW-LECTEUR-1 est **fermé** sur l'oracle sha256 | orch. | tout G0 qui promeut la collecte ou `sources` | ≈ 40 lignes [inféré] | G1 B-1, L6 ; Q4 |
+| SHOGEN-RAW-MEMOIRE-1 | le lecteur charge le fichier entier ; mémoire non mesurée sur un `raw.jsonl` de campagne (D.4 a) | orch. | exécution unique (partie 4, poste de l'exécution : taille du fichier lue avant) | une mesure [inféré] | G1 B-1, L8 |
+| SHOGEN-CONTEXTE-MUTABLE-1 | `r1.CONTEXTE_DECIMAL` est un objet modifiable ; le test 1 fige ses valeurs | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 B-1, L9 |
+
+Réponses de l'orchestrateur : Q1 sous-lot B3 ; Q2 refus nommé sous filtre gardé (refus par défaut) ; Q3 strict ; Q4 oracle sha256 suffisant, redécodage en item ; Q5 appelant = exécution unique (étape C), verdict imprimé et enregistré. L3 (mutant équivalent) : constat, sans item.

@@ -152,3 +152,7 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
   `closure.py` (quarantaine, D6 vi) n'est pas touché, limite déclarée dans le journal G1. Tests : sous un contexte
   ambiant hostile (`ROUND_DOWN`, Emin −20, piège Inexact), le rendu J2 et les sorties de la règle égalent ceux du
   contexte par défaut. Règle scellée inchangée à l'octet (16 fixtures). ≤ 200 lignes, sinon coupe.
+
+### B — second ajout daté du 2026-10-02 04:53 UTC (adjudication de B0 à B2, annexe B.22)
+
+- **B3** porte aussi SHOGEN-FMT-CONTEXTE-1 (`_fmt_dec` sous `CONTEXTE_DECIMAL`). **C** appelle `records.verifier_raw` : verdict imprimé et enregistré, sans fermer l'exécution (SHOGEN-RAW-FIN-1). SHOGEN-RAW-LECTEUR-1 fermé.
