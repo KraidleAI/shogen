@@ -1,5 +1,9 @@
-//! **S-G5 `citations`** — une citation dans `docs/` doit exister dans le
-//! registre bibliographique ou dans les octets détenus.
+//! **S-G5 `citations`** — une citation dans `docs/` ou `s2-harness/` doit
+//! exister dans le registre bibliographique ou dans les octets détenus.
+//!
+//! Périmètre : celui de S-G4 (`crate::sg4::PERIMETRE`) — `docs/**/*.md`,
+//! puis `s2-harness/**/*.md` depuis le 2026-10-02 (SHOGEN-ORACLE-PERIMETRE-1
+//! (i), ADR-0028 annexe B).
 //!
 //! Ce qu'elle casse (DEVOPS §3) : « une citation entre guillemets dans
 //! `docs/` introuvable dans les sidecars de `biblio/` — la règle
@@ -35,6 +39,7 @@ use crate::documents::{
 };
 use crate::rapport::{Rapport, lire};
 use crate::roles::chemin_relatif;
+use crate::sg4::PERIMETRE;
 use crate::source::ligne_de;
 use std::path::Path;
 
@@ -66,9 +71,21 @@ const EXTENSIONS_TEXTE: &[&str] = &[
 
 pub fn executer(racine: &Path) -> Rapport {
     let mut rapport = Rapport::nouveau("S-G5", "citations (une-citation-un-grep, mécanisée)");
-    rapport
-        .chemins_couverts
-        .push(String::from("docs/**/*.md (extraction des « … » anglais)"));
+    // Le périmètre est recensé d'abord : sa couverture s'imprime même quand
+    // le registre manque (retour anticipé ci-dessous).
+    let mut fichiers = Vec::new();
+    for relatif in PERIMETRE {
+        let recensement = fichiers_markdown(racine, relatif);
+        for incident in recensement.incidents {
+            rapport.incident(incident);
+        }
+        rapport.chemins_couverts.push(format!(
+            "{relatif}/**/*.md : {} fichier(s) (extraction des « … » anglais)",
+            recensement.fichiers.len()
+        ));
+        fichiers.extend(recensement.fichiers);
+    }
+    rapport.presents = fichiers.len();
     rapport.chemins_couverts.push(String::from(
         "corpus : biblio/INDEX.md + octets texte de biblio/ présents",
     ));
@@ -141,17 +158,11 @@ pub fn executer(racine: &Path) -> Rapport {
         None => octets_presents == 0,
     };
 
-    // 2. Les citations des docs.
-    let recensement = fichiers_markdown(racine, "docs");
-    for incident in &recensement.incidents {
-        rapport.incident(incident.clone());
-    }
-    rapport.presents = recensement.fichiers.len();
-
+    // 2. Les citations des documents du périmètre.
     let mut controlees = 0usize;
     let mut ecartes = 0usize;
     let mut non_controlables = Vec::new();
-    for chemin in &recensement.fichiers {
+    for chemin in &fichiers {
         let Some(texte) = lire(&mut rapport, racine, chemin) else {
             continue;
         };

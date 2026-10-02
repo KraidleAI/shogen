@@ -323,3 +323,11 @@ Item de la revue G2 de D5-AMEND (Q-G2-3), formé par la revue et ratifié par l'
 | item | objet et construction | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-SENS-PERTES-2 | [SENSIBILITÉ] imprime les enregistrements PRÉSENTS retirés par la plage (C-12) ; les fenêtres de grille sans marqueur dans une plage D5 et les lectures absentes des fenêtres de la plage ne sont comptées nulle part (SHOGEN-DP-JOURNAL-LOSS-1 dit « pertes du journal dans la plage »). Construction : par plage, `fenetres_sautees(ws_tous, spec, w, (a, b + 1), ())` par strate, et lectures absentes = somme sur les fenêtres de la plage ayant un marqueur de |pool_s| moins les lectures présentes, imprimées à côté des comptes actuels | orch. | G0 de RENDU-1 (partie 2) | ≈ 10 lignes de code et 20 de tests [inféré, revue G2] | revue G2 de D5-AMEND, Q-G2-3 |
+
+## B.20 Amendement daté du 2026-10-02 : partie 2, lot P0 (rapport G1 §6 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PERIMETRE-DISQUE-1 | S-G4 et S-G5 recensent le disque, pas l'index git : un `.md` non suivi sous `docs/` ou `s2-harness/` (dont `s2-harness/data/`, ignoré par `.gitignore` l.38) entre au périmètre ; sous l'annexe D, S-G4 imprime la ligne fautive et S-G5 chaque fragment non contrôlé, d'où un risque d'exposition de lignes de campagne dans une sortie `verify` lue par un agent frais (FM-1.1). Construction : (a) sur le poste local, avant le premier `verify` qui suit P0, comparer `find s2-harness -name '*.md'` et `git ls-files s2-harness` par compte seulement ; (b) recensement par l'index git : décision d'ADR, non prise | orch. | (a) premier `xtask verify` sur le poste local après P0 ; (b) G0 de la partie 3 | (a) une commande ; (b) ≈ 20 lignes [inféré] | rapport G1 de P0, L-1 ; G0 de P0, risque (b) |
+
+Réponses de l'orchestrateur au rapport G1 de P0 : Q-1 `PERIMETRE` reste dans `sg4.rs` ; Q-2 changement du chemin d'erreur de S-G5 accepté (couverture « 0 sur N », verdict ROUGE inchangé) ; Q-3 `docs/DEVOPS.md` §3 amendé au commit de P0 ; Q-4 item ci-dessus ; Q-5 tests ajoutés au-delà du G0 gardés (resserrages). L-3 (aucun fragment de `s2-harness/` au-dessus du seuil de S-G5) : constat, sans item neuf (SHOGEN-E1-XTASK-REFS-1 couvre les angles morts).
