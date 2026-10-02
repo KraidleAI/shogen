@@ -35,3 +35,27 @@ scellé du 2026-10-02 (`494d770d…`), §9-§10.
 Relecture G2 par un réviseur neuf ; commit ; nouveau commit d'analyse ; rejeux au gel (oracle (4), S-b) ; nouveau bloc
 machine ; paquet révisé (texte inchangé hors bloc et une mention datée du premier sceau et de CORR-2), cp-1 bref d'un
 validateur frais ; nouveau scellement, nouveau jeton FreeTSA, délai de 24 h depuis son genTime.
+
+## Extension CORR-3 (ajout daté du 2026-10-02 22:2x UTC ; décision de l'investisseur, verbatim : « ok, continue, clors tout »)
+
+Liste fermée des items de l'annexe B clos dans le même lot, avant le nouveau gel (le code est rouvert par la décision
+de resceller ; chacun est sans effet sur les valeurs de la règle) :
+
+| item | annexe B | construction |
+|---|---|---|
+| SHOGEN-SCEAU-VERIFY-REQUETE-1 | B.35 | test `test_verify_lie_le_jeton_a_la_requete` de la relecture G2 de la partie 3 (`docs/G2-partie-3.md` §6, C-1), tel quel |
+| SHOGEN-RENDU-MKDTEMP-1 | B.41 | `mkdtemp` de `produire_tout` dans le `try` ; parent absent : ligne « échec de production », code 1 ; un test |
+| SHOGEN-RAW-CHEMIN-1 | B.41 | verdict du run `raw` sans le chemin absolu des journaux (réécrit comme les avertissements du lecteur) ; un test |
+| SHOGEN-TESTS-C8-SUITE-1 | B.41 | tests : contrôle de `window_start` et de `harness_ts` (C-8 de la partie 2), `suite` en tête des runs (mutants M29, M30, M24 de R-C) |
+| SHOGEN-TESTS-HOTE-DEUX-FLUX-1 | B.42 | tests : hôte à deux flux (R2, k_eff), branche « VRAI, borne supérieure de k_eff < k nominal → éteint » (mutants M03b, M15, M06, M01 de R-B) |
+| SHOGEN-TESTS-BORDS-R1-1 | B.43 | tests : staleness `>` contre `>=`, garde §5.4 `<` contre `<=` (mutants de R-A) |
+| SHOGEN-R1-DOCSTRINGS-1 | B.32 | docstrings de `r1.block_long_run_variance` (Künsch 1989 versé et lu) et de `r1.regle_critere` (texte normatif : le paquet) |
+| commentaires et libellés (C-3, C-5 de R-A ; C-4 de R-B) | B.42, B.43 | commentaires de `records.py` l.10 et l.41-42 ; docstring de `model.py` ; libellés périmés de `report.py` cités par R-B |
+| SHOGEN-ASN-DIVERGENCE-ECHEC-1 | B.42 | un relevé `resolve_failed` ou à base muette n'est plus imprimé comme « DIVERGENCE ASN » ; un test ; k_eff et drapeau 2 inchangés |
+
+Hors du lot, par construction : SHOGEN-D3-LIFT-1 (publié au rapport `docs/11`) ; analyses « ajoutées après le
+pré-enregistrement » (FLUX-QUASI-MORT-1 sensibilité, -2, FLUX-DEVIANT-1, FLUX-FAIBLE-1, POOL-MIN-1, HOST-DEGRADED-2,
+CENSURE-INFO-2, DEP-FENETRES-2, R1-PLUGIN-1, CONTENU-DEP-1, POOLEE-BLOC-1) ; ancre OpenTimestamps (investisseur).
+Mêmes contraintes que CORR-1 et CORR-2 (tests d'abord, non-régression `ea3a2d94…`, `4e62fbb8…`, `d079dd9d…` ; un
+rendu épinglé qui changerait par l'item ASN est ré-épinglé avec le diff textuel lu, seules les lignes de l'item
+changeant) ; sous-lots R-25.
