@@ -403,3 +403,14 @@ Réponses de l'orchestrateur : Q1 serrage E2 retenu (jeton lié à `PAQUET.sha25
 | SHOGEN-RENDU-TABLE-REELLE-1 | la table réelle des sorties (bornes de D4, n fixe 38 600, plage de D5) ne tourne pas de bout en bout sur fixture (il faudrait plus de 38 600 fenêtres synthétiques) : contrôlée contre des constantes écrites à la main depuis l'ADR ; première exécution de bout en bout = exécution unique | orch. | exécution unique (partie 4) ; texte au PAQUET | 0 ligne [inféré] | G1 C-2, L4 |
 
 Items proposés par le G1 et soldés par décision au G0 §C (ajout daté) : SHOGEN-RENDU-ETIQUETTE-1 (Q4), SHOGEN-RECALCUL-TIERS-PORTEE-1 (Q6), SHOGEN-RENDU-ECHEC-TARDIF-1 (Q8), SHOGEN-RENDU-NOMS-JOURNAUX-1 (L3) : construits dans C3.
+
+## B.27 Amendement daté du 2026-10-02 : partie 2, étape C, sous-lot C3 (journal `docs/G1-partie-2-etape-C-3.md` §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-ECHEC-DIAG-1 | à l'échec, rien ne reste (aucun contenu de sortie gardé, par décision : Q3) ; seuls l'heure, le run en échec et son code sortent sur stderr | orch. | limite déclarée ; texte de la procédure d'exécution (partie 4) | 0 ligne [inféré] | G1 C-3, L1 ; Q3 |
+| SHOGEN-RENDU-COUT-1 | durée des runs sur les journaux réels non mesurable avant l'exécution (délai par défaut 3 600 s par commande) | orch. | exécution unique (partie 4) : `--gardes-seules` d'abord, taille des journaux lue | une mesure [inféré] | G1 C-3, L2 |
+| SHOGEN-RENDU-RENAME-POSIX-1 | sous POSIX, `os.rename` remplace un répertoire vide apparu entre le contrôle de `--sortie` et le renommage | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 C-3, L3 |
+| SHOGEN-RENDU-TABLE-DELIMITEURS-1 | le test nominal dépend des deux lignes de commentaire qui délimitent la table des sorties dans `rendu_unique.py` | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 C-3, L4 |
+
+Réponses de l'orchestrateur : Q1 texte de la déclaration de Q2 dans l'étiquette des J14 accepté ; Q2 `--gardes-seules` entre à la procédure d'exécution (SHOGEN-RENDU-HOTE-1) ; Q3 non : aucun diagnostic de contenu après échec. Borne haute de la plage D5 contrôlée par l'orchestrateur : 15:08Z ratifiée (décision 272, ADR-0028 l.59), égale aux tests existants.
