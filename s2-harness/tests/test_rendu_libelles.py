@@ -2,8 +2,8 @@
 des blocs 3 à 6 et de [SENSIBILITÉ]. SHOGEN-GARDE-LIBELLE-1 (seuil appliqué imprimé aux trois sites),
 SHOGEN-RENDU-ZERO-1 (« 0 » pour un zéro Decimal exact), SHOGEN-AXES-ENONCE-1 (construction (b) : axes évaluables
 de la strate et résidu nommé ; J1 et J2 : tests/test_critere.py, constante AX), SHOGEN-SENS-PLAGES-1 (titre
-accordé au nombre de plages). Attendus écrits à la main depuis la conception des fixtures (collecteur réel,
-aucune donnée de campagne). Chaque test nomme la mutation qui le rougit."""
+accordé au nombre de plages) et -2 (lignes de week-end, partie 3, lot P3). Attendus écrits à la main depuis la
+conception des fixtures (collecteur réel, aucune donnée de campagne). Chaque test nomme la mutation qui le rougit."""
 
 from __future__ import annotations
 
@@ -87,6 +87,19 @@ class TestRenduLibelles(unittest.TestCase):
             lignes = report.render_report(c, j, exclude_ranges=rg).splitlines()
             self.assertEqual([x for x in lignes if x.startswith("[SENSIBILITÉ]")],
                              [f"[SENSIBILITÉ] {titre}{SUITE}"])
+
+    def test_lignes_week_end_accordees_au_nombre_de_plages(self):
+        """SENS-PLAGES-2 : une, deux puis trois plages (la troisième hors campagne) : chaque ligne de week-end finit
+        par « retirées par la plage <n> », puis « retirées par les <k> plages <n> » ; ligne des totaux : « retirés en
+        totalité par la plage : », puis « … par les <k> plages : ». Rougit si : singulier sous plusieurs plages ;
+        nombre codé en dur ; pluriel sans le nombre."""
+        c, j = fixture(tempfile.mkdtemp(prefix="s2p3b_"))
+        for rg, par in (([RA], "la plage"), ([RA, RB], "les 2 plages"), ([RA, RB, (t(1, 0), t(1, 5))], "les 3 plages")):
+            lignes = report.render_report(c, j, exclude_ranges=rg).splitlines()
+            we = [re.sub(r" \d+$", "", x.split(" ; ")[-1]) for x in lignes if x.startswith("    week-end ")]
+            tot = [x.split(" ; ")[-1].rsplit(" : ", 1)[0] for x in lignes if x.startswith("    en totalité : ")]
+            with self.subTest(plages=len(rg)):
+                self.assertEqual((we, tot), ([f"retirées par {par}"] * 3, [f"retirés en totalité par {par}"]))
 
 
 if __name__ == "__main__":

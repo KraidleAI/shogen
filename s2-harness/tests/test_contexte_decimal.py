@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import contextlib
 import unittest
-from decimal import (ROUND_DOWN, ROUND_HALF_EVEN, Decimal as D, DivisionByZero, Inexact, InvalidOperation, Overflow,
-                     getcontext, localcontext)
+from decimal import (ROUND_DOWN, ROUND_HALF_EVEN, Context, Decimal as D, DivisionByZero, Inexact, InvalidOperation,
+                     Overflow, getcontext, localcontext)
 
 from shogen_s2 import lm, r1, r2, report
 from tests.test_arrondi import CAS
@@ -51,13 +51,29 @@ def hostile():
 
 class TestContexteDecimalNomme(unittest.TestCase):
     def test_contexte_nomme_complet(self):
-        """DefaultContext de la bibliothèque standard (_pydecimal.py), précision DECIMAL_PREC. Rougit si : un attribut
-        change (prec, rounding, Emin, Emax, capitals, clamp, traps) ou un drapeau est levé."""
-        k = r1.CONTEXTE_DECIMAL
+        """DefaultContext de la bibliothèque standard (_pydecimal.py), précision DECIMAL_PREC, rendu par la fabrique
+        (CONTEXTE-MUTABLE-1). Rougit si : un attribut change (prec, rounding, Emin, Emax, capitals, clamp, traps) ou un
+        drapeau est levé."""
+        k = r1.contexte_decimal()
         self.assertEqual((k.prec, k.rounding, k.Emin, k.Emax, k.capitals, k.clamp),
                          (50, ROUND_HALF_EVEN, -999999, 999999, 1, 0))
         self.assertEqual({s for s, v in k.traps.items() if v}, {InvalidOperation, DivisionByZero, Overflow})
         self.assertFalse(any(k.flags.values()))
+
+    def test_contexte_nomme_non_modifiable(self):
+        """SHOGEN-CONTEXTE-MUTABLE-1 : contexte neuf à chaque usage ; affectations sur un contexte rendu (prec 10,
+        ROUND_DOWN, Emin −20, piège et drapeau Inexact) : le suivant garde les valeurs nommées, un site de lm et un de
+        r1 leurs attendus (oracle du test des sites) ; aucun module du chemin de recalcul (r1, lm, r2, report) ne tient
+        d'objet Context. Rougit si : la fabrique rend un objet partagé ; un contexte de module revient."""
+        k = r1.contexte_decimal()
+        k.prec, k.rounding, k.Emin, k.traps[Inexact], k.flags[Inexact] = 10, ROUND_DOWN, -20, True, True
+        n = r1.contexte_decimal()
+        self.assertEqual((n is k, n.prec, n.rounding, n.Emin, n.traps[Inexact], n.flags[Inexact]),
+                         (False, 50, ROUND_HALF_EVEN, -999999, False, False))
+        self.assertEqual((lm.pairwise_second_moment(2, 4), r1._median([D("1E-75"), D("3E-75")])),
+                         (D("0.1" + "6" * 48 + "7"), D("2E-75")))
+        self.assertEqual([(m.__name__, x) for m in (r1, lm, r2, report) for x, v in vars(m).items()
+                          if isinstance(v, Context)], [])
 
     def test_sites_sous_contexte_hostile(self):
         """13 sites de r1 (CAS de test_arrondi), 10 de lm et r2 non exercés sur J2 (X), médiane de 1E-75 et 3E-75 (0E-69

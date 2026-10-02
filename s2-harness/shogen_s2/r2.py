@@ -67,7 +67,6 @@ from typing import Callable, Optional
 
 from . import r1, records
 from .r1 import (
-    CONTEXTE_DECIMAL,
     DECIMAL_PREC,
     SEUIL_HIST,
     SEUIL_Z,
@@ -75,6 +74,7 @@ from .r1 import (
     binomial_tail_ge,
     build_reading_map,
     build_window_strate,
+    contexte_decimal,
     gate_value,
     z_score,
 )
@@ -432,7 +432,7 @@ def pearson(xs: list[Decimal], ys: list[Decimal]) -> tuple[Optional[Decimal], st
     """Corrélation de Pearson SIGNÉE de deux séries appariées, précision FIXÉE.
     None si n < 2 ou une série est constante (variance nulle → ρ non défini) — jamais
     un 0 fabriqué (fail-closed de publication, §5.2). Rend (ρ, note)."""
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         n = len(xs)
         if n < 2:
             return None, f"n={n} < 2 — corrélation non définie"
@@ -472,7 +472,7 @@ def lnprice_by_window(wins: list[int], reading_map: dict) -> dict[int, dict[str,
     flux) (chaque ln calculé UNE fois, jamais par paire). Bit-identique : même valeur,
     calculée une fois ou N fois (arrondi correct, prec fixée — ADR-0003)."""
     out: dict[int, dict[str, Decimal]] = {}
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         for (ws, f), rd in reading_map.items():
             if rd.get("status") == "ok" and rd.get("price") is not None:
                 p = Decimal(rd["price"])
@@ -487,7 +487,7 @@ def log_returns(wins: list[int], lnp: dict, f: str, w: int) -> dict[int, Decimal
     non ponté (un rendement enjambant un trou a la mauvaise variance). Clé = ws de j.
     Consomme le précalcul `lnp` (lnprice_by_window)."""
     out: dict[int, Decimal] = {}
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         for k in range(1, len(wins)):
             ws, prev = wins[k], wins[k - 1]
             if ws - prev != w:
@@ -519,7 +519,7 @@ def rho_resid(wins, lnp, a, b, n_min, k_min=4) -> dict:
     à < k_min autres répondantes est exclue (jamais un résidu au pool mal défini).
     Consomme le précalcul `lnp` (O(fenêtres × flux), plus de re-balayage par paire)."""
     xa, xb, ncommon = [], [], []
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         for ws in wins:
             cell = lnp.get(ws, {})
             if a not in cell or b not in cell:
@@ -542,7 +542,7 @@ def _quantize(p: Decimal, tick_rule: str) -> Decimal:
     quantum décimal (ex. « 0.01 »)."""
     if tick_rule == "exact":
         return p
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         return p.quantize(Decimal(tick_rule))
 
 
@@ -577,7 +577,7 @@ def tick_identity(wins, reading_map, a, b, w, n_min, tick_rule, delta_windows) -
         n_shift += 1
         if _quantize(pa, tick_rule) == _quantize(pb2, tick_rule):
             eq_shift += 1
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         T = None if n_common == 0 else +(Decimal(eq) / Decimal(n_common))
         T_delta = None if n_shift == 0 else +(Decimal(eq_shift) / Decimal(n_shift))
     non_constant = len(values_seen) >= 2
@@ -596,7 +596,7 @@ def _aberrance_by_window(wins, lnp, pool, kappa) -> dict[int, dict]:
     Consomme le précalcul `lnp` ; la médiane des e est calculée UNE fois (pas par élément)."""
     out: dict[int, dict] = {}
     poolset = set(pool)
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         for ws in wins:
             elns = {f: v for f, v in lnp.get(ws, {}).items() if f in poolset}
             if len(elns) < 2:
@@ -636,7 +636,7 @@ def coaberrance_kz(aber: dict, a, b, seuil_hist=SEUIL_HIST) -> dict:
     if n == 0:
         return {"K": 0, "n": 0, "z": None, "queue": None,
                 "note": "aucune fenêtre co-évaluable (MAD nulle ou pool trop petit)"}
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         pa_p, pa_n = Decimal(ap) / Decimal(n), Decimal(an) / Decimal(n)
         pb_p, pb_n = Decimal(bp) / Decimal(n), Decimal(bn) / Decimal(n)
         p_co = +(pa_p * pb_p + pa_n * pb_n)
@@ -658,7 +658,7 @@ def _jumps(wins, lnp, f, w, jump_sigma) -> dict[int, int]:
     r = log_returns(wins, lnp, f, w)
     if len(r) < 2:
         return {}
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         vals = list(r.values())
         m = sum(vals, Decimal(0)) / Decimal(len(vals))
         var = sum(((v - m) ** 2 for v in vals), Decimal(0)) / Decimal(len(vals))
@@ -926,7 +926,7 @@ def cluster_lm_correlations(partition, markers, readings, pool, w, sigma_by_clas
         fa, fb = ca["flux"], cb["flux"]
         na, nb = len(fa), len(fb)
         xs, ys = [], []
-        with localcontext(CONTEXTE_DECIMAL):
+        with localcontext(contexte_decimal()):
             for ws in wins:
                 ma = sum(1 for f in fa if cells.get((ws, f)) in ECARTS)
                 mb = sum(1 for f in fb if cells.get((ws, f)) in ECARTS)

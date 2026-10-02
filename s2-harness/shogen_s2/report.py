@@ -42,7 +42,6 @@ from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
-    CONTEXTE_DECIMAL,
     ELL_BLOC,
     ETIQUETTE_POOLEE,
     GARDE_BLOCS,
@@ -52,6 +51,7 @@ from .r1 import (
     build_window_strate,
     classify_cells,
     compute_r1,
+    contexte_decimal,
     fenetres_sautees,
     fenetres_sautees_vivant,
     parse_journal,
@@ -74,7 +74,7 @@ def _fmt_dec(x) -> str:
     """Decimal → chaîne exacte (recalculable) ; zéro Decimal exact → « 0 », forme unique quel que soit l'exposant
     hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret. Écrit sous le contexte nommé, jamais celui de l'appelant
     (capitals de l'exposant : SHOGEN-FMT-CONTEXTE-1)."""
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
 
 
@@ -716,7 +716,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             if e is None or i is None or e["z"] is None or i["z"] is None:
                 ap(f"  {st:8} écart de z : non calculable (z non publié ou strate absente d'une variante)")
             else:
-                with localcontext(CONTEXTE_DECIMAL):
+                with localcontext(contexte_decimal()):
                     dz = +(i["z"] - e["z"])
                 ap(f"  {st:8} écart de z = {_fmt_dec(dz)}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
@@ -731,6 +731,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                               if weekday_utc(d * 86400) in jours}, sc) if jrs else {}
             inc = {k: inc.get(k, 0) for k in sorted(set(inc) | set(cal))}
             plein = {k: len(range(-(-k[0] // w) * w, k[1], w)) for k in inc}
+            pl = "la plage" if len(ranges) == 1 else f"les {len(ranges)} plages"      # SENS-PLAGES-2
             ap(f"  couverture par week-end (fenêtres « {sc['stress']} », stress_weekdays = {sorted(jours)} "
                f"UTC ; w = {w} s de run_params ; durée = fenêtres × w) :"
                + ("" if inc else " aucun week-end"))
@@ -738,11 +739,11 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                 n_e = ex.get((a, b), 0)
                 ap(f"    week-end {_iso_utc(a)[:10]} [{a} ; {b}) : complet = {plein[a, b]} fenêtres = "
                    f"{_duree(plein[a, b] * w)} ; exclue {n_e} = {_duree(n_e * w)} ; incluse {n_i} = "
-                   f"{_duree(n_i * w)} ; retirées par la plage {n_i - n_e}")
+                   f"{_duree(n_i * w)} ; retirées par {pl} {n_i - n_e}")
             tot = [sum(1 for k in inc if d.get(k, 0) == plein[k]) for d in (ex, inc)]
             par = [sum(1 for k in inc if 0 < d.get(k, 0) < plein[k]) for d in (ex, inc)]
             ap(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue {par[0]}, "
-               f"incluse {par[1]} ; retirés en totalité par la plage : "
+               f"incluse {par[1]} ; retirés en totalité par {pl} : "
                f"{sum(1 for k in inc if inc[k] and k not in ex)}")
             ap("    non couverts (0 fenêtre dans les deux variantes, entre la première et la dernière "
                f"fenêtre de l'assiette) : {sum(1 for k in inc if not inc[k])}")

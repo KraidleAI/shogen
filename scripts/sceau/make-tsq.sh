@@ -9,6 +9,9 @@ shift || true
 cd "$(git rev-parse --show-toplevel)"
 mkdir -p "$D/chain"
 [ "$#" -ge 1 ] || { echo "usage: make-tsq.sh <dossier sceau> <fichier du paquet>..." ; exit 2 ; }
+# convention unique du manifeste (SCEAU-VERIFY-CHEMINS-1, relue depuis la racine par verify.sh) : chemin relatif à
+# la racine, sans « .. » ni lecteur ni barre inverse ; contrôlée avant toute écriture
+for f in "$@"; do case "/$f/" in //*|*/../*|/[A-Za-z]:*|*\\*) echo "refus : $f hors de la convention du manifeste" ; exit 2 ;; esac ; done
 # manifeste : chemins relatifs à la racine du dépôt, LF, sans BOM
 : > "$D/PAQUET.sha256"
 for f in "$@"; do sha256sum -b "$f" >> "$D/PAQUET.sha256"; done

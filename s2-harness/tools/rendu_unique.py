@@ -159,12 +159,16 @@ def g1(c: dict):
 
 
 def g2(c: dict):
-    """(2) git diff --quiet <commit_analyse> <head> -- CHEMINS sort 0, et arbre de travail propre sur CHEMINS (git
-    status : aucune modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
+    """(2) git diff --quiet <commit_analyse> <head> -- CHEMINS sort 0 ; arbre de travail jugé contre le commit gardé
+    (git diff --quiet <head> -- CHEMINS sort 0 : RENDU-STATUS-HEAD-1) ; git status sur CHEMINS vide (aucune
+    modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
     r, commit = racine(c), c["bloc"]["commit_analyse"]
     d = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, head(c), "--", *CHEMINS)
     if d.returncode:
         return f"git diff --quiet {commit} {head(c)} -- {' '.join(CHEMINS)} : code {d.returncode}"
+    a = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", head(c), "--", *CHEMINS)
+    if a.returncode:
+        return f"arbre de travail ≠ commit gardé {head(c)} sur {' '.join(CHEMINS)} (git diff : code {a.returncode})"
     s = git(r, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", *CHEMINS)
     if s.returncode or s.stdout:
         return f"arbre de travail modifié sur {' '.join(CHEMINS)} : {s.stdout.decode('utf-8', 'replace')[:300]!r}"
@@ -235,9 +239,9 @@ def voie_a(c: dict) -> datetime:
 def voie_b(c: dict) -> datetime:
     """(6) voie (b) : SCEAU/GO-sans-ancre.txt en UTF-8 strict, sans BOM, LF, les trois lignes exactes de GO (date ISO
     8601 UTC du calendrier) ; son sha256 complet dans JOURNAL.md à HEAD, première occurrence sur une ligne postérieure
-    à la première qui porte le sha du paquet (scellement). S et Gc : premiers commits qui introduisent dans JOURNAL.md
-    le sha du paquet et celui du go ; refus si Gc = S, si S n'est pas ancêtre de Gc, si ct(Gc) ≤ ct(S), ou si la date
-    du go n'est pas dans [ct(S) ; ct(Gc)] (D.4 c ; SHOGEN-GO-ORDRE-1, G2 C-3). Rend ct(Gc)."""
+    à la première qui porte le sha du paquet (scellement). S et Gc : premiers commits dont une ligne de JOURNAL.md
+    porte le sha du paquet, celui du go (premier) ; refus si Gc = S, si S n'est pas ancêtre de Gc, si ct(Gc) ≤ ct(S),
+    ou si la date du go n'est pas dans [ct(S) ; ct(Gc)] (D.4 c ; SHOGEN-GO-ORDRE-1, G2 C-3). Rend ct(Gc)."""
     with open(os.path.join(racine(c), SCEAU, "GO-sans-ancre.txt"), "rb") as f:
         octets = f.read()
     m = GO.fullmatch(octets.decode("utf-8"))
@@ -258,13 +262,16 @@ def voie_b(c: dict) -> datetime:
 
 
 def premier(c: dict, sha: str) -> tuple:
-    """Premier commit qui introduit sha dans JOURNAL.md (git log --no-textconv --reverse --format="%H %ct" -S<sha>
-    <head> -- JOURNAL.md) : (sha du commit, date de commit UTC) ; aucun : ValueError."""
-    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%H %ct", "-S" + sha, head(c), "--", "JOURNAL.md")
-    x = p.stdout.decode().split()
-    if p.returncode or len(x) < 2:
-        raise ValueError(f"aucun commit n'introduit {sha} dans JOURNAL.md à {head(c)}")
-    return x[0], datetime.fromtimestamp(int(x[1]), timezone.utc)
+    """Premier commit dont JOURNAL.md porte une ligne qui contient sha entier (lignes_avec, comme (1) ; GO-PICKAXE-1) :
+    candidats de git log --no-textconv --reverse --format="%H %ct" -G<sha> <head> -- JOURNAL.md (lignes ajoutées ou
+    retirées qui contiennent sha), chacun confirmé sur git show <commit>:JOURNAL.md ; (sha du commit, date de commit
+    UTC) ; aucun : ValueError."""
+    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%H %ct", "-G" + sha, head(c), "--", "JOURNAL.md")
+    for commit, ct in (x.split() for x in (p.stdout.decode().splitlines() if not p.returncode else [])):
+        j = git(racine(c), "show", f"{commit}:JOURNAL.md")
+        if not j.returncode and lignes_avec(j.stdout.decode("utf-8", "replace"), sha):
+            return commit, datetime.fromtimestamp(int(ct), timezone.utc)
+    raise ValueError(f"aucun commit n'introduit une ligne qui porte {sha} dans JOURNAL.md à {head(c)}")
 
 
 VOIES = (("a", voie_a), ("b", voie_b))
@@ -400,7 +407,7 @@ def produire(argv: list) -> int:
                                                                                      segment=seg)]
     avert = [x for x in err.getvalue().replace(os.path.join(a.journaux, ""), "").splitlines() if x.strip()]
     if a.nom == "recalcul-tiers":
-        with localcontext(r1.CONTEXTE_DECIMAL):
+        with localcontext(r1.contexte_decimal()):
             texte = json.dumps({**out, "avertissements": avert}, ensure_ascii=False, indent=1, sort_keys=True,
                                default=_decimal)
     else:                                           # étiquette (ou verdict), avertissements, puis le rendu
@@ -413,9 +420,11 @@ def produire_tout(c: dict, a, cible: str) -> int:
     """Gardes levées (G0 §C, Q5 à Q8) : runs RUNS de l'enregistreur sur l'extraction de HEAD, arrêt au premier échec,
     dans un répertoire temporaire voisin de la cible ; motif de déviation écrit ; enregistrement de rôle « rendu »
     (paquet.sha256, sceau.genTime, base = commit_analyse) relu par verifier (tree.sha256 recalculé) ; renommage en une
-    fois. Tout échec : rien ne reste, code 1, heure et motif sur stderr. Sortie standard : chemins et sha256 seulement,
-    aucun contenu de sortie."""
+    fois, qui refuse une cible présente à cet instant (POSIX : création exclusive de la cible, puis renommage sur cette
+    réserve vide ; Windows : os.rename ne remplace jamais ; RENDU-RENAME-POSIX-1). Tout échec : rien ne reste, code 1,
+    heure et motif sur stderr. Sortie standard : chemins et sha256 seulement, aucun contenu de sortie."""
     tmp, fait = tempfile.mkdtemp(prefix=f".{os.path.basename(cible)}.", dir=os.path.dirname(os.path.abspath(cible))), 0
+    reserve = None
     try:
         if a.deviation is not None:
             with open(os.path.join(tmp, "DEVIATION.txt"), "x", encoding="utf-8", newline="\n") as f:
@@ -431,7 +440,10 @@ def produire_tout(c: dict, a, cible: str) -> int:
                 echecs = [(x["nom"], x["exit"]) for x in json.load(f)["runs"] if x["exit"]]
             raise RuntimeError(f"run en échec : {echecs}")
         rec = orc.verifier(chemin, "rendu", c["head"], r)          # exit 0, sha256 de chaque sortie, commit gardé
-        os.rename(tmp, cible)
+        if os.name != "nt":                         # POSIX : os.rename remplacerait une cible vide apparue
+            os.mkdir(cible)                         # création exclusive : FileExistsError si la cible existe
+            reserve = cible
+        os.rename(tmp, cible)                       # sur la réserve vide ; Windows : FileExistsError si elle existe
         fait = 1
     except Exception as e:
         print(f"rendu_unique : échec de production à {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ} : "
@@ -441,6 +453,9 @@ def produire_tout(c: dict, a, cible: str) -> int:
         os.environ.pop(JETON, None)
         if not fait:
             shutil.rmtree(tmp, ignore_errors=True)
+            if reserve:
+                with contextlib.suppress(OSError):
+                    os.rmdir(reserve)               # réserve vide retirée ; non vide, elle n'est plus la nôtre
     print(f"sorties : {cible} (voie {o['voie']} ; T0 {o['T0']} ; genTime {o['genTime'] or '-'})")
     for x in rec["runs"]:
         print(f"  {x['nom']} {x['sortie']['sha256']} {x['sortie']['chemin']}")

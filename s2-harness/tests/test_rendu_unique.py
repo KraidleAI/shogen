@@ -226,9 +226,11 @@ class TestRenduUnique(unittest.TestCase):
                 self.assertEqual(self.lancer(f), (2, attendus("(4)")))
 
     def test_gardes_lisent_le_head_resolu_une_fois(self):
-        """C-2 (i) : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de JOURNAL.md, code d'analyse
-        et outil changés) ; la résolution unique de HEAD rend X (enveloppe de git) : gardes levées sur X, contexte
-        head = X. Rougit si (1), (2), (4) ou la voie (b) relisent HEAD au lieu du commit résolu."""
+        """C-2 (i) et RENDU-STATUS-HEAD-1 : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de
+        JOURNAL.md, code d'analyse et outil changés), arbre de travail propre sur Y ; la résolution unique de HEAD rend
+        X (enveloppe de git) : contexte head = X ; seule (2) refuse, l'arbre de travail étant jugé contre X (git status
+        le juge contre HEAD et n'y voit rien). Rougit si (1), (4) ou la voie (b) relisent HEAD au lieu du commit
+        résolu, ou si l'arbre de travail n'est pas jugé contre X."""
         f = monter(tempfile.mkdtemp())
         epingler(f)
         x, vrai = g(f["depot"], "rev-parse", "HEAD"), ru.git
@@ -239,7 +241,8 @@ class TestRenduUnique(unittest.TestCase):
             "rev-parse", "--verify", "HEAD^{commit}") else vrai(r, *a)
         with mock.patch.object(ru, "git", resolu):
             refus, c = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
-        self.assertEqual((refus, c.get("head")), ([], x))
+        self.assertEqual(([n for n, _ in refus], c.get("head")), (["(2)"], x))
+        self.assertTrue(refus[0][1].startswith(f"arbre de travail ≠ commit gardé {x} "), refus)
 
     def test_garde_2_code_d_analyse(self):
         """(2) : code d'analyse différent du commit du bloc (commit qui change tools), commit du bloc absent du dépôt,
@@ -402,6 +405,37 @@ class TestRenduUnique(unittest.TestCase):
         epingler(f, date="2026-08-31T20:00:00+00:00")
         with self.subTest(variante="hors de la descendance du scellement"):
             self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
+
+    def test_voie_b_premiere_ligne_entiere_pas_une_sous_chaine(self):
+        """GO-PICKAXE-1 : S et Gc = premiers commits dont JOURNAL.md porte une ligne qui contient le sha entier (comme
+        (1)). Go cité d'abord en « f<sha> » (08-31 13:00, après la date du go), puis sur sa ligne (09-01) : T0 =
+        09-01T00:00Z, refus (5) à 09-01 14:00 ; paquet cité d'abord en « f<sha> » (00:00), puis sur sa ligne (06:00) :
+        go daté de 03:00 refusé, de 12:00 levé ; « f<sha> » réécrit en ligne entière (même nombre d'occurrences, 09-01)
+        : T0 = 09-01T00:00Z. Rougit si : sous-chaîne prise pour S ou Gc (git log -S) ; candidat non confirmé sur sa
+        ligne ; remplacement à compte égal manqué."""
+        j = lambda f: Path(f["depot"], "JOURNAL.md").read_bytes()
+        f = monter(tempfile.mkdtemp())
+        poser(f["depot"], {"JOURNAL.md": j(f) + f"- brouillon f{h(GO_OK)}\n".encode()}, date="2026-08-31T13:00:00Z")
+        epingler(f)
+        r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        with self.subTest(cas="go en sous-chaîne d'abord"):
+            self.assertEqual((r[0], ru.ouverture(r[1])["T0"]), ([], "2026-09-01T00:00:00Z"))
+            self.assertEqual(self.lancer(f, maintenant=datetime(2026, 9, 1, 14, tzinfo=timezone.utc)), (2, ["(5)"]))
+        for heure, attendu in (("03", (2, ["(5)", "(6)"])), ("12", (0, []))):
+            f = monter(tempfile.mkdtemp(), journal="- brouillon f{}\n")
+            poser(f["depot"], {"JOURNAL.md": j(f) + f"- scellement : sha256 {f['sha']}\n".encode()},
+                  date="2026-08-31T06:00:00Z")
+            epingler(f, go=GO_OK.replace(b"T12:", f"T{heure}:".encode()))
+            with self.subTest(go=heure):
+                self.assertEqual(self.lancer(f, maintenant=LOIN), attendu)
+        f = monter(tempfile.mkdtemp())
+        x = j(f)
+        poser(f["depot"], {"JOURNAL.md": x + f"- go : sha256 f{h(GO_OK)}\n".encode()}, date="2026-08-31T13:00:00Z")
+        poser(f["depot"], {"JOURNAL.md": x + f"- go : sha256 {h(GO_OK)}\n".encode()}, date="2026-09-01T00:00:00Z")
+        poser(f["depot"], {f"{SCEAU}/GO-sans-ancre.txt": GO_OK}, commit=False)
+        r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        with self.subTest(cas="remplacement à compte égal"):
+            self.assertEqual((r[0], ru.ouverture(r[1]).get("T0") if not r[0] else None), ([], "2026-09-01T00:00:00Z"))
 
     def test_deux_voies_t0_le_plus_tardif(self):
         """(5), les deux voies établies : go épinglé trois jours avant le jeton ; horloge à T0 du go + 25 h, avant

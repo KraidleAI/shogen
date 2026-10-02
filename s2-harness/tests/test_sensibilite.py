@@ -84,6 +84,7 @@ def attendu_we(c: str, ranges) -> list:
         objs = [json.loads(x) for x in f]
     rp = [o for o in objs if o["record"] == "run_params"][-1]
     w, jours, un, cpt = int(rp["w"]), set(rp["strate_calendar"]["stress_weekdays"]), timedelta(days=1), {}
+    pl = "la plage" if len(ranges) == 1 else f"les {len(ranges)} plages"              # SENS-PLAGES-2
     for x in {o["window_start"] for o in objs if o["record"] == "window_close"}:
         a = b = datetime.fromtimestamp(x, timezone.utc).date()
         if a.weekday() in jours:
@@ -101,7 +102,7 @@ def attendu_we(c: str, ranges) -> list:
         B = A + ((b - a).days + 1) * 86400
         p = (B - A) // w
         out.append(f"    week-end {a} [{A} ; {B}) : complet = {p} fenêtres = {dur(p * w)} ; exclue {e} = "
-                   f"{dur(e * w)} ; incluse {i} = {dur(i * w)} ; retirées par la plage {i - e}")
+                   f"{dur(e * w)} ; incluse {i} = {dur(i * w)} ; retirées par {pl} {i - e}")
     return out
 
 
@@ -148,16 +149,17 @@ class TestSensibilite(unittest.TestCase):
 
     def week_ends(self, txt, ranges, segment=None) -> list:
         rc, sens = self.recompte(ranges, segment), section(txt)
+        pl = "la plage" if len(ranges) == 1 else f"les {len(ranges)} plages"          # SENS-PLAGES-2
         for sam, (e, i) in rc.items():
             a = int(datetime(sam.year, sam.month, sam.day, tzinfo=timezone.utc).timestamp())
             self.assertIn(f"    week-end {sam} [{a} ; {a + 2 * 86400}) : complet = {PLEIN} fenêtres = "
                           f"{PLEIN} h 00 min ; exclue {e} = {e} h 00 min ; incluse {i} = {i} h 00 min ; "
-                          f"retirées par la plage {i - e}", sens)
+                          f"retirées par {pl} {i - e}", sens)
         self.assertEqual(sum(ln.startswith("    week-end ") for ln in sens), len(rc))
         tot, par = ([sum(f(v[k]) for v in rc.values()) for k in (0, 1)]
                     for f in (lambda n: n == PLEIN, lambda n: 0 < n < PLEIN))
         self.assertIn(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue "
-                      f"{par[0]}, incluse {par[1]} ; retirés en totalité par la plage : "
+                      f"{par[0]}, incluse {par[1]} ; retirés en totalité par {pl} : "
                       f"{sum(not v[0] for v in rc.values())}", sens)
         self.assertIn("    non couverts (0 fenêtre dans les deux variantes, entre la première et la dernière "
                       "fenêtre de l'assiette) : 0", sens)                               # G2 C-5
