@@ -6,8 +6,9 @@ i/ii/iii, précédence **panne > staleness > hors-enveloppe**), §5.4 (seuil
 « historique insuffisant » `n·P̂_more·(1−P̂_more) ≥ 10`, source UConn OER Math
 3160 ch.9 p.121). Plan S2 §3, [C5].
 
-`Decimal` partout, **précision fixée** (`DECIMAL_PREC`) → recalcul
-bit-identique par l'oracle. Ne lit QUE les fichiers de journal
+`Decimal` partout, **précision fixée** (`DECIMAL_PREC`) et **arrondi fixé**
+(`ROUND_HALF_EVEN` dans chaque `localcontext`, jamais l'arrondi de l'appelant :
+SHOGEN-DECIMAL-ARRONDI-1) → recalcul bit-identique par l'oracle. Ne lit QUE les fichiers de journal
 (`control.jsonl` + `journal.jsonl`) : aucun accès à Shōgen, aucun paramètre
 hors-bande (σ_classe, τ_classe, w, pool viennent de `run_params`).
 
@@ -46,7 +47,7 @@ from __future__ import annotations
 import enum
 import math
 from collections import Counter
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal, localcontext
 from typing import Optional
 
 from . import records
@@ -92,6 +93,7 @@ def _median(values: list[Decimal]) -> Decimal:
     # diverge prec 28 vs 50 (démontré par l'oracle) → recalcul non identique.
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         s = sorted(values)
         m = len(s)
         if m % 2 == 1:
@@ -166,6 +168,7 @@ def classify_ecart(
     précision FIXÉE (DECIMAL_PREC), comme les statistiques."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         # (iii) panne — précédence maximale : une panne n'a pas de valeur.
         if reading is None or reading.get("status") != "ok" or reading.get("price") is None:
             return Ecart.PANNE
@@ -203,23 +206,18 @@ def classify_ecart(
 # ── Formules K&L §5 (identité élémentaire) — Decimal, précision fixée ──────────
 
 def poisson_binomial(phats: list[Decimal]) -> tuple[Decimal, Decimal, Decimal]:
-    """(P₀, P₁, P_more) pour des écarts indépendants de probabilités `phats`
-    (10 §5.1). P_more = 1 − P₀ − P₁ **par construction**."""
+    """(P₀, P₁, P_more) pour des écarts indépendants de probabilités `phats` (10 §5.1). P_more = 1 − P₀ − P₁
+    tenu en rationnels exacts, sans annulation Decimal (SHOGEN-PMORE-RESIDU-1) : p̂ᵢ = aᵢ/bᵢ exact
+    (`as_integer_ratio`), D = Π bᵢ, N₀ = Π (bᵢ − aᵢ), N₁ = Σᵢ aᵢ·Πⱼ≠ᵢ (bⱼ − aⱼ) en entiers, puis une seule division
+    Decimal par valeur : N₀/D, N₁/D, (D − N₀ − N₁)/D. Un seul p̂ᵢ non nul : P_more = 0 exact."""
+    d, n0, n1 = 1, 1, 0
+    for p in phats:
+        a, b = p.as_integer_ratio()
+        d, n0, n1 = d * b, n0 * (b - a), n1 * (b - a) + n0 * a
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
-        one = Decimal(1)
-        p0 = one
-        for p in phats:
-            p0 *= (one - p)
-        p1 = Decimal(0)
-        for i, pi in enumerate(phats):
-            term = pi
-            for j, pj in enumerate(phats):
-                if j != i:
-                    term *= (one - pj)
-            p1 += term
-        p_more = one - p0 - p1
-        return +p0, +p1, +p_more
+        ctx.rounding = ROUND_HALF_EVEN
+        return Decimal(n0) / Decimal(d), Decimal(n1) / Decimal(d), Decimal(d - n0 - n1) / Decimal(d)
 
 
 def _ecart_relatif(rep: dict, f: str) -> Decimal:
@@ -228,6 +226,7 @@ def _ecart_relatif(rep: dict, f: str) -> Decimal:
     annexe D.5)."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         m = _median([p for g, p in rep.items() if g != f])
         return +(abs(rep[f] - m) / m)
 
@@ -249,6 +248,7 @@ def gate_value(n: int, p_more: Decimal) -> Decimal:
     """`n·P̂_more·(1−P̂_more)` (10 §5.4) — la forme produit-variance."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         return +(Decimal(n) * p_more * (Decimal(1) - p_more))
 
 
@@ -262,6 +262,7 @@ def z_score(n: int, k: int, p_more: Decimal) -> Decimal:
     Appeler UNIQUEMENT si `not insufficient_history` (sinon division par ~0)."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         mean = Decimal(n) * p_more
         var = Decimal(n) * p_more * (Decimal(1) - p_more)
         return +((Decimal(k) - mean) / var.sqrt())
@@ -289,6 +290,7 @@ def binomial_tail_ge(k_obs: int, n: int, p_more: Decimal) -> Decimal:
     10 §9.5), donc Poisson serait du code mort — non implémenté à dessein."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         one = Decimal(1)
         if k_obs <= 0:
             return +one                          # P(K ≥ 0) = 1 (toutes les fenêtres)
@@ -311,6 +313,7 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
     valeur fabriquée."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         num = sum((Decimal(k) - Decimal(n) * p for n, k, p in termes), Decimal(0))
         var = sum((Decimal(n) * p * (Decimal(1) - p) for n, k, p in termes), Decimal(0))
         if var <= 0:
@@ -352,6 +355,7 @@ def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
                                 - n * k1 * ((val & pk).bit_count() + (pres & vk).bit_count()))   # n²·γ̂_k
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         return {"n": n, "K": k1, "numerateur": num, "gamma0": +(Decimal(n * k1 - k1 * k1) / Decimal(n)),
                 "sigma2_bloc": +(Decimal(num) / Decimal(ell * n * n))}
 
@@ -378,6 +382,7 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
         nombre, run_max, avant = nombre + (c == 1), max(run_max, c), ws
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         if n == 0:
             mz = mf = ms = "aucune fenêtre (n = 0)"
         else:
@@ -604,6 +609,7 @@ def compute_r1(
             # bit-identique quel que soit le contexte de l'oracle (ADR-0003).
             with localcontext() as ctx:
                 ctx.prec = DECIMAL_PREC
+                ctx.rounding = ROUND_HALF_EVEN
                 phat = +(Decimal(ecart) / Decimal(n))
             phats.append(phat)
             axes = ["panne"]                       # (iii) toujours évaluable
@@ -645,6 +651,7 @@ def compute_r1(
         if insufficient:
             with localcontext() as ctx:
                 ctx.prec = DECIMAL_PREC
+                ctx.rounding = ROUND_HALF_EVEN
                 degenere = (n == 0) or (p_more == Decimal(0)) or (p_more == Decimal(1))
             if degenere:
                 queue_note = ("dégénérée : P̂_more ∈ {0,1} ou n=0 — queue triviale, "
@@ -700,6 +707,7 @@ def regle_critere(r1_out: dict) -> dict:
         if v == "NE REJETTE PAS":
             with localcontext() as ctx:
                 ctx.prec = DECIMAL_PREC
+                ctx.rounding = ROUND_HALF_EVEN
                 emd = +((SEUIL_Z + Z_PUISSANCE) * max(b["gate_value"], b["bloc"]["sigma2_bloc"]).sqrt())
                 frac = +(emd / Decimal(b["n"]))
         par[st] = {"valeur": v, "cas": cas, "emd": emd, "emd_fraction": frac}
@@ -751,6 +759,7 @@ def bornes_censure(n: int, k: int, p_more: Decimal, s: int, sigma2_bloc: Optiona
     de bloc_strate (s = 0 : z_bloc). Non extérieures (CV2-24). À n'appeler que si z_s est publiée (§5.4)."""
     with localcontext() as ctx:
         ctx.prec = DECIMAL_PREC
+        ctx.rounding = ROUND_HALF_EVEN
         zb = [None, None] if sigma2_bloc is None else [
             +((Decimal(x) - Decimal(n + s) * p_more) / sigma2_bloc.sqrt()) for x in (k, k + s)]
     return {"s": s, "z_bas": z_score(n + s, k, p_more), "z_haut": z_score(n + s, k + s, p_more),
