@@ -400,7 +400,7 @@ def produire(argv: list) -> int:
                                                                                      segment=seg)]
     avert = [x for x in err.getvalue().replace(os.path.join(a.journaux, ""), "").splitlines() if x.strip()]
     if a.nom == "recalcul-tiers":
-        with localcontext(r1.CONTEXTE_DECIMAL):
+        with localcontext(r1.contexte_decimal()):
             texte = json.dumps({**out, "avertissements": avert}, ensure_ascii=False, indent=1, sort_keys=True,
                                default=_decimal)
     else:                                           # étiquette (ou verdict), avertissements, puis le rendu

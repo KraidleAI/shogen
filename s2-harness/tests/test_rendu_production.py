@@ -55,7 +55,7 @@ def chaine(d) -> str:
 
 def en_json(x):
     """Sortie de recompute_* telle qu'un JSON la relit (Decimal en chaîne, tuples en listes)."""
-    with localcontext(r1.CONTEXTE_DECIMAL):
+    with localcontext(r1.contexte_decimal()):
         return json.loads(json.dumps(x, default=chaine))
 
 

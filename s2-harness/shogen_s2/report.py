@@ -42,7 +42,6 @@ from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
-    CONTEXTE_DECIMAL,
     ELL_BLOC,
     ETIQUETTE_POOLEE,
     GARDE_BLOCS,
@@ -52,6 +51,7 @@ from .r1 import (
     build_window_strate,
     classify_cells,
     compute_r1,
+    contexte_decimal,
     fenetres_sautees,
     fenetres_sautees_vivant,
     parse_journal,
@@ -74,7 +74,7 @@ def _fmt_dec(x) -> str:
     """Decimal → chaîne exacte (recalculable) ; zéro Decimal exact → « 0 », forme unique quel que soit l'exposant
     hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret. Écrit sous le contexte nommé, jamais celui de l'appelant
     (capitals de l'exposant : SHOGEN-FMT-CONTEXTE-1)."""
-    with localcontext(CONTEXTE_DECIMAL):
+    with localcontext(contexte_decimal()):
         return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
 
 
@@ -716,7 +716,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             if e is None or i is None or e["z"] is None or i["z"] is None:
                 ap(f"  {st:8} écart de z : non calculable (z non publié ou strate absente d'une variante)")
             else:
-                with localcontext(CONTEXTE_DECIMAL):
+                with localcontext(contexte_decimal()):
                     dz = +(i["z"] - e["z"])
                 ap(f"  {st:8} écart de z = {_fmt_dec(dz)}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
