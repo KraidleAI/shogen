@@ -370,3 +370,16 @@ Réponses de l'orchestrateur : Q1 sous-lot B3 ; Q2 refus nommé sous filtre gard
 | SHOGEN-ENREG-G1-1 | l'enregistreur n'extrait qu'un commit : un enregistrement de rôle G1 sur un travail non commis n'est pas productible. Conduite : enregistrement produit par l'orchestrateur sur le commit du lot | orch. | limite déclarée ; texte au PAQUET | 0 ligne de code [inféré] | G1 B-2, L10 |
 
 **SHOGEN-CENSURE-CAUSES-1, décision de l'orchestrateur (Q1, option (a))** : le journal réparé et scellé ne porte qu'une signature (fenêtre sautée entre deux marqueurs d'un même démarrage = harnais vivant ; `run_params` et `clock_check` de démarrage sont réécrits à chaque chunk, les lignes NUL ont été excisées par les réparations) ; deux lignes par strate : « sautées, harnais vivant » et « arrêt ou passage entre démarrages, cause non attribuée par le journal » (fenêtres entre `started_epoch` et le premier marqueur comprises) ; aucun seuil. Sous-lot B5. Q4 : `served_from` reste limité au même rôle et au même commit.
+
+## B.24 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B5 et B6 (journal `docs/G1-partie-2-etape-B-3.md` §6 et §7 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-CENSURE-CAUSES-TIERS-1 | la ventilation de B5 n'est pas servie au recalcul tiers | orch. | sous-lot C3 (avec SHOGEN-RECALCUL-TIERS-CLI-1) | ≈ 20 lignes [inféré] | G1 B-3, §6 |
+| SHOGEN-CENSURE-VIVANT-PORTEE-1 | « harnais vivant » veut dire même démarrage avant et après la fenêtre, pas que le harnais tournait pendant la fenêtre (une mise en veille de la machine dans un démarrage est comptée « vivant ») | orch. | G0 du PAQUET (portée écrite au texte scellé ; libellé du rendu inchangé) | ≈ 2 lignes de texte [inféré] | G1 B-3, §6 ; Q4 |
+| SHOGEN-ENREG-DELAI-ARBRE-1 | le délai ne tue que l'enfant direct ; sous Windows, un petit-enfant qui tient le tuyau peut prolonger le blocage | orch. | avant l'exécution unique (partie 4) | ≈ 10 lignes [inféré] | G1 B-3, §6 |
+| SHOGEN-ENREG-DELAI-CHAMP-1 | le délai appliqué n'est pas un champ de l'enregistrement (liste de champs ratifiée) ; il est écrit au texte du PAQUET | orch. | G0 du PAQUET | 1 ligne de texte [inféré] | G1 B-3, §6 ; Q3 |
+| SHOGEN-ENREG-TEST-BASH-1 | le test d'`auteur` est le premier test du harnais qui dépend de `bash` (trouvé par le PATH) ; sur un hôte Windows, le bash de Git doit précéder celui de System32 | orch. | premier rejeu de la suite sur un hôte Windows (partie 4) | une vérification [inféré] | G1 B-3, §6 ; SHOGEN-HARNAIS-BASH-WSL-1 |
+| SHOGEN-ENREG-AUTEUR-ECRITURE-1 | l'écriture d'un enregistrement accepte un `auteur` hors liste blanche (seul `--verifier` refuse) | orch. | sous-lot C3 | ≈ 5 lignes et un test [inféré] | G1 B-3, Q2 |
+
+Réponses de l'orchestrateur : Q1 liste blanche lue dans le lint courant (une seule source de vérité au moment de la vérification) ; Q2 oui, en C3 ; Q3 texte du PAQUET, schéma inchangé ; Q4 portée écrite au PAQUET, libellé inchangé.

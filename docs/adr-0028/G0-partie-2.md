@@ -162,3 +162,7 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
 - **B5** : SHOGEN-CENSURE-CAUSES-1, option (a) (annexe B.23) : deux lignes par strate au bloc 1, aucun seuil.
 - **B6** (neuf) : SHOGEN-ENREG-VERIF-1 : `--verifier` contrôle `auteur` (égalité exacte avec la liste blanche lue dans `enforcement/lint-model-pinning.sh`, ou suffixe `[1m]`) et, avec `--depot`, recalcule `tree.sha256` ; délai maximal par commande (dépassement : exit non nul et enregistrement écrit).
 - **C3** porte SHOGEN-RECALCUL-TIERS-CLI-1.
+
+### B — clôture de l'étape, ajout daté du 2026-10-02 07:20 UTC
+
+- Étape B complète (B0 à B6b). **C3** porte en plus SHOGEN-CENSURE-CAUSES-TIERS-1 et SHOGEN-ENREG-AUTEUR-ECRITURE-1 (annexe B.24).
