@@ -24,7 +24,7 @@ _SPEC.loader.exec_module(ru)
 JOURNAUX = {"control.jsonl": b'{"type": "run_params"}\n', "journal.jsonl": b'{"v": 1}\n', "raw.jsonl": b'{"r": 2}\n'}
 SOMMES = {**JOURNAUX, "campagne.log": b"x\n", "segments.json": b"{}\n"}     # cinq entrées au fichier de sommes
 PAQUET, ORDRE = "docs/adr-0028/PAQUET-PREREG-S2.md", ["bloc", "(1)", "(2)", "(3)", "(4)", "(5)", "(6)"]
-NON_CONSTRUITES = ["(2)", "(3)", "(5)", "(6)"]                  # sous-lot C1b
+NON_CONSTRUITES = ["(5)", "(6)"]                                # sous-lot C1c
 
 
 def h(octets: bytes) -> str:
@@ -55,15 +55,16 @@ def texte_bloc(lignes: list) -> str:
     return "# Paquet de fixture\n\n```shogen-paquet-v1\n" + "\n".join(lignes) + "\n```\n"
 
 
-def monter(d: str, bloc=lambda x: x, journal="- scellement du paquet : sha256 {}\n", texte=texte_bloc) -> dict:
+def monter(d: str, bloc=lambda x: x, journal="- scellement du paquet : sha256 {}\n", texte=texte_bloc,
+           sommes=lambda s: s) -> dict:
     """Fixture nominale dans d : dépôt jetable dont le commit c1 porte le code d'analyse, puis paquet et JOURNAL.md ;
     journaux et fichier de sommes (format de sha256sum) hors dépôt. Variantes : bloc(lignes), journal (gabarit,
-    {} = sha du paquet), texte(lignes) du paquet."""
+    {} = sha du paquet), texte(lignes) du paquet, sommes(texte) du fichier de sommes."""
     depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
     os.makedirs(depot), g(depot, "init", "-q"), g(depot, "config", "core.autocrlf", "false")
     c1 = poser(depot, {".gitignore": b"__pycache__/\n", "s2-harness/shogen_s2/m.py": b"x = 1\n",
                        "s2-harness/tools/t.py": b"y = 2\n"})
-    sommes = "".join(f"{h(v)}  {n}\n" for n, v in SOMMES.items()).encode()
+    sommes = sommes("".join(f"{h(v)}  {n}\n" for n, v in SOMMES.items())).encode()
     poser(jx, {**SOMMES, "SHA256SUMS.txt": sommes}, commit=False)
     paquet = texte(bloc(lignes_bloc(c1, sommes))).encode()
     poser(depot, {PAQUET: paquet, "JOURNAL.md": journal.format(h(paquet)).encode()})
@@ -100,13 +101,13 @@ class TestRenduUnique(unittest.TestCase):
                          (2, "", attendus()))
 
     def test_bloc_absent_duplique_malforme(self):
-        """Bloc machine (G0 §C) : paquet sans bloc : refus (bloc ; (4) non évaluée), rien d'écrit ; lecteur seul : forme
-        nominale lue à l'identique ; chaque variante absente, dupliquée ou malformée lève ValueError. Rougit si : bloc
-        non lu ou refus avalé ; clé dupliquée admise (même valeur), clé ou journal absent, quatrième journal,
-        majuscules, sha tronqué, champ en trop, clé inconnue, nom hors forme ; second bloc ou ouverture voisine
-        ignorés ; fermeture non exigée."""
+        """Bloc machine (G0 §C) : paquet sans bloc : refus (bloc ; (2) à (4) non évaluées), rien d'écrit ; lecteur
+        seul : forme nominale lue à l'identique ; chaque variante absente, dupliquée ou malformée lève ValueError.
+        Rougit si : bloc non lu ou refus avalé ; clé dupliquée admise (même valeur), clé ou journal absent, quatrième
+        journal, majuscules, sha tronqué, champ en trop, clé inconnue, nom hors forme ; second bloc ou ouverture
+        voisine ignorés ; fermeture non exigée."""
         f = monter(tempfile.mkdtemp(), texte=lambda x: "# Paquet sans bloc\n")
-        self.assertEqual(self.lancer(f), (2, attendus("bloc", "(4)")))
+        self.assertEqual(self.lancer(f), (2, attendus("bloc", "(2)", "(3)", "(4)")))
         x = lignes_bloc("a" * 40, b"s")
         self.assertEqual(ru.lire_bloc(texte_bloc(x)), {
             "commit_analyse": "a" * 40, "sha256_script": h(Path(OUTIL).read_bytes()), "sommes": h(b"s"),
@@ -145,6 +146,55 @@ class TestRenduUnique(unittest.TestCase):
         rien d'écrit. Rougit si la garde est neutralisée ou hache un autre fichier que l'outil."""
         f = monter(tempfile.mkdtemp(), bloc=lambda x: [x[0], x[1][:-1] + "01"[x[1][-1] == "0"], *x[2:]])
         self.assertEqual(self.lancer(f), (2, attendus("(4)")))
+
+    def test_garde_2_code_d_analyse(self):
+        """(2) : code d'analyse différent du commit du bloc (commit qui change tools), commit du bloc absent du dépôt,
+        arbre de travail modifié sur les chemins (fichier suivi modifié, indexé ou non ; non suivi ; ignoré) : refus
+        (2), rien d'écrit ; de même avec --depot sur un sous-dossier ; commit hors des chemins : levée. Rougit si : git
+        diff ou git status retirés, erreur de git diff admise, non suivis ou ignorés admis, racine non résolue."""
+        sale = {"s2-harness/shogen_s2/m.py": b"x = 2\n"}
+        for nom, faire in (("commit", lambda d: poser(d, {"s2-harness/tools/t.py": b"y = 3\n"})),
+                           ("modifié", lambda d: poser(d, sale, commit=False)),
+                           ("indexé", lambda d: (poser(d, sale, commit=False), g(d, "add", "-A"))),
+                           ("non suivi", lambda d: poser(d, {"s2-harness/shogen_s2/n.py": b""}, commit=False)),
+                           ("ignoré", lambda d: poser(d, {"s2-harness/tools/__pycache__/t.pyc": b"\0"}, False))):
+            f = monter(tempfile.mkdtemp())
+            faire(f["depot"])
+            with self.subTest(variante=nom):
+                self.assertEqual(self.lancer(f), (2, attendus("(2)")))
+                self.assertEqual(self.lancer({**f, "depot": os.path.join(f["depot"], "s2-harness")}),
+                                 (2, attendus("(2)")))
+        f = monter(tempfile.mkdtemp(), bloc=lambda x: ["commit_analyse " + "0" * 40, *x[1:]])
+        self.assertEqual(self.lancer(f), (2, attendus("(2)")))
+        f = monter(tempfile.mkdtemp())
+        poser(f["depot"], {"LISEZ-MOI": b"hors des chemins\n"})
+        self.assertEqual(self.lancer(f), (2, attendus()))
+
+    def test_garde_3_journaux_bloc_et_sommes(self):
+        """(3) et EX-E1-1 : journal modifié ; sommes qui diffèrent du fichier et du bloc (sha des sommes au bloc mis à
+        jour) ; bloc qui diffère du fichier et des sommes ; sommes modifiées hors de leurs entrées ; journal absent des
+        sommes ou du dossier ; nom répété ou ligne non conforme aux sommes : refus (3), rien d'écrit ; sommes en CRLF,
+        marque binaire et majuscules : levée. Rougit si : comparaison au bloc ou aux sommes retirée, sha du fichier de
+        sommes non contrôlé, nom répété ou ligne non conforme admis, CRLF, « * » ou majuscules refusés."""
+        j, r = h(JOURNAUX["journal.jsonl"]), h(JOURNAUX["raw.jsonl"])
+        for nom, kw in (("sommes ≠ fichier", {"sommes": lambda s: s.replace(j, "f" * 64)}),
+                        ("bloc ≠ fichier", {"bloc": lambda x: [*x[:3], "journal journal.jsonl " + "e" * 64, *x[4:]]}),
+                        ("absent des sommes", {"sommes": lambda s: s.replace(f"{r}  raw.jsonl\n", "")}),
+                        ("nom répété", {"sommes": lambda s: "f" * 64 + "  control.jsonl\n" + s}),
+                        ("ligne non conforme", {"sommes": lambda s: "n'importe quoi\n" + s})):
+            with self.subTest(variante=nom):
+                self.assertEqual(self.lancer(monter(tempfile.mkdtemp(), **kw)), (2, attendus("(3)")))
+        for nom, faire in (("journal modifié", lambda jx: poser(jx, {"raw.jsonl": b"{}\n"}, commit=False)),
+                           ("sommes hors entrées", lambda jx: poser(jx, {"SHA256SUMS.txt": Path(
+                               jx, "SHA256SUMS.txt").read_bytes() + b"\n"}, commit=False)),
+                           ("absent du dossier", lambda jx: os.remove(os.path.join(jx, "control.jsonl")))):
+            f = monter(tempfile.mkdtemp())
+            faire(f["journaux"])
+            with self.subTest(variante=nom):
+                self.assertEqual(self.lancer(f), (2, attendus("(3)")))
+        crlf = lambda s: re.sub(r"^([0-9a-f]{64})  ", lambda m: m.group(1).upper() + " *", s, flags=re.M)
+        self.assertEqual(self.lancer(monter(tempfile.mkdtemp(), sommes=lambda s: crlf(s).replace("\n", "\r\n"))),
+                         (2, attendus()))
 
 
 if __name__ == "__main__":

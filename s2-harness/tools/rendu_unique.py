@@ -15,7 +15,7 @@ LANGAGE = "shogen-paquet-v1"
 HEX64, NOM = re.compile(r"[0-9a-f]{64}"), re.compile(r"[\w-][\w.-]*(/[\w-][\w.-]*)*", re.A)
 CLES = {"commit_analyse": re.compile(r"[0-9a-f]{40}"),
         **dict.fromkeys(("sha256_script", "sommes", "cacert_sha256", "tsa_crt_sha256"), HEX64)}
-N_JOURNAUX = 3
+N_JOURNAUX, CHEMINS = 3, ("s2-harness/shogen_s2", "s2-harness/tools")      # garde (2) : code d'analyse
 
 
 def git(racine: str, *args: str) -> subprocess.CompletedProcess:
@@ -61,6 +61,20 @@ def lire_bloc(texte: str) -> dict:
     return {**bloc, "journal": journaux}
 
 
+def lire_sommes(chemin: str) -> dict:
+    """Fichier de sommes au format de sha256sum : « <sha256> <espace ou *><nom> » par ligne, fin de ligne LF ou CRLF,
+    lignes vides ignorées, hexadécimal rendu en minuscules ; ligne non conforme ou nom répété : ValueError."""
+    table = {}
+    with open(chemin, "rb") as f:
+        for x in f.read().decode("utf-8").split("\n"):
+            m = re.fullmatch(r"([0-9a-fA-F]{64}) [ *](.+?)\r?", x)
+            if x.strip() and (not m or m.group(2) in table):
+                raise ValueError(f"ligne du fichier de sommes non conforme ou nom répété : {x!r}")
+            if m:
+                table[m.group(2)] = m.group(1).lower()
+    return table
+
+
 def racine(c: dict) -> str:
     """Racine du dépôt (git rev-parse --show-toplevel), lue une fois ; dépôt illisible : ValueError."""
     if "racine" not in c:
@@ -89,6 +103,31 @@ def g1(c: dict):
         return f"sha256 du paquet {c['sha_paquet']} absent de JOURNAL.md à HEAD"
 
 
+def g2(c: dict):
+    """(2) git diff --quiet <commit_analyse> HEAD -- CHEMINS sort 0, et arbre de travail propre sur CHEMINS (git
+    status : aucune modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
+    r, commit = racine(c), c["bloc"]["commit_analyse"]
+    d = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, "HEAD", "--", *CHEMINS)
+    if d.returncode:
+        return f"git diff --quiet {commit} HEAD -- {' '.join(CHEMINS)} : code {d.returncode}"
+    s = git(r, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", *CHEMINS)
+    if s.returncode or s.stdout:
+        return f"arbre de travail modifié sur {' '.join(CHEMINS)} : {s.stdout.decode('utf-8', 'replace')[:300]!r}"
+
+
+def g3(c: dict):
+    """(3) et EX-E1-1 : sha256 du fichier de sommes égal à sommes du bloc ; sha256 complet de chaque journal du bloc
+    (dossier des journaux scellés) égal à celui du bloc et à celui du fichier de sommes."""
+    if sha256_fichier(c["sommes"]) != c["bloc"]["sommes"]:
+        return "sha256 du fichier de sommes ≠ sommes du bloc"
+    table, ecarts = lire_sommes(c["sommes"]), []
+    for nom, attendu in c["bloc"]["journal"].items():
+        reel = sha256_fichier(os.path.join(c["journaux"], nom))
+        if not reel == attendu == table.get(nom):
+            ecarts.append(f"{nom} : fichier {reel}, bloc {attendu}, sommes {table.get(nom)}")
+    return "; ".join(ecarts) or None
+
+
 def g4(c: dict):
     """(4) sha256 de ce script égal à sha256_script du bloc (garde contre une édition accidentelle, pas une preuve)."""
     reel = sha256_fichier(SCRIPT)
@@ -100,8 +139,8 @@ def non_construite(sous_lot: str):
     return lambda c: f"garde construite au sous-lot {sous_lot} : refus"
 
 
-GARDES = (("bloc", g_bloc), ("(1)", g1), ("(2)", non_construite("C1c")), ("(3)", non_construite("C1c")),
-          ("(4)", g4), ("(5)", non_construite("C2a")), ("(6)", non_construite("C2a")))
+GARDES = (("bloc", g_bloc), ("(1)", g1), ("(2)", g2), ("(3)", g3), ("(4)", g4), ("(5)", non_construite("C2a")),
+          ("(6)", non_construite("C2a")))
 
 
 def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, maintenant=None) -> list:
