@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Shōgen, hook pre-commit versionné : lot D8c d'ADR-0028 D8 (G0 docs/adr-0028/G0-lot-D8c.md ;
+# journal docs/G1-lot-D8c.md). Porté du blob 9c4c846, hook local de F:/Shogen (sha256 1da91c72…77d),
+# soit VibeGates 52a569d:enforcement/gate-commit.sh ; l'amont a évolué vers 0b4f3f9 (blob 9dade29),
+# même corps en mode pre-commit. Écarts nommés au blob (G0 CH-1 à CH-3, CH-7, CH-8) :
+#   - mode harnais retiré : sous git, l'entrée d'un pre-commit est vide (mesuré, G0 §5.1 a) ;
+#   - étape R-13 = image locale du job g5 de gates.yml : même motif élargi, mêmes exclusions, octet
+#     pour octet (cas H-20) ; marqueur suivi de deux-points compris, enforcement/ et .github/ balayés,
+#     .claude/ exclu ;
+#   - index entier balayé (git grep --cached), pas les seules lignes ajoutées : g5 serait rouge sur
+#     le même contenu ;
+#   - étapes ajoutées, images locales des jobs g1 et g3 : lint d'épinglage (D8a) et gate des secrets
+#     (D8b), chacun pris dans l'index et jugeant l'index.
+# Portée : quand git commit le lance, le hook juge le contenu de l'index du commit en préparation.
+# Ce n'est pas une garde de commit : il ne voit ni une fusion sans conflit, ni cherry-pick, ni
+# rebase, ni un commit qui le contourne (R-22) ; ses verts ne sont pas une preuve de CI (G0 CH-15).
+# Installation : enforcement/hooks/install-pre-commit.sh ; cas : enforcement/tests/run-fixtures-hooks.sh.
+# Sortie : 0 toutes étapes vertes ; 2 sinon, jetons REFUS (HOOK/…) sur stderr ; toute erreur : 2.
+
+set -u
+M='(\b(TODO|FIXME):|(//|#|--|;|/\*|\*|<!--)[[:space:]]*(TODO|FIXME)\b)'
+F=0
+refus() { F=1; echo "REFUS (HOOK/$1) : $2" >&2; }
+TOP="$(git rev-parse --show-toplevel 2>/dev/null)" && [ -n "$TOP" ] && cd "$TOP" ||
+  { echo "REFUS (HOOK/echec) : hors d'un arbre de travail git ; échec fermé" >&2; exit 2; }
+T="$(mktemp -d)" && [ -d "$T" ] || { echo "REFUS (HOOK/echec) : mktemp -d a échoué ; échec fermé" >&2; exit 2; }
+trap 'rm -rf "$T"' EXIT
+BASE="absent de l'index : avancer la base (git merge --ff-only vers main) avant tout commit local"
+
+# Étape R-13 : marqueurs de dette nus dans l'index. git grep : 1 aucune ligne, 0 lignes trouvées
+# (fichier binaire compris, comme g5), tout autre code est une erreur.
+O="$(git grep --cached -nE "$M" -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml')"; g=$?
+case "$g" in
+  1) ;;
+  0) refus g5 "marqueur de dette nu dans l'index (R-13, motif du job g5) ; cinq premières lignes :"
+     printf '%s\n' "$O" | head -5 >&2 ;;
+  *) refus echec "git grep a échoué (code $g) ; échec fermé" ;;
+esac
+# Étape R-1 (job g1) : lint pris dans l'index, lancé sur une extraction de l'index des chemins qu'il
+# lit, sans -u (l'index n'est pas réécrit) ; un fichier ignoré (.claude/settings.local.json) n'est
+# donc pas lu (G0 CH-7).
+if ! git show :enforcement/lint-model-pinning.sh > "$T/lint.sh" 2>/dev/null; then refus echec "lint d'épinglage $BASE"
+elif ! { git ls-files -z -- ':(glob)**/.claude/**' ':(glob)**/*.js' ':(glob)**/*.mjs' ':(glob)**/*.cjs' > "$T/l" &&
+  mkdir "$T/a" && git checkout-index -z --stdin --prefix="$T/a/" < "$T/l"; }; then refus echec "extraction de l'index impossible ; échec fermé"
+elif ! bash "$T/lint.sh" "$T/a" > "$T/l.out" 2>&1; then
+  refus lint "épinglage des modèles refusé dans l'index (R-1) :"; grep -E '^REFUS' "$T/l.out" | sed "s#$T/a/##g" | head -5 >&2
+fi
+# Étape G3 (job g3) : gate des secrets prise dans l'index, mode indexé (contenu indexé des fichiers
+# touchés par le commit ; sortie masquée par construction, G0 CH-8).
+if ! git show :enforcement/gate-secrets.sh > "$T/gs.sh" 2>/dev/null; then refus echec "gate des secrets $BASE"
+elif ! bash "$T/gs.sh" > "$T/s.out" 2>&1; then
+  refus secrets "gate des secrets refusée sur l'index :"; grep -v '^AVIS' "$T/s.out" | head -8 >&2
+fi
+
+if [ "$F" -ne 0 ]; then
+  echo "Remède : résoudre le point, ou registre de dette et ADR (R-13) ; corriger l'index (git add), puis relancer le commit. Un hook ne se contourne pas (R-22)." >&2
+  exit 2
+fi
+echo "OK (hook) : aucune étape en refus sur l'index (images locales des jobs g5, g1 et g3)"
+exit 0

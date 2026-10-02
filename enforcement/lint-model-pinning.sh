@@ -17,11 +17,14 @@
 # Tout ce qui n'est pas exactement dans la liste est refusé : tier nu, identifiant banni
 # ou retiré, casse ou suffixe différents, clé model d'agent absente ou répétée, forme
 # YAML hors du sous-ensemble lu (clé non nue, valeur sur plusieurs lignes, frontmatter
-# indenté ou non fermé), clé JSON échappée, aucun agent lu.
+# indenté ou non fermé, clé model imbriquée hors d'une ligne model, suite de valeur à toute
+# profondeur), JSON non strict, clé JSON échappée, aucun agent lu (lot D8c : CH-12, CH-13).
 # Limite : ce lint lit le texte versionné, pas le modèle qui tourne (paramètre
 # d'invocation, environnement, réglages hors dépôt, substitution par la plateforme) ;
-# le contrôle R-1 au lancement reste dû. Une clé model imbriquée écrite hors d'une ligne
-# model (entrée de séquence, flux, suite de valeur) n'est pas lue : item SHOGEN-LINT-IMBRIQUE-1.
+# le contrôle R-1 au lancement reste dû. Lecteur de Claude Code non lu : refus fail-closed,
+# formes restantes (ancres, étiquettes, alias et échappements imbriqués) : SHOGEN-LINT-LECTEUR-CC-1.
+# Prix mesuré (revue G2 de D8c, 2026-10-01) : une description qui cite une forme de flux de la clé
+# model est refusée (R-1/cle-model) ; ainsi l'agent global worker.md, l.3 : SHOGEN-LINT-HORS-DEPOT-1.
 # Usage : lint-model-pinning.sh [racine]   Sortie : 0 aucun refus, 2 refus (stderr).
 
 set -u
@@ -35,6 +38,9 @@ TIERS='opus|sonnet|haiku|fable|inherit|default|opusplan'
 # (mesuré) : guillemets, ?, ancre &, étiquette !, alias *, flux {, clé de fusion <<. Le
 # tiret et | > en colonne 0 restent des formes valides (séquence non indentée, bloc).
 NON_NUE="^([\"'?&!*{]|<<)"
+# Clé model hors de la forme lue (ligne canonique, entrée de séquence comprise) : entre guillemets à
+# toute profondeur, ou après [, { ou , (flux). Une prose où model suit un mot n'est pas prise.
+SENT="(^[[:space:]]*(-[[:space:]]+)*|[[{,][[:space:]]*)[\"']?model[\"']?[[:space:]]*:"
 ELAG=( \( -name target -o -name .git -o -name node_modules -o -name 'mutants.out*' -o -path "$ROOT/.claude/worktrees" -o -path "$ROOT/biblio" \) -prune -o )
 FAIL=0
 N=0
@@ -80,20 +86,24 @@ verdict() { # lieu, valeur normalisée ; base = minuscules, sans suffixe final [
 #    conservés. Hors du sous-ensemble ligne à ligne lu ici, une forme YAML est refusée.
 while IFS= read -r f; do
   [ -f "$f" ] || continue
-  N=$((N + 1)); n=0; K=0; FM=0; SUITE=0; DEB=0
+  N=$((N + 1)); n=0; K=0; FM=0; SUITE=0; DEB=0; I=0
   while IFS= read -r x || [ -n "$x" ]; do
     n=$((n + 1)); x="${x%$'\r'}"
     if [ "$n" -eq 1 ]; then x="${x#$'\xEF\xBB\xBF'}"; [[ $x =~ ^---[[:space:]]*$ ]] || break; FM=1; DEB=1; continue; fi
     [[ $x =~ ^---[[:space:]]*$ ]] && { FM=2; break; }
     if [ "$DEB" -eq 1 ] && [[ $x =~ ^[[:space:]]*[^[:space:]#] ]]; then DEB=0
       [[ $x =~ ^[[:space:]] ]] && refus 'R-1/cle-model' "$f:$n" "$x" "frontmatter indenté : clés de premier niveau non lues"; fi
-    if [ "$SUITE" -eq 1 ] && [[ $x =~ [^[:space:]] ]]; then SUITE=0
-      [[ $x =~ ^[[:space:]]+[^[:space:]#] ]] && refus 'R-1/hors-liste' "$f:$n" "$x" "suite de la valeur model sur une autre ligne : non lue"; fi
+    # Suite d'une valeur model, à toute profondeur : première ligne ni vide ni commentaire, plus
+    # indentée que la clé (colonne I).
+    if [ "$SUITE" -eq 1 ] && [[ $x =~ ^([[:space:]]*)[^[:space:]#] ]]; then SUITE=0
+      [ "${#BASH_REMATCH[1]}" -gt "$I" ] && refus 'R-1/hors-liste' "$f:$n" "$x" "suite de la valeur model sur une autre ligne : non lue"; fi
     [[ $x =~ $NON_NUE ]] && refus 'R-1/cle-model' "$f:$n" "$x" "ligne de premier niveau qui n'est pas une clé nue : non lue"
-    # Clé model de premier niveau comptée ; toute ligne model contrôlée, indentée ou non.
-    [[ $x =~ ^model[[:space:]]*:([[:space:]]|$) ]] && { K=$((K + 1)); SUITE=1; }
-    [[ $x =~ ^[[:space:]]*model[[:space:]]*: ]] &&
-      verdict "$f:$n" "$(norm "$(printf '%s' "$x" | sed -E 's/^[[:space:]]*model[[:space:]]*:[[:space:]]*//')")"
+    # Clé model de premier niveau comptée ; ligne model contrôlée à toute profondeur, entrée de
+    # séquence comprise ; hors de cette forme, une clé model est refusée (sentinelle SENT).
+    [[ $x =~ ^model[[:space:]]*:([[:space:]]|$) ]] && K=$((K + 1))
+    if [[ $x =~ ^([[:space:]]*(-[[:space:]]+)*)model[[:space:]]*: ]]; then SUITE=1; I=${#BASH_REMATCH[1]}
+      verdict "$f:$n" "$(norm "$(printf '%s' "$x" | sed -E 's/^[[:space:]]*(-[[:space:]]+)*model[[:space:]]*:[[:space:]]*//')")"
+    elif [[ $x =~ $SENT ]]; then refus 'R-1/cle-model' "$f:$n" "$x" "clé model hors de la forme lue (flux, guillemets) : non lue"; fi
   done < "$f"
   [ "$FM" -eq 1 ] && refus 'R-1/cle-model' "$f" "frontmatter non fermé" "aucune ligne --- de fin"
   # Agent : une seule clé model de premier niveau ; absente, c'est l'héritage du modèle de
@@ -105,23 +115,28 @@ done <<EOF_FILES
 $(find "$ROOT" "${ELAG[@]}" -name '*.md' \( -path '*/.claude/agents/*' -o -path '*/.claude/skills/*' -o -path '*/.claude/commands/*' \) -print 2>/dev/null)
 EOF_FILES
 
-# 2) Réglages JSON, aplatis : une clé et sa valeur sur deux lignes sont lues. Une clé
-#    dont la valeur n'est pas une chaîne est refusée : elle n'épingle rien. Une clé qui
-#    porte une barre oblique inverse est refusée : un échappement peut former model.
+# 2) Réglages JSON, aplatis, lus comme une suite de chaînes JSON entières (RX, LC_ALL=C) : une clé est
+#    une chaîne suivie de deux-points (lot D8c, CH-13). Refusés : un résidu hors chaînes autre que
+#    ponctuation, nombres et littéraux (JSON non strict : commentaire, clé sans guillemets) ; une clé
+#    qui porte une barre oblique inverse (un échappement peut former model) ; une clé model ou
+#    advisorModel dont la valeur n'est pas une chaîne (elle n'épingle rien). Virgule finale admise.
+RX='"([^"\\]|\\.)*"'
 for f in "$ROOT/.claude/settings.json" "$ROOT/.claude/settings.local.json"; do
   [ -f "$f" ] || continue
   N=$((N + 1))
   J="$(tr '\r\n' '  ' < "$f")"
-  P="$(printf '%s' "$J" | grep -ioE '"(model|advisorModel)"[[:space:]]*:[[:space:]]*"[^"]*"')"
-  [ "$(printf '%s' "$J" | grep -ioE '"(model|advisorModel)"[[:space:]]*:' | wc -l)" -eq "$(printf '%s' "$P" | grep -c .)" ] ||
-    refus 'R-1/hors-liste' "$f" "valeur non chaîne" "clé model ou advisorModel sans identifiant entre guillemets"
-  printf '%s' "$J" | grep -qE '"[^"]*\\[^"]*"[[:space:]]*:' &&
+  [ -z "$(printf '%s' "$J" | LC_ALL=C sed -E "s/$RX//g; s/true|false|null//g; s/[][{}:,0-9eE.+[:space:]-]//g")" ] ||
+    refus 'R-1/hors-liste' "$f" "JSON non strict" "hors chaînes, autre chose que ponctuation, nombres et littéraux : non lu"
+  P="$(printf '%s' "$J" | LC_ALL=C grep -oE "$RX([[:space:]]*:[[:space:]]*($RX|.))?" | LC_ALL=C grep -E "^$RX[[:space:]]*:")"
+  printf '%s\n' "$P" | grep -qE '^"[^"]*\\' &&
     refus 'R-1/hors-liste' "$f" "clé JSON avec échappement" "clé non lue : un échappement peut former model ou advisorModel"
   while IFS= read -r p; do
     [ -n "$p" ] || continue
-    verdict "$f ($(printf '%s' "$p" | sed -E 's/^"([^"]*)".*/\1/'))" "$(printf '%s' "$p" | sed -E 's/^"[^"]*"[[:space:]]*:[[:space:]]*"(.*)"$/\1/')"
+    k="$(printf '%s' "$p" | sed -E 's/^"([^"]*)".*/\1/')"; v="$(printf '%s' "$p" | LC_ALL=C sed -E "s/^$RX[[:space:]]*:[[:space:]]*//")"
+    case "$v" in \"*\") verdict "$f ($k)" "${v:1:${#v}-2}" ;;
+      *) refus 'R-1/hors-liste' "$f ($k)" "valeur non chaîne" "clé model ou advisorModel sans identifiant entre guillemets" ;; esac
   done <<EOF_JSON
-$P
+$(printf '%s\n' "$P" | LC_ALL=C grep -iE '^"(model|advisorModel)"[[:space:]]*:')
 EOF_JSON
 done
 
