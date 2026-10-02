@@ -3,14 +3,15 @@ SHOGEN-ORACLE-ENREG-1 ; G0 docs/adr-0028/G0-partie-2.md §B). Bibliothèque stan
 listes d'arguments, jamais par un shell. Extrait le commit par `git archive` dans un répertoire temporaire, y lance des
 commandes de la liste fermée COMMANDES, écrit dans le répertoire donné la sortie de chacune et l'enregistrement
 shogen-<sha court>-<rôle>-<date>-<pid>.json (sorties : chemins relatifs à ce répertoire). SHOGEN_S2_CAMPAGNE_CONTROL
-est consignée, posée ou non, jamais posée (annexe D.4 a). SHOGEN-ENREG-VERIF-1 : la lecture contrôle aussi auteur
-et, avec un dépôt, tree.sha256."""
+est consignée, posée ou non, jamais posée (annexe D.4 a). SHOGEN-ENREG-VERIF-1 : délai maximal par commande ; la
+lecture contrôle aussi auteur et, avec un dépôt, tree.sha256."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import shutil
@@ -31,6 +32,8 @@ CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tre
 RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
 LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "enforcement",
                     "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
+DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
+EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
 
 
 def git(depot: str, *args: str) -> bytes:
@@ -99,9 +102,12 @@ def ecarts_arbre(depot: str, commit: str, consignes) -> list:
 
 
 def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, commandes=("suite",), base=None,
-                paquet_sha256=None, sceau_gentime=None) -> tuple:
+                paquet_sha256=None, sceau_gentime=None, delai=None) -> tuple:
     """Lance les commandes nommées sur l'extraction du commit, écrit sorties et enregistrement sans jamais écraser ;
-    rend (chemin, exit). paquet.sha256 exigé au rôle « rendu » ; nul, comme sceau.genTime, hors de ce rôle."""
+    rend (chemin, exit). paquet.sha256 exigé au rôle « rendu » ; nul, comme sceau.genTime, hors de ce rôle. Délai
+    maximal par commande (s ; None : DELAI_DEFAUT) : au dépassement, commande arrêtée, exit EXIT_DELAI consigné, ligne
+    de dépassement en fin de sortie, enregistrement écrit quand même."""
+    delai = DELAI_DEFAUT if delai is None else delai
     if role not in ROLES or not commandes or any(c not in COMMANDES for c in commandes):
         raise ValueError(f"rôle {role!r} ou commande(s) {list(commandes)} hors des listes fermées {ROLES}, "
                          f"{sorted(COMMANDES)} — refus")
@@ -109,6 +115,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
             role != "rendu" and (paquet_sha256, sceau_gentime) != (None, None)):
         raise ValueError("paquet.sha256 (64 hex) exigé au rôle « rendu » ; paquet.sha256 et sceau.genTime nuls hors "
                          "de ce rôle — refus")
+    if not 0 < delai < math.inf:
+        raise ValueError(f"délai {delai!r} : nombre de secondes fini et positif exigé — refus")
     sha, base = commit_complet(depot, commit), commit_complet(depot, base) if base else None
     maintenant = datetime.now(timezone.utc)
     nom = f"shogen-{sha[:7]}-{role}-{maintenant:%Y%m%dT%H%M%SZ}-{os.getpid()}"
@@ -118,12 +126,18 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c]
             cmd, sortie = [sys.executable, *args], f"{nom}.{i}-{c}.out"
-            p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            try:
+                p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT, timeout=delai)
+                octets, code = p.stdout, p.returncode
+            except subprocess.TimeoutExpired as e:
+                octets, code = (e.stdout or b"") + (f"\n[oracle_record] délai maximal de {delai:g} s dépassé : "
+                                                    f"commande arrêtée, exit {EXIT_DELAI}\n").encode(), EXIT_DELAI
             with open(os.path.join(dossier, sortie), "xb") as f:
-                f.write(p.stdout)
-            runs.append({"nom": c, "arbre": sous, "commande": cmd, "exit": p.returncode,
-                         "sortie": {"chemin": sortie, "sha256": hashlib.sha256(p.stdout).hexdigest()},
-                         "tests_avec_variable": tests_lances(p.stdout.decode("utf-8", "replace"))
+                f.write(octets)
+            runs.append({"nom": c, "arbre": sous, "commande": cmd, "exit": code,
+                         "sortie": {"chemin": sortie, "sha256": hashlib.sha256(octets).hexdigest()},
+                         "tests_avec_variable": tests_lances(octets.decode("utf-8", "replace"))
                          if os.environ.get(VARIABLE) is not None else []})
     finally:
         shutil.rmtree(arbre)
@@ -200,9 +214,9 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
 
 def main(argv: list) -> int:
     """Écriture (--role, --auteur, --depot, --commit, --sortie ; options --base, --commande, --paquet-sha256,
-    --sceau-gentime), ou lecture (--verifier ENREGISTREMENT --role R --commit SHA_COMPLET ; option --depot :
-    tree.sha256 recalculé). Code 0 : enregistrement écrit et commandes vertes, ou conforme ; 1 : une commande a échoué ;
-    2 : refus."""
+    --sceau-gentime, --delai), ou lecture (--verifier ENREGISTREMENT --role R --commit SHA_COMPLET ; option --depot :
+    tree.sha256 recalculé). Code 0 : enregistrement écrit et commandes vertes, ou conforme ; 1 : une commande a échoué
+    ou dépassé son délai ; 2 : refus."""
     p = argparse.ArgumentParser(prog="oracle_record.py", description="enregistrement shogen.oracle-record.v1 (D6 viii)")
     p.add_argument("--verifier", metavar="ENREGISTREMENT")
     p.add_argument("--role", required=True, choices=ROLES)
@@ -210,8 +224,9 @@ def main(argv: list) -> int:
     for opt in ("--auteur", "--depot", "--sortie", "--base", "--paquet-sha256", "--sceau-gentime"):
         p.add_argument(opt)
     p.add_argument("--commande", action="append", choices=sorted(COMMANDES))
+    p.add_argument("--delai", type=float, help=f"secondes par commande (défaut {DELAI_DEFAUT})")
     a = p.parse_args(argv)
-    ecriture = (a.auteur, a.sortie, a.base, a.commande, a.paquet_sha256, a.sceau_gentime)
+    ecriture = (a.auteur, a.sortie, a.base, a.commande, a.paquet_sha256, a.sceau_gentime, a.delai)
     if a.verifier is not None and any(x is not None for x in ecriture) or a.verifier is None and None in (
             a.auteur, a.depot, a.sortie):
         p.error("--verifier n'admet que --role, --commit et --depot ; l'écriture exige --auteur, --depot et --sortie")
@@ -222,7 +237,7 @@ def main(argv: list) -> int:
                 "non recalculé : --depot absent)" if a.depot is None else f"recalculé sur {a.depot})"))
             return 0
         chemin, code = enregistrer(a.sortie, a.role, a.auteur, a.depot, a.commit, tuple(a.commande or ("suite",)),
-                                   a.base, a.paquet_sha256, a.sceau_gentime)
+                                   a.base, a.paquet_sha256, a.sceau_gentime, a.delai)
     except (ValueError, OSError, subprocess.CalledProcessError) as e:
         print(f"oracle_record : {e}", file=sys.stderr)
         return 2

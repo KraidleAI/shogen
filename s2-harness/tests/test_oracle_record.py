@@ -26,6 +26,7 @@ _SPEC.loader.exec_module(orc)
 T = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):\n        pass\n"
 OK = {"s2-harness/tests/__init__.py": b"", "s2-harness/tests/test_t.py": T, "LISEZ-MOI": "dépôt jetable\n".encode()}
 KO = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"self.fail()")}
+LENT = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"__import__('time').sleep(20)")}
 SUITE = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
 SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
@@ -60,7 +61,7 @@ class TestOracleRecord(unittest.TestCase):
         cls.d = tempfile.mkdtemp(prefix="oracle_test_")
         cls.depot, cls.sortie = os.path.join(cls.d, "depot"), os.path.join(cls.d, "sorties")
         os.makedirs(cls.sortie)
-        cls.c1, cls.c2 = depot(cls.depot, [OK, KO])
+        cls.c1, cls.c2, cls.c3 = depot(cls.depot, [OK, KO, LENT])
 
     def test_enregistrement_champs_et_sha(self):
         """Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la
@@ -275,6 +276,38 @@ class TestOracleRecord(unittest.TestCase):
             v = subprocess.run([sys.executable, "-B", OUTIL, "--verifier", x, "--role", "G2", "--commit", self.c1,
                                 "--depot", self.depot], capture_output=True, text=True)
             self.assertEqual((v.returncode, v.stdout, "refus (tree.sha256)" in v.stderr), (code, sortie, code == 2))
+
+    def test_delai_depasse_exit_non_nul_enregistrement_ecrit(self):
+        """SHOGEN-ENREG-VERIF-1 (iii) : test qui dort 20 s sous un délai de 1 s : commande arrêtée, exit 124 consigné
+        dans le run, ligne de dépassement en fin de sortie hachée, enregistrement écrit (exit 1), refus (exit) à la
+        lecture ; délai par défaut déclaré (3 600 s) appliqué sans argument ; délai nul, négatif, infini ou NaN refusé
+        sans rien écrire ; CLI --delai, refusé avec --verifier. Rougit si : aucun délai, ou défaut non appliqué ;
+        dépassement consigné 0 ; enregistrement non écrit ; ligne absente ; option non transmise, ou admise en
+        lecture."""
+        d = tempfile.mkdtemp(dir=self.d)
+        self.assertEqual((orc.DELAI_DEFAUT, orc.EXIT_DELAI), (3600, 124))
+        chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c3, delai=1)
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        out = Path(d, rec["runs"][0]["sortie"]["chemin"]).read_bytes()
+        self.assertEqual((code, rec["exit"], rec["runs"][0]["exit"], rec["runs"][0]["sortie"]["sha256"]),
+                         (1, 1, 124, hashlib.sha256(out).hexdigest()))
+        self.assertTrue(out.endswith("\n[oracle_record] délai maximal de 1 s dépassé : commande arrêtée, exit 124\n"
+                                     .encode()), out[-200:])
+        with self.assertRaisesRegex(ValueError, r"^refus \(exit\) : "):
+            orc.verifier(chemin, "G2", self.c3)
+        with mock.patch.object(orc, "DELAI_DEFAUT", 1):
+            chemin = orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c3)[0]
+        self.assertEqual(json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
+        avant = sorted(os.listdir(d))
+        for x in (0, -1, float("inf"), float("nan")):
+            with self.subTest(delai=x), self.assertRaisesRegex(ValueError, r"— refus$"):
+                orc.enregistrer(d, "cp-2", "claude-opus-5-5", self.depot, self.c1, delai=x)
+        self.assertEqual(sorted(os.listdir(d)), avant)
+        p, m = (subprocess.run([sys.executable, "-B", OUTIL, *a, "--role", "cp-2", "--commit", self.c3, "--delai", "1"],
+                               capture_output=True, text=True) for a in (
+            ("--auteur", "claude-opus-5-5", "--depot", self.depot, "--sortie", d), ("--verifier", chemin)))
+        self.assertEqual((p.returncode, m.returncode, "--verifier" in m.stderr), (1, 2, True))
+        self.assertEqual(json.loads(Path(p.stdout.strip()).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
 
 
 if __name__ == "__main__":
