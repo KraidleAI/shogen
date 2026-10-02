@@ -782,3 +782,19 @@ def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=
         seuil_hist=Decimal(str(params["seuil_historique_valeur"])),
         n_min=int(params["n_min_hors_enveloppe"]),
     )
+
+
+def recompute_d5_from_journal(control_path: str, journal_path: str, exclude_ranges=(), segment=None) -> dict:
+    """Fonction sœur de `recompute_from_journal` pour le lecteur tiers (SHOGEN-D5-RECALCUL-TIERS-1 ; ADR-0028 annexe
+    D.5) : garde §5.3 et filtre de lecture (`records.filtre_lecture`) par `recompute_from_journal`, puis, comme le
+    rendu, s par strate (`fenetres_sautees` sur les marqueurs du journal entier, portée du segment, plages D5 ; bloc 1)
+    et bornes de censure par strate de R1 (bloc 3) : None sous la garde §5.4 (z_s non publiée), variante σ̂_bloc si
+    z_bloc est publiée. Rend {"fenetres_sautees": {strate : s}, "bornes_censure": {strate : bornes ou None}}."""
+    out = recompute_from_journal(control_path, journal_path, exclude_ranges, segment)
+    params_list, _clock, markers = records.parse_control(control_path)
+    params, ranges = records.effective_run_params(params_list), records.exclusion_ranges(exclude_ranges)
+    seg = records.filtre_lecture(params, markers, ranges=ranges, segment=segment)[3]
+    s = fenetres_sautees(build_window_strate(markers), params["strate_calendar"], int(params["w"]), seg, ranges)
+    return {"fenetres_sautees": s, "bornes_censure": {
+        st: None if b["z"] is None else bornes_censure(b["n"], b["K"], b["P_more"], s.get(st, 0), b["bloc"][
+            "sigma2_bloc"] if b["bloc"]["z_bloc"] is not None else None) for st, b in out["strates"].items()}}

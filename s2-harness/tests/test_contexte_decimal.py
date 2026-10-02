@@ -7,7 +7,7 @@ from __future__ import annotations
 import contextlib
 import unittest
 from decimal import (ROUND_DOWN, ROUND_HALF_EVEN, Decimal as D, DivisionByZero, Inexact, InvalidOperation, Overflow,
-                     localcontext)
+                     getcontext, localcontext)
 
 from shogen_s2 import lm, r1, r2, report
 from tests.test_arrondi import CAS
@@ -81,6 +81,16 @@ class TestContexteDecimalNomme(unittest.TestCase):
         with hostile():
             self.assertEqual(tout(), defaut)
         self.assertIn("\n  stress   écart de z = ", defaut[2])
+
+    def test_fmt_dec_sous_capitals_0(self):
+        """SHOGEN-FMT-CONTEXTE-1 (annexe B.22) : sous capitals = 0 ambiant, _fmt_dec écrit l'exposant en capitale, celle
+        du contexte nommé (lettre de l'exposant lue dans context.capitals : _pydecimal.py l.1089) ; contexte ambiant
+        rendu intact. Rougit si : _fmt_dec écrit hors du contexte nommé (2e-75)."""
+        with localcontext() as amb:
+            amb.capitals = 0
+            obtenu = [report._fmt_dec(x) for x in (D("2E-75"), D("-1.5E+7"), D("0E-69"), D("0.25"), None)]
+            self.assertEqual((getcontext() is amb, amb.capitals), (True, 0))
+        self.assertEqual(obtenu, ["2E-75", "-1.5E+7", "0", "0.25", "-"])
 
 
 if __name__ == "__main__":

@@ -71,8 +71,10 @@ ETIQUETTE_CENSURE = ("bornes à P̂_more fixé, non extérieures ; verdict non i
 
 def _fmt_dec(x) -> str:
     """Decimal → chaîne exacte (recalculable) ; zéro Decimal exact → « 0 », forme unique quel que soit l'exposant
-    hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret."""
-    return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
+    hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret. Écrit sous le contexte nommé, jamais celui de l'appelant
+    (capitals de l'exposant : SHOGEN-FMT-CONTEXTE-1)."""
+    with localcontext(CONTEXTE_DECIMAL):
+        return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
 
 
 def _iso_utc(ts) -> str:
