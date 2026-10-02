@@ -68,8 +68,9 @@ ETIQUETTE_CENSURE = ("bornes à P̂_more fixé, non extérieures ; verdict non i
 
 
 def _fmt_dec(x) -> str:
-    """Decimal → chaîne exacte (recalculable) ; None → tiret."""
-    return "-" if x is None else str(x)
+    """Decimal → chaîne exacte (recalculable) ; zéro Decimal exact → « 0 », forme unique quel que soit l'exposant
+    hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret."""
+    return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
 
 
 def _iso_utc(ts) -> str:
@@ -120,7 +121,7 @@ def _ligne_variante(st: str, nom: str, blk) -> str:
     if blk is None:
         return tete + "absente (0 fenêtre retenue)"
     zs = f"z = {_fmt_dec(blk['z'])}" if blk["z"] is not None else (
-        "z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) ; " + (
+        f"z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < {_fmt_dec(blk['seuil_historique'])}) ; " + (
             f"queue exacte P(K ≥ K_obs | Bin(n, P̂_more)) = {_fmt_dec(blk['queue_binomiale_P_K_ge_Kobs'])}"
             if blk["queue_exacte_applicable"] else "queue dégénérée (P̂_more ∈ {0,1})"))
     return (tete + f"n = {blk['n']} ; K = {blk['K']} ; P̂_more = {_fmt_dec(blk['P_more'])} ; {zs} ; "
@@ -281,7 +282,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # ── Bloc 3 : R1 ────────────────────────────────────────────────────────
     ap("\n[BLOC 3] R1 (test K&L §5 transposé — 10 §5.1/§5.2/§5.4)")
-    ap("  définition d'écart (10 §5.2 ; r1.classify_ecart), par fenêtre et par flux du pool d'analyse, "
+    ap("  définition d'écart (10 §5.2 ; τ relatif : ADR-0020 déc. 2, ADR-0022 ; r1.classify_ecart), par fenêtre "
+       "et par flux du pool d'analyse, "
        "précédence panne > staleness > hors-enveloppe : panne = lecture absente, statut ≠ ok ou prix "
        "absent ; staleness = win_end − source_ts > σ_classe de la classe du flux (σ_classe ou source_ts "
        "absent : non évaluée) ; hors-enveloppe = |p − médiane_LOO|/médiane_LOO > τ_classe, N ≥ n_min "
@@ -314,7 +316,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap(f"    n·P̂_more·(1−P̂_more) = {_fmt_dec(blk['gate_value'])} "
            f"(seuil {_fmt_dec(blk['seuil_historique'])})")
         if blk["flag_historique_insuffisant"]:
-            ap("    z       = non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) — "
+            ap("    z       = non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < "
+               f"{_fmt_dec(blk['seuil_historique'])}) — "
                "aucun z non significatif présenté comme absence de dépendance (04 §2)")
             if blk.get("queue_exacte_applicable"):
                 ap(f"    queue exacte P(K ≥ K_obs={blk['K']} | Bin(n={blk['n']}, P̂_more)) "
@@ -373,7 +376,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     # Règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 5, 6, 8) : valeurs de r1.regle_critere, sans recalcul
     ap("\n  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
        "comparaisons sur les Decimal publiées, non arrondies, au seuil 2.33, « ≥ » ; aucune p-valeur")
-    kp, axes = r2_out["partition"], "axes panne / staleness / hors-enveloppe"
+    kp = r2_out["partition"]
     ke = ("= non évaluable" if kp["k_eff"] is None else f"≤ {kp['k_eff']} (borne supérieure)"
           if kp.get("k_eff_is_upper_bound") else f"= {kp['k_eff']}")
     suites = {"garde_5_4": " : strate non testée, hors décision (§1 bis.1 pt 2)",
@@ -381,8 +384,14 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
               "discordance": " (discordance)"}
     for st, e in rg["strates"].items():
         blk, cas, tete = r1["strates"][st], e["cas"], f"    « {st} » : "
-        z, zb = blk["z"], blk["bloc"]["z_bloc"]
-        zs = ("z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10)" if z is None else
+        z, zb, src = blk["z"], blk["bloc"]["z_bloc"], blk["per_source"].values()
+        fo, ne = blk["residu_staleness_fail_open"], sum(s["non_eval_hors_env"] for s in src)   # AXES-ENONCE-1 (b)
+        res = [f"staleness fail-open : {', '.join(fo)}"] * bool(fo) + [
+            f"hors-enveloppe non évaluable : {ne} cellules (fenêtre, flux)"] * bool(ne)
+        axes = "axes " + " / ".join(a.replace("_", "-") for a in ("panne", "staleness", "hors_enveloppe") if any(
+            a in s["axes_evaluables"] for s in src)) + f" (résidu : {' ; '.join(res) or 'aucun'})"
+        zs = (f"z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < {_fmt_dec(blk['seuil_historique'])})"
+              if z is None else
               f"z_s = {_fmt_dec(z)} {'<' if cas == 'z_sous_seuil' else '≥'} 2,33"
               + (" (z_s ≤ −2,33 : hors famille, sans conclusion)" if z <= -SEUIL_Z else ""))
         zbt = ("" if cas in ("garde_5_4", "z_sous_seuil") else
@@ -526,8 +535,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # 5b. Axe contenu (§4.2) — 5 statistiques PAR PAIRE, jamais fusionnées
     content = r2_out["content"]
-    ap(f"\n  (b) AXE CONTENU (§4.2) — {content['n_windows']} fenêtres ; N_min = "
-       f"{content['n_min']} (Fisher)")
+    ap(f"\n  (b) AXE CONTENU (§4.2) — {content['n_windows']} fenêtres ; N_min = {content['n_min']} fenêtres "
+       "communes par paire (choix de conception, doc 10 §4.2 b ; SE(artanh r) = 1/√(N−3), transformation de "
+       "Fisher, Penn State STAT 509 L7 §7.8)")
     ap(f"      {content['grid_note']}")
     ap(f"      critère de fusion contenu v0 : {content['merge_criterion']}")
     ap(f"      {content['coab_staleness_note']}")
@@ -645,8 +655,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                           seuil_hist, n_min, pools_i)
         sc = params["strate_calendar"]
         we, jours = sc.get("kind") == "weekend_utc", set(sc.get("stress_weekdays", ()))
-        ap("\n[SENSIBILITÉ] PLAGE D'EXCLUSION INCLUSE — ADR-0025 déc. 4 ; ADR-0028 D2 pt 7 (liste fermée), "
-           "§1 bis.1 pt 9 : hors décision")
+        ap("\n[SENSIBILITÉ] " + ("PLAGE D'EXCLUSION INCLUSE" if len(ranges) == 1 else    # SENS-PLAGES-1
+                                f"{len(ranges)} PLAGES D'EXCLUSION INCLUSES") + " — ADR-0025 déc. 4 ; ADR-0028 D2 "
+           "pt 7 (liste fermée), §1 bis.1 pt 9 : hors décision")
         ap("  variante « exclue » = principale (blocs 1-6) ; variante « incluse » = sensibilité — biaisée "
            "vers le haut par construction ; documente l'exclusion D5 ; pas un estimateur alternatif")
         ap("  motif de l'exclusion (harnais dégradé, ADR-0025) : causalité non établie")
@@ -666,7 +677,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                 with localcontext() as ctx:
                     ctx.prec = DECIMAL_PREC
                     dz = +(i["z"] - e["z"])
-                ap(f"  {st:8} écart de z = {_fmt_dec(dz) if dz else '0'}")
+                ap(f"  {st:8} écart de z = {_fmt_dec(dz)}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
                 ap(f"  {st:8} pool d'analyse D1 : exclue {pools[st]} ; incluse {pools_i[st]} (diffèrent)")
         if not (we and 0 < len(jours) < 7):

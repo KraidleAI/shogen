@@ -33,8 +33,9 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis de CRITERE-a2 (bloc 3 : famille,
 # section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md) ; puis de CRITERE-b2
 # (bloc 6 : ligne d'entrées du drapeau 2 ; avant dc7210d3…82910a3 ; même journal) ; puis de D5-AMEND-b (blocs
-# 1 et 3, [SENSIBILITÉ] ; avant 0410039b…eac18 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
-SHA_BASE_AVEC_OPTION = "b0b4f3b75058ab286723982b82984dcfa83e6af19bc7ee10bfd4068f7b67d2d0"
+# 1 et 3, [SENSIBILITÉ] ; avant 0410039b…eac18 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md) ; puis du
+# sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant b0b4f3b7…67d2d0).
+SHA_BASE_AVEC_OPTION = "c1fd5391d65eec06e87915ec6d460e5442252869493d3407b14ad85f0c397686"
 
 
 class Coupure(Exception):

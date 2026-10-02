@@ -34,7 +34,8 @@ FAMILLE = ("  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : m = {
            "registre 08) ; niveau asymptotique, non démontré ≤ 0,01 en échantillon fini "
            "(SHOGEN-SIM-NIVEAU-1)")
 R1D = "  « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = "
-AX = "axes panne / staleness / hors-enveloppe"
+AX = ("axes panne / staleness (résidu : staleness fail-open : kraken ; hors-enveloppe non évaluable : 500 "
+      "cellules (fenêtre, flux))")    # SHOGEN-AXES-ENONCE-1 (b) ; J1, J2 : N = 3 < 4, (200 − 50)·2 + 200 cellules
 EMD = (r"EMD_s = \(2,33 \+ 0,8416\)·max\(√\(n_s·P̂_more,s·\(1 − P̂_more,s\)\), σ̂_bloc,s\) = (\S+) "
        r"fenêtres ; fraction de n_s = (\S+) \(puissance 0,8 : choix de conception ; aucun seuil sur l'EMD\)")
 NRJ = (f"« le modèle d'indépendance n'est pas rejeté sur 200 fenêtres, {AX} » ; un résultat négatif est "

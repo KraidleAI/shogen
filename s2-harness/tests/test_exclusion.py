@@ -34,8 +34,9 @@ PLAGE = (WS[2], WS[4])
 # sous-lot CRITERE-a2 (bloc 3 : famille, section règle ; avant aec8409c…c20b6bd ; P2P texte :
 # docs/G1-lot-CRITERE-regle.md) ; puis au sous-lot CRITERE-b2 (bloc 6 : ligne d'entrées du drapeau 2 ;
 # avant 8e01c22f…27cf13b ; même journal) ; puis au sous-lot D5-AMEND-b (bloc 1 : fenêtres sautées ; bloc 3 :
-# traitements de l'annexe D.5 ; avant ac530cec…bcf8 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
-SHA_BASE_SANS_OPTION = "a7f5cbfda5295a25e5c4dfa8b1700843af96fc92e3b77dbfc2be632fa72bb544"
+# traitements de l'annexe D.5 ; avant ac530cec…bcf8 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md) ; puis au
+# sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant a7f5cbfd…72bb544).
+SHA_BASE_SANS_OPTION = "19865d4f1599e7b40401473eb43d7d4bfcc4ce2bff927a943f0cb28c6be90233"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 
@@ -117,6 +118,19 @@ class TestExclusionFixture(unittest.TestCase):
         points. Rougit si : A − 1 ou B + 1 inclus sur la branche window_start (prédicat fermé propre)."""
         self.assertEqual(self._n([(WS[3] + 1, WS[4])]), {"calme": 3, "stress": 2})
         self.assertEqual(self._n([(WS[2], WS[3] - 1)]), {"calme": 2, "stress": 3})
+
+    def test_v_ligne_nmin_suit_le_journal(self):
+        """(v bis) SHOGEN-REPORT-FISHER-1 (DOCS-S2-b ; forme finale : docs/G1-lot-DOCS-S2.md §2) : ligne N_min du
+        bloc 5, formule en texte et source de manuel, N_min lu de run_params (content_n_min = 7 réécrit dans chaque
+        démarrage). Rougit si : N_min codé en dur (« 300 ») ; « (Fisher) » nu ; « 0,058 » imprimé."""
+        with open(self.control, encoding="utf-8") as f:
+            objs = [dict(o, content_n_min=7) if o["record"] == "run_params" else o for o in map(json.loads, f)]
+        with open(self.control, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(o, ensure_ascii=False) + "\n" for o in objs)
+        txt = report.render_report(self.control, self.journal)
+        self.assertEqual([x for x in txt.splitlines() if "AXE CONTENU" in x], [
+            "  (b) AXE CONTENU (§4.2) — 6 fenêtres ; N_min = 7 fenêtres communes par paire (choix de conception, "
+            "doc 10 §4.2 b ; SE(artanh r) = 1/√(N−3), transformation de Fisher, Penn State STAT 509 L7 §7.8)"])
 
     def test_garde_53_voit_les_marqueurs_exclus(self):
         """w3 (samedi, DANS la plage) ré-étiqueté « calme » lève toujours, aux quatre points
