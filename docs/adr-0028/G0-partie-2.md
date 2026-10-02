@@ -62,3 +62,43 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
   (b) BLOC1-RUNPARAMS-1 et SENS-PERTES-2 ne lisent aucun journal de campagne avant le scellement (D.4 a) : calcul
   au rendu, testé sur fixture ; (c) la règle scellée SHOGEN-CRITERE-R1-1 (seuil 2,33, ℓ = 240, trois valeurs) ne
   change pas : test de non-régression des valeurs de la règle sur les fixtures de `test_critere`.
+
+## B — RENDU-2 : lecteur de journal, recalcul tiers et enregistreur d'oracle (2026-10-02 03:2x UTC)
+
+- **Sources** : annexe A l.38 (RENDU-2) ; annexe B l.43 (TORN-LINE-UTF8-1), l.45 (RAW-LECTEUR-1), l.52 et l.108
+  (ORACLE-ENREG-1), l.214 (BLOC6-TS-1), l.318 (D5-RECALCUL-TIERS-1), l.319 (CENSURE-CAUSES-1) ; ADR-0028 D6 (viii)
+  (champs du schéma `shogen.oracle-record.v1`) et §1 bis.6 (A-12 : `paquet.sha256`, `sceau.genTime`) ; code lu à
+  03:2x UTC : `records.read_jsonl_tolerant` (l.72-101 : `open(..., encoding="utf-8")` puis `readlines()`, d'où
+  l'erreur de décodage avant le contrôle de dernière ligne), `journal.raw_entry` (l.50-57 : `sha256_raw`,
+  `raw_b64`), `r1.recompute_from_journal` (l.760).
+- **Décisions de l'orchestrateur (constructions)** :
+  - TORN-LINE-UTF8-1 : lecture en octets, décodage ligne par ligne ; dernière ligne non décodable traitée comme
+    dernière ligne tronquée (consignée, ignorée) ; ligne non décodable **non finale** : `ValueError` (le refus
+    actuel est gardé, jamais affaibli).
+  - RAW-LECTEUR-1 : **lecteur et oracle construits** (pas de limite déclarée) : relecture de `raw.jsonl` par le
+    même lecteur tolérant, décodage de `raw_b64`, sha256 recalculé égal à `sha256_raw` de la ligne et à celui de
+    la lecture correspondante de `journal.jsonl` ; tout écart = refus nommé.
+  - BLOC6-TS-1 : relevé `asn_attribution` sans `ts` compté à part au bloc 6 (ligne imprimée), jamais `KeyError`.
+  - D5-RECALCUL-TIERS-1 : fonction sœur `recompute_d5_from_journal(control, journal, exclude_ranges, segment)`
+    selon la construction de l'item ; test d'égalité avec le bloc 3 du rendu (même journal, mêmes options).
+  - CENSURE-CAUSES-1 : le sous-lot commence par établir, sur les sources du dépôt (HS2-04, journaux G1 de B-SEG
+    et de D5-AMEND, notes de réparation versionnées), quelles signatures sont lisibles dans un journal **réparé et
+    scellé** ; ventilation par cause codée seulement sur ces signatures ; la cause « limite d'exécution de tâche »
+    n'a pas de signature dans le journal : source hors journal nommée (journal d'événements de l'ordonnanceur du
+    poste local), cause imprimée « arrêt du harnais, cause non attribuée par le journal » ; si les signatures ne
+    suffisent pas, le sous-lot rend la question au lieu de coder.
+  - ORACLE-ENREG-1 : enregistreur `s2-harness/tools/oracle_record.py` (bibliothèque standard) : lance les
+    commandes nommées, écrit un enregistrement `shogen.oracle-record.v1` (tous les champs de D6 viii, plus
+    `paquet.sha256` et `sceau.genTime`, nuls hors du rôle « rendu ») dans un répertoire passé en argument, nom
+    `shogen-<sha court>-<role>-<date>-<pid>.json` ; mode `--verifier` qui relit un enregistrement et contrôle
+    rôle attendu, `tree.commit`, `exit` 0, `static_only` false, `served_from` conforme (refus nommé sinon) ; le
+    rôle « rendu » exige `paquet.sha256` et le sha256 de chaque sortie.
+- **Coupe R-25 (dans l'ordre, chacun ≤ 200)** : **B1** lecteur (TORN-LINE-UTF8-1, BLOC6-TS-1) ; **B2**
+  RAW-LECTEUR-1 ; **B3** D5-RECALCUL-TIERS-1 ; **B4** ORACLE-ENREG-1 ; **B5** CENSURE-CAUSES-1 (le plus incertain,
+  en dernier).
+- **Tests** : D.4 a (fixtures seulement) ; fixture « dernière ligne coupée dans un caractère multi-octets »
+  (HS2-03) ; enregistrement produit sur fixture puis relu par `--verifier` (champs, sha, exit), avec un mutant par
+  contrôle ; épingles re-capturées seulement si un rendu change (BLOC6-TS-1), par diff textuel.
+- **Risques** : (a) le lecteur est sur le chemin de recalcul (D6 i) : toute tolérance neuve est un desserrage,
+  interdite hors dernière ligne ; (b) l'enregistreur lance des commandes : liste fermée, jamais de shell
+  interprété ; (c) `SHOGEN_S2_CAMPAGNE_CONTROL` : l'enregistreur la consigne (posée ou non), ne la pose jamais.
