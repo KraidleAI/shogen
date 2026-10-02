@@ -151,6 +151,17 @@ binaire, le corpus committé croissant et les budgets ; il ne tient pas la
 partie guidée par la couverture — c'est ce que les deux moteurs instrumentés
 ajoutent, sur Linux seulement (asymétrie mesurée, cf. `.github/workflows/fuzz.yml`).
 
+## Outillage de lecture (OCR) — contrôlé le 2026-10-02 14:26 UTC, avant installation (session cloud, partie 3 de S2)
+
+Usage : OCR mécanique des scans Künsch 1989 et Fisher 1921 (sans couche de texte : `pdftotext` rend 20 et 5 mots), pour des extractions `*.sidecar` indépendantes du lecteur (gate S-G5) ; hors graphe du workspace, hors CI, rien de livré. Registre officiel : archive Ubuntu 24.04 (noble), champs recopiés de `apt-cache show` et du paquet téléchargé sans installation (`apt-get download`, `dpkg-deb --fsys-tarfile`).
+
+| outil | version retenue | licence | mainteneurs | origine | contrôle du | usage |
+|---|---|---|---|---|---|---|
+| `tesseract-ocr` | 5.3.4-1build5 (`pool/universe/t/tesseract/tesseract-ocr_5.3.4-1build5_amd64.deb`, SHA256 de l'index `2dfac382d77215aee0c3de4a2a2205505d5f2195e72e79b54ad32154fc08da77` = sha256 du paquet téléchargé) | Apache-2.0 (fichier `copyright` du paquet ; `Upstream-Name: tesseract-ocr`, `Source: https://github.com/tesseract-ocr/`) | Ubuntu Developers ; mainteneur d'origine Alexander Pozdnyakov | Ubuntu, section universe/graphics | 2026-10-02 14:26 UTC | OCR des scans de la biblio (partie 3) |
+| `tesseract-ocr-eng` (dépendance du précédent) | 1:4.1.0-2 (SHA256 de l'index `b1996b3113c78663f4dd16cf18aa1f288b07e9624f8d4a0ddbd7d9b52a234ba7`) | (paquet `tesseract-lang`) | Ubuntu Developers | Ubuntu, universe | 2026-10-02 14:26 UTC | données de langue anglaise |
+
+Limite déclarée : pas de compte de téléchargements ni d'ancienneté pour un paquet d'archive Ubuntu (champs absents du registre) ; l'outil s'installe dans le conteneur éphémère de la session, pas sur le poste de l'investisseur.
+
 ## Ce que ce registre ne dit pas
 
 Qu'un outil contrôlé est sûr. R-8 mesure ce qu'un registre publie — existence,
