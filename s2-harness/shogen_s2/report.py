@@ -42,7 +42,7 @@ from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
-    DECIMAL_PREC,
+    CONTEXTE_DECIMAL,
     ELL_BLOC,
     ETIQUETTE_POOLEE,
     GARDE_BLOCS,
@@ -698,8 +698,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             if e is None or i is None or e["z"] is None or i["z"] is None:
                 ap(f"  {st:8} écart de z : non calculable (z non publié ou strate absente d'une variante)")
             else:
-                with localcontext() as ctx:
-                    ctx.prec = DECIMAL_PREC
+                with localcontext(CONTEXTE_DECIMAL):
                     dz = +(i["z"] - e["z"])
                 ap(f"  {st:8} écart de z = {_fmt_dec(dz)}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
