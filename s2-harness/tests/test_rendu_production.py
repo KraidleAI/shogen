@@ -314,6 +314,22 @@ class TestProduction(unittest.TestCase):
             code, out, err = lancer(f)
         self.assertEqual((code, out, lances, os.path.exists(sortie(f))), (2, "", [], False))
 
+    def test_cible_apparue_avant_le_renommage(self):
+        """SHOGEN-RENDU-RENAME-POSIX-1 : répertoire vide posé à la place de --sortie pendant le dernier run, après le
+        contrôle de destination et avant le renommage final : code 1, « gardes levées » seul sur la sortie standard,
+        FileExistsError nommée sur stderr, tous les runs lancés, le répertoire posé reste vide, aucun temporaire
+        voisin. Rougit si le renommage final remplace une cible apparue (os.rename seul, sous POSIX)."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        parent = os.path.dirname(f["depot"])
+        avant = sorted(os.listdir(parent))
+        p, lances = faux_runs(pendant=lambda nom: nom == "raw" and os.makedirs(sortie(f)))
+        with p:
+            code, out, err = lancer(f)
+        self.assertEqual((code, out, lances, sorted(os.listdir(parent)), os.listdir(sortie(f))),
+                         (1, "gardes levées\n", RUNS, sorted(avant + ["sortie"]), []))
+        self.assertRegex(err, r"^rendu_unique : échec de production à \S+ : FileExistsError : ")
+
     def test_deviation_seconde_sortie_premiere_intacte(self):
         """D.4 b, G0 §C : première exécution (runs factices) écrite ; relance sans --deviation : refus sortie, rien
         d'écrit ; avec --deviation : <sortie>.deviation-1, avec DEVIATION.txt (motif, première sortie), première sortie

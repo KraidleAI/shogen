@@ -413,9 +413,11 @@ def produire_tout(c: dict, a, cible: str) -> int:
     """Gardes levées (G0 §C, Q5 à Q8) : runs RUNS de l'enregistreur sur l'extraction de HEAD, arrêt au premier échec,
     dans un répertoire temporaire voisin de la cible ; motif de déviation écrit ; enregistrement de rôle « rendu »
     (paquet.sha256, sceau.genTime, base = commit_analyse) relu par verifier (tree.sha256 recalculé) ; renommage en une
-    fois. Tout échec : rien ne reste, code 1, heure et motif sur stderr. Sortie standard : chemins et sha256 seulement,
-    aucun contenu de sortie."""
+    fois, qui refuse une cible présente à cet instant (POSIX : création exclusive de la cible, puis renommage sur cette
+    réserve vide ; Windows : os.rename ne remplace jamais ; RENDU-RENAME-POSIX-1). Tout échec : rien ne reste, code 1,
+    heure et motif sur stderr. Sortie standard : chemins et sha256 seulement, aucun contenu de sortie."""
     tmp, fait = tempfile.mkdtemp(prefix=f".{os.path.basename(cible)}.", dir=os.path.dirname(os.path.abspath(cible))), 0
+    reserve = None
     try:
         if a.deviation is not None:
             with open(os.path.join(tmp, "DEVIATION.txt"), "x", encoding="utf-8", newline="\n") as f:
@@ -431,7 +433,10 @@ def produire_tout(c: dict, a, cible: str) -> int:
                 echecs = [(x["nom"], x["exit"]) for x in json.load(f)["runs"] if x["exit"]]
             raise RuntimeError(f"run en échec : {echecs}")
         rec = orc.verifier(chemin, "rendu", c["head"], r)          # exit 0, sha256 de chaque sortie, commit gardé
-        os.rename(tmp, cible)
+        if os.name != "nt":                         # POSIX : os.rename remplacerait une cible vide apparue
+            os.mkdir(cible)                         # création exclusive : FileExistsError si la cible existe
+            reserve = cible
+        os.rename(tmp, cible)                       # sur la réserve vide ; Windows : FileExistsError si elle existe
         fait = 1
     except Exception as e:
         print(f"rendu_unique : échec de production à {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ} : "
@@ -441,6 +446,9 @@ def produire_tout(c: dict, a, cible: str) -> int:
         os.environ.pop(JETON, None)
         if not fait:
             shutil.rmtree(tmp, ignore_errors=True)
+            if reserve:
+                with contextlib.suppress(OSError):
+                    os.rmdir(reserve)               # réserve vide retirée ; non vide, elle n'est plus la nôtre
     print(f"sorties : {cible} (voie {o['voie']} ; T0 {o['T0']} ; genTime {o['genTime'] or '-'})")
     for x in rec["runs"]:
         print(f"  {x['nom']} {x['sortie']['sha256']} {x['sortie']['chemin']}")
