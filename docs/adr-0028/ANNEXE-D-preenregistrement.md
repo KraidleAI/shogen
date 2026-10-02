@@ -146,6 +146,7 @@ Pièces lues déclarées (l.122-129) : CONSULTATION, `monark.md` §0-§12, 07-gt
   - *Préparé sans acte par l'orchestrateur* (lot PAQUET) : `paquet.tsq` (requête locale), `docs/adr-0028/sceau/README.md`, `scripts/sceau/verify.sh`, la ligne JOURNAL type. L'envoi du `.tsq`, `ots stamp` et le téléchargement de `cacert.pem` et `tsa.crt` sont des actes de l'investisseur (§4.10 b), après la lecture sur place des conditions d'usage (P-12).
   - *Routage* : investisseur (§4.10 b) et mainteneur (ADR-0006 pt 3) ; c'est la même personne, informée des deux titres.
   - **SOUS ESCALADE — en attente de l'investisseur** (cp-1 de l'amendement, ADR §1 bis.8). *Veto (A-8, CV2-28)* : un veto entre le scellement et l'exécution invalide le sceau (nouveau paquet, nouveau sha, nouvelle ancre, délai recommencé ; le premier sha reste cité).
+  - *Ajout daté du 2026-10-02 (les lignes qui précèdent sont inchangées)* : l'escalade ci-dessus est **tranchée** : réponses de l'investisseur du 2026-09-30 23:33 UTC (JOURNAL) : « Oui » et, au veto, « Ok pour les quatre » (A-8 confirmé) ; voir l'erratum de statut d'ADR-0028 du 2026-10-02.
   - Sans l'ancre (1), la limite « sceau privé » reste écrite au paquet et au rapport.
 
 ## D.5 Traitements pré-enregistrés des items d'analyse ouverts (C-10 v) — proposés, à ratifier au paquet

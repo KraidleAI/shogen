@@ -102,3 +102,44 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
 - **Risques** : (a) le lecteur est sur le chemin de recalcul (D6 i) : toute tolérance neuve est un desserrage,
   interdite hors dernière ligne ; (b) l'enregistreur lance des commandes : liste fermée, jamais de shell
   interprété ; (c) `SHOGEN_S2_CAMPAGNE_CONTROL` : l'enregistreur la consigne (posée ou non), ne la pose jamais.
+
+## C — RENDU-1 : exécution unique en refus par défaut (2026-10-02 03:2x UTC)
+
+- **Sources** : annexe A l.37 (RENDU-1) ; annexe D.4 b (gardes (1) à (6), ordre des sorties, seconde exécution =
+  déviation déclarée) et D.4 c (objet horodaté `PAQUET.sha256`, FreeTSA, préfixes `2151b611…` et `8bfb0305…`) ;
+  annexe B l.57 (RENDU-UNIQUE-1), l.163 (EX-E1-1), l.270 (HOOK-SUITE-S2-1) ; `scripts/sceau/verify.sh` (commandes
+  `openssl ts` déjà fixées) ; `docs/17-modele-de-menace.md` (T-13, T-16, T-17).
+- **Décisions de l'orchestrateur** :
+  - Script `s2-harness/tools/rendu_unique.py` (bibliothèque standard ; `git` et `openssl` lancés par listes
+    d'arguments, jamais par un shell).
+  - **Bloc machine du paquet** (format fixé ici, rempli par le lot PAQUET : exigence portée à son G0) : dans
+    `docs/adr-0028/PAQUET-PREREG-S2.md`, un bloc clôturé de langage `shogen-paquet-v1`, une clé par ligne :
+    `commit_analyse`, `sha256_script`, `journal <nom> <sha256 complet>` (trois lignes), `sommes <sha256 complet>`,
+    `cacert_sha256`, `tsa_crt_sha256`. Toute clé absente, dupliquée ou malformée = refus.
+  - Gardes : (1) sha256 complet du paquet présent dans `JOURNAL.md` à HEAD (`git show HEAD:JOURNAL.md`) ;
+    (2) `git diff --quiet <commit_analyse> HEAD -- s2-harness/shogen_s2 s2-harness/tools` et arbre de travail
+    propre sur ces chemins ; (3) + **EX-E1-1** : sha256 complet de chaque journal scellé égal à celui du bloc du
+    paquet **et** à celui du fichier de sommes ; (4) sha256 du script égal à `sha256_script` ; (5) T_now ≥ T0 + 24 h,
+    T0 = genTime du jeton (`openssl ts -reply -text`) ou, voie (b), date de commit du premier commit qui introduit le
+    sha du go dans `JOURNAL.md` ; (6) voie (a) : `openssl ts -verify` sur `docs/adr-0028/sceau/` (mêmes arguments
+    que `verify.sh`) sort 0, et sha256 de `cacert.pem` et `tsa.crt` égaux au bloc du paquet (et à leurs préfixes de
+    D.4 c) ; voie (b) : **fichier de go** `docs/adr-0028/sceau/GO-sans-ancre.txt`, UTF-8 sans BOM, LF, trois
+    lignes exactes `date: <ISO 8601 UTC>`, `ordre: exécuter sans ancre`, `signataire: investisseur`, dont le
+    sha256 complet figure dans `JOURNAL.md` à HEAD sur une ligne postérieure à celle du sha du paquet. L'horloge
+    seule n'ouvre jamais.
+  - Sorties : écrites dans un répertoire temporaire voisin, renommé en une fois à la fin ; répertoire de sortie
+    déjà présent = refus, sauf option `--deviation <motif>` (seconde exécution déclarée, sorties des deux gardées).
+    Ordre de D.4 b ; l'enregistrement d'oracle (étape B, rôle « rendu ») porte `paquet.sha256`, `sceau.genTime` et
+    le sha256 de chaque sortie.
+  - **HOOK-SUITE-S2-1 : non** (la suite n'entre pas au hook : ≈ 26 s par commit ; elle est tenue par le job
+    `s2-harness-unittest` et par l'enregistrement d'oracle du rendu, qui la lance).
+- **Coupe R-25** : **C1** bloc machine du paquet et gardes (1) à (4) avec EX-E1-1 ; **C2** gardes (5) et (6)
+  (autorité RFC 3161 de test produite par `openssl` dans le test, jamais FreeTSA) ; **C3** enchaînement des
+  sorties, atomicité, enregistrement d'oracle, cas nominal.
+- **Tests** : chaque garde a une fixture qui la déclenche (sortie ≠ 0, aucune sortie écrite) et son mutant ; cas
+  nominal sortie 0 ; fixture « ni jeton vérifié ni go épinglé » ; dépôts git jetables ; D.4 a (fixtures seulement).
+- **Risques** : (a) `openssl` absent : le test échoue, il ne saute pas (une garde non testée ne se déclare pas
+  verte) ; (b) OpenSSL 3.0.13 ici, 3.5.7 sur l'hôte ; (c) les sha complets de `cacert.pem` et `tsa.crt` ne sont
+  au dépôt que par préfixe (FAITS-ancre-sceau est local) : le bloc du paquet les porte en entier.
+- **Écart de registre relevé** : annexe D.4 c porte encore « SOUS ESCALADE — en attente de l'investisseur »
+  (tranché le 2026-09-30 23:33 UTC, JOURNAL) : ajout daté au commit de ce G0.
