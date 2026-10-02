@@ -815,12 +815,16 @@ def recompute_d5_from_journal(control_path: str, journal_path: str, exclude_rang
     D.5) : garde §5.3 et filtre de lecture (`records.filtre_lecture`) par `recompute_from_journal`, puis, comme le
     rendu, s par strate (`fenetres_sautees` sur les marqueurs du journal entier, portée du segment, plages D5 ; bloc 1)
     et bornes de censure par strate de R1 (bloc 3) : None sous la garde §5.4 (z_s non publiée), variante σ̂_bloc si
-    z_bloc est publiée. Rend {"fenetres_sautees": {strate : s}, "bornes_censure": {strate : bornes ou None}}."""
+    z_bloc est publiée ; part « harnais vivant » de s, comme le bloc 1 (SHOGEN-CENSURE-CAUSES-TIERS-1). Rend
+    {"fenetres_sautees": {strate : s}, "fenetres_sautees_vivant": {strate : part}, "bornes_censure": {strate : bornes
+    ou None}} (strates à 0 absentes des deux premiers)."""
     out = recompute_from_journal(control_path, journal_path, exclude_ranges, segment)
     params_list, _clock, markers = records.parse_control(control_path)
     params, ranges = records.effective_run_params(params_list), records.exclusion_ranges(exclude_ranges)
     seg = records.filtre_lecture(params, markers, ranges=ranges, segment=segment)[3]
-    s = fenetres_sautees(build_window_strate(markers), params["strate_calendar"], int(params["w"]), seg, ranges)
-    return {"fenetres_sautees": s, "bornes_censure": {
+    ws, spec, w = build_window_strate(markers), params["strate_calendar"], int(params["w"])
+    s = fenetres_sautees(ws, spec, w, seg, ranges)
+    return {"fenetres_sautees": s, "fenetres_sautees_vivant": fenetres_sautees_vivant(
+        ws, records.demarrages(control_path), spec, w, seg, ranges), "bornes_censure": {
         st: None if b["z"] is None else bornes_censure(b["n"], b["K"], b["P_more"], s.get(st, 0), b["bloc"][
             "sigma2_bloc"] if b["bloc"]["z_bloc"] is not None else None) for st, b in out["strates"].items()}}

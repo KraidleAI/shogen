@@ -12,7 +12,7 @@ import re
 import tempfile
 import unittest
 
-from shogen_s2 import collector, records, report, window
+from shogen_s2 import collector, r1, records, report, window
 from tests.test_collector import BY_ID, DELTA, SKELETON, TAU, FakeClock, _taumap, frozen_read_fn, sbc_huge
 from tests.test_d5_amend import rang
 from tests.test_exclusion import PLAGE, build_fixture
@@ -117,6 +117,19 @@ class TestCensureCauses(unittest.TestCase):
                 (v, sv), (a, sa) = (map(int, re.search(rf"« {st} » : (\d+) sur s = (\d+) — ", x).groups())
                                     for x in (viv, aut))
                 self.assertEqual((v + a, sv, sa), (s[st],) * 3, (kw, st))
+
+    def test_recalcul_tiers_ventilation(self):
+        """SHOGEN-CENSURE-CAUSES-TIERS-1 : recompute_d5_from_journal sert la part « harnais vivant » (clé
+        fenetres_sautees_vivant, strates à 0 absentes, comme fenetres_sautees), égale aux valeurs écrites à la main et
+        à la première des deux lignes du bloc 1, sans option, sous plages et sous segment. Rougit si : clé absente,
+        part calculée sur les marqueurs filtrés, sans les plages ou hors de la portée du segment."""
+        for kw, att in zip(KW, ({"calme": 1, "stress": 4}, {"stress": 3}, {"calme": 1, "stress": 2})):
+            v = r1.recompute_d5_from_journal(self.c, self.j, **kw)["fenetres_sautees_vivant"]
+            s, lignes = lu(report.render_report(self.c, self.j, **kw))
+            with self.subTest(kw=kw):
+                self.assertEqual(v, att)
+                self.assertEqual([f"« {st} » : {v.get(st, 0)} sur s" for st in sorted(s)],
+                                 [re.search(r"« \w+ » : \d+ sur s", x).group(0) for x in lignes[::2]])
 
 
 if __name__ == "__main__":

@@ -13,10 +13,11 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime
+from decimal import Decimal, localcontext
 from pathlib import Path
 from unittest import mock
 
-from shogen_s2 import records, report
+from shogen_s2 import lm, r1, r2, records, report
 from tests.test_rendu_unique import OUTIL, ru
 from tests.test_sensibilite import RA, fixture, t
 
@@ -32,6 +33,18 @@ def produire(*args) -> tuple:
         code = ru.main(["--produire", *args])
         w.flush()
         return code, buf.getvalue()
+
+
+def chaine(d) -> str:
+    if isinstance(d, Decimal):
+        return str(d)
+    raise TypeError(f"{type(d).__name__} hors JSON")
+
+
+def en_json(x):
+    """Sortie de recompute_* telle qu'un JSON la relit (Decimal en chaîne, tuples en listes)."""
+    with localcontext(r1.CONTEXTE_DECIMAL):
+        return json.loads(json.dumps(x, default=chaine))
 
 
 class TestSortiesNommees(unittest.TestCase):
@@ -55,7 +68,7 @@ class TestSortiesNommees(unittest.TestCase):
              "segment confirmatoire de la règle SHOGEN-CRITERE-R1-1 (D2 pt 6) ; la section [SENSIBILITÉ] (plage "
              "incluse) est hors décision, biaisée vers le haut par construction")))
         self.assertEqual(ru.NOMS_JOURNAUX, ("control.jsonl", "journal.jsonl", "raw.jsonl"))
-        for n in ("j14-principal", "j14-second", "j28", "raw"):
+        for n in ("j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"):
             self.assertEqual(ru.orc.COMMANDES[n], ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n,
                                                                    "--journaux", ru.orc.JOURNAUX]))
 
@@ -70,6 +83,25 @@ class TestSortiesNommees(unittest.TestCase):
                     self.assertEqual(produire(nom, "--journaux", self.d),
                                      (0, f"[ÉTIQUETTE] {nom} : {etiq}\n{txt}\n".encode("utf-8")))
                     self.assertEqual("[SENSIBILITÉ]" in txt, bool(pl))
+
+    def test_recalcul_tiers_quatre_recompute_et_variante_incluse(self):
+        """Q6 : JSON des quatre recompute_* (r1, d5 avec la ventilation de B5, lm, r2) par sortie, mêmes options,
+        plus la variante sans plage du J28 ; ses n et K égaux aux lignes « incluse » de la section [SENSIBILITÉ] du
+        rendu J28. Rougit si : un recompute manque, options autres, variante incluse absente ou sous plage."""
+        with mock.patch.object(ru, "SORTIES", TABLE):
+            code, octets = produire("recalcul-tiers", "--journaux", self.d)
+        out = json.loads(octets)
+        var = [(n, s, pl) for n, s, pl, _ in TABLE] + [("j28-incluse", TABLE[2][1], ())]
+        self.assertEqual((code, list(out)), (0, sorted(n for n, *_ in var)))
+        for n, s, pl in var:
+            with self.subTest(sortie=n):
+                self.assertEqual(out[n], en_json({"segment": s, "plages": [list(x) for x in pl], **{
+                    k: f(self.c, self.j, pl, s) for k, f in (
+                        ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
+                        ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}}))
+        sens = report.render_report(self.c, self.j, exclude_ranges=[RA], segment=TABLE[2][1]).split("[SENSIBILITÉ]")[1]
+        for st, b in out["j28-incluse"]["r1"]["strates"].items():
+            self.assertIn(f"  {st:8} {'incluse (sensibilité)':22} : n = {b['n']} ; K = {b['K']} ; ", sens)
 
     def test_raw_verdict_et_exit_0(self):
         """Q7, SHOGEN-RAW-FIN-1 : verdict de records.verifier_raw écrit sur la sortie, code 0 conforme comme en refus

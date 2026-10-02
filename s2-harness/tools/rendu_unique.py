@@ -1,18 +1,20 @@
 """Exécution unique du rendu S2, en refus par défaut (ADR-0028 annexe D.4 b ; SHOGEN-RENDU-UNIQUE-1, EX-E1-1 ; G0
 docs/adr-0028/G0-partie-2.md §C). Bibliothèque standard seule ; git et openssl lancés par listes d'arguments, jamais
 par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde qui ne peut s'évaluer refuse. --produire : commande
-nommée de l'enregistreur (sortie de la table et raw ; G0 §C, décisions Q1 à Q5 et Q7)."""
+nommée de l'enregistreur (sortie de la table, recalcul-tiers, raw ; G0 §C, décisions Q1 à Q7)."""
 from __future__ import annotations
 
 import argparse
 import hashlib
 import importlib.util
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal, localcontext
 
 SCRIPT = os.path.abspath(__file__)
 LANGAGE = "shogen-paquet-v1"
@@ -271,18 +273,25 @@ def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, mainten
     return refus
 
 
+def _decimal(x) -> str:
+    if isinstance(x, Decimal):
+        return str(x)                                   # Decimal en chaîne, sous le contexte nommé (appelant)
+    raise TypeError(f"{type(x).__name__} hors du JSON du recalcul tiers")
+
+
 def produire(argv: list) -> int:
     """Commande nommée de l'enregistreur (liste fermée de oracle_record), lancée sur l'extraction du commit : une
-    sortie de SORTIES (étiquette en tête, puis render_report avec ses seules options ; Q1, Q2, Q4) ou raw (verdict de
+    sortie de SORTIES (étiquette en tête, puis render_report avec ses seules options ; Q1, Q2, Q4), recalcul-tiers
+    (JSON des quatre recompute_* par sortie, variante sans plage comprise ; Q6) ou raw (verdict de
     records.verifier_raw, code 0 quel que soit le verdict ; Q7, SHOGEN-RAW-FIN-1). Octets UTF-8 sur la sortie
     standard, capturée par l'enregistreur."""
     p = argparse.ArgumentParser(prog="rendu_unique.py --produire")
-    p.add_argument("nom", choices=[s[0] for s in SORTIES] + ["raw"])
+    p.add_argument("nom", choices=[s[0] for s in SORTIES] + ["recalcul-tiers", "raw"])
     p.add_argument("--journaux", required=True)
     a = p.parse_args(argv)
     if HARNAIS not in sys.path:
         sys.path.insert(0, HARNAIS)
-    from shogen_s2 import records, report
+    from shogen_s2 import lm, r1, r2, records, report
     c, j, raw = (os.path.join(a.journaux, n) for n in NOMS_JOURNAUX)
     if a.nom == "raw":
         try:
@@ -291,6 +300,13 @@ def produire(argv: list) -> int:
         except ValueError as e:                     # verdict de refus : imprimé, l'exécution continue
             texte = f"refus — {e}"
         texte = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}"
+    elif a.nom == "recalcul-tiers":
+        var = [(n, s, pl) for n, s, pl, _ in SORTIES] + [(n + "-incluse", s, ()) for n, s, pl, _ in SORTIES if pl]
+        out = {n: {"segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
+            ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
+            ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl in var}
+        with localcontext(r1.CONTEXTE_DECIMAL):
+            texte = json.dumps(out, ensure_ascii=False, indent=1, sort_keys=True, default=_decimal)
     else:
         nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
         texte = f"[ÉTIQUETTE] {nom} : {etiquette}\n" + report.render_report(c, j, exclude_ranges=pl, segment=seg)

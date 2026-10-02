@@ -28,7 +28,7 @@ ROLES = ("G1", "G2", "cp-2", "rendu")
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
 JOURNAUX = "<journaux>"     # marqueur d'argument : dossier des journaux, chemin absolu substitué (jamais un shell)
-PRODUCTION = ("j14-principal", "j14-second", "j28", "raw")   # rendu unique (G0 §C, Q5 à Q7)
+PRODUCTION = ("j14-principal", "j14-second", "j28", "recalcul-tiers", "raw")   # rendu unique (G0 §C, Q5 à Q7)
 COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]),
              **{n: ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n, "--journaux", JOURNAUX])
                 for n in PRODUCTION}}                                       # liste fermée
