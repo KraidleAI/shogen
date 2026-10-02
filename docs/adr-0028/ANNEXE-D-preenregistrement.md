@@ -107,6 +107,18 @@ Pièces lues déclarées (l.122-129) : CONSULTATION, `monark.md` §0-§12, 07-gt
 - **Non ouverts** : `baseline_step0.out`, `measure-M009a.md`, `campagne.md`, le dossier `campagne\`, `_result.json`, `_workflow-output.json`, `F:\tmp\shogen-j28\work\`, les journaux de campagne et leurs copies, ADR-M002. La l.51 de la cartographie n'a pas été affichée (seul son sha256 a été calculé).
 - **Aucune statistique calculée. Aucun z, aucun K, aucun P̂_more, aucun φ vu.**
 
+**(g) Rédacteur frais du paquet** — *ajout daté du 2026-10-02 17:1x UTC (les lignes qui précèdent sont inchangées)* : `shogen-worker`, Gate 0 `claude-opus-5-5`, rédaction de 16:06 à 16:42 UTC, corrections C-1..C-5 (16:43-16:48) et C-6, C-7 (17:06-17:14) ; journal `docs/G1-partie-3-R.md`, §1 et §10-11, recopié :
+
+> « Je n'ai vu aucun z, aucun K, aucun P̂_more, aucun φ de campagne, et je n'en ai calculé aucun. Je n'ai lu aucun taux d'écart ni de panne d'une source de la campagne. Je n'ai ouvert aucune pièce de la liste fermée D.2 (points 1 à 11) »
+
+Exposé à (déclaré) : comptes de classe M que porte l'ADR (D1, D5, fenêtres), annexe B l.38 (compte de fenêtres sautées), annexe D l.159, noms des pièces de D.2, résultats synthétiques, JOURNAL l.125 seule. Contrôle FM-1.1 de l'orchestrateur (annexe B.32 et B.33) : 0 fragment des lignes interdites dans sa transcription.
+
+**(h) Validateur frais du paquet (cp-1 complet, puis cp-1 bref)** — *même ajout daté* : `shogen-validateur`, Gate 0 `claude-fable-5-1`, de 16:52 à 17:03 UTC et de 17:15 à 17:17 UTC ; rapport `docs/adr-0028/CP1-PAQUET-2026-10-02.md`, §1 et §7, recopié :
+
+> « Je n'ai vu aucun z, aucun K, aucun P̂_more ni aucun φ de campagne, et n'en ai calculé aucun ; aucun taux d'une source réelle. Je n'ai ouvert aucune pièce de D.2 (points 1 à 11) »
+
+Exposé à (déclaré) : comptes de classe M portés par l'ADR et ses annexes, noms des pièces de D.2, D.3 (a) masquée, JOURNAL l.125 seule, résultats synthétiques, sujets de commits. Contrôle FM-1.1 de l'orchestrateur (annexe B.33) : 0 fragment des lignes interdites dans sa transcription.
+
 ## D.4 Définitions de contrôle
 
 **(a) « Fixtures seulement » (C-11) — option retenue : lectures « comptes seulement » admises nommément ; proposition du rédacteur, RATIFIÉE par l'orchestrateur le 2026-09-30 sous la délégation investisseur du même jour (JOURNAL), C-8 du cp-1 bref de B-SEG-1 et C-4 de son G2 ; ratification révocable par l'investisseur avant l'exécution unique.**
