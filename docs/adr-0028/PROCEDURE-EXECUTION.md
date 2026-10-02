@@ -21,6 +21,9 @@ cloud (P1, JOURNAL du 2026-10-02 21:2x UTC). Toute heure écrite est lue par `da
   suppression, puis contrôle à nouveau) ; toutes les commandes Python sous `PYTHONDONTWRITEBYTECODE=1` et `-B` ;
   `SHOGEN_S2_CAMPAGNE_CONTROL` absente (`env -u`).
 - `bash scripts/sceau/verify.sh` : sortie 0.
+- *Ajout daté du 2026-10-02 21:5x UTC (constat H-1 de R-C, annexe B.41)* : le dossier parent de `--sortie`,
+  `docs/adr-0028/execution/`, doit exister (il est suivi par son `README.md`) ; `--sortie` s'écrit sans barre finale
+  (constat C-1 de R-C : avec une barre finale, les débris d'une tentative interrompue ne sont pas vus).
 
 ## 2. Journaux scellés (après le go seulement)
 
@@ -34,6 +37,9 @@ cloud (P1, JOURNAL du 2026-10-02 21:2x UTC). Toute heure écrite est lue par `da
   mémoire libre lue (`free -g`) ; aucune mesure de durée avant l'exécution.
 - `sha256sum` des trois fichiers : égaux aux lignes `journal …` du bloc machine et à celles de `$S` ; consigné au
   JOURNAL (sha seulement). Un écart : arrêt, ligne de JOURNAL, question à l'investisseur.
+- *Ajout daté du 2026-10-02 21:5x UTC (constat B-1 de R-C)* : si `raw.jsonl` porte une ligne corrompue autre que la
+  dernière, le verdict du run `raw` cite le chemin absolu de `$J` : ses octets et son sha256 dépendent alors de ce
+  chemin. Le chemin exact de `$J` est écrit au JOURNAL avant l'exécution, pour qu'un tiers rejoue à l'octet.
 
 ## 3. Gardes seules, puis production
 
