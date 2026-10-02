@@ -24,7 +24,8 @@ from unittest import mock
 from shogen_s2 import lm, r1, r2, records, report
 from tests.test_oracle_record import LINT, OUTIL as ENREGISTREUR, g
 from tests import test_rendu_unique as tru
-from tests.test_rendu_unique import LOIN, OPENSSL, OUTIL, PAQUET, SCEAU, epingler, h, monter, poser, ru, texte_bloc
+from tests.test_rendu_unique import (LOIN, OPENSSL, OUTIL, PAQUET, SCEAU, SCELLEMENT, epingler, h, monter, poser, ru,
+                                     texte_bloc)
 from tests.test_sensibilite import RA, fixture, t
 
 TABLE = (("j14-principal", {"t0": t(7, 22), "t_fin": t(10, 2)}, (), "étiquette un"),        # table de fixture
@@ -224,7 +225,8 @@ def monter_prod(d: str) -> dict:
     paquet = texte_bloc([f"commit_analyse {c1}", f"sha256_script {h(outil.encode())}", *(
         f"journal {n} {h(Path(jx, n).read_bytes())}" for n in noms[:3]), f"sommes {h(sommes)}",
         "cacert_sha256 " + "1" * 64, "tsa_crt_sha256 " + "2" * 64]).encode()
-    poser(depot, {PAQUET: paquet, "JOURNAL.md": f"- scellement du paquet : sha256 {h(paquet)}\n".encode()})
+    poser(depot, {PAQUET: paquet, "JOURNAL.md": f"- scellement du paquet : sha256 {h(paquet)}\n".encode()},
+          date=SCELLEMENT)
     f = {"depot": depot, "paquet": os.path.join(depot, PAQUET), "journaux": jx, "sha": h(paquet), "c1": c1,
          "sommes": os.path.join(jx, "SHA256SUMS.txt")}
     epingler(f)

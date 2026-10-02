@@ -31,8 +31,9 @@ SANS_PREUVE = ["(5)", "(6)"]                    # fixture sans jeton ni go : (5)
 SCEAU, DELAI, OPENSSL = "docs/adr-0028/sceau", timedelta(hours=24), shutil.which("openssl")
 CNF = (b"[req]\ndistinguished_name = dn\n[dn]\n[tsa]\ndefault_tsa = t\n[t]\nserial = serial\nsigner_digest = sha256\n"
        b"default_policy = 1.2.3.4\ndigests = sha256\ness_cert_id_alg = sha256\n")     # configuration minimale de test
-GO_OK, LOIN = "date: 2026-10-03T12:00:00Z\nordre: exécuter sans ancre\nsignataire: investisseur\n".encode(), datetime(
-    2100, 1, 1, tzinfo=timezone.utc)
+GO_OK, LOIN = "date: 2026-08-31T12:00:00Z\nordre: exécuter sans ancre\nsignataire: investisseur\n".encode(), datetime(
+    2100, 1, 1, tzinfo=timezone.utc)                # go daté entre le scellement et son épinglage (C-3)
+SCELLEMENT = "2026-08-31T00:00:00+00:00"        # date de commit du scellement des fixtures (C-3)
 
 
 def h(octets: bytes) -> str:
@@ -43,13 +44,21 @@ def attendus(*noms: str) -> list:
     return sorted(set(noms) | set(SANS_PREUVE), key=ORDRE.index)
 
 
-def poser(racine: str, fichiers: dict, commit: bool = True):
-    """Écrit les fichiers (octets) sous racine ; avec commit, les commite (dépôt jetable) et rend le sha de HEAD."""
+def dater(depot: str, date, *args: str) -> None:
+    """git commit sur le dépôt jetable, identité de fixture ; date : date de commit (GIT_COMMITTER_DATE), ou None."""
+    subprocess.run(["git", "-C", depot, "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
+                    "commit.gpgsign=false", "commit", "-q", *args], check=True, capture_output=True,
+                   env={**GIT_ENV, **({"GIT_COMMITTER_DATE": date} if date else {})})
+
+
+def poser(racine: str, fichiers: dict, commit: bool = True, date=None):
+    """Écrit les fichiers (octets) sous racine ; avec commit, les commite (dépôt jetable ; date : date de commit) et
+    rend le sha de HEAD."""
     for rel, octets in fichiers.items():
         Path(racine, rel).parent.mkdir(parents=True, exist_ok=True)
         Path(racine, rel).write_bytes(octets)
     if commit:
-        g(racine, "add", "-A"), g(racine, "commit", "-q", "-m", "fixture")
+        g(racine, "add", "-A"), dater(racine, date, "-m", "fixture")
         return g(racine, "rev-parse", "HEAD")
 
 
@@ -78,7 +87,7 @@ def monter(d: str, bloc=lambda x: x, journal="- scellement du paquet : sha256 {}
     sommes = sommes("".join(f"{h(v)}  {n}\n" for n, v in SOMMES.items())).encode()
     poser(jx, {**SOMMES, "SHA256SUMS.txt": sommes}, commit=False)
     paquet = texte(bloc(lignes_bloc(c1, sommes))).encode()
-    poser(depot, {PAQUET: paquet, "JOURNAL.md": journal.format(h(paquet)).encode()})
+    poser(depot, {PAQUET: paquet, "JOURNAL.md": journal.format(h(paquet)).encode()}, date=SCELLEMENT)
     return {"depot": depot, "paquet": os.path.join(depot, PAQUET), "journaux": jx, "sha": h(paquet),
             "sommes": os.path.join(jx, "SHA256SUMS.txt"), "c1": c1}
 
@@ -119,9 +128,7 @@ def epingler(f: dict, go: bytes = GO_OK, date="2026-09-01T00:00:00+00:00", ligne
     j = Path(f["depot"], "JOURNAL.md")
     j.write_bytes(ou(j.read_bytes().decode(), ligne.format(h(go))).encode())
     if date:
-        subprocess.run(["git", "-C", f["depot"], "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
-                        "commit.gpgsign=false", "commit", "-qam", "go"], check=True, capture_output=True,
-                       env={**GIT_ENV, "GIT_COMMITTER_DATE": date})
+        dater(f["depot"], date, "-am", "go")
         return datetime.fromisoformat(date)
 
 
@@ -354,23 +361,44 @@ class TestRenduUnique(unittest.TestCase):
 
     def test_voie_b_refus(self):
         """(6), voie (b), horloge en 2100 : go avec BOM, en CRLF, sans LF final, avec une ligne de plus, sans accent,
-        date hors ISO 8601, hors calendrier ou sans fuseau, encodé en Latin-1 ; sha du go absent de JOURNAL.md, en
-        préfixe seulement, sur le disque seulement, avant la ligne du scellement ou sur cette ligne : refus (5) et (6),
-        rien d'écrit. Rougit si l'un des contrôles de la voie (b) est retiré ou relâché."""
-        u = GO_OK.decode()
+        date hors ISO 8601, hors calendrier, sans fuseau ou à +01:00 (même instant UTC), encodé en Latin-1 ; sha du go
+        absent de JOURNAL.md, en préfixe seulement, sur le disque seulement, avant la ligne du scellement (seul, ou cité
+        avant puis après), ou sur cette ligne ; C-3 (SHOGEN-GO-ORDRE-1) : go daté après son commit d'épinglage ou
+        avant le commit du scellement ; commit d'épinglage daté avant le scellement, au même instant, ou hors de sa
+        descendance ; scellement et go dans le même commit : refus (5) et (6), rien d'écrit. Rougit si l'un des
+        contrôles de la voie (b) est retiré ou relâché."""
+        u, date = GO_OK.decode(), lambda x: GO_OK.decode().replace("2026-08-31T12:00:00Z", x).encode()
         for nom, kw in (("BOM", {"go": b"\xef\xbb\xbf" + GO_OK}), ("CRLF", {"go": GO_OK.replace(b"\n", b"\r\n")}),
                         ("sans LF final", {"go": GO_OK[:-1]}), ("ligne de plus", {"go": GO_OK + b"x\n"}),
                         ("sans accent", {"go": u.replace("é", "e").encode()}), ("Latin-1", {"go": u.encode("latin-1")}),
-                        ("date hors ISO", {"go": u.replace("2026-10-03T12:00:00Z", "03/10/2026").encode()}),
-                        ("hors calendrier", {"go": u.replace("2026-10", "2026-13").encode()}),
+                        ("date hors ISO", {"go": date("31/08/2026")}),
+                        ("hors calendrier", {"go": date("2026-13-31T12:00:00Z")}),
                         ("sans fuseau", {"go": u.replace(":00Z", ":00").encode()}),
+                        ("+01:00", {"go": date("2026-08-31T13:00:00+01:00")}),
                         ("sha absent", {"ligne": "- go de l'investisseur\n"}), ("préfixe", {"ligne": "- go {:.8}…\n"}),
                         ("disque seulement", {"date": None}), ("avant le scellement", {"ou": lambda j, x: x + j}),
-                        ("même ligne", {"ou": lambda j, x: j.rstrip("\n") + " " + x})):
+                        ("cité avant puis après", {"ou": lambda j, x: x + j + x}),
+                        ("même ligne", {"ou": lambda j, x: j.rstrip("\n") + " " + x}),
+                        ("go après son épinglage", {"go": date("2026-09-01T00:00:01Z")}),
+                        ("go avant le scellement", {"go": date("2026-08-30T23:59:59Z")}),
+                        ("épinglage avant le scellement", {"date": "2026-08-30T00:00:00+00:00"}),
+                        ("épinglage au même instant", {"go": date("2026-08-31T00:00:00Z"), "date": SCELLEMENT})):
             f = monter(tempfile.mkdtemp())
             epingler(f, **kw)
             with self.subTest(variante=nom):
                 self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
+        go = date("2026-08-31T00:00:00Z")
+        f = monter(tempfile.mkdtemp(), journal="- scellement du paquet : sha256 {}\n" + f"- go : sha256 {h(go)}\n")
+        poser(f["depot"], {f"{SCEAU}/GO-sans-ancre.txt": go}, commit=False)
+        with self.subTest(variante="même commit"):
+            self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
+        f = monter(tempfile.mkdtemp())                  # go épinglé sur une branche partie de c1, puis fusionnée
+        g(f["depot"], "checkout", "-q", "-b", "parallele", f["c1"])
+        poser(f["depot"], {"JOURNAL.md": f"- go : sha256 {h(GO_OK)}\n".encode()}, date="2026-08-31T18:00:00+00:00")
+        g(f["depot"], "checkout", "-q", "-"), g(f["depot"], "merge", "-q", "--no-commit", "-s", "ours", "parallele")
+        epingler(f, date="2026-08-31T20:00:00+00:00")
+        with self.subTest(variante="hors de la descendance du scellement"):
+            self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
 
     def test_deux_voies_t0_le_plus_tardif(self):
         """(5), les deux voies établies : go épinglé trois jours avant le jeton ; horloge à T0 du go + 25 h, avant

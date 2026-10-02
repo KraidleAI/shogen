@@ -229,20 +229,36 @@ def voie_a(c: dict) -> datetime:
 def voie_b(c: dict) -> datetime:
     """(6) voie (b) : SCEAU/GO-sans-ancre.txt en UTF-8 strict, sans BOM, LF, les trois lignes exactes de GO (date ISO
     8601 UTC du calendrier) ; son sha256 complet dans JOURNAL.md à HEAD, première occurrence sur une ligne postérieure
-    à la première qui porte le sha du paquet (scellement). Rend la date de commit du premier commit qui introduit ce
-    sha dans JOURNAL.md (git log -S, sans textconv)."""
+    à la première qui porte le sha du paquet (scellement). S et Gc : premiers commits qui introduisent dans JOURNAL.md
+    le sha du paquet et celui du go ; refus si Gc = S, si S n'est pas ancêtre de Gc, si ct(Gc) ≤ ct(S), ou si la date
+    du go n'est pas dans [ct(S) ; ct(Gc)] (D.4 c ; SHOGEN-GO-ORDRE-1, G2 C-3). Rend ct(Gc)."""
     with open(os.path.join(racine(c), SCEAU, "GO-sans-ancre.txt"), "rb") as f:
         octets = f.read()
     m = GO.fullmatch(octets.decode("utf-8"))
     if not m:
         raise ValueError("fichier de go hors du format du G0 §C")
-    datetime.fromisoformat(m.group(1))                  # date du calendrier, sinon ValueError
+    date = datetime.fromisoformat(m.group(1))           # date du calendrier, sinon ValueError
     sha = hashlib.sha256(octets).hexdigest()
     go, scelle = lignes_avec(c["journal_md"], sha), lignes_avec(c["journal_md"], c["sha_paquet"])
     if not (go and scelle and go[0] > scelle[0]):
         raise ValueError(f"sha256 du go {sha} absent de JOURNAL.md à HEAD, ou pas après la ligne du scellement")
-    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%ct", "-S" + sha, head(c), "--", "JOURNAL.md")
-    return datetime.fromtimestamp(int(p.stdout.split()[0]), timezone.utc)
+    (s, ts), (gc, tg) = premier(c, c["sha_paquet"]), premier(c, sha)
+    if gc == s or git(racine(c), "merge-base", "--is-ancestor", s, gc).returncode or tg <= ts:
+        raise ValueError(f"commit du go {gc} : ni descendant strict ni postérieur au commit du scellement {s} (D.4 c)")
+    if not ts <= date <= tg:
+        raise ValueError(f"date du go {m.group(1)} hors de [{ts:%Y-%m-%dT%H:%M:%SZ} ; {tg:%Y-%m-%dT%H:%M:%SZ}] "
+                         "(commit du scellement ; commit qui épingle le go)")
+    return tg
+
+
+def premier(c: dict, sha: str) -> tuple:
+    """Premier commit qui introduit sha dans JOURNAL.md (git log --no-textconv --reverse --format="%H %ct" -S<sha>
+    <head> -- JOURNAL.md) : (sha du commit, date de commit UTC) ; aucun : ValueError."""
+    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%H %ct", "-S" + sha, head(c), "--", "JOURNAL.md")
+    x = p.stdout.decode().split()
+    if p.returncode or len(x) < 2:
+        raise ValueError(f"aucun commit n'introduit {sha} dans JOURNAL.md à {head(c)}")
+    return x[0], datetime.fromtimestamp(int(x[1]), timezone.utc)
 
 
 VOIES = (("a", voie_a), ("b", voie_b))
