@@ -9,12 +9,19 @@ nomme la mutation qui le rougit."""
 
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
+from datetime import datetime, timezone
 from decimal import Decimal as D, localcontext
 from fractions import Fraction as F
+from unittest import mock
 
-from shogen_s2 import r1
+from shogen_s2 import collector, r1, records, window
+from shogen_s2.model import Reading, Status
 from shogen_s2.r1 import Ecart
+from shogen_s2.sources import SIGMA_CLASS_OF_FLUX
+from tests.test_collector import BY_ID, DELTA, FakeClock, _taumap, sbc_huge
 from tests.test_r1 import mk, rd
 
 POOL = list("abcdef")
@@ -27,6 +34,12 @@ DK = {0: {"a": PT, "b": PT}, 1: {"a": PT, "b": None}, 2: {"a": "panne_http", "b"
 TA = {**{j - 1: {"d": str(100 + j)} for j in range(1, 26)}, 25: {"d": "150/200"},
       26: {**dict.fromkeys("abc", "panne_http"), "d": "190"}}
 TM = {0: {"c": "200", "d": "200", "e": None, "f": None}, 1: {"e": "50"}}
+G = [int(datetime(2026, 8, 7, 23, 55, tzinfo=timezone.utc).timestamp()) + 60 * k for k in range(10)]
+VEN = int(datetime(2026, 8, 7, 22, tzinfo=timezone.utc).timestamp())      # ven. 22:00Z : rang 0 (calme)
+P6 = ["coinbase", "bitstamp", "gemini", "okx_index", "kraken", "binance"]
+PAN = {0: {"coinbase": PT, "bitstamp": PT}, 1: {"kraken": PT, "binance": "http"},
+       2: {"gemini": "http", "okx_index": "http"}, 3: dict.fromkeys(P6, PT),
+       4: {"coinbase": PT, "kraken": "http"}, 5: {}}
 
 
 def calcul(spec: dict, tau: str, stress=99, pool=POOL) -> tuple:
@@ -59,6 +72,37 @@ def oracle_tau(m, lec, t) -> tuple:
             rat[SCOF[f]].append(abs(px[ws, f] - med) / med)
             he[SCOF[f]] += e is Ecart.HORS_ENVELOPPE
     return rat, he
+
+
+def rang(k: int) -> int:
+    return VEN + 60 * k
+
+
+def lecture(spec, ts):
+    """Fixture RF (§2.6) : statut par rang j mod 6 (PAN) ; okx_index à 100 + (j mod 5), 150 au rang 7 ;
+    autres à 100 ; source_ts porté par les place_horodatee seules."""
+    k, base = (int(ts) - VEN) // 60, dict(flux_id=spec.flux_id, kind=spec.kind, endpoint=spec.endpoint,
+                                          fetch_ts=ts, currency=spec.currency)
+    st = PAN[k % 6].get(spec.flux_id)
+    if st:
+        return Reading(status=Status.PANNE_TRANSPORT if st == PT else Status.PANNE_HTTP,
+                       http_status=None if st == PT else 401, **base)
+    okx = spec.flux_id == "okx_index"
+    return Reading(status=Status.OK, http_status=200, price=D(150 if okx and k == 7 else 100 + k % 5 * okx),
+                   source_ts=ts if SIGMA_CLASS_OF_FLUX[spec.flux_id] == "place_horodatee" else None, **base)
+
+
+def rf() -> str:
+    """Collecteur réel, w = 60, calendrier week-end, τ = 0,2 : rangs 0-239 puis 250-269 (trou 240-249,
+    stress)."""
+    d = tempfile.mkdtemp(prefix="s2d5_")
+    paths = [os.path.join(d, x) for x in ("control.jsonl", "journal.jsonl", "raw.jsonl")]
+    for a, b in ((0, 240), (250, 270)):
+        clock = [float(rang(a))] + [t for k in range(a, b) for t in (rang(k) + 1.0, rang(k) + 60 - DELTA)]
+        collector.collect([BY_ID[f] for f in P6], *paths, n_windows=b - a, sigma_by_class=sbc_huge(),
+                          tau_classe=_taumap(D("0.2")), strate_spec=window.WEEKEND_STRATE_SPEC,
+                          now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=lecture)
+    return d
 
 
 class TestDecompositionK(unittest.TestCase):
@@ -144,6 +188,75 @@ class TestTauObserve(unittest.TestCase):
         décalé au seul bord entier (99·N multiple de 100), que TA (N = 103) ne voit pas."""
         self.controle(calcul({k: TA[k] for k in range(25)}, "0.2", pool=list("abcd")),
                       {"cA": (100, "0.24", "0.25")})
+
+
+class TestCensure(unittest.TestCase):
+    def test_bornes_valeurs_a_la_main(self):
+        """§2.4. Rougit si : z_haut sans « + s » ; n au lieu de n + s ; bornes permutées ; variante σ̂_bloc
+        sur l'erreur-type binomiale ; σ̂²_bloc absent lu comme une valeur."""
+        b = r1.bornes_censure(96, 30, D("0.2"), 4, D(25))
+        self.assertEqual([b[k] for k in ("s", "z_bas", "z_haut", "z_bloc_bas", "z_bloc_haut")],
+                         [4, D("2.5"), D("3.5"), D(2), D("2.8")])
+        b = r1.bornes_censure(96, 10, D("0.2"), 4)
+        self.assertEqual([b[k] for k in ("z_bas", "z_haut", "z_bloc_bas", "z_bloc_haut")],
+                         [D("-2.5"), D("-1.5"), None, None])
+
+    def test_s_nul_egalite_exacte_z_et_z_bloc(self):
+        """s = 0 : z_bas = z_haut = r1.z_score (même fonction que z_s) et = z_bloc de r1.bloc_strate (ℓ = 1,
+        n = 100, K = 30 : σ̂² = 21), égalité Decimal exacte. Rougit si : autre forme de calcul (arrondi, ordre
+        des opérations) ; imputation non nulle à s = 0."""
+        b = r1.bloc_strate([(60 * i, int(i < 30)) for i in range(100)], 60, D("0.2"), D(16), ell=1)
+        z = r1.bornes_censure(100, 30, D("0.2"), 0, b["sigma2_bloc"])
+        self.assertEqual((b["sigma2_bloc"], z["z_bas"]), (D(21), D("2.5")))
+        self.assertEqual((z["z_bas"], z["z_haut"]), (r1.z_score(100, 30, D("0.2")),) * 2)
+        self.assertEqual((z["z_bloc_bas"], z["z_bloc_haut"]), (b["z_bloc"],) * 2)
+
+    def test_fenetres_sautees_grille_portee_plages(self):
+        """§2.5, addendum 2 §B.3 et §B.6. Rougit si : fenêtre exclue comptée sautée ; marqueur d'une plage
+        retiré deux fois ; plages chevauchantes retirées deux fois ; fin de portée incluse ; t0 non aligné
+        pris tel quel ; portée sans segment autre que [premier ; dernier + w) ; strate lue hors du
+        calendrier ; marqueur hors grille ou calendrier non journalier accepté."""
+        we, j, pl = window.WEEKEND_STRATE_SPEC, {G[0], G[2], G[3], G[6], G[7], G[9]}, [(G[7], G[8])]
+        for borne, rg, att in ((None, pl, {"calme": 2, "stress": 1}), ((G[2], G[5]), pl, {"calme": 1}),
+                               ((G[1] + 1, G[5]), pl, {"calme": 1}), (None, (), {"calme": 2, "stress": 2}),
+                               (None, pl + [(G[8], G[8])], {"calme": 2, "stress": 1})):
+            self.assertEqual(r1.fenetres_sautees(j, we, 60, borne, rg), att, borne)
+        self.assertEqual(r1.fenetres_sautees(j, window.SINGLE_STRATE_SPEC, 60, None, pl), {"calme": 3})
+        self.assertEqual(r1.fenetres_sautees(set(), we, 60), {})
+        self.assertRaises(ValueError, r1.fenetres_sautees, {G[0] + 1}, we, 60)
+        # kind que le calendrier accepterait (strate_from_spec substitué) : la garde de fenetres_sautees lève
+        with mock.patch.object(r1, "strate_from_spec", lambda ws, spec: "x"):
+            self.assertRaises(ValueError, r1.fenetres_sautees, j, {"kind": "horaire"}, 60)
+
+    def test_fenetres_sautees_plages_desordre_bornes_fractionnaires(self):
+        """Revue G2, C-1 (a) à (c) : mono-strate, w = 60, M_k = mer. 2026-08-05 10:00Z + 60·k, un seul jour
+        UTC. (a) [M1 ; M8] et [M5 ; M6] dans le désordre, marqueurs M0 et M9 : rien ; (b) borne [M0 ; M3),
+        plage [M5 ; M6] au-delà, le même jour : 2 ; (c) t0 = M1 + 0,5 exclut M1, t_fin = M3 + 0,5 inclut M3.
+        Rougit si : fin d'union = b (G02) ; plages non triées avant l'union (G03) ; compte d'un jour non borné
+        à 0 (G04) ; int au lieu de ceil sur les bornes (G05)."""
+        m = [int(datetime(2026, 8, 5, 10, tzinfo=timezone.utc).timestamp()) + 60 * k for k in range(10)]
+        for marq, borne, rg, att in (({m[0], m[9]}, None, [(m[5], m[6]), (m[1], m[8])], {}),
+                                     ({m[0]}, (m[0], m[3]), [(m[5], m[6])], {"calme": 2}),
+                                     ({m[0]}, (m[1] + 0.5, m[4]), (), {"calme": 2}),
+                                     ({m[0]}, (m[1], m[3] + 0.5), (), {"calme": 3})):
+            self.assertEqual(r1.fenetres_sautees(marq, window.SINGLE_STRATE_SPEC, 60, borne, rg), att, borne)
+
+    def test_rf_recalcul_depuis_le_journal(self):
+        """Fixture RF (§2.6, addendum 2 §B.1), collecteur réel : r1.recompute_from_journal, chemin du lecteur
+        tiers, sert la décomposition de K et τ observé ; fenetres_sautees sur ses marqueurs. Rougit si : clé
+        absente du recalcul depuis le journal ; composante de K, c_s ou τ observé faux ; trou de 10 fenêtres
+        stress non compté."""
+        d = rf()
+        c, j = (os.path.join(d, x) for x in ("control.jsonl", "journal.jsonl"))
+        out, k = r1.recompute_from_journal(c, j), ("pt_2_plus", "pt_1", "pt_0", "tous_hors_enveloppe", "c")
+        for st, v in (("calme", (100, 40, 40, 20, 0, 20)), ("stress", (116, 46, 47, 23, 0, 23))):
+            b = out["strates"][st]
+            self.assertEqual((b["K"], *(b["decomposition_K"][x] for x in k)), v, st)
+        tau = {cl: (o["N"], o["P99"], o["max"]) for cl, o in out["tau_observe"].items()}
+        self.assertEqual((tau["place_horodatee"], tau["sans_horodatage"]),
+                         ((652, D("0.04"), D("0.5")), (304, 0, 0)))
+        ws = {m["window_start"] for m in records.parse_control(c)[2]}
+        self.assertEqual(r1.fenetres_sautees(ws, window.WEEKEND_STRATE_SPEC, 60), {"stress": 10})
 
 
 if __name__ == "__main__":

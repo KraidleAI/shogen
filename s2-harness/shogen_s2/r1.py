@@ -51,7 +51,7 @@ from typing import Optional
 
 from . import records
 from .model import Status
-from .window import verify_markers_against_spec, window_end
+from .window import strate_from_spec, verify_markers_against_spec, window_end
 
 DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique (oracle)
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
@@ -708,6 +708,53 @@ def regle_critere(r1_out: dict) -> dict:
     nq = [s for s, e in par.items() if e["cas"] == "rejet_non_qualifiable"]
     return {"strates": par, "rejette": rej, "testees": tst, "m": len(tst), "non_qualifiables": nq,
             "r1_discrimine": "VRAI" if rej else "FAUX" if tst and not nq else "NON ÉVALUABLE"}
+
+
+def fenetres_sautees(ws_journal, spec: dict, w: int, borne=None, ranges=()) -> dict:
+    """Fenêtres sautées par strate, toutes causes confondues (ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1) :
+    window_start de la grille de pas w (multiples de w) sur borne = [t0 ; t_fin) (segment ; None : [premier ;
+    dernier + w) de `ws_journal`), strate par `spec` (strate_calendar), sans marqueur window_close
+    (`ws_journal`, garde §5.3 passée), hors des plages D5 fermées sur window_start (une fenêtre exclue n'est
+    pas sautée). Compte par jour UTC, en O(jours + marqueurs) : grille, moins l'union des plages, moins les
+    marqueurs retenus ; la strate ne dépend que du jour (kinds single et weekend_utc). Marqueur hors grille ou
+    autre kind : ValueError. Rend {strate : s}, strates sans fenêtre sautée absentes."""
+    ws_journal, out, union = set(ws_journal), {}, []
+    if any(x % w for x in ws_journal) or spec.get("kind") not in ("single", "weekend_utc"):
+        raise ValueError(f"fenêtres sautées : window_start hors de la grille de pas w = {w}, ou calendrier "
+                         f"{spec.get('kind')!r} non journalier — fail-closed")
+    if borne is None and not ws_journal:
+        return {}
+    t0, t_fin = (math.ceil(x) for x in borne or (min(ws_journal), max(ws_journal) + w))
+
+    def grille(lo, hi, signe):                   # débuts de fenêtre dans [lo ; hi), par jour UTC
+        for d in range(lo // 86400, -(-hi // 86400)):
+            st, a, b = strate_from_spec(d * 86400, spec), max(lo, d * 86400), min(hi, d * 86400 + 86400)
+            out[st] = out.get(st, 0) + signe * max(0, -(-b // w) + (-a // w))     # ⌈b/w⌉ − ⌈a/w⌉
+    grille(t0, t_fin, 1)
+    for a, b in sorted(ranges):                    # union des plages fermées, retirée une seule fois
+        if union and a <= union[-1][1]:
+            union[-1][1] = max(union[-1][1], b)
+        else:
+            union.append([a, b])
+    for a, b in union:
+        grille(max(a, t0), min(b + 1, t_fin), -1)
+    for x in ws_journal:
+        if t0 <= x < t_fin and not any(a <= x <= b for a, b in union):
+            out[strate_from_spec(x, spec)] -= 1
+    return {st: s for st, s in out.items() if s}
+
+
+def bornes_censure(n: int, k: int, p_more: Decimal, s: int, sigma2_bloc: Optional[Decimal] = None) -> dict:
+    """Bornes à P̂_more fixé (ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1 ; A-6), s fenêtres sautées imputées
+    sans co-écart (bas) puis avec (haut) : z_bas = z_score(n + s, K, P̂), z_haut = z_score(n + s, K + s, P̂),
+    la fonction de z_s (s = 0 : z_s) ; si sigma2_bloc est donné, (K [+ s] − (n + s)·P̂)/σ̂_bloc, l'expression
+    de bloc_strate (s = 0 : z_bloc). Non extérieures (CV2-24). À n'appeler que si z_s est publiée (§5.4)."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        zb = [None, None] if sigma2_bloc is None else [
+            +((Decimal(x) - Decimal(n + s) * p_more) / sigma2_bloc.sqrt()) for x in (k, k + s)]
+    return {"s": s, "z_bas": z_score(n + s, k, p_more), "z_haut": z_score(n + s, k + s, p_more),
+            "z_bloc_bas": zb[0], "z_bloc_haut": zb[1]}
 
 
 def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
