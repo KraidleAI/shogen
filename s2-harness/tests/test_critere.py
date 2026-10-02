@@ -1,6 +1,6 @@
 """Lot CRITERE d'ADR-0028 (A-1, A-3, A-4) : règle SHOGEN-CRITERE-R1-1 (texte : ADR-0028 §1 bis.1, pts 1-11),
 r1.regle_critere et sa section au bloc 3 de report.py. Attendus écrits à la main et scellés avant le code
-(journal G1 du lot, §2 ; annexe C, FM-3.3) : table unitaire sur des strates au schéma de r1_out, puis
+(fichier scellé du G1 §2, journal §4.2 ; FM-3.3) : table unitaire sur des strates au schéma de r1_out, puis
 fixtures du collecteur réel (w = 60 s, la panne seule écart), valeurs en fractions ; ℓ ≠ 240 par la couture
 de B-DEP-2 (D-10). Chaque test nomme la mutation qui le rougit."""
 
@@ -11,9 +11,10 @@ import os
 import re
 import tempfile
 import unittest
-from decimal import Decimal as D
+from decimal import Decimal as D, localcontext
 from fractions import Fraction as F
 from itertools import count
+from unittest import mock
 
 from shogen_s2 import r1, r2, report
 from tests import test_rendu_blocs as trb
@@ -39,6 +40,7 @@ EMD = (r"EMD_s = \(2,33 \+ 0,8416\)·max\(√\(n_s·P̂_more,s·\(1 − P̂_more
 NRJ = (f"« le modèle d'indépendance n'est pas rejeté sur 200 fenêtres, {AX} » ; un résultat négatif est "
        "un résultat")
 NQ = " → NON ÉVALUABLE : rejet non qualifiable : niveau non tenu sous dépendance sérielle"
+LAB = " (z_s ≤ −2,33 : hors famille, sans conclusion)"
 
 
 def blk(z, zb, garde="16", s2="9", n=1000) -> dict:
@@ -96,6 +98,11 @@ def rendu(c: str, j: str, n: int = 240) -> tuple:
             break
         par.setdefault(m.group(1), []).append(m.group(2))
     return par, b3[h + 1 + sum(map(len, par.values()))], [ln for ln in b3 if ln.startswith("  famille de B")]
+
+
+def bloc3(txt: str) -> str:
+    """Bloc 3 du rapport rendu, entre « [BLOC 3] » et « [BLOC 4] »."""
+    return txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0]
 
 
 class TestRegleTable(unittest.TestCase):
@@ -238,6 +245,32 @@ class TestRegleRendu(unittest.TestCase):
         for k, m, t in (("J1-1", 2, "calme, stress"), ("J2", 2, "calme, stress"), ("J1", 0, "aucune")):
             self.assertEqual(self.r[k][2], [FAMILLE.format(m, t)], k)
 
+    def test_borne_exacte_et_voisine(self):
+        """C-G2-2 (revue G2) : étiquette « z_s ≤ −2,33 » à la borne exacte z_s = −2,33, absente à
+        z_s = −2,33 + 10⁻⁵⁰ (z_s de la strate calme de J2 forcé par mock de report.compute_r1). Rougit si :
+        « < » au lieu de « ≤ » (MG01) ; étiquette sur tout z_s < 0 (MG02)."""
+        c, j = journal(200, 200, deux(50, 37))
+        orig = report.compute_r1
+        with localcontext() as ctx:
+            ctx.prec = 60
+            voisine = D("-2.33") + D("1e-50")
+        for z, att in ((D("-2.33"), True), (voisine, False)):
+            def fake(*a, **k):
+                out = orig(*a, **k)
+                out["strates"]["calme"]["z"] = z
+                return out
+            with mock.patch.object(report, "compute_r1", fake):
+                b3 = bloc3(report.render_report(c, j))
+            ligne = [x for x in b3.split("\n") if x.startswith("    « calme » : z_s = ")][0]
+            self.assertEqual(LAB in ligne, att, ligne)
+
+    def test_z_negatif_au_dessus_de_la_borne(self):
+        """C-G2-2 (revue G2) : −2,33 < z_s < 0 sans étiquette (deux(50, 40), stress : K = 10, z_s ≈ −0,73) ;
+        calme (K = 0, z_s ≈ −3,65) étiqueté. Rougit si : étiquette sur tout z_s < 0 (MG02)."""
+        par = rendu(*journal(200, 200, deux(50, 40)))[0]          # stress : K = 10, z_s ≈ −0,73
+        self.assertRegex(par["stress"][0], r"^z_s = -0\.7\d+ < 2,33 → NE REJETTE PAS$")
+        self.assertIn(LAB, par["calme"][0])                        # calme : K = 0, z_s ≈ −3,65
+
 
 def asn(c: str, partage: bool = False) -> None:
     """Relevés ASN (r2.collect_asn) : un AS par hôte (k_eff = 3 = k nominal), ou coinbase et kraken sur un
@@ -250,6 +283,24 @@ def asn(c: str, partage: bool = False) -> None:
                 "cname_chain": [], "prefix": "192.0.2.0/24", "asn_ripestat": a, "asn_cymru": a,
                 "holder": "TEST"}
     r2.collect_asn([BY_ID[f] for f in FL], c, resolve_fn=resolve, now_fn=lambda: float(SAM))
+
+
+def asn_discordant(c: str) -> None:
+    """Relevés ASN : un AS par hôte ; l'hôte de kraken discordant (RIPEstat ≠ Cymru), donc non attribué :
+    k_eff ≤ 3 (borne supérieure)."""
+    n = count(64512)
+
+    def resolve(host, resolvers):
+        a = next(n)
+        return {"status": "ok", "resolver": resolvers[0], "ip": "192.0.2.1", "ip_secondary": [],
+                "cname_chain": [], "prefix": "192.0.2.0/24", "asn_ripestat": a,
+                "asn_cymru": a + 1000 if "kraken" in host else a, "holder": "TEST"}
+    r2.collect_asn([BY_ID[f] for f in FL], c, resolve_fn=resolve, now_fn=lambda: float(SAM))
+
+
+def mort_en_calme(f: str, st: bool, j: int) -> bool:
+    """J1 en calme et bitstamp sans lecture ok en calme (D1 cas b : retiré du pool de la strate calme)."""
+    return (not st and f == "bitstamp") or deux(25, 29)(f, st, j)
 
 
 ENT = (r"état = (\w+)\n.*\n      entrées \(ADR-0028 §1 bis\.1 pt 10\) : « R1 discrimine » = ([A-ZÉ ]+) "
@@ -344,6 +395,48 @@ class TestDrapeau2Regle(unittest.TestCase):
             txt = cli(os.path.dirname(self.j[nom][0])).decode("utf-8")
             self.assertEqual(composer(self, txt), att, nom)
             self.assertEqual(txt, report.render_report(*self.j[nom]) + "\n", nom)
+
+
+class TestKeffBorneEtPoolStrate(unittest.TestCase):
+    """Corrections C-G2-3 à C-G2-5 de la revue G2 (2026-10-01), J1 sous la couture ℓ = 1 : énoncé REJETTE du
+    bloc 3 quand k_eff est une borne supérieure (hôte de kraken discordant) ou sous D1 cas b ; drapeau 2 quand
+    la borne supérieure égale k nominal (Q-G2-1, option a de la démonstration du réviseur)."""
+
+    def test_enonce_rejette_keff_borne(self):
+        """C-G2-3 : énoncé REJETTE quand k_eff est une borne supérieure (hôte non attribué). Rougit si : la
+        branche « ≤ … (borne supérieure) » est retirée (MG03)."""
+        c, j = journal(200, 200, deux(25, 29))
+        asn_discordant(c)
+        with couture(1):
+            txt = report.render_report(c, j)
+        self.assertIn("\n  k_eff     ≤ 3  (BORNE SUPÉRIEURE ; 1 hôte(s) non attribué(s)", txt)
+        self.assertIn("k_eff mesuré ≤ 3 (borne supérieure), bloc 6) est rejeté dans la strate calme",
+                      bloc3(txt))
+
+    def test_k_nominal_s_cas_b(self):
+        """C-G2-4 : énoncé REJETTE sous D1 cas b, k nominal_s = flux du pool de la strate (2), pas celui du
+        segment (3). Rougit si : k nominal_s lu sur le pool d'analyse du segment (MG04)."""
+        c, j = journal(200, 200, mort_en_calme)
+        asn(c)
+        with couture(1):
+            txt = report.render_report(c, j)
+        self.assertIn("(k nominal_s = 2 flux du pool de la strate, bloc 1 ; k_eff mesuré = 3, bloc 6) est "
+                      "rejeté dans la strate calme sur 200 fenêtres", bloc3(txt))
+        self.assertIn("k nominal_s (flux du pool de la strate) : « calme » = 2, « stress » = 3 — comparaison "
+                      "hétérogène déclarée", txt)
+
+    def test_drapeau2_keff_borne(self):
+        """C-G2-5 et Q-G2-1 (option a) : k_eff borne supérieure égale à k nominal. Rougit si : LEVÉ sur une
+        égalité non établie (MG05R) ; « k_eff = 3 » imprimé au drapeau 2 quand le bloc 6 imprime « k_eff ≤ 3
+        (BORNE SUPÉRIEURE) » (MG10R)."""
+        c, j = journal(200, 200, deux(25, 29))
+        asn_discordant(c)
+        with couture(1):
+            g = r2.recompute_r2_from_journal(c, j)["drapeau_2"]
+            b6 = report.render_report(c, j).split("[BLOC 6]")[1]
+        self.assertEqual((g["etat"], g["r1_discrimine"], g["k_eff"]), ("non_evaluable", "VRAI", 3))
+        self.assertIn(" ; k_eff ≤ 3 (borne supérieure) ; k nominal du segment (hôtes) = 3 ;", b6)
+        self.assertNotIn("k_eff = 3", b6.split("DRAPEAU 2")[1])
 
 
 class TestRegleLong(unittest.TestCase):

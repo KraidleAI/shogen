@@ -159,7 +159,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     r1 = compute_r1(markers, readings, pool_an, w, sigma_by_class, sigma_class_of_flux,
                     tau, seuil_hist, n_min, pools)
     rg = regle_critere(r1)                 # règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1) : bloc 3
-    cells =classify_cells(markers, readings, pool, w, sigma_by_class,
+    cells = classify_cells(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
     # R2 complet (partition/k_eff, contenu, méthode, clusters, drapeau 2) — recalculé
@@ -573,8 +573,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     ap(f"      {d2['raison']}")
     kns = d2["k_nominal_strates"]        # ADR-0028 §1 bis.1 pt 10 ; annexe D.5, bloc 6 (lot CRITERE, C-8)
     ap(f"      entrées (ADR-0028 §1 bis.1 pt 10) : « R1 discrimine » = {d2['r1_discrimine']} (bloc 3"
-       + (f" ; strate(s) : {', '.join(d2['rejette'])}" if d2["rejette"] else "") + ") ; k_eff = "
-       f"{_fmt_dec(d2['k_eff'])} ; k nominal du segment (hôtes) = {d2['k_nominal']} ; k nominal_s (flux du "
+       + (f" ; strate(s) : {', '.join(d2['rejette'])}" if d2["rejette"] else "") + ") ; k_eff "
+       + (f"≤ {d2['k_eff']} (borne supérieure)" if kp.get("k_eff_is_upper_bound")
+          else f"= {_fmt_dec(d2['k_eff'])}")
+       + f" ; k nominal du segment (hôtes) = {d2['k_nominal']} ; k nominal_s (flux du "
        "pool de la strate) : " + (", ".join(f"« {s} » = {k}" for s, k in kns.items()) or "aucune strate")
        + (" — comparaison hétérogène déclarée" if any(k != d2["k_nominal"] for k in kns.values()) else "")
        + " ; strate poolée hors des entrées")

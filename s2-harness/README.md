@@ -81,15 +81,16 @@ octet (`SHA_BASE_SANS_OPTION`, `tests/test_exclusion.py`, test iv).
   = R2(2a) ρ_resid ; **rapport §6 COMPLET (6 blocs)**. `HARNESS_VERSION` = S2A-M1c.
   Tests et smoke 12/12 de cet incrément ; le compte courant est la mesure datée ci-dessous.
 
-- **2026-10-02 — mesure** (arbre de la branche `partie-1-moteur` au commit du lot B-DEP-2, après le lot B-DEP-1, après le lot POOLEE, le lot B,
+- **2026-10-02 — mesure** (arbre de la branche `partie-1-moteur` au commit du lot CRITERE, après les lots B-DEP-2 et B-DEP-1, après le lot POOLEE, le lot B,
   B-SEG-1/B-SEG-2, E1, DOCS-S2-a et SIM-NIVEAU, TMP sous `F:/tmp`, `SHOGEN_S2_CAMPAGNE_CONTROL` non posée ;
   re-mesurée par l'orchestrateur au commit, C-8 de la revue G2 du lot POOLEE, précédent C-7 de la revue G2
-  du lot B) : `python -B -m unittest discover -s tests -t .` → « Ran 269 tests … OK (skipped=2) »
+  du lot B) : `python -B -m unittest discover -s tests -t .` → « Ran 288 tests … OK (skipped=2) »
   (au commit de DOCS-S2-a : 216, et son G1 avait mesuré « Ran 207 » sur `aa0afdc` + a1, b, a2 ; le lot B
   en ajoute 13 : 219, 222, 224 puis 229 après B-a1, B-a2, B-b et B-c ; le lot POOLEE en ajoute 13 : 237,
   239 puis 242 après POOLEE-a, POOLEE-b et POOLEE-c ; le lot B-DEP-1 en ajoute 16 : 248, 256 puis 258 après
   B-DEP-1a, B-DEP-1b et B-DEP-1c ; le lot B-DEP-2 en ajoute 11 : 262, 264, 266 puis 269 après
-  B-DEP-2a, B-DEP-2a-bis, B-DEP-2b et B-DEP-2c ; DOCS-S2-b n'est pas encore commis).
+  B-DEP-2a, B-DEP-2a-bis, B-DEP-2b et B-DEP-2c ; le lot CRITERE en ajoute 19 : 275, 277, 278, 283 puis
+  288 après CRITERE-a1, a2, b1, b2 et c ; DOCS-S2-b n'est pas encore commis).
   Les deux tests sautés sont les deux tests (ii) de `TestExclusionJournalReel`
   (`tests/test_exclusion.py`), qui lisent la copie scellée de la campagne (comptes seulement) : la
   variable n'est posée que par l'orchestrateur seul, sur copie (ADR-0028 annexe D.4 a). `aa0afdc`
