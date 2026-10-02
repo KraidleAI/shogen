@@ -395,3 +395,11 @@ Réponses de l'orchestrateur : Q1 liste blanche lue dans le lint courant (une se
 | SHOGEN-RENDU-PYCACHE-1 | un `__pycache__` sur les chemins gardés fait refuser la garde (2) (serrage E3 : un `.pyc` périmé se charge même sous `-B`) : consigne d'exploitation (nettoyage avant l'exécution, `PYTHONDONTWRITEBYTECODE`) | orch. | texte de la procédure d'exécution (partie 4) | 3 lignes de texte [inféré] | G1 C-1, L7 |
 
 Réponses de l'orchestrateur : Q1 serrage E2 retenu (jeton lié à `PAQUET.sha256`) ; Q2 et Q3 en item (SHOGEN-GO-ORDRE-1) ; Q4 l'orchestrateur, au G0 du PAQUET ; Q5 interface `--sortie` gardée pour C3. Exposition déclarée par le worker : une ligne de préfixes de sha256 (admise par D.2 n° 7) et trois lignes de `docs/pocket-report/` affichées par un `grep`, sans conséquence de pré-enregistrement.
+
+## B.26 Amendement daté du 2026-10-02 : partie 2, étape C, G1 de C3 arrêté avant code (journal `docs/G1-partie-2-etape-C-2.md` ; décisions de l'orchestrateur au G0 §C)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-TABLE-REELLE-1 | la table réelle des sorties (bornes de D4, n fixe 38 600, plage de D5) ne tourne pas de bout en bout sur fixture (il faudrait plus de 38 600 fenêtres synthétiques) : contrôlée contre des constantes écrites à la main depuis l'ADR ; première exécution de bout en bout = exécution unique | orch. | exécution unique (partie 4) ; texte au PAQUET | 0 ligne [inféré] | G1 C-2, L4 |
+
+Items proposés par le G1 et soldés par décision au G0 §C (ajout daté) : SHOGEN-RENDU-ETIQUETTE-1 (Q4), SHOGEN-RECALCUL-TIERS-PORTEE-1 (Q6), SHOGEN-RENDU-ECHEC-TARDIF-1 (Q8), SHOGEN-RENDU-NOMS-JOURNAUX-1 (L3) : construits dans C3.
