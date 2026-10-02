@@ -31,8 +31,9 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # (bloc 3 : famille et strate poolée, avant 43cc5f85…a1f2897 ; P2P texte :
 # docs/G1-lot-POOLEE-strate-poolee.md) ; puis de B-DEP-2 (bloc 3 : z_bloc par strate, A(window-dependence),
 # avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis de CRITERE-a2 (bloc 3 : famille,
-# section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md).
-SHA_BASE_AVEC_OPTION = "dc7210d3aefbc1233e609bc0246a7a44cfa27446beeb73605e08c265682910a3"
+# section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md) ; puis de CRITERE-b2
+# (bloc 6 : ligne d'entrées du drapeau 2 ; avant dc7210d3…82910a3 ; même journal).
+SHA_BASE_AVEC_OPTION = "0410039bb27d6ed6d5293b229c37b0084ec96d7d72f04467f9c9711d602eac18"
 
 
 class Coupure(Exception):

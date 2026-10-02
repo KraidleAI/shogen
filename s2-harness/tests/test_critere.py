@@ -7,16 +7,21 @@ de B-DEP-2 (D-10). Chaque test nomme la mutation qui le rougit."""
 from __future__ import annotations
 
 import contextlib
+import os
 import re
+import tempfile
 import unittest
 from decimal import Decimal as D
 from fractions import Fraction as F
 from itertools import count
 
 from shogen_s2 import r1, r2, report
+from tests import test_rendu_blocs as trb
 from tests.test_blocs import d50
 from tests.test_collector import BY_ID, SKELETON as FL
-from tests.test_rendu_blocs import SAM, couture, journal, proche
+from tests.test_exclusion import cli
+from tests.test_pool_analyse import fixture_b
+from tests.test_rendu_blocs import E45, SAM, couture, journal, proche
 
 S1, NN, NEUF = "NON ÉVALUABLE", "NE REJETTE PAS", "2.32" + "9" * 49      # NEUF : 2,33 − 10⁻⁵¹
 TETE = ("  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
@@ -247,6 +252,26 @@ def asn(c: str, partage: bool = False) -> None:
     r2.collect_asn([BY_ID[f] for f in FL], c, resolve_fn=resolve, now_fn=lambda: float(SAM))
 
 
+ENT = (r"état = (\w+)\n.*\n      entrées \(ADR-0028 §1 bis\.1 pt 10\) : « R1 discrimine » = ([A-ZÉ ]+) "
+       r"\(bloc 3.*?\) ; k_eff = (\S+) ; k nominal du segment \(hôtes\) = (\d+) ;")
+
+
+def composer(t: unittest.TestCase, txt: str) -> str:
+    """Composition exécutée sur l'artefact rendu (C-5) : valeurs par strate lues au bloc 3 → « R1 discrimine »
+    (pt 6), comparé à la ligne imprimée → état attendu du drapeau 2 (pt 10, précédence D-4), comparé à l'état
+    et à la ligne d'entrées du bloc 6. Rend l'état imprimé."""
+    b3, b6 = txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0], txt.split("[BLOC 6]")[1]
+    v = dict(re.findall(r"\n    « (\w+) » : z_s .*→ (REJETTE|NE REJETTE PAS|NON ÉVALUABLE)", b3))
+    nq = [s for s in v if re.search(rf"\n    « {s} » : z_s .*rejet non qualifiable", b3)]
+    rej, tst = [s for s in v if v[s] == "REJETTE"], [s for s in v if v[s] != S1]
+    d = "VRAI" if rej else "FAUX" if tst and not nq else S1
+    t.assertIn(R1D + d + " : ", b3)
+    etat, d6, ke, kn = re.search(ENT, b6).groups()
+    t.assertEqual((d6, etat), (d, "NON_EVALUABLE" if ke == "-" or d == S1 else
+                               "LEVE" if d == "VRAI" and ke == kn else "ETEINT"))
+    return etat
+
+
 class TestDrapeau2Regle(unittest.TestCase):
     """Drapeau 2 aligné sur la règle (fichier scellé §2.3 et §3.3) : J1 et J2 avec ASN distincts, partagés
     ou absents."""
@@ -286,6 +311,69 @@ class TestDrapeau2Regle(unittest.TestCase):
                              (self.RAISON[cle], {"calme": 3, "stress": 3}), nom)
             self.assertEqual(("z_max" in g, g.get("localisation_inter_clusters") is not None),
                              (False, d == "VRAI" and ke is not None), nom)
+
+    def test_bloc6_entrees_k_nominal_heterogene(self):
+        """Ligne d'entrées (§3.3) : J1 à ℓ = 1 (VRAI nommé), J2 avec ASN (FAUX), fixture_b de B0 (D1 cas b,
+        k nominal_s = 2 ≠ 3 en stress : comparaison hétérogène déclarée). Rougit si : k nominal_s ou la
+        déclaration retirés ; strates qui rejettent tues."""
+        e = "\n      entrées (ADR-0028 §1 bis.1 pt 10) : « R1 discrimine » = "
+        k3 = " ; k nominal du segment (hôtes) = 3 ; k nominal_s (flux du pool de la strate) : « calme » = 3, "
+        fin = " ; strate poolée hors des entrées\n"
+        with couture(1):
+            t1 = report.render_report(*self.j["J1d"])
+        t2 = report.render_report(*self.j["J2d"])
+        tb = report.render_report(*fixture_b(tempfile.mkdtemp(prefix="s2crit_")))
+        self.assertIn(e + "VRAI (bloc 3 ; strate(s) : calme) ; k_eff = 3" + k3 + "« stress » = 3" + fin, t1)
+        self.assertIn(e + "FAUX (bloc 3) ; k_eff = 3" + k3 + "« stress » = 3" + fin, t2)
+        self.assertIn(e + "NON ÉVALUABLE (bloc 3) ; k_eff = -" + k3 + "« stress » = 2 — comparaison "
+                      "hétérogène déclarée" + fin, tb)
+
+    def test_drapeau_run_max(self):
+        """J1 sous la couture ℓ = 25 : run maximal 25 ≥ ℓ en calme (drapeau), 21 < ℓ en stress (aucun) ; à
+        ℓ = 240, aucun drapeau. Rougit si : drapeau omis ; « > » à la place de « ≥ » ; autre strate."""
+        dr = ("drapeau « run maximal ≥ ℓ » (run maximal = 25 ≥ ℓ = 25) : σ̂²_bloc,s biaisé vers le bas ; "
+              "SHOGEN-DEP-FENETRES-2 prioritaire avant G10 — hors décision, sans effet sur la valeur")
+        for n, att in ((25, {"calme": [dr], "stress": []}), (240, {"calme": [], "stress": []})):
+            par = rendu(*self.j["J1d"], n)[0]
+            self.assertEqual({s: [x for x in p if x.startswith("drapeau")] for s, p in par.items()}, att, n)
+
+    def test_composition_cli_petites_fixtures(self):
+        """Chemin servi (CLI, processus neuf) à ℓ = 240 : NON ÉVALUABLE (J1), ÉTEINT (J2), NON ÉVALUABLE sans
+        ASN (J2) ; composition bloc 3 → bloc 6 sur la sortie. Rougit si : bloc 6 sur une autre règle."""
+        for nom, att in (("J1d", "NON_EVALUABLE"), ("J2d", "ETEINT"), ("J2n", "NON_EVALUABLE")):
+            txt = cli(os.path.dirname(self.j[nom][0])).decode("utf-8")
+            self.assertEqual(composer(self, txt), att, nom)
+            self.assertEqual(txt, report.render_report(*self.j[nom]) + "\n", nom)
+
+
+class TestRegleLong(unittest.TestCase):
+    """Chemin de production ℓ = 240 sur la fixture B de B-DEP-2b (7 200 fenêtres calme, 60 stress) avec ASN
+    distincts (C-9) ; composition bloc 3 → bloc 6 sur l'artefact, API et CLI en processus neuf (C-5)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.c, j = journal(7200, 60, trb.TestRenduBlocsLong.panne)
+        asn(cls.c)
+        cls.txt = report.render_report(cls.c, j)
+
+    def test_production_l240_rejette_calme(self):
+        """J4 (§2.2) : calme z² = 321723783226467079200/170332635149538239, z_bloc² =
+        44683858781453761/253969241100300 : REJETTE ; stress sous la garde §5.4 ; VRAI [calme], m = 1.
+        Rougit si : garde de blocs mal lue au chemin de production ; m statique ; énoncé sans k_eff."""
+        b3 = self.txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0]
+        m = re.search(r"\n    « calme » : z_s = (\S+) ≥ 2,33 ; z_bloc = (\S+) ≥ 2,33 → REJETTE\n", b3)
+        self.assertTrue(m and proche(m.group(1), F(321723783226467079200, 170332635149538239), True, E45)
+                        and proche(m.group(2), F(44683858781453761, 253969241100300), True, E45))
+        self.assertIn("k_eff mesuré = 3, bloc 6) est rejeté dans la strate calme sur 7200 fenêtres", b3)
+        self.assertIn("\n    « stress » : z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10) → NON "
+                      "ÉVALUABLE : strate non testée, hors décision (§1 bis.1 pt 2)\n", b3)
+        self.assertIn("\n" + FAMILLE.format(1, "calme") + "\n", b3)
+
+    def test_composition_bloc3_bloc6_api_cli(self):
+        """Rougit si : bloc 6 incohérent avec le bloc 3 (drapeau 2 sur le max des z, autre règle) ; chemin
+        servi différent de l'API."""
+        self.assertEqual(composer(self, self.txt), "LEVE")
+        self.assertEqual(cli(os.path.dirname(self.c)), (self.txt + "\n").encode("utf-8"))
 
 
 if __name__ == "__main__":

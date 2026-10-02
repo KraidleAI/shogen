@@ -337,7 +337,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         f"{ELL_BLOC} (A(window-dependence), registre 08) ; niveau asymptotique, non démontré ≤ 0,01 en "
         "échantillon fini (SHOGEN-SIM-NIVEAU-1)" if sc.get("kind") == "weekend_utc"
         else "non applicable (calendrier mono-strate)"))
-    po = r1["poolee"]                   # hors de r1["strates"] : ni z_max, ni drapeau 2, ni famille
+    po = r1["poolee"]                   # hors de r1["strates"] : ni règle, ni drapeau 2, ni famille
     ap(f"\n  ── strate poolée (ADR-0028 D2 pt 4 ; {ETIQUETTE_POOLEE}) : forme stratifiée, jamais l'union "
        "brute des fenêtres")
     ap("    z_pool = Σ_s (K_s − n_s·P̂_more,s) / √(Σ_s n_s·P̂_more,s·(1 − P̂_more,s)), chaque strate sur son "
@@ -387,6 +387,11 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             ap(f"{tete}EMD_s = (2,33 + 0,8416)·max(√(n_s·P̂_more,s·(1 − P̂_more,s)), σ̂_bloc,s) = "
                f"{_fmt_dec(e['emd'])} fenêtres ; fraction de n_s = {_fmt_dec(e['emd_fraction'])} "
                "(puissance 0,8 : choix de conception ; aucun seuil sur l'EMD)")
+        ru, lb = blk["bloc"]["runs"]["run_max"], blk["bloc"]["ell"]
+        if ru >= lb:                     # ADR-0028 §1 bis.1 pt 9 : hors décision, sans effet sur la valeur
+            ap(f"{tete}drapeau « run maximal ≥ ℓ » (run maximal = {ru} ≥ ℓ = {lb}) : σ̂²_bloc,s biaisé vers "
+               "le bas ; SHOGEN-DEP-FENETRES-2 prioritaire avant G10 — hors décision, sans effet sur la "
+               "valeur")
     nq, tst = rg["non_qualifiables"], rg["testees"]
     ap(f"  « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = {rg['r1_discrimine']} : "
        + (f"strate(s) qui rejettent : {', '.join(rg['rejette'])}" if rg["rejette"] else
@@ -566,6 +571,13 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     ap(f"  DRAPEAU 2 « co-défaillance observée non expliquée par les axes R2 » (§5.6) : "
        f"état = {d2['etat'].upper()}")
     ap(f"      {d2['raison']}")
+    kns = d2["k_nominal_strates"]        # ADR-0028 §1 bis.1 pt 10 ; annexe D.5, bloc 6 (lot CRITERE, C-8)
+    ap(f"      entrées (ADR-0028 §1 bis.1 pt 10) : « R1 discrimine » = {d2['r1_discrimine']} (bloc 3"
+       + (f" ; strate(s) : {', '.join(d2['rejette'])}" if d2["rejette"] else "") + ") ; k_eff = "
+       f"{_fmt_dec(d2['k_eff'])} ; k nominal du segment (hôtes) = {d2['k_nominal']} ; k nominal_s (flux du "
+       "pool de la strate) : " + (", ".join(f"« {s} » = {k}" for s, k in kns.items()) or "aucune strate")
+       + (" — comparaison hétérogène déclarée" if any(k != d2["k_nominal"] for k in kns.values()) else "")
+       + " ; strate poolée hors des entrées")
     loc = d2.get("localisation_inter_clusters")
     if loc:
         ap(f"      localisation ({loc['note']}) — consomme la matrice de co-écarts M1b :")
