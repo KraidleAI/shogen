@@ -25,7 +25,7 @@ configuration globale `F:\claude-config`. Tout ce qui t'est nécessaire et trans
 |---|---|
 | branche de travail | `main` |
 | dernier commit de fusion | `eb1b13d` (partie 1 dans `main`) |
-| poussé sur GitHub | `origin/main` = `afc7756` avant cette passation ; cette passation pousse `main` (voir §7) |
+| poussé sur GitHub | **branche `passation-cloud-2026-10-02`** (tout le travail, partie 1 comprise). La `main` de GitHub reste à `afc7756` : sa protection a refusé le push (§7). **Clone cette branche.** |
 | branche de partie close | `partie-1-moteur` (fusionnée ; conservée, ne pas supprimer sans accord) |
 | suite Python | `cd s2-harness && python -B -m unittest discover -s tests -t .` → `Ran 307 tests … OK (skipped=2)` |
 | gates Rust | `cargo --locked xtask verify` → `VERDICT GLOBAL : VERT` |
@@ -73,7 +73,9 @@ SIM-NIVEAU a mesuré que la règle tient son niveau (`docs/adr-0028/sim-niveau/`
 4. **UNE relecture G2** par une instance neuve, sur toute la partie.
 5. **UNE revue de partie** par l'orchestrateur (oracles rejoués sur la tête de branche, §6).
 6. **Fusion** dans `main` par `git merge --no-ff partie-2-rendu` (jamais de rebase, de push forcé ni de
-   réécriture d'historique). Une fusion sans conflit ne lance pas le hook : rejoue
+   réécriture d'historique). **Attention** : la `main` de GitHub refuse aujourd'hui les commits de fusion et
+   non signés (§7) ; tant que l'investisseur n'a pas tranché, fusionne en local et pousse sur une branche
+   (pas sur `main`). Une fusion sans conflit ne lance pas le hook : rejoue
    `bash enforcement/tests/run-fixtures-hooks.sh` et `bash enforcement/hooks/install-pre-commit.sh --verifier`
    **avant** (item SHOGEN-HOOK-COUVERTURE-1).
 
@@ -173,12 +175,26 @@ dette `TODO`/`FIXME` nue est refusée (R-13).
 - **Protocole** : l'investisseur ouvre une **fenêtre publique** le temps des CI, tu pousses `main`, il referme.
   **Tu ne bascules jamais la visibilité toi-même.** Entre deux fenêtres, les oracles du §6 font foi.
 - Pousser sur un dépôt privé ne demande pas de fenêtre (seules les CI en demandent une).
+- **Protection de `main` sur GitHub** (lue le 2026-10-02, `gh api …/branches/main/protection`) :
+  `required_signatures` (commits signés exigés), `required_linear_history` (**aucun commit de fusion**),
+  `enforce_admins`, push forcé interdit. Le push de `main` du 2026-10-02 a été **refusé** (`protected branch
+  hook declined`) : les commits ne sont pas signés et la partie 1 a été fusionnée par commits de fusion.
+  **Conflit à trancher par l'investisseur** : la méthode (règle 4) impose des commits de fusion, la protection
+  les interdit. Ne réécris pas l'historique pour passer (signer après coup ou linéariser = réécriture,
+  interdite par la méthode). Le travail est poussé sur la branche non protégée `passation-cloud-2026-10-02`.
+  Voies : (A) l'investisseur retire « Require linear history » (et, s'il le veut, « Require signed commits »)
+  de `main`, puis `main` reçoit la branche par avance rapide ; (B) l'investisseur garde la protection et la
+  méthode change : chaque partie entre dans `main` par une PR fusionnée en « Squash and merge » dans
+  l'interface de GitHub (commit signé par GitHub, historique linéaire) ; l'historique détaillé reste sur la
+  branche de partie.
 
 ---
 
 ## 8. Décisions et actes en attente de l'investisseur
 
 - **Accord de la partie 2** (§3, étape 1).
+- **Protection de `main` contre méthode** (§7) : voie (A) ou (B). Tant que ce n'est pas tranché, travaille sur
+  des branches et ne touche pas à `main` sur GitHub.
 - **Biblio** : l'investisseur a décidé de la mettre « Dans le dépôt shogen » (JOURNAL, 2026-10-02) ; le
   versement a été **refusé par le contrôle de permissions** de la session locale (droit d'auteur : un manuel
   Wiley, des articles IMS, dépôt public pendant les fenêtres). **Non contourné.** Voies : règle de permission
