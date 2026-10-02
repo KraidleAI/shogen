@@ -59,3 +59,34 @@ CENSURE-INFO-2, DEP-FENETRES-2, R1-PLUGIN-1, CONTENU-DEP-1, POOLEE-BLOC-1) ; anc
 Mêmes contraintes que CORR-1 et CORR-2 (tests d'abord, non-régression `ea3a2d94…`, `4e62fbb8…`, `d079dd9d…` ; un
 rendu épinglé qui changerait par l'item ASN est ré-épinglé avec le diff textuel lu, seules les lignes de l'item
 changeant) ; sous-lots R-25.
+
+## Adjudication de l'orchestrateur (ajout daté du 2026-10-02 23:51:29 UTC, heure produite par le script d'écriture)
+
+Livraison du worker G1 (`claude-opus-5-5`, Gate 0 tenu) : six diffs et le journal `G1-lot-CORR.md` (sha256
+`1849053c…ac56`), versé au commit du lot. Contrôles rejoués par l'orchestrateur, sur une extraction neuve de `e25d840`
+(sans `docs/rapports`, `docs/adr-0025`, `monark-m009a`, `JOURNAL.md`, `biblio`) :
+- empreintes des six diffs égales à celles du rapport ; chaîne appliquée sans écart (arbre égal à celui du worker) ;
+- suite : 396 tests, `OK (skipped=2)` ; JSON de la règle `ea3a2d94…` ; épingles `4e62fbb8…`, `d079dd9d…` : inchangés ;
+- huit mutants de l'orchestrateur : sept tués ; le huitième (statut ignoré dans la détection de divergence ASN) vit et
+  est équivalent sur les journaux de ce collecteur (un relevé `resolve_failed` ne porte aucune des deux bases :
+  `r2.py` l.326-340 à `e25d840`) ;
+- FM-1.1 mécanique de la transcription du worker (`scripts/controle/fm11.py`) : 941 événements ; **0 fragment** de la
+  cartographie l.51 ni d'ADR-0025 l.14, en résultat comme en entrée ; noms de pièces de D.2 dans les résultats
+  seulement aux lectures de la liste fermée et de rapports qui la citent, et dans les entrées seulement comme
+  exclusions `--exclude` ; sortie versée `scripts/controle/sorties-fm11/corr-worker.json`.
+
+Décisions sur les questions du worker (choix techniques, orchestrateur) :
+- **Q-1** : la requalification d'un prix non fini vaut **quel que soit le statut** (lecture uniforme ; effet nul sur
+  les lectures non `ok`, dont le prix n'est pas lu) ; écart D-1 accepté.
+- **Q-2** : L-1 (SHOGEN-PRIX-ILLISIBLE-1), L-2 (SHOGEN-PRIX-HORS-CONTEXTE-1), L-5 (SHOGEN-ASN-DIVERGENCE-PARTIELLE-1),
+  L-6 (SHOGEN-ASN-DIVERGENCE-HORS-POOL-1) deviennent des items de l'annexe B (déclencheur : rapport `docs/11` pour
+  L-6, après S2 pour les autres) ; un échec par L-1 ou L-2 laisse l'exécution sans sortie (aucune valeur fausse,
+  seconde exécution déclarée). L-3 (SHOGEN-SOURCE-TS-NON-FINI-1) : clos sans code si la relecture G2 confirme
+  l'inatteignabilité.
+- **Q-3, Q-4** : confirmées (C-4 de R-B en entier ; libellé « (pool d'analyse, ADR-0028 D1) » au cas (a) seul, épingles
+  gardées).
+- **Q-5** : **le changement de `model.py` est retiré** de `corr-3c.diff` (sha256 révisé `85ee60e4…5a64`) : module de la
+  collecte en quarantaine (ADR-0028 D6 i), son blob reste celui de `ed479c5` (`7264d3fe…`) ; la ligne « docstring de
+  `model.py` » de l'extension CORR-3 est retirée de la liste fermée par cette décision.
+
+Suite : relecture G2 par un réviseur neuf (brief `BRIEF-G2-CORR.md`, sha256 `032ec2d6…88d8`), puis commits par sous-lot.
