@@ -11,11 +11,14 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 from tests.test_exclusion import HARNESS
 
-_SPEC = importlib.util.spec_from_file_location("oracle_record", os.path.join(HARNESS, "tools", "oracle_record.py"))
+OUTIL = os.path.join(HARNESS, "tools", "oracle_record.py")
+_SPEC = importlib.util.spec_from_file_location("oracle_record", OUTIL)
 orc = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(orc)
 T = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):\n        pass\n"
@@ -26,21 +29,25 @@ SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
+def g(d: str, *args: str, entree: bytes = None) -> str:
+    """git sur le dépôt jetable d : identité de fixture, signature coupée, variables GIT_* retirées."""
+    return subprocess.run(["git", "-C", d, "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
+                           "commit.gpgsign=false", *args], input=entree, check=True, capture_output=True,
+                          env=GIT_ENV).stdout.decode().strip()
+
+
 def depot(d: str, commits):
     """Dépôt git jetable : un commit par mapping {chemin : octets} ; rend les sha complets (git rev-parse HEAD)."""
-    def g(*args):
-        return subprocess.run(["git", "-C", d, "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
-                               "commit.gpgsign=false", *args], check=True, capture_output=True, env=GIT_ENV).stdout
     os.makedirs(d)
-    g("init", "-q")
-    g("config", "core.autocrlf", "false")
+    g(d, "init", "-q")
+    g(d, "config", "core.autocrlf", "false")
     for fichiers in commits:
         for rel, octets in fichiers.items():
             os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
             with open(os.path.join(d, rel), "wb") as f:
                 f.write(octets)
-        g("add", "-A"), g("commit", "-q", "-m", "fixture")
-        yield g("rev-parse", "HEAD").decode().strip()
+        g(d, "add", "-A"), g(d, "commit", "-q", "-m", "fixture")
+        yield g(d, "rev-parse", "HEAD")
 
 
 class TestOracleRecord(unittest.TestCase):
@@ -138,6 +145,59 @@ class TestOracleRecord(unittest.TestCase):
             with self.subTest(controle=controle, maj=maj):
                 with self.assertRaisesRegex(ValueError, rf"^refus \({controle}\) : "):
                     orc.verifier(copie(src, f"mutant-{controle}.json", f, **maj), role, commit)
+
+    def test_cli_ecriture_verifier_et_git_dir_herite(self):
+        """CLI : écriture (rôle cp-2) sous un GIT_DIR hérité qui désigne un autre dépôt, --verifier conforme (code 0),
+        refus nommé (code 2) ; options d'écriture mêlées à --verifier refusées ; commit inconnu : code 2, rien d'écrit ;
+        commande en échec : code 1.
+        Rougit si : variables GIT_* héritées gardées (autre dépôt lu), code ou motif de refus perdus, mélange admis,
+        écriture sans --sortie admise."""
+        d, autre = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "autre")
+        list(depot(autre, [{"x": b"x"}]))
+
+        def cli(*args, **env):
+            return subprocess.run([sys.executable, "-B", OUTIL, *args], capture_output=True, text=True,
+                                  env={**os.environ, **env})
+        p = cli("--role", "cp-2", "--auteur", "claude-opus-5-5", "--depot", self.depot, "--commit", self.c1[:10],
+                "--sortie", d, GIT_DIR=os.path.join(autre, ".git"))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        chemin, avant = p.stdout.strip(), sorted(os.listdir(d))
+        v, r, m = (cli("--verifier", chemin, "--role", "cp-2", *x) for x in (
+            ("--commit", self.c1), ("--commit", self.c2), ("--commit", self.c1, "--auteur", "claude-opus-5-5")))
+        self.assertEqual((v.returncode, v.stdout), (0, f"conforme : {chemin} (rôle cp-2, tree.commit {self.c1})\n"))
+        self.assertEqual(r.returncode, 2)
+        self.assertRegex(r.stderr, r"^oracle_record : refus \(tree\.commit\) : ")
+        self.assertEqual((m.returncode, "--verifier" in m.stderr), (2, True))
+        s = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", self.c1)
+        self.assertEqual((s.returncode, "exige --auteur, --depot et --sortie" in s.stderr), (2, True))
+        n = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", "0" * 40, "--sortie", d)
+        self.assertEqual((n.returncode, sorted(os.listdir(d))), (2, avant))
+        k = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", self.c2, "--sortie", d)
+        self.assertEqual((k.returncode, os.path.dirname(k.stdout.strip())), (1, d))
+
+    def test_collision_sans_ecrasement_et_lien_sortant(self):
+        """Même instant, même pid, même rôle et commit : la seconde écriture lève FileExistsError sans écraser la
+        sortie de la première ; commit qui porte un lien symbolique absolu (posé par la plomberie git, aucun lien sur
+        le disque) : refus nommé du filtre « data » de tarfile, rien d'écrit. Rougit si : sortie ouverte en
+        écrasement ; extraction sans filtre."""
+        d, lien = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "lien")
+        fixe = datetime(2026, 10, 2, 5, 0, tzinfo=timezone.utc)
+        with mock.patch.object(orc, "datetime", mock.Mock(now=lambda tz: fixe)):
+            chemin = orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c1)[0]
+            sortie = Path(d, json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]["sortie"]["chemin"])
+            sortie.write_bytes(sortie.read_bytes() + b"marque")
+            with self.assertRaises(FileExistsError):
+                orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c1)
+        self.assertTrue(sortie.read_bytes().endswith(b"marque"))
+        list(depot(lien, [{"x": b"x"}]))
+        blob = g(lien, "hash-object", "-w", "--stdin", entree=b"/inexistant-shogen")
+        g(lien, "update-index", "--add", "--cacheinfo", f"120000,{blob},lien")
+        g(lien, "commit", "-q", "-m", "lien")
+        avant = sorted(os.listdir(d))
+        with self.assertRaisesRegex(ValueError, r"filtre data .* — refus$"):
+            orc.enregistrer(d, "G2", "claude-opus-5-5", lien, "HEAD")
+        self.assertEqual(sorted(os.listdir(d)), avant)
+
 
 if __name__ == "__main__":
     unittest.main()

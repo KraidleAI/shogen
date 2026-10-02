@@ -6,6 +6,7 @@ shogen-<sha court>-<rôle>-<date>-<pid>.json (sorties : chemins relatifs à ce r
 est consignée, posée ou non, jamais posée (annexe D.4 a)."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import io
 import json
@@ -30,8 +31,9 @@ RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
 
 
 def git(depot: str, *args: str) -> bytes:
-    """git en lecture seule sur `depot`."""
-    return subprocess.run(["git", "-C", depot, *args], capture_output=True, check=True).stdout
+    """git en lecture seule sur `depot` ; variables GIT_* retirées (un GIT_DIR hérité désignerait un autre dépôt)."""
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return subprocess.run(["git", "-C", depot, *args], capture_output=True, check=True, env=env).stdout
 
 
 def commit_complet(depot: str, rev: str) -> str:
@@ -71,7 +73,10 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     arbre, runs = tempfile.mkdtemp(prefix="oracle_"), []
     try:
         with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
-            t.extractall(arbre, filter="data")
+            try:
+                t.extractall(arbre, filter="data")
+            except tarfile.FilterError as e:
+                raise ValueError(f"extraction de {sha} rejetée par le filtre data de tarfile ({e}) — refus") from e
         hashes = {os.path.relpath(os.path.join(d, f), arbre).replace(os.sep, "/"): sha256_fichier(os.path.join(d, f))
                   for d, _sous, fs in os.walk(arbre) for f in fs}
         for i, c in enumerate(commandes):
@@ -143,3 +148,36 @@ def verifier(chemin: str, role: str, commit: str) -> dict:
         except ValueError as e:
             exige(False, "served_from", f" → {e}")
     return rec
+
+
+def main(argv: list) -> int:
+    """Écriture (--role, --auteur, --depot, --commit, --sortie ; options --base, --commande, --paquet-sha256,
+    --sceau-gentime), ou lecture (--verifier ENREGISTREMENT --role R --commit SHA_COMPLET). Code 0 : enregistrement
+    écrit et commandes vertes, ou conforme ; 1 : une commande a échoué ; 2 : refus."""
+    p = argparse.ArgumentParser(prog="oracle_record.py", description="enregistrement shogen.oracle-record.v1 (D6 viii)")
+    p.add_argument("--verifier", metavar="ENREGISTREMENT")
+    p.add_argument("--role", required=True, choices=ROLES)
+    p.add_argument("--commit", required=True)
+    for opt in ("--auteur", "--depot", "--sortie", "--base", "--paquet-sha256", "--sceau-gentime"):
+        p.add_argument(opt)
+    p.add_argument("--commande", action="append", choices=sorted(COMMANDES))
+    a = p.parse_args(argv)
+    ecriture = (a.auteur, a.depot, a.sortie, a.base, a.commande, a.paquet_sha256, a.sceau_gentime)
+    if a.verifier is not None and any(x is not None for x in ecriture) or a.verifier is None and None in ecriture[:3]:
+        p.error("--verifier n'admet que --role et --commit ; l'écriture exige --auteur, --depot et --sortie")
+    try:
+        if a.verifier is not None:
+            verifier(a.verifier, a.role, a.commit)
+            print(f"conforme : {a.verifier} (rôle {a.role}, tree.commit {a.commit})")
+            return 0
+        chemin, code = enregistrer(a.sortie, a.role, a.auteur, a.depot, a.commit, tuple(a.commande or ("suite",)),
+                                   a.base, a.paquet_sha256, a.sceau_gentime)
+    except (ValueError, OSError, subprocess.CalledProcessError) as e:
+        print(f"oracle_record : {e}", file=sys.stderr)
+        return 2
+    print(chemin)
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
