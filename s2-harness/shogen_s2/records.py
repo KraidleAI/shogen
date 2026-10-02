@@ -27,8 +27,11 @@ Trois types, discriminés par le champ ``record`` (les lignes de lecture de
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import sys
+from collections import Counter
 from decimal import Decimal
 from typing import Optional
 
@@ -101,6 +104,35 @@ def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
                     f"(ligne {i + 1}) : recalcul impossible (fail-closed)"
                 ) from e
     return objs
+
+
+def verifier_raw(raw_path: str, journal_path: str) -> dict:
+    """Lecteur et oracle de `raw.jsonl` (SHOGEN-RAW-LECTEUR-1 ; promesse de journal.py : « le sha256 du journal doit
+    y correspondre ») : relecture par le lecteur tolérant, décodage de raw_b64 (base64 strict), sha256 recalculé égal
+    à sha256_raw de la ligne, puis à celui de la lecture correspondante de journal.jsonl (même window_start, flux_id,
+    fetch_ts ; multiplicités comprises). Tout écart lève ValueError, refus nommé. Rend les comptes de lectures."""
+    def cle(o):
+        return o.get("window_start"), o.get("flux_id"), o.get("fetch_ts")
+    brut: Counter = Counter()
+    for o in read_jsonl_tolerant(raw_path, parse_float=Decimal):
+        try:
+            sha = None if o.get("raw_b64") is None else hashlib.sha256(
+                base64.b64decode(o["raw_b64"], validate=True)).hexdigest()
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"raw.jsonl, lecture {cle(o)} : raw_b64 non décodable (base64 strict) — refus "
+                             "(SHOGEN-RAW-LECTEUR-1)") from e
+        if sha != o.get("sha256_raw"):
+            raise ValueError(f"raw.jsonl, lecture {cle(o)} : sha256 recalculé {sha} ≠ sha256_raw de la ligne "
+                             f"{o.get('sha256_raw')} — refus (SHOGEN-RAW-LECTEUR-1)")
+        brut[cle(o), sha] += 1
+    jour = Counter((cle(o), o.get("sha256_raw")) for o in read_jsonl_tolerant(journal_path, parse_float=Decimal))
+    r, j = {k for k, _ in brut - jour}, {k for k, _ in jour - brut}
+    for ecart, motif in ((r & j, "sha256 des octets ≠ sha256_raw de journal.jsonl"),
+                         (r - j, "lecture(s) de raw.jsonl absente(s) de journal.jsonl"),
+                         (j - r, "lecture(s) de journal.jsonl absente(s) de raw.jsonl")):
+        if ecart:
+            raise ValueError(f"{motif} : {sorted(ecart, key=str)[:5]} — refus (SHOGEN-RAW-LECTEUR-1)")
+    return {"lectures": sum(brut.values()), "avec_octets": sum(n for (_k, s), n in brut.items() if s is not None)}
 
 
 def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS) -> dict:
