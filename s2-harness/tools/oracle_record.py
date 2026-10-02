@@ -188,7 +188,8 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     champs, schema, rôle attendu, auteur (identifiant de la liste blanche du lint, ou cet identifiant suivi de [1m],
     par égalité exacte), tree.commit égal au sha complet attendu, tree.sha256 égal par fichier à la ré-extraction du
     commit si `depot` est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
-    paquet.sha256 au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou chemin et sha256 d'un
+    paquet.sha256 et runs (suite, puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de
+    ce rôle, served_from nul, ou chemin et sha256 d'un
     enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
     def exige(ok, controle, detail=""):
         if not ok:
@@ -221,6 +222,8 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
         exige(os.path.isfile(p) and sha256_fichier(p) == r["sortie"]["sha256"], "sortie", f" : {p}")
     if role == "rendu":
         exige(isinstance(rec["paquet"]["sha256"], str) and HEX.fullmatch(rec["paquet"]["sha256"]), "paquet.sha256")
+        noms = [r["nom"] for r in rec["runs"]]
+        exige(noms == ["suite", *PRODUCTION], "runs", f" : {noms}, attendu {['suite', *PRODUCTION]}")
     else:
         exige((rec["paquet"]["sha256"], rec["sceau"]["genTime"]) == (None, None), "nuls hors rendu")
     sf = rec["served_from"]

@@ -114,12 +114,13 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual(orc.tests_lances(texte), ["tests.t.T.test_a", "tests.t.T.test_b", "tests.t.U.test_c"])
 
     def test_verifier_un_refus_nomme_par_controle(self):
-        """Lecture : enregistrements conformes acceptés (G2, rendu, served_from conforme), puis un refus nommé par
-        contrôle sur copie modifiée. Rougit si un contrôle manque ou se relâche : champs, schema, rôle, tree.commit (sha
-        complet exigé), static_only (false exact), exit (0 entier, chaque commande), sha256 et présence de chaque
-        sortie, paquet.sha256 au rôle « rendu », champs nuls hors rendu, served_from (sha, conformité du servi)."""
+        """Lecture : enregistrements conformes acceptés (G2, rendu à six runs écrits ici, served_from conforme), puis un
+        refus nommé par contrôle sur copie modifiée. Rougit si un contrôle manque ou se relâche : champs, schema, rôle,
+        tree.commit (sha complet exigé), static_only (false exact), exit (0 entier, chaque commande), sha256 et présence
+        de chaque sortie, paquet.sha256 et runs (suite puis D.4 b, dans l'ordre ; C-6) au rôle « rendu », champs nuls
+        hors rendu, served_from (sha, conformité du servi)."""
         d, a = tempfile.mkdtemp(dir=self.d), "claude-opus-5-5"
-        g2, rendu, ko = (orc.enregistrer(d, r, a, self.depot, c, **kw)[0] for r, c, kw in (
+        g2, rendu1, ko = (orc.enregistrer(d, r, a, self.depot, c, **kw)[0] for r, c, kw in (
             ("G2", self.c1, {}), ("rendu", self.c1, {"paquet_sha256": SHA}), ("G2", self.c2, {})))
         sha = {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in (g2, ko)}
 
@@ -129,6 +130,12 @@ class TestOracleRecord(unittest.TestCase):
             f and f(rec)
             Path(d, nom).write_text(json.dumps(rec), encoding="utf-8")
             return os.path.join(d, nom)
+        six = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]    # C-6 : suite, puis D.4 b
+        for n in six:
+            Path(d, f"{n}.out").write_bytes(n.encode())
+        runs = [{"nom": n, "arbre": "s2-harness", "commande": [n], "exit": 0, "tests_avec_variable": [],
+                 "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(n.encode()).hexdigest()}} for n in six]
+        rendu = copie(rendu1, "rendu.json", runs=runs)
         sert = {"chemin": os.path.basename(g2), "sha256": sha[g2]}
         for chemin, role in ((g2, "G2"), (rendu, "rendu"), (copie(g2, "sert.json", served_from=sert), "G2")):
             self.assertEqual(orc.verifier(chemin, role, self.c1)["tree"]["commit"], self.c1)
@@ -145,6 +152,8 @@ class TestOracleRecord(unittest.TestCase):
                 ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(sha256="0" * 64), {}),
                 ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(chemin="absente.out"), {}),
                 ("paquet.sha256", rendu, "rendu", self.c1, lambda r: r["paquet"].update(sha256=SHA[:-1]), {}),
+                ("runs", rendu1, "rendu", self.c1, None, {}), ("runs", rendu, "rendu", self.c1,
+                                                               lambda r: r["runs"].reverse(), {}),
                 ("nuls hors rendu", g2, "G2", self.c1, lambda r: r["sceau"].update(genTime="2026-10-02T05:00Z"), {}),
                 ("served_from", g2, "G2", self.c1, None, {"served_from": {**sert, "sha256": "0" * 64}}),
                 ("served_from", g2, "G2", self.c1, None, {"served_from": {"chemin": ko, "sha256": sha[ko]}})):

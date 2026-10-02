@@ -31,6 +31,7 @@ GO = re.compile(r"date: (\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,6})?)?(?:Z|\
                 r"signataire: investisseur\n")                          # fichier de go, voie (b) de (6), G0 §C
 HARNAIS = os.path.dirname(os.path.dirname(SCRIPT))      # s2-harness du script : code scellé de l'extraction
 NOMS_JOURNAUX = ("control.jsonl", "journal.jsonl", "raw.jsonl")   # exigés au bloc avant tout rendu (G0 §C, L3)
+JETON = "SHOGEN_RENDU_PRODUCTION"    # temporaire voisin posé par produire_tout ; --produire refuse sans lui (G2, C-1)
 # --- table des sorties (ADR-0028 D4, D2 pt 6, D5 ; G0 §C, décisions Q1 à Q4 du 2026-10-02) ---
 T0, PLAGE_D5 = 1787770800, (1790273880, 1790435280)     # 2026-08-26T19:00:00Z ; plage fermée sur window_start
 HORS_J28 = " ; plage D5 non passée : hors du segment (D2 pt 6 l'applique au J28)"      # décision Q2
@@ -317,7 +318,13 @@ def produire(argv: list) -> int:
     sortie de SORTIES (étiquette en tête, puis render_report avec ses seules options ; Q1, Q2, Q4), recalcul-tiers
     (JSON des quatre recompute_* par sortie, variante sans plage comprise ; Q6) ou raw (verdict de
     records.verifier_raw, code 0 quel que soit le verdict ; Q7, SHOGEN-RAW-FIN-1). Octets UTF-8 sur la sortie
-    standard, capturée par l'enregistreur."""
+    standard, capturée par l'enregistreur. Réservée à l'exécution unique (C-1) : JETON absent ou hors d'un répertoire
+    existant dont le nom commence par un point, refus, code 2, sortie standard vide."""
+    v = os.environ.get(JETON, "")
+    if not (os.path.isdir(v) and os.path.basename(v).startswith(".")):
+        print(f"rendu_unique : refus production : commande nommée réservée à l'exécution unique ({JETON} absente ou "
+              "hors d'un répertoire temporaire de production)", file=sys.stderr)
+        return 2
     p = argparse.ArgumentParser(prog="rendu_unique.py --produire")
     p.add_argument("nom", choices=[s[0] for s in SORTIES] + ["recalcul-tiers", "raw"])
     p.add_argument("--journaux", required=True)
@@ -360,6 +367,7 @@ def produire_tout(c: dict, a, cible: str) -> int:
                 f.write(f"seconde exécution déclarée (ADR-0028 annexe D.4 b) ; première : {a.sortie} ; motif : "
                         f"{a.deviation}\n")
         o, r = ouverture(c), racine(c)
+        os.environ[JETON] = tmp                     # hérité par les runs --produire (C-1)
         chemin, code = orc.enregistrer(tmp, "rendu", a.auteur, r, "HEAD", RUNS, base=c["bloc"]["commit_analyse"],
                                        paquet_sha256=c["sha_paquet"], sceau_gentime=o["genTime"], journaux=a.journaux,
                                        arret_premier_echec=True)
@@ -375,6 +383,7 @@ def produire_tout(c: dict, a, cible: str) -> int:
               f"{type(e).__name__} : {e} ; aucun répertoire de sortie", file=sys.stderr)
         return 1
     finally:
+        os.environ.pop(JETON, None)
         if not fait:
             shutil.rmtree(tmp, ignore_errors=True)
     print(f"sorties : {cible} (voie {o['voie']} ; T0 {o['T0']} ; genTime {o['genTime'] or '-'})")

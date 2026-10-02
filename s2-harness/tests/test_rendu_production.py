@@ -27,12 +27,17 @@ from tests.test_sensibilite import RA, fixture, t
 TABLE = (("j14-principal", {"t0": t(7, 22), "t_fin": t(10, 2)}, (), "étiquette un"),        # table de fixture
          ("j14-second", {"t0": t(7, 22), "t_fin": t(8, 23)}, (), "étiquette deux"),
          ("j28", {"t0": t(7, 22), "n_fixe": 60}, (RA,), "étiquette trois"))
+JETON = "SHOGEN_RENDU_PRODUCTION"       # C-1 du G2 : jeton de production (temporaire voisin), écrit à la main
+ENVELOPPE = ("import ast, importlib.util, sys\ns = importlib.util.spec_from_file_location('ru', sys.argv[1])\n"
+             "ru = importlib.util.module_from_spec(s)\ns.loader.exec_module(ru)\n"
+             "ru.SORTIES = ast.literal_eval(sys.argv[2])\nraise SystemExit(ru.main(sys.argv[3:]))\n")
 
 
 def produire(*args) -> tuple:
-    """rendu_unique --produire en processus : (code, octets écrits sur la sortie standard)."""
+    """rendu_unique --produire en processus, jeton de production posé : (code, octets écrits sur la sortie standard)."""
     buf = io.BytesIO()
-    with contextlib.redirect_stdout(io.TextIOWrapper(buf, encoding="utf-8")) as w:
+    with contextlib.redirect_stdout(io.TextIOWrapper(buf, encoding="utf-8")) as w, mock.patch.dict(
+            os.environ, {JETON: tempfile.mkdtemp(prefix=".")}):
         code = ru.main(["--produire", *args])
         w.flush()
         return code, buf.getvalue()
@@ -121,11 +126,29 @@ class TestSortiesNommees(unittest.TestCase):
         x = next(i for i, y in enumerate(lignes) if y.get("raw_b64") is not None)
         lignes[x]["sha256_raw"] = "0" * 64
         Path(k, "raw.jsonl").write_text("".join(json.dumps(y) + "\n" for y in lignes), encoding="utf-8")
-        p = subprocess.run([sys.executable, "-B", OUTIL, "--produire", "raw", "--journaux", k], capture_output=True)
+        p = subprocess.run([sys.executable, "-B", OUTIL, "--produire", "raw", "--journaux", k], capture_output=True,
+                           env={**os.environ, JETON: tempfile.mkdtemp(prefix=".")})
         self.assertEqual((p.returncode, p.stdout.decode("utf-8").startswith(f"{tete}refus — raw.jsonl, lecture ")),
                          (0, True), p.stderr)
         self.assertNotIn("conforme", p.stdout.decode("utf-8"))
         self.assertTrue(records.verifier_raw(os.path.join(self.d, "raw.jsonl"), self.j))
+
+    def test_produire_reserve_a_l_execution_unique(self):
+        """C-1 (G2 de la partie 2) : --produire j14-principal, recalcul-tiers et raw en sous-processus (table de
+        fixture) : sans SHOGEN_RENDU_PRODUCTION, vide, ou sur un répertoire dont le nom ne commence pas par un point,
+        un chemin absent ou un fichier : code 2, sortie standard vide, motif sur stderr ; sur un répertoire existant
+        dont le nom commence par un point : code 0. Rougit si le contrôle est retiré ou relâché."""
+        point, sans = tempfile.mkdtemp(prefix="."), tempfile.mkdtemp()
+        Path(sans, ".f").write_bytes(b"")
+        env = {k: v for k, v in os.environ.items() if k != JETON}         # héritée dans la production : retirée
+        for nom in ("j14-principal", "recalcul-tiers", "raw"):
+            for v in (None, "", sans, os.path.join(sans, ".absent"), os.path.join(sans, ".f"), point):
+                p = subprocess.run([sys.executable, "-B", "-c", ENVELOPPE, OUTIL, repr(TABLE), "--produire", nom,
+                                    "--journaux", self.d], capture_output=True,
+                                   env={**env, **({} if v is None else {JETON: v})})
+                with self.subTest(nom=nom, valeur=v):
+                    self.assertEqual((p.returncode, p.stdout == b"", "réservée à l'exécution unique" in p.stderr.decode(
+                        "utf-8")), (0, False, False) if v == point else (2, True, True), p.stderr[-300:])
 
 
 RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]     # Q8 puis ordre de D.4 b
