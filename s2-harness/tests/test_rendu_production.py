@@ -68,7 +68,8 @@ class TestSortiesNommees(unittest.TestCase):
     def test_table_reelle_constantes(self):
         """SHOGEN-RENDU-TABLE-REELLE-1 et décisions Q1 à Q4 : bornes recalculées ici depuis les dates d'ADR-0028 (D4,
         D2 pt 6, D5), étiquettes du G0 §C ; commandes nommées de l'enregistreur ; noms des journaux (L3). Rougit si une
-        borne, une plage, une étiquette, l'ordre ou une commande nommée diffère."""
+        borne, une plage, une étiquette (J28 complétée : G2 C-7, décision Q-3), l'ordre ou une commande nommée
+        diffère."""
         ep = lambda s: int(datetime.fromisoformat(s + "+00:00").timestamp())
         t0, hors = ep("2026-08-26T19:00:00"), " ; plage D5 non passée : hors du segment (D2 pt 6 l'applique au J28)"
         self.assertEqual(ru.SORTIES, (
@@ -78,7 +79,8 @@ class TestSortiesNommees(unittest.TestCase):
              "sensibilité de la liste fermée (seconde coupe, décision 270), hors décision, non confirmatoire" + hors),
             ("j28", {"t0": t0, "n_fixe": 38600}, ((ep("2026-09-24T18:18:00"), ep("2026-09-26T15:08:00")),),
              "segment confirmatoire de la règle SHOGEN-CRITERE-R1-1 (D2 pt 6) ; la section [SENSIBILITÉ] (plage "
-             "incluse) est hors décision, biaisée vers le haut par construction")))
+             "incluse) est hors décision, biaisée vers le haut par construction ; hors décision aussi (§1 bis.1 pt "
+             "9) : L&M (bloc 4), queues exactes, strate poolée, diagnostic de runs et drapeau « run maximal ≥ ℓ »")))
         self.assertEqual(ru.NOMS_JOURNAUX, ("control.jsonl", "journal.jsonl", "raw.jsonl"))
         for n in ("j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"):
             self.assertEqual(ru.orc.COMMANDES[n], ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n,
@@ -99,16 +101,20 @@ class TestSortiesNommees(unittest.TestCase):
     def test_recalcul_tiers_quatre_recompute_et_variante_incluse(self):
         """Q6 : JSON des quatre recompute_* (r1, d5 avec la ventilation de B5, lm, r2) par sortie, mêmes options,
         plus la variante sans plage du J28 ; ses n et K égaux aux lignes « incluse » de la section [SENSIBILITÉ] du
-        rendu J28. Rougit si : un recompute manque, options autres, variante incluse absente ou sous plage."""
+        rendu J28 ; clé etiquette de chaque entrée (celle de la table ; texte écrit ici pour la variante incluse, G2
+        C-7). Rougit si : un recompute manque, options autres, variante incluse absente ou sous plage, étiquette
+        autre."""
         with mock.patch.object(ru, "SORTIES", TABLE):
             code, octets = produire("recalcul-tiers", "--journaux", self.d)
         out = json.loads(octets)
-        var = [(n, s, pl) for n, s, pl, _ in TABLE] + [("j28-incluse", TABLE[2][1], ())]
+        incluse = ("sensibilité « plage incluse » de la liste fermée (D2 pt 7), hors décision, biaisée vers le haut "
+                   "par construction")
+        var = [(n, s, pl, e) for n, s, pl, e in TABLE] + [("j28-incluse", TABLE[2][1], (), incluse)]
         self.assertEqual((code, list(out), out["avertissements"]), (0, ["avertissements", *sorted(n for n, *_ in var)],
                                                                     []))
-        for n, s, pl in var:
+        for n, s, pl, e in var:
             with self.subTest(sortie=n):
-                self.assertEqual(out[n], en_json({"segment": s, "plages": [list(x) for x in pl], **{
+                self.assertEqual(out[n], en_json({"etiquette": e, "segment": s, "plages": [list(x) for x in pl], **{
                     k: f(self.c, self.j, pl, s) for k, f in (
                         ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
                         ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}}))
@@ -236,6 +242,9 @@ def monter_prod(d: str) -> dict:
     depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
     os.makedirs(depot), os.makedirs(jx), g(depot, "init", "-q"), g(depot, "config", "core.autocrlf", "false")
     src = Path(OUTIL).read_text(encoding="utf-8")
+    for marque in ("# --- table des sorties", "# --- fin de la"):     # C-9 : une ligne de délimitation chacune
+        if sum(x.startswith(marque) for x in src.split("\n")) != 1:
+            raise AssertionError(f"délimiteur {marque!r} : une seule ligne exigée dans {OUTIL}")
     outil = src[:src.index("# --- table des sorties")] + f"SORTIES = {TABLE!r}\n" + src[src.index("# --- fin de la"):]
     code = ["tools/oracle_record.py"] + [f"shogen_s2/{n}" for n in os.listdir(os.path.join(HARNAIS, "shogen_s2"))
                                         if n.endswith(".py")]

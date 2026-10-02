@@ -30,6 +30,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import math
 import sys
 from collections import Counter
 from decimal import Decimal
@@ -351,8 +352,9 @@ def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
     """UN SEUL outil de lecture par horodatage, pour tous les types (ADR-0028 D4, D5 ; HS2-08) : filtre
     d'ANALYSE, jamais une excision du journal. Exclusion d'ADR-0025 déc. 1 amendée par D5 : `window_start`
     dans la plage FERMÉE [A ; B] ; `ts` et `harness_ts` dans [A ; B + w), durée de la dernière fenêtre
-    (w de run_params) ; run_params conservé ; type sans règle : ValueError. Segment `(t0, t_fin)`, avant
-    l'exclusion : [t0 ; t_fin) semi-ouvert, MÊME borne, tous types (D4). Sans plage ni segment : inchangé."""
+    (w de run_params) ; run_params conservé ; type sans règle, horodatage absent, booléen, non numérique ou non fini
+    (G2, C-8) : ValueError. Segment `(t0, t_fin)`, avant l'exclusion : [t0 ; t_fin) semi-ouvert, MÊME borne, tous
+    types (D4). Sans plage ni segment : inchangé."""
     rs = exclusion_ranges(ranges)
     if not rs and segment is None:
         return list(recs)
@@ -364,6 +366,10 @@ def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
         if champ is not None and r.get(champ) is None:     # jamais KeyError (SHOGEN-BLOC6-TS-1)
             raise ValueError(f"{r['record']} sans {champ} : placement dans le segment ou la plage indécidable — "
                              "fail-closed (SHOGEN-BLOC6-TS-1)")
+        v = r.get(champ)                                   # booléen, non numérique ou non fini : refus (G2, C-8)
+        if champ is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)):
+            raise ValueError(f"{r['record']} : {champ} = {v!r} non numérique ou non fini — fail-closed "
+                             "(SHOGEN-BLOC6-TS-NUM-1)")
         if champ is not None and segment is not None and not segment[0] <= r[champ] < segment[1]:
             continue
         if champ == "window_start":

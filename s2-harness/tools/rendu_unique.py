@@ -45,9 +45,12 @@ SORTIES = (
      "sensibilité de la liste fermée (seconde coupe, décision 270), hors décision, non confirmatoire" + HORS_J28),
     ("j28", {"t0": T0, "n_fixe": 38600}, (PLAGE_D5,),            # 38 600e fenêtre distincte, plus w (D2 pt 6)
      "segment confirmatoire de la règle SHOGEN-CRITERE-R1-1 (D2 pt 6) ; la section [SENSIBILITÉ] (plage incluse) "
-     "est hors décision, biaisée vers le haut par construction"),
+     "est hors décision, biaisée vers le haut par construction ; hors décision aussi (§1 bis.1 pt 9) : L&M (bloc 4), "
+     "queues exactes, strate poolée, diagnostic de runs et drapeau « run maximal ≥ ℓ »"),        # G2 C-7, Q-3
 )
 # --- fin de la table des sorties ---
+INCLUSE = ("sensibilité « plage incluse » de la liste fermée (D2 pt 7), hors décision, biaisée vers le haut par "
+           "construction")                         # étiquette de la variante incluse du recalcul tiers (G2 C-7)
 RUNS = ("suite", *(s[0] for s in SORTIES), "recalcul-tiers", "raw")     # Q8 : suite d'abord ; puis ordre de D.4 b
 _SPEC = importlib.util.spec_from_file_location("oracle_record", os.path.join(HARNAIS, "tools", "oracle_record.py"))
 orc = importlib.util.module_from_spec(_SPEC)            # enregistreur voisin (liste fermée des commandes)
@@ -387,10 +390,10 @@ def produire(argv: list) -> int:
                 texte = f"refus — {e}"
             tete, corps = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}", []
         elif a.nom == "recalcul-tiers":
-            var = [(n, s, pl) for n, s, pl, _ in SORTIES] + [(n + "-incluse", s, ()) for n, s, pl, _ in SORTIES if pl]
-            out = {n: {"segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
+            var = [*SORTIES, *((n + "-incluse", s, (), INCLUSE) for n, s, pl, _ in SORTIES if pl)]
+            out = {n: {"etiquette": e, "segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
                 ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
-                ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl in var}
+                ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl, e in var}
         else:
             nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
             tete, corps = f"[ÉTIQUETTE] {nom} : {etiquette}", [report.render_report(c, j, exclude_ranges=pl,

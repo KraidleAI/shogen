@@ -99,6 +99,23 @@ class TestBloc6SansTs(unittest.TestCase):
             report.render_report(self.c, self.j, exclude_ranges=[PLAGE])
 
 
+class TestTsNumerique(unittest.TestCase):
+    def test_ts_non_numerique_ou_non_fini_refus_nomme(self):
+        """SHOGEN-BLOC6-TS-NUM-1 (G2, C-8) : relevé asn_attribution sous segment, ts lu par json.loads : true, NaN,
+        Infinity, "abc", "1787770900" : refus nommé (ValueError) ; entier ou flottant fini : retenu. Rougit si le
+        contrôle est retiré (écarté en silence, ou TypeError anonyme)."""
+        seg = (1787770800, 1788980400)
+        for brut, refus in (("true", 1), ("NaN", 1), ("Infinity", 1), ('"abc"', 1), ('"1787770900"', 1),
+                            ("1787770900", 0), ("1787770900.5", 0)):
+            rec = json.loads('{"record": "asn_attribution", "host": "h", "ts": ' + brut + "}")
+            with self.subTest(ts=brut):
+                if refus:
+                    with self.assertRaisesRegex(ValueError, r"non numérique ou non fini .*SHOGEN-BLOC6-TS-NUM-1"):
+                        records.filtre_horodatage([rec], (), 60, seg)
+                else:
+                    self.assertEqual(records.filtre_horodatage([rec], (), 60, seg), [rec])
+
+
 
 class TestRawLecteur(unittest.TestCase):
     """SHOGEN-RAW-LECTEUR-1 sur la fixture d'exclusion (9 fenêtres × 3 flux, octets gelés) ; une altération par cas,
