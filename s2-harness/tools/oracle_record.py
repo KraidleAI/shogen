@@ -24,6 +24,9 @@ VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
 COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"])}  # fermée
 HEX = re.compile(r"[0-9a-f]{64}")
+CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tree", "python", "env", "runs", "exit",
+          "ecrit", "paquet", "sceau")
+RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
 
 
 def git(depot: str, *args: str) -> bytes:
@@ -93,3 +96,50 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         json.dump(rec, f, ensure_ascii=False, indent=1, sort_keys=True)
     return chemin, rec["exit"]
 
+
+def cles(x, attendues) -> bool:
+    return isinstance(x, dict) and set(x) == set(attendues)
+
+
+def zero(x) -> bool:
+    return type(x) is int and x == 0                  # 0 entier ; false JSON refusé
+
+
+def verifier(chemin: str, role: str, commit: str) -> dict:
+    """Relit un enregistrement ; refus nommé, ValueError « refus (<contrôle>) : … », au premier contrôle non conforme :
+    champs, schema, rôle attendu, tree.commit égal au sha complet attendu, static_only false, exit 0 (et chaque
+    commande), sha256 de chaque sortie recalculé, paquet.sha256 au rôle « rendu » ou champs nuls hors de ce rôle,
+    served_from nul, ou chemin et sha256 d'un enregistrement conforme aux mêmes contrôles. Rend l'enregistrement."""
+    def exige(ok, controle, detail=""):
+        if not ok:
+            raise ValueError(f"refus ({controle}) : {chemin}{detail} — enregistrement d'oracle non conforme (D6 viii)")
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            rec = json.load(f)
+    except (OSError, ValueError):
+        rec = None
+    exige(cles(rec, CHAMPS) and cles(rec["tree"], ("commit", "extraction", "sha256")) and cles(rec["paquet"], [
+        "sha256"]) and cles(rec["sceau"], ["genTime"]) and isinstance(rec["runs"], list) and all(
+        cles(r, RUN) and cles(r["sortie"], ("chemin", "sha256")) for r in rec["runs"]), "champs")
+    exige(rec["schema"] == SCHEMA, "schema")
+    exige(rec["role"] == role, "rôle", f" : {rec['role']!r}, attendu {role!r}")
+    exige(rec["tree"]["commit"] == commit, "tree.commit", f" : {rec['tree']['commit']!r}, attendu {commit!r}")
+    exige(rec["static_only"] is False, "static_only")
+    exige(zero(rec["exit"]) and rec["runs"] and all(zero(r["exit"]) for r in rec["runs"]), "exit")
+    racine = os.path.dirname(os.path.abspath(chemin))
+    for r in rec["runs"]:
+        p = os.path.join(racine, str(r["sortie"]["chemin"]))
+        exige(os.path.isfile(p) and sha256_fichier(p) == r["sortie"]["sha256"], "sortie", f" : {p}")
+    if role == "rendu":
+        exige(isinstance(rec["paquet"]["sha256"], str) and HEX.fullmatch(rec["paquet"]["sha256"]), "paquet.sha256")
+    else:
+        exige((rec["paquet"]["sha256"], rec["sceau"]["genTime"]) == (None, None), "nuls hors rendu")
+    sf = rec["served_from"]
+    if sf is not None:
+        p = os.path.join(racine, str(sf.get("chemin"))) if isinstance(sf, dict) else ""
+        exige(cles(sf, ("chemin", "sha256")) and os.path.isfile(p) and sha256_fichier(p) == sf["sha256"], "served_from")
+        try:
+            verifier(p, role, commit)
+        except ValueError as e:
+            exige(False, "served_from", f" → {e}")
+    return rec

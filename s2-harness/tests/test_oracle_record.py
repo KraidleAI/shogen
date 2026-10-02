@@ -100,6 +100,44 @@ class TestOracleRecord(unittest.TestCase):
                  "test_c (tests.t.U) ... ok\n")
         self.assertEqual(orc.tests_lances(texte), ["tests.t.T.test_a", "tests.t.T.test_b", "tests.t.U.test_c"])
 
+    def test_verifier_un_refus_nomme_par_controle(self):
+        """Lecture : enregistrements conformes acceptés (G2, rendu, served_from conforme), puis un refus nommé par
+        contrôle sur copie modifiée. Rougit si un contrôle manque ou se relâche : champs, schema, rôle, tree.commit (sha
+        complet exigé), static_only (false exact), exit (0 entier, chaque commande), sha256 et présence de chaque
+        sortie, paquet.sha256 au rôle « rendu », champs nuls hors rendu, served_from (sha, conformité du servi)."""
+        d, a = tempfile.mkdtemp(dir=self.d), "claude-opus-5-5"
+        g2, rendu, ko = (orc.enregistrer(d, r, a, self.depot, c, **kw)[0] for r, c, kw in (
+            ("G2", self.c1, {}), ("rendu", self.c1, {"paquet_sha256": SHA}), ("G2", self.c2, {})))
+        sha = {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in (g2, ko)}
+
+        def copie(src, nom, f=None, **maj):
+            rec = json.loads(Path(src).read_text(encoding="utf-8"))
+            rec.update(maj)
+            f and f(rec)
+            Path(d, nom).write_text(json.dumps(rec), encoding="utf-8")
+            return os.path.join(d, nom)
+        sert = {"chemin": os.path.basename(g2), "sha256": sha[g2]}
+        for chemin, role in ((g2, "G2"), (rendu, "rendu"), (copie(g2, "sert.json", served_from=sert), "G2")):
+            self.assertEqual(orc.verifier(chemin, role, self.c1)["tree"]["commit"], self.c1)
+        for controle, src, role, commit, f, maj in (
+                ("champs", g2, "G2", self.c1, lambda r: r.pop("ecrit"), {}),
+                ("champs", g2, "G2", self.c1, lambda r: r["runs"][0].pop("tests_avec_variable"), {}),
+                ("schema", g2, "G2", self.c1, None, {"schema": "shogen.oracle-record.v0"}),
+                ("rôle", g2, "cp-2", self.c1, None, {}), ("tree.commit", g2, "G2", self.c2, None, {}),
+                ("tree.commit", g2, "G2", self.c1[:7], None, {}),
+                ("static_only", g2, "G2", self.c1, None, {"static_only": 0}),
+                ("exit", ko, "G2", self.c2, None, {}), ("exit", g2, "G2", self.c1, None, {"exit": False}),
+                ("exit", g2, "G2", self.c1, lambda r: r["runs"][0].update(exit=1), {}),
+                ("exit", g2, "G2", self.c1, None, {"runs": []}),
+                ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(sha256="0" * 64), {}),
+                ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(chemin="absente.out"), {}),
+                ("paquet.sha256", rendu, "rendu", self.c1, lambda r: r["paquet"].update(sha256=SHA[:-1]), {}),
+                ("nuls hors rendu", g2, "G2", self.c1, lambda r: r["sceau"].update(genTime="2026-10-02T05:00Z"), {}),
+                ("served_from", g2, "G2", self.c1, None, {"served_from": {**sert, "sha256": "0" * 64}}),
+                ("served_from", g2, "G2", self.c1, None, {"served_from": {"chemin": ko, "sha256": sha[ko]}})):
+            with self.subTest(controle=controle, maj=maj):
+                with self.assertRaisesRegex(ValueError, rf"^refus \({controle}\) : "):
+                    orc.verifier(copie(src, f"mutant-{controle}.json", f, **maj), role, commit)
 
 if __name__ == "__main__":
     unittest.main()
