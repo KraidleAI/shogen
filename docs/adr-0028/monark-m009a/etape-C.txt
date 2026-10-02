@@ -1,0 +1,84 @@
+C0 jetons numériques du titre : 2 ; empreinte 711297029268
+
+C1 activité des fils principaux (messages par jour, 2026-09-25 à 2026-10-01) et écritures dans ADR-0028/annexes :
+  C--Users-KACIMI-AppData-Roaming-Claude-scratch-workspaces-9feaa3ef-edf9-4d51-bbea-f5cf5d2f810e-19e914f6-5065-47b6-bc17-ed7466e58464-scratch-2026-09-19-91fc61\1022f184-e88d-4880-b1fc-ce79812af324.jsonl | messages {'2026-09-27': 84} | écritures ADR-0028/annexes {}
+  F--Monark--claude-worktrees-magical-proskuriakova-8790c9\714827fb-9644-492e-995a-9de684694005.jsonl | messages {'2026-09-27': 393} | écritures ADR-0028/annexes {}
+  F--Monark\485d2bf0-6bdb-4a8b-adfb-54694a4ddbf8.jsonl | messages {'2026-09-29': 5} | écritures ADR-0028/annexes {}
+  F--Monark\4ac73e0a-8329-4d9b-9530-15339204c551.jsonl | messages {'2026-09-30': 10} | écritures ADR-0028/annexes {}
+  F--Monark\5afdb96e-4956-4b42-a7e7-4e1e9712cd0b.jsonl | messages {'2026-09-26': 1606} | écritures ADR-0028/annexes {}
+  F--Monark\6e27fbcd-5bdf-4648-9c33-5d54222ebac3.jsonl | messages {'2026-09-27': 7} | écritures ADR-0028/annexes {}
+  F--Monark\95c96415-a57e-401b-a70f-5626f51c1bf0.jsonl | messages {'2026-09-28': 42} | écritures ADR-0028/annexes {}
+  F--Monark\a0cf3d1b-5446-43e6-b228-3b1feff36069.jsonl | messages {'2026-09-28': 3261, '2026-09-29': 4056, '2026-09-30': 7629, '2026-10-01': 4610} | écritures ADR-0028/annexes {}
+  F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19.jsonl | messages {'2026-09-26': 4304, '2026-09-27': 6110, '2026-09-28': 1672} | écritures ADR-0028/annexes {}
+  F--Monark\f1746d5d-98a2-40ac-a59d-2bde286890a3.jsonl | messages {'2026-09-29': 8} | écritures ADR-0028/annexes {}
+  F--Monark\fb4c59d2-3abc-449b-9b0c-777b3eb9fd44.jsonl | messages {'2026-09-30': 11} | écritures ADR-0028/annexes {}
+  F--Monark\fbada707-747d-4cdf-ab78-754f84492163.jsonl | messages {'2026-09-27': 19} | écritures ADR-0028/annexes {}
+  F--Shogen--claude-worktrees-wf-089f8fc6-492-6\b6fb7193-21ca-4d43-88fe-b60c51fd7a46.jsonl | messages {'2026-09-30': 8} | écritures ADR-0028/annexes {}
+  F--Shogen--claude-worktrees-wf-b64d9898-cd4-6\20ad1bca-8d91-41e1-b66f-053d6bfbab4b.jsonl | messages {'2026-09-30': 15} | écritures ADR-0028/annexes {}
+  F--Shogen--claude-worktrees-wf-b64d9898-cd4-6\b7208d20-d534-4713-af21-aa94e502f6e3.jsonl | messages {'2026-09-30': 10} | écritures ADR-0028/annexes {}
+  F--Shogen\03c0ea18-1617-438a-819c-66e577660a89.jsonl | messages {'2026-09-30': 12} | écritures ADR-0028/annexes {}
+  F--Shogen\065e1b11-b4bd-4042-8bc4-66d4048fbfd9.jsonl | messages {'2026-09-30': 9} | écritures ADR-0028/annexes {}
+  F--Shogen\0bd72c3d-e3c6-45aa-9ca9-cbe122ed9a03.jsonl | messages {'2026-10-01': 8} | écritures ADR-0028/annexes {}
+  F--Shogen\0c6523f8-e2e7-4423-bc0e-49bf96677679.jsonl | messages {'2026-10-01': 24} | écritures ADR-0028/annexes {}
+  F--Shogen\34e9ccdd-9577-4270-a11f-240e30520c9f.jsonl | messages {'2026-10-01': 11} | écritures ADR-0028/annexes {}
+  F--Shogen\37ece638-a21d-4f1b-bb8f-13f8d096bce0.jsonl | messages {'2026-09-30': 9} | écritures ADR-0028/annexes {}
+  F--Shogen\3dc9d022-7284-4271-9227-8fa43910da59.jsonl | messages {'2026-09-30': 25} | écritures ADR-0028/annexes {}
+  F--Shogen\44c89ca0-0d10-40aa-be7b-f7a8436fdb09.jsonl | messages {'2026-09-30': 17} | écritures ADR-0028/annexes {}
+  F--Shogen\465272cb-0931-4b81-ac8f-a24064a59a44.jsonl | messages {'2026-09-29': 13} | écritures ADR-0028/annexes {}
+  F--Shogen\47e2995c-9dc8-4c94-90d4-683e9ff3174d.jsonl | messages {'2026-10-01': 20} | écritures ADR-0028/annexes {}
+  F--Shogen\53da51a2-ff78-468d-8e8a-5d050eb5270a.jsonl | messages {'2026-09-30': 20} | écritures ADR-0028/annexes {}
+  F--Shogen\583319ac-9add-4681-bd80-8df9dc08592f.jsonl | messages {'2026-10-01': 19} | écritures ADR-0028/annexes {}
+  F--Shogen\58c3c487-5784-45b9-9eaa-a0456f36fd34.jsonl | messages {'2026-09-30': 20} | écritures ADR-0028/annexes {}
+  F--Shogen\6752aba6-6f53-4fdf-aefb-e2239e20d957.jsonl | messages {'2026-10-01': 11} | écritures ADR-0028/annexes {}
+  F--Shogen\701e8783-7a22-42e6-8cc0-e6e7701dcbc8.jsonl | messages {'2026-09-29': 22} | écritures ADR-0028/annexes {}
+  F--Shogen\71845b8f-af27-4981-a7f5-ed9cf5ee2522.jsonl | messages {'2026-09-30': 29} | écritures ADR-0028/annexes {}
+  F--Shogen\750a62d2-5eb0-4fab-ab89-055471e1f73b.jsonl | messages {'2026-09-30': 29} | écritures ADR-0028/annexes {}
+  F--Shogen\8766d3e2-2572-45e9-a898-988a3fffa14f.jsonl | messages {'2026-10-01': 8} | écritures ADR-0028/annexes {}
+  F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3.jsonl | messages {'2026-09-25': 7279, '2026-09-26': 1530} | écritures ADR-0028/annexes {}
+  F--Shogen\912ffcec-0f1c-4c0a-ab9a-b21d091f09a0.jsonl | messages {'2026-09-30': 14} | écritures ADR-0028/annexes {}
+  F--Shogen\9b65c30d-84f0-4e66-a00d-8b7ba4873fb1.jsonl | messages {'2026-09-30': 5} | écritures ADR-0028/annexes {}
+  F--Shogen\b3c00f4a-0ad1-4547-89c4-727fc028267f.jsonl | messages {'2026-09-30': 8} | écritures ADR-0028/annexes {}
+  F--Shogen\cd242ffa-12d1-49d4-9fb5-b68e94ce2ce4.jsonl | messages {'2026-09-30': 17} | écritures ADR-0028/annexes {}
+  F--Shogen\cfa64bf5-f65d-4433-acba-373516ed6677.jsonl | messages {'2026-09-30': 10} | écritures ADR-0028/annexes {}
+  F--Shogen\de2ee815-5fff-4411-acbb-62ec3f18c3c2.jsonl | messages {'2026-09-30': 9} | écritures ADR-0028/annexes {}
+  F--Shogen\e32c69f9-a309-4359-95b3-89eab49a563d.jsonl | messages {'2026-09-30': 17} | écritures ADR-0028/annexes {}
+  F--Shogen\e433a3fa-606a-4709-82d3-9d5881320aaf.jsonl | messages {'2026-09-30': 14} | écritures ADR-0028/annexes {}
+  F--Shogen\e5177128-0c36-45b0-8dd7-27dd9dcc878f.jsonl | messages {'2026-10-01': 6} | écritures ADR-0028/annexes {}
+  F--Shogen\f877777a-9dae-40af-a352-c0720e703b89.jsonl | messages {'2026-10-01': 18} | écritures ADR-0028/annexes {}
+  F--Shogen\ff2e371e-50c8-45d7-beaa-e67dae9b1c8a.jsonl | messages {'2026-09-30': 16} | écritures ADR-0028/annexes {}
+  F--Shogen\ffc66d81-6b92-46c3-9c81-21981964f030.jsonl | messages {'2026-09-29': 1076, '2026-09-30': 925, '2026-10-01': 342} | écritures ADR-0028/annexes {'2026-09-29': 2}
+  F--Shogen\fff61892-28d7-452d-a27a-4d1fd34e2e29.jsonl | messages {'2026-09-29': 5} | écritures ADR-0028/annexes {}
+  F--Vernier\4c1b09db-d4d3-4adf-9c8a-27e5222f478a.jsonl | messages {'2026-09-25': 836, '2026-09-26': 84} | écritures ADR-0028/annexes {}
+  F--Vernier\7d762a97-0583-4aaa-8092-5f74c86170e3.jsonl | messages {'2026-09-26': 15} | écritures ADR-0028/annexes {}
+
+C2 occurrences d'un jeton du titre dans les transcriptions (n ; dont à moins de 300 caractères de M009/p-hat) :
+  resultat_outil | 12 ; 2 | 2026-09-09T17:39:07.060Z -> 2026-09-25T17:29:34.138Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3.jsonl
+  texte_user | 14 ; 6 | 2026-09-17T13:41:34.224Z -> 2026-09-25T15:32:20.162Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3.jsonl
+  entree_outil | 12 ; 8 | 2026-09-17T13:48:15.462Z -> 2026-09-18T22:08:48.711Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3.jsonl
+  texte_assistant | 8 ; 6 | 2026-09-18T21:09:51.799Z -> 2026-09-18T21:34:12.765Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-aa404fa07d9c9cd52.jsonl
+  entree_outil | 2 ; 2 | 2026-09-18T21:16:35.193Z -> 2026-09-18T21:16:35.193Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-aa404fa07d9c9cd52.jsonl
+  resultat_outil | 16 ; 16 | 2026-09-18T21:42:23.142Z -> 2026-09-18T22:02:38.559Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-a5310587045f17a80.jsonl
+  texte_assistant | 2 ; 2 | 2026-09-18T22:05:17.388Z -> 2026-09-18T22:05:17.388Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-a5310587045f17a80.jsonl
+  resultat_outil | 4 ; 4 | 2026-09-18T22:11:56.076Z -> 2026-09-18T22:11:56.076Z | F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-abe5bb926883b9a33.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-19T12:51:06.899Z -> 2026-09-19T12:51:06.899Z | F--Monark\0b28054b-ca58-4cf1-820c-991d31d99595\subagents\agent-a05254da583c86d68.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-19T13:52:23.040Z -> 2026-09-19T13:52:23.040Z | F--Monark\0b28054b-ca58-4cf1-820c-991d31d99595\subagents\agent-a428d96546eacaca0.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-19T14:33:03.724Z -> 2026-09-19T14:33:03.724Z | F--Monark\0b28054b-ca58-4cf1-820c-991d31d99595\subagents\agent-a61a5a88ff8ecc005.jsonl
+  resultat_outil | 3 ; 3 | 2026-09-20T17:42:16.031Z -> 2026-09-20T17:42:16.031Z | F--Monark\a7659644-0519-4943-8b82-d50d7405fe34.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-21T21:17:07.245Z -> 2026-09-21T21:17:07.245Z | F--Monark\2e4b725b-0e5f-471f-bf29-d75a71aa0865\subagents\agent-a4bc1ae63b0c3b4fd.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-26T23:08:06.838Z -> 2026-09-26T23:08:06.838Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-a5e8d5a792dd41063.jsonl
+  resultat_outil | 2 ; 2 | 2026-09-26T23:08:07.387Z -> 2026-09-26T23:08:12.711Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-ab52ff810f814b1a2.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-26T23:10:12.283Z -> 2026-09-26T23:10:12.283Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-a854a603eab713ec5.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-26T23:12:11.654Z -> 2026-09-26T23:12:11.654Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-a46ba0ad9d25f399d.jsonl
+  entree_outil | 7 ; 3 | 2026-09-26T23:21:25.757Z -> 2026-09-26T23:24:49.344Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-a46ba0ad9d25f399d.jsonl
+  resultat_outil | 3 ; 1 | 2026-09-26T23:25:29.404Z -> 2026-09-26T23:25:29.404Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_b8214f4d-901\agent-ac29d688662c95b75.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-27T05:50:29.812Z -> 2026-09-27T05:50:29.812Z | F--Monark\e03dd7cc-4452-4c79-9aa6-58827dad4d19\subagents\workflows\wf_2c705d24-c49\agent-af31a71b166f2d76d.jsonl
+  resultat_outil | 1 ; 1 | 2026-09-29T14:56:40.544Z -> 2026-09-29T14:56:40.544Z | F--Shogen\ffc66d81-6b92-46c3-9c81-21981964f030\subagents\workflows\wf_5cfd7896-a93\agent-adf632be932312faa.jsonl
+  (lignes avec co-occurrence : 21 ; sans co-occurrence, non listées : 244 )
+
+C3 rôles des sous-agents nommés (type ; description tronquée) :
+  F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-a5310587045f17a80.jsonl | worker | G2 fraîche : lots P0-a + P0-b fusionnés
+  F--Shogen\90684fb2-4e7b-42e9-b820-f042dc4465f3\subagents\agent-abe5bb926883b9a33.jsonl | validateur-humain | Checkpoint-1 : ADR-M017 (P1, AttestedPrice dans le gate)
+  F--Shogen\ffc66d81-6b92-46c3-9c81-21981964f030\subagents\workflows\wf_5cfd7896-a93\agent-adf632be932312faa.jsonl | worker | carto:monark
+
+C4 fichiers (n ; dont à moins de 300 caractères de M009/p-hat) :
+  fichiers avec co-occurrence : 0 sur 3305
