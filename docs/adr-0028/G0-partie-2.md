@@ -166,3 +166,7 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
 ### B — clôture de l'étape, ajout daté du 2026-10-02 07:20 UTC
 
 - Étape B complète (B0 à B6b). **C3** porte en plus SHOGEN-CENSURE-CAUSES-TIERS-1 et SHOGEN-ENREG-AUTEUR-ECRITURE-1 (annexe B.24).
+
+### C — ajout daté du 2026-10-02 08:44 UTC (adjudication de C1 et C2, annexe B.25)
+
+- **C3** porte : enchaînement des sorties dans l'ordre de D.4 b, écrites dans un répertoire temporaire voisin renommé en une fois ; `--deviation <motif>` ; enregistrement d'oracle de rôle « rendu » (`paquet.sha256`, `sceau.genTime`, sha256 de chaque sortie ; SHOGEN-RENDU-T0-1) ; commande nommée `recalcul-tiers` (SHOGEN-RECALCUL-TIERS-CLI-1, SHOGEN-CENSURE-CAUSES-TIERS-1) ; refus d'un `auteur` hors liste à l'écriture (SHOGEN-ENREG-AUTEUR-ECRITURE-1) ; verdict de `records.verifier_raw` imprimé et enregistré sans fermer l'exécution (SHOGEN-RAW-FIN-1). Les sorties de D.4 b (J14 principal, J14 second, J28, sensibilités de la liste fermée) sont définies par ADR-0028 D2, D4 et D.4 b : le G1 les lit et les nomme avant de coder ; toute définition introuvable = question rendue.

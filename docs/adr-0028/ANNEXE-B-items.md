@@ -383,3 +383,15 @@ Réponses de l'orchestrateur : Q1 sous-lot B3 ; Q2 refus nommé sous filtre gard
 | SHOGEN-ENREG-AUTEUR-ECRITURE-1 | l'écriture d'un enregistrement accepte un `auteur` hors liste blanche (seul `--verifier` refuse) | orch. | sous-lot C3 | ≈ 5 lignes et un test [inféré] | G1 B-3, Q2 |
 
 Réponses de l'orchestrateur : Q1 liste blanche lue dans le lint courant (une seule source de vérité au moment de la vérification) ; Q2 oui, en C3 ; Q3 texte du PAQUET, schéma inchangé ; Q4 portée écrite au PAQUET, libellé inchangé.
+
+## B.25 Amendement daté du 2026-10-02 : partie 2, étape C, sous-lots C1 et C2 (journal `docs/G1-partie-2-etape-C-1.md` ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SCEAU-VERIFY-CHEMINS-1 | `make-tsq.sh` écrit le manifeste avec des chemins relatifs à la racine, l'étape (1) de `verify.sh` le relit depuis le dossier de sceau : « MANIFESTE : ÉCART » avant toute vérification du jeton (sonde du worker) ; `rendu_unique` n'en dépend pas | orch. | G0 du PAQUET (sceau préparé, partie 3) | ≈ 5 lignes et une sonde [inféré] | G1 C-1, L1 ; Q4 |
+| SHOGEN-RENDU-HOTE-1 | OpenSSL 3.5.7 et Windows non éprouvés ; format du fichier de sommes réel non lisible en cloud : lancer `rendu_unique` en refus sur l'hôte de l'exécution avant le scellement | orch. | avant le scellement (partie 3), sur l'hôte de l'exécution | une exécution en refus [inféré] | G1 C-1, L2, L3 |
+| SHOGEN-GO-ORDRE-1 | voie (b) : l'ordre des commits n'est pas contrôlé (seul l'ordre des lignes de `JOURNAL.md` à HEAD l'est ; sans réécriture d'historique, les deux concordent) ; la date portée par le fichier de go n'est pas confrontée au commit qui l'épingle | orch. | relecture G2 de la partie 2 | ≈ 15 lignes et deux tests [inféré] | G1 C-1, L4, L5 ; Q2, Q3 |
+| SHOGEN-RENDU-T0-1 | `verifier_gardes` ne rend ni T0 ni genTime, nécessaires à l'enregistrement d'oracle du rendu | orch. | sous-lot C3 | ≈ 10 lignes [inféré] | G1 C-1, L6 |
+| SHOGEN-RENDU-PYCACHE-1 | un `__pycache__` sur les chemins gardés fait refuser la garde (2) (serrage E3 : un `.pyc` périmé se charge même sous `-B`) : consigne d'exploitation (nettoyage avant l'exécution, `PYTHONDONTWRITEBYTECODE`) | orch. | texte de la procédure d'exécution (partie 4) | 3 lignes de texte [inféré] | G1 C-1, L7 |
+
+Réponses de l'orchestrateur : Q1 serrage E2 retenu (jeton lié à `PAQUET.sha256`) ; Q2 et Q3 en item (SHOGEN-GO-ORDRE-1) ; Q4 l'orchestrateur, au G0 du PAQUET ; Q5 interface `--sortie` gardée pour C3. Exposition déclarée par le worker : une ligne de préfixes de sha256 (admise par D.2 n° 7) et trois lignes de `docs/pocket-report/` affichées par un `grep`, sans conséquence de pré-enregistrement.
