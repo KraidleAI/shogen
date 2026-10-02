@@ -487,3 +487,17 @@ Décision de l'orchestrateur sur le constat 9 du cp-1 (marqueurs « [C-7] » et 
 **Contrôle FM-1.1** (script `fm11.py`, sha256 `886cc676…`, inchangé depuis B.32) : transcription finale du rédacteur (713 événements, sha256 `ec9727ca…`) et du validateur (211 événements, sha256 `0a9aeae5…`) : 0 fragment des lignes interdites (cartographie l.51, ADR-0025 l.14) dans les résultats et les entrées d'outils ; fichiers ouverts par `Read` : tous hors de D.2 ; noms de pièces de D.2 dans les entrées : usages déclarés (comptes `grep -c` sur leurs propres sorties, exclusions `git archive` à la source, sonde du bloc). Sorties `redacteur-final.json` (`a4ab03ce…`), `validateur-final.json` (`03e57a35…`).
 
 Ménage de l'orchestrateur : le bac à sable de vérification du rédacteur (`git archive` de HEAD, pièces de D.2 exclues à la source, avec une copie de `biblio/`, sources sous droits) est supprimé (17:1x UTC), comme au JOURNAL du 2026-09-30 06:5x UTC. Le rédacteur a lu l'état de la PR KraidleAI/shogen#1 par `gh` (lecture seule) pour contrôler C-7 : hors de ses commandes prescrites, sans effet.
+
+## B.34 Amendement daté du 2026-10-02 17:5x UTC : mesure de MONARK-S2-M009A-EXPOSITION-1 (après le scellement), à la demande de l'investisseur
+
+Faits mesurés par l'orchestrateur de la session cloud (noms de fichiers et historique git seulement, clones sans blobs, supprimés ensuite) :
+- dépôt public `KraidleAI/Monark` (25 commits, toutes branches, tête `8ca8a23`) : aucune des pièces de D.2 n° 2, à aucun moment de l'historique ;
+- dépôt **privé** `KraidleAI/monark-governance` (2 658 commits, tête `207f021`) : les pièces sont présentes sur `main` depuis le commit `aa04924` (2026-09-18T22:40:28+01:00, `measure-M009a.md` et `measure-m009a.mjs` ajoutés) ; ADR-M002 depuis `0f477ea` (2026-09-04), amendé jusqu'à `b78c603` (2026-09-20) ; auteurs des commits : comptes `Kraidle` (et `n3mo`, même adresse) et `Claude` ;
+- collaborateurs du dépôt privé (API GitHub) : **un seul**, `Kraidle`, administrateur ; aucun lecteur extérieur par GitHub ;
+- le **sujet du commit `aa04924` porte un taux estimé sur les traces S2** : tout affichage du journal git de ce dépôt l'expose (annexe D.1 n° 16 ; D.2 n° 12). L'orchestrateur cloud l'a vu en le mesurant (déviation déclarée, D2 pt 8 ; aucun effet sur le texte scellé ni sur la règle ; l'exécution unique est mécanique).
+
+Reste à mesurer pour clore l'item : (1) l'attestation de l'investisseur (lecture ou non des valeurs de `measure-M009a.md` ou d'ADR-M002 D6) ; (2) le balayage mécanique des transcriptions Claude du poste local (sessions qui ont lu ces fichiers ou affiché le sujet du commit `aa04924`), par un agent du poste, sans affichage de contenu.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-MONARK-SUJET-COMMIT-1 | le sujet du commit `aa04924` de `monark-governance` porte un taux estimé sur les traces S2 : lecture possible par tout affichage du journal git du dépôt ; mesurer quelles sessions l'ont affiché (balayage du poste local, motif de D.2 n° 12) | orch. (mesure) ; investisseur (balayage sur le poste) | avant l'exécution unique | un balayage mécanique [inféré] | mesure du 2026-10-02 ci-dessus |
