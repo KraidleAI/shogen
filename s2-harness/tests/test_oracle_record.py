@@ -1,0 +1,370 @@
+"""SHOGEN-ORACLE-ENREG-1 (G0-partie-2.md §B ; ADR-0028 D6 (viii), §1 bis.6) : tools/oracle_record.py sur dépôt
+git jetable (fixtures seulement, D.4 a ; variable scellée jamais posée). Attendus indépendants de l'outil : sha256
+des octets écrits par le test, sha complets de git rev-parse, liste fermée écrite à la main ; un mutant par test."""
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest import mock
+
+from tests.test_exclusion import HARNESS
+
+OUTIL = os.path.join(HARNESS, "tools", "oracle_record.py")
+_SPEC = importlib.util.spec_from_file_location("oracle_record", OUTIL)
+orc = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(orc)
+T = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):\n        pass\n"
+OK = {"s2-harness/tests/__init__.py": b"", "s2-harness/tests/test_t.py": T, "LISEZ-MOI": "dépôt jetable\n".encode()}
+KO = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"self.fail()")}
+LENT = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"__import__('time').sleep(20)")}
+SUITE = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
+SHA = "ab" * 32
+GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
+BANNI = "claude-opus-" + "5"                    # construit à l'exécution, comme dans le lint (aucun littéral)
+STUB = b"import sys\nprint('argv', sys.argv[1:])\n"    # tools/rendu_unique.py de fixture : imprime ses arguments
+
+
+def g(d: str, *args: str, entree: bytes = None) -> str:
+    """git sur le dépôt jetable d : identité de fixture, signature coupée, variables GIT_* retirées."""
+    return subprocess.run(["git", "-C", d, "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
+                           "commit.gpgsign=false", *args], input=entree, check=True, capture_output=True,
+                          env=GIT_ENV).stdout.decode().strip()
+
+
+def depot(d: str, commits):
+    """Dépôt git jetable : un commit par mapping {chemin : octets} ; rend les sha complets (git rev-parse HEAD)."""
+    os.makedirs(d)
+    g(d, "init", "-q")
+    g(d, "config", "core.autocrlf", "false")
+    for fichiers in commits:
+        for rel, octets in fichiers.items():
+            os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
+            with open(os.path.join(d, rel), "wb") as f:
+                f.write(octets)
+        g(d, "add", "-A"), g(d, "commit", "-q", "-m", "fixture")
+        yield g(d, "rev-parse", "HEAD")
+
+
+class TestOracleRecord(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.d = tempfile.mkdtemp(prefix="oracle_test_")
+        cls.depot, cls.sortie = os.path.join(cls.d, "depot"), os.path.join(cls.d, "sorties")
+        os.makedirs(cls.sortie)
+        cls.c1, cls.c2, cls.c3 = depot(cls.depot, [OK, KO, LENT])
+
+    def test_enregistrement_champs_et_sha(self):
+        """Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la
+        sortie, nom shogen-<sha court>-<rôle>-<date>-<pid>.json. Rougit si : autre commit extrait, sha d'un fichier
+        faux, commande hors liste, sortie non hachée, static_only vrai, variable non consignée ou tests comptés lancés
+        avec elle, exit faux, champ nul hors rendu rempli, env non consigné (PYTHONHASHSEED posé ; C-11, R17)."""
+        with mock.patch.dict(os.environ, {"PYTHONHASHSEED": "17"}):       # jamais la variable scellée
+            chemin, code = orc.enregistrer(self.sortie, "G2", "claude-opus-5-5", self.depot, self.c1[:10])
+        self.assertRegex(os.path.basename(chemin), rf"^shogen-{self.c1[:7]}-G2-\d{{8}}T\d{{6}}Z-\d+\.json$")
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        out = Path(self.sortie, rec["runs"][0]["sortie"]["chemin"]).read_bytes()
+        self.assertIn(b"test_a (tests.test_t.T.test_a) ... ok", out)
+        self.assertRegex(rec.pop("ecrit"), r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
+        self.assertEqual((code, rec), (0, {
+            "schema": "shogen.oracle-record.v1", "role": "G2", "auteur": "claude-opus-5-5", "base": None,
+            "tree": {"commit": self.c1, "extraction": f"git archive {self.c1}",
+                     "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())}},
+            "static_only": False, "served_from": None, "python": sys.version, "exit": 0,
+            "env": {"SHOGEN_S2_CAMPAGNE_CONTROL": None, "PYTHONHASHSEED": "17", "PYTHONPATH": os.environ.get(
+                "PYTHONPATH")},
+            "runs": [{"nom": "suite", "arbre": "s2-harness", "commande": SUITE, "exit": 0, "tests_avec_variable": [],
+                      "sortie": {"chemin": os.path.basename(chemin)[:-5] + ".0-suite.out",
+                                 "sha256": hashlib.sha256(out).hexdigest()}}],
+            "paquet": {"sha256": None}, "sceau": {"genTime": None}}))
+
+    def test_rendu_base_echec_et_refus(self):
+        """Rôle « rendu », commit dont le test échoue, base = premier commit : paquet.sha256 et genTime écrits, exit 1 ;
+        refus sans rien écrire : rendu sans paquet.sha256, paquet.sha256 ou genTime hors rendu, commande ou rôle hors
+        liste. Rougit si : exit forcé à 0, base non résolue, garde du rôle « rendu » retirée, liste fermée ouverte."""
+        chemin, code = orc.enregistrer(self.sortie, "rendu", "claude-opus-5-5", self.depot, self.c2, base=self.c1[:8],
+                                       paquet_sha256=SHA, sceau_gentime="2026-10-02T05:00:00Z")
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        self.assertEqual((code, rec["exit"], rec["runs"][0]["exit"], rec["base"], rec["paquet"], rec["sceau"]),
+                         (1, 1, 1, self.c1, {"sha256": SHA}, {"genTime": "2026-10-02T05:00:00Z"}))
+        avant = sorted(os.listdir(self.sortie))
+        for role, kw in (("rendu", {}), ("rendu", {"paquet_sha256": SHA[:-1]}), ("G2", {"paquet_sha256": SHA}),
+                         ("cp-2", {"sceau_gentime": "2026-10-02T05:00:00Z"}), ("G2", {"commandes": ("rapport",)}),
+                         ("G3", {}), ("G1", {"commandes": ()})):
+            with self.subTest(role=role, kw=kw), self.assertRaisesRegex(ValueError, r"— refus$"):
+                orc.enregistrer(self.sortie, role, "claude-opus-5-5", self.depot, self.c1, **kw)
+        self.assertEqual(sorted(os.listdir(self.sortie)), avant)
+
+    def test_consigne_et_tests_lances(self):
+        """Fonctions pures, sur un mapping (aucun processus ne reçoit la variable) et des sorties -v de 3.11 et 3.10.
+        Rougit si : variable absente non nulle ; valeur posée perdue ; docstring lue comme test ; id 3.10 incomplet."""
+        self.assertEqual(orc.consigne({"SHOGEN_S2_CAMPAGNE_CONTROL": "/chemin/fictif", "AUTRE": "x"}),
+                         {"SHOGEN_S2_CAMPAGNE_CONTROL": "/chemin/fictif", "PYTHONHASHSEED": None, "PYTHONPATH": None})
+        texte = ("test_a (tests.t.T.test_a)\nDoc (tests.t.T) ... ok\ntest_b (tests.t.T.test_b) ... skipped 'm'\n"
+                 "test_c (tests.t.U) ... ok\n")
+        self.assertEqual(orc.tests_lances(texte), ["tests.t.T.test_a", "tests.t.T.test_b", "tests.t.U.test_c"])
+
+    def test_verifier_un_refus_nomme_par_controle(self):
+        """Lecture : enregistrements conformes acceptés (G2, rendu à six runs écrits ici, served_from conforme), puis un
+        refus nommé par contrôle sur copie modifiée. Rougit si un contrôle manque ou se relâche : champs, schema, rôle,
+        tree.commit (sha complet exigé), static_only (false exact), exit (0 entier, chaque commande), sha256 et présence
+        de chaque sortie, paquet.sha256 et runs (suite puis D.4 b, dans l'ordre ; C-6) au rôle « rendu », champs nuls
+        hors rendu, served_from (sha, conformité du servi)."""
+        d, a = tempfile.mkdtemp(dir=self.d), "claude-opus-5-5"
+        g2, rendu1, ko = (orc.enregistrer(d, r, a, self.depot, c, **kw)[0] for r, c, kw in (
+            ("G2", self.c1, {}), ("rendu", self.c1, {"paquet_sha256": SHA}), ("G2", self.c2, {})))
+        sha = {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in (g2, ko)}
+
+        def copie(src, nom, f=None, **maj):
+            rec = json.loads(Path(src).read_text(encoding="utf-8"))
+            rec.update(maj)
+            f and f(rec)
+            Path(d, nom).write_text(json.dumps(rec), encoding="utf-8")
+            return os.path.join(d, nom)
+        six = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]    # C-6 : suite, puis D.4 b
+        for n in six:
+            Path(d, f"{n}.out").write_bytes(n.encode())
+        runs = [{"nom": n, "arbre": "s2-harness", "commande": [n], "exit": 0, "tests_avec_variable": [],
+                 "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(n.encode()).hexdigest()}} for n in six]
+        rendu = copie(rendu1, "rendu.json", runs=runs)
+        sert = {"chemin": os.path.basename(g2), "sha256": sha[g2]}
+        for chemin, role in ((g2, "G2"), (rendu, "rendu"), (copie(g2, "sert.json", served_from=sert), "G2")):
+            self.assertEqual(orc.verifier(chemin, role, self.c1)["tree"]["commit"], self.c1)
+        for controle, src, role, commit, f, maj in (
+                ("champs", g2, "G2", self.c1, lambda r: r.pop("ecrit"), {}),
+                ("champs", g2, "G2", self.c1, lambda r: r["runs"][0].pop("tests_avec_variable"), {}),
+                ("schema", g2, "G2", self.c1, None, {"schema": "shogen.oracle-record.v0"}),
+                ("rôle", g2, "cp-2", self.c1, None, {}), ("tree.commit", g2, "G2", self.c2, None, {}),
+                ("tree.commit", g2, "G2", self.c1[:7], None, {}),
+                ("static_only", g2, "G2", self.c1, None, {"static_only": 0}),
+                ("exit", ko, "G2", self.c2, None, {}), ("exit", g2, "G2", self.c1, None, {"exit": False}),
+                ("exit", g2, "G2", self.c1, lambda r: r["runs"][0].update(exit=1), {}),
+                ("exit", g2, "G2", self.c1, None, {"runs": []}),
+                ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(sha256="0" * 64), {}),
+                ("sortie", g2, "G2", self.c1, lambda r: r["runs"][0]["sortie"].update(chemin="absente.out"), {}),
+                ("paquet.sha256", rendu, "rendu", self.c1, lambda r: r["paquet"].update(sha256=SHA[:-1]), {}),
+                ("runs", rendu1, "rendu", self.c1, None, {}), ("runs", rendu, "rendu", self.c1,
+                                                               lambda r: r["runs"].reverse(), {}),
+                ("nuls hors rendu", g2, "G2", self.c1, lambda r: r["sceau"].update(genTime="2026-10-02T05:00Z"), {}),
+                ("served_from", g2, "G2", self.c1, None, {"served_from": {**sert, "sha256": "0" * 64}}),
+                ("served_from", g2, "G2", self.c1, None, {"served_from": {"chemin": ko, "sha256": sha[ko]}})):
+            with self.subTest(controle=controle, maj=maj):
+                with self.assertRaisesRegex(ValueError, rf"^refus \({controle}\) : "):
+                    orc.verifier(copie(src, f"mutant-{controle}.json", f, **maj), role, commit)
+
+    def test_cli_ecriture_verifier_et_git_dir_herite(self):
+        """CLI : écriture (rôle cp-2) sous un GIT_DIR hérité qui désigne un autre dépôt, --verifier conforme (code 0),
+        refus nommé (code 2) ; options d'écriture mêlées à --verifier refusées ; commit inconnu : code 2, rien d'écrit ;
+        commande en échec : code 1.
+        Rougit si : variables GIT_* héritées gardées (autre dépôt lu), code ou motif de refus perdus, mélange admis,
+        écriture sans --sortie admise."""
+        d, autre = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "autre")
+        list(depot(autre, [{"x": b"x"}]))
+
+        def cli(*args, **env):
+            return subprocess.run([sys.executable, "-B", OUTIL, *args], capture_output=True, text=True,
+                                  env={**os.environ, **env})
+        p = cli("--role", "cp-2", "--auteur", "claude-opus-5-5", "--depot", self.depot, "--commit", self.c1[:10],
+                "--sortie", d, GIT_DIR=os.path.join(autre, ".git"))
+        self.assertEqual(p.returncode, 0, p.stderr)
+        chemin, avant = p.stdout.strip(), sorted(os.listdir(d))
+        v, r, m = (cli("--verifier", chemin, "--role", "cp-2", *x) for x in (
+            ("--commit", self.c1), ("--commit", self.c2), ("--commit", self.c1, "--auteur", "claude-opus-5-5")))
+        self.assertEqual((v.returncode, v.stdout), (0, f"conforme : {chemin} (rôle cp-2, tree.commit {self.c1} ; "
+                                                       "tree.sha256 non recalculé : --depot absent)\n"))
+        self.assertEqual(r.returncode, 2)
+        self.assertRegex(r.stderr, r"^oracle_record : refus \(tree\.commit\) : ")
+        self.assertEqual((m.returncode, "--verifier" in m.stderr), (2, True))
+        s = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", self.c1)
+        self.assertEqual((s.returncode, "exige --auteur, --depot et --sortie" in s.stderr), (2, True))
+        a = ("--role", "G2", "--auteur", "claude-opus-5-5", "--depot", self.depot, "--sortie", d)
+        n = cli(*a, "--commit", "0" * 40)
+        self.assertEqual((n.returncode, sorted(os.listdir(d))), (2, avant))
+        k = cli(*a, "--commit", self.c2)
+        self.assertEqual((k.returncode, os.path.dirname(k.stdout.strip())), (1, d))
+
+    def test_collision_sans_ecrasement_et_lien_sortant(self):
+        """Même instant, même pid, même rôle et commit : la seconde écriture lève FileExistsError sans écraser la
+        sortie de la première ; commit qui porte un lien symbolique absolu (posé par la plomberie git, aucun lien sur
+        le disque) : refus nommé du filtre « data » de tarfile, rien d'écrit. Rougit si : sortie ouverte en
+        écrasement ; extraction sans filtre."""
+        d, lien = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "lien")
+        fixe = datetime(2026, 10, 2, 5, 0, tzinfo=timezone.utc)
+        with mock.patch.object(orc, "datetime", mock.Mock(now=lambda tz: fixe)):
+            chemin = orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c1)[0]
+            sortie = Path(d, json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]["sortie"]["chemin"])
+            sortie.write_bytes(sortie.read_bytes() + b"marque")
+            with self.assertRaises(FileExistsError):
+                orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c1)
+        self.assertTrue(sortie.read_bytes().endswith(b"marque"))
+        list(depot(lien, [{"x": b"x"}]))
+        blob = g(lien, "hash-object", "-w", "--stdin", entree=b"/inexistant-shogen")
+        g(lien, "update-index", "--add", "--cacheinfo", f"120000,{blob},lien")
+        g(lien, "commit", "-q", "-m", "lien")
+        avant = sorted(os.listdir(d))
+        with self.assertRaisesRegex(ValueError, r"filtre data .* — refus$"):
+            orc.enregistrer(d, "G2", "claude-opus-5-5", lien, "HEAD")
+        self.assertEqual(sorted(os.listdir(d)), avant)
+
+    def copie(self, d: str, src: str, nom: str, f) -> str:
+        """Copie de l'enregistrement `src` modifiée par f(rec), écrite dans d sous `nom` (sorties relatives
+        intactes)."""
+        rec = json.loads(Path(src).read_text(encoding="utf-8"))
+        f(rec)
+        Path(d, nom).write_text(json.dumps(rec), encoding="utf-8")
+        return os.path.join(d, nom)
+
+    def test_verifier_auteur_liste_blanche_du_lint(self):
+        """SHOGEN-ENREG-VERIF-1 (i) : auteur égal à un identifiant de la liste blanche (oracle : celle qu'imprime le
+        lint d'épinglage lui-même), ou à cet identifiant suivi exactement de « [1m] » ; toute autre forme : refus
+        (auteur). Liste lue dans le lint : un lint de fixture qui en porte une autre la remplace ; ligne ALLOWED répétée
+        ou lint absent : refus. Rougit si : préfixe, casse, autre suffixe ou blancs admis ; [1m] refusé ; liste
+        recopiée dans l'outil ; première de deux lignes ALLOWED lue ; contrôle absent."""
+        d, bash = tempfile.mkdtemp(dir=self.d), shutil.which("bash")    # PATH (CreateProcess lirait System32 d'abord)
+        self.assertTrue(bash and os.path.isfile(LINT), f"bash ({bash}) ou lint d'épinglage ({LINT}) absent")
+        os.makedirs(os.path.join(d, "arbre", ".claude", "agents"))
+        Path(d, "arbre", ".claude", "agents", "a.md").write_text("---\nmodel: opus\n---\n", encoding="utf-8")
+        refus = subprocess.run([bash, LINT, os.path.join(d, "arbre")], capture_output=True, text=True).stderr
+        admis = re.search(r"liste blanche : (.+) \(R-1\)\.$", refus, re.M).group(1).split()
+        x, g2 = admis[0], orc.enregistrer(d, "G2", admis[0], self.depot, self.c1)[0]
+
+        def auteur(a, ok, nom="a.json"):
+            p = self.copie(d, g2, nom, lambda r: r.update(auteur=a))
+            if ok:
+                return self.assertEqual(orc.verifier(p, "G2", self.c1)["auteur"], a)
+            with self.assertRaisesRegex(ValueError, r"^refus \(auteur\) : "):
+                orc.verifier(p, "G2", self.c1)
+        for a in [*admis, *(y + "[1m]" for y in admis)]:
+            auteur(a, True)
+        for a in (BANNI, BANNI + "[1m]", "opus", x + "x", x[:-1], x.upper(), x + "[1M]", x + "[2m]", x + "[1m][1m]",
+                  " " + x, x + " ", "[1m]", None, 5):
+            with self.subTest(auteur=a):
+                auteur(a, False)
+        faux = os.path.join(d, "lint.sh")
+        for contenu, a, ok in (("# ALLOWED='en-commentaire'\nALLOWED='modele-fixture-1'\n", "modele-fixture-1", True),
+                               ("ALLOWED='modele-fixture-1'\n", x, False),
+                               ("ALLOWED='modele-fixture-1'\nALLOWED='modele-fixture-1'\n", "modele-fixture-1", False),
+                               (None, x, False)):
+            Path(faux).write_text(contenu, encoding="utf-8") if contenu else Path(faux).unlink(missing_ok=True)
+            with self.subTest(lint=contenu, auteur=a), mock.patch.object(orc, "LINT", faux):
+                auteur(a, ok)
+
+    def test_verifier_depot_recalcule_tree_sha256(self):
+        """SHOGEN-ENREG-VERIF-1 (ii) : avec --depot, tree.commit ré-extrait et tree.sha256 égal par fichier (attendu :
+        sha256 des octets du test) ; refus (tree.sha256) sur un sha changé, un fichier en trop ou en moins, un dépôt
+        sans le commit ; servi contrôlé au même dépôt (refus served_from) ; sans --depot, ces copies passent et la CLI
+        dit « non recalculé ». Rougit si : --depot ignoré ; clés seules, ou valeurs communes seules, comparées ; autre
+        commit ré-extrait ; servi non recalculé ; ré-extraction impossible admise ; option non transmise par la CLI."""
+        d, autre = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "autre-depot")
+        list(depot(autre, [{"x": b"x"}]))
+        g2 = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(g2, "G2", self.c1, self.depot)["tree"]["sha256"],
+                         {k: hashlib.sha256(v).hexdigest() for k, v in OK.items()})
+        for i, f in enumerate((lambda t: t.update({"LISEZ-MOI": "0" * 64}), lambda t: t.update({"en-trop": "0" * 64}),
+                               lambda t: t.pop("LISEZ-MOI"))):
+            p = self.copie(d, g2, f"arbre-{i}.json", lambda r: f(r["tree"]["sha256"]))
+            self.assertEqual(orc.verifier(p, "G2", self.c1)["tree"]["commit"], self.c1)
+            with self.subTest(i=i), self.assertRaisesRegex(ValueError, r"^refus \(tree\.sha256\) : "):
+                orc.verifier(p, "G2", self.c1, self.depot)
+        with self.assertRaisesRegex(ValueError, r"^refus \(tree\.sha256\) : .*ré-extraction impossible"):
+            orc.verifier(g2, "G2", self.c1, autre)
+        sert = {"chemin": "arbre-0.json", "sha256": hashlib.sha256(Path(d, "arbre-0.json").read_bytes()).hexdigest()}
+        p = self.copie(d, g2, "sert.json", lambda r: r.update(served_from=sert))
+        self.assertEqual(orc.verifier(p, "G2", self.c1)["served_from"], sert)
+        with self.assertRaisesRegex(ValueError, r"^refus \(served_from\) : .*refus \(tree\.sha256\)"):
+            orc.verifier(p, "G2", self.c1, self.depot)
+        for x, code, sortie in ((g2, 0, f"conforme : {g2} (rôle G2, tree.commit {self.c1} ; tree.sha256 recalculé sur "
+                                       f"{self.depot})\n"), (Path(d, "arbre-0.json"), 2, "")):
+            v = subprocess.run([sys.executable, "-B", OUTIL, "--verifier", x, "--role", "G2", "--commit", self.c1,
+                                "--depot", self.depot], capture_output=True, text=True)
+            self.assertEqual((v.returncode, v.stdout, "refus (tree.sha256)" in v.stderr), (code, sortie, code == 2))
+
+    def test_delai_depasse_exit_non_nul_enregistrement_ecrit(self):
+        """SHOGEN-ENREG-VERIF-1 (iii) : test qui dort 20 s sous un délai de 1 s : commande arrêtée, exit 124 consigné
+        dans le run, ligne de dépassement en fin de sortie hachée, enregistrement écrit (exit 1), refus (exit) à la
+        lecture ; délai par défaut déclaré (3 600 s) appliqué sans argument ; délai nul, négatif, infini ou NaN refusé
+        sans rien écrire ; CLI --delai, refusé avec --verifier. Rougit si : aucun délai, ou défaut non appliqué ;
+        dépassement consigné 0 ; enregistrement non écrit ; ligne absente ; option non transmise, ou admise en
+        lecture."""
+        d = tempfile.mkdtemp(dir=self.d)
+        self.assertEqual((orc.DELAI_DEFAUT, orc.EXIT_DELAI), (3600, 124))
+        chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c3, delai=1)
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        out = Path(d, rec["runs"][0]["sortie"]["chemin"]).read_bytes()
+        self.assertEqual((code, rec["exit"], rec["runs"][0]["exit"], rec["runs"][0]["sortie"]["sha256"]),
+                         (1, 1, 124, hashlib.sha256(out).hexdigest()))
+        self.assertTrue(out.endswith("\n[oracle_record] délai maximal de 1 s dépassé : commande arrêtée, exit 124\n"
+                                     .encode()), out[-200:])
+        with self.assertRaisesRegex(ValueError, r"^refus \(exit\) : "):
+            orc.verifier(chemin, "G2", self.c3)
+        with mock.patch.object(orc, "DELAI_DEFAUT", 1):
+            chemin = orc.enregistrer(d, "G1", "claude-opus-5-5", self.depot, self.c3)[0]
+        self.assertEqual(json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
+        avant = sorted(os.listdir(d))
+        for x in (0, -1, float("inf"), float("nan")):
+            with self.subTest(delai=x), self.assertRaisesRegex(ValueError, r"— refus$"):
+                orc.enregistrer(d, "cp-2", "claude-opus-5-5", self.depot, self.c1, delai=x)
+        self.assertEqual(sorted(os.listdir(d)), avant)
+        p, m = (subprocess.run([sys.executable, "-B", OUTIL, *a, "--role", "cp-2", "--commit", self.c3, "--delai", "1"],
+                               capture_output=True, text=True) for a in (
+            ("--auteur", "claude-opus-5-5", "--depot", self.depot, "--sortie", d), ("--verifier", chemin)))
+        self.assertEqual((p.returncode, m.returncode, "--verifier" in m.stderr), (1, 2, True))
+        self.assertEqual(json.loads(Path(p.stdout.strip()).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
+
+
+    def test_auteur_refuse_a_l_ecriture(self):
+        """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu
+        ou suivi de [1m] ; tier nu ; casse ; autre suffixe ; blanc ; non-chaîne) : refus avant tout git et toute
+        commande, rien d'écrit ; identifiant admis suivi de [1m] : écrit et conforme ; CLI : code 2, rien d'écrit.
+        Rougit si : contrôle absent à l'écriture ou placé après git, prédicat autre que celui de --verifier."""
+        d, x = tempfile.mkdtemp(dir=self.d), "claude-opus-5-5"
+        with mock.patch.object(orc, "git", side_effect=AssertionError("git lancé avant le refus")):
+            for a in (BANNI, BANNI + "[1m]", "opus", x.upper(), x + "[2m]", " " + x, None, 5):
+                with self.subTest(auteur=a), self.assertRaisesRegex(ValueError, r"— refus$"):
+                    orc.enregistrer(d, "G2", a, self.depot, self.c1)
+        self.assertEqual(os.listdir(d), [])
+        p = subprocess.run([sys.executable, "-B", OUTIL, "--role", "G2", "--auteur", BANNI, "--depot", self.depot,
+                            "--commit", self.c1, "--sortie", d], capture_output=True, text=True)
+        self.assertEqual((p.returncode, "auteur" in p.stderr, os.listdir(d)), (2, True, []))
+        chemin = orc.enregistrer(d, "G2", x + "[1m]", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(chemin, "G2", self.c1)["auteur"], x + "[1m]")
+
+    def test_journaux_substitues_et_arret_au_premier_echec(self):
+        """G0 §C (Q5, Q8) : le marqueur JOURNAUX d'une commande de la liste fermée est remplacé par le chemin absolu du
+        dossier des journaux (chemin relatif rendu absolu), consigné dans « commande » et reçu par la commande ; sans
+        dossier : refus avant toute écriture. Arrêt au premier échec : run en échec, les suivants ne sont pas lancés ;
+        sans l'option, ou sans échec, tous le sont. Rougit si : marqueur non remplacé, chemin relatif laissé, dossier
+        absent admis, arrêt absent ou inconditionnel."""
+        d, jx, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-essai")
+        ok, ko = depot(dep, [{**x, "s2-harness/tools/rendu_unique.py": STUB} for x in (OK, KO)])
+        essai = ["-B", "tools/rendu_unique.py", "--produire", "essai", "--journaux"]
+        with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", essai + [orc.JOURNAUX])}):
+            with self.assertRaisesRegex(ValueError, r"— refus$"):
+                orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, commandes=("essai",))
+            self.assertEqual(os.listdir(d), [])
+            chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, commandes=("essai",),
+                                           journaux=os.path.relpath(jx))
+            run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
+            self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
+                             (0, [sys.executable, *essai, jx], f"argv {essai[2:] + [jx]}\n"))
+            for commit, arret, noms in ((ko, True, ["suite"]), (ko, False, ["suite", "essai"]),
+                                        (ok, True, ["suite", "essai"])):
+                chemin = orc.enregistrer(tempfile.mkdtemp(dir=self.d), "cp-2", "claude-opus-5-5", dep, commit,
+                                         ("suite", "essai"), journaux=jx, arret_premier_echec=arret)[0]
+                with self.subTest(commit=commit, arret=arret):
+                    self.assertEqual([r["nom"] for r in json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"]],
+                                     noms)
+
+
+if __name__ == "__main__":
+    unittest.main()

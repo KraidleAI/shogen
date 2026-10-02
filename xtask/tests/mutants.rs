@@ -386,8 +386,10 @@ fn mutant_sg2_manifeste_illisible_par_la_gate() {
 // ---------------------------------------------------------------------------
 
 /// Construit l'arbre documentaire synthétique conforme : docs/ (registre 09
-/// présent + une note propre), JOURNAL.md valide, biblio/INDEX.md dont
-/// l'en-tête et les mentions concordent avec deux artefacts présents.
+/// présent + une note propre), s2-harness/ (un README propre — périmètre de
+/// S-G4/S-G5 depuis SHOGEN-ORACLE-PERIMETRE-1 (i)), JOURNAL.md valide,
+/// biblio/INDEX.md dont l'en-tête et les mentions concordent avec deux
+/// artefacts présents.
 fn arbre_documentaire(nom_du_cas: &str) -> PathBuf {
     let racine = std::env::temp_dir().join(format!("shogen-mutant-doc-{nom_du_cas}"));
     let _ = std::fs::remove_dir_all(&racine);
@@ -403,6 +405,16 @@ fn arbre_documentaire(nom_du_cas: &str) -> PathBuf {
             "# note synthétique\n\n",
             "Le registre interdit « donnée vérifiée » — la locution est ici en\n",
             "citation marquée et la voix du projet reste propre.\n\n",
+            "Une citation adossée : « this quotation is present in the corpus and\n",
+            "it is checked by the gate ».\n",
+        ),
+    );
+    ecrire(
+        &racine,
+        "s2-harness/README.md",
+        concat!(
+            "# harnais synthétique\n\n",
+            "Le harnais nomme « donnée vérifiée » en citation marquée.\n\n",
             "Une citation adossée : « this quotation is present in the corpus and\n",
             "it is checked by the gate ».\n",
         ),
@@ -454,12 +466,13 @@ fn gates_documentaires(racine: &Path) -> Vec<Rapport> {
 #[test]
 fn temoin_arbre_documentaire_intact_est_vert() {
     let racine = arbre_documentaire("temoin");
-    for rapport in gates_documentaires(&racine) {
+    let rapports = gates_documentaires(&racine);
+    for rapport in &rapports {
         assert!(
             rapport.vert(),
             "l'arbre documentaire intact devrait être VERT sur {} :\n{}",
             rapport.gate,
-            motifs(&rapport)
+            motifs(rapport)
         );
         assert_eq!(
             rapport.examines, rapport.presents,
@@ -467,6 +480,15 @@ fn temoin_arbre_documentaire_intact_est_vert() {
             rapport.gate, rapport.examines, rapport.presents
         );
         assert!(rapport.presents > 0, "{} : rien d'examiné", rapport.gate);
+    }
+    // Vert pour la bonne raison : le README synthétique du harnais est
+    // recensé et sa couverture imprimée, pas ignoré.
+    for gate in ["S-G4", "S-G5"] {
+        let couverts = rapport_de(&rapports, gate).chemins_couverts.join("\n");
+        assert!(
+            couverts.contains("s2-harness/**/*.md : 1 fichier(s)"),
+            "{gate} doit imprimer la couverture de s2-harness/ ; chemins :\n{couverts}"
+        );
     }
 }
 
@@ -504,6 +526,59 @@ fn mutant_sg5_citation_hors_corpus() {
     );
     let rapports = gates_documentaires(&racine);
     exiger_rouge(rapport_de(&rapports, "S-G5"), "citation introuvable");
+}
+
+// SHOGEN-ORACLE-PERIMETRE-1 (i) (ADR-0028 annexe B) : README et RUNBOOK de
+// `s2-harness/` entrent au périmètre de S-G4 et S-G5. Chaque mutant exige le
+// ROUGE pour le motif attendu ET situé dans le harnais.
+fn exiger_rouge_dans_le_harnais(rapport: &Rapport, attendu: &str) {
+    exiger_rouge(rapport, attendu);
+    let motifs = motifs(rapport);
+    assert!(
+        motifs.contains("s2-harness/README.md:"),
+        "{} : la violation doit être située dans le harnais ; motifs :\n{motifs}",
+        rapport.gate
+    );
+}
+
+#[test]
+fn mutant_sg4_locution_interdite_dans_le_harnais() {
+    let racine = arbre_documentaire("sg4-harnais");
+    ajouter(
+        &racine,
+        "s2-harness/README.md",
+        "\nCette donnée vérifiée fonde le verdict du harnais.\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge_dans_le_harnais(rapport_de(&rapports, "S-G4"), "« donnée vérifiée »");
+}
+
+#[test]
+fn mutant_sg5_citation_hors_corpus_dans_le_harnais() {
+    let racine = arbre_documentaire("sg5-harnais");
+    ajouter(
+        &racine,
+        "s2-harness/README.md",
+        "\nUne citation forgée : « this sentence is not in the corpus and it\nmust be caught in the harness ».\n",
+    );
+    let rapports = gates_documentaires(&racine);
+    exiger_rouge_dans_le_harnais(rapport_de(&rapports, "S-G5"), "citation introuvable");
+}
+
+/// Le refus sur répertoire absent tient pour le chemin neuf : supprimer
+/// `s2-harness/` ne fait pas disparaître sa couverture, il rend les deux
+/// gates ROUGES (même doctrine que `mutant_couverture_repertoire_de_role_supprime`).
+#[test]
+fn mutant_couverture_harnais_supprime() {
+    let racine = arbre_documentaire("couverture-harnais");
+    std::fs::remove_dir_all(racine.join("s2-harness")).expect("suppression du harnais synthétique");
+    let rapports = gates_documentaires(&racine);
+    for gate in ["S-G4", "S-G5"] {
+        exiger_rouge(
+            rapport_de(&rapports, gate),
+            "répertoire absent ou illisible : s2-harness",
+        );
+    }
 }
 
 #[test]

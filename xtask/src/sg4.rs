@@ -17,7 +17,9 @@
 //!
 //! Périmètre : `docs/**/*.md`, **hors `docs/09-vocabulaire.md`** — le
 //! registre qui énonce les interdits ne peut pas être scanné contre
-//! lui-même (sa section « héritées » nomme les mots hors guillemets).
+//! lui-même (sa section « héritées » nomme les mots hors guillemets) —, puis
+//! `s2-harness/**/*.md` sans exclusion (depuis le 2026-10-02 : README et
+//! RUNBOOK du harnais, SHOGEN-ORACLE-PERIMETRE-1 (i), ADR-0028 annexe B).
 
 use crate::documents::{fichiers_markdown, prose_hors_citations};
 use crate::rapport::{Rapport, lire};
@@ -93,23 +95,34 @@ pub const LOCUTIONS_INTERDITES: &[(&str, &str)] = &[
     ),
 ];
 
+/// Les arbres du périmètre, en chemins exacts et dans cet ordre. Chacun est
+/// recensé par `fichiers_markdown` : absent ou sans `.md`, il est un incident,
+/// jamais un ensemble vide. S-G5 lit cette même liste : un seul périmètre
+/// pour les deux gates.
+pub const PERIMETRE: &[&str] = &["docs", "s2-harness"];
+
 pub fn executer(racine: &Path) -> Rapport {
     let mut rapport = Rapport::nouveau("S-G4", "vocabulary (registre 09 mécanisé, voix du projet)");
-    rapport.chemins_couverts.push(String::from(
-        "docs/**/*.md (hors docs/09-vocabulaire.md — le registre lui-même)",
-    ));
-
-    let recensement = fichiers_markdown(racine, "docs");
-    for incident in &recensement.incidents {
-        rapport.incident(incident.clone());
-    }
-
     let registre = racine.join(REGISTRE);
-    let a_examiner: Vec<_> = recensement
-        .fichiers
-        .iter()
-        .filter(|chemin| **chemin != registre)
-        .collect();
+    let mut a_examiner = Vec::new();
+    for relatif in PERIMETRE {
+        let recensement = fichiers_markdown(racine, relatif);
+        for incident in recensement.incidents {
+            rapport.incident(incident);
+        }
+        let retenus: Vec<_> = recensement
+            .fichiers
+            .into_iter()
+            .filter(|chemin| *chemin != registre)
+            .collect();
+        rapport
+            .chemins_couverts
+            .push(format!("{relatif}/**/*.md : {} fichier(s)", retenus.len()));
+        a_examiner.extend(retenus);
+    }
+    rapport.chemins_couverts.push(format!(
+        "hors {REGISTRE} — le registre lui-même, seule exclusion du périmètre"
+    ));
     rapport.presents = a_examiner.len();
     if !registre.is_file() {
         rapport.incident(format!(
@@ -117,7 +130,7 @@ pub fn executer(racine: &Path) -> Rapport {
         ));
     }
 
-    for chemin in a_examiner {
+    for chemin in &a_examiner {
         let Some(texte) = lire(&mut rapport, racine, chemin) else {
             continue;
         };

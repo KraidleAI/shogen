@@ -323,3 +323,116 @@ Item de la revue G2 de D5-AMEND (Q-G2-3), formé par la revue et ratifié par l'
 | item | objet et construction | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-SENS-PERTES-2 | [SENSIBILITÉ] imprime les enregistrements PRÉSENTS retirés par la plage (C-12) ; les fenêtres de grille sans marqueur dans une plage D5 et les lectures absentes des fenêtres de la plage ne sont comptées nulle part (SHOGEN-DP-JOURNAL-LOSS-1 dit « pertes du journal dans la plage »). Construction : par plage, `fenetres_sautees(ws_tous, spec, w, (a, b + 1), ())` par strate, et lectures absentes = somme sur les fenêtres de la plage ayant un marqueur de |pool_s| moins les lectures présentes, imprimées à côté des comptes actuels | orch. | G0 de RENDU-1 (partie 2) | ≈ 10 lignes de code et 20 de tests [inféré, revue G2] | revue G2 de D5-AMEND, Q-G2-3 |
+
+## B.20 Amendement daté du 2026-10-02 : partie 2, lot P0 (rapport G1 §6 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PERIMETRE-DISQUE-1 | S-G4 et S-G5 recensent le disque, pas l'index git : un `.md` non suivi sous `docs/` ou `s2-harness/` (dont `s2-harness/data/`, ignoré par `.gitignore` l.38) entre au périmètre ; sous l'annexe D, S-G4 imprime la ligne fautive et S-G5 chaque fragment non contrôlé, d'où un risque d'exposition de lignes de campagne dans une sortie `verify` lue par un agent frais (FM-1.1). Construction : (a) sur le poste local, avant le premier `verify` qui suit P0, comparer `find s2-harness -name '*.md'` et `git ls-files s2-harness` par compte seulement ; (b) recensement par l'index git : décision d'ADR, non prise | orch. | (a) premier `xtask verify` sur le poste local après P0 ; (b) G0 de la partie 3 | (a) une commande ; (b) ≈ 20 lignes [inféré] | rapport G1 de P0, L-1 ; G0 de P0, risque (b) |
+
+Réponses de l'orchestrateur au rapport G1 de P0 : Q-1 `PERIMETRE` reste dans `sg4.rs` ; Q-2 changement du chemin d'erreur de S-G5 accepté (couverture « 0 sur N », verdict ROUGE inchangé) ; Q-3 `docs/DEVOPS.md` §3 amendé au commit de P0 ; Q-4 item ci-dessus ; Q-5 tests ajoutés au-delà du G0 gardés (resserrages). L-3 (aucun fragment de `s2-harness/` au-dessus du seuil de S-G5) : constat, sans item neuf (SHOGEN-E1-XTASK-REFS-1 couvre les angles morts).
+
+## B.21 Amendement daté du 2026-10-02 : partie 2, étape A (journal `docs/G1-partie-2-etape-A.md` §5 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-DECIMAL-ARRONDI-2 | l'arrondi ambiant reste hérité hors de `r1.py` : `lm.py` (3 sites), `r2.py` (10), `report.py` (1, écart de z), `closure.py` (1, quarantaine) ; rendu J2 sous `ROUND_DOWN` : 4 lignes du bloc 4 changent encore. Construction : celle de DECIMAL-ARRONDI-1 étendue à ces sites, ou contexte nommé unique (voir DECIMAL-CONTEXTE-1) | orch. | G0 de l'étape B (partie 2), avant le scellement | ≈ 20 lignes et un test [inféré] | G1 étape A, L1 |
+| SHOGEN-DECIMAL-CONTEXTE-1 | `localcontext()` copie aussi Emin, Emax, pièges, clamp et capitals de l'appelant : `_median([1E-75, 3E-75])` rend `0E-69` sous Emin −20 (sous-dépassement silencieux). Construction : un contexte nommé complet (prec, rounding, Emin, Emax, traps, clamp) utilisé par tout le chemin de recalcul | orch. | G0 de l'étape B (partie 2), avec DECIMAL-ARRONDI-2 | ≈ 15 lignes et un test [inféré] | G1 étape A, L2 |
+| SHOGEN-AXES-SIGMA-NUL-1 | `axes_evaluables` marque « staleness » évaluable pour une source porteuse de `source_ts` dont le σ de classe est None, ce que `classify_ecart` n'évalue pas ; l'énoncé (b) en hérite ; sans effet en production (σ None seulement pour `sans_horodatage`, classe sans `source_ts`, `sources.py` l.301-304) | orch. | premier G0 qui touche `axes_evaluables` ou `classify_ecart` ; au plus tard, limite écrite au paquet (partie 3) | ≈ 5 lignes et un test [inféré] | G1 étape A, L3 |
+| SHOGEN-SIM-R1-DERIVE-1 | la réplique `sim_niveau_calc.poisson_binomial` est ancrée à `r1` de `f5b8269` (`R1_BLOB`) et ne le suit plus au 50e chiffre après A1 ; valeurs de la règle inchangées (16 fixtures, identité à l'octet). Construction : rejouer l'oracle (4) contre `r1` à la tête de la partie 2 et écrire au paquet le blob de `r1` contre lequel SIM-NIVEAU a été mesuré | orch. | revue de partie 2 (rejeu), puis G0 du PAQUET (texte) | une commande et deux lignes de texte [inféré] | G1 étape A, tuyau SIM-NIVEAU |
+| SHOGEN-SENS-PLAGES-2 | sous plusieurs plages, les lignes de week-end disent encore « retirées par la plage » et « retirés en totalité par la plage » au singulier | orch. | relecture G2 de la partie 2 | ≈ 3 lignes et une re-capture [inféré] | G1 étape A, Q2 |
+
+Réponses de l'orchestrateur : Q1 coupe au segment gardée ; Q3 écart 2 (entiers des p̂ᵢ publiés) et constante `AX` de `test_critere` acceptés (énoncé de la construction (b), B.18 ; valeurs de la règle inchangées).
+
+## B.22 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B0 à B2 (journal `docs/G1-partie-2-etape-B-1.md` §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-FMT-CONTEXTE-1 | `str()` et `_fmt_dec` suivent `capitals` de l'appelant (`2E-75` écrit `2e-75` sous `capitals = 0`). Construction : `_fmt_dec` écrit sous `CONTEXTE_DECIMAL` | orch. | sous-lot B3 (partie 2) | ≈ 3 lignes et un test [inféré] | G1 B-1, L1 ; Q1 |
+| SHOGEN-CLOSURE-CONTEXTE-1 | le `localcontext` de `closure.py` (quarantaine) copie le contexte de l'appelant | orch. | tout G0 qui promeut la collecte (D6 vi) | ≈ 2 lignes [inféré] | G1 B-1, L2 |
+| SHOGEN-BLOC6-TS-NUM-1 | la ligne « sans ts » du bloc 6 ne compte que les relevés retenus des hôtes du pool ; un `ts` présent mais non numérique n'est pas traité | orch. | relecture G2 de la partie 2 | ≈ 5 lignes et un test [inféré] | G1 B-1, L4 |
+| SHOGEN-RAW-FIN-1 | l'oracle `raw.jsonl` refuse sur une lecture finale sans contrepartie (dernière ligne tronquée, arrêt entre les deux écritures du collecteur) ; verdict sur les journaux scellés inconnu (D.4 a). **Décision** : l'oracle reste strict ; l'exécution unique imprime et enregistre son verdict sans qu'il ferme l'exécution (la liste des gardes de D.4 b est fermée) ; conduite écrite au paquet | orch. | G0 du PAQUET (texte) ; exécution unique (verdict) | 0 ligne de code ; ≈ 3 lignes de texte [inféré] | G1 B-1, L5 ; Q3, Q5 |
+| SHOGEN-RAW-REDECODAGE-1 | l'oracle recalcule le sha256 des octets, pas le prix décodé (parseurs de `sources`, quarantaine) : la promesse de `journal.py` n'est tenue que pour l'intégrité des octets. SHOGEN-RAW-LECTEUR-1 est **fermé** sur l'oracle sha256 | orch. | tout G0 qui promeut la collecte ou `sources` | ≈ 40 lignes [inféré] | G1 B-1, L6 ; Q4 |
+| SHOGEN-RAW-MEMOIRE-1 | le lecteur charge le fichier entier ; mémoire non mesurée sur un `raw.jsonl` de campagne (D.4 a) | orch. | exécution unique (partie 4, poste de l'exécution : taille du fichier lue avant) | une mesure [inféré] | G1 B-1, L8 |
+| SHOGEN-CONTEXTE-MUTABLE-1 | `r1.CONTEXTE_DECIMAL` est un objet modifiable ; le test 1 fige ses valeurs | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 B-1, L9 |
+
+Réponses de l'orchestrateur : Q1 sous-lot B3 ; Q2 refus nommé sous filtre gardé (refus par défaut) ; Q3 strict ; Q4 oracle sha256 suffisant, redécodage en item ; Q5 appelant = exécution unique (étape C), verdict imprimé et enregistré. L3 (mutant équivalent) : constat, sans item.
+
+## B.23 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B3 à B5 (journal `docs/G1-partie-2-etape-B-2.md` §4, §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RECALCUL-TIERS-CLI-1 | s_s et les bornes de censure n'entrent dans l'enregistrement d'oracle que par une commande nommée du recalcul tiers, absente. Construction : commande `recalcul-tiers` (JSON de `recompute_from_journal` et `recompute_d5_from_journal` par sortie) dans la liste fermée | orch. | sous-lot C3 (partie 2) | ≈ 50 lignes [inféré] | G1 B-2, L1 ; Q2 |
+| SHOGEN-ENREG-VERIF-1 | `--verifier` ne contrôle ni `auteur` (SHOGEN-R1-FORME-RESOLUE-1 : égalité exacte avec un identifiant de la liste blanche de `enforcement/lint-model-pinning.sh`, ou cet identifiant suivi de `[1m]`) ni `tree.sha256` (option `--depot` : ré-extraction et égalité) ; les commandes n'ont pas de délai maximal | orch. | sous-lot B6 (partie 2) | ≈ 60 lignes [inféré] | G1 B-2, L2, L6, L7 ; Q3, Q5 |
+| SHOGEN-ENREG-VARIABLE-1 | la branche « variable posée » de l'enregistreur n'est testée que sur des fonctions pures ; `tests_avec_variable` dépend du format de `unittest -v` (sous-déclaration silencieuse possible) | orch. | exécution unique (partie 4 : premier enregistrement réel sous la variable, relu) | une relecture [inféré] | G1 B-2, L3, L4 |
+| SHOGEN-ENREG-EOL-1 | `tree.sha256` dépend de la configuration de fin de ligne du poste sans attribut `eol` ; le dépôt fixe LF par `.gitattributes` | orch. | relecture G2 de la partie 2 (vérifier la couverture de `.gitattributes` sur `s2-harness/`) | une lecture [inféré] | G1 B-2, L5 |
+| SHOGEN-CAPITALS-REPORT-1 | écritures de valeurs de `report.py` hors `_fmt_dec` non auditées pour `capitals` | orch. | relecture G2 de la partie 2 | une lecture, ≈ 5 lignes [inféré] | G1 B-2, L8 |
+| SHOGEN-ENREG-G1-1 | l'enregistreur n'extrait qu'un commit : un enregistrement de rôle G1 sur un travail non commis n'est pas productible. Conduite : enregistrement produit par l'orchestrateur sur le commit du lot | orch. | limite déclarée ; texte au PAQUET | 0 ligne de code [inféré] | G1 B-2, L10 |
+
+**SHOGEN-CENSURE-CAUSES-1, décision de l'orchestrateur (Q1, option (a))** : le journal réparé et scellé ne porte qu'une signature (fenêtre sautée entre deux marqueurs d'un même démarrage = harnais vivant ; `run_params` et `clock_check` de démarrage sont réécrits à chaque chunk, les lignes NUL ont été excisées par les réparations) ; deux lignes par strate : « sautées, harnais vivant » et « arrêt ou passage entre démarrages, cause non attribuée par le journal » (fenêtres entre `started_epoch` et le premier marqueur comprises) ; aucun seuil. Sous-lot B5. Q4 : `served_from` reste limité au même rôle et au même commit.
+
+## B.24 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B5 et B6 (journal `docs/G1-partie-2-etape-B-3.md` §6 et §7 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-CENSURE-CAUSES-TIERS-1 | la ventilation de B5 n'est pas servie au recalcul tiers | orch. | sous-lot C3 (avec SHOGEN-RECALCUL-TIERS-CLI-1) | ≈ 20 lignes [inféré] | G1 B-3, §6 |
+| SHOGEN-CENSURE-VIVANT-PORTEE-1 | « harnais vivant » veut dire même démarrage avant et après la fenêtre, pas que le harnais tournait pendant la fenêtre (une mise en veille de la machine dans un démarrage est comptée « vivant ») | orch. | G0 du PAQUET (portée écrite au texte scellé ; libellé du rendu inchangé) | ≈ 2 lignes de texte [inféré] | G1 B-3, §6 ; Q4 |
+| SHOGEN-ENREG-DELAI-ARBRE-1 | le délai ne tue que l'enfant direct ; sous Windows, un petit-enfant qui tient le tuyau peut prolonger le blocage | orch. | avant l'exécution unique (partie 4) | ≈ 10 lignes [inféré] | G1 B-3, §6 |
+| SHOGEN-ENREG-DELAI-CHAMP-1 | le délai appliqué n'est pas un champ de l'enregistrement (liste de champs ratifiée) ; il est écrit au texte du PAQUET | orch. | G0 du PAQUET | 1 ligne de texte [inféré] | G1 B-3, §6 ; Q3 |
+| SHOGEN-ENREG-TEST-BASH-1 | le test d'`auteur` est le premier test du harnais qui dépend de `bash` (trouvé par le PATH) ; sur un hôte Windows, le bash de Git doit précéder celui de System32 | orch. | premier rejeu de la suite sur un hôte Windows (partie 4) | une vérification [inféré] | G1 B-3, §6 ; SHOGEN-HARNAIS-BASH-WSL-1 |
+| SHOGEN-ENREG-AUTEUR-ECRITURE-1 | l'écriture d'un enregistrement accepte un `auteur` hors liste blanche (seul `--verifier` refuse) | orch. | sous-lot C3 | ≈ 5 lignes et un test [inféré] | G1 B-3, Q2 |
+
+Réponses de l'orchestrateur : Q1 liste blanche lue dans le lint courant (une seule source de vérité au moment de la vérification) ; Q2 oui, en C3 ; Q3 texte du PAQUET, schéma inchangé ; Q4 portée écrite au PAQUET, libellé inchangé.
+
+## B.25 Amendement daté du 2026-10-02 : partie 2, étape C, sous-lots C1 et C2 (journal `docs/G1-partie-2-etape-C-1.md` ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SCEAU-VERIFY-CHEMINS-1 | `make-tsq.sh` écrit le manifeste avec des chemins relatifs à la racine, l'étape (1) de `verify.sh` le relit depuis le dossier de sceau : « MANIFESTE : ÉCART » avant toute vérification du jeton (sonde du worker) ; `rendu_unique` n'en dépend pas | orch. | G0 du PAQUET (sceau préparé, partie 3) | ≈ 5 lignes et une sonde [inféré] | G1 C-1, L1 ; Q4 |
+| SHOGEN-RENDU-HOTE-1 | OpenSSL 3.5.7 et Windows non éprouvés ; format du fichier de sommes réel non lisible en cloud : lancer `rendu_unique` en refus sur l'hôte de l'exécution avant le scellement | orch. | avant le scellement (partie 3), sur l'hôte de l'exécution | une exécution en refus [inféré] | G1 C-1, L2, L3 |
+| SHOGEN-GO-ORDRE-1 | voie (b) : l'ordre des commits n'est pas contrôlé (seul l'ordre des lignes de `JOURNAL.md` à HEAD l'est ; sans réécriture d'historique, les deux concordent) ; la date portée par le fichier de go n'est pas confrontée au commit qui l'épingle | orch. | relecture G2 de la partie 2 | ≈ 15 lignes et deux tests [inféré] | G1 C-1, L4, L5 ; Q2, Q3 |
+| SHOGEN-RENDU-T0-1 | `verifier_gardes` ne rend ni T0 ni genTime, nécessaires à l'enregistrement d'oracle du rendu | orch. | sous-lot C3 | ≈ 10 lignes [inféré] | G1 C-1, L6 |
+| SHOGEN-RENDU-PYCACHE-1 | un `__pycache__` sur les chemins gardés fait refuser la garde (2) (serrage E3 : un `.pyc` périmé se charge même sous `-B`) : consigne d'exploitation (nettoyage avant l'exécution, `PYTHONDONTWRITEBYTECODE`) | orch. | texte de la procédure d'exécution (partie 4) | 3 lignes de texte [inféré] | G1 C-1, L7 |
+
+Réponses de l'orchestrateur : Q1 serrage E2 retenu (jeton lié à `PAQUET.sha256`) ; Q2 et Q3 en item (SHOGEN-GO-ORDRE-1) ; Q4 l'orchestrateur, au G0 du PAQUET ; Q5 interface `--sortie` gardée pour C3. Exposition déclarée par le worker : une ligne de préfixes de sha256 (admise par D.2 n° 7) et trois lignes de `docs/pocket-report/` affichées par un `grep`, sans conséquence de pré-enregistrement.
+
+## B.26 Amendement daté du 2026-10-02 : partie 2, étape C, G1 de C3 arrêté avant code (journal `docs/G1-partie-2-etape-C-2.md` ; décisions de l'orchestrateur au G0 §C)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-TABLE-REELLE-1 | la table réelle des sorties (bornes de D4, n fixe 38 600, plage de D5) ne tourne pas de bout en bout sur fixture (il faudrait plus de 38 600 fenêtres synthétiques) : contrôlée contre des constantes écrites à la main depuis l'ADR ; première exécution de bout en bout = exécution unique | orch. | exécution unique (partie 4) ; texte au PAQUET | 0 ligne [inféré] | G1 C-2, L4 |
+
+Items proposés par le G1 et soldés par décision au G0 §C (ajout daté) : SHOGEN-RENDU-ETIQUETTE-1 (Q4), SHOGEN-RECALCUL-TIERS-PORTEE-1 (Q6), SHOGEN-RENDU-ECHEC-TARDIF-1 (Q8), SHOGEN-RENDU-NOMS-JOURNAUX-1 (L3) : construits dans C3.
+
+## B.27 Amendement daté du 2026-10-02 : partie 2, étape C, sous-lot C3 (journal `docs/G1-partie-2-etape-C-3.md` §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-ECHEC-DIAG-1 | à l'échec, rien ne reste (aucun contenu de sortie gardé, par décision : Q3) ; seuls l'heure, le run en échec et son code sortent sur stderr | orch. | limite déclarée ; texte de la procédure d'exécution (partie 4) | 0 ligne [inféré] | G1 C-3, L1 ; Q3 |
+| SHOGEN-RENDU-COUT-1 | durée des runs sur les journaux réels non mesurable avant l'exécution (délai par défaut 3 600 s par commande) | orch. | exécution unique (partie 4) : `--gardes-seules` d'abord, taille des journaux lue | une mesure [inféré] | G1 C-3, L2 |
+| SHOGEN-RENDU-RENAME-POSIX-1 | sous POSIX, `os.rename` remplace un répertoire vide apparu entre le contrôle de `--sortie` et le renommage | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 C-3, L3 |
+| SHOGEN-RENDU-TABLE-DELIMITEURS-1 | le test nominal dépend des deux lignes de commentaire qui délimitent la table des sorties dans `rendu_unique.py` | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 C-3, L4 |
+
+Réponses de l'orchestrateur : Q1 texte de la déclaration de Q2 dans l'étiquette des J14 accepté ; Q2 `--gardes-seules` entre à la procédure d'exécution (SHOGEN-RENDU-HOTE-1) ; Q3 non : aucun diagnostic de contenu après échec. Borne haute de la plage D5 contrôlée par l'orchestrateur : 15:08Z ratifiée (décision 272, ADR-0028 l.59), égale aux tests existants.
+
+## B.28 Amendement daté du 2026-10-02 : relecture G2 de la partie 2 (`docs/G2-partie-2.md`, verdict ACCEPTE-AVEC-CORRECTIONS C-1..C-11 ; décisions de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-EXPOSITION-ORCH-CLOUD-1 | exposition de l'orchestrateur de la session cloud : cartographie du 2026-09-29 affichée en entier (l.51 comprise) vers 02:47 UTC le 2026-10-02 (JOURNAL, entrée de 05:56 UTC). Construction : ligne de l'inventaire D.1 et contrôle FM-1.1 de la transcription de cette session | orch. | G0 du PAQUET | une ligne et un contrôle [inféré] | G2 partie 2, I-1 |
+| SHOGEN-HOTE-ATTRIBUTS-GIT-1 | `$GIT_DIR/info/attributes` et `core.attributesFile` changent la sortie de `git archive` (fins de ligne) : `.git/info/attributes` vide, `core.attributesFile` non posé, `git check-attr eol` LF sur les fichiers suivis, sur l'hôte de l'exécution avant le scellement | orch. | avec SHOGEN-RENDU-HOTE-1 | une commande [inféré] | G2 partie 2, I-2 |
+| SHOGEN-RENDU-CLI-REPORT-1 | la CLI `python -m shogen_s2.report` rend des journaux sans garde (C-1 ne ferme que `rendu_unique.py`) : texte de procédure au PAQUET (aucun rendu des journaux scellés hors de `rendu_unique.py`) et contrôle FM-1.1 des transcriptions de l'exécution | orch. | G0 du PAQUET | deux lignes de texte [inféré] | G2 partie 2, I-3 |
+| SHOGEN-CP2-RUNS-RENDU-1 | au cp-2, contrôler que l'enregistrement de rôle « rendu » porte les runs exigés (suite, puis la liste de D.4 b), comme `--verifier` après C-6 | orch. | cp-2 (partie 4) | une ligne de procédure [inféré] | G2 partie 2, Q-4 |
+
+Items de la relecture : SHOGEN-BLOC6-TS-NUM-1 (C-8), SHOGEN-GO-ORDRE-1 (C-3), SHOGEN-RENDU-TABLE-DELIMITEURS-1 (C-9) corrigés dans la partie 2 ; SHOGEN-ENREG-EOL-1 et SHOGEN-CAPITALS-REPORT-1 **fermés sans code** (motifs : G2 §7) ; SHOGEN-SENS-PLAGES-2, SHOGEN-CONTEXTE-MUTABLE-1, SHOGEN-RENDU-RENAME-POSIX-1 gardés, déclencheur reporté au G0 du PAQUET. Réponses : Q-1 jeton de production par variable d'environnement (construction de C-1) ; Q-2 bornes basse et haute de la date du go retenues ; Q-3 étiquette du J28 complétée par le script (épingles inchangées) ; Q-4 oui (item ci-dessus).
+
+## B.29 Amendement daté du 2026-10-02 : correction de la relecture G2 de la partie 2 (journal `docs/G1-partie-2-corrections-G2.md` ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-JETON-MAIN-1 | le jeton de C-1 ferme l'appel accidentel de `--produire`, pas l'appel délibéré (variable posée à la main) : garde contre l'erreur, pas une preuve (comme D.4 b (4)) ; limite écrite au PAQUET avec SHOGEN-RENDU-CLI-REPORT-1 | orch. | G0 du PAQUET | une ligne de texte [inféré] | correction G2, Q-b |
+| SHOGEN-RENDU-ORC-OCTETS-1 | la garde (4) hache les fichiers sur le disque, pas les octets réellement chargés en mémoire | orch. | G0 du PAQUET (limite écrite) | une ligne de texte [inféré] | correction G2, Q-b |
+| SHOGEN-RENDU-STATUS-HEAD-1 | le `git status` de la garde (2) juge l'arbre de travail contre le HEAD courant, pas contre le commit résolu | orch. | revue de partie 3 (code touché au PAQUET) ou premier G0 qui touche `rendu_unique.py` | ≈ 5 lignes [inféré] | correction G2, Q-b |
+| SHOGEN-GO-PICKAXE-1 | `git log -S` cherche une sous-chaîne, alors que les lignes de `JOURNAL.md` exigent le sha256 entier (le premier commit trouvé peut précéder la ligne exacte) | orch. | premier G0 qui touche `rendu_unique.py` | ≈ 10 lignes [inféré] | correction G2, Q-b |
+
+Réponse : Q-a avertissements du lecteur gardés tels qu'émis (fidélité ; pas de déduplication).

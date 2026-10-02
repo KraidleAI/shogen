@@ -196,7 +196,8 @@ class TestSensibilite(unittest.TestCase):
         self.assertEqual((p.returncode, p.stdout), (0, f"{txt}\n".encode()))
         self.table(self.c, self.j, txt, [RA, RB], SEG)
         self.assertEqual(self.week_ends(txt, [RA, RB], SEG), [(0, 1), (1, 6), (PLEIN, PLEIN)])
-        for x in ("\n  définition d'écart (10 §5.2 ; r1.classify_ecart)", "\n  date de la partition, axe"):
+        for x in ("\n  définition d'écart (10 §5.2 ; τ relatif : ADR-0020 déc. 2, ADR-0022 ; r1.classify_ecart)",
+                  "\n  date de la partition, axe"):
             self.assertEqual(txt.count(x), 1)                                  # blocs 3 et 6 (B-b)
 
     def test_plage_sans_effet_variantes_egales_ecart_0(self):
@@ -316,6 +317,41 @@ class TestSensibiliteG2(unittest.TestCase):
             "    en totalité : exclue 1, incluse 1 ; partiellement : exclue 0, incluse 1 ; retirés en "
             "totalité par la plage : 1", "    non couverts (0 fenêtre dans les deux variantes, entre la "
             "première et la dernière fenêtre de l'assiette) : 1"])
+
+
+class TestSensPertes(unittest.TestCase):
+    def test_pertes_du_journal_par_plage_et_par_strate(self):
+        """SHOGEN-SENS-PERTES-2 : plages [lun. 10 00:00Z ; 05:00Z] (calme) et [sam. 15 04:00Z ; 09:00Z] (stress),
+        chacune sur la fin d'un bloc (marqueurs à 00:00, 01:00 et 04:00, 05:00) : 4 fenêtres de grille sans
+        marqueur chacune ; lectures retirées du journal : kraken à lun. 01:00Z, coinbase et bitstamp à sam. 05:00Z
+        (pool D1 de la variante incluse : 3 flux par strate) ; sous le segment [ven. 7 22:00Z ; lun. 10 03:00Z) :
+        1 fenêtre sans marqueur ; C-11 : plage [ven. 7 22:00Z ; 23:00Z], bitstamp absent à 23:00Z mais hors du pool
+        D1 de la variante incluse en calme sous ce segment (0 lecture ok) : non compté (R24) ; plage [lun. 10 00:00Z ;
+        01:00Z], kraken absent sur la borne haute : compté (R23). Rougit si : fenêtres sans marqueur hors de la plage
+        (ou du segment) ; lectures absentes comptées hors des fenêtres à marqueur ; strates confondues ; borne haute
+        exclue ; pool autre que D1 ; ligne absente."""
+        c, j = fixture(tempfile.mkdtemp(prefix="s2pertes_"))
+        retirees = {(t(10, 1), "kraken"), (t(15, 5), "coinbase"), (t(15, 5), "bitstamp"), (t(7, 23), "bitstamp")}
+        with open(j, encoding="utf-8") as f:
+            lignes = [x for x in f
+                      if (lambda o: (o["window_start"], o["flux_id"]))(json.loads(x)) not in retirees]
+        with open(j, "w", encoding="utf-8") as f:
+            f.writelines(lignes)
+        ra, rb = (t(10, 0), t(10, 5)), (t(15, 4), t(15, 9))
+
+        def att(a, b, sc, ss, lc, ls):
+            return (f"    [{a} ; {b}] pertes du journal dans la plage : fenêtres de grille sans marqueur calme "
+                    f"{sc}, stress {ss} ; lectures absentes des fenêtres à marqueur (pool D1 de la variante "
+                    f"incluse) calme {lc}, stress {ls} — SHOGEN-SENS-PERTES-2")
+        sens = section(report.render_report(c, j, exclude_ranges=[ra, rb]))
+        self.assertEqual([x for x in sens if "SHOGEN-SENS-PERTES-2" in x],
+                         [att(*ra, 4, 0, 1, 0), att(*rb, 0, 4, 0, 2)])
+        seg = {"t0": t(7, 22), "t_fin": t(10, 3)}
+        sens = section(report.render_report(c, j, exclude_ranges=[ra], segment=seg))
+        self.assertEqual([x for x in sens if "SHOGEN-SENS-PERTES-2" in x], [att(*ra, 1, 0, 1, 0)])
+        rc, rd = (t(7, 22), t(7, 23)), (t(10, 0), t(10, 1))
+        sens = section(report.render_report(c, j, exclude_ranges=[rc, rd], segment=seg))
+        self.assertEqual([x for x in sens if "SHOGEN-SENS-PERTES-2" in x], [att(*rc, 0, 0, 0, 0), att(*rd, 0, 0, 1, 0)])
 
 
 if __name__ == "__main__":

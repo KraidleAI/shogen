@@ -15,7 +15,8 @@ from tests.test_collector import BY_ID, DELTA, SKELETON, W, FakeClock, _taumap, 
 from tests.test_exclusion import PLAGE, WS, build_fixture, poser
 
 A = PLAGE[0]
-DEF = ("  définition d'écart (10 §5.2 ; r1.classify_ecart), par fenêtre et par flux du pool d'analyse, "
+DEF = ("  définition d'écart (10 §5.2 ; τ relatif : ADR-0020 déc. 2, ADR-0022 ; r1.classify_ecart), par fenêtre "
+       "et par flux du pool d'analyse, "                    # SHOGEN-BLOC3-RENVOI-TAU-1 (renvoi de τ relatif)
        "précédence panne > staleness > hors-enveloppe : panne = lecture absente, statut ≠ ok ou prix "
        "absent ; staleness = win_end − source_ts > σ_classe de la classe du flux (σ_classe ou source_ts "
        "absent : non évaluée) ; hors-enveloppe = |p − médiane_LOO|/médiane_LOO > τ_classe, N ≥ n_min "
