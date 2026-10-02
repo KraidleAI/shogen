@@ -156,3 +156,9 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
 ### B — second ajout daté du 2026-10-02 04:53 UTC (adjudication de B0 à B2, annexe B.22)
 
 - **B3** porte aussi SHOGEN-FMT-CONTEXTE-1 (`_fmt_dec` sous `CONTEXTE_DECIMAL`). **C** appelle `records.verifier_raw` : verdict imprimé et enregistré, sans fermer l'exécution (SHOGEN-RAW-FIN-1). SHOGEN-RAW-LECTEUR-1 fermé.
+
+### B — troisième ajout daté du 2026-10-02 05:56 UTC (adjudication de B3 et B4, annexe B.23)
+
+- **B5** : SHOGEN-CENSURE-CAUSES-1, option (a) (annexe B.23) : deux lignes par strate au bloc 1, aucun seuil.
+- **B6** (neuf) : SHOGEN-ENREG-VERIF-1 : `--verifier` contrôle `auteur` (égalité exacte avec la liste blanche lue dans `enforcement/lint-model-pinning.sh`, ou suffixe `[1m]`) et, avec `--depot`, recalcule `tree.sha256` ; délai maximal par commande (dépassement : exit non nul et enregistrement écrit).
+- **C3** porte SHOGEN-RECALCUL-TIERS-CLI-1.

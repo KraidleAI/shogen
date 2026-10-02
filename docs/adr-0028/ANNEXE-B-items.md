@@ -357,3 +357,16 @@ Réponses de l'orchestrateur : Q1 coupe au segment gardée ; Q3 écart 2 (entier
 | SHOGEN-CONTEXTE-MUTABLE-1 | `r1.CONTEXTE_DECIMAL` est un objet modifiable ; le test 1 fige ses valeurs | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 B-1, L9 |
 
 Réponses de l'orchestrateur : Q1 sous-lot B3 ; Q2 refus nommé sous filtre gardé (refus par défaut) ; Q3 strict ; Q4 oracle sha256 suffisant, redécodage en item ; Q5 appelant = exécution unique (étape C), verdict imprimé et enregistré. L3 (mutant équivalent) : constat, sans item.
+
+## B.23 Amendement daté du 2026-10-02 : partie 2, étape B, sous-lots B3 à B5 (journal `docs/G1-partie-2-etape-B-2.md` §4, §7 et §8 ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RECALCUL-TIERS-CLI-1 | s_s et les bornes de censure n'entrent dans l'enregistrement d'oracle que par une commande nommée du recalcul tiers, absente. Construction : commande `recalcul-tiers` (JSON de `recompute_from_journal` et `recompute_d5_from_journal` par sortie) dans la liste fermée | orch. | sous-lot C3 (partie 2) | ≈ 50 lignes [inféré] | G1 B-2, L1 ; Q2 |
+| SHOGEN-ENREG-VERIF-1 | `--verifier` ne contrôle ni `auteur` (SHOGEN-R1-FORME-RESOLUE-1 : égalité exacte avec un identifiant de la liste blanche de `enforcement/lint-model-pinning.sh`, ou cet identifiant suivi de `[1m]`) ni `tree.sha256` (option `--depot` : ré-extraction et égalité) ; les commandes n'ont pas de délai maximal | orch. | sous-lot B6 (partie 2) | ≈ 60 lignes [inféré] | G1 B-2, L2, L6, L7 ; Q3, Q5 |
+| SHOGEN-ENREG-VARIABLE-1 | la branche « variable posée » de l'enregistreur n'est testée que sur des fonctions pures ; `tests_avec_variable` dépend du format de `unittest -v` (sous-déclaration silencieuse possible) | orch. | exécution unique (partie 4 : premier enregistrement réel sous la variable, relu) | une relecture [inféré] | G1 B-2, L3, L4 |
+| SHOGEN-ENREG-EOL-1 | `tree.sha256` dépend de la configuration de fin de ligne du poste sans attribut `eol` ; le dépôt fixe LF par `.gitattributes` | orch. | relecture G2 de la partie 2 (vérifier la couverture de `.gitattributes` sur `s2-harness/`) | une lecture [inféré] | G1 B-2, L5 |
+| SHOGEN-CAPITALS-REPORT-1 | écritures de valeurs de `report.py` hors `_fmt_dec` non auditées pour `capitals` | orch. | relecture G2 de la partie 2 | une lecture, ≈ 5 lignes [inféré] | G1 B-2, L8 |
+| SHOGEN-ENREG-G1-1 | l'enregistreur n'extrait qu'un commit : un enregistrement de rôle G1 sur un travail non commis n'est pas productible. Conduite : enregistrement produit par l'orchestrateur sur le commit du lot | orch. | limite déclarée ; texte au PAQUET | 0 ligne de code [inféré] | G1 B-2, L10 |
+
+**SHOGEN-CENSURE-CAUSES-1, décision de l'orchestrateur (Q1, option (a))** : le journal réparé et scellé ne porte qu'une signature (fenêtre sautée entre deux marqueurs d'un même démarrage = harnais vivant ; `run_params` et `clock_check` de démarrage sont réécrits à chaque chunk, les lignes NUL ont été excisées par les réparations) ; deux lignes par strate : « sautées, harnais vivant » et « arrêt ou passage entre démarrages, cause non attribuée par le journal » (fenêtres entre `started_epoch` et le premier marqueur comprises) ; aucun seuil. Sous-lot B5. Q4 : `served_from` reste limité au même rôle et au même commit.
