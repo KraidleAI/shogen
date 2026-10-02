@@ -143,3 +143,12 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
   au dépôt que par préfixe (FAITS-ancre-sceau est local) : le bloc du paquet les porte en entier.
 - **Écart de registre relevé** : annexe D.4 c porte encore « SOUS ESCALADE — en attente de l'investisseur »
   (tranché le 2026-09-30 23:33 UTC, JOURNAL) : ajout daté au commit de ce G0.
+
+### B — ajout daté du 2026-10-02 04:0x UTC (items formés à l'adjudication de l'étape A, annexe B.21)
+
+- **B0** (avant B1) : SHOGEN-DECIMAL-CONTEXTE-1 et SHOGEN-DECIMAL-ARRONDI-2. **Décision** : un contexte nommé
+  complet (prec, rounding `ROUND_HALF_EVEN`, Emin, Emax, traps, clamp fixés) défini une fois dans le paquet
+  `shogen_s2` et utilisé par tous les `localcontext` du chemin de recalcul (`r1.py`, `lm.py`, `r2.py`, `report.py`) ;
+  `closure.py` (quarantaine, D6 vi) n'est pas touché, limite déclarée dans le journal G1. Tests : sous un contexte
+  ambiant hostile (`ROUND_DOWN`, Emin −20, piège Inexact), le rendu J2 et les sorties de la règle égalent ceux du
+  contexte par défaut. Règle scellée inchangée à l'octet (16 fixtures). ≤ 200 lignes, sinon coupe.
