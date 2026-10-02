@@ -44,11 +44,13 @@ from .r1 import (
     ELL_BLOC,
     ETIQUETTE_POOLEE,
     GARDE_BLOCS,
+    SEUIL_Z,
     analysis_pools,
     build_window_strate,
     classify_cells,
     compute_r1,
     parse_journal,
+    regle_critere,
 )
 from .window import STRATE_DEFAUT, verify_markers_against_spec, weekday_utc
 
@@ -156,7 +158,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     r1 = compute_r1(markers, readings, pool_an, w, sigma_by_class, sigma_class_of_flux,
                     tau, seuil_hist, n_min, pools)
-    cells = classify_cells(markers, readings, pool, w, sigma_by_class,
+    rg = regle_critere(r1)                 # règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1) : bloc 3
+    cells =classify_cells(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
     # R2 complet (partition/k_eff, contenu, méthode, clusters, drapeau 2) — recalculé
@@ -325,10 +328,14 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                                              else _fmt_dec(b["z_bloc"])))
             ap(f"    « {st} » : diagnostic de runs de I_t (hors décision) : nombre = {ru['nombre']} ; "
                f"longueur moyenne = {_fmt_dec(ru['longueur_moyenne'])} ; run maximal = {ru['run_max']}")
-    sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6) : lot CRITERE
+    sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6), prémisse (pt 7)
     ap("\n  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : " + (
-        f"m = 2 tests confirmatoires ({sc['calme']}, {sc['stress']}), chacun unilatéral au seuil 2,33 ; "
-        "borne P(au moins un rejet à tort) ≤ 2 × 0,01 = 0,02" if sc.get("kind") == "weekend_utc"
+        f"m = {rg['m']} (strates testées : {', '.join(rg['testees']) or 'aucune'} ; m ≤ 2 ; "
+        "§1 bis.1 pt 6), tests unilatéraux au seuil 2,33 ; borne P(au moins un rejet à tort) ≤ "
+        "2 × 0,01 = 0,02 sous le modèle nul joint (§1 bis.1 pt 7) : modèle d'indépendance du pool de "
+        "doc 10 §5.1 et dépendance sérielle des fenêtres de portée < ℓ = "
+        f"{ELL_BLOC} (A(window-dependence), registre 08) ; niveau asymptotique, non démontré ≤ 0,01 en "
+        "échantillon fini (SHOGEN-SIM-NIVEAU-1)" if sc.get("kind") == "weekend_utc"
         else "non applicable (calendrier mono-strate)"))
     po = r1["poolee"]                   # hors de r1["strates"] : ni z_max, ni drapeau 2, ni famille
     ap(f"\n  ── strate poolée (ADR-0028 D2 pt 4 ; {ETIQUETTE_POOLEE}) : forme stratifiée, jamais l'union "
@@ -346,6 +353,46 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap(f"    z_pool  = {_fmt_dec(po['z_pool'])} — {ETIQUETTE_POOLEE}")
     ap(f"\n  {A_WINDOW_STATIONARITY}")
     ap(f"  {A_WINDOW_DEPENDENCE}")
+    # Règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 5, 6, 8) : valeurs de r1.regle_critere, sans recalcul
+    ap("\n  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
+       "comparaisons sur les Decimal publiées, non arrondies, au seuil 2.33, « ≥ » ; aucune p-valeur")
+    kp, axes = r2_out["partition"], "axes panne / staleness / hors-enveloppe"
+    ke = ("= non évaluable" if kp["k_eff"] is None else f"≤ {kp['k_eff']} (borne supérieure)"
+          if kp.get("k_eff_is_upper_bound") else f"= {kp['k_eff']}")
+    suites = {"garde_5_4": " : strate non testée, hors décision (§1 bis.1 pt 2)",
+              "rejet_non_qualifiable": " : rejet non qualifiable : niveau non tenu sous dépendance sérielle",
+              "discordance": " (discordance)"}
+    for st, e in rg["strates"].items():
+        blk, cas, tete = r1["strates"][st], e["cas"], f"    « {st} » : "
+        z, zb = blk["z"], blk["bloc"]["z_bloc"]
+        zs = ("z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10)" if z is None else
+              f"z_s = {_fmt_dec(z)} {'<' if cas == 'z_sous_seuil' else '≥'} 2,33"
+              + (" (z_s ≤ −2,33 : hors famille, sans conclusion)" if z <= -SEUIL_Z else ""))
+        zbt = ("" if cas in ("garde_5_4", "z_sous_seuil") else
+               f" ; z_bloc non publié ({blk['bloc']['z_bloc_motif']})" if zb is None else
+               f" ; z_bloc = {_fmt_dec(zb)} {'≥' if cas == 'rejette' else '<'} 2,33")
+        ap(f"{tete}{zs}{zbt} → {e['valeur']}{suites.get(cas, '')}")
+        if cas == "rejette":
+            ap(f"{tete}« le modèle d'indépendance du pool (k nominal_s = {len(blk['per_source'])} flux "
+               f"du pool de la strate, bloc 1 ; k_eff mesuré {ke}, bloc 6) est rejeté dans la strate {st} "
+               f"sur {blk['n']} fenêtres, {axes}, tel qu'observé par cet instrument (hôte, DNS et réseau du "
+               "harnais compris) ; aucune dépendance de paire n'est établie »")
+        elif cas == "discordance":
+            ap(f"{tete}« le modèle binomial de doc 10 §5.1, à fenêtres indépendantes, est rejeté ; la cause "
+               "n'est pas identifiée entre co-défaillance des sources et dépendance sérielle des fenêtres »")
+        elif cas == "z_sous_seuil":
+            ap(f"{tete}« le modèle d'indépendance n'est pas rejeté sur {blk['n']} fenêtres, {axes} » ; un "
+               "résultat négatif est un résultat")
+        if e["emd"] is not None:
+            ap(f"{tete}EMD_s = (2,33 + 0,8416)·max(√(n_s·P̂_more,s·(1 − P̂_more,s)), σ̂_bloc,s) = "
+               f"{_fmt_dec(e['emd'])} fenêtres ; fraction de n_s = {_fmt_dec(e['emd_fraction'])} "
+               "(puissance 0,8 : choix de conception ; aucun seuil sur l'EMD)")
+    nq, tst = rg["non_qualifiables"], rg["testees"]
+    ap(f"  « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = {rg['r1_discrimine']} : "
+       + (f"strate(s) qui rejettent : {', '.join(rg['rejette'])}" if rg["rejette"] else
+          "aucune strate ne rejette ; " + (f"rejet non qualifiable : {', '.join(nq)}" if nq else
+                                           f"strate(s) testée(s) : {', '.join(tst)}" if tst
+                                           else "aucune strate testée")))
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,

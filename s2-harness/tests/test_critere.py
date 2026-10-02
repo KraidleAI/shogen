@@ -7,16 +7,32 @@ de B-DEP-2 (D-10). Chaque test nomme la mutation qui le rougit."""
 from __future__ import annotations
 
 import contextlib
+import re
 import unittest
 from decimal import Decimal as D
 from fractions import Fraction as F
 
-from shogen_s2 import r1
+from shogen_s2 import r1, report
 from tests.test_blocs import d50
 from tests.test_collector import SKELETON as FL
 from tests.test_rendu_blocs import couture, journal, proche
 
 S1, NN, NEUF = "NON ÉVALUABLE", "NE REJETTE PAS", "2.32" + "9" * 49      # NEUF : 2,33 − 10⁻⁵¹
+TETE = ("  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
+        "comparaisons sur les Decimal publiées, non arrondies, au seuil 2.33, « ≥ » ; aucune p-valeur")
+FAMILLE = ("  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : m = {} (strates testées : {} ; "
+           "m ≤ 2 ; §1 bis.1 pt 6), tests unilatéraux au seuil 2,33 ; borne P(au moins un rejet à tort) ≤ "
+           "2 × 0,01 = 0,02 sous le modèle nul joint (§1 bis.1 pt 7) : modèle d'indépendance du pool de "
+           "doc 10 §5.1 et dépendance sérielle des fenêtres de portée < ℓ = 240 (A(window-dependence), "
+           "registre 08) ; niveau asymptotique, non démontré ≤ 0,01 en échantillon fini "
+           "(SHOGEN-SIM-NIVEAU-1)")
+R1D = "  « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = "
+AX = "axes panne / staleness / hors-enveloppe"
+EMD = (r"EMD_s = \(2,33 \+ 0,8416\)·max\(√\(n_s·P̂_more,s·\(1 − P̂_more,s\)\), σ̂_bloc,s\) = (\S+) "
+       r"fenêtres ; fraction de n_s = (\S+) \(puissance 0,8 : choix de conception ; aucun seuil sur l'EMD\)")
+NRJ = (f"« le modèle d'indépendance n'est pas rejeté sur 200 fenêtres, {AX} » ; un résultat négatif est "
+       "un résultat")
+NQ = " → NON ÉVALUABLE : rejet non qualifiable : niveau non tenu sous dépendance sérielle"
 
 
 def blk(z, zb, garde="16", s2="9", n=1000) -> dict:
@@ -59,6 +75,21 @@ def regle(c: str, j: str, n: int = 240) -> tuple:
     with ell(n):
         out = r1.recompute_from_journal(c, j)
     return out, r1.regle_critere(out)
+
+
+def rendu(c: str, j: str, n: int = 240) -> tuple:
+    """(lignes de la section règle par strate, ligne « R1 discrimine », lignes de famille) du bloc 3 ; la
+    section suit la ligne A(window-dependence) et une ligne vide."""
+    with ell(n):
+        b3 = report.render_report(c, j).split("[BLOC 3]")[1].split("[BLOC 4]")[0].split("\n")
+    h, par = b3.index(TETE), {}
+    assert b3[h - 1] == "" and b3[h - 2].startswith("  A(window-dependence)"), b3[h - 2:h]
+    for ln in b3[h + 1:]:
+        m = re.match(r"    « (\w+) » : (.*)$", ln)
+        if not m:
+            break
+        par.setdefault(m.group(1), []).append(m.group(2))
+    return par, b3[h + 1 + sum(map(len, par.values()))], [ln for ln in b3 if ln.startswith("  famille de B")]
 
 
 class TestRegleTable(unittest.TestCase):
@@ -142,6 +173,64 @@ class TestRegleFixtures(unittest.TestCase):
         self.assertEqual(c["bloc"]["z_bloc_motif"], "σ̂²_bloc = 0 (K ∈ {0, n})")
         self.assertEqual([e["cas"] for e in g["strates"].values()], ["rejet_non_qualifiable", "garde_5_4"])
         self.assertEqual((g["r1_discrimine"], g["m"]), (S1, 0))
+
+
+class TestRegleRendu(unittest.TestCase):
+    """Chaînes du fichier scellé §3.1 et §3.2 au bloc 3 : J1 (ℓ = 1 et 240), J2 (240), J3 (ℓ = 1)."""
+
+    @classmethod
+    def setUpClass(cls):
+        j1, j2 = journal(200, 200, deux(25, 29)), journal(200, 200, deux(50, 37))
+        j3 = journal(54, 10, rotation)
+        cls.r = {"J1-1": rendu(*j1, 1), "J1": rendu(*j1), "J2": rendu(*j2), "J3-1": rendu(*j3, 1)}
+
+    def val(self, ligne: str, motif: str, z2: F, signe: int = 1):
+        """Ligne entière au motif ; groupe 1 : valeur imprimée, de carré z2 (10⁻⁴⁷ près), de signe donné."""
+        m = re.fullmatch(motif, ligne)
+        self.assertTrue(m and proche(m.group(1), z2, True) and (D(m.group(1)) > 0) == (signe > 0), ligne)
+        return m
+
+    def test_rendu_valeurs_enonces_emd(self):
+        """Rougit si : EMD omis ; « R1 discrimine » sans strate nommée ; discordance imprimée « n'est pas
+        rejeté » ; étiquette « hors famille, sans conclusion » retirée ; section hors place ; motif tu."""
+        p, l1, _f = self.r["J1-1"]
+        self.val(p["calme"][0], r"z_s = \S+ ≥ 2,33 ; z_bloc = (\S+) ≥ 2,33 → REJETTE", F(50, 7))
+        self.assertEqual(p["calme"][1], "« le modèle d'indépendance du pool (k nominal_s = 3 flux du pool "
+                         "de la strate, bloc 1 ; k_eff mesuré = non évaluable, bloc 6) est rejeté dans la "
+                         f"strate calme sur 200 fenêtres, {AX}, tel qu'observé par cet instrument (hôte, DNS "
+                         "et réseau du harnais compris) ; aucune dépendance de paire n'est établie »")
+        self.val(p["stress"][0], r"z_s = (\S+) ≥ 2,33 ; z_bloc = \S+ < 2,33 → NE REJETTE PAS \(discordance\)",
+                 F(2312, 375))
+        self.assertEqual(p["stress"][1], "« le modèle binomial de doc 10 §5.1, à fenêtres indépendantes, "
+                         "est rejeté ; la cause n'est pas identifiée entre co-défaillance des sources et "
+                         "dépendance sérielle des fenêtres »")
+        self.val(p["stress"][2], EMD, F(236324725119, 1250000000))
+        self.assertEqual(l1, R1D + "VRAI : strate(s) qui rejettent : calme")
+        p, l1, _f = self.r["J2"]
+        self.val(p["calme"][0], r"z_s = (\S+) < 2,33 \(z_s ≤ −2,33 : hors famille, sans conclusion\) → NE "
+                 r"REJETTE PAS", F(40, 3), -1)
+        self.val(p["stress"][0], r"z_s = (\S+) < 2,33 → NE REJETTE PAS", F(8, 375))
+        for st, emd2 in (("calme", F(188607123, 1600000)), ("stress", F(43269638424597, 10 ** 11))):
+            self.assertEqual(p[st][1], NRJ, st)
+            self.assertTrue(proche(self.val(p[st][2], EMD, emd2).group(2), emd2 / 40000, True), st)
+        self.assertEqual(l1, R1D + "FAUX : aucune strate ne rejette ; strate(s) testée(s) : calme, stress")
+        p, l1, _f = self.r["J1"]
+        self.val(p["calme"][0], r"z_s = (\S+) ≥ 2,33 ; z_bloc non publié \(garde de blocs : n_s = 200 < "
+                 r"30·ℓ = 7200\)" + NQ, F(40, 3))
+        self.assertEqual(l1, R1D + "NON ÉVALUABLE : aucune strate ne rejette ; rejet non qualifiable : "
+                         "calme, stress")
+        p, l1, _f = self.r["J3-1"]
+        self.val(p["calme"][0], r"z_s = (\S+) ≥ 2,33 ; z_bloc non publié \(σ̂²_bloc = 0 \(K ∈ \{0, n\}\)\)"
+                 + NQ, F(189, 10))
+        self.assertEqual(p["stress"], ["z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10) → NON "
+                                       "ÉVALUABLE : strate non testée, hors décision (§1 bis.1 pt 2)"])
+        self.assertEqual(l1, R1D + "NON ÉVALUABLE : aucune strate ne rejette ; rejet non qualifiable : calme")
+
+    def test_famille_m_dynamique_premisse(self):
+        """SHOGEN-POOLEE-FAMILLE-1, test nommé (D-8) : m = nombre de strates testées, « m ≤ 2 », borne 0,02 et
+        prémisse du pt 7 sur une ligne, en place. Rougit si : m statique ; prémisse retirée ; strates tues."""
+        for k, m, t in (("J1-1", 2, "calme, stress"), ("J2", 2, "calme, stress"), ("J1", 0, "aucune")):
+            self.assertEqual(self.r[k][2], [FAMILLE.format(m, t)], k)
 
 
 if __name__ == "__main__":

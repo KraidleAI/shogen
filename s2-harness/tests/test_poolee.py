@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, localcontext
 
 from shogen_s2 import r1, r2, records, report, window
+from tests.test_critere import FAMILLE
 from tests.test_exclusion import WS, build_fixture, cli
 from tests.test_sensibilite import fixture
 
@@ -148,8 +149,7 @@ class TestPooleeGardes(unittest.TestCase):
 class TestPooleeRendu(unittest.TestCase):
     """Bloc 3 (sous-lot POOLEE-b) : ligne de famille puis strate poolée, après les strates confirmatoires,
     avant A(window-stationarity) ; chemin servi (CLI) = API."""
-    FAM = ("  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : m = 2 tests confirmatoires (calme, "
-           "stress), chacun unilatéral au seuil 2,33 ; borne P(au moins un rejet à tort) ≤ 2 × 0,01 = 0,02")
+    FAM = FAMILLE.format(1, "stress")    # lot CRITERE (D-8) : m dynamique ; calme en rejet non qualifiable
     TETE = ("  ── strate poolée (ADR-0028 D2 pt 4 ; exploratoire, hors famille, hors décision) : forme "
             "stratifiée, jamais l'union brute des fenêtres")
     FORME = ("    z_pool = Σ_s (K_s − n_s·P̂_more,s) / √(Σ_s n_s·P̂_more,s·(1 − P̂_more,s)), chaque strate "

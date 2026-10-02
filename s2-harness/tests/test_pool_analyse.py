@@ -30,8 +30,9 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # B-c, C-5 de la revue G2 : ligne « non couverts » insérée, avant 4d511faf…b25819) ; puis de POOLEE-b
 # (bloc 3 : famille et strate poolée, avant 43cc5f85…a1f2897 ; P2P texte :
 # docs/G1-lot-POOLEE-strate-poolee.md) ; puis de B-DEP-2 (bloc 3 : z_bloc par strate, A(window-dependence),
-# avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md).
-SHA_BASE_AVEC_OPTION = "3398167fddff2934b904aee5ca4ec44d12debd05596a2c4a1a447a49595fbf44"
+# avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis de CRITERE-a2 (bloc 3 : famille,
+# section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md).
+SHA_BASE_AVEC_OPTION = "dc7210d3aefbc1233e609bc0246a7a44cfa27446beeb73605e08c265682910a3"
 
 
 class Coupure(Exception):
