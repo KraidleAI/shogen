@@ -7,6 +7,8 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -27,6 +29,8 @@ KO = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"self.fail()")}
 SUITE = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
 SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
+BANNI = "claude-opus-" + "5"                    # construit à l'exécution, comme dans le lint (aucun littéral)
 
 
 def g(d: str, *args: str, entree: bytes = None) -> str:
@@ -164,7 +168,8 @@ class TestOracleRecord(unittest.TestCase):
         chemin, avant = p.stdout.strip(), sorted(os.listdir(d))
         v, r, m = (cli("--verifier", chemin, "--role", "cp-2", *x) for x in (
             ("--commit", self.c1), ("--commit", self.c2), ("--commit", self.c1, "--auteur", "claude-opus-5-5")))
-        self.assertEqual((v.returncode, v.stdout), (0, f"conforme : {chemin} (rôle cp-2, tree.commit {self.c1})\n"))
+        self.assertEqual((v.returncode, v.stdout), (0, f"conforme : {chemin} (rôle cp-2, tree.commit {self.c1} ; "
+                                                       "tree.sha256 non recalculé : --depot absent)\n"))
         self.assertEqual(r.returncode, 2)
         self.assertRegex(r.stderr, r"^oracle_record : refus \(tree\.commit\) : ")
         self.assertEqual((m.returncode, "--verifier" in m.stderr), (2, True))
@@ -197,6 +202,79 @@ class TestOracleRecord(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"filtre data .* — refus$"):
             orc.enregistrer(d, "G2", "claude-opus-5-5", lien, "HEAD")
         self.assertEqual(sorted(os.listdir(d)), avant)
+
+    def copie(self, d: str, src: str, nom: str, f) -> str:
+        """Copie de l'enregistrement `src` modifiée par f(rec), écrite dans d sous `nom` (sorties relatives
+        intactes)."""
+        rec = json.loads(Path(src).read_text(encoding="utf-8"))
+        f(rec)
+        Path(d, nom).write_text(json.dumps(rec), encoding="utf-8")
+        return os.path.join(d, nom)
+
+    def test_verifier_auteur_liste_blanche_du_lint(self):
+        """SHOGEN-ENREG-VERIF-1 (i) : auteur égal à un identifiant de la liste blanche (oracle : celle qu'imprime le
+        lint d'épinglage lui-même), ou à cet identifiant suivi exactement de « [1m] » ; toute autre forme : refus
+        (auteur). Liste lue dans le lint : un lint de fixture qui en porte une autre la remplace ; ligne ALLOWED répétée
+        ou lint absent : refus. Rougit si : préfixe, casse, autre suffixe ou blancs admis ; [1m] refusé ; liste
+        recopiée dans l'outil ; première de deux lignes ALLOWED lue ; contrôle absent."""
+        d, bash = tempfile.mkdtemp(dir=self.d), shutil.which("bash")    # PATH (CreateProcess lirait System32 d'abord)
+        self.assertTrue(bash and os.path.isfile(LINT), f"bash ({bash}) ou lint d'épinglage ({LINT}) absent")
+        os.makedirs(os.path.join(d, "arbre", ".claude", "agents"))
+        Path(d, "arbre", ".claude", "agents", "a.md").write_text("---\nmodel: opus\n---\n", encoding="utf-8")
+        refus = subprocess.run([bash, LINT, os.path.join(d, "arbre")], capture_output=True, text=True).stderr
+        admis = re.search(r"liste blanche : (.+) \(R-1\)\.$", refus, re.M).group(1).split()
+        x, g2 = admis[0], orc.enregistrer(d, "G2", admis[0], self.depot, self.c1)[0]
+
+        def auteur(a, ok, nom="a.json"):
+            p = self.copie(d, g2, nom, lambda r: r.update(auteur=a))
+            if ok:
+                return self.assertEqual(orc.verifier(p, "G2", self.c1)["auteur"], a)
+            with self.assertRaisesRegex(ValueError, r"^refus \(auteur\) : "):
+                orc.verifier(p, "G2", self.c1)
+        for a in [*admis, *(y + "[1m]" for y in admis)]:
+            auteur(a, True)
+        for a in (BANNI, BANNI + "[1m]", "opus", x + "x", x[:-1], x.upper(), x + "[1M]", x + "[2m]", x + "[1m][1m]",
+                  " " + x, x + " ", "[1m]", None, 5):
+            with self.subTest(auteur=a):
+                auteur(a, False)
+        faux = os.path.join(d, "lint.sh")
+        for contenu, a, ok in (("# ALLOWED='en-commentaire'\nALLOWED='modele-fixture-1'\n", "modele-fixture-1", True),
+                               ("ALLOWED='modele-fixture-1'\n", x, False),
+                               ("ALLOWED='modele-fixture-1'\nALLOWED='modele-fixture-1'\n", "modele-fixture-1", False),
+                               (None, x, False)):
+            Path(faux).write_text(contenu, encoding="utf-8") if contenu else Path(faux).unlink(missing_ok=True)
+            with self.subTest(lint=contenu, auteur=a), mock.patch.object(orc, "LINT", faux):
+                auteur(a, ok)
+
+    def test_verifier_depot_recalcule_tree_sha256(self):
+        """SHOGEN-ENREG-VERIF-1 (ii) : avec --depot, tree.commit ré-extrait et tree.sha256 égal par fichier (attendu :
+        sha256 des octets du test) ; refus (tree.sha256) sur un sha changé, un fichier en trop ou en moins, un dépôt
+        sans le commit ; servi contrôlé au même dépôt (refus served_from) ; sans --depot, ces copies passent et la CLI
+        dit « non recalculé ». Rougit si : --depot ignoré ; clés seules, ou valeurs communes seules, comparées ; autre
+        commit ré-extrait ; servi non recalculé ; ré-extraction impossible admise ; option non transmise par la CLI."""
+        d, autre = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "autre-depot")
+        list(depot(autre, [{"x": b"x"}]))
+        g2 = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(g2, "G2", self.c1, self.depot)["tree"]["sha256"],
+                         {k: hashlib.sha256(v).hexdigest() for k, v in OK.items()})
+        for i, f in enumerate((lambda t: t.update({"LISEZ-MOI": "0" * 64}), lambda t: t.update({"en-trop": "0" * 64}),
+                               lambda t: t.pop("LISEZ-MOI"))):
+            p = self.copie(d, g2, f"arbre-{i}.json", lambda r: f(r["tree"]["sha256"]))
+            self.assertEqual(orc.verifier(p, "G2", self.c1)["tree"]["commit"], self.c1)
+            with self.subTest(i=i), self.assertRaisesRegex(ValueError, r"^refus \(tree\.sha256\) : "):
+                orc.verifier(p, "G2", self.c1, self.depot)
+        with self.assertRaisesRegex(ValueError, r"^refus \(tree\.sha256\) : .*ré-extraction impossible"):
+            orc.verifier(g2, "G2", self.c1, autre)
+        sert = {"chemin": "arbre-0.json", "sha256": hashlib.sha256(Path(d, "arbre-0.json").read_bytes()).hexdigest()}
+        p = self.copie(d, g2, "sert.json", lambda r: r.update(served_from=sert))
+        self.assertEqual(orc.verifier(p, "G2", self.c1)["served_from"], sert)
+        with self.assertRaisesRegex(ValueError, r"^refus \(served_from\) : .*refus \(tree\.sha256\)"):
+            orc.verifier(p, "G2", self.c1, self.depot)
+        for x, code, sortie in ((g2, 0, f"conforme : {g2} (rôle G2, tree.commit {self.c1} ; tree.sha256 recalculé sur "
+                                       f"{self.depot})\n"), (Path(d, "arbre-0.json"), 2, "")):
+            v = subprocess.run([sys.executable, "-B", OUTIL, "--verifier", x, "--role", "G2", "--commit", self.c1,
+                                "--depot", self.depot], capture_output=True, text=True)
+            self.assertEqual((v.returncode, v.stdout, "refus (tree.sha256)" in v.stderr), (code, sortie, code == 2))
 
 
 if __name__ == "__main__":

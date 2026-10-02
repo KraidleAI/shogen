@@ -3,7 +3,8 @@ SHOGEN-ORACLE-ENREG-1 ; G0 docs/adr-0028/G0-partie-2.md §B). Bibliothèque stan
 listes d'arguments, jamais par un shell. Extrait le commit par `git archive` dans un répertoire temporaire, y lance des
 commandes de la liste fermée COMMANDES, écrit dans le répertoire donné la sortie de chacune et l'enregistrement
 shogen-<sha court>-<rôle>-<date>-<pid>.json (sorties : chemins relatifs à ce répertoire). SHOGEN_S2_CAMPAGNE_CONTROL
-est consignée, posée ou non, jamais posée (annexe D.4 a)."""
+est consignée, posée ou non, jamais posée (annexe D.4 a). SHOGEN-ENREG-VERIF-1 : la lecture contrôle aussi auteur
+et, avec un dépôt, tree.sha256."""
 from __future__ import annotations
 
 import argparse
@@ -28,6 +29,8 @@ HEX = re.compile(r"[0-9a-f]{64}")
 CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tree", "python", "env", "runs", "exit",
           "ecrit", "paquet", "sceau")
 RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
+LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "enforcement",
+                    "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
 
 
 def git(depot: str, *args: str) -> bytes:
@@ -56,6 +59,45 @@ def consigne(environ) -> dict:
     return {k: environ.get(k) for k in ENV}
 
 
+def liste_blanche() -> tuple:
+    """Identifiants admis, lus sur l'unique ligne ALLOWED='…' du lint d'épinglage (LINT) ; lint illisible, ligne
+    absente, répétée ou vide : ValueError."""
+    try:
+        with open(LINT, encoding="utf-8") as f:
+            lignes = re.findall(r"^ALLOWED='([^']*)'\r?$", f.read(), re.M)
+    except OSError as e:
+        raise ValueError(f"lint illisible ({e})") from e
+    if len(lignes) != 1 or not lignes[0].split():
+        raise ValueError(f"{LINT} : une seule ligne ALLOWED='…' non vide exigée, {len(lignes)} lue(s)")
+    return tuple(lignes[0].split())
+
+
+def extraire(depot: str, sha: str, arbre: str) -> dict:
+    """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend {chemin : sha256} par
+    fichier."""
+    with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
+        try:
+            t.extractall(arbre, filter="data")
+        except tarfile.FilterError as e:
+            raise ValueError(f"extraction de {sha} rejetée par le filtre data de tarfile ({e}) — refus") from e
+    return {os.path.relpath(os.path.join(d, f), arbre).replace(os.sep, "/"): sha256_fichier(os.path.join(d, f))
+            for d, _sous, fs in os.walk(arbre) for f in fs}
+
+
+def ecarts_arbre(depot: str, commit: str, consignes) -> list:
+    """Chemins dont le sha256 de la ré-extraction de `commit` diffère de `consignes` (fichiers en trop ou en moins
+    compris) ; ré-extraction impossible : un écart unique qui la nomme."""
+    arbre = tempfile.mkdtemp(prefix="oracle_")
+    try:
+        h = extraire(depot, commit, arbre)
+    except (ValueError, OSError, subprocess.CalledProcessError) as e:
+        return [f"ré-extraction impossible ({e})"]
+    finally:
+        shutil.rmtree(arbre)
+    t = consignes if isinstance(consignes, dict) else {}
+    return sorted(k for k in set(h) | set(t) if h.get(k) != t.get(k))
+
+
 def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, commandes=("suite",), base=None,
                 paquet_sha256=None, sceau_gentime=None) -> tuple:
     """Lance les commandes nommées sur l'extraction du commit, écrit sorties et enregistrement sans jamais écraser ;
@@ -72,13 +114,7 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     nom = f"shogen-{sha[:7]}-{role}-{maintenant:%Y%m%dT%H%M%SZ}-{os.getpid()}"
     arbre, runs = tempfile.mkdtemp(prefix="oracle_"), []
     try:
-        with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
-            try:
-                t.extractall(arbre, filter="data")
-            except tarfile.FilterError as e:
-                raise ValueError(f"extraction de {sha} rejetée par le filtre data de tarfile ({e}) — refus") from e
-        hashes = {os.path.relpath(os.path.join(d, f), arbre).replace(os.sep, "/"): sha256_fichier(os.path.join(d, f))
-                  for d, _sous, fs in os.walk(arbre) for f in fs}
+        hashes = extraire(depot, sha, arbre)
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c]
             cmd, sortie = [sys.executable, *args], f"{nom}.{i}-{c}.out"
@@ -110,11 +146,13 @@ def zero(x) -> bool:
     return type(x) is int and x == 0                  # 0 entier ; false JSON refusé
 
 
-def verifier(chemin: str, role: str, commit: str) -> dict:
+def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     """Relit un enregistrement ; refus nommé, ValueError « refus (<contrôle>) : … », au premier contrôle non conforme :
-    champs, schema, rôle attendu, tree.commit égal au sha complet attendu, static_only false, exit 0 (et chaque
-    commande), sha256 de chaque sortie recalculé, paquet.sha256 au rôle « rendu » ou champs nuls hors de ce rôle,
-    served_from nul, ou chemin et sha256 d'un enregistrement conforme aux mêmes contrôles. Rend l'enregistrement."""
+    champs, schema, rôle attendu, auteur (identifiant de la liste blanche du lint, ou cet identifiant suivi de [1m],
+    par égalité exacte), tree.commit égal au sha complet attendu, tree.sha256 égal par fichier à la ré-extraction du
+    commit si `depot` est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
+    paquet.sha256 au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou chemin et sha256 d'un
+    enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
     def exige(ok, controle, detail=""):
         if not ok:
             raise ValueError(f"refus ({controle}) : {chemin}{detail} — enregistrement d'oracle non conforme (D6 viii)")
@@ -128,7 +166,17 @@ def verifier(chemin: str, role: str, commit: str) -> dict:
         cles(r, RUN) and cles(r["sortie"], ("chemin", "sha256")) for r in rec["runs"]), "champs")
     exige(rec["schema"] == SCHEMA, "schema")
     exige(rec["role"] == role, "rôle", f" : {rec['role']!r}, attendu {role!r}")
+    try:
+        admis = liste_blanche()
+    except ValueError as e:
+        exige(False, "auteur", f" : liste blanche illisible ({e})")
+    a = rec["auteur"]
+    exige(isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis), "auteur",
+          f" : {a!r}, attendu un identifiant de la liste blanche de {LINT}, ou cet identifiant suivi de [1m]")
     exige(rec["tree"]["commit"] == commit, "tree.commit", f" : {rec['tree']['commit']!r}, attendu {commit!r}")
+    if depot is not None:
+        e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
+        exige(not e, "tree.sha256", f" : {e[:3]}{' …' if len(e) > 3 else ''} (ré-extraction depuis {depot})")
     exige(rec["static_only"] is False, "static_only")
     exige(zero(rec["exit"]) and rec["runs"] and all(zero(r["exit"]) for r in rec["runs"]), "exit")
     racine = os.path.dirname(os.path.abspath(chemin))
@@ -144,7 +192,7 @@ def verifier(chemin: str, role: str, commit: str) -> dict:
         p = os.path.join(racine, str(sf.get("chemin"))) if isinstance(sf, dict) else ""
         exige(cles(sf, ("chemin", "sha256")) and os.path.isfile(p) and sha256_fichier(p) == sf["sha256"], "served_from")
         try:
-            verifier(p, role, commit)
+            verifier(p, role, commit, depot)
         except ValueError as e:
             exige(False, "served_from", f" → {e}")
     return rec
@@ -152,8 +200,9 @@ def verifier(chemin: str, role: str, commit: str) -> dict:
 
 def main(argv: list) -> int:
     """Écriture (--role, --auteur, --depot, --commit, --sortie ; options --base, --commande, --paquet-sha256,
-    --sceau-gentime), ou lecture (--verifier ENREGISTREMENT --role R --commit SHA_COMPLET). Code 0 : enregistrement
-    écrit et commandes vertes, ou conforme ; 1 : une commande a échoué ; 2 : refus."""
+    --sceau-gentime), ou lecture (--verifier ENREGISTREMENT --role R --commit SHA_COMPLET ; option --depot :
+    tree.sha256 recalculé). Code 0 : enregistrement écrit et commandes vertes, ou conforme ; 1 : une commande a échoué ;
+    2 : refus."""
     p = argparse.ArgumentParser(prog="oracle_record.py", description="enregistrement shogen.oracle-record.v1 (D6 viii)")
     p.add_argument("--verifier", metavar="ENREGISTREMENT")
     p.add_argument("--role", required=True, choices=ROLES)
@@ -162,13 +211,15 @@ def main(argv: list) -> int:
         p.add_argument(opt)
     p.add_argument("--commande", action="append", choices=sorted(COMMANDES))
     a = p.parse_args(argv)
-    ecriture = (a.auteur, a.depot, a.sortie, a.base, a.commande, a.paquet_sha256, a.sceau_gentime)
-    if a.verifier is not None and any(x is not None for x in ecriture) or a.verifier is None and None in ecriture[:3]:
-        p.error("--verifier n'admet que --role et --commit ; l'écriture exige --auteur, --depot et --sortie")
+    ecriture = (a.auteur, a.sortie, a.base, a.commande, a.paquet_sha256, a.sceau_gentime)
+    if a.verifier is not None and any(x is not None for x in ecriture) or a.verifier is None and None in (
+            a.auteur, a.depot, a.sortie):
+        p.error("--verifier n'admet que --role, --commit et --depot ; l'écriture exige --auteur, --depot et --sortie")
     try:
         if a.verifier is not None:
-            verifier(a.verifier, a.role, a.commit)
-            print(f"conforme : {a.verifier} (rôle {a.role}, tree.commit {a.commit})")
+            verifier(a.verifier, a.role, a.commit, a.depot)
+            print(f"conforme : {a.verifier} (rôle {a.role}, tree.commit {a.commit} ; tree.sha256 " + (
+                "non recalculé : --depot absent)" if a.depot is None else f"recalculé sur {a.depot})"))
             return 0
         chemin, code = enregistrer(a.sortie, a.role, a.auteur, a.depot, a.commit, tuple(a.commande or ("suite",)),
                                    a.base, a.paquet_sha256, a.sceau_gentime)
