@@ -29,8 +29,12 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # 7a4ff05c…663734 ; B-b : blocs 3 et 6, avant 30f5c0fb…9ff0e1 ; P2P texte : docs/G1-lot-B-sensibilite.md ;
 # B-c, C-5 de la revue G2 : ligne « non couverts » insérée, avant 4d511faf…b25819) ; puis de POOLEE-b
 # (bloc 3 : famille et strate poolée, avant 43cc5f85…a1f2897 ; P2P texte :
-# docs/G1-lot-POOLEE-strate-poolee.md).
-SHA_BASE_AVEC_OPTION = "f1f379f2ed7179a5f16b7ac74f14033dabbfa4c862213f556d2703c97d483de6"
+# docs/G1-lot-POOLEE-strate-poolee.md) ; puis de B-DEP-2 (bloc 3 : z_bloc par strate, A(window-dependence),
+# avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis de CRITERE-a2 (bloc 3 : famille,
+# section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md) ; puis de CRITERE-b2
+# (bloc 6 : ligne d'entrées du drapeau 2 ; avant dc7210d3…82910a3 ; même journal) ; puis de D5-AMEND-b (blocs
+# 1 et 3, [SENSIBILITÉ] ; avant 0410039b…eac18 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
+SHA_BASE_AVEC_OPTION = "b0b4f3b75058ab286723982b82984dcfa83e6af19bc7ee10bfd4068f7b67d2d0"
 
 
 class Coupure(Exception):

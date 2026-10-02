@@ -41,14 +41,30 @@ from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
     DECIMAL_PREC,
+    ELL_BLOC,
     ETIQUETTE_POOLEE,
+    GARDE_BLOCS,
+    SEUIL_Z,
     analysis_pools,
+    bornes_censure,
     build_window_strate,
     classify_cells,
     compute_r1,
+    fenetres_sautees,
     parse_journal,
+    regle_critere,
 )
 from .window import STRATE_DEFAUT, verify_markers_against_spec, weekday_utc
+
+ETIQUETTE_Z_BLOC = ("plancher d'erreur-type pré-enregistré (blocs mobiles, noyau de Bartlett ; "
+                    "ADR-0028 §1 bis) — z_s reste la statistique confirmatoire")   # ADR-0028 §1 bis.2
+A_WINDOW_DEPENDENCE = (                    # registre 08, colonne « exercée par » ; lot B-DEP-2
+    "A(window-dependence) engagée par le niveau de R1 (ADR-0028 §1 bis.1 pt 7 ; registre 08) : dépendance "
+    f"sérielle de I_t = 1{{m_t ≥ 2}} d'une strate de portée < ℓ = {ELL_BLOC} fenêtres ; exercée par z_bloc "
+    "et le diagnostic de runs de I_t ; décharge = SHOGEN-DEP-FENETRES-2 (08 ; ADR-0028 annexe B.6)")
+# ADR-0028 annexe D.5 (SHOGEN-CENSURE-INFO-1 ; CV2-24, CV2-26) : étiquette imposée, C-7 du cp-1 de D5-AMEND
+ETIQUETTE_CENSURE = ("bornes à P̂_more fixé, non extérieures ; verdict non identifié sous censure arbitraire "
+                     "des fenêtres sautées")
 
 
 def _fmt_dec(x) -> str:
@@ -147,6 +163,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     r1 = compute_r1(markers, readings, pool_an, w, sigma_by_class, sigma_class_of_flux,
                     tau, seuil_hist, n_min, pools)
+    rg = regle_critere(r1)                 # règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1) : bloc 3
     cells = classify_cells(markers, readings, pool, w, sigma_by_class,
                            sigma_class_of_flux, tau, n_min)
     reading_map = {(int(r["window_start"]), r["flux_id"]): r for r in readings}
@@ -194,6 +211,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap(f"  {'segment_retraits':24} = hors segment : {_retires(tous, dans_seg, strates)} — ADR-0028 D4")
     else:
         ap(f"  {'segment':24} = aucun (journal entier) — ADR-0028 D4")
+    pertes = []                # → [SENSIBILITÉ] (annexe D.5, SHOGEN-DP-JOURNAL-LOSS-1), sans second calcul
     for a, b in ranges:        # uniquement si filtre (sans option : aucune ligne ajoutée)
         ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
            f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
@@ -202,11 +220,22 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            "semi-ouvert : asn_attribution (ts), clock_check (harness_ts), "
            f"w = {w} s de run_params — ADR-0028 D5")
         seule = records.filtre_lecture(params, *dans_seg, [(a, b)])[:3]
-        ap(f"  {'exclusion_retraits':24} = [{a} ; {b}] seule (assiette : ligne segment) : "
-           f"{_retires(dans_seg, seule, strates)}")
+        r = _retires(dans_seg, seule, strates)
+        pertes.append(f"[{a} ; {b}] seule : {r}")
+        ap(f"  {'exclusion_retraits':24} = [{a} ; {b}] seule (assiette : ligne segment) : {r}")
     if ranges:                 # C-4 (i) : chaque plage seule, puis l'union (chevauchement compté une fois)
+        r = _retires(dans_seg, (markers, clock_checks, asn_records), strates)
+        pertes.append(f"union de {len(ranges)} plage(s) : {r}")
         ap(f"  {'exclusion_retraits_union':24} = {len(ranges)} plage(s), union (assiette : ligne segment) : "
-           f"{_retires(dans_seg, (markers, clock_checks, asn_records), strates)} — SHOGEN-EXCL-COMPTE-1")
+           f"{r} — SHOGEN-EXCL-COMPTE-1")
+    sautees = fenetres_sautees(ws_tous, params["strate_calendar"], w, seg, ranges)   # ADR-0028 annexe D.5
+    bs, ss = seg or (deb and (deb[0], deb[-1] + w)), ", ".join(
+        f"{st} {sautees.get(st, 0)}" for st in sorted({*strates, *sautees}))
+    port = "segment" if seg else "journal entier : première fenêtre ; dernière + w"
+    ap(f"  {'fenetres_sautees':24} = " + (f"grille de pas w = {w} s sur [{bs[0]} ; {bs[1]}) ({port}), sans "
+       f"marqueur window_close, hors plages D5 : {ss}" if bs else "aucune fenêtre au journal") + " — toutes "
+       "causes confondues, sous l'hypothèse H_perte (pertes d'outillage non informatives : "
+       "A(loss-non-informative), registre 08) ; ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1")
     for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
         cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
         ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "
@@ -296,12 +325,36 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         else:
             ap(f"    z       = {_fmt_dec(blk['z'])} (seuil {_fmt_dec(blk['seuil_z'])}, "
                f"unilatéral — 10 §5.1)")
-    sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6) : lot CRITERE
+    if r1.get("strates"):     # ADR-0028 §1 bis.1 pts 3 et 9 (A-2) : clé « bloc » de r1, sans recalcul
+        ap(f"\n  ── z_bloc par strate : {ETIQUETTE_Z_BLOC}")
+        ap("    z_bloc = (K − n·P̂_more)/σ̂_bloc, même numérateur que z ; σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} "
+           "(1 − k/ℓ)·γ̂_k sur la série I_t = 1{m_t ≥ 2} de la strate, γ̂_k centrés sur Ī = K/n, lag sur la "
+           "grille de pas w : paires de deux fenêtres de la strate, fenêtre absente sans paire")
+        ap(f"    z_bloc publié si σ̂²_bloc > 0 et n ≥ {GARDE_BLOCS}·ℓ (garde de blocs, distincte du "
+           "drapeau 1), que la garde §5.4 soit tenue ou non ; FIV = σ̂²_bloc/(n·P̂_more·(1 − P̂_more)) = "
+           "R_centrage × FIV_série, R_centrage = γ̂₀/(n·P̂_more·(1 − P̂_more)), FIV_série = σ̂²_bloc/γ̂₀ ; "
+           "cv théorique = √(4ℓ/(3n)) [inféré : dérivation de l'AVIS-advisor-defi Q1 (iv)]")
+        for st, blk in r1["strates"].items():
+            b, ru = blk["bloc"], blk["bloc"]["runs"]
+            ap(f"    « {st} » : ℓ = {b['ell']} ; γ̂₀ = {_fmt_dec(b['gamma0'])} ; σ̂²_bloc = "
+               f"{_fmt_dec(b['sigma2_bloc'])} ; cv théorique = {_fmt_dec(b['cv_theorique'])} [inféré]")
+            ap(f"    « {st} » : " + (b["FIV_motif"] or f"FIV = {_fmt_dec(b['FIV'])} ; R_centrage = "
+                                    f"{_fmt_dec(b['R_centrage'])}")
+               + " ; " + (b["FIV_serie_motif"] or f"FIV_série = {_fmt_dec(b['FIV_serie'])}"))
+            ap(f"    « {st} » : z_bloc = " + (f"non publié : {b['z_bloc_motif']}" if b["z_bloc"] is None
+                                             else _fmt_dec(b["z_bloc"])))
+            ap(f"    « {st} » : diagnostic de runs de I_t (hors décision) : nombre = {ru['nombre']} ; "
+               f"longueur moyenne = {_fmt_dec(ru['longueur_moyenne'])} ; run maximal = {ru['run_max']}")
+    sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6), prémisse (pt 7)
     ap("\n  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : " + (
-        f"m = 2 tests confirmatoires ({sc['calme']}, {sc['stress']}), chacun unilatéral au seuil 2,33 ; "
-        "borne P(au moins un rejet à tort) ≤ 2 × 0,01 = 0,02" if sc.get("kind") == "weekend_utc"
+        f"m = {rg['m']} (strates testées : {', '.join(rg['testees']) or 'aucune'} ; m ≤ 2 ; "
+        "§1 bis.1 pt 6), tests unilatéraux au seuil 2,33 ; borne P(au moins un rejet à tort) ≤ "
+        "2 × 0,01 = 0,02 sous le modèle nul joint (§1 bis.1 pt 7) : modèle d'indépendance du pool de "
+        "doc 10 §5.1 et dépendance sérielle des fenêtres de portée < ℓ = "
+        f"{ELL_BLOC} (A(window-dependence), registre 08) ; niveau asymptotique, non démontré ≤ 0,01 en "
+        "échantillon fini (SHOGEN-SIM-NIVEAU-1)" if sc.get("kind") == "weekend_utc"
         else "non applicable (calendrier mono-strate)"))
-    po = r1["poolee"]                   # hors de r1["strates"] : ni z_max, ni drapeau 2, ni famille
+    po = r1["poolee"]                   # hors de r1["strates"] : ni règle, ni drapeau 2, ni famille
     ap(f"\n  ── strate poolée (ADR-0028 D2 pt 4 ; {ETIQUETTE_POOLEE}) : forme stratifiée, jamais l'union "
        "brute des fenêtres")
     ap("    z_pool = Σ_s (K_s − n_s·P̂_more,s) / √(Σ_s n_s·P̂_more,s·(1 − P̂_more,s)), chaque strate sur son "
@@ -316,6 +369,84 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            f"Σ_s n_s·P̂_more,s·(1 − P̂_more,s) = {_fmt_dec(po['variance'])}")
         ap(f"    z_pool  = {_fmt_dec(po['z_pool'])} — {ETIQUETTE_POOLEE}")
     ap(f"\n  {A_WINDOW_STATIONARITY}")
+    ap(f"  {A_WINDOW_DEPENDENCE}")
+    # Règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 5, 6, 8) : valeurs de r1.regle_critere, sans recalcul
+    ap("\n  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
+       "comparaisons sur les Decimal publiées, non arrondies, au seuil 2.33, « ≥ » ; aucune p-valeur")
+    kp, axes = r2_out["partition"], "axes panne / staleness / hors-enveloppe"
+    ke = ("= non évaluable" if kp["k_eff"] is None else f"≤ {kp['k_eff']} (borne supérieure)"
+          if kp.get("k_eff_is_upper_bound") else f"= {kp['k_eff']}")
+    suites = {"garde_5_4": " : strate non testée, hors décision (§1 bis.1 pt 2)",
+              "rejet_non_qualifiable": " : rejet non qualifiable : niveau non tenu sous dépendance sérielle",
+              "discordance": " (discordance)"}
+    for st, e in rg["strates"].items():
+        blk, cas, tete = r1["strates"][st], e["cas"], f"    « {st} » : "
+        z, zb = blk["z"], blk["bloc"]["z_bloc"]
+        zs = ("z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10)" if z is None else
+              f"z_s = {_fmt_dec(z)} {'<' if cas == 'z_sous_seuil' else '≥'} 2,33"
+              + (" (z_s ≤ −2,33 : hors famille, sans conclusion)" if z <= -SEUIL_Z else ""))
+        zbt = ("" if cas in ("garde_5_4", "z_sous_seuil") else
+               f" ; z_bloc non publié ({blk['bloc']['z_bloc_motif']})" if zb is None else
+               f" ; z_bloc = {_fmt_dec(zb)} {'≥' if cas == 'rejette' else '<'} 2,33")
+        ap(f"{tete}{zs}{zbt} → {e['valeur']}{suites.get(cas, '')}")
+        if cas == "rejette":
+            ap(f"{tete}« le modèle d'indépendance du pool (k nominal_s = {len(blk['per_source'])} flux "
+               f"du pool de la strate, bloc 1 ; k_eff mesuré {ke}, bloc 6) est rejeté dans la strate {st} "
+               f"sur {blk['n']} fenêtres, {axes}, tel qu'observé par cet instrument (hôte, DNS et réseau du "
+               "harnais compris) ; aucune dépendance de paire n'est établie »")
+        elif cas == "discordance":
+            ap(f"{tete}« le modèle binomial de doc 10 §5.1, à fenêtres indépendantes, est rejeté ; la cause "
+               "n'est pas identifiée entre co-défaillance des sources et dépendance sérielle des fenêtres »")
+        elif cas == "z_sous_seuil":
+            ap(f"{tete}« le modèle d'indépendance n'est pas rejeté sur {blk['n']} fenêtres, {axes} » ; un "
+               "résultat négatif est un résultat")
+        if e["emd"] is not None:
+            ap(f"{tete}EMD_s = (2,33 + 0,8416)·max(√(n_s·P̂_more,s·(1 − P̂_more,s)), σ̂_bloc,s) = "
+               f"{_fmt_dec(e['emd'])} fenêtres ; fraction de n_s = {_fmt_dec(e['emd_fraction'])} "
+               "(puissance 0,8 : choix de conception ; aucun seuil sur l'EMD)")
+        ru, lb = blk["bloc"]["runs"]["run_max"], blk["bloc"]["ell"]
+        if ru >= lb:                     # ADR-0028 §1 bis.1 pt 9 : hors décision, sans effet sur la valeur
+            ap(f"{tete}drapeau « run maximal ≥ ℓ » (run maximal = {ru} ≥ ℓ = {lb}) : σ̂²_bloc,s biaisé vers "
+               "le bas ; SHOGEN-DEP-FENETRES-2 prioritaire avant G10 — hors décision, sans effet sur la "
+               "valeur")
+    nq, tst = rg["non_qualifiables"], rg["testees"]
+    ap(f"  « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = {rg['r1_discrimine']} : "
+       + (f"strate(s) qui rejettent : {', '.join(rg['rejette'])}" if rg["rejette"] else
+          "aucune strate ne rejette ; " + (f"rejet non qualifiable : {', '.join(nq)}" if nq else
+                                           f"strate(s) testée(s) : {', '.join(tst)}" if tst
+                                           else "aucune strate testée")))
+    # Traitements de l'annexe D.5 d'ADR-0028 (amendement du 2026-09-30, A-6) : valeurs de r1, sans recalcul
+    ap("\n  ── traitements pré-enregistrés de l'annexe D.5 d'ADR-0028 (amendement du 2026-09-30, A-6) : "
+       "descriptifs, hors décision, sans paramètre")
+    ap("    τ observé (SHOGEN-TAU-REDERIV-1), sans ré-estimation de τ : |p − médiane_LOO|/médiane_LOO des "
+       "cellules (fenêtre, flux) arrivées à l'axe (i) (hors-enveloppe ou pas d'écart), pool d'analyse D1 de "
+       "chaque strate, sur le segment, par classe (sigma_class_of_flux) ; P99 au rang le plus proche, rang "
+       "(99·N + 99)//100")
+    for cl, t in r1["tau_observe"].items():
+        ap(f"    « {cl} » : τ_classe = {_fmt_dec(t['tau_classe'])} ; N = {t['N']}" + (
+            f" ; P99 = {_fmt_dec(t['P99'])} ; maximum = {_fmt_dec(t['max'])}" if t["N"] else " : non défini"))
+    ap("    décomposition de K (SHOGEN-HOST-DEGRADED-1) par nombre de lectures présentes au statut "
+       "panne_transport (model.Status) des flux du pool D1 de la strate ; c_s = fenêtres où chaque flux du "
+       "pool porte une lecture panne_transport ; le z confirmatoire inclut les modes communs de "
+       "l'observateur (hôte, DNS, réseau)")
+    for st, blk in r1.get("strates", {}).items():
+        d = blk["decomposition_K"]
+        ap(f"    « {st} » : K = {blk['K']} = K[≥ 2 panne_transport] {d['pt_2_plus']} + K[1] {d['pt_1']} + "
+           f"K[0] {d['pt_0']} ; K[tous les écarts hors_enveloppe] = {d['tous_hors_enveloppe']} ; c_s = "
+           f"{d['c']}")
+    ap(f"    fenêtres sautées (SHOGEN-CENSURE-INFO-1 ; s au bloc 1) : {ETIQUETTE_CENSURE}")
+    ap("    z_bas = (K − (n + s)·P̂_more)/√((n + s)·P̂_more·(1 − P̂_more)) ; z_haut = (K + s − (n + s)·"
+       "P̂_more)/√((n + s)·P̂_more·(1 − P̂_more)) ; puis σ̂_bloc au dénominateur si z_bloc est publié ; "
+       "hypothèse H_perte")
+    for st, blk in r1.get("strates", {}).items():
+        s, zb = sautees.get(st, 0), blk["bloc"]["z_bloc"] is not None
+        if blk["z"] is None:
+            ap(f"    « {st} » : s = {s} ; bornes non publiées (garde §5.4 : z_s non publié)")
+            continue
+        b = bornes_censure(blk["n"], blk["K"], blk["P_more"], s, blk["bloc"]["sigma2_bloc"] if zb else None)
+        ap(f"    « {st} » : s = {s} ; z_bas = {_fmt_dec(b['z_bas'])} ; z_haut = {_fmt_dec(b['z_haut'])} ; "
+           "avec σ̂_bloc : " + (f"z_bas = {_fmt_dec(b['z_bloc_bas'])} ; z_haut = "
+                               f"{_fmt_dec(b['z_bloc_haut'])}" if zb else "non publiées (z_bloc non publié)"))
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
@@ -489,6 +620,15 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     ap(f"  DRAPEAU 2 « co-défaillance observée non expliquée par les axes R2 » (§5.6) : "
        f"état = {d2['etat'].upper()}")
     ap(f"      {d2['raison']}")
+    kns = d2["k_nominal_strates"]        # ADR-0028 §1 bis.1 pt 10 ; annexe D.5, bloc 6 (lot CRITERE, C-8)
+    ap(f"      entrées (ADR-0028 §1 bis.1 pt 10) : « R1 discrimine » = {d2['r1_discrimine']} (bloc 3"
+       + (f" ; strate(s) : {', '.join(d2['rejette'])}" if d2["rejette"] else "") + ") ; k_eff "
+       + (f"≤ {d2['k_eff']} (borne supérieure)" if kp.get("k_eff_is_upper_bound")
+          else f"= {_fmt_dec(d2['k_eff'])}")
+       + f" ; k nominal du segment (hôtes) = {d2['k_nominal']} ; k nominal_s (flux du "
+       "pool de la strate) : " + (", ".join(f"« {s} » = {k}" for s, k in kns.items()) or "aucune strate")
+       + (" — comparaison hétérogène déclarée" if any(k != d2["k_nominal"] for k in kns.values()) else "")
+       + " ; strate poolée hors des entrées")
     loc = d2.get("localisation_inter_clusters")
     if loc:
         ap(f"      localisation ({loc['note']}) — consomme la matrice de co-écarts M1b :")
@@ -512,6 +652,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap("  motif de l'exclusion (harnais dégradé, ADR-0025) : causalité non établie")
         ap("  assiette : fenêtres du segment (bloc 1), dédoublonnées (last-wins) ; R1 seul par variante, "
            "pool d'analyse D1 de la variante ; ni L&M ni R2 ; écart de z = z(incluse) − z(exclue)")
+        ap("  comptes de pertes par type d'enregistrement, retirés par la plage, plage par plage puis union "
+           "(SHOGEN-DP-JOURNAL-LOSS-1, ADR-0028 annexe D.5 ; repris du bloc 1, sans second calcul) :")
+        for t in pertes:
+            ap(f"    {t}")
         for st in (sorted({sc["calme"], sc["stress"]}) if we else [sc.get("strate", STRATE_DEFAUT)]):
             e, i = r1.get("strates", {}).get(st), r1_i.get("strates", {}).get(st)
             ap(_ligne_variante(st, "exclue (principale)", e))

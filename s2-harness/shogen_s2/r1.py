@@ -19,7 +19,7 @@ garde, le bloc R1 rend la queue exacte au lieu d'un `z` vide de sens ;
 calendrier 2-strates ex ante est dans `window.py` (M1b). Le drapeau 2 de §5.6
 (« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2) : **réalisé en M1c
 (`r2.drapeau_2`)** — ici (bloc R1) seul le drapeau « historique insuffisant » est
-calculé ; `r2.drapeau_2` consomme ce z par strate.
+calculé ; `r2.drapeau_2` consomme la règle par strate (`regle_critere`, ADR-0028 §1 bis.1 pt 10).
 
 **Identité élémentaire** (10 §5.1, indépendante de la citation, donc du calcul
 débloqué) :
@@ -50,13 +50,18 @@ from decimal import Decimal, localcontext
 from typing import Optional
 
 from . import records
-from .window import verify_markers_against_spec, window_end
+from .model import Status
+from .window import strate_from_spec, verify_markers_against_spec, window_end
 
 DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique (oracle)
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
 N_MIN_HORSENV = 4                 # N ≥ 4 répondantes pour l'enveloppe leave-one-out (10 §5.2)
 SEUIL_Z = Decimal("2.33")         # point 99% normale standard (K&L — 10 §5.1)
+ELL_BLOC = 240                    # ℓ, fenêtres : choix de conception, seule valeur rendue (ADR-0028 §1 bis.2)
+GARDE_BLOCS = 30                  # garde de blocs : z_bloc publié si n_s ≥ 30·ℓ (ADR-0028 §1 bis.1 pt 3)
+Z_PUISSANCE = Decimal("0.8416")   # EMD, puissance 0,8 : choix de conception (ADR-0028 §1 bis.1 pt 8)
 ETIQUETTE_POOLEE = "exploratoire, hors famille, hors décision"   # strate poolée (ADR-0028 D2 pt 4)
+PANNE_TRANSPORT = Status.PANNE_TRANSPORT.value   # lecture PRÉSENTE seule (ADR-0028 annexe D.5)
 A_WINDOW_STATIONARITY = (
     "A(window-stationarity) engagée par le test agrégé (10 §5.3 ; ancre "
     "Eckhardt & Lee TM-86369 p. fichier 2, hyp. (ii) « stationary input series ») "
@@ -217,6 +222,29 @@ def poisson_binomial(phats: list[Decimal]) -> tuple[Decimal, Decimal, Decimal]:
         return +p0, +p1, +p_more
 
 
+def _ecart_relatif(rep: dict, f: str) -> Decimal:
+    """|p_f − médiane_LOO|/médiane_LOO d'une cellule arrivée à l'axe (i), `rep` = prix des répondantes de la
+    fenêtre : le rapport que classify_ecart compare à τ_classe, même médiane, même précision (ADR-0028
+    annexe D.5)."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        m = _median([p for g, p in rep.items() if g != f])
+        return +(abs(rep[f] - m) / m)
+
+
+def _tau_observe(ratios: dict, tau: dict) -> dict:
+    """τ observé par classe de τ_classe, sur le segment (ADR-0028 annexe D.5, SHOGEN-TAU-REDERIV-1), sans
+    ré-estimation : N cellules, P99 au rang le plus proche (99·N + 99)//100, 1-indexé (méthode documentée de
+    closure.percentile_nearest_rank, citée ; closure, en quarantaine, n'est pas importé), maximum ; N = 0 :
+    None."""
+    out = {}
+    for cl in sorted(tau):
+        v = sorted(ratios.get(cl, ()))
+        out[cl] = {"tau_classe": tau[cl], "N": len(v), "P99": v[(99 * len(v) + 99) // 100 - 1] if v else None,
+                   "max": v[-1] if v else None}
+    return out
+
+
 def gate_value(n: int, p_more: Decimal) -> Decimal:
     """`n·P̂_more·(1−P̂_more)` (10 §5.4) — la forme produit-variance."""
     with localcontext() as ctx:
@@ -289,6 +317,82 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
             raise ValueError("strate poolée : Σ_s n_s·P̂_s·(1 − P̂_s) ≤ 0, z_pool non défini "
                              "(ADR-0028 D2 pt 4)")
         return +num, +var, +(num / var.sqrt())
+
+
+def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
+    """Variance de long terme par blocs d'UNE strate (ADR-0028 §1 bis.1 pt 3 ; A-2) :
+    σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} (1 − k/ℓ)·γ̂_k, γ̂_k = Σ (I_t − Ī)(I_{t+k} − Ī) sur les paires de la
+    grille, Ī = K/n. Forme de Künsch 1989 (P-01, OCR seul, [2nd]) : blocs mobiles, noyau de Bartlett, non
+    restreinte. Elle égale (1/ℓ)·Σ_j B_j² (sommes de blocs de la série centrée complétée par des 0), d'où
+    σ̂² ≥ 0 et σ̂² = 0 ⇔ K ∈ {0, n} (CRITIQUE v2 §4.1). `serie` : couples (window_start, I_t), window_start
+    entiers strictement croissants, écarts multiples de `w`, I_t ∈ {0, 1} ; sinon ValueError. Lag k ⇔ écart
+    k·w : une fenêtre absente, exclue ou d'une autre strate ne forme pas de paire. Comptes entiers par lag sur
+    masques de bits (bit t : position de grille (ws − ws₀)/w) : M_k paires, C_k = Σ I_t·I_{t+k}, S_g et S_d
+    sommes des I des deux membres ; N = ℓ·n²·σ̂² = ℓ·n·K(n − K)
+    + Σ_{k=1}^{ℓ−1} 2(ℓ − k)·(n²·C_k − n·K·(S_g + S_d) + M_k·K²), puis une division Decimal par valeur
+    (DECIMAL_PREC). Rend n, K, `numerateur` (N), `gamma0`, `sigma2_bloc` ; n = 0 : ces trois-là à None."""
+    if not (isinstance(w, int) and isinstance(ell, int) and w >= 1 and ell >= 1):
+        raise ValueError(f"variance par blocs : w = {w!r} et ℓ = {ell!r} doivent être des entiers ≥ 1")
+    serie, pres, val = list(serie), 0, 0
+    for i, (ws, it) in enumerate(serie):
+        ok = isinstance(ws, int) and isinstance(it, int) and it in (0, 1)
+        d = ws - serie[i - 1][0] if ok and i else w             # types contrôlés avant la soustraction
+        if not (ok and d > 0 and d % w == 0):
+            raise ValueError(f"variance par blocs : couple n° {i} ({ws!r}, {it!r}) refusé (window_start "
+                             f"entier, strictement croissant, écart multiple de w = {w} ; I_t ∈ {{0, 1}})")
+        pres |= 1 << (ws - serie[0][0]) // w
+        val |= it << (ws - serie[0][0]) // w
+    n, k1 = len(serie), val.bit_count()
+    if n == 0:
+        return {"n": 0, "K": 0, "numerateur": None, "gamma0": None, "sigma2_bloc": None}
+    num = ell * n * k1 * (n - k1)                                  # lag 0 : ℓ·n²·γ̂₀
+    for k in range(1, ell):
+        pk, vk = pres >> k, val >> k                               # bit t : position t + k
+        num += 2 * (ell - k) * (n * n * (val & vk).bit_count() + (pres & pk).bit_count() * k1 * k1
+                                - n * k1 * ((val & pk).bit_count() + (pres & vk).bit_count()))   # n²·γ̂_k
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        return {"n": n, "K": k1, "numerateur": num, "gamma0": +(Decimal(n * k1 - k1 * k1) / Decimal(n)),
+                "sigma2_bloc": +(Decimal(num) / Decimal(ell * n * n))}
+
+
+def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BLOC) -> dict:
+    """Clé `bloc` d'une strate (ADR-0028 §1 bis.1 pts 3 et 9 ; A-2), schéma fermé de 12 clés : ell, gamma0,
+    sigma2_bloc, cv_theorique, FIV, R_centrage, FIV_serie, FIV_motif, FIV_serie_motif, z_bloc, z_bloc_motif,
+    runs. `serie` : celle de `block_long_run_variance` ; `p_more`, `gate` : P̂_more et n·P̂_more(1 − P̂_more)
+    (`gate_value`) de la strate. FIV = σ̂²_bloc/garde, R_centrage = γ̂₀/garde (= Ī(1 − Ī)/(P̂(1 − P̂))),
+    FIV_serie = σ̂²_bloc/γ̂₀ : une division Decimal chacune, sur les valeurs publiées ; garde ≤ 0 : FIV et
+    R_centrage à None (FIV_motif) ; γ̂₀ = 0 : FIV_serie à None (FIV_serie_motif). cv_theorique = √(4ℓ/(3n))
+    [inféré : dérivation AVIS-advisor-defi Q1 (iv), pas un énoncé de Künsch]. z_bloc = (K − n·P̂_more)/
+    σ̂_bloc, numérateur de z_s, publié si σ̂²_bloc > 0 et n ≥ GARDE_BLOCS·ℓ (pt 3), que la garde §5.4 soit
+    tenue ou non (le NON ÉVALUABLE du pt 5 relève du lot CRITERE) ; sinon None et z_bloc_motif. runs (pt 9,
+    descriptif) : un run = positions de grille consécutives à I_t = 1 ; une fenêtre absente ou d'une autre
+    strate le coupe ; longueur_moyenne = K/nombre, None si nombre = 0."""
+    serie = list(serie)                                   # deux parcours (variance, runs) : itérateur admis
+    v = block_long_run_variance(serie, w, ell)
+    n, k1, g0, s2 = v["n"], v["K"], v["gamma0"], v["sigma2_bloc"]
+    nombre = run_max = c = 0
+    avant = None
+    for ws, it in serie:
+        c = (c + 1 if avant == ws - w else 1) if it else 0
+        nombre, run_max, avant = nombre + (c == 1), max(run_max, c), ws
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        if n == 0:
+            mz = mf = ms = "aucune fenêtre (n = 0)"
+        else:
+            garde_b = f"garde de blocs : n_s = {n} < {GARDE_BLOCS}·ℓ = {GARDE_BLOCS * ell}"
+            mz = " ; ".join(m for m, oui in (("σ̂²_bloc = 0 (K ∈ {0, n})", s2 == 0),
+                                             (garde_b, n < GARDE_BLOCS * ell)) if oui) or None
+            mf = None if gate > 0 else "garde n·P̂_more·(1 − P̂_more) ≤ 0 : FIV, R_centrage indéfinis"
+            ms = None if g0 != 0 else "γ̂₀ = 0 (K ∈ {0, n}) : FIV_serie indéfini"
+        moy = +(Decimal(k1) / Decimal(nombre)) if nombre else None
+        return {"ell": ell, "gamma0": g0, "sigma2_bloc": s2,
+                "cv_theorique": +(Decimal(4 * ell) / Decimal(3 * n)).sqrt() if n else None,
+                "FIV": None if mf else +(s2 / gate), "R_centrage": None if mf else +(g0 / gate),
+                "FIV_serie": None if ms else +(s2 / g0), "FIV_motif": mf, "FIV_serie_motif": ms,
+                "z_bloc": None if mz else +((Decimal(k1) - Decimal(n) * p_more) / s2.sqrt()),
+                "z_bloc_motif": mz, "runs": {"nombre": nombre, "longueur_moyenne": moy, "run_max": run_max}}
 
 
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
@@ -394,7 +498,7 @@ def classify_cells(
 
 def strate_poolee(strates: dict) -> dict:
     """Strate poolée (ADR-0028 D2 pt 4 ; §1 bis.1 pt 9 ; §1 bis.11 item 14) : hors de `strates`, donc
-    hors z_max, drapeau 2 et famille. Entrées par strate : n, K, P̂_more, pool d'analyse D1 et sa taille.
+    hors règle, drapeau 2 et famille. Entrées par strate : n, K, P̂_more, pool d'analyse D1 et sa taille.
     z_pool publié si au moins deux strates et si chacune publie son z (garde §5.4 tenue) ; sinon None
     et motif."""
     ent = {st: {"n": b["n"], "K": b["K"], "P_more": b["P_more"], "pool": list(b["per_source"]),
@@ -441,6 +545,7 @@ def compute_r1(
             "note": "aucune fenêtre complétée (n = 0)",
             "flag_historique_insuffisant": True,
             "poolee": strate_poolee({}),
+            "tau_observe": _tau_observe({}, tau),
             "A_window_stationarity": A_WINDOW_STATIONARITY,
         }
 
@@ -450,6 +555,7 @@ def compute_r1(
         windows_by_strate.setdefault(st, []).append(ws)
 
     strates_out: dict[str, dict] = {}
+    ratios: dict = {}                              # τ observé : classe → rapports de l'axe (i) du segment
     for st, wins in windows_by_strate.items():
         n = len(wins)
         ps = pool if pool_by_strate is None else pool_by_strate[st]
@@ -458,22 +564,35 @@ def compute_r1(
         stale_evaluable = {f: 0 for f in ps}
         ok_windows = {f: 0 for f in ps}
         k_count = 0
+        dk = dict.fromkeys(("pt_2_plus", "pt_1", "pt_0", "tous_hors_enveloppe", "c"), 0)   # annexe D.5
+        serie = []                                 # (window_start, I_t) de la strate (ADR-0028 §1 bis.1 pt 3)
         for ws in wins:
             cls = _classify_window(ws, reading_map, ps, w, sigma_by_class,
                                    sigma_class_of_flux, tau, n_min)
-            win_ecarts = 0
+            win_ecarts = pt = he = 0
+            rep = {}                               # répondantes de la fenêtre (enveloppe leave-one-out)
             for f in ps:
                 rd = reading_map.get((ws, f))
                 if rd is not None and rd.get("status") == "ok" and rd.get("price") is not None:
                     ok_windows[f] += 1
+                    rep[f] = Decimal(rd["price"])
                     if rd.get("source_ts") is not None:
                         stale_evaluable[f] += 1
+                pt += rd is not None and rd.get("status") == PANNE_TRANSPORT
                 kind = cls[f]
                 tally[f][kind] += 1
                 if kind in ECARTS:
                     win_ecarts += 1
+                    he += kind is Ecart.HORS_ENVELOPPE
+            for f in ps:                           # axe (i) atteint : hors-enveloppe ou pas d'écart
+                if cls[f] in (Ecart.HORS_ENVELOPPE, Ecart.PAS_ECART):
+                    ratios.setdefault(sigma_class_of_flux[f], []).append(_ecart_relatif(rep, f))
             if win_ecarts >= 2:
                 k_count += 1
+                dk["pt_2_plus" if pt >= 2 else f"pt_{pt}"] += 1
+                dk["tous_hors_enveloppe"] += he == win_ecarts
+            dk["c"] += bool(ps) and pt == len(ps)
+            serie.append((ws, int(win_ecarts >= 2)))  # même sommande que K
 
         per_source = {}
         phats: list[Decimal] = []
@@ -553,10 +672,89 @@ def compute_r1(
             "queue_binomiale_P_K_ge_Kobs": queue,
             "queue_note": queue_note,
             "A_window_stationarity": A_WINDOW_STATIONARITY,
+            "bloc": bloc_strate(serie, w, p_more, gate),   # ℓ = ELL_BLOC (ADR-0028 §1 bis.1 pt 3)
+            "decomposition_K": dk,               # panne_transport : ≥ 2, 1, 0 sur K ; c_s (annexe D.5)
         }
 
     return {"pool": pool, "strates": strates_out, "poolee": strate_poolee(strates_out),   # clé à part
-            "A_window_stationarity": A_WINDOW_STATIONARITY}
+            "tau_observe": _tau_observe(ratios, tau), "A_window_stationarity": A_WINDOW_STATIONARITY}
+
+
+def regle_critere(r1_out: dict) -> dict:
+    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : ADR-0028 §1 bis.1, pts 1-11
+    (docs/adr-0028/ADR-0028-decisions-sortie-S2.md, commit f5b8269), non recopié ici (une seule vérité). Lit
+    r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
+    compute_r1 (z, bloc.z_bloc), sans arrondi ni contexte posé, à SEUIL_Z par « ≥ » ; aucune p-valeur (pt 4).
+    Par strate (pt 5) : valeur, cas (garde_5_4, z_sous_seuil, rejette, discordance, rejet_non_qualifiable)
+    et, pour toute strate qui NE REJETTE PAS, EMD = (SEUIL_Z + Z_PUISSANCE)·√max(n·P̂(1 − P̂), σ̂²_bloc)
+    fenêtres et sa fraction de n (pt 8). Rend « R1 discrimine », les strates qui rejettent, les strates
+    testées et m (pt 6)."""
+    par = {}
+    for st, b in r1_out.get("strates", {}).items():
+        z, zb = b["z"], b["bloc"]["z_bloc"]
+        cas = ("garde_5_4" if z is None else "z_sous_seuil" if z < SEUIL_Z else
+               "rejet_non_qualifiable" if zb is None else "rejette" if zb >= SEUIL_Z else "discordance")
+        v = ("NON ÉVALUABLE" if cas in ("garde_5_4", "rejet_non_qualifiable") else
+             "REJETTE" if cas == "rejette" else "NE REJETTE PAS")
+        emd = frac = None
+        if v == "NE REJETTE PAS":
+            with localcontext() as ctx:
+                ctx.prec = DECIMAL_PREC
+                emd = +((SEUIL_Z + Z_PUISSANCE) * max(b["gate_value"], b["bloc"]["sigma2_bloc"]).sqrt())
+                frac = +(emd / Decimal(b["n"]))
+        par[st] = {"valeur": v, "cas": cas, "emd": emd, "emd_fraction": frac}
+    rej = [s for s, e in par.items() if e["valeur"] == "REJETTE"]
+    tst = [s for s, e in par.items() if e["valeur"] != "NON ÉVALUABLE"]
+    nq = [s for s, e in par.items() if e["cas"] == "rejet_non_qualifiable"]
+    return {"strates": par, "rejette": rej, "testees": tst, "m": len(tst), "non_qualifiables": nq,
+            "r1_discrimine": "VRAI" if rej else "FAUX" if tst and not nq else "NON ÉVALUABLE"}
+
+
+def fenetres_sautees(ws_journal, spec: dict, w: int, borne=None, ranges=()) -> dict:
+    """Fenêtres sautées par strate, toutes causes confondues (ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1) :
+    window_start de la grille de pas w (multiples de w) sur borne = [t0 ; t_fin) (segment ; None : [premier ;
+    dernier + w) de `ws_journal`), strate par `spec` (strate_calendar), sans marqueur window_close
+    (`ws_journal`, garde §5.3 passée), hors des plages D5 fermées sur window_start (une fenêtre exclue n'est
+    pas sautée). Compte par jour UTC, en O(jours + marqueurs) : grille, moins l'union des plages, moins les
+    marqueurs retenus ; la strate ne dépend que du jour (kinds single et weekend_utc). Marqueur hors grille ou
+    autre kind : ValueError. Rend {strate : s}, strates sans fenêtre sautée absentes."""
+    ws_journal, out, union = set(ws_journal), {}, []
+    if any(x % w for x in ws_journal) or spec.get("kind") not in ("single", "weekend_utc"):
+        raise ValueError(f"fenêtres sautées : window_start hors de la grille de pas w = {w}, ou calendrier "
+                         f"{spec.get('kind')!r} non journalier — fail-closed")
+    if borne is None and not ws_journal:
+        return {}
+    t0, t_fin = (math.ceil(x) for x in borne or (min(ws_journal), max(ws_journal) + w))
+
+    def grille(lo, hi, signe):                   # débuts de fenêtre dans [lo ; hi), par jour UTC
+        for d in range(lo // 86400, -(-hi // 86400)):
+            st, a, b = strate_from_spec(d * 86400, spec), max(lo, d * 86400), min(hi, d * 86400 + 86400)
+            out[st] = out.get(st, 0) + signe * max(0, -(-b // w) + (-a // w))     # ⌈b/w⌉ − ⌈a/w⌉
+    grille(t0, t_fin, 1)
+    for a, b in sorted(ranges):                    # union des plages fermées, retirée une seule fois
+        if union and a <= union[-1][1]:
+            union[-1][1] = max(union[-1][1], b)
+        else:
+            union.append([a, b])
+    for a, b in union:
+        grille(max(a, t0), min(b + 1, t_fin), -1)
+    for x in ws_journal:
+        if t0 <= x < t_fin and not any(a <= x <= b for a, b in union):
+            out[strate_from_spec(x, spec)] -= 1
+    return {st: s for st, s in out.items() if s}
+
+
+def bornes_censure(n: int, k: int, p_more: Decimal, s: int, sigma2_bloc: Optional[Decimal] = None) -> dict:
+    """Bornes à P̂_more fixé (ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1 ; A-6), s fenêtres sautées imputées
+    sans co-écart (bas) puis avec (haut) : z_bas = z_score(n + s, K, P̂), z_haut = z_score(n + s, K + s, P̂),
+    la fonction de z_s (s = 0 : z_s) ; si sigma2_bloc est donné, (K [+ s] − (n + s)·P̂)/σ̂_bloc, l'expression
+    de bloc_strate (s = 0 : z_bloc). Non extérieures (CV2-24). À n'appeler que si z_s est publiée (§5.4)."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        zb = [None, None] if sigma2_bloc is None else [
+            +((Decimal(x) - Decimal(n + s) * p_more) / sigma2_bloc.sqrt()) for x in (k, k + s)]
+    return {"s": s, "z_bas": z_score(n + s, k, p_more), "z_haut": z_score(n + s, k + s, p_more),
+            "z_bloc_bas": zb[0], "z_bloc_haut": zb[1]}
 
 
 def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
