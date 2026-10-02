@@ -5,6 +5,7 @@ chemin de recalcul avec ces options ; un mutant par comportement (journal G1).""
 from __future__ import annotations
 
 import contextlib
+import glob
 import io
 import json
 import os
@@ -18,7 +19,8 @@ from pathlib import Path
 from unittest import mock
 
 from shogen_s2 import lm, r1, r2, records, report
-from tests.test_rendu_unique import OUTIL, ru
+from tests import test_rendu_unique as tru
+from tests.test_rendu_unique import LOIN, OPENSSL, OUTIL, SCEAU, epingler, h, monter, ru
 from tests.test_sensibilite import RA, fixture, t
 
 TABLE = (("j14-principal", {"t0": t(7, 22), "t_fin": t(10, 2)}, (), "étiquette un"),        # table de fixture
@@ -123,6 +125,122 @@ class TestSortiesNommees(unittest.TestCase):
                          (0, True), p.stderr)
         self.assertNotIn("conforme", p.stdout.decode("utf-8"))
         self.assertTrue(records.verifier_raw(os.path.join(self.d, "raw.jsonl"), self.j))
+
+
+RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]     # Q8 puis ordre de D.4 b
+
+
+def lancer(f: dict, *plus: str) -> tuple:
+    """main en processus, sans --gardes-seules, horloge en 2100 : (code, sortie standard, stderr)."""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = ru.main(["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes",
+                        f["sommes"], "--sortie", sortie(f), "--auteur", "claude-opus-5-5", *plus], maintenant=LOIN)
+    return code, out.getvalue(), err.getvalue()
+
+
+def sortie(f: dict) -> str:
+    return os.path.join(os.path.dirname(f["depot"]), "sortie")
+
+
+def faux_runs(echec=None, pendant=lambda nom: None) -> tuple:
+    """Runs de l'enregistreur (commandes lancées par sys.executable) remplacés : sortie factice, code 1 au run echec,
+    pendant(nom) appelé avant chaque run ; git et openssl passent au vrai subprocess.run. Rend (patch, runs lancés)."""
+    vrai, lances = subprocess.run, []
+
+    def faux(cmd, *a, **k):
+        if cmd[0] != sys.executable:
+            return vrai(cmd, *a, **k)
+        lances.append("suite" if "unittest" in cmd else cmd[cmd.index("--produire") + 1])
+        pendant(lances[-1])
+        return subprocess.CompletedProcess(cmd, int(lances[-1] == echec), f"sortie factice {lances[-1]}\n".encode())
+    return mock.patch.object(subprocess, "run", faux), lances
+
+
+def affichage(cible: str, chemin: str) -> str:
+    """Sortie standard attendue (voie (b), go du 2026-09-01) : chemins et sha256 lus dans l'enregistrement relu."""
+    rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+    return (f"gardes levées\nsorties : {cible} (voie b ; T0 2026-09-01T00:00:00Z ; genTime -)\n" + "".join(
+        f"  {r['nom']} {r['sortie']['sha256']} {r['sortie']['chemin']}\n" for r in rec["runs"])
+        + f"  enregistrement {h(Path(chemin).read_bytes())} {os.path.basename(chemin)}\n")
+
+
+def fichiers(d: str) -> dict:
+    return {n: h(Path(d, n).read_bytes()) for n in sorted(os.listdir(d))}
+
+
+class TestProduction(unittest.TestCase):
+    def test_echec_a_chaque_pas_rien_ne_reste(self):
+        """Q8 : runs factices ; échec à chaque run, sortie altérée pendant le dernier run (relecture : refus sortie),
+        extraction ou renommage en échec : code 1, « gardes levées » seul sur la sortie standard, dossier parent
+        inchangé, aucun run après l'échec, temporaire voisin de la sortie, heure et motif nommé sur stderr ; gardes
+        refusées sans --gardes-seules : code 2, aucun run. Rougit si : temporaire ou sortie restés, arrêt absent, suite
+        non première, relecture absente, temporaire hors du dossier parent, run en échec non nommé."""
+        def pendant(nom):
+            voisins.append(len(glob.glob(os.path.join(parent, ".sortie.*"))))
+            for x in glob.glob(os.path.join(parent, ".sortie.*", "*-j28.out")) if alterer and nom == "raw" else ():
+                Path(x).write_bytes(b"altere")
+        nul = contextlib.nullcontext()
+        cas = [(n, n, False, nul) for n in RUNS] + [
+            ("relecture", None, True, nul),
+            ("extraction", None, False, mock.patch.object(ru.orc, "extraire", side_effect=ValueError("factice"))),
+            ("renommage", None, False, mock.patch.object(ru.os, "rename", side_effect=OSError("factice")))]
+        for nom, echec, alterer, autre in cas:
+            f, voisins = monter(tempfile.mkdtemp()), []
+            epingler(f)
+            parent = os.path.dirname(f["depot"])
+            avant = sorted(os.listdir(parent))
+            p, lances = faux_runs(echec, pendant)
+            with p, autre:
+                code, out, err = lancer(f)
+            runs = [] if nom == "extraction" else RUNS[:RUNS.index(echec) + 1] if echec else RUNS
+            with self.subTest(cas=nom):
+                self.assertEqual((code, out, sorted(os.listdir(parent)), lances, set(voisins) <= {1}),
+                                 (1, "gardes levées\n", avant, runs, True))
+                self.assertRegex(err, r"^rendu_unique : échec de production à \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ : ")
+                self.assertIn({"relecture": "refus (sortie)", "extraction": "factice", "renommage": "factice"}.get(
+                    nom, f"run en échec : [('{nom}', 1)]"), err)
+        f = monter(tempfile.mkdtemp())
+        p, lances = faux_runs()
+        with p:
+            code, out, err = lancer(f)
+        self.assertEqual((code, out, lances, os.path.exists(sortie(f))), (2, "", [], False))
+
+    def test_deviation_seconde_sortie_premiere_intacte(self):
+        """D.4 b, G0 §C : première exécution (runs factices) écrite ; relance sans --deviation : refus sortie, rien
+        d'écrit ; avec --deviation : <sortie>.deviation-1, avec DEVIATION.txt (motif, première sortie), première sortie
+        intacte octet pour octet ; sortie standard : chemins et sha256 de l'enregistrement relu, aucun contenu. Rougit
+        si : écrasement, motif non écrit, autre répertoire, contenu imprimé."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        p, _ = faux_runs()
+        with p:
+            self.assertEqual(lancer(f)[0], 0)
+            premiere = fichiers(sortie(f))
+            self.assertEqual(lancer(f)[:2], (2, ""))
+            code, out, err = lancer(f, "--deviation", "relance déclarée")
+        dev = sortie(f) + ".deviation-1"
+        self.assertEqual((code, fichiers(sortie(f)), out), (0, premiere, affichage(dev, *glob.glob(f"{dev}/*.json"))))
+        self.assertEqual(Path(dev, "DEVIATION.txt").read_text(encoding="utf-8"), "seconde exécution déclarée (ADR-0028 "
+                         f"annexe D.4 b) ; première : {sortie(f)} ; motif : relance déclarée\n")
+
+    def test_gentime_du_jeton_dans_l_enregistrement(self):
+        """SHOGEN-RENDU-T0-1 : voie (a) (autorité de test d'openssl), runs factices : sceau.genTime = genTime du jeton,
+        lu ici dans openssl ts -reply -text ; paquet.sha256 = sha du paquet ; base = commit d'analyse. Rougit si genTime
+        manque ou diffère."""
+        self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
+        f, _, _, pref = tru.TestRenduUnique.voie_a(None, tempfile.mkdtemp())     # fixture de la voie (a), sans self
+        x = subprocess.run([OPENSSL, "ts", "-reply", "-in", os.path.join(f["depot"], SCEAU, "paquet.tsr"), "-text"],
+                           capture_output=True, text=True).stdout.split("Time stamp: ")[1].split("\n")[0]
+        jeton = datetime.strptime(x, "%b %d %H:%M:%S %Y GMT").strftime("%Y-%m-%dT%H:%M:%SZ")
+        p, _ = faux_runs()
+        with p, mock.patch.dict(ru.PREFIXES, pref):
+            self.assertEqual(lancer(f)[0], 0)
+        (chemin,) = glob.glob(os.path.join(sortie(f), "*.json"))
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        self.assertEqual((rec["sceau"], rec["paquet"], rec["base"]),
+                         ({"genTime": jeton}, {"sha256": f["sha"]}, f["c1"]))
+
 
 
 if __name__ == "__main__":

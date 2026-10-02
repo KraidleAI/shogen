@@ -405,11 +405,6 @@ class TestRenduUnique(unittest.TestCase):
         epingler(f)
         sortie = os.path.join(os.path.dirname(f["depot"]), "sortie")
         self.assertEqual(self.lancer(f, maintenant=LOIN), (0, []))
-        err = io.StringIO()
-        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
-            code = ru.main(argv(f)[:-1], maintenant=LOIN)           # sans --gardes-seules : production
-        self.assertEqual((code, out.getvalue(), os.path.exists(sortie)), (2, "", False))
-        self.assertRegex(err.getvalue(), r"^rendu_unique : refus production : ")
         self.assertEqual(self.lancer(f, "--auteur", "claude-opus-" + "5", maintenant=LOIN), (2, ["auteur"]))
         for plus in (["--deviation", "relance"], ["--deviation", " "]):
             self.assertEqual(self.lancer(f, *plus, maintenant=LOIN), (2, ["sortie"]))

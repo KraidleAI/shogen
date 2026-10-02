@@ -1,7 +1,8 @@
 """Exécution unique du rendu S2, en refus par défaut (ADR-0028 annexe D.4 b ; SHOGEN-RENDU-UNIQUE-1, EX-E1-1 ; G0
 docs/adr-0028/G0-partie-2.md §C). Bibliothèque standard seule ; git et openssl lancés par listes d'arguments, jamais
-par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde qui ne peut s'évaluer refuse. --produire : commande
-nommée de l'enregistreur (sortie de la table, recalcul-tiers, raw ; G0 §C, décisions Q1 à Q7)."""
+par un shell. Une garde qui ne peut s'évaluer refuse ; gardes levées : runs nommés de l'enregistreur (sorties de D.4 b)
+dans un répertoire temporaire voisin de --sortie, renommé en une fois ; tout échec : rien ne reste. --produire :
+commande nommée de l'enregistreur (sortie de la table, recalcul-tiers, raw ; G0 §C, décisions Q1 à Q8)."""
 from __future__ import annotations
 
 import argparse
@@ -13,6 +14,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, localcontext
 
@@ -42,6 +44,7 @@ SORTIES = (
      "est hors décision, biaisée vers le haut par construction"),
 )
 # --- fin de la table des sorties ---
+RUNS = ("suite", *(s[0] for s in SORTIES), "recalcul-tiers", "raw")     # Q8 : suite d'abord ; puis ordre de D.4 b
 _SPEC = importlib.util.spec_from_file_location("oracle_record", os.path.join(HARNAIS, "tools", "oracle_record.py"))
 orc = importlib.util.module_from_spec(_SPEC)            # enregistreur voisin (liste fermée des commandes)
 _SPEC.loader.exec_module(orc)
@@ -344,11 +347,50 @@ def produire(argv: list) -> int:
     return 0
 
 
+def produire_tout(c: dict, a, cible: str) -> int:
+    """Gardes levées (G0 §C, Q5 à Q8) : runs RUNS de l'enregistreur sur l'extraction de HEAD, arrêt au premier échec,
+    dans un répertoire temporaire voisin de la cible ; motif de déviation écrit ; enregistrement de rôle « rendu »
+    (paquet.sha256, sceau.genTime, base = commit_analyse) relu par verifier (tree.sha256 recalculé) ; renommage en une
+    fois. Tout échec : rien ne reste, code 1, heure et motif sur stderr. Sortie standard : chemins et sha256 seulement,
+    aucun contenu de sortie."""
+    tmp, fait = tempfile.mkdtemp(prefix=f".{os.path.basename(cible)}.", dir=os.path.dirname(os.path.abspath(cible))), 0
+    try:
+        if a.deviation is not None:
+            with open(os.path.join(tmp, "DEVIATION.txt"), "x", encoding="utf-8", newline="\n") as f:
+                f.write(f"seconde exécution déclarée (ADR-0028 annexe D.4 b) ; première : {a.sortie} ; motif : "
+                        f"{a.deviation}\n")
+        o, r = ouverture(c), racine(c)
+        chemin, code = orc.enregistrer(tmp, "rendu", a.auteur, r, "HEAD", RUNS, base=c["bloc"]["commit_analyse"],
+                                       paquet_sha256=c["sha_paquet"], sceau_gentime=o["genTime"], journaux=a.journaux,
+                                       arret_premier_echec=True)
+        if code:                                    # motif nommé pour la ligne du JOURNAL (Q8), sans contenu
+            with open(chemin, encoding="utf-8") as f:
+                echecs = [(x["nom"], x["exit"]) for x in json.load(f)["runs"] if x["exit"]]
+            raise RuntimeError(f"run en échec : {echecs}")
+        rec = orc.verifier(chemin, "rendu", orc.commit_complet(r, "HEAD"), r)    # exit 0, sha256 de chaque sortie
+        os.rename(tmp, cible)
+        fait = 1
+    except Exception as e:
+        print(f"rendu_unique : échec de production à {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ} : "
+              f"{type(e).__name__} : {e} ; aucun répertoire de sortie", file=sys.stderr)
+        return 1
+    finally:
+        if not fait:
+            shutil.rmtree(tmp, ignore_errors=True)
+    print(f"sorties : {cible} (voie {o['voie']} ; T0 {o['T0']} ; genTime {o['genTime'] or '-'})")
+    for x in rec["runs"]:
+        print(f"  {x['nom']} {x['sortie']['sha256']} {x['sortie']['chemin']}")
+    nom = os.path.basename(chemin)
+    print(f"  enregistrement {sha256_fichier(os.path.join(cible, nom))} {nom}")
+    return 0
+
+
 def main(argv: list, maintenant=None) -> int:
     """--depot, --paquet, --journaux (dossier des journaux scellés), --sommes (fichier de sommes), --sortie, --auteur
     (identifiant de la liste blanche du lint) ; --deviation MOTIF (seconde exécution déclarée) ; --gardes-seules (rien
     de produit). Refus (auteur, sortie, gardes, noms des journaux, L3) sur stderr, code 2, rien d'écrit ; sinon
-    « gardes levées ». L'horloge n'est jamais une option : maintenant n'est passé qu'en processus, par les tests.
+    « gardes levées », puis production (produire_tout). L'horloge n'est jamais une option : maintenant n'est passé
+    qu'en processus, par les tests.
     --produire : commande nommée."""
     if argv[:1] == ["--produire"]:
         return produire(argv[1:])
@@ -371,14 +413,12 @@ def main(argv: list, maintenant=None) -> int:
         refus, c = evaluer_gardes(a.depot, a.paquet, a.journaux, a.sommes, maintenant)
         if not refus and sorted(c["bloc"]["journal"]) != sorted(NOMS_JOURNAUX):
             refus = [("noms", f"journaux du bloc {sorted(c['bloc']['journal'])}, exigés {list(NOMS_JOURNAUX)}")]
-        if not refus and not a.gardes_seules:
-            refus = [("production", "enchaînement des sorties construit au sous-lot C3e : refus")]
     for nom, motif in refus:
         print(f"rendu_unique : refus {nom} : {motif}", file=sys.stderr)
     if refus:
         return 2
-    print("gardes levées")
-    return 0
+    print("gardes levées", flush=True)
+    return 0 if a.gardes_seules else produire_tout(c, a, cible)
 
 
 if __name__ == "__main__":
