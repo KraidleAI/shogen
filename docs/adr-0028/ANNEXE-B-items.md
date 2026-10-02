@@ -597,3 +597,17 @@ Rapport versé : `docs/adr-0028/G2-RATTRAPAGE-R-B.md` (réviseur neuf `shogen-wo
 | SHOGEN-ASN-DIVERGENCE-ECHEC-1 | B-1 : divergences ASN imprimées pour des relevés en échec | orch. | après l'exécution ; déclaré au rapport | un test [inféré] | R-B, B-1 |
 | SHOGEN-D3-LIFT-1 | B-2 : lift et identité φ de D3 non rendus par le script ; publiés au rapport rédigé | orch. | rapport `docs/11` | une table [inféré] | R-B, B-2 |
 | SHOGEN-TESTS-HOTE-DEUX-FLUX-1 | C-2, C-3 : fixtures sans hôte à deux flux ; branche « éteint par borne supérieure » non fixée | orch. | après l'exécution | deux tests [inféré] | R-B, C-2, C-3 |
+
+## B.43 Amendement daté du 2026-10-02 22:1x UTC : relecture G2 de rattrapage R-A — CONSTAT A conditionnel ; lot CORR
+
+Rapport versé : `docs/adr-0028/G2-RATTRAPAGE-R-A.md` (réviseur neuf `shogen-worker`, Gate 0 `claude-opus-5-5` ; source `d2fdd8cc…`). Périmètre : `r1.py`, `records.py`, `window.py`, `model.py` entiers. **Oracle indépendant en arithmétique exacte écrit depuis le texte scellé (paquet §2, §3, §6, §10.2 ; doc 10 §5), comparé à `r1.recompute_from_journal` et `regle_critere` sur 585 journaux synthétiques : 0 écart**, les cinq cas de la règle couverts ; table réelle du J28 sur un journal synthétique de taille campagne : égal, ≈ 21 s, pic ≈ 1 Gio. Mutants : 20, 18 tués. Contrôle FM-1.1 (721 événements) : 0 fragment ; écarts déclarés (copie d'arbre supprimée sans lecture ; un `grep` sur `docs/adr-0028/monark-m009a/` sans sortie).
+
+- **A-1 (conditionnel)** : une lecture `ok` à prix non fini (`NaN`…) lève `decimal.InvalidOperation` dans `_median` (`r1.py` l.102-110, l.180-207) : exécution sans sortie. Les décodeurs de la collecte (`sources.py` l.84-215, `ed479c5`) ne contrôlent pas la finitude. Item SHOGEN-PRIX-NON-FINI-1 : traité dans le lot CORR (CORR-2), décision de l'orchestrateur sous la décision de l'investisseur de corriger et resceller.
+- C-1 à C-5 (conformité de D1 au « dernier de la fenêtre » ; deux mutants de bord vivants ; commentaires ; τ observé et PX-Shogen-13 ; docstring de `model.py`) : items SHOGEN-TESTS-BORDS-R1-1 (après S2) et note à PX-Shogen-13.
+
+Lot **CORR** : G0 `docs/adr-0028/G0-lot-CORR.md` (CORR-1 : sérialisation du `frozenset` des copies exactes ; CORR-2 : prix non fini traité comme absent, en un point, avec avertissement compté). Annexe A : ligne CORR à poser au commit du lot.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PRIX-NON-FINI-1 | prix `ok` non fini : exception, exécution sans sortie | orch. | lot CORR, avant le nouveau scellement | quelques lignes, tests [inféré] | R-A, A-1 |
+| SHOGEN-TESTS-BORDS-R1-1 | mutants de bord vivants : staleness `>` / `>=`, garde §5.4 `<` / `<=` (code conforme au texte) | orch. | après S2 | deux tests [inféré] | R-A, C-2 |
