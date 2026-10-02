@@ -32,6 +32,7 @@ SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
 BANNI = "claude-opus-" + "5"                    # construit à l'exécution, comme dans le lint (aucun littéral)
+STUB = b"import sys\nprint('argv', sys.argv[1:])\n"    # tools/rendu_unique.py de fixture : imprime ses arguments
 
 
 def g(d: str, *args: str, entree: bytes = None) -> str:
@@ -176,9 +177,10 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual((m.returncode, "--verifier" in m.stderr), (2, True))
         s = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", self.c1)
         self.assertEqual((s.returncode, "exige --auteur, --depot et --sortie" in s.stderr), (2, True))
-        n = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", "0" * 40, "--sortie", d)
+        a = ("--role", "G2", "--auteur", "claude-opus-5-5", "--depot", self.depot, "--sortie", d)
+        n = cli(*a, "--commit", "0" * 40)
         self.assertEqual((n.returncode, sorted(os.listdir(d))), (2, avant))
-        k = cli("--role", "G2", "--auteur", "a", "--depot", self.depot, "--commit", self.c2, "--sortie", d)
+        k = cli(*a, "--commit", self.c2)
         self.assertEqual((k.returncode, os.path.dirname(k.stdout.strip())), (1, d))
 
     def test_collision_sans_ecrasement_et_lien_sortant(self):
@@ -308,6 +310,50 @@ class TestOracleRecord(unittest.TestCase):
             ("--auteur", "claude-opus-5-5", "--depot", self.depot, "--sortie", d), ("--verifier", chemin)))
         self.assertEqual((p.returncode, m.returncode, "--verifier" in m.stderr), (1, 2, True))
         self.assertEqual(json.loads(Path(p.stdout.strip()).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
+
+
+    def test_auteur_refuse_a_l_ecriture(self):
+        """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu
+        ou suivi de [1m] ; tier nu ; casse ; autre suffixe ; blanc ; non-chaîne) : refus avant tout git et toute
+        commande, rien d'écrit ; identifiant admis suivi de [1m] : écrit et conforme ; CLI : code 2, rien d'écrit.
+        Rougit si : contrôle absent à l'écriture ou placé après git, prédicat autre que celui de --verifier."""
+        d, x = tempfile.mkdtemp(dir=self.d), "claude-opus-5-5"
+        with mock.patch.object(orc, "git", side_effect=AssertionError("git lancé avant le refus")):
+            for a in (BANNI, BANNI + "[1m]", "opus", x.upper(), x + "[2m]", " " + x, None, 5):
+                with self.subTest(auteur=a), self.assertRaisesRegex(ValueError, r"— refus$"):
+                    orc.enregistrer(d, "G2", a, self.depot, self.c1)
+        self.assertEqual(os.listdir(d), [])
+        p = subprocess.run([sys.executable, "-B", OUTIL, "--role", "G2", "--auteur", BANNI, "--depot", self.depot,
+                            "--commit", self.c1, "--sortie", d], capture_output=True, text=True)
+        self.assertEqual((p.returncode, "auteur" in p.stderr, os.listdir(d)), (2, True, []))
+        chemin = orc.enregistrer(d, "G2", x + "[1m]", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(chemin, "G2", self.c1)["auteur"], x + "[1m]")
+
+    def test_journaux_substitues_et_arret_au_premier_echec(self):
+        """G0 §C (Q5, Q8) : le marqueur JOURNAUX d'une commande de la liste fermée est remplacé par le chemin absolu du
+        dossier des journaux (chemin relatif rendu absolu), consigné dans « commande » et reçu par la commande ; sans
+        dossier : refus avant toute écriture. Arrêt au premier échec : run en échec, les suivants ne sont pas lancés ;
+        sans l'option, ou sans échec, tous le sont. Rougit si : marqueur non remplacé, chemin relatif laissé, dossier
+        absent admis, arrêt absent ou inconditionnel."""
+        d, jx, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-essai")
+        ok, ko = depot(dep, [{**x, "s2-harness/tools/rendu_unique.py": STUB} for x in (OK, KO)])
+        essai = ["-B", "tools/rendu_unique.py", "--produire", "essai", "--journaux"]
+        with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", essai + [orc.JOURNAUX])}):
+            with self.assertRaisesRegex(ValueError, r"— refus$"):
+                orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, commandes=("essai",))
+            self.assertEqual(os.listdir(d), [])
+            chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, commandes=("essai",),
+                                           journaux=os.path.relpath(jx))
+            run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
+            self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
+                             (0, [sys.executable, *essai, jx], f"argv {essai[2:] + [jx]}\n"))
+            for commit, arret, noms in ((ko, True, ["suite"]), (ko, False, ["suite", "essai"]),
+                                        (ok, True, ["suite", "essai"])):
+                chemin = orc.enregistrer(tempfile.mkdtemp(dir=self.d), "cp-2", "claude-opus-5-5", dep, commit,
+                                         ("suite", "essai"), journaux=jx, arret_premier_echec=arret)[0]
+                with self.subTest(commit=commit, arret=arret):
+                    self.assertEqual([r["nom"] for r in json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"]],
+                                     noms)
 
 
 if __name__ == "__main__":

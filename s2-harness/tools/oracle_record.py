@@ -4,7 +4,9 @@ listes d'arguments, jamais par un shell. Extrait le commit par `git archive` dan
 commandes de la liste fermée COMMANDES, écrit dans le répertoire donné la sortie de chacune et l'enregistrement
 shogen-<sha court>-<rôle>-<date>-<pid>.json (sorties : chemins relatifs à ce répertoire). SHOGEN_S2_CAMPAGNE_CONTROL
 est consignée, posée ou non, jamais posée (annexe D.4 a). SHOGEN-ENREG-VERIF-1 : délai maximal par commande ; la
-lecture contrôle aussi auteur et, avec un dépôt, tree.sha256."""
+lecture contrôle aussi auteur et, avec un dépôt, tree.sha256. Partie 2, C3 : auteur contrôlé dès l'écriture
+(SHOGEN-ENREG-AUTEUR-ECRITURE-1) ; marqueur JOURNAUX des commandes remplacé par le dossier des journaux ; arrêt au
+premier échec sur demande (G0 §C, Q5 et Q8)."""
 from __future__ import annotations
 
 import argparse
@@ -26,6 +28,7 @@ ROLES = ("G1", "G2", "cp-2", "rendu")
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
 COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"])}  # fermée
+JOURNAUX = "<journaux>"     # marqueur d'argument : dossier des journaux, chemin absolu substitué (jamais un shell)
 HEX = re.compile(r"[0-9a-f]{64}")
 CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tree", "python", "env", "runs", "exit",
           "ecrit", "paquet", "sceau")
@@ -75,6 +78,13 @@ def liste_blanche() -> tuple:
     return tuple(lignes[0].split())
 
 
+def auteur_admis(a) -> bool:
+    """Identifiant de la liste blanche du lint, ou cet identifiant suivi exactement de [1m] (égalité exacte) ; liste
+    illisible : ValueError (liste_blanche)."""
+    admis = liste_blanche()
+    return isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis)
+
+
 def extraire(depot: str, sha: str, arbre: str) -> dict:
     """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend {chemin : sha256} par
     fichier."""
@@ -102,11 +112,13 @@ def ecarts_arbre(depot: str, commit: str, consignes) -> list:
 
 
 def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, commandes=("suite",), base=None,
-                paquet_sha256=None, sceau_gentime=None, delai=None) -> tuple:
+                paquet_sha256=None, sceau_gentime=None, delai=None, journaux=None, arret_premier_echec=False) -> tuple:
     """Lance les commandes nommées sur l'extraction du commit, écrit sorties et enregistrement sans jamais écraser ;
     rend (chemin, exit). paquet.sha256 exigé au rôle « rendu » ; nul, comme sceau.genTime, hors de ce rôle. Délai
     maximal par commande (s ; None : DELAI_DEFAUT) : au dépassement, commande arrêtée, exit EXIT_DELAI consigné, ligne
-    de dépassement en fin de sortie, enregistrement écrit quand même."""
+    de dépassement en fin de sortie, enregistrement écrit quand même. auteur hors liste blanche : refus avant tout git.
+    journaux : dossier substitué au marqueur JOURNAUX (exigé si une commande le porte). arret_premier_echec : aucun
+    run lancé après un run en échec."""
     delai = DELAI_DEFAUT if delai is None else delai
     if role not in ROLES or not commandes or any(c not in COMMANDES for c in commandes):
         raise ValueError(f"rôle {role!r} ou commande(s) {list(commandes)} hors des listes fermées {ROLES}, "
@@ -117,6 +129,12 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
                          "de ce rôle — refus")
     if not 0 < delai < math.inf:
         raise ValueError(f"délai {delai!r} : nombre de secondes fini et positif exigé — refus")
+    if not auteur_admis(auteur):
+        raise ValueError(f"auteur {auteur!r} hors de la liste blanche de {LINT} (identifiant exact, ou suivi de [1m]) "
+                         "— refus")
+    if not journaux and any(JOURNAUX in COMMANDES[c][1] for c in commandes):
+        raise ValueError(f"dossier des journaux exigé par {list(commandes)} — refus")
+    journaux = journaux and os.path.abspath(journaux)
     sha, base = commit_complet(depot, commit), commit_complet(depot, base) if base else None
     maintenant = datetime.now(timezone.utc)
     nom = f"shogen-{sha[:7]}-{role}-{maintenant:%Y%m%dT%H%M%SZ}-{os.getpid()}"
@@ -125,7 +143,7 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         hashes = extraire(depot, sha, arbre)
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c]
-            cmd, sortie = [sys.executable, *args], f"{nom}.{i}-{c}.out"
+            cmd, sortie = [sys.executable, *(journaux if x == JOURNAUX else x for x in args)], f"{nom}.{i}-{c}.out"
             try:
                 p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, timeout=delai)
@@ -139,6 +157,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
                          "sortie": {"chemin": sortie, "sha256": hashlib.sha256(octets).hexdigest()},
                          "tests_avec_variable": tests_lances(octets.decode("utf-8", "replace"))
                          if os.environ.get(VARIABLE) is not None else []})
+            if arret_premier_echec and code:
+                break
     finally:
         shutil.rmtree(arbre)
     rec = {"schema": SCHEMA, "role": role, "auteur": auteur, "base": base, "static_only": False, "served_from": None,
@@ -181,12 +201,11 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     exige(rec["schema"] == SCHEMA, "schema")
     exige(rec["role"] == role, "rôle", f" : {rec['role']!r}, attendu {role!r}")
     try:
-        admis = liste_blanche()
+        ok = auteur_admis(rec["auteur"])
     except ValueError as e:
         exige(False, "auteur", f" : liste blanche illisible ({e})")
-    a = rec["auteur"]
-    exige(isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis), "auteur",
-          f" : {a!r}, attendu un identifiant de la liste blanche de {LINT}, ou cet identifiant suivi de [1m]")
+    exige(ok, "auteur", f" : {rec['auteur']!r}, attendu un identifiant de la liste blanche de {LINT}, ou cet "
+          "identifiant suivi de [1m]")
     exige(rec["tree"]["commit"] == commit, "tree.commit", f" : {rec['tree']['commit']!r}, attendu {commit!r}")
     if depot is not None:
         e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
