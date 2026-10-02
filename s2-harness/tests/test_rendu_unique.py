@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from tests.test_oracle_record import HARNESS, g
+from tests.test_oracle_record import GIT_ENV, HARNESS, g
 
 OUTIL = os.path.join(HARNESS, "tools", "rendu_unique.py")
 _SPEC = importlib.util.spec_from_file_location("rendu_unique", OUTIL)
@@ -31,6 +31,8 @@ SANS_PREUVE = ["(5)", "(6)"]                    # fixture sans jeton ni go : (5)
 SCEAU, DELAI, OPENSSL = "docs/adr-0028/sceau", timedelta(hours=24), shutil.which("openssl")
 CNF = (b"[req]\ndistinguished_name = dn\n[dn]\n[tsa]\ndefault_tsa = t\n[t]\nserial = serial\nsigner_digest = sha256\n"
        b"default_policy = 1.2.3.4\ndigests = sha256\ness_cert_id_alg = sha256\n")     # configuration minimale de test
+GO_OK, LOIN = "date: 2026-10-03T12:00:00Z\nordre: exécuter sans ancre\nsignataire: investisseur\n".encode(), datetime(
+    2100, 1, 1, tzinfo=timezone.utc)
 
 
 def h(octets: bytes) -> str:
@@ -104,6 +106,20 @@ def jeton(d: str, donnees: bytes) -> dict:
     o(d, "ts", "-query", "-data", "m", "-sha256", "-cert", "-out", "q.tsq")
     o(d, "ts", "-reply", "-queryfile", "q.tsq", "-signer", "tsa.crt", "-inkey", "tsa.key", "-out", "r.tsr")
     return {f"{SCEAU}/paquet.tsq": Path(d, "q.tsq").read_bytes(), f"{SCEAU}/paquet.tsr": Path(d, "r.tsr").read_bytes()}
+
+
+def epingler(f: dict, go: bytes = GO_OK, date="2026-09-01T00:00:00+00:00", ligne="- go : sha256 {}\n",
+             ou=lambda j, x: j + x):
+    """Voie (b) sur la fixture f : fichier de go posé (non commité), ligne qui porte son sha256 placée dans JOURNAL.md
+    par ou(journal, ligne), commit daté (GIT_COMMITTER_DATE ; date None : pas de commit) ; rend la date du commit."""
+    poser(f["depot"], {f"{SCEAU}/GO-sans-ancre.txt": go}, commit=False)
+    j = Path(f["depot"], "JOURNAL.md")
+    j.write_bytes(ou(j.read_bytes().decode(), ligne.format(h(go))).encode())
+    if date:
+        subprocess.run(["git", "-C", f["depot"], "-c", "user.name=fixture", "-c", "user.email=fixture@invalid", "-c",
+                        "commit.gpgsign=false", "commit", "-qam", "go"], check=True, capture_output=True,
+                       env={**GIT_ENV, "GIT_COMMITTER_DATE": date})
+        return datetime.fromisoformat(date)
 
 
 def argv(f: dict) -> list:
@@ -289,6 +305,57 @@ class TestRenduUnique(unittest.TestCase):
         p = subprocess.run([sys.executable, "-B", OUTIL, *argv(f), "--maintenant", "2100-01-01T00:00:00Z"],
                            capture_output=True, text=True)
         self.assertEqual((p.returncode, p.stdout, "unrecognized arguments: --maintenant" in p.stderr), (2, "", True))
+
+    def test_voie_b_go_epingle_et_garde_5(self):
+        """(5) et (6), voie (b), textconv hostile posé sur JOURNAL.md : horloge à T0 + 24 h exactement (T0 = date du
+        commit qui épingle le go) : levées, code 0 ; une seconde avant : refus (5) seul ; le go cité de nouveau dix
+        jours plus tard : T0 reste le premier commit ; ligne de commande (heure système) : go épinglé trois jours plus
+        tôt, code 0 et « gardes levées » ; go épinglé maintenant : refus (5). Rougit si : borne exclue, dernier commit
+        pris pour T0, textconv appliqué, voie (b) absente, horloge système non lue."""
+        f = monter(tempfile.mkdtemp())
+        Path(f["depot"], ".git", "info", "attributes").write_bytes(b"JOURNAL.md diff=maj\n")
+        g(f["depot"], "config", "diff.maj.textconv", "tr a-f A-F <")
+        t0 = epingler(f)
+        epingler(f, ligne="- rappel du go : {}\n", date="2026-09-11T00:00:00+00:00")
+        self.assertEqual(self.lancer(f, maintenant=t0 + DELAI), (0, []))
+        self.assertEqual(self.lancer(f, maintenant=t0 + DELAI - timedelta(seconds=1)), (2, ["(5)"]))
+        for recul, code, sortie, noms in ((3 * DELAI, 0, "gardes levées\n", []), (timedelta(0), 2, "", ["(5)"])):
+            f = monter(tempfile.mkdtemp())
+            epingler(f, date=(datetime.now(timezone.utc) - recul).isoformat())
+            p = subprocess.run([sys.executable, "-B", OUTIL, *argv(f)], capture_output=True, text=True)
+            self.assertEqual((p.returncode, p.stdout, re.findall(r"^rendu_unique : refus (\S+) : ", p.stderr, re.M)),
+                             (code, sortie, noms))
+
+    def test_voie_b_refus(self):
+        """(6), voie (b), horloge en 2100 : go avec BOM, en CRLF, sans LF final, avec une ligne de plus, sans accent,
+        date hors ISO 8601, hors calendrier ou sans fuseau, encodé en Latin-1 ; sha du go absent de JOURNAL.md, en
+        préfixe seulement, sur le disque seulement, avant la ligne du scellement ou sur cette ligne : refus (5) et (6),
+        rien d'écrit. Rougit si l'un des contrôles de la voie (b) est retiré ou relâché."""
+        u = GO_OK.decode()
+        for nom, kw in (("BOM", {"go": b"\xef\xbb\xbf" + GO_OK}), ("CRLF", {"go": GO_OK.replace(b"\n", b"\r\n")}),
+                        ("sans LF final", {"go": GO_OK[:-1]}), ("ligne de plus", {"go": GO_OK + b"x\n"}),
+                        ("sans accent", {"go": u.replace("é", "e").encode()}), ("Latin-1", {"go": u.encode("latin-1")}),
+                        ("date hors ISO", {"go": u.replace("2026-10-03T12:00:00Z", "03/10/2026").encode()}),
+                        ("hors calendrier", {"go": u.replace("2026-10", "2026-13").encode()}),
+                        ("sans fuseau", {"go": u.replace(":00Z", ":00").encode()}),
+                        ("sha absent", {"ligne": "- go de l'investisseur\n"}), ("préfixe", {"ligne": "- go {:.8}…\n"}),
+                        ("disque seulement", {"date": None}), ("avant le scellement", {"ou": lambda j, x: x + j}),
+                        ("même ligne", {"ou": lambda j, x: j.rstrip("\n") + " " + x})):
+            f = monter(tempfile.mkdtemp())
+            epingler(f, **kw)
+            with self.subTest(variante=nom):
+                self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
+
+    def test_deux_voies_t0_le_plus_tardif(self):
+        """(5), les deux voies établies : go épinglé trois jours avant le jeton ; horloge à T0 du go + 25 h, avant
+        genTime + 24 h : refus (5) ; à genTime + 24 h (borne haute) : levées. Rougit si T0 est le plus ancien."""
+        self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
+        f, _, t, pref = self.voie_a(tempfile.mkdtemp())
+        haut = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=1)
+        t0 = epingler(f, date=(t - 3 * DELAI).isoformat())
+        with mock.patch.dict(ru.PREFIXES, pref):
+            self.assertEqual(self.lancer(f, maintenant=t0 + DELAI + timedelta(hours=1)), (2, ["(5)"]))
+            self.assertEqual(self.lancer(f, maintenant=haut + DELAI), (0, []))
 
     def test_gentime_formes(self):
         """genTime de openssl ts -reply -text : forme d'OpenSSL et ISO 8601, fin de ligne CRLF, fraction de seconde

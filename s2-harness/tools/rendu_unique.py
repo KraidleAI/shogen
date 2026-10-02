@@ -1,6 +1,6 @@
 """Exécution unique du rendu S2, en refus par défaut (ADR-0028 annexe D.4 b ; SHOGEN-RENDU-UNIQUE-1, EX-E1-1 ; G0
 docs/adr-0028/G0-partie-2.md §C). Bibliothèque standard seule ; git et openssl lancés par listes d'arguments, jamais
-par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde non construite, ou qui ne peut s'évaluer, refuse."""
+par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde qui ne peut s'évaluer refuse."""
 from __future__ import annotations
 
 import argparse
@@ -21,6 +21,8 @@ N_JOURNAUX, CHEMINS = 3, ("s2-harness/shogen_s2", "s2-harness/tools")      # gar
 SCEAU, DELAI = "docs/adr-0028/sceau", timedelta(hours=24)                  # gardes (5) et (6), G0 §C
 PREFIXES = {"cacert_sha256": "2151b611", "tsa_crt_sha256": "8bfb0305"}     # annexe D.4 c (FreeTSA, FAITS §2)
 MOIS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
+GO = re.compile(r"date: (\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,6})?)?(?:Z|\+00:00))\nordre: exécuter sans ancre\n"
+                r"signataire: investisseur\n")                          # fichier de go, voie (b) de (6), G0 §C
 
 
 def git(racine: str, *args: str) -> subprocess.CompletedProcess:
@@ -180,7 +182,26 @@ def voie_a(c: dict) -> datetime:
     return gentime(openssl("ts", "-reply", "-in", tsr, "-text").stdout.decode("utf-8", "replace"))
 
 
-VOIES = (("a", voie_a),)                    # voie (b), fichier de go : sous-lot C2b
+def voie_b(c: dict) -> datetime:
+    """(6) voie (b) : SCEAU/GO-sans-ancre.txt en UTF-8 strict, sans BOM, LF, les trois lignes exactes de GO (date ISO
+    8601 UTC du calendrier) ; son sha256 complet dans JOURNAL.md à HEAD, première occurrence sur une ligne postérieure
+    à la première qui porte le sha du paquet (scellement). Rend la date de commit du premier commit qui introduit ce
+    sha dans JOURNAL.md (git log -S, sans textconv)."""
+    with open(os.path.join(racine(c), SCEAU, "GO-sans-ancre.txt"), "rb") as f:
+        octets = f.read()
+    m = GO.fullmatch(octets.decode("utf-8"))
+    if not m:
+        raise ValueError("fichier de go hors du format du G0 §C")
+    datetime.fromisoformat(m.group(1))                  # date du calendrier, sinon ValueError
+    sha = hashlib.sha256(octets).hexdigest()
+    go, scelle = lignes_avec(c["journal_md"], sha), lignes_avec(c["journal_md"], c["sha_paquet"])
+    if not (go and scelle and go[0] > scelle[0]):
+        raise ValueError(f"sha256 du go {sha} absent de JOURNAL.md à HEAD, ou pas après la ligne du scellement")
+    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%ct", "-S" + sha, "HEAD", "--", "JOURNAL.md")
+    return datetime.fromtimestamp(int(p.stdout.split()[0]), timezone.utc)
+
+
+VOIES = (("a", voie_a), ("b", voie_b))
 
 
 def preuves(c: dict) -> dict:
