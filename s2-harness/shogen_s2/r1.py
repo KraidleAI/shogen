@@ -50,6 +50,7 @@ from decimal import Decimal, localcontext
 from typing import Optional
 
 from . import records
+from .model import Status
 from .window import verify_markers_against_spec, window_end
 
 DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique (oracle)
@@ -60,6 +61,7 @@ ELL_BLOC = 240                    # ℓ, fenêtres : choix de conception, seule 
 GARDE_BLOCS = 30                  # garde de blocs : z_bloc publié si n_s ≥ 30·ℓ (ADR-0028 §1 bis.1 pt 3)
 Z_PUISSANCE = Decimal("0.8416")   # EMD, puissance 0,8 : choix de conception (ADR-0028 §1 bis.1 pt 8)
 ETIQUETTE_POOLEE = "exploratoire, hors famille, hors décision"   # strate poolée (ADR-0028 D2 pt 4)
+PANNE_TRANSPORT = Status.PANNE_TRANSPORT.value   # lecture PRÉSENTE seule (ADR-0028 annexe D.5)
 A_WINDOW_STATIONARITY = (
     "A(window-stationarity) engagée par le test agrégé (10 §5.3 ; ancre "
     "Eckhardt & Lee TM-86369 p. fichier 2, hyp. (ii) « stationary input series ») "
@@ -218,6 +220,29 @@ def poisson_binomial(phats: list[Decimal]) -> tuple[Decimal, Decimal, Decimal]:
             p1 += term
         p_more = one - p0 - p1
         return +p0, +p1, +p_more
+
+
+def _ecart_relatif(rep: dict, f: str) -> Decimal:
+    """|p_f − médiane_LOO|/médiane_LOO d'une cellule arrivée à l'axe (i), `rep` = prix des répondantes de la
+    fenêtre : le rapport que classify_ecart compare à τ_classe, même médiane, même précision (ADR-0028
+    annexe D.5)."""
+    with localcontext() as ctx:
+        ctx.prec = DECIMAL_PREC
+        m = _median([p for g, p in rep.items() if g != f])
+        return +(abs(rep[f] - m) / m)
+
+
+def _tau_observe(ratios: dict, tau: dict) -> dict:
+    """τ observé par classe de τ_classe, sur le segment (ADR-0028 annexe D.5, SHOGEN-TAU-REDERIV-1), sans
+    ré-estimation : N cellules, P99 au rang le plus proche (99·N + 99)//100, 1-indexé (méthode documentée de
+    closure.percentile_nearest_rank, citée ; closure, en quarantaine, n'est pas importé), maximum ; N = 0 :
+    None."""
+    out = {}
+    for cl in sorted(tau):
+        v = sorted(ratios.get(cl, ()))
+        out[cl] = {"tau_classe": tau[cl], "N": len(v), "P99": v[(99 * len(v) + 99) // 100 - 1] if v else None,
+                   "max": v[-1] if v else None}
+    return out
 
 
 def gate_value(n: int, p_more: Decimal) -> Decimal:
@@ -520,6 +545,7 @@ def compute_r1(
             "note": "aucune fenêtre complétée (n = 0)",
             "flag_historique_insuffisant": True,
             "poolee": strate_poolee({}),
+            "tau_observe": _tau_observe({}, tau),
             "A_window_stationarity": A_WINDOW_STATIONARITY,
         }
 
@@ -529,6 +555,7 @@ def compute_r1(
         windows_by_strate.setdefault(st, []).append(ws)
 
     strates_out: dict[str, dict] = {}
+    ratios: dict = {}                              # τ observé : classe → rapports de l'axe (i) du segment
     for st, wins in windows_by_strate.items():
         n = len(wins)
         ps = pool if pool_by_strate is None else pool_by_strate[st]
@@ -537,23 +564,34 @@ def compute_r1(
         stale_evaluable = {f: 0 for f in ps}
         ok_windows = {f: 0 for f in ps}
         k_count = 0
+        dk = dict.fromkeys(("pt_2_plus", "pt_1", "pt_0", "tous_hors_enveloppe", "c"), 0)   # annexe D.5
         serie = []                                 # (window_start, I_t) de la strate (ADR-0028 §1 bis.1 pt 3)
         for ws in wins:
             cls = _classify_window(ws, reading_map, ps, w, sigma_by_class,
                                    sigma_class_of_flux, tau, n_min)
-            win_ecarts = 0
+            win_ecarts = pt = he = 0
+            rep = {}                               # répondantes de la fenêtre (enveloppe leave-one-out)
             for f in ps:
                 rd = reading_map.get((ws, f))
                 if rd is not None and rd.get("status") == "ok" and rd.get("price") is not None:
                     ok_windows[f] += 1
+                    rep[f] = Decimal(rd["price"])
                     if rd.get("source_ts") is not None:
                         stale_evaluable[f] += 1
+                pt += rd is not None and rd.get("status") == PANNE_TRANSPORT
                 kind = cls[f]
                 tally[f][kind] += 1
                 if kind in ECARTS:
                     win_ecarts += 1
+                    he += kind is Ecart.HORS_ENVELOPPE
+            for f in ps:                           # axe (i) atteint : hors-enveloppe ou pas d'écart
+                if cls[f] in (Ecart.HORS_ENVELOPPE, Ecart.PAS_ECART):
+                    ratios.setdefault(sigma_class_of_flux[f], []).append(_ecart_relatif(rep, f))
             if win_ecarts >= 2:
                 k_count += 1
+                dk["pt_2_plus" if pt >= 2 else f"pt_{pt}"] += 1
+                dk["tous_hors_enveloppe"] += he == win_ecarts
+            dk["c"] += bool(ps) and pt == len(ps)
             serie.append((ws, int(win_ecarts >= 2)))  # même sommande que K
 
         per_source = {}
@@ -635,10 +673,11 @@ def compute_r1(
             "queue_note": queue_note,
             "A_window_stationarity": A_WINDOW_STATIONARITY,
             "bloc": bloc_strate(serie, w, p_more, gate),   # ℓ = ELL_BLOC (ADR-0028 §1 bis.1 pt 3)
+            "decomposition_K": dk,               # panne_transport : ≥ 2, 1, 0 sur K ; c_s (annexe D.5)
         }
 
     return {"pool": pool, "strates": strates_out, "poolee": strate_poolee(strates_out),   # clé à part
-            "A_window_stationarity": A_WINDOW_STATIONARITY}
+            "tau_observe": _tau_observe(ratios, tau), "A_window_stationarity": A_WINDOW_STATIONARITY}
 
 
 def regle_critere(r1_out: dict) -> dict:

@@ -410,7 +410,7 @@ class TestDrapeau2(unittest.TestCase):
                 asn_rec("api.exchange.coinbase.com", 20, 20)]
         with couture(1):
             out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                                _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
+                                _sbc(), _scof(["binance", "coinbase"]), _taumap(TAU), r2_params(fh))
         self.assertEqual(out["drapeau_2"]["etat"], "leve")
         d2 = out["drapeau_2"]
         self.assertEqual((d2["r1_discrimine"], d2["rejette"]), ("VRAI", ["calme"]))
@@ -423,7 +423,7 @@ class TestDrapeau2(unittest.TestCase):
                 asn_rec("api.exchange.coinbase.com", 13335, 13335, "CF")]
         with couture(1):                                         # lot CRITERE : « R1 discrimine » VRAI
             out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                                _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
+                                _sbc(), _scof(["binance", "coinbase"]), _taumap(TAU), r2_params(fh))
         self.assertEqual(out["partition"]["k_eff"], 1)
         self.assertEqual(out["drapeau_2"]["etat"], "eteint")
 
@@ -433,7 +433,7 @@ class TestDrapeau2(unittest.TestCase):
         recs = [asn_rec("api.binance.com", 10, 10),
                 asn_rec("api.exchange.coinbase.com", 20, 20)]
         out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
+                            _sbc(), _scof(["binance", "coinbase"]), _taumap(TAU), r2_params(fh))
         self.assertEqual(out["drapeau_2"]["etat"], "non_evaluable")
 
     def test_eteint_when_z_below_threshold(self):
