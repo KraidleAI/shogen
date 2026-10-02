@@ -65,3 +65,7 @@ crates/shogen-verifier/tests/fixtures/PROVENANCE.md text=auto eol=lf
 # Manifeste du sceau du paquet de pré-enregistrement S2 (ADR-0028 §1 bis.11 pt 9 ; annexe D.4 c ; CV2-33) : ses
 # octets sont l'objet horodaté par le jeton RFC 3161 ; aucune normalisation de fins de ligne, jamais.
 docs/adr-0028/sceau/PAQUET.sha256 -text
+
+# Sorties du poste local versées telles quelles (MONARK-S2-M009A-EXPOSITION-1, annexe B.36) : octets reçus, fins de ligne
+# Windows comprises ; aucune normalisation (SHA256SUMS du dossier).
+docs/adr-0028/monark-m009a/*.txt -text
