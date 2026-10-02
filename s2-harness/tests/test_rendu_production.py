@@ -19,8 +19,9 @@ from pathlib import Path
 from unittest import mock
 
 from shogen_s2 import lm, r1, r2, records, report
+from tests.test_oracle_record import OUTIL as ENREGISTREUR, g
 from tests import test_rendu_unique as tru
-from tests.test_rendu_unique import LOIN, OPENSSL, OUTIL, SCEAU, epingler, h, monter, ru
+from tests.test_rendu_unique import LOIN, OPENSSL, OUTIL, PAQUET, SCEAU, epingler, h, monter, poser, ru, texte_bloc
 from tests.test_sensibilite import RA, fixture, t
 
 TABLE = (("j14-principal", {"t0": t(7, 22), "t_fin": t(10, 2)}, (), "étiquette un"),        # table de fixture
@@ -169,6 +170,38 @@ def fichiers(d: str) -> dict:
     return {n: h(Path(d, n).read_bytes()) for n in sorted(os.listdir(d))}
 
 
+HARNAIS = os.path.dirname(os.path.dirname(OUTIL))
+T_OK = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):\n        pass\n"
+
+
+def monter_prod(d: str) -> dict:
+    """Dépôt jetable : commit c1 = shogen_s2/ et tools/ du harnais (seule la table des sorties de rendu_unique remplacée
+    par TABLE) et une suite triviale ; journaux du collecteur réel et sommes hors dépôt ; paquet, JOURNAL.md, go
+    épinglé (voie (b), 2026-09-01)."""
+    depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
+    os.makedirs(depot), os.makedirs(jx), g(depot, "init", "-q"), g(depot, "config", "core.autocrlf", "false")
+    src = Path(OUTIL).read_text(encoding="utf-8")
+    outil = src[:src.index("# --- table des sorties")] + f"SORTIES = {TABLE!r}\n" + src[src.index("# --- fin de la"):]
+    code = ["tools/oracle_record.py"] + [f"shogen_s2/{n}" for n in os.listdir(os.path.join(HARNAIS, "shogen_s2"))
+                                        if n.endswith(".py")]
+    c1 = poser(depot, {".gitignore": b"__pycache__/\n", "s2-harness/tests/__init__.py": b"", "s2-harness/tests/"
+                       "test_t.py": T_OK, "s2-harness/tools/rendu_unique.py": outil.encode(),
+                       **{f"s2-harness/{r}": Path(HARNAIS, r).read_bytes() for r in code}})
+    fixture(jx)
+    poser(jx, {"campagne.log": b"x\n", "segments.json": b"{}\n"}, commit=False)
+    noms = ("control.jsonl", "journal.jsonl", "raw.jsonl", "campagne.log", "segments.json")
+    sommes = "".join(f"{h(Path(jx, n).read_bytes())}  {n}\n" for n in noms).encode()
+    poser(jx, {"SHA256SUMS.txt": sommes}, commit=False)
+    paquet = texte_bloc([f"commit_analyse {c1}", f"sha256_script {h(Path(OUTIL).read_bytes())}", *(
+        f"journal {n} {h(Path(jx, n).read_bytes())}" for n in noms[:3]), f"sommes {h(sommes)}",
+        "cacert_sha256 " + "1" * 64, "tsa_crt_sha256 " + "2" * 64]).encode()
+    poser(depot, {PAQUET: paquet, "JOURNAL.md": f"- scellement du paquet : sha256 {h(paquet)}\n".encode()})
+    f = {"depot": depot, "paquet": os.path.join(depot, PAQUET), "journaux": jx, "sha": h(paquet), "c1": c1,
+         "sommes": os.path.join(jx, "SHA256SUMS.txt")}
+    epingler(f)
+    return f
+
+
 class TestProduction(unittest.TestCase):
     def test_echec_a_chaque_pas_rien_ne_reste(self):
         """Q8 : runs factices ; échec à chaque run, sortie altérée pendant le dernier run (relecture : refus sortie),
@@ -241,6 +274,34 @@ class TestProduction(unittest.TestCase):
         self.assertEqual((rec["sceau"], rec["paquet"], rec["base"]),
                          ({"genTime": jeton}, {"sha256": f["sha"]}, f["c1"]))
 
+    def test_nominal_bout_en_bout(self):
+        """Q5, Q8 : runs réels de l'enregistreur sur l'extraction d'un dépôt jetable qui porte le code d'analyse : code
+        0, temporaire renommé (seul ajout au dossier parent), runs dans l'ordre RUNS, chaque sortie égale à son attendu,
+        enregistrement conforme à oracle_record --verifier (rôle rendu, --depot), paquet.sha256, genTime nul (voie
+        (b)), base = commit d'analyse ; sortie standard : chemins et sha256 seulement. Rougit si l'un diffère."""
+        f = monter_prod(tempfile.mkdtemp())
+        parent = os.path.dirname(f["depot"])
+        avant = sorted(os.listdir(parent))
+        code, out, err = lancer(f)
+        self.assertEqual((code, sorted(os.listdir(parent))), (0, sorted(avant + ["sortie"])), err)
+        (chemin,) = glob.glob(os.path.join(sortie(f), "*.json"))
+        rec, sha = json.loads(Path(chemin).read_text(encoding="utf-8")), g(f["depot"], "rev-parse", "HEAD")
+        self.assertEqual(([r["nom"] for r in rec["runs"]], rec["paquet"], rec["sceau"], rec["base"], rec["role"]),
+                         (RUNS, {"sha256": f["sha"]}, {"genTime": None}, f["c1"], "rendu"))
+        v = subprocess.run([sys.executable, "-B", ENREGISTREUR, "--verifier", chemin, "--role", "rendu", "--commit",
+                            sha, "--depot", f["depot"]], capture_output=True, text=True)
+        self.assertEqual(v.returncode, 0, v.stderr)
+        lu = {r["nom"]: Path(sortie(f), r["sortie"]["chemin"]).read_bytes() for r in rec["runs"]}
+        c, j = (os.path.join(f["journaux"], n) for n in ("control.jsonl", "journal.jsonl"))
+        for nom, seg, pl, etiq in TABLE:
+            txt = report.render_report(c, j, exclude_ranges=pl, segment=seg)
+            self.assertEqual(lu[nom], f"[ÉTIQUETTE] {nom} : {etiq}\n{txt}\n".encode("utf-8"))
+        self.assertIn(b"test_a (tests.test_t.T.test_a) ... ok", lu["suite"])
+        incluse = en_json(r1.recompute_from_journal(c, j, (), TABLE[2][1]))
+        self.assertEqual(json.loads(lu["recalcul-tiers"])["j28-incluse"]["r1"], incluse)
+        self.assertTrue(lu["raw"].startswith("verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : "
+                                             "conforme".encode("utf-8")))
+        self.assertEqual(out, affichage(sortie(f), chemin))
 
 
 if __name__ == "__main__":
