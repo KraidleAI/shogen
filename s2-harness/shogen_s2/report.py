@@ -32,8 +32,10 @@ claim de recalculabilité (plan §5).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from collections import Counter
 from decimal import Decimal, localcontext
 
 from . import r2, records
@@ -89,10 +91,14 @@ def _comptes(recs, strates) -> list:
 
 
 def _retires(avant, apres, strates) -> str:
-    """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1)."""
+    """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1) ; asn_attribution
+    ventilées par valeur du statut de l'enregistrement, sur la même assiette (SHOGEN-ASN-STATUT-1)."""
     d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
     fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d)) or "0 (aucune fenêtre au journal)"
-    return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
+    st = Counter(r.get("status") for r in avant[2]) - Counter(r.get("status") for r in apres[2])
+    ven = ", ".join(f"{'sans statut' if k is None else k} {v}" for k, v in sorted(st.items(), key=str))
+    return (f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]}" + (f" ({ven})" if ven else "")
+            + f" ; clock_check {d[-1]}")
 
 
 def _duree(s: int) -> str:
@@ -183,12 +189,13 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
        "journal seul (ADR-0003)")
     ap("=" * 78)
     ap("\n[BLOC 1] PARAMÈTRES")
-    for key in ("harness_version", "classe", "pool", "w", "sample_lead",
-                "sigma_classe", "sigma_class_of_flux", "tau_classe", "kappa",
-                "seuil_historique_valeur",
-                "n_min_hors_enveloppe", "strate_defaut", "decimal_prec",
-                "seuil_historique", "seuil_z", "residu_staleness",
-                "n_windows_demande", "started_utc", "note_skeleton"):
+    cles = ("harness_version", "classe", "pool", "w", "sample_lead",
+            "sigma_classe", "sigma_class_of_flux", "tau_classe", "kappa",
+            "seuil_historique_valeur",
+            "n_min_hors_enveloppe", "strate_defaut", "decimal_prec",
+            "seuil_historique", "seuil_z", "residu_staleness",
+            "n_windows_demande", "started_utc", "note_skeleton")
+    for key in cles:
         if key in params:
             ap(f"  {key:24} = {params[key]}")
     ap(f"  {'run_params_demarrages':24} = {len(params_list)} (concordants sur les "
@@ -204,6 +211,11 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                                   f"{_iso_utc(deb[-1])} (window_start)" if deb else "") + " — HS2-05")
     ap(f"  {'portee_run_params':24} = journal entier, jamais segmenté ni exclu (§E) : run_params_demarrages"
        " = tous les démarrages ; started_utc, n_windows_demande = dernier démarrage (HS2-05)")
+    nb = [k for k in cles if k in params and k not in records.LOAD_BEARING_KEYS + records.R2_LOAD_BEARING_KEYS]
+    ap(f"  {'run_params_non_porteurs':24} = valeurs distinctes sur les {len(params_list)} démarrages, par clé non "
+       "porteuse imprimée ci-dessus (valeur du dernier démarrage, hors contrôle de concordance §E) : " + ", ".join(
+           f"{k} {len({json.dumps(p.get(k), sort_keys=True) for p in params_list})}" for k in nb)
+       + " — SHOGEN-BLOC1-RUNPARAMS-1")
     dans_seg = records.filtre_lecture(params, *tous, (), segment)[:3]   # assiette des comptes par plage
     if seg is not None:
         ap(f"  {'segment':24} = [{seg[0]} ; {seg[1]}) = [{_iso_utc(seg[0])} ; {_iso_utc(seg[1])}) "
@@ -667,6 +679,18 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            "(SHOGEN-DP-JOURNAL-LOSS-1, ADR-0028 annexe D.5 ; repris du bloc 1, sans second calcul) :")
         for t in pertes:
             ap(f"    {t}")
+        ws_seg = build_window_strate(dans_seg[0])           # SHOGEN-SENS-PERTES-2 : assiette du segment
+        for a, b in ranges:
+            sa = fenetres_sautees(ws_tous, sc, w, (a, b + 1) if seg is None else (max(a, seg[0]),
+                                                                                   min(b + 1, seg[1])))
+            ab = Counter()
+            for x, s in ws_seg.items():
+                ab[s] += sum((x, f) not in reading_map for f in pools_i[s]) if a <= x <= b else 0
+            ls = sorted({*strates, *sa})
+            ap(f"    [{a} ; {b}] pertes du journal dans la plage : fenêtres de grille sans marqueur "
+               + ", ".join(f"{s} {sa.get(s, 0)}" for s in ls) + " ; lectures absentes des fenêtres à marqueur "
+               "(pool D1 de la variante incluse) " + ", ".join(f"{s} {ab[s]}" for s in ls)
+               + " — SHOGEN-SENS-PERTES-2")
         for st in (sorted({sc["calme"], sc["stress"]}) if we else [sc.get("strate", STRATE_DEFAUT)]):
             e, i = r1.get("strates", {}).get(st), r1_i.get("strates", {}).get(st)
             ap(_ligne_variante(st, "exclue (principale)", e))
