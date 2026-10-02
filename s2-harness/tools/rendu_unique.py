@@ -6,8 +6,11 @@ commande nommée de l'enregistreur (sortie de la table, recalcul-tiers, raw ; G0
 from __future__ import annotations
 
 import argparse
+import contextlib
+import glob
 import hashlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -328,7 +331,13 @@ def ouverture(c: dict) -> dict:
 def destination(sortie: str, motif) -> str:
     """Répertoire de sortie (D.4 b, G0 §C) : --sortie s'il est absent ; présent : refus, sauf --deviation <motif>
     (seconde exécution déclarée, motif d'une ligne non vide) : premier <sortie>.deviation-<k> libre, la première sortie
-    n'est jamais touchée ; --deviation sans première exécution : refus. Refus : ValueError."""
+    n'est jamais touchée ; --deviation sans première exécution : refus ; entrée .<nom de --sortie>.* dans le dossier
+    parent (débris d'une tentative interrompue, G2 C-4) : refus, avec ou sans --deviation. Refus : ValueError."""
+    parent, nom = os.path.split(os.path.abspath(sortie))
+    debris = sorted(glob.glob(os.path.join(glob.escape(parent), glob.escape(f".{nom}.") + "*")))
+    if debris:
+        raise ValueError(f"{', '.join(debris)} : tentative interrompue, à consigner au JOURNAL (heure, motif ; Q8), "
+                         "puis à retirer à la main")
     if motif is None:
         if os.path.lexists(sortie):
             raise ValueError(f"{sortie} déjà présent : une seconde exécution est une déviation déclarée (--deviation)")
@@ -353,7 +362,9 @@ def produire(argv: list) -> int:
     (JSON des quatre recompute_* par sortie, variante sans plage comprise ; Q6) ou raw (verdict de
     records.verifier_raw, code 0 quel que soit le verdict ; Q7, SHOGEN-RAW-FIN-1). Octets UTF-8 sur la sortie
     standard, capturée par l'enregistreur. Réservée à l'exécution unique (C-1) : JETON absent ou hors d'un répertoire
-    existant dont le nom commence par un point, refus, code 2, sortie standard vide."""
+    existant dont le nom commence par un point, refus, code 2, sortie standard vide. Avertissements du lecteur capturés
+    pendant le calcul, réécrits sans le dossier des journaux, écrits dans la sortie (C-5) : lignes [AVERTISSEMENT DU
+    LECTEUR] après l'étiquette (ou le verdict), clé avertissements du JSON de recalcul-tiers."""
     v = os.environ.get(JETON, "")
     if not (os.path.isdir(v) and os.path.basename(v).startswith(".")):
         print(f"rendu_unique : refus production : commande nommée réservée à l'exécution unique ({JETON} absente ou "
@@ -367,23 +378,30 @@ def produire(argv: list) -> int:
         sys.path.insert(0, HARNAIS)
     from shogen_s2 import lm, r1, r2, records, report
     c, j, raw = (os.path.join(a.journaux, n) for n in NOMS_JOURNAUX)
-    if a.nom == "raw":
-        try:
-            v = records.verifier_raw(raw, j)
-            texte = f"conforme — lectures {v['lectures']} ; avec octets {v['avec_octets']}"
-        except ValueError as e:                     # verdict de refus : imprimé, l'exécution continue
-            texte = f"refus — {e}"
-        texte = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}"
-    elif a.nom == "recalcul-tiers":
-        var = [(n, s, pl) for n, s, pl, _ in SORTIES] + [(n + "-incluse", s, ()) for n, s, pl, _ in SORTIES if pl]
-        out = {n: {"segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
-            ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
-            ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl in var}
+    with contextlib.redirect_stderr(io.StringIO()) as err:      # avertissements du lecteur, hors de stderr (C-5)
+        if a.nom == "raw":
+            try:
+                v = records.verifier_raw(raw, j)
+                texte = f"conforme — lectures {v['lectures']} ; avec octets {v['avec_octets']}"
+            except ValueError as e:                     # verdict de refus : imprimé, l'exécution continue
+                texte = f"refus — {e}"
+            tete, corps = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}", []
+        elif a.nom == "recalcul-tiers":
+            var = [(n, s, pl) for n, s, pl, _ in SORTIES] + [(n + "-incluse", s, ()) for n, s, pl, _ in SORTIES if pl]
+            out = {n: {"segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
+                ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
+                ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl in var}
+        else:
+            nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
+            tete, corps = f"[ÉTIQUETTE] {nom} : {etiquette}", [report.render_report(c, j, exclude_ranges=pl,
+                                                                                     segment=seg)]
+    avert = [x for x in err.getvalue().replace(os.path.join(a.journaux, ""), "").splitlines() if x.strip()]
+    if a.nom == "recalcul-tiers":
         with localcontext(r1.CONTEXTE_DECIMAL):
-            texte = json.dumps(out, ensure_ascii=False, indent=1, sort_keys=True, default=_decimal)
-    else:
-        nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
-        texte = f"[ÉTIQUETTE] {nom} : {etiquette}\n" + report.render_report(c, j, exclude_ranges=pl, segment=seg)
+            texte = json.dumps({**out, "avertissements": avert}, ensure_ascii=False, indent=1, sort_keys=True,
+                               default=_decimal)
+    else:                                           # étiquette (ou verdict), avertissements, puis le rendu
+        texte = "\n".join([tete, *(f"[AVERTISSEMENT DU LECTEUR] {x}" for x in avert), *corps])
     sys.stdout.buffer.write((texte + "\n").encode("utf-8"))
     return 0
 

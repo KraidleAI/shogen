@@ -475,6 +475,20 @@ class TestRenduUnique(unittest.TestCase):
         epingler(f)
         self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["noms"]))
 
+    def test_refus_debris_d_une_tentative_interrompue(self):
+        """C-4 (G2) : dossier .sortie.abcd (débris d'une tentative interrompue) à côté de --sortie : refus sortie, rien
+        d'écrit, sans --deviation (sortie absente) et avec (première exécution présente) ; motif nommant le chemin.
+        Rougit si le contrôle est retiré."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        sortie, debris = (os.path.join(os.path.dirname(f["depot"]), x) for x in ("sortie", ".sortie.abcd"))
+        os.makedirs(debris)
+        self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["sortie"]))
+        os.makedirs(sortie)
+        self.assertEqual(self.lancer(f, "--deviation", "relance déclarée", maintenant=LOIN), (2, ["sortie"]))
+        with self.assertRaisesRegex(ValueError, re.escape(debris)):
+            ru.destination(sortie, None)
+
 
 if __name__ == "__main__":
     unittest.main()

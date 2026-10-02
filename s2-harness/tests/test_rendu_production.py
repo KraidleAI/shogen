@@ -104,7 +104,8 @@ class TestSortiesNommees(unittest.TestCase):
             code, octets = produire("recalcul-tiers", "--journaux", self.d)
         out = json.loads(octets)
         var = [(n, s, pl) for n, s, pl, _ in TABLE] + [("j28-incluse", TABLE[2][1], ())]
-        self.assertEqual((code, list(out)), (0, sorted(n for n, *_ in var)))
+        self.assertEqual((code, list(out), out["avertissements"]), (0, ["avertissements", *sorted(n for n, *_ in var)],
+                                                                    []))
         for n, s, pl in var:
             with self.subTest(sortie=n):
                 self.assertEqual(out[n], en_json({"segment": s, "plages": [list(x) for x in pl], **{
@@ -153,6 +154,31 @@ class TestSortiesNommees(unittest.TestCase):
                 with self.subTest(nom=nom, valeur=v):
                     self.assertEqual((p.returncode, p.stdout == b"", "réservée à l'exécution unique" in p.stderr.decode(
                         "utf-8")), (0, False, False) if v == point else (2, True, True), p.stderr[-300:])
+
+    def test_avertissements_du_lecteur_dans_les_sorties(self):
+        """C-5 (G2) : dernière ligne de control.jsonl et de raw.jsonl tronquée, deux copies des journaux dans deux
+        dossiers ; commandes lancées comme par l'enregistreur (stderr=STDOUT, jeton posé, table de fixture) : première
+        ligne = étiquette (verdict pour raw), puis les lignes [AVERTISSEMENT DU LECTEUR] (nom du journal sans dossier),
+        puis le rendu ; JSON de recalcul-tiers relisible, clé avertissements non vide ; sorties identiques à l'octet
+        depuis les deux dossiers. Rougit si la capture ou la réécriture du préfixe du dossier sont retirées."""
+        sorties, coupe, tete = [], b'{"record": "clock_check", "pha', "[AVERTISSEMENT DU LECTEUR] [s2-harness] "
+        for d in (tempfile.mkdtemp(), tempfile.mkdtemp()):
+            for n in ("control.jsonl", "journal.jsonl", "raw.jsonl"):
+                Path(d, n).write_bytes(Path(self.d, n).read_bytes() + (coupe if n != "journal.jsonl" else b""))
+            env = {**os.environ, JETON: tempfile.mkdtemp(prefix=".")}
+            sorties.append({n: subprocess.run([sys.executable, "-B", "-c", ENVELOPPE, OUTIL, repr(TABLE), "--produire",
+                                               n, "--journaux", d], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                              env=env).stdout.decode("utf-8") for n in [*(x[0] for x in TABLE),
+                                                                                        "recalcul-tiers", "raw"]})
+        self.assertEqual(sorties[0], sorties[1])
+        for nom, *_x, etiq in TABLE:
+            x = sorties[0][nom].split("\n")
+            self.assertEqual((x[0], x[1].startswith(tete + "AVERTISSEMENT : dernière ligne tronquée ignorée dans "
+                                                    "control.jsonl (ligne ")), (f"[ÉTIQUETTE] {nom} : {etiq}", True))
+        self.assertTrue(json.loads(sorties[0]["recalcul-tiers"])["avertissements"])
+        x = sorties[0]["raw"].split("\n")
+        self.assertEqual((x[0].startswith("verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : conforme"),
+                          x[1].startswith(tete) and " dans raw.jsonl (ligne " in x[1]), (True, True))
 
 
 RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]     # Q8 puis ordre de D.4 b
