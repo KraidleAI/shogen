@@ -9,11 +9,14 @@ import importlib.util
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 from tests.test_oracle_record import HARNESS, g
 
@@ -24,7 +27,10 @@ _SPEC.loader.exec_module(ru)
 JOURNAUX = {"control.jsonl": b'{"type": "run_params"}\n', "journal.jsonl": b'{"v": 1}\n', "raw.jsonl": b'{"r": 2}\n'}
 SOMMES = {**JOURNAUX, "campagne.log": b"x\n", "segments.json": b"{}\n"}     # cinq entrées au fichier de sommes
 PAQUET, ORDRE = "docs/adr-0028/PAQUET-PREREG-S2.md", ["bloc", "(1)", "(2)", "(3)", "(4)", "(5)", "(6)"]
-NON_CONSTRUITES = ["(5)", "(6)"]                                # sous-lot C1c
+SANS_PREUVE = ["(5)", "(6)"]                    # fixture sans jeton ni go : (5) et (6) refusent (D.4 b (6))
+SCEAU, DELAI, OPENSSL = "docs/adr-0028/sceau", timedelta(hours=24), shutil.which("openssl")
+CNF = (b"[req]\ndistinguished_name = dn\n[dn]\n[tsa]\ndefault_tsa = t\n[t]\nserial = serial\nsigner_digest = sha256\n"
+       b"default_policy = 1.2.3.4\ndigests = sha256\ness_cert_id_alg = sha256\n")     # configuration minimale de test
 
 
 def h(octets: bytes) -> str:
@@ -32,7 +38,7 @@ def h(octets: bytes) -> str:
 
 
 def attendus(*noms: str) -> list:
-    return sorted(set(noms) | set(NON_CONSTRUITES), key=ORDRE.index)
+    return sorted(set(noms) | set(SANS_PREUVE), key=ORDRE.index)
 
 
 def poser(racine: str, fichiers: dict, commit: bool = True):
@@ -72,6 +78,34 @@ def monter(d: str, bloc=lambda x: x, journal="- scellement du paquet : sha256 {}
             "sommes": os.path.join(jx, "SHA256SUMS.txt"), "c1": c1}
 
 
+def o(d: str, *args: str) -> None:
+    """openssl dans d sous la configuration minimale CNF (rien de la configuration système) ; absent : échec du test."""
+    subprocess.run([OPENSSL or "openssl", *args], cwd=d, check=True, capture_output=True,
+                   env={**os.environ, "OPENSSL_CONF": os.path.join(d, "ac.cnf")})
+
+
+def autorite(d: str) -> tuple:
+    """Autorité RFC 3161 de test produite par openssl dans d (jamais FreeTSA, aucun réseau) : CA de test et certificat
+    de TSA qu'elle signe, extension timeStamping critique ; rend les octets de cacert.pem et de tsa.crt."""
+    os.makedirs(d)
+    Path(d, "ac.cnf").write_bytes(CNF)
+    k = ("-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "3")
+    o(d, "req", "-x509", *k, "-keyout", "ca.key", "-subj", "/CN=CA de test", "-addext",
+      "basicConstraints=critical,CA:TRUE", "-addext", "keyUsage=critical,keyCertSign", "-out", "cacert.pem")
+    o(d, "req", "-x509", *k, "-keyout", "tsa.key", "-subj", "/CN=TSA de test", "-CA", "cacert.pem", "-CAkey",
+      "ca.key", "-addext", "extendedKeyUsage=critical,timeStamping", "-out", "tsa.crt")
+    return Path(d, "cacert.pem").read_bytes(), Path(d, "tsa.crt").read_bytes()
+
+
+def jeton(d: str, donnees: bytes) -> dict:
+    """Requête sur donnees (sha256, nonce, certificat demandé : scripts/sceau/make-tsq.sh) et réponse de la TSA de test
+    de d ; rend paquet.tsq et paquet.tsr du dossier de sceau."""
+    Path(d, "m").write_bytes(donnees)
+    o(d, "ts", "-query", "-data", "m", "-sha256", "-cert", "-out", "q.tsq")
+    o(d, "ts", "-reply", "-queryfile", "q.tsq", "-signer", "tsa.crt", "-inkey", "tsa.key", "-out", "r.tsr")
+    return {f"{SCEAU}/paquet.tsq": Path(d, "q.tsq").read_bytes(), f"{SCEAU}/paquet.tsr": Path(d, "r.tsr").read_bytes()}
+
+
 def argv(f: dict) -> list:
     return ["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes", f["sommes"],
             "--sortie", os.path.join(os.path.dirname(f["depot"]), "sortie")]
@@ -90,10 +124,21 @@ class TestRenduUnique(unittest.TestCase):
                          (avant, bool(noms), "" if noms else "gardes levées\n"))
         return code, noms
 
+    def voie_a(self, d: str, ca=lambda s: s, tsa=lambda s: s) -> tuple:
+        """Fixture de la voie (a) dans d : autorité de test, bloc aux sha256 de sa chaîne (ca, tsa : variantes), dossier
+        de sceau (PAQUET.sha256 qui liste le paquet, jeton sur ses octets, chain/) ; rend (fixture, dossier de
+        l'autorité, horloge lue avant la requête à la seconde, préfixes de la chaîne de test)."""
+        a, c = autorite(os.path.join(d, "ac"))
+        f = monter(d, bloc=lambda x: x[:-2] + [f"cacert_sha256 {ca(h(a))}", f"tsa_crt_sha256 {tsa(h(c))}"])
+        t, m = datetime.now(timezone.utc).replace(microsecond=0), f"{f['sha']} *{PAQUET}\n".encode()
+        poser(f["depot"], {f"{SCEAU}/PAQUET.sha256": m, **jeton(os.path.join(d, "ac"), m),
+                           f"{SCEAU}/chain/cacert.pem": a, f"{SCEAU}/chain/tsa.crt": c}, commit=False)
+        return f, os.path.join(d, "ac"), t, {"cacert_sha256": h(a)[:8], "tsa_crt_sha256": h(c)[:8]}
+
     def test_nominal_et_cli(self):
-        """Fixture nominale : seules refusent les gardes non construites, en processus et par la ligne de commande
-        (code 2, stdout vide, rien d'écrit). Rougit si une garde construite refuse à tort, si une garde non construite
-        cesse de refuser, si le refus ne s'imprime pas ou si son code se perd."""
+        """Fixture sans jeton ni go : seules refusent (5) et (6), en processus et par la ligne de commande (code 2,
+        stdout vide, rien d'écrit). Rougit si une autre garde refuse à tort, si (5) ou (6) cesse de refuser, si le refus
+        ne s'imprime pas ou si son code se perd."""
         f = monter(tempfile.mkdtemp())
         self.assertEqual(self.lancer(f), (2, attendus()))
         p = subprocess.run([sys.executable, "-B", OUTIL, *argv(f)], capture_output=True, text=True)
@@ -195,6 +240,68 @@ class TestRenduUnique(unittest.TestCase):
         crlf = lambda s: re.sub(r"^([0-9a-f]{64})  ", lambda m: m.group(1).upper() + " *", s, flags=re.M)
         self.assertEqual(self.lancer(monter(tempfile.mkdtemp(), sommes=lambda s: crlf(s).replace("\n", "\r\n"))),
                          (2, attendus()))
+
+
+    def test_voie_a_jeton_verifie_et_garde_5(self):
+        """(5) et (6), voie (a), préfixes de D.4 c remplacés par ceux de la chaîne de test : horloge à genTime + 24 h
+        (borne haute) : gardes levées, code 0, « gardes levées », rien d'écrit ; une seconde avant genTime + 24 h (borne
+        basse) : refus (5) seul ; préfixes réels de D.4 c : refus (5) et (6). Rougit si : délai retiré ou raccourci,
+        genTime mal lu, préfixes non contrôlés, jeton refusé à tort."""
+        self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
+        f, _, t, pref = self.voie_a(tempfile.mkdtemp())
+        haut = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=1)
+        with mock.patch.dict(ru.PREFIXES, pref):
+            self.assertEqual(self.lancer(f, maintenant=haut + DELAI), (0, []))
+            self.assertEqual(self.lancer(f, maintenant=t + DELAI - timedelta(seconds=1)), (2, ["(5)"]))
+        self.assertEqual(self.lancer(f, maintenant=haut + DELAI), (2, ["(5)", "(6)"]))
+
+    def test_voie_a_refus(self):
+        """(6), voie (a), horloge à genTime + 48 h : bloc d'une autre chaîne que cacert.pem ou tsa.crt (même préfixe) ;
+        requête qui n'est pas celle du jeton (autre nonce) ; jeton sur d'autres octets que PAQUET.sha256 ; manifeste qui
+        ne liste pas le sha du paquet (jeton sur ce manifeste) ; jeton d'une autre autorité : refus (5) et (6), rien
+        d'écrit. Rougit si l'un des contrôles de la voie (a) est retiré ou si le code d'openssl est ignoré."""
+        self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
+        m = lambda f: Path(f["depot"], SCEAU, "PAQUET.sha256").read_bytes()
+        autre = lambda f, ac: (autorite(ac + "2"), poser(f["depot"], jeton(ac + "2", m(f)), commit=False))
+        sans = ("0" * 64 + " *x\n").encode()
+        for nom, kw, faire in (
+                ("bloc ≠ cacert.pem", {"ca": lambda s: s[:8] + "0" * 56}, None),
+                ("bloc ≠ tsa.crt", {"tsa": lambda s: s[:8] + "0" * 56}, None),
+                ("autre requête", {}, lambda f, ac: poser(f["depot"], {f"{SCEAU}/paquet.tsq": jeton(ac, m(f))[
+                    f"{SCEAU}/paquet.tsq"]}, commit=False)),
+                ("jeton sur d'autres octets", {}, lambda f, ac: poser(f["depot"], jeton(ac, b"autre\n"), commit=False)),
+                ("manifeste sans le paquet", {}, lambda f, ac: poser(f["depot"], {f"{SCEAU}/PAQUET.sha256": sans,
+                                                                                  **jeton(ac, sans)}, commit=False)),
+                ("autre autorité", {}, autre)):
+            f, ac, t, pref = self.voie_a(tempfile.mkdtemp(), **kw)
+            faire and faire(f, ac)
+            with self.subTest(variante=nom), mock.patch.dict(ru.PREFIXES, pref):
+                self.assertEqual(self.lancer(f, maintenant=t + 2 * DELAI), (2, ["(5)", "(6)"]))
+
+    def test_ni_jeton_ni_go_horloge_seule(self):
+        """D.4 b (6) : ni jeton vérifié ni go épinglé (pas de dossier de sceau, puis dossier vide) : refus (5) et (6),
+        même horloge en 2100, rien d'écrit ; ligne de commande : même refus, et l'horloge n'y est pas une option.
+        Rougit si (5) ou (6) est neutralisée, si T0 indéterminé est admis, ou si l'horloge devient une option."""
+        f, loin = monter(tempfile.mkdtemp()), datetime(2100, 1, 1, tzinfo=timezone.utc)
+        self.assertEqual(self.lancer(f, maintenant=loin), (2, ["(5)", "(6)"]))
+        os.makedirs(os.path.join(f["depot"], SCEAU, "chain"))
+        self.assertEqual(self.lancer(f, maintenant=loin), (2, ["(5)", "(6)"]))
+        p = subprocess.run([sys.executable, "-B", OUTIL, *argv(f), "--maintenant", "2100-01-01T00:00:00Z"],
+                           capture_output=True, text=True)
+        self.assertEqual((p.returncode, p.stdout, "unrecognized arguments: --maintenant" in p.stderr), (2, "", True))
+
+    def test_gentime_formes(self):
+        """genTime de openssl ts -reply -text : forme d'OpenSSL et ISO 8601, fin de ligne CRLF, fraction de seconde
+        portée à la seconde suivante (T0 jamais avancé) ; ligne absente ou répétée, autre décalage : ValueError. Rougit
+        si : CRLF, forme ISO ou fraction mal lus."""
+        u = lambda *a: datetime(*a, tzinfo=timezone.utc)
+        for texte, attendu in (("Time stamp: Oct  2 07:32:34 2026 GMT\n", u(2026, 10, 2, 7, 32, 34)),
+                               ("x\r\nTime stamp: Dec 31 23:59:59.5 2026 GMT\r\n", u(2027, 1, 1)),
+                               ("Time stamp: 2026-10-02 07:32:34.000Z\n", u(2026, 10, 2, 7, 32, 34))):
+            self.assertEqual(ru.gentime(texte), attendu)
+        for texte in ("", "Time stamp: Oct  2 07:32:34 2026 GMT\n" * 2, "Time stamp: 2026-10-02T07:32:34+01:00\n"):
+            with self.subTest(texte=texte), self.assertRaises(ValueError):
+                ru.gentime(texte)
 
 
 if __name__ == "__main__":

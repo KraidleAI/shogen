@@ -7,8 +7,10 @@ import argparse
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 
 SCRIPT = os.path.abspath(__file__)
 LANGAGE = "shogen-paquet-v1"
@@ -16,6 +18,9 @@ HEX64, NOM = re.compile(r"[0-9a-f]{64}"), re.compile(r"[\w-][\w.-]*(/[\w-][\w.-]
 CLES = {"commit_analyse": re.compile(r"[0-9a-f]{40}"),
         **dict.fromkeys(("sha256_script", "sommes", "cacert_sha256", "tsa_crt_sha256"), HEX64)}
 N_JOURNAUX, CHEMINS = 3, ("s2-harness/shogen_s2", "s2-harness/tools")      # garde (2) : code d'analyse
+SCEAU, DELAI = "docs/adr-0028/sceau", timedelta(hours=24)                  # gardes (5) et (6), G0 §C
+PREFIXES = {"cacert_sha256": "2151b611", "tsa_crt_sha256": "8bfb0305"}     # annexe D.4 c (FreeTSA, FAITS §2)
+MOIS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
 
 def git(racine: str, *args: str) -> subprocess.CompletedProcess:
@@ -23,6 +28,11 @@ def git(racine: str, *args: str) -> subprocess.CompletedProcess:
     désignerait un autre dépôt)."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     return subprocess.run(["git", "--no-optional-locks", "-C", racine, *args], capture_output=True, env=env)
+
+
+def openssl(*args: str) -> subprocess.CompletedProcess:
+    """openssl résolu dans l'ordre du PATH (shutil.which), lancé sans shell ; absent : FileNotFoundError (refus)."""
+    return subprocess.run([shutil.which("openssl") or "openssl", *args], capture_output=True)
 
 
 def sha256_fichier(chemin: str) -> str:
@@ -135,12 +145,74 @@ def g4(c: dict):
         return f"sha256 du script {reel} ≠ sha256_script du bloc"
 
 
-def non_construite(sous_lot: str):
-    return lambda c: f"garde construite au sous-lot {sous_lot} : refus"
+def gentime(texte: str) -> datetime:
+    """genTime lu dans la sortie de openssl ts -reply -text : une seule ligne « Time stamp: », forme d'OpenSSL
+    (« Oct  2 07:32:34 2026 GMT ») ou ISO 8601 (« 2026-10-02 07:32:34Z »), LF ou CRLF ; fraction de seconde : seconde
+    suivante (T0 jamais avancé). Sinon ValueError."""
+    x, = re.findall(r"^Time stamp: (.*?)\r?$", texte, re.M)
+    m = re.fullmatch(r"(?P<b>[A-Z][a-z]{2}) +(?P<d>\d{1,2}) (?P<H>\d\d):(?P<M>\d\d):(?P<S>\d\d)(?P<f>\.\d+)? "
+                     r"(?P<Y>\d{4}) GMT", x) or re.fullmatch(r"(?P<Y>\d{4})-(?P<m>\d\d)-(?P<d>\d\d) (?P<H>\d\d):"
+                                                           r"(?P<M>\d\d):(?P<S>\d\d)(?P<f>\.\d+)?Z", x)
+    if not m:
+        raise ValueError(f"genTime illisible : {x!r}")
+    g = m.groupdict()
+    t = datetime(int(g["Y"]), MOIS.index(g["b"]) + 1 if "b" in g else int(g["m"]), int(g["d"]), int(g["H"]),
+                 int(g["M"]), int(g["S"]), tzinfo=timezone.utc)
+    return t + timedelta(seconds=1) if g["f"] and int(g["f"][1:]) else t
 
 
-GARDES = (("bloc", g_bloc), ("(1)", g1), ("(2)", g2), ("(3)", g3), ("(4)", g4), ("(5)", non_construite("C2a")),
-          ("(6)", non_construite("C2a")))
+def voie_a(c: dict) -> datetime:
+    """(6) voie (a) : chain/cacert.pem et chain/tsa.crt du dossier de sceau aux sha256 du bloc, valeurs du bloc aux
+    préfixes de D.4 c ; openssl ts -verify aux arguments de scripts/sceau/verify.sh sort 0 ; serrage (journal G1) :
+    le jeton porte sur les octets de PAQUET.sha256 (-data), manifeste qui liste le sha256 du paquet. Rend genTime."""
+    d = os.path.join(racine(c), SCEAU)
+    ca, tsa, tsr = (os.path.join(d, x) for x in ("chain/cacert.pem", "chain/tsa.crt", "paquet.tsr"))
+    for chemin, cle in ((ca, "cacert_sha256"), (tsa, "tsa_crt_sha256")):
+        if sha256_fichier(chemin) != c["bloc"][cle] or not c["bloc"][cle].startswith(PREFIXES[cle]):
+            raise ValueError(f"{chemin} : sha256 ≠ {cle} du bloc, ou bloc hors du préfixe {PREFIXES[cle]} (D.4 c)")
+    for objet in (("-queryfile", os.path.join(d, "paquet.tsq")), ("-data", os.path.join(d, "PAQUET.sha256"))):
+        p = openssl("ts", "-verify", "-in", tsr, *objet, "-CAfile", ca, "-untrusted", tsa)
+        if p.returncode:
+            raise ValueError(f"openssl ts -verify {objet[0]} : code {p.returncode}")
+    with open(os.path.join(d, "PAQUET.sha256"), "rb") as f:
+        if not re.search(rb"^" + c["sha_paquet"].encode() + rb" [ *]", f.read(), re.M):
+            raise ValueError("PAQUET.sha256 ne liste pas le sha256 du paquet")
+    return gentime(openssl("ts", "-reply", "-in", tsr, "-text").stdout.decode("utf-8", "replace"))
+
+
+VOIES = (("a", voie_a),)                    # voie (b), fichier de go : sous-lot C2b
+
+
+def preuves(c: dict) -> dict:
+    """Voies d'ouverture de (6), évaluées une fois : {voie : (T0 ou None, motif)} ; une voie qui ne s'établit pas
+    n'ouvre pas."""
+    if "preuves" not in c:
+        c["preuves"] = {}
+        for v, f in VOIES:
+            try:
+                c["preuves"][v] = (f(c), "")
+            except Exception as e:      # la voie ne s'établit pas
+                c["preuves"][v] = (None, f"{type(e).__name__} : {e}")
+    return c["preuves"]
+
+
+def g5(c: dict):
+    """(5) T_now ≥ T0 + 24 h, T0 le plus tardif des voies établies (genTime du jeton ; commit qui épingle le go) ; sans
+    voie établie, T0 est indéterminé : refus. T_now : heure système, ou horloge injectée par les tests."""
+    t0 = [t for t, _ in preuves(c).values() if t is not None]
+    t = c["maintenant"] or datetime.now(timezone.utc)
+    if not t0 or t < max(t0) + DELAI:
+        return f"T_now {t:%Y-%m-%dT%H:%M:%SZ} < T0 + 24 h (T0 : {max(t0) if t0 else 'indéterminé'})"
+
+
+def g6(c: dict):
+    """(6) ouverture sur un jeton vérifié (voie a) ou sur un go épinglé (voie b) ; l'horloge seule n'ouvre jamais."""
+    p = preuves(c)
+    if all(t is None for t, _ in p.values()):
+        return "ni jeton vérifié ni go épinglé : " + " ; ".join(f"voie ({v}) {m}" for v, (_, m) in p.items())
+
+
+GARDES = (("bloc", g_bloc), ("(1)", g1), ("(2)", g2), ("(3)", g3), ("(4)", g4), ("(5)", g5), ("(6)", g6))
 
 
 def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, maintenant=None) -> list:
