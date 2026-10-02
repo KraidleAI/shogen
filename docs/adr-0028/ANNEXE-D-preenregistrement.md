@@ -107,7 +107,7 @@ Pièces lues déclarées (l.122-129) : CONSULTATION, `monark.md` §0-§12, 07-gt
 ## D.4 Définitions de contrôle
 
 **(a) « Fixtures seulement » (C-11) — option retenue : lectures « comptes seulement » admises nommément ; proposition du rédacteur, RATIFIÉE par l'orchestrateur le 2026-09-30 sous la délégation investisseur du même jour (JOURNAL), C-8 du cp-1 bref de B-SEG-1 et C-4 de son G2 ; ratification révocable par l'investisseur avant l'exécution unique.**
-- Pendant les G1/G2 des lots B0, B-SEG-1, B-SEG-2, B, POOLEE, B-DEP-1 (ajout du 2026-10-01, revue G2 de B-DEP-1 §10), RENDU-1 et RENDU-2, `SHOGEN_S2_CAMPAGNE_CONTROL` n'est posée que pour les tests nommés ci-dessous. Tout autre test qui lirait une copie scellée lève `SkipTest`.
+- Pendant les G1/G2 des lots B0, B-SEG-1, B-SEG-2, B, POOLEE, B-DEP-1 (ajout du 2026-10-01, revue G2 de B-DEP-1 §10), B-DEP-2 (ajout du 2026-10-02, revue G2 de B-DEP-2 §10), RENDU-1 et RENDU-2, `SHOGEN_S2_CAMPAGNE_CONTROL` n'est posée que pour les tests nommés ci-dessous. Tout autre test qui lirait une copie scellée lève `SkipTest`.
 - Tests admis nommément. Ce sont des comptes seulement : aucun statut, aucun prix en sortie.
   1. `tests/test_exclusion.py`, `test_ii_plage_adr0025_retire_2618_fenetres` : marqueurs `window_close` de `control.jsonl`, comptes par strate (oracle d'ADR-0025 déc. 2).
   2. Le test de comptes par type du lot B-SEG-1 : enregistrements de la plage comptés par type, lus sur les champs d'horodatage (`window_start`, `ts`, `harness_ts`) et de type seulement, jamais sur un champ de statut. Nom fixé au G0 de B-SEG-1 (2026-09-30) : `tests/test_exclusion.py::TestExclusionJournalReel::test_ii_plage_adr0025_comptes_par_type`. Exécuté par l'orchestrateur seul, sur copie, jamais par un G1/G2.
