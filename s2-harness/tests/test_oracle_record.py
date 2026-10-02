@@ -68,8 +68,9 @@ class TestOracleRecord(unittest.TestCase):
         """Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la
         sortie, nom shogen-<sha court>-<rôle>-<date>-<pid>.json. Rougit si : autre commit extrait, sha d'un fichier
         faux, commande hors liste, sortie non hachée, static_only vrai, variable non consignée ou tests comptés lancés
-        avec elle, exit faux, champ nul hors rendu rempli."""
-        chemin, code = orc.enregistrer(self.sortie, "G2", "claude-opus-5-5", self.depot, self.c1[:10])
+        avec elle, exit faux, champ nul hors rendu rempli, env non consigné (PYTHONHASHSEED posé ; C-11, R17)."""
+        with mock.patch.dict(os.environ, {"PYTHONHASHSEED": "17"}):       # jamais la variable scellée
+            chemin, code = orc.enregistrer(self.sortie, "G2", "claude-opus-5-5", self.depot, self.c1[:10])
         self.assertRegex(os.path.basename(chemin), rf"^shogen-{self.c1[:7]}-G2-\d{{8}}T\d{{6}}Z-\d+\.json$")
         rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
         out = Path(self.sortie, rec["runs"][0]["sortie"]["chemin"]).read_bytes()
@@ -80,8 +81,8 @@ class TestOracleRecord(unittest.TestCase):
             "tree": {"commit": self.c1, "extraction": f"git archive {self.c1}",
                      "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())}},
             "static_only": False, "served_from": None, "python": sys.version, "exit": 0,
-            "env": {"SHOGEN_S2_CAMPAGNE_CONTROL": None, **{k: os.environ.get(k) for k in ("PYTHONHASHSEED",
-                                                                                      "PYTHONPATH")}},
+            "env": {"SHOGEN_S2_CAMPAGNE_CONTROL": None, "PYTHONHASHSEED": "17", "PYTHONPATH": os.environ.get(
+                "PYTHONPATH")},
             "runs": [{"nom": "suite", "arbre": "s2-harness", "commande": SUITE, "exit": 0, "tests_avec_variable": [],
                       "sortie": {"chemin": os.path.basename(chemin)[:-5] + ".0-suite.out",
                                  "sha256": hashlib.sha256(out).hexdigest()}}],

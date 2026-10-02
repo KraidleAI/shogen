@@ -275,17 +275,21 @@ def monter_prod(d: str) -> dict:
 class TestProduction(unittest.TestCase):
     def test_echec_a_chaque_pas_rien_ne_reste(self):
         """Q8 : runs factices ; échec à chaque run, sortie altérée pendant le dernier run (relecture : refus sortie),
-        extraction ou renommage en échec : code 1, « gardes levées » seul sur la sortie standard, dossier parent
-        inchangé, aucun run après l'échec, temporaire voisin de la sortie, heure et motif nommé sur stderr ; gardes
-        refusées sans --gardes-seules : code 2, aucun run. Rougit si : temporaire ou sortie restés, arrêt absent, suite
-        non première, relecture absente, temporaire hors du dossier parent, run en échec non nommé."""
+        .git/info/attributes posé pendant le dernier run (relecture : refus tree.sha256 ; C-11, R27), extraction ou
+        renommage en échec : code 1, « gardes levées » seul sur la sortie standard, dossier parent inchangé, aucun run
+        après l'échec, temporaire voisin de la sortie, heure et motif nommé sur stderr ; gardes refusées sans
+        --gardes-seules : code 2, aucun run. Rougit si : temporaire ou sortie restés, arrêt absent, suite non première,
+        relecture absente (ou sans --depot), temporaire hors du dossier parent, run en échec non nommé."""
         def pendant(nom):
             voisins.append(len(glob.glob(os.path.join(parent, ".sortie.*"))))
-            for x in glob.glob(os.path.join(parent, ".sortie.*", "*-j28.out")) if alterer and nom == "raw" else ():
-                Path(x).write_bytes(b"altere")
-        nul = contextlib.nullcontext()
-        cas = [(n, n, False, nul) for n in RUNS] + [
-            ("relecture", None, True, nul),
+            if alterer and nom == "raw":
+                alterer(f)
+        nul, crlf = contextlib.nullcontext(), b"*.py eol=crlf\n"
+        sortie_alteree = lambda f: [Path(x).write_bytes(b"altere") for x in glob.glob(os.path.join(
+            os.path.dirname(f["depot"]), ".sortie.*", "*-j28.out"))]
+        cas = [(n, n, None, nul) for n in RUNS] + [
+            ("relecture", None, sortie_alteree, nul),
+            ("attributs", None, lambda f: Path(f["depot"], ".git", "info", "attributes").write_bytes(crlf), nul),
             ("extraction", None, False, mock.patch.object(ru.orc, "extraire", side_effect=ValueError("factice"))),
             ("renommage", None, False, mock.patch.object(ru.os, "rename", side_effect=OSError("factice")))]
         for nom, echec, alterer, autre in cas:
@@ -301,7 +305,8 @@ class TestProduction(unittest.TestCase):
                 self.assertEqual((code, out, sorted(os.listdir(parent)), lances, set(voisins) <= {1}),
                                  (1, "gardes levées\n", avant, runs, True))
                 self.assertRegex(err, r"^rendu_unique : échec de production à \d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ : ")
-                self.assertIn({"relecture": "refus (sortie)", "extraction": "factice", "renommage": "factice"}.get(
+                self.assertIn({"relecture": "refus (sortie)", "attributs": "refus (tree.sha256)",
+                               "extraction": "factice", "renommage": "factice"}.get(
                     nom, f"run en échec : [('{nom}', 1)]"), err)
         f = monter(tempfile.mkdtemp())
         p, lances = faux_runs()

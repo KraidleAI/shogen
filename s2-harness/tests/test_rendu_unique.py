@@ -307,12 +307,13 @@ class TestRenduUnique(unittest.TestCase):
     def test_voie_a_refus(self):
         """(6), voie (a), horloge à genTime + 48 h : bloc d'une autre chaîne que cacert.pem ou tsa.crt (même préfixe) ;
         requête qui n'est pas celle du jeton (autre nonce) ; jeton sur d'autres octets que PAQUET.sha256 ; manifeste qui
-        ne liste pas le sha du paquet (jeton sur ce manifeste) ; jeton d'une autre autorité : refus (5) et (6), rien
-        d'écrit. Rougit si l'un des contrôles de la voie (a) est retiré ou si le code d'openssl est ignoré."""
+        ne liste pas le sha du paquet (jeton sur ce manifeste), ou le liste au format BSD (C-11, R04) ; jeton d'une
+        autre autorité : refus (5) et (6), rien d'écrit. Rougit si l'un des contrôles de la voie (a) est retiré ou si
+        le code d'openssl est ignoré."""
         self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
         m = lambda f: Path(f["depot"], SCEAU, "PAQUET.sha256").read_bytes()
         autre = lambda f, ac: (autorite(ac + "2"), poser(f["depot"], jeton(ac + "2", m(f)), commit=False))
-        sans = ("0" * 64 + " *x\n").encode()
+        sans, bsd = ("0" * 64 + " *x\n").encode(), lambda f: f"SHA256 ({PAQUET}) = {f['sha']}\n".encode()
         for nom, kw, faire in (
                 ("bloc ≠ cacert.pem", {"ca": lambda s: s[:8] + "0" * 56}, None),
                 ("bloc ≠ tsa.crt", {"tsa": lambda s: s[:8] + "0" * 56}, None),
@@ -321,6 +322,8 @@ class TestRenduUnique(unittest.TestCase):
                 ("jeton sur d'autres octets", {}, lambda f, ac: poser(f["depot"], jeton(ac, b"autre\n"), commit=False)),
                 ("manifeste sans le paquet", {}, lambda f, ac: poser(f["depot"], {f"{SCEAU}/PAQUET.sha256": sans,
                                                                                   **jeton(ac, sans)}, commit=False)),
+                ("manifeste BSD", {}, lambda f, ac: poser(f["depot"], {f"{SCEAU}/PAQUET.sha256": bsd(f),
+                                                                       **jeton(ac, bsd(f))}, commit=False)),
                 ("autre autorité", {}, autre)):
             f, ac, t, pref = self.voie_a(tempfile.mkdtemp(), **kw)
             faire and faire(f, ac)
@@ -449,10 +452,10 @@ class TestRenduUnique(unittest.TestCase):
 
     def test_refus_auteur_sortie_deviation_noms(self):
         """Avant toute garde : auteur hors de la liste blanche du lint (refus auteur) ; --sortie présent sans
-        --deviation, --deviation sans première exécution, à motif vide ou sur deux lignes (refus sortie). Gardes levées
-        (go épinglé, horloge en 2100) : noms des journaux du bloc autres que control.jsonl, journal.jsonl, raw.jsonl
-        (refus noms, L3). Code 2, rien d'écrit ; répertoire de déviation : premier suffixe libre. Rougit si un refus
-        manque ou si un suffixe existant est repris."""
+        --deviation, lien symbolique pendant à la place de --sortie (C-11, R05), --deviation sans première exécution,
+        à motif vide ou sur deux lignes (refus sortie). Gardes levées (go épinglé, horloge en 2100) : noms des journaux
+        du bloc autres que control.jsonl, journal.jsonl, raw.jsonl (refus noms, L3). Code 2, rien d'écrit ; répertoire
+        de déviation : premier suffixe libre. Rougit si un refus manque ou si un suffixe existant est repris."""
         f = monter(tempfile.mkdtemp())
         epingler(f)
         sortie = os.path.join(os.path.dirname(f["depot"]), "sortie")
@@ -460,6 +463,9 @@ class TestRenduUnique(unittest.TestCase):
         self.assertEqual(self.lancer(f, "--auteur", "claude-opus-" + "5", maintenant=LOIN), (2, ["auteur"]))
         for plus in (["--deviation", "relance"], ["--deviation", " "]):
             self.assertEqual(self.lancer(f, *plus, maintenant=LOIN), (2, ["sortie"]))
+        os.symlink(os.path.join(os.path.dirname(sortie), "absent"), sortie)       # lien pendant (C-11, R05)
+        self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["sortie"]))
+        os.remove(sortie)
         os.makedirs(sortie)
         for plus in ([], ["--deviation", ""], ["--deviation", "deux\nlignes"]):
             self.assertEqual(self.lancer(f, *plus, maintenant=LOIN), (2, ["sortie"]))
