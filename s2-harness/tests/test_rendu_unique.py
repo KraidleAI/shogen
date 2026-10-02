@@ -226,9 +226,11 @@ class TestRenduUnique(unittest.TestCase):
                 self.assertEqual(self.lancer(f), (2, attendus("(4)")))
 
     def test_gardes_lisent_le_head_resolu_une_fois(self):
-        """C-2 (i) : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de JOURNAL.md, code d'analyse
-        et outil changés) ; la résolution unique de HEAD rend X (enveloppe de git) : gardes levées sur X, contexte
-        head = X. Rougit si (1), (2), (4) ou la voie (b) relisent HEAD au lieu du commit résolu."""
+        """C-2 (i) et RENDU-STATUS-HEAD-1 : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de
+        JOURNAL.md, code d'analyse et outil changés), arbre de travail propre sur Y ; la résolution unique de HEAD rend
+        X (enveloppe de git) : contexte head = X ; seule (2) refuse, l'arbre de travail étant jugé contre X (git status
+        le juge contre HEAD et n'y voit rien). Rougit si (1), (4) ou la voie (b) relisent HEAD au lieu du commit
+        résolu, ou si l'arbre de travail n'est pas jugé contre X."""
         f = monter(tempfile.mkdtemp())
         epingler(f)
         x, vrai = g(f["depot"], "rev-parse", "HEAD"), ru.git
@@ -239,7 +241,8 @@ class TestRenduUnique(unittest.TestCase):
             "rev-parse", "--verify", "HEAD^{commit}") else vrai(r, *a)
         with mock.patch.object(ru, "git", resolu):
             refus, c = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
-        self.assertEqual((refus, c.get("head")), ([], x))
+        self.assertEqual(([n for n, _ in refus], c.get("head")), (["(2)"], x))
+        self.assertTrue(refus[0][1].startswith(f"arbre de travail ≠ commit gardé {x} "), refus)
 
     def test_garde_2_code_d_analyse(self):
         """(2) : code d'analyse différent du commit du bloc (commit qui change tools), commit du bloc absent du dépôt,

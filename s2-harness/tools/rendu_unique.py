@@ -159,12 +159,16 @@ def g1(c: dict):
 
 
 def g2(c: dict):
-    """(2) git diff --quiet <commit_analyse> <head> -- CHEMINS sort 0, et arbre de travail propre sur CHEMINS (git
-    status : aucune modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
+    """(2) git diff --quiet <commit_analyse> <head> -- CHEMINS sort 0 ; arbre de travail jugé contre le commit gardé
+    (git diff --quiet <head> -- CHEMINS sort 0 : RENDU-STATUS-HEAD-1) ; git status sur CHEMINS vide (aucune
+    modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
     r, commit = racine(c), c["bloc"]["commit_analyse"]
     d = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, head(c), "--", *CHEMINS)
     if d.returncode:
         return f"git diff --quiet {commit} {head(c)} -- {' '.join(CHEMINS)} : code {d.returncode}"
+    a = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", head(c), "--", *CHEMINS)
+    if a.returncode:
+        return f"arbre de travail ≠ commit gardé {head(c)} sur {' '.join(CHEMINS)} (git diff : code {a.returncode})"
     s = git(r, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", *CHEMINS)
     if s.returncode or s.stdout:
         return f"arbre de travail modifié sur {' '.join(CHEMINS)} : {s.stdout.decode('utf-8', 'replace')[:300]!r}"
