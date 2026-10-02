@@ -258,10 +258,11 @@ def g6(c: dict):
 GARDES = (("bloc", g_bloc), ("(1)", g1), ("(2)", g2), ("(3)", g3), ("(4)", g4), ("(5)", g5), ("(6)", g6))
 
 
-def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, maintenant=None) -> list:
-    """Évalue toutes les gardes de GARDES, dans l'ordre ; rend [(nom, motif)] des refus, liste vide si toutes sont
-    levées. Une exception pendant une garde (fichier absent, bloc illisible, git en échec) est un refus. maintenant
-    (datetime UTC) : horloge injectée en processus par les tests ; None en production (heure système)."""
+def evaluer_gardes(depot: str, paquet: str, journaux: str, sommes: str, maintenant=None) -> tuple:
+    """Évalue toutes les gardes de GARDES, dans l'ordre ; rend ([(nom, motif)] des refus, liste vide si toutes sont
+    levées ; contexte des gardes, lu par ouverture). Une exception pendant une garde (fichier absent, bloc illisible,
+    git en échec) est un refus. maintenant (datetime UTC) : horloge injectée en processus par les tests ; None en
+    production (heure système)."""
     c, refus = {"depot": depot, "paquet": paquet, "journaux": journaux, "sommes": sommes, "maintenant": maintenant}, []
     for nom, garde in GARDES:
         try:
@@ -270,7 +271,36 @@ def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, mainten
             motif = f"non évaluée ({type(e).__name__} : {e})"
         if motif:
             refus.append((nom, motif))
-    return refus
+    return refus, c
+
+
+def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, maintenant=None) -> list:
+    """Refus de evaluer_gardes seuls."""
+    return evaluer_gardes(depot, paquet, journaux, sommes, maintenant)[0]
+
+
+def ouverture(c: dict) -> dict:
+    """SHOGEN-RENDU-T0-1, gardes levées : voie(s) établie(s) de (6), T0 (le plus tardif, celui de la garde (5)) et
+    genTime du jeton (voie (a), sinon None), en ISO 8601 UTC."""
+    t = {v: d for v, (d, _m) in preuves(c).items() if d is not None}
+    iso = lambda d: f"{d:%Y-%m-%dT%H:%M:%SZ}"
+    return {"voie": "+".join(sorted(t)), "T0": iso(max(t.values())), "genTime": iso(t["a"]) if "a" in t else None}
+
+
+def destination(sortie: str, motif) -> str:
+    """Répertoire de sortie (D.4 b, G0 §C) : --sortie s'il est absent ; présent : refus, sauf --deviation <motif>
+    (seconde exécution déclarée, motif d'une ligne non vide) : premier <sortie>.deviation-<k> libre, la première sortie
+    n'est jamais touchée ; --deviation sans première exécution : refus. Refus : ValueError."""
+    if motif is None:
+        if os.path.lexists(sortie):
+            raise ValueError(f"{sortie} déjà présent : une seconde exécution est une déviation déclarée (--deviation)")
+        return sortie
+    if not os.path.lexists(sortie) or not motif.strip() or "\n" in motif or "\r" in motif:
+        raise ValueError("--deviation exige une première exécution (--sortie présent) et un motif d'une ligne non vide")
+    k = 1
+    while os.path.lexists(f"{sortie}.deviation-{k}"):
+        k += 1
+    return f"{sortie}.deviation-{k}"
 
 
 def _decimal(x) -> str:
@@ -315,16 +345,34 @@ def produire(argv: list) -> int:
 
 
 def main(argv: list, maintenant=None) -> int:
-    """--depot, --paquet, --journaux (dossier des journaux scellés), --sommes (fichier de sommes), --sortie (C3 ; rien
-    n'y est écrit ici). Refus : gardes refusées sur stderr, code 2 ; sinon « gardes levées », code 0. L'horloge n'est
-    jamais une option : maintenant n'est passé qu'en processus, par les tests. --produire : commande nommée."""
+    """--depot, --paquet, --journaux (dossier des journaux scellés), --sommes (fichier de sommes), --sortie, --auteur
+    (identifiant de la liste blanche du lint) ; --deviation MOTIF (seconde exécution déclarée) ; --gardes-seules (rien
+    de produit). Refus (auteur, sortie, gardes, noms des journaux, L3) sur stderr, code 2, rien d'écrit ; sinon
+    « gardes levées ». L'horloge n'est jamais une option : maintenant n'est passé qu'en processus, par les tests.
+    --produire : commande nommée."""
     if argv[:1] == ["--produire"]:
         return produire(argv[1:])
     p = argparse.ArgumentParser(prog="rendu_unique.py", description="exécution unique du rendu S2 (ADR-0028 D.4 b)")
-    for opt in ("--depot", "--paquet", "--journaux", "--sommes", "--sortie"):
+    for opt in ("--depot", "--paquet", "--journaux", "--sommes", "--sortie", "--auteur"):
         p.add_argument(opt, required=True)
-    a = p.parse_args(argv)
-    refus = verifier_gardes(a.depot, a.paquet, a.journaux, a.sommes, maintenant)
+    p.add_argument("--deviation", metavar="MOTIF")
+    p.add_argument("--gardes-seules", action="store_true")
+    a, refus = p.parse_args(argv), []
+    try:
+        cible = destination(a.sortie, a.deviation)
+    except ValueError as e:
+        refus.append(("sortie", str(e)))
+    try:
+        if not orc.auteur_admis(a.auteur):
+            raise ValueError(f"{a.auteur!r} hors de la liste blanche de {orc.LINT}")
+    except ValueError as e:                 # liste illisible comprise
+        refus.append(("auteur", str(e)))
+    if not refus:
+        refus, c = evaluer_gardes(a.depot, a.paquet, a.journaux, a.sommes, maintenant)
+        if not refus and sorted(c["bloc"]["journal"]) != sorted(NOMS_JOURNAUX):
+            refus = [("noms", f"journaux du bloc {sorted(c['bloc']['journal'])}, exigés {list(NOMS_JOURNAUX)}")]
+        if not refus and not a.gardes_seules:
+            refus = [("production", "enchaînement des sorties construit au sous-lot C3e : refus")]
     for nom, motif in refus:
         print(f"rendu_unique : refus {nom} : {motif}", file=sys.stderr)
     if refus:

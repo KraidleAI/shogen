@@ -123,18 +123,20 @@ def epingler(f: dict, go: bytes = GO_OK, date="2026-09-01T00:00:00+00:00", ligne
 
 
 def argv(f: dict) -> list:
+    """Gardes seules (rien de produit, C3) ; auteur de la liste blanche du lint."""
     return ["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes", f["sommes"],
-            "--sortie", os.path.join(os.path.dirname(f["depot"]), "sortie")]
+            "--sortie", os.path.join(os.path.dirname(f["depot"]), "sortie"), "--auteur", "claude-opus-5-5",
+            "--gardes-seules"]
 
 
 class TestRenduUnique(unittest.TestCase):
-    def lancer(self, f: dict, **kw) -> tuple:
+    def lancer(self, f: dict, *plus: str, **kw) -> tuple:
         """main() en processus : (code, gardes refusées lues sur stderr) ; rien d'écrit (répertoire de sortie absent,
         dossier parent inchangé) ; refus ⇔ code ≠ 0 ⇔ stdout vide, sinon « gardes levées »."""
         parent, err = os.path.dirname(f["depot"]), io.StringIO()
         avant = sorted(os.listdir(parent))
         with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
-            code = ru.main(argv(f), **kw)
+            code = ru.main(argv(f) + list(plus), **kw)
         noms = re.findall(r"^rendu_unique : refus (\S+) : ", err.getvalue(), re.M)
         self.assertEqual((sorted(os.listdir(parent)), code != 0, out.getvalue()),
                          (avant, bool(noms), "" if noms else "gardes levées\n"))
@@ -369,6 +371,62 @@ class TestRenduUnique(unittest.TestCase):
         for texte in ("", "Time stamp: Oct  2 07:32:34 2026 GMT\n" * 2, "Time stamp: 2026-10-02T07:32:34+01:00\n"):
             with self.subTest(texte=texte), self.assertRaises(ValueError):
                 ru.gentime(texte)
+
+
+    def test_ouverture_voie_t0_gentime(self):
+        """SHOGEN-RENDU-T0-1 : evaluer_gardes rend les refus et le contexte ; ouverture() en tire la voie, T0 (le plus
+        tardif, celui de la garde (5)) et genTime (voie (a) seule), en ISO 8601 UTC. Voie (b) : T0 = date du commit qui
+        épingle le go, genTime nul ; voie (a) : T0 = genTime, lu ici dans openssl ts -reply -text ; deux voies (go
+        épinglé un jour après genTime) : T0 = le go, genTime du jeton. Rougit si : voie, T0 ou genTime faux."""
+        self.assertTrue(OPENSSL, "openssl absent : le test échoue, il ne saute pas (G0 §C, risque (a))")
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        self.assertEqual((r[0], ru.ouverture(r[1])), ([], {"voie": "b", "T0": "2026-09-01T00:00:00Z", "genTime": None}))
+        f, _, _, pref = self.voie_a(tempfile.mkdtemp())
+        x = subprocess.run([OPENSSL, "ts", "-reply", "-in", os.path.join(f["depot"], SCEAU, "paquet.tsr"), "-text"],
+                           capture_output=True, text=True).stdout.split("Time stamp: ")[1].split("\n")[0]
+        g = datetime.strptime(x, "%b %d %H:%M:%S %Y GMT").replace(tzinfo=timezone.utc)
+        iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%SZ")
+        with mock.patch.dict(ru.PREFIXES, pref):
+            r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+            self.assertEqual((r[0], ru.ouverture(r[1])), ([], {"voie": "a", "T0": iso(g), "genTime": iso(g)}))
+            go = epingler(f, date=(g + DELAI).isoformat())
+            r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+            self.assertEqual((r[0], ru.ouverture(r[1])), ([], {"voie": "a+b", "T0": iso(go), "genTime": iso(g)}))
+
+    def test_refus_auteur_sortie_deviation_noms(self):
+        """Avant toute garde : auteur hors de la liste blanche du lint (refus auteur) ; --sortie présent sans
+        --deviation, --deviation sans première exécution, à motif vide ou sur deux lignes (refus sortie). Gardes levées
+        (go épinglé, horloge en 2100) : noms des journaux du bloc autres que control.jsonl, journal.jsonl, raw.jsonl
+        (refus noms, L3). Code 2, rien d'écrit ; répertoire de déviation : premier suffixe libre. Rougit si un refus
+        manque ou si un suffixe existant est repris."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        sortie = os.path.join(os.path.dirname(f["depot"]), "sortie")
+        self.assertEqual(self.lancer(f, maintenant=LOIN), (0, []))
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(err):
+            code = ru.main(argv(f)[:-1], maintenant=LOIN)           # sans --gardes-seules : production
+        self.assertEqual((code, out.getvalue(), os.path.exists(sortie)), (2, "", False))
+        self.assertRegex(err.getvalue(), r"^rendu_unique : refus production : ")
+        self.assertEqual(self.lancer(f, "--auteur", "claude-opus-" + "5", maintenant=LOIN), (2, ["auteur"]))
+        for plus in (["--deviation", "relance"], ["--deviation", " "]):
+            self.assertEqual(self.lancer(f, *plus, maintenant=LOIN), (2, ["sortie"]))
+        os.makedirs(sortie)
+        for plus in ([], ["--deviation", ""], ["--deviation", "deux\nlignes"]):
+            self.assertEqual(self.lancer(f, *plus, maintenant=LOIN), (2, ["sortie"]))
+        self.assertEqual(self.lancer(f, "--deviation", "relance déclarée", maintenant=LOIN), (0, []))
+        self.assertEqual(ru.destination(sortie, "motif"), sortie + ".deviation-1")
+        os.makedirs(sortie + ".deviation-1")
+        self.assertEqual(ru.destination(sortie, "motif"), sortie + ".deviation-2")
+        noms = {"control.jsonl": JOURNAUX["control.jsonl"], "journal.jsonl": JOURNAUX["journal.jsonl"],
+                "brut.jsonl": JOURNAUX["raw.jsonl"]}
+        cinq = {**noms, "campagne.log": b"x\n", "segments.json": b"{}\n"}
+        with mock.patch.dict(JOURNAUX, noms, clear=True), mock.patch.dict(SOMMES, cinq, clear=True):
+            f = monter(tempfile.mkdtemp())
+        epingler(f)
+        self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["noms"]))
 
 
 if __name__ == "__main__":
