@@ -160,6 +160,18 @@ L'investisseur les dépose sur **son Google Drive**, dans un dossier **privé** 
 **Lien du dossier Drive** : à demander à l'investisseur au début de la session cloud, puis à inscrire ici par un
 commit daté.
 
+> **Ajout daté du 2026-10-02 03:0x UTC (session cloud)** : emplacement réel constaté par le connecteur Google Drive
+> (lecture accordée par l'investisseur vers 02:5x UTC) : pas de dossier parent `Shogen-biblio/` ; deux dossiers à la
+> racine du Drive, privés, créés le 2026-10-02 02:27 UTC : `biblio` (id `10e0eif32lMlwsc0HP1AZsSd6eHX58zHj`) et
+> `biblio-a-verser` (id `1Z3QzHd5JKAqN4NhGoPorhPJJsUTliFiL`) ; Künsch 1989, Fisher 1921 et
+> `PROVENANCE-2026-09-30.md` sont dans un sous-dossier de `biblio-a-verser` ; une transcription
+> `kunsch1989.ocr.txt` (datée du 2026-09-29) existe dans un autre dossier, provenance à établir au lot de lecture.
+> **Conduite corrigée** : la recopie complète (point 2 ci-dessous) est impraticable par le connecteur (chaque
+> fichier transite encodé par le contexte de la session ; ≈ 98 Mo) ; la recherche plein texte du Drive cherche des
+> mots, pas une phrase exacte : elle ne remplace pas S-G5. Donc : lectures ciblées par le connecteur (parties 2 et
+> 3) ; rejeu mécanisé de S-G5 en corpus complet (SHOGEN-ORACLE-PERIMETRE-1 (ii)) sur le poste local, où sont les
+> octets, avant l'entrée de la partie 2 dans `main`.
+
 **Conduite en cloud** :
 1. Lire le Drive par le connecteur Google Drive de claude.ai (à autoriser par l'investisseur s'il ne l'est pas).
 2. Recopier `Shogen-biblio/biblio/` dans `biblio/` du clone, et `Shogen-biblio/biblio-a-verser/` dans
