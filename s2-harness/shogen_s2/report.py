@@ -615,12 +615,16 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     else:
         ap(f"  k_eff     = {_fmt_dec(part['k_eff'])}  — {part['k_eff_note']}")
     hs = [h for h in part["hosts"] if h in part["attribution_by_host"]]      # hôtes du pool, relevé retenu
-    ts = sorted(part["attribution_by_host"][h]["ts"] for h in hs)
+    sans = [h for h in hs if part["attribution_by_host"][h].get("ts") is None]     # SHOGEN-BLOC6-TS-1
+    ts = sorted(part["attribution_by_host"][h]["ts"] for h in hs if h not in sans)
     ap("  date de la partition, axe ASN (ADR-0026 déc. 1 ; HS2-07) = " + (
         f"relevé asn_attribution retenu (dernier par hôte, après filtre de lecture) : min {ts[0]} = "
-        f"{_iso_utc(ts[0])} ; max {ts[-1]} = {_iso_utc(ts[-1])} ; {len(hs)} / {len(part['hosts'])} hôtes "
-        "du pool" if ts else "non mesurée (aucun hôte du pool n'a de relevé asn_attribution retenu)")
-       + " — descriptif seulement (ADR-0028 annexe D.5)")
+        f"{_iso_utc(ts[0])} ; max {ts[-1]} = {_iso_utc(ts[-1])} ; {len(ts)} / {len(part['hosts'])} hôtes "
+        "du pool" if ts else "non mesurée (aucun hôte du pool n'a de relevé asn_attribution retenu"
+        + (" daté)" if sans else ")")) + " — descriptif seulement (ADR-0028 annexe D.5)")
+    ap(f"  relevés asn_attribution retenus sans ts (hôtes du pool, entrée malformée) = {len(sans)}"
+       + (f" : {', '.join(sans)}" if sans else "") + " — comptés à part, hors date de la partition "
+       "(SHOGEN-BLOC6-TS-1)")
     ap("  R3 (déclaration : entité légale, juridiction, méthodologie annoncée) ne "
        "modifie JAMAIS k_eff (§5.6 / 04 §3) — seuls les recouvrements R2 measured partitionnent.")
     ap("  PARTITION NOMMÉE (ADR-0007 : nomme l'amont, jamais un compte anonyme) :")

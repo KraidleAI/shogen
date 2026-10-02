@@ -73,30 +73,32 @@ def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
     """Relit un JSONL en TOLÉRANT une **dernière** ligne tronquée (crash
     mi-écriture — la machine de Phase A a un historique de coupures, plan §4.2).
 
-    - dernière ligne non vide illisible → **consignée** sur stderr puis ignorée
-      (jamais silencieux) ;
+    - dernière ligne non vide illisible (JSON, ou UTF-8 coupé dans un caractère) → **consignée** sur stderr
+      puis ignorée (jamais silencieux) ;
     - une ligne illisible **non finale** → corruption → ValueError (fail-closed :
       un journal au milieu corrompu n'est pas recalculable).
+    Lecture en octets, fins de ligne universelles (LF, CRLF, CR, comme le mode texte), décodage UTF-8 ligne par
+    ligne : une coupure dans un caractère multi-octets n'empêche plus la lecture (SHOGEN-TORN-LINE-UTF8-1, HS2-03).
     """
-    with open(path, encoding="utf-8") as f:
-        raw_lines = f.readlines()
-    idx = [i for i, ln in enumerate(raw_lines) if ln.strip()]
+    with open(path, "rb") as f:
+        raw_lines = f.read().splitlines()
+    idx = [i for i, ln in enumerate(raw_lines) if ln.decode("utf-8", "replace").strip()]
     objs: list[dict] = []
     for pos, i in enumerate(idx):
-        s = raw_lines[i].strip()
         try:
-            objs.append(json.loads(s, parse_float=parse_float))
-        except json.JSONDecodeError as e:
+            objs.append(json.loads(raw_lines[i].decode("utf-8").strip(), parse_float=parse_float))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            utf = isinstance(e, UnicodeDecodeError)
             if pos == len(idx) - 1:
                 sys.stderr.write(
                     f"[s2-harness] AVERTISSEMENT : dernière ligne tronquée ignorée "
-                    f"dans {path} (ligne {i + 1}) — crash mi-écriture probable "
-                    f"(plan §4.2) ; consigné, non silencieux.\n"
+                    f"dans {path} (ligne {i + 1}{', non décodable en UTF-8' if utf else ''}) — crash mi-écriture "
+                    f"probable (plan §4.2) ; consigné, non silencieux.\n"
                 )
             else:
                 raise ValueError(
-                    f"ligne JSON corrompue NON finale dans {path} (ligne {i + 1}) : "
-                    f"recalcul impossible (fail-closed)"
+                    f"ligne {'non décodable en UTF-8' if utf else 'JSON corrompue'} NON finale dans {path} "
+                    f"(ligne {i + 1}) : recalcul impossible (fail-closed)"
                 ) from e
     return objs
 
@@ -313,6 +315,9 @@ def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
         if r.get("record") not in HORODATAGE:
             raise ValueError(f"type {r.get('record')!r} sans champ d'horodatage connu — fail-closed")
         champ = HORODATAGE[r["record"]]
+        if champ is not None and r.get(champ) is None:     # jamais KeyError (SHOGEN-BLOC6-TS-1)
+            raise ValueError(f"{r['record']} sans {champ} : placement dans le segment ou la plage indécidable — "
+                             "fail-closed (SHOGEN-BLOC6-TS-1)")
         if champ is not None and segment is not None and not segment[0] <= r[champ] < segment[1]:
             continue
         if champ == "window_start":
