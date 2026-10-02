@@ -211,6 +211,7 @@ dette `TODO`/`FIXME` nue est refusée (R-13).
   méthode change : chaque partie entre dans `main` par une PR fusionnée en « Squash and merge » dans
   l'interface de GitHub (commit signé par GitHub, historique linéaire) ; l'historique détaillé reste sur la
   branche de partie.
+- **État constaté le 2026-10-02 02:22 UTC** : l'investisseur a retiré `required_signatures` et `required_linear_history`, mais la règle exige désormais une **PR approuvée par une personne** (`required_approving_review_count: 1`, administrateurs compris). Push direct refusé (« Changes must be made through a pull request »). **PR ouverte : `KraidleAI/shogen#1`** (branche `passation-cloud-2026-10-02` vers `main`, fusionnable, bloquée par l'approbation). L'auteur de la PR ne peut pas l'approuver lui-même. Réglage de sécurité : acte de l'investisseur ; ne contourne jamais l'approbation, et n'approuve pas avec un second compte.
 - **Décision de l'investisseur (2026-10-02) : voie (A).** Le retrait de la protection est un réglage de sécurité
   du dépôt : **acte de l'investisseur**, jamais de l'orchestrateur. Vérifie qu'il est fait
   (`gh api repos/KraidleAI/shogen/branches/main/protection`) avant de pousser `main` ; la branche
