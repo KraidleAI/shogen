@@ -19,7 +19,7 @@ garde, le bloc R1 rend la queue exacte au lieu d'un `z` vide de sens ;
 calendrier 2-strates ex ante est dans `window.py` (M1b). Le drapeau 2 de §5.6
 (« co-défaillance non expliquée par R2 ») requiert `k_eff` (R2) : **réalisé en M1c
 (`r2.drapeau_2`)** — ici (bloc R1) seul le drapeau « historique insuffisant » est
-calculé ; `r2.drapeau_2` consomme ce z par strate.
+calculé ; `r2.drapeau_2` consomme la règle par strate (`regle_critere`, ADR-0028 §1 bis.1 pt 10).
 
 **Identité élémentaire** (10 §5.1, indépendante de la citation, donc du calcul
 débloqué) :
@@ -473,7 +473,7 @@ def classify_cells(
 
 def strate_poolee(strates: dict) -> dict:
     """Strate poolée (ADR-0028 D2 pt 4 ; §1 bis.1 pt 9 ; §1 bis.11 item 14) : hors de `strates`, donc
-    hors z_max, drapeau 2 et famille. Entrées par strate : n, K, P̂_more, pool d'analyse D1 et sa taille.
+    hors règle, drapeau 2 et famille. Entrées par strate : n, K, P̂_more, pool d'analyse D1 et sa taille.
     z_pool publié si au moins deux strates et si chacune publie son z (garde §5.4 tenue) ; sinon None
     et motif."""
     ent = {st: {"n": b["n"], "K": b["K"], "P_more": b["P_more"], "pool": list(b["per_source"]),

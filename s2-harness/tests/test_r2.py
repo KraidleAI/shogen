@@ -30,7 +30,9 @@ from tests.test_collector import (
     frozen_read_fn,
     sbc_huge,
 )
+from tests.test_critere import blk
 from tests.test_r1 import mk, rd
+from tests.test_rendu_blocs import couture
 
 D = Decimal
 # [C2b] Étaient `SIGMA = D("1e12")` (σ SCALAIRE) et `TAU = D("50")` (τ ABSOLU).
@@ -400,15 +402,18 @@ class TestDrapeau2(unittest.TestCase):
         return markers, readings
 
     def test_leve_when_z_signif_and_clean_partition(self):
-        # binance & coinbase : hôtes DISTINCTS, ASN distincts → k_eff = k nominal.
+        # binance & coinbase : hôtes DISTINCTS, ASN distincts → k_eff = k nominal. Lot CRITERE : la règle
+        # exige z_bloc publiée ; couture ℓ = 1 (n = 60 ≥ 30) : z² = 20, z_bloc² = 15, « R1 discrimine » VRAI.
         fh = r2.build_flux_hosts(SPECS)
         markers, readings = self._cofailure(60, 30)
         recs = [asn_rec("api.binance.com", 10, 10),
                 asn_rec("api.exchange.coinbase.com", 20, 20)]
-        out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
+        with couture(1):
+            out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
+                                _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
         self.assertEqual(out["drapeau_2"]["etat"], "leve")
-        self.assertGreaterEqual(out["drapeau_2"]["z_max"], r2.SEUIL_Z)
+        d2 = out["drapeau_2"]
+        self.assertEqual((d2["r1_discrimine"], d2["rejette"]), ("VRAI", ["calme"]))
         self.assertIsNotNone(out["drapeau_2"]["localisation_inter_clusters"])
 
     def test_eteint_when_shared_asn(self):
@@ -416,8 +421,9 @@ class TestDrapeau2(unittest.TestCase):
         markers, readings = self._cofailure(60, 30)
         recs = [asn_rec("api.binance.com", 13335, 13335, "CF"),
                 asn_rec("api.exchange.coinbase.com", 13335, 13335, "CF")]
-        out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
-                            _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
+        with couture(1):                                         # lot CRITERE : « R1 discrimine » VRAI
+            out = r2.compute_r2(markers, readings, recs, ["binance", "coinbase"], 60,
+                                _sbc(), _scof(["binance", "coinbase"]), TAU, r2_params(fh))
         self.assertEqual(out["partition"]["k_eff"], 1)
         self.assertEqual(out["drapeau_2"]["etat"], "eteint")
 
@@ -431,17 +437,15 @@ class TestDrapeau2(unittest.TestCase):
         self.assertEqual(out["drapeau_2"]["etat"], "non_evaluable")
 
     def test_eteint_when_z_below_threshold(self):
-        # unité : z publié mais < 2,33 → éteint (pas de co-défaillance significative).
-        r1_out = {"strates": {"calme": {"z": D("1.5"),
-                                        "flag_historique_insuffisant": False}}}
+        # unité : z publié mais < 2,33 → NE REJETTE PAS, « R1 discrimine » FAUX → éteint (lot CRITERE).
+        r1_out = {"strates": {"calme": {**blk("1.5", None), "per_source": {}}}}
         part = {"k_eff": 2, "k_nominal": 2, "clusters": []}
         lm_out = {"strates": {}}
         d2 = r2.drapeau_2(r1_out, part, lm_out)
         self.assertEqual(d2["etat"], "eteint")
 
     def test_non_evaluable_when_keff_none(self):
-        r1_out = {"strates": {"calme": {"z": D("5"),
-                                        "flag_historique_insuffisant": False}}}
+        r1_out = {"strates": {"calme": {**blk("5", "5"), "per_source": {}}}}          # REJETTE : VRAI
         part = {"k_eff": None, "k_nominal": 3, "clusters": []}
         d2 = r2.drapeau_2(r1_out, part, {"strates": {}})
         self.assertEqual(d2["etat"], "non_evaluable")

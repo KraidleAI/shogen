@@ -11,11 +11,12 @@ import re
 import unittest
 from decimal import Decimal as D
 from fractions import Fraction as F
+from itertools import count
 
-from shogen_s2 import r1, report
+from shogen_s2 import r1, r2, report
 from tests.test_blocs import d50
-from tests.test_collector import SKELETON as FL
-from tests.test_rendu_blocs import couture, journal, proche
+from tests.test_collector import BY_ID, SKELETON as FL
+from tests.test_rendu_blocs import SAM, couture, journal, proche
 
 S1, NN, NEUF = "NON ÉVALUABLE", "NE REJETTE PAS", "2.32" + "9" * 49      # NEUF : 2,33 − 10⁻⁵¹
 TETE = ("  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
@@ -231,6 +232,60 @@ class TestRegleRendu(unittest.TestCase):
         prémisse du pt 7 sur une ligne, en place. Rougit si : m statique ; prémisse retirée ; strates tues."""
         for k, m, t in (("J1-1", 2, "calme, stress"), ("J2", 2, "calme, stress"), ("J1", 0, "aucune")):
             self.assertEqual(self.r[k][2], [FAMILLE.format(m, t)], k)
+
+
+def asn(c: str, partage: bool = False) -> None:
+    """Relevés ASN (r2.collect_asn) : un AS par hôte (k_eff = 3 = k nominal), ou coinbase et kraken sur un
+    même AS (k_eff = 2) ; contrôlés sur la base au journal G1 (keff-base.out)."""
+    n = count(64512)
+
+    def resolve(host, resolvers):
+        a = 64000 if partage and ("coinbase" in host or "kraken" in host) else next(n)
+        return {"status": "ok", "resolver": resolvers[0], "ip": "192.0.2.1", "ip_secondary": [],
+                "cname_chain": [], "prefix": "192.0.2.0/24", "asn_ripestat": a, "asn_cymru": a,
+                "holder": "TEST"}
+    r2.collect_asn([BY_ID[f] for f in FL], c, resolve_fn=resolve, now_fn=lambda: float(SAM))
+
+
+class TestDrapeau2Regle(unittest.TestCase):
+    """Drapeau 2 aligné sur la règle (fichier scellé §2.3 et §3.3) : J1 et J2 avec ASN distincts, partagés
+    ou absents."""
+    V = "« R1 discrimine » VRAI (strate(s) : calme) "
+    RAISON = {"leve": V + "AVEC k_eff = 3 = k nominal du segment : les axes R2 ne capturent pas le mode "
+              "commun (§5.6 / 04 §3) — signal sur A(axis-coverage), jamais la règle",
+              "eteint-VRAI": V + "mais k_eff = 2 < k nominal du segment = 3 : recouvrement R2 mesuré "
+              "explique au moins en partie la co-défaillance",
+              "non_evaluable-NON ÉVALUABLE": "« R1 discrimine » NON ÉVALUABLE (règle SHOGEN-CRITERE-R1-1, "
+              "bloc 3) — co-défaillance non qualifiable ; ni levé ni éteint",
+              "eteint-FAUX": "« R1 discrimine » FAUX : le modèle d'indépendance n'est rejeté dans aucune "
+              "strate testée (bloc 3)",
+              "non_evaluable-FAUX": "k_eff non évaluable (axe ASN non mesuré/incomplet) — le drapeau exige "
+              "une partition évaluable (§5.6)"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.j = {}
+        for nom, f, a in (("J1d", deux(25, 29), False), ("J1p", deux(25, 29), True),
+                          ("J2d", deux(50, 37), False), ("J2n", deux(50, 37), None)):
+            cls.j[nom] = journal(200, 200, f)
+            if a is not None:
+                asn(cls.j[nom][0], a)
+
+    def test_drapeau2_aligne_sur_la_regle(self):
+        """Rougit si : drapeau 2 lu sur le max des z (v0 : J1 à ℓ = 240 LEVÉ) ; LEVÉ sans k_eff = k nominal
+        (J1 partagé) ; FAUX éteint avant le contrôle de k_eff (J2 sans ASN) ; z_max rendu ; k nominal_s
+        absent."""
+        for nom, n, etat, d, ke in (("J1d", 1, "leve", "VRAI", 3), ("J1p", 1, "eteint", "VRAI", 2),
+                                    ("J1d", 240, "non_evaluable", S1, 3), ("J2d", 240, "eteint", "FAUX", 3),
+                                    ("J2n", 240, "non_evaluable", "FAUX", None)):
+            with ell(n):
+                g = r2.recompute_r2_from_journal(*self.j[nom])["drapeau_2"]
+            self.assertEqual((g["etat"], g["r1_discrimine"], g["k_eff"], g["k_nominal"]), (etat, d, ke, 3))
+            cle = etat if etat == "leve" else f"{etat}-{d}"
+            self.assertEqual((g["raison"], g["k_nominal_strates"]),
+                             (self.RAISON[cle], {"calme": 3, "stress": 3}), nom)
+            self.assertEqual(("z_max" in g, g.get("localisation_inter_clusters") is not None),
+                             (False, d == "VRAI" and ke is not None), nom)
 
 
 if __name__ == "__main__":

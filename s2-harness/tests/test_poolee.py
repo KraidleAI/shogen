@@ -205,17 +205,18 @@ class TestPooleeG2(unittest.TestCase):
 
     def test_g2_poolee_franchit_strates_non_drapeau2_zmax(self):
         """Kc = 56, Ks = 23 : z_calme = 12/√33 = 2,08… et z_stress = 7/√12 = 2,02… < 2,33 ≤ z_pool = 19/√45
-        = 2,83…. Rougit si : z_pool entre dans z_max ou dans les entrées de r2.drapeau_2 (ADR-0028 §1 bis.1
-        pt 9)."""
+        = 2,83…. Rougit si : z_pool entre dans les entrées de la règle (lot CRITERE : z_max retiré) ou de
+        r2.drapeau_2 (ADR-0028 §1 bis.1 pt 9)."""
         c, j = self.jour(56, 23)
         out = r1.recompute_from_journal(c, j)
         zc, zs, zp = out["strates"]["calme"]["z"], out["strates"]["stress"]["z"], out["poolee"]["z_pool"]
         self.assertLess(abs(zc - a_sur_racine(12, 33)) + abs(zs - a_sur_racine(7, 12)), E)
         self.assertLess(abs(zp - a_sur_racine(19, 45)), E)
         self.assertTrue(max(zc, zs) < r1.SEUIL_Z <= zp)
-        self.assertEqual(r2.recompute_r2_from_journal(c, j)["drapeau_2"]["z_max"], zc)
+        self.assertEqual(r2.recompute_r2_from_journal(c, j)["drapeau_2"]["r1_discrimine"], "FAUX")
+        self.assertEqual(list(r1.regle_critere(out)["strates"]), ["calme", "stress"])
         d2 = r2.drapeau_2(out, {"k_eff": 3, "k_nominal": 3, "clusters": []}, {"strates": {}})
-        self.assertEqual((d2["etat"], d2["z_max"]), ("eteint", zc))
+        self.assertEqual((d2["etat"], d2["r1_discrimine"]), ("eteint", "FAUX"))
 
     def test_g2_numerateur_negatif_signe_conserve(self):
         """Kc = 30, Ks = 10 : numérateurs −14 et −6 ; z_pool = −20/√45 = −2,98…, imprimé avec son signe.
