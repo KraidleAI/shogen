@@ -211,12 +211,12 @@ Ratifiés par l'orchestrateur sous délégation, révocables par l'investisseur 
 Le bloc ci-dessous est rempli par l'orchestrateur après la validation du texte, par commande (valeurs recalculées, non-LLM), puis contrôlé par `rendu_unique.py --gardes-seules` sur fixture ; le validateur valide le texte et le format du bloc, pas ses valeurs (G0 §R l.76-78). Format (G0 de la partie 2, §C, l.115-118 ; lecteur `lire_bloc`, `rendu_unique.py` l.83-105) : une seule ouverture de bloc clôturé de langage `shogen-paquet-v1` dans tout le fichier ; une clé par ligne, champs séparés par une espace, hexadécimal en minuscules, sha complets ; clé absente, dupliquée, inconnue ou malformée : refus. Clés : `commit_analyse` (40 chiffres : tête de `partie-3-paquet` au remplissage ; tout changement de code ensuite refait le bloc) ; `sha256_script` (`s2-harness/tools/rendu_unique.py` à ce commit) ; trois lignes `journal <nom> <sha256>` (journaux scellés, EX-E1-2) ; `sommes` (fichier de sommes de clôture) ; `cacert_sha256` et `tsa_crt_sha256` (`cacert.pem` et `tsa.crt` de FreeTSA, préfixes `2151b611` et `8bfb0305`, annexe D.4 c ; exigées par le lecteur, ancre ou non). Tant que les marqueurs ci-dessous restent, le lecteur refuse le bloc : aucune exécution ne s'ouvre sur ce texte non rempli.
 
 ```shogen-paquet-v1
-commit_analyse [à remplir par l'orchestrateur au gel]
-sha256_script [à remplir par l'orchestrateur au gel]
-journal control.jsonl [à remplir par l'orchestrateur au gel]
-journal journal.jsonl [à remplir par l'orchestrateur au gel]
-journal raw.jsonl [à remplir par l'orchestrateur au gel]
-sommes [à remplir par l'orchestrateur au gel]
-cacert_sha256 [à remplir par l'orchestrateur au gel]
-tsa_crt_sha256 [à remplir par l'orchestrateur au gel]
+commit_analyse 41f087ef3e0a621ddb04fa4f2af8733e5fd5a0f9
+sha256_script 67b897a949b76071e1b3f8508d877217ac33f957f92463dd8e9b5e672ab8f8d9
+journal control.jsonl 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff
+journal journal.jsonl 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+journal raw.jsonl 39ffb13fb0e5939ff88285ce256fbd416b0665c20ee6394c512eed7d2175c15d
+sommes 70910984076474987239d8c7a9da786acc95c38b375ad572d78afa297bf8caf4
+cacert_sha256 2151b61137ffa86bf664691ba67e7da0b19f98c758e3d228d5d8ebf27e044438
+tsa_crt_sha256 8bfb0305bb64e2571ca507552ef3245cb1c2fee8728e0ff8689225081ea13467
 ```
