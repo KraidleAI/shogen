@@ -182,3 +182,7 @@ Rattachement : `docs/adr-0028/PLAN-PARTIE-2.md` ; ADR-0028 annexes A, B, D ; mé
 - **Q7** : verdict de `verifier_raw` par une commande nommée qui sort 0 quel que soit le verdict et l'écrit dans sa sortie (sha256 enregistré).
 - **Q8** : la suite tourne en premier run, avant tout rendu ; aucun contenu de sortie n'est imprimé sur la sortie standard ; un échec avant le renommage final ne laisse rien ; une tentative échouée sans sortie est consignée au JOURNAL (heure, motif) et n'est pas une seconde exécution (déclaré au PAQUET).
 - **L3** (SHOGEN-RENDU-NOMS-JOURNAUX-1) : la production exige au bloc les trois noms `control.jsonl`, `journal.jsonl`, `raw.jsonl` (refus avant tout rendu) ; dans C3.
+
+## G2 — corrections de la relecture (ajout daté du 2026-10-02 11:33 UTC)
+
+- Liste fermée C-1..C-11 de `docs/G2-partie-2.md` §10, appliquée telle quelle, avec les décisions de l'orchestrateur sur Q-1..Q-4 (annexe B.28). Une correction par sous-lot ou groupe cohérent, ≤ 200 lignes chacun ; même méthode que les G1 (tests d'abord, échec montré, mutant par test).

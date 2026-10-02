@@ -414,3 +414,14 @@ Items proposés par le G1 et soldés par décision au G0 §C (ajout daté) : SHO
 | SHOGEN-RENDU-TABLE-DELIMITEURS-1 | le test nominal dépend des deux lignes de commentaire qui délimitent la table des sorties dans `rendu_unique.py` | orch. | relecture G2 de la partie 2 | ≈ 5 lignes [inféré] | G1 C-3, L4 |
 
 Réponses de l'orchestrateur : Q1 texte de la déclaration de Q2 dans l'étiquette des J14 accepté ; Q2 `--gardes-seules` entre à la procédure d'exécution (SHOGEN-RENDU-HOTE-1) ; Q3 non : aucun diagnostic de contenu après échec. Borne haute de la plage D5 contrôlée par l'orchestrateur : 15:08Z ratifiée (décision 272, ADR-0028 l.59), égale aux tests existants.
+
+## B.28 Amendement daté du 2026-10-02 : relecture G2 de la partie 2 (`docs/G2-partie-2.md`, verdict ACCEPTE-AVEC-CORRECTIONS C-1..C-11 ; décisions de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-EXPOSITION-ORCH-CLOUD-1 | exposition de l'orchestrateur de la session cloud : cartographie du 2026-09-29 affichée en entier (l.51 comprise) vers 02:47 UTC le 2026-10-02 (JOURNAL, entrée de 05:56 UTC). Construction : ligne de l'inventaire D.1 et contrôle FM-1.1 de la transcription de cette session | orch. | G0 du PAQUET | une ligne et un contrôle [inféré] | G2 partie 2, I-1 |
+| SHOGEN-HOTE-ATTRIBUTS-GIT-1 | `$GIT_DIR/info/attributes` et `core.attributesFile` changent la sortie de `git archive` (fins de ligne) : `.git/info/attributes` vide, `core.attributesFile` non posé, `git check-attr eol` LF sur les fichiers suivis, sur l'hôte de l'exécution avant le scellement | orch. | avec SHOGEN-RENDU-HOTE-1 | une commande [inféré] | G2 partie 2, I-2 |
+| SHOGEN-RENDU-CLI-REPORT-1 | la CLI `python -m shogen_s2.report` rend des journaux sans garde (C-1 ne ferme que `rendu_unique.py`) : texte de procédure au PAQUET (aucun rendu des journaux scellés hors de `rendu_unique.py`) et contrôle FM-1.1 des transcriptions de l'exécution | orch. | G0 du PAQUET | deux lignes de texte [inféré] | G2 partie 2, I-3 |
+| SHOGEN-CP2-RUNS-RENDU-1 | au cp-2, contrôler que l'enregistrement de rôle « rendu » porte les runs exigés (suite, puis la liste de D.4 b), comme `--verifier` après C-6 | orch. | cp-2 (partie 4) | une ligne de procédure [inféré] | G2 partie 2, Q-4 |
+
+Items de la relecture : SHOGEN-BLOC6-TS-NUM-1 (C-8), SHOGEN-GO-ORDRE-1 (C-3), SHOGEN-RENDU-TABLE-DELIMITEURS-1 (C-9) corrigés dans la partie 2 ; SHOGEN-ENREG-EOL-1 et SHOGEN-CAPITALS-REPORT-1 **fermés sans code** (motifs : G2 §7) ; SHOGEN-SENS-PLAGES-2, SHOGEN-CONTEXTE-MUTABLE-1, SHOGEN-RENDU-RENAME-POSIX-1 gardés, déclencheur reporté au G0 du PAQUET. Réponses : Q-1 jeton de production par variable d'environnement (construction de C-1) ; Q-2 bornes basse et haute de la date du go retenues ; Q-3 étiquette du J28 complétée par le script (épingles inchangées) ; Q-4 oui (item ci-dessus).
