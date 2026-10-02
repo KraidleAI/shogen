@@ -425,3 +425,14 @@ Réponses de l'orchestrateur : Q1 texte de la déclaration de Q2 dans l'étiquet
 | SHOGEN-CP2-RUNS-RENDU-1 | au cp-2, contrôler que l'enregistrement de rôle « rendu » porte les runs exigés (suite, puis la liste de D.4 b), comme `--verifier` après C-6 | orch. | cp-2 (partie 4) | une ligne de procédure [inféré] | G2 partie 2, Q-4 |
 
 Items de la relecture : SHOGEN-BLOC6-TS-NUM-1 (C-8), SHOGEN-GO-ORDRE-1 (C-3), SHOGEN-RENDU-TABLE-DELIMITEURS-1 (C-9) corrigés dans la partie 2 ; SHOGEN-ENREG-EOL-1 et SHOGEN-CAPITALS-REPORT-1 **fermés sans code** (motifs : G2 §7) ; SHOGEN-SENS-PLAGES-2, SHOGEN-CONTEXTE-MUTABLE-1, SHOGEN-RENDU-RENAME-POSIX-1 gardés, déclencheur reporté au G0 du PAQUET. Réponses : Q-1 jeton de production par variable d'environnement (construction de C-1) ; Q-2 bornes basse et haute de la date du go retenues ; Q-3 étiquette du J28 complétée par le script (épingles inchangées) ; Q-4 oui (item ci-dessus).
+
+## B.29 Amendement daté du 2026-10-02 : correction de la relecture G2 de la partie 2 (journal `docs/G1-partie-2-corrections-G2.md` ; adjudication de l'orchestrateur)
+
+| item | objet et construction | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-JETON-MAIN-1 | le jeton de C-1 ferme l'appel accidentel de `--produire`, pas l'appel délibéré (variable posée à la main) : garde contre l'erreur, pas une preuve (comme D.4 b (4)) ; limite écrite au PAQUET avec SHOGEN-RENDU-CLI-REPORT-1 | orch. | G0 du PAQUET | une ligne de texte [inféré] | correction G2, Q-b |
+| SHOGEN-RENDU-ORC-OCTETS-1 | la garde (4) hache les fichiers sur le disque, pas les octets réellement chargés en mémoire | orch. | G0 du PAQUET (limite écrite) | une ligne de texte [inféré] | correction G2, Q-b |
+| SHOGEN-RENDU-STATUS-HEAD-1 | le `git status` de la garde (2) juge l'arbre de travail contre le HEAD courant, pas contre le commit résolu | orch. | revue de partie 3 (code touché au PAQUET) ou premier G0 qui touche `rendu_unique.py` | ≈ 5 lignes [inféré] | correction G2, Q-b |
+| SHOGEN-GO-PICKAXE-1 | `git log -S` cherche une sous-chaîne, alors que les lignes de `JOURNAL.md` exigent le sha256 entier (le premier commit trouvé peut précéder la ligne exacte) | orch. | premier G0 qui touche `rendu_unique.py` | ≈ 10 lignes [inféré] | correction G2, Q-b |
+
+Réponse : Q-a avertissements du lecteur gardés tels qu'émis (fidélité ; pas de déduplication).
