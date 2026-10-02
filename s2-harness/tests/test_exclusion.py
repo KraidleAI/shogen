@@ -29,8 +29,9 @@ PLAGE = (WS[2], WS[4])
 # (P2P ligne à ligne : insertions seules, docs/G1-lot-B-SEG-2-bloc1.md) ; lot A : a4ffc3e5…f649a5 ; puis au
 # sous-lot B-b (blocs 3 et 6 ; avant b054a0f4…69ac01e ; P2P texte : docs/G1-lot-B-sensibilite.md) ; puis au
 # sous-lot POOLEE-b (bloc 3 : famille et strate poolée ; avant 9518d21b…4b62a92 ; P2P texte :
-# docs/G1-lot-POOLEE-strate-poolee.md).
-SHA_BASE_SANS_OPTION = "a3b5f0f80a80c6d3ca1452a05137104a6c82928ecac0dad9e631cf894906f954"
+# docs/G1-lot-POOLEE-strate-poolee.md) ; puis au lot B-DEP-2 (bloc 3 : z_bloc par strate et
+# A(window-dependence) ; avant a3b5f0f8…906f954 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md).
+SHA_BASE_SANS_OPTION = "aec8409c87b7352a1743cebee30425ab1bf7c201fda1e80356fc648bcc20b6bd"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 

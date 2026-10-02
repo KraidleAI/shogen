@@ -41,7 +41,9 @@ from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
     DECIMAL_PREC,
+    ELL_BLOC,
     ETIQUETTE_POOLEE,
+    GARDE_BLOCS,
     analysis_pools,
     build_window_strate,
     classify_cells,
@@ -49,6 +51,13 @@ from .r1 import (
     parse_journal,
 )
 from .window import STRATE_DEFAUT, verify_markers_against_spec, weekday_utc
+
+ETIQUETTE_Z_BLOC = ("plancher d'erreur-type pré-enregistré (blocs mobiles, noyau de Bartlett ; "
+                    "ADR-0028 §1 bis) — z_s reste la statistique confirmatoire")   # ADR-0028 §1 bis.2
+A_WINDOW_DEPENDENCE = (                    # registre 08, colonne « exercée par » ; lot B-DEP-2
+    "A(window-dependence) engagée par le niveau de R1 (ADR-0028 §1 bis.1 pt 7 ; registre 08) : dépendance "
+    f"sérielle de I_t = 1{{m_t ≥ 2}} d'une strate de portée < ℓ = {ELL_BLOC} fenêtres ; exercée par z_bloc "
+    "et le diagnostic de runs de I_t ; décharge = SHOGEN-DEP-FENETRES-2 (08 ; ADR-0028 annexe B.6)")
 
 
 def _fmt_dec(x) -> str:
@@ -296,6 +305,26 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         else:
             ap(f"    z       = {_fmt_dec(blk['z'])} (seuil {_fmt_dec(blk['seuil_z'])}, "
                f"unilatéral — 10 §5.1)")
+    if r1.get("strates"):     # ADR-0028 §1 bis.1 pts 3 et 9 (A-2) : clé « bloc » de r1, sans recalcul
+        ap(f"\n  ── z_bloc par strate : {ETIQUETTE_Z_BLOC}")
+        ap("    z_bloc = (K − n·P̂_more)/σ̂_bloc, même numérateur que z ; σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} "
+           "(1 − k/ℓ)·γ̂_k sur la série I_t = 1{m_t ≥ 2} de la strate, γ̂_k centrés sur Ī = K/n, lag sur la "
+           "grille de pas w : paires de deux fenêtres de la strate, fenêtre absente sans paire")
+        ap(f"    z_bloc publié si σ̂²_bloc > 0 et n ≥ {GARDE_BLOCS}·ℓ (garde de blocs, distincte du "
+           "drapeau 1), que la garde §5.4 soit tenue ou non ; FIV = σ̂²_bloc/(n·P̂_more·(1 − P̂_more)) = "
+           "R_centrage × FIV_série, R_centrage = γ̂₀/(n·P̂_more·(1 − P̂_more)), FIV_série = σ̂²_bloc/γ̂₀ ; "
+           "cv théorique = √(4ℓ/(3n)) [inféré : dérivation de l'AVIS-advisor-defi Q1 (iv)]")
+        for st, blk in r1["strates"].items():
+            b, ru = blk["bloc"], blk["bloc"]["runs"]
+            ap(f"    « {st} » : ℓ = {b['ell']} ; γ̂₀ = {_fmt_dec(b['gamma0'])} ; σ̂²_bloc = "
+               f"{_fmt_dec(b['sigma2_bloc'])} ; cv théorique = {_fmt_dec(b['cv_theorique'])} [inféré]")
+            ap(f"    « {st} » : " + (b["FIV_motif"] or f"FIV = {_fmt_dec(b['FIV'])} ; R_centrage = "
+                                    f"{_fmt_dec(b['R_centrage'])}")
+               + " ; " + (b["FIV_serie_motif"] or f"FIV_série = {_fmt_dec(b['FIV_serie'])}"))
+            ap(f"    « {st} » : z_bloc = " + (f"non publié : {b['z_bloc_motif']}" if b["z_bloc"] is None
+                                             else _fmt_dec(b["z_bloc"])))
+            ap(f"    « {st} » : diagnostic de runs de I_t (hors décision) : nombre = {ru['nombre']} ; "
+               f"longueur moyenne = {_fmt_dec(ru['longueur_moyenne'])} ; run maximal = {ru['run_max']}")
     sc = params["strate_calendar"]      # famille D2 pt 4 ; m dynamique (§1 bis.1 pt 6) : lot CRITERE
     ap("\n  famille de Bonferroni pré-enregistrée (ADR-0028 D2 pt 4) : " + (
         f"m = 2 tests confirmatoires ({sc['calme']}, {sc['stress']}), chacun unilatéral au seuil 2,33 ; "
@@ -316,6 +345,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            f"Σ_s n_s·P̂_more,s·(1 − P̂_more,s) = {_fmt_dec(po['variance'])}")
         ap(f"    z_pool  = {_fmt_dec(po['z_pool'])} — {ETIQUETTE_POOLEE}")
     ap(f"\n  {A_WINDOW_STATIONARITY}")
+    ap(f"  {A_WINDOW_DEPENDENCE}")
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
