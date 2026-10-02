@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import enum
 import math
+from bisect import bisect_left
 from collections import Counter
 from decimal import ROUND_HALF_EVEN, Context, Decimal, DivisionByZero, InvalidOperation, Overflow, localcontext
 from typing import Optional
@@ -728,6 +729,31 @@ def fenetres_sautees(ws_journal, spec: dict, w: int, borne=None, ranges=()) -> d
         if t0 <= x < t_fin and not any(a <= x <= b for a, b in union):
             out[strate_from_spec(x, spec)] -= 1
     return {st: s for st, s in out.items() if s}
+
+
+def fenetres_sautees_vivant(ws_journal, demarrages, spec: dict, w: int, borne=None, ranges=()) -> dict:
+    """Part « harnais vivant » des fenêtres sautées (SHOGEN-CENSURE-CAUSES-1, option (a), ADR-0028 annexe B.23) : les
+    fenêtres comptées par `fenetres_sautees` (mêmes marqueurs, portée et plages) qui tombent entre deux marqueurs d'un
+    même démarrage (`demarrages` : records.demarrages), c'est-à-dire dans l'union des intervalles [premier marqueur ;
+    dernier marqueur] des démarrages (bornes marquées, jamais sautées ; chevauchements comptés une fois) ; aucun seuil
+    de temps. Le reste de s : arrêt ou passage entre démarrages, cause non attribuée par le journal. Rend {strate :
+    nombre}, strates sans fenêtre vivante absentes."""
+    ws = sorted(set(ws_journal))
+    if borne is None and not ws:
+        return {}
+    t0, t_fin = borne or (ws[0], ws[-1] + w)
+    union, out = [], {}
+    for a, b in sorted((min(g), max(g)) for g in demarrages if g):
+        if union and a <= union[-1][1]:
+            union[-1][1] = max(union[-1][1], b)
+        else:
+            union.append([a, b])
+    for a, b in union:                    # marqueurs de la portée seuls : coût linéaire en jours, portées, marqueurs
+        lo, hi = max(a, t0), min(b, t_fin)
+        for st, k in (fenetres_sautees(ws[bisect_left(ws, lo):bisect_left(ws, hi)], spec, w, (lo, hi), ranges).items()
+                      if lo < hi else ()):
+            out[st] = out.get(st, 0) + k
+    return out
 
 
 def bornes_censure(n: int, k: int, p_more: Decimal, s: int, sigma2_bloc: Optional[Decimal] = None) -> dict:

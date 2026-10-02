@@ -313,6 +313,20 @@ def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
     return run_params_list, clock_checks, markers
 
 
+def demarrages(path: str) -> list:
+    """window_start des marqueurs window_close de chaque démarrage, dans l'ordre du journal (SHOGEN-CENSURE-CAUSES-1,
+    ADR-0028 annexe B.23) : un démarrage s'ouvre à chaque run_params et à chaque clock_check de phase « startup »
+    (collector.collect écrit les deux en tête de chaque appel, chunk ou reprise : l'un suffit si l'autre manque) ;
+    marqueurs écrits avant toute ligne de démarrage : hors de tout démarrage. Lecture tolérante (§F)."""
+    out: list = []
+    for o in read_jsonl_tolerant(path):
+        if o.get("record") == "run_params" or o.get("record") == "clock_check" and o.get("phase") == "startup":
+            out.append([])
+        elif o.get("record") == "window_close" and out:
+            out[-1].append(int(o["window_start"]))
+    return out
+
+
 def exclusion_ranges(ranges=()) -> list:
     """Plages d'exclusion du lecteur (ADR-0025 déc. 2) : entières, FERMÉES `[from, to]`,
     TRIÉES (déterminisme) ; `from > to` ou borne < 0 LÈVE (fail-closed, jamais une exclusion vide

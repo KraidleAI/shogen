@@ -53,6 +53,7 @@ from .r1 import (
     classify_cells,
     compute_r1,
     fenetres_sautees,
+    fenetres_sautees_vivant,
     parse_journal,
     regle_critere,
 )
@@ -251,6 +252,17 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
        f"marqueur window_close, hors plages D5 : {ss}" if bs else "aucune fenêtre au journal") + " — toutes "
        "causes confondues, sous l'hypothèse H_perte (pertes d'outillage non informatives : "
        "A(loss-non-informative), registre 08) ; ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1")
+    # SHOGEN-CENSURE-CAUSES-1, option (a) (ADR-0028 annexe B.23) : s = part vivante + reste, par strate
+    vivant = fenetres_sautees_vivant(ws_tous, records.demarrages(control_path), params["strate_calendar"], w, seg,
+                                     ranges)
+    for st in sorted({*strates, *sautees}):
+        v, s = vivant.get(st, 0), sautees.get(st, 0)
+        ap(f"  {'sautees_harnais_vivant':24} = « {st} » : {v} sur s = {s} — sautées entre deux marqueurs window_close "
+           "d'un même démarrage (run_params ou clock_check « startup », ordre du journal) : harnais vivant — "
+           "SHOGEN-CENSURE-CAUSES-1")
+        ap(f"  {'sautees_non_attribuees':24} = « {st} » : {s - v} sur s = {s} — arrêt ou passage entre démarrages, "
+           "cause non attribuée par le journal (fenêtres entre started_epoch et le premier marqueur d'un démarrage "
+           "comprises) — SHOGEN-CENSURE-CAUSES-1")
     for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
         cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
         ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "

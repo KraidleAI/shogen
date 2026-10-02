@@ -37,8 +37,9 @@ PLAGE = (WS[2], WS[4])
 # traitements de l'annexe D.5 ; avant ac530cec…bcf8 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md) ; puis au
 # sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant a7f5cbfd…72bb544) ;
 # puis au sous-lot A3 (bloc 1 : ligne run_params_non_porteurs insérée ; avant 19865d4f…be90233) ; puis au
-# sous-lot B1 de l'étape B (bloc 6 : ligne « sans ts » insérée, SHOGEN-BLOC6-TS-1 ; avant c4f45f47…6a5d144).
-SHA_BASE_SANS_OPTION = "37dfcacba647c8c1184ba3897787cdb1b4a6f0678c96d9b3adc9ca38f0c00a96"
+# sous-lot B1 de l'étape B (bloc 6 : ligne « sans ts » insérée, SHOGEN-BLOC6-TS-1 ; avant c4f45f47…6a5d144) ; puis au
+# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 37dfcacb…0c00a96).
+SHA_BASE_SANS_OPTION = "4e62fbb8a4a7a29c0761c719c8f731a8247ef407be7a7a04c44219bd093c9a01"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 
