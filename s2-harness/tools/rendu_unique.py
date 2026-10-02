@@ -239,9 +239,9 @@ def voie_a(c: dict) -> datetime:
 def voie_b(c: dict) -> datetime:
     """(6) voie (b) : SCEAU/GO-sans-ancre.txt en UTF-8 strict, sans BOM, LF, les trois lignes exactes de GO (date ISO
     8601 UTC du calendrier) ; son sha256 complet dans JOURNAL.md à HEAD, première occurrence sur une ligne postérieure
-    à la première qui porte le sha du paquet (scellement). S et Gc : premiers commits qui introduisent dans JOURNAL.md
-    le sha du paquet et celui du go ; refus si Gc = S, si S n'est pas ancêtre de Gc, si ct(Gc) ≤ ct(S), ou si la date
-    du go n'est pas dans [ct(S) ; ct(Gc)] (D.4 c ; SHOGEN-GO-ORDRE-1, G2 C-3). Rend ct(Gc)."""
+    à la première qui porte le sha du paquet (scellement). S et Gc : premiers commits dont une ligne de JOURNAL.md
+    porte le sha du paquet, celui du go (premier) ; refus si Gc = S, si S n'est pas ancêtre de Gc, si ct(Gc) ≤ ct(S),
+    ou si la date du go n'est pas dans [ct(S) ; ct(Gc)] (D.4 c ; SHOGEN-GO-ORDRE-1, G2 C-3). Rend ct(Gc)."""
     with open(os.path.join(racine(c), SCEAU, "GO-sans-ancre.txt"), "rb") as f:
         octets = f.read()
     m = GO.fullmatch(octets.decode("utf-8"))
@@ -262,13 +262,16 @@ def voie_b(c: dict) -> datetime:
 
 
 def premier(c: dict, sha: str) -> tuple:
-    """Premier commit qui introduit sha dans JOURNAL.md (git log --no-textconv --reverse --format="%H %ct" -S<sha>
-    <head> -- JOURNAL.md) : (sha du commit, date de commit UTC) ; aucun : ValueError."""
-    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%H %ct", "-S" + sha, head(c), "--", "JOURNAL.md")
-    x = p.stdout.decode().split()
-    if p.returncode or len(x) < 2:
-        raise ValueError(f"aucun commit n'introduit {sha} dans JOURNAL.md à {head(c)}")
-    return x[0], datetime.fromtimestamp(int(x[1]), timezone.utc)
+    """Premier commit dont JOURNAL.md porte une ligne qui contient sha entier (lignes_avec, comme (1) ; GO-PICKAXE-1) :
+    candidats de git log --no-textconv --reverse --format="%H %ct" -G<sha> <head> -- JOURNAL.md (lignes ajoutées ou
+    retirées qui contiennent sha), chacun confirmé sur git show <commit>:JOURNAL.md ; (sha du commit, date de commit
+    UTC) ; aucun : ValueError."""
+    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%H %ct", "-G" + sha, head(c), "--", "JOURNAL.md")
+    for commit, ct in (x.split() for x in (p.stdout.decode().splitlines() if not p.returncode else [])):
+        j = git(racine(c), "show", f"{commit}:JOURNAL.md")
+        if not j.returncode and lignes_avec(j.stdout.decode("utf-8", "replace"), sha):
+            return commit, datetime.fromtimestamp(int(ct), timezone.utc)
+    raise ValueError(f"aucun commit n'introduit une ligne qui porte {sha} dans JOURNAL.md à {head(c)}")
 
 
 VOIES = (("a", voie_a), ("b", voie_b))

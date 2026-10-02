@@ -406,6 +406,37 @@ class TestRenduUnique(unittest.TestCase):
         with self.subTest(variante="hors de la descendance du scellement"):
             self.assertEqual(self.lancer(f, maintenant=LOIN), (2, ["(5)", "(6)"]))
 
+    def test_voie_b_premiere_ligne_entiere_pas_une_sous_chaine(self):
+        """GO-PICKAXE-1 : S et Gc = premiers commits dont JOURNAL.md porte une ligne qui contient le sha entier (comme
+        (1)). Go cité d'abord en « f<sha> » (08-31 13:00, après la date du go), puis sur sa ligne (09-01) : T0 =
+        09-01T00:00Z, refus (5) à 09-01 14:00 ; paquet cité d'abord en « f<sha> » (00:00), puis sur sa ligne (06:00) :
+        go daté de 03:00 refusé, de 12:00 levé ; « f<sha> » réécrit en ligne entière (même nombre d'occurrences, 09-01)
+        : T0 = 09-01T00:00Z. Rougit si : sous-chaîne prise pour S ou Gc (git log -S) ; candidat non confirmé sur sa
+        ligne ; remplacement à compte égal manqué."""
+        j = lambda f: Path(f["depot"], "JOURNAL.md").read_bytes()
+        f = monter(tempfile.mkdtemp())
+        poser(f["depot"], {"JOURNAL.md": j(f) + f"- brouillon f{h(GO_OK)}\n".encode()}, date="2026-08-31T13:00:00Z")
+        epingler(f)
+        r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        with self.subTest(cas="go en sous-chaîne d'abord"):
+            self.assertEqual((r[0], ru.ouverture(r[1])["T0"]), ([], "2026-09-01T00:00:00Z"))
+            self.assertEqual(self.lancer(f, maintenant=datetime(2026, 9, 1, 14, tzinfo=timezone.utc)), (2, ["(5)"]))
+        for heure, attendu in (("03", (2, ["(5)", "(6)"])), ("12", (0, []))):
+            f = monter(tempfile.mkdtemp(), journal="- brouillon f{}\n")
+            poser(f["depot"], {"JOURNAL.md": j(f) + f"- scellement : sha256 {f['sha']}\n".encode()},
+                  date="2026-08-31T06:00:00Z")
+            epingler(f, go=GO_OK.replace(b"T12:", f"T{heure}:".encode()))
+            with self.subTest(go=heure):
+                self.assertEqual(self.lancer(f, maintenant=LOIN), attendu)
+        f = monter(tempfile.mkdtemp())
+        x = j(f)
+        poser(f["depot"], {"JOURNAL.md": x + f"- go : sha256 f{h(GO_OK)}\n".encode()}, date="2026-08-31T13:00:00Z")
+        poser(f["depot"], {"JOURNAL.md": x + f"- go : sha256 {h(GO_OK)}\n".encode()}, date="2026-09-01T00:00:00Z")
+        poser(f["depot"], {f"{SCEAU}/GO-sans-ancre.txt": GO_OK}, commit=False)
+        r = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        with self.subTest(cas="remplacement à compte égal"):
+            self.assertEqual((r[0], ru.ouverture(r[1]).get("T0") if not r[0] else None), ([], "2026-09-01T00:00:00Z"))
+
     def test_deux_voies_t0_le_plus_tardif(self):
         """(5), les deux voies établies : go épinglé trois jours avant le jeton ; horloge à T0 du go + 25 h, avant
         genTime + 24 h : refus (5) ; à genTime + 24 h (borne haute) : levées. Rougit si T0 est le plus ancien."""
