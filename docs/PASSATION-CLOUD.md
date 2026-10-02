@@ -139,11 +139,35 @@ introuvable) ou une **recherche de solutions documentée** (choix/blocage) — j
 | manque | où il vit (poste local) | conséquence en cloud | quoi faire |
 |---|---|---|---|
 | **Copie scellée de la campagne** (`control.jsonl`, sha256 `351f51b2…`) | `F:/tmp/shogen-scelle-copie/` | les 2 tests nommés **sautent** (normal) ; **exécution unique impossible** | parties 2 et 3 : rien à faire (fixtures seulement). Partie 4 : **reste locale**, avec l'investisseur |
-| **Papiers de la biblio** (`biblio/*.pdf` etc.) | `F:/Shogen/biblio/`, `F:/Shogen/scratch/biblio-a-verser/` | seul `biblio/INDEX.md` est versionné ; S-G5 tourne en « régime partiel » et reste **VERT** | voir §8 (décision investisseur en attente) ; lire Künsch/Fisher au PAQUET demande les PDF |
+| **Papiers de la biblio** (`biblio/*.pdf` etc.) | `F:/Shogen/biblio/`, `F:/Shogen/scratch/biblio-a-verser/` | seul `biblio/INDEX.md` est versionné ; S-G5 tourne en « régime partiel » et reste **VERT** | **copie sur le Google Drive de l'investisseur** : voir §5 bis ; jamais dans git |
 | **Corpus qualité** (doc 02 gates, doc 03 méthode, doc 06 AgileGates, templates) | `C:\Users\KACIMI\compiliance et ingénierie locielle et architecturale\` | non disponible | §4 en donne l'essentiel ; demande la copie à l'investisseur si un détail manque |
 | **Config globale** (CLAUDE.md global, agents `worker`, `lecteur`, `advisor`, `validateur-humain`…) | `F:\claude-config\` | agents globaux absents | utilise `agent(..., {model, effort})` avec les ID du §4 ; agents projet dans `.claude/agents/` |
 | **Mémoire `memstack`** | serveur local | absente | ce fichier et `JOURNAL.md` la remplacent |
 | **Étude Pocket — copie isolée** | `F:/etudes-locales/pocket-network/` | — | §8 |
+
+---
+
+## 5 bis. La biblio sur Google Drive (décision de l'investisseur, 2026-10-02)
+
+Les papiers ne vont **pas** dans git : le versement dans le dépôt a été refusé (droit d'auteur, §8).
+L'investisseur les dépose sur **son Google Drive**, dans un dossier **privé** (ni lien public, ni partage) :
+
+| dossier local (source) | contenu | dossier Drive |
+|---|---|---|
+| `F:\Shogen\biblio\` | 152 fichiers, ≈ 44 Mo : les 125 artefacts indexés, `INDEX.md`, les extractions texte `*.sidecar` | `Shogen-biblio/biblio/` |
+| `F:\Shogen\scratch\biblio-a-verser\` | 56 fichiers, ≈ 54 Mo : papiers reçus, pas encore indexés, dont **Künsch 1989** et **Fisher 1921** (sous-dossier `2026-09-30/`, avec `PROVENANCE-2026-09-30.md`) | `Shogen-biblio/biblio-a-verser/` |
+
+**Lien du dossier Drive** : à demander à l'investisseur au début de la session cloud, puis à inscrire ici par un
+commit daté.
+
+**Conduite en cloud** :
+1. Lire le Drive par le connecteur Google Drive de claude.ai (à autoriser par l'investisseur s'il ne l'est pas).
+2. Recopier `Shogen-biblio/biblio/` dans `biblio/` du clone, et `Shogen-biblio/biblio-a-verser/` dans
+   `scratch/biblio-a-verser/`. Ces deux chemins sont **ignorés par git** : **ne jamais les committer**.
+3. Avec les octets en place, la gate S-G5 passe en régime complet, comme sur le poste local ; vérifier
+   `cargo --locked xtask verify` (S-G6 doit compter 125 artefacts).
+4. Lectures du PAQUET (Künsch, Fisher) : `pdftotext` d'abord (doc 03 §6) ; Künsch est un scan JSTOR sans
+   couche de texte, une OCR est nécessaire. Citations de 25 mots au plus.
 
 ---
 
@@ -187,19 +211,21 @@ dette `TODO`/`FIXME` nue est refusée (R-13).
   méthode change : chaque partie entre dans `main` par une PR fusionnée en « Squash and merge » dans
   l'interface de GitHub (commit signé par GitHub, historique linéaire) ; l'historique détaillé reste sur la
   branche de partie.
+- **Décision de l'investisseur (2026-10-02) : voie (A).** Le retrait de la protection est un réglage de sécurité
+  du dépôt : **acte de l'investisseur**, jamais de l'orchestrateur. Vérifie qu'il est fait
+  (`gh api repos/KraidleAI/shogen/branches/main/protection`) avant de pousser `main` ; la branche
+  `passation-cloud-2026-10-02` entre alors dans `main` par avance rapide.
 
 ---
 
 ## 8. Décisions et actes en attente de l'investisseur
 
 - **Accord de la partie 2** (§3, étape 1).
-- **Protection de `main` contre méthode** (§7) : voie (A) ou (B). Tant que ce n'est pas tranché, travaille sur
-  des branches et ne touche pas à `main` sur GitHub.
-- **Biblio** : l'investisseur a décidé de la mettre « Dans le dépôt shogen » (JOURNAL, 2026-10-02) ; le
-  versement a été **refusé par le contrôle de permissions** de la session locale (droit d'auteur : un manuel
-  Wiley, des articles IMS, dépôt public pendant les fenêtres). **Non contourné.** Voies : règle de permission
-  ajoutée par l'investisseur, ou dépôt privé séparé jamais public (recommandation de l'orchestrateur), ou
-  versement par l'investisseur lui-même.
+- **Protection de `main`** (§7) : voie (A) décidée ; le retrait est un acte de l'investisseur. Tant qu'il n'est
+  pas constaté, travaille sur des branches et ne pousse pas `main` sur GitHub.
+- **Biblio** : le versement dans le dépôt a été **refusé par le contrôle de permissions** de la session locale
+  (droit d'auteur : un manuel Wiley, des articles IMS, dépôt public pendant les fenêtres) ; **non contourné**.
+  Décision de l'investisseur ensuite : **copie sur son Google Drive** (§5 bis) ; lien à obtenir de lui.
 - **Ancre du sceau** (partie 4) : une commande `curl` vers FreeTSA, acte de l'investisseur.
 - **Renommage** du dépôt en `shogen-gouvernance`.
 - **Pocket** : réponse reçue le 2026-10-01 (F1/F4 confirmés, sévérité medium, **fenêtre de divulgation
