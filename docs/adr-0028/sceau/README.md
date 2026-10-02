@@ -26,5 +26,5 @@ Limites (annexe D.4 c ; paquet §12 pt 16) : le jeton atteste l'existence des oc
 - Requête envoyée à `https://freetsa.org/tsr` le 2026-10-02 à 17:44:30 UTC (horloge de la session), réponse HTTP 200.
 - Jeton `paquet.tsr` : 4 644 octets, sha256 `5f5ce535b131ff0d25e50c197a4c606a78cedafa07094c245057775b3fa30ee8` ; numéro de série `0x08CC76D7`.
 - **genTime : 2026-10-02T17:44:30Z** (horloge de FreeTSA).
-- `scripts/sceau/verify.sh` : sortie 0 (manifeste → paquet OK ; jeton → requête, manifeste et chaîne : `Verification: OK` deux fois). L'avertissement d'OpenSSL « is not a CA cert » porte sur `tsa.crt` passé en `-untrusted` : c'est le certificat de signature de la TSA, pas une autorité ; sans effet sur la vérification.
+- `scripts/sceau/verify.sh` : sortie 0 (manifeste → paquet OK ; jeton → requête, manifeste et chaîne : `Verification: OK` deux fois). L'avertissement d'OpenSSL “is not a CA cert” (guillemets anglais : sortie d'outil, hors corpus S-G5) porte sur `tsa.crt` passé en `-untrusted` : c'est le certificat de signature de la TSA, pas une autorité ; sans effet sur la vérification.
 - **Échéance du délai de rétractation (A-7) : 2026-10-03T17:44:30Z.** Avant elle, la garde (5) refuse toute exécution ; après elle, l'exécution unique reste ouverte par un acte distinct de l'investisseur.
