@@ -33,8 +33,9 @@ PLAGE = (WS[2], WS[4])
 # A(window-dependence) ; avant a3b5f0f8…906f954 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis au
 # sous-lot CRITERE-a2 (bloc 3 : famille, section règle ; avant aec8409c…c20b6bd ; P2P texte :
 # docs/G1-lot-CRITERE-regle.md) ; puis au sous-lot CRITERE-b2 (bloc 6 : ligne d'entrées du drapeau 2 ;
-# avant 8e01c22f…27cf13b ; même journal).
-SHA_BASE_SANS_OPTION = "ac530cecbfb874a3d1d355b5bda8b1b58cb1892411d132325a2aa105e14fbcf8"
+# avant 8e01c22f…27cf13b ; même journal) ; puis au sous-lot D5-AMEND-b (bloc 1 : fenêtres sautées ; bloc 3 :
+# traitements de l'annexe D.5 ; avant ac530cec…bcf8 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
+SHA_BASE_SANS_OPTION = "a7f5cbfda5295a25e5c4dfa8b1700843af96fc92e3b77dbfc2be632fa72bb544"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 

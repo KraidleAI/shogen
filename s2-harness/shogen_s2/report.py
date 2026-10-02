@@ -46,9 +46,11 @@ from .r1 import (
     GARDE_BLOCS,
     SEUIL_Z,
     analysis_pools,
+    bornes_censure,
     build_window_strate,
     classify_cells,
     compute_r1,
+    fenetres_sautees,
     parse_journal,
     regle_critere,
 )
@@ -60,6 +62,9 @@ A_WINDOW_DEPENDENCE = (                    # registre 08, colonne « exercée pa
     "A(window-dependence) engagée par le niveau de R1 (ADR-0028 §1 bis.1 pt 7 ; registre 08) : dépendance "
     f"sérielle de I_t = 1{{m_t ≥ 2}} d'une strate de portée < ℓ = {ELL_BLOC} fenêtres ; exercée par z_bloc "
     "et le diagnostic de runs de I_t ; décharge = SHOGEN-DEP-FENETRES-2 (08 ; ADR-0028 annexe B.6)")
+# ADR-0028 annexe D.5 (SHOGEN-CENSURE-INFO-1 ; CV2-24, CV2-26) : étiquette imposée, C-7 du cp-1 de D5-AMEND
+ETIQUETTE_CENSURE = ("bornes à P̂_more fixé, non extérieures ; verdict non identifié sous censure arbitraire "
+                     "des fenêtres sautées")
 
 
 def _fmt_dec(x) -> str:
@@ -206,6 +211,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap(f"  {'segment_retraits':24} = hors segment : {_retires(tous, dans_seg, strates)} — ADR-0028 D4")
     else:
         ap(f"  {'segment':24} = aucun (journal entier) — ADR-0028 D4")
+    pertes = []                # → [SENSIBILITÉ] (annexe D.5, SHOGEN-DP-JOURNAL-LOSS-1), sans second calcul
     for a, b in ranges:        # uniquement si filtre (sans option : aucune ligne ajoutée)
         ap(f"  {'exclusion_window_start':24} = [{a} ; {b}] = [{_iso_utc(a)} ; "
            f"{_iso_utc(b)}] fermée, bornes incluses : hors n, K, P̂_more de toutes les "
@@ -214,11 +220,22 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            "semi-ouvert : asn_attribution (ts), clock_check (harness_ts), "
            f"w = {w} s de run_params — ADR-0028 D5")
         seule = records.filtre_lecture(params, *dans_seg, [(a, b)])[:3]
-        ap(f"  {'exclusion_retraits':24} = [{a} ; {b}] seule (assiette : ligne segment) : "
-           f"{_retires(dans_seg, seule, strates)}")
+        r = _retires(dans_seg, seule, strates)
+        pertes.append(f"[{a} ; {b}] seule : {r}")
+        ap(f"  {'exclusion_retraits':24} = [{a} ; {b}] seule (assiette : ligne segment) : {r}")
     if ranges:                 # C-4 (i) : chaque plage seule, puis l'union (chevauchement compté une fois)
+        r = _retires(dans_seg, (markers, clock_checks, asn_records), strates)
+        pertes.append(f"union de {len(ranges)} plage(s) : {r}")
         ap(f"  {'exclusion_retraits_union':24} = {len(ranges)} plage(s), union (assiette : ligne segment) : "
-           f"{_retires(dans_seg, (markers, clock_checks, asn_records), strates)} — SHOGEN-EXCL-COMPTE-1")
+           f"{r} — SHOGEN-EXCL-COMPTE-1")
+    sautees = fenetres_sautees(ws_tous, params["strate_calendar"], w, seg, ranges)   # ADR-0028 annexe D.5
+    bs, ss = seg or (deb and (deb[0], deb[-1] + w)), ", ".join(
+        f"{st} {sautees.get(st, 0)}" for st in sorted({*strates, *sautees}))
+    port = "segment" if seg else "journal entier : première fenêtre ; dernière + w"
+    ap(f"  {'fenetres_sautees':24} = " + (f"grille de pas w = {w} s sur [{bs[0]} ; {bs[1]}) ({port}), sans "
+       f"marqueur window_close, hors plages D5 : {ss}" if bs else "aucune fenêtre au journal") + " — toutes "
+       "causes confondues, sous l'hypothèse H_perte (pertes d'outillage non informatives : "
+       "A(loss-non-informative), registre 08) ; ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1")
     for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
         cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
         ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "
@@ -398,6 +415,38 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
           "aucune strate ne rejette ; " + (f"rejet non qualifiable : {', '.join(nq)}" if nq else
                                            f"strate(s) testée(s) : {', '.join(tst)}" if tst
                                            else "aucune strate testée")))
+    # Traitements de l'annexe D.5 d'ADR-0028 (amendement du 2026-09-30, A-6) : valeurs de r1, sans recalcul
+    ap("\n  ── traitements pré-enregistrés de l'annexe D.5 d'ADR-0028 (amendement du 2026-09-30, A-6) : "
+       "descriptifs, hors décision, sans paramètre")
+    ap("    τ observé (SHOGEN-TAU-REDERIV-1), sans ré-estimation de τ : |p − médiane_LOO|/médiane_LOO des "
+       "cellules (fenêtre, flux) arrivées à l'axe (i) (hors-enveloppe ou pas d'écart), pool d'analyse D1 de "
+       "chaque strate, sur le segment, par classe (sigma_class_of_flux) ; P99 au rang le plus proche, rang "
+       "(99·N + 99)//100")
+    for cl, t in r1["tau_observe"].items():
+        ap(f"    « {cl} » : τ_classe = {_fmt_dec(t['tau_classe'])} ; N = {t['N']}" + (
+            f" ; P99 = {_fmt_dec(t['P99'])} ; maximum = {_fmt_dec(t['max'])}" if t["N"] else " : non défini"))
+    ap("    décomposition de K (SHOGEN-HOST-DEGRADED-1) par nombre de lectures présentes au statut "
+       "panne_transport (model.Status) des flux du pool D1 de la strate ; c_s = fenêtres où chaque flux du "
+       "pool porte une lecture panne_transport ; le z confirmatoire inclut les modes communs de "
+       "l'observateur (hôte, DNS, réseau)")
+    for st, blk in r1.get("strates", {}).items():
+        d = blk["decomposition_K"]
+        ap(f"    « {st} » : K = {blk['K']} = K[≥ 2 panne_transport] {d['pt_2_plus']} + K[1] {d['pt_1']} + "
+           f"K[0] {d['pt_0']} ; K[tous les écarts hors_enveloppe] = {d['tous_hors_enveloppe']} ; c_s = "
+           f"{d['c']}")
+    ap(f"    fenêtres sautées (SHOGEN-CENSURE-INFO-1 ; s au bloc 1) : {ETIQUETTE_CENSURE}")
+    ap("    z_bas = (K − (n + s)·P̂_more)/√((n + s)·P̂_more·(1 − P̂_more)) ; z_haut = (K + s − (n + s)·"
+       "P̂_more)/√((n + s)·P̂_more·(1 − P̂_more)) ; puis σ̂_bloc au dénominateur si z_bloc est publié ; "
+       "hypothèse H_perte")
+    for st, blk in r1.get("strates", {}).items():
+        s, zb = sautees.get(st, 0), blk["bloc"]["z_bloc"] is not None
+        if blk["z"] is None:
+            ap(f"    « {st} » : s = {s} ; bornes non publiées (garde §5.4 : z_s non publié)")
+            continue
+        b = bornes_censure(blk["n"], blk["K"], blk["P_more"], s, blk["bloc"]["sigma2_bloc"] if zb else None)
+        ap(f"    « {st} » : s = {s} ; z_bas = {_fmt_dec(b['z_bas'])} ; z_haut = {_fmt_dec(b['z_haut'])} ; "
+           "avec σ̂_bloc : " + (f"z_bas = {_fmt_dec(b['z_bloc_bas'])} ; z_haut = "
+                               f"{_fmt_dec(b['z_bloc_haut'])}" if zb else "non publiées (z_bloc non publié)"))
 
     # ── Bloc 4 : L&M (§5.5) ────────────────────────────────────────────────
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
@@ -603,6 +652,10 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap("  motif de l'exclusion (harnais dégradé, ADR-0025) : causalité non établie")
         ap("  assiette : fenêtres du segment (bloc 1), dédoublonnées (last-wins) ; R1 seul par variante, "
            "pool d'analyse D1 de la variante ; ni L&M ni R2 ; écart de z = z(incluse) − z(exclue)")
+        ap("  comptes de pertes par type d'enregistrement, retirés par la plage, plage par plage puis union "
+           "(SHOGEN-DP-JOURNAL-LOSS-1, ADR-0028 annexe D.5 ; repris du bloc 1, sans second calcul) :")
+        for t in pertes:
+            ap(f"    {t}")
         for st in (sorted({sc["calme"], sc["stress"]}) if we else [sc.get("strate", STRATE_DEFAUT)]):
             e, i = r1.get("strates", {}).get(st), r1_i.get("strates", {}).get(st)
             ap(_ligne_variante(st, "exclue (principale)", e))

@@ -10,6 +10,9 @@ nomme la mutation qui le rougit."""
 from __future__ import annotations
 
 import os
+import re
+import subprocess
+import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -17,12 +20,16 @@ from decimal import Decimal as D, localcontext
 from fractions import Fraction as F
 from unittest import mock
 
-from shogen_s2 import collector, r1, records, window
+from shogen_s2 import collector, r1, records, report, window
 from shogen_s2.model import Reading, Status
 from shogen_s2.r1 import Ecart
 from shogen_s2.sources import SIGMA_CLASS_OF_FLUX
 from tests.test_collector import BY_ID, DELTA, FakeClock, _taumap, sbc_huge
+from tests.test_exclusion import HARNESS
 from tests.test_r1 import mk, rd
+from tests.test_critere import rotation
+from tests.test_rendu_blocs import couture, journal, proche
+from tests.test_sensibilite import H, fixture, t as heure
 
 POOL = list("abcdef")
 SCOF = {**dict.fromkeys("abcd", "cA"), **dict.fromkeys("ef", "cB")}
@@ -40,6 +47,11 @@ P6 = ["coinbase", "bitstamp", "gemini", "okx_index", "kraken", "binance"]
 PAN = {0: {"coinbase": PT, "bitstamp": PT}, 1: {"kraken": PT, "binance": "http"},
        2: {"gemini": "http", "okx_index": "http"}, 3: dict.fromkeys(P6, PT),
        4: {"coinbase": PT, "kraken": "http"}, 5: {}}
+TETE = ("  ── traitements pré-enregistrés de l'annexe D.5 d'ADR-0028 (amendement du 2026-09-30, A-6) : "
+        "descriptifs, hors décision, sans paramètre")
+SAUT = (f"  {'fenetres_sautees':24} = grille de pas w = 60 s sur {{}}, sans marqueur window_close, hors "
+        "plages D5 : {} — toutes causes confondues, sous l'hypothèse H_perte (pertes d'outillage non "
+        "informatives : A(loss-non-informative), registre 08) ; ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1")
 
 
 def calcul(spec: dict, tau: str, stress=99, pool=POOL) -> tuple:
@@ -103,6 +115,14 @@ def rf() -> str:
                           tau_classe=_taumap(D("0.2")), strate_spec=window.WEEKEND_STRATE_SPEC,
                           now_fn=FakeClock(clock), sleep_fn=lambda s: None, read_fn=lecture)
     return d
+
+
+def strate3(b3: list, st: str) -> tuple:
+    """(n, K, P̂_more, z) imprimés au bloc 3 pour la strate st."""
+    i = next(k for k, ln in enumerate(b3) if ln.startswith(f"  ── strate « {st} » : n = "))
+    n, k = map(int, re.findall(r"= (\d+)", b3[i])[:2])
+    p = next(ln for ln in b3[i:] if ln.startswith("    P̂_more  = ")).split("= ")[1]
+    return n, k, F(p), next(ln for ln in b3[i:] if ln.startswith("    z       = ")).split()[2]
 
 
 class TestDecompositionK(unittest.TestCase):
@@ -257,6 +277,117 @@ class TestCensure(unittest.TestCase):
                          ((652, D("0.04"), D("0.5")), (304, 0, 0)))
         ws = {m["window_start"] for m in records.parse_control(c)[2]}
         self.assertEqual(r1.fenetres_sautees(ws, window.WEEKEND_STRATE_SPEC, 60), {"stress": 10})
+
+
+class TestRendu(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.d = rf()
+        cls.c, cls.j = (os.path.join(cls.d, x) for x in ("control.jsonl", "journal.jsonl"))
+        cls.txt = report.render_report(cls.c, cls.j)
+
+    def section(self, txt: str) -> tuple:
+        b3 = txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0].splitlines()
+        return b3, b3[b3.index(TETE) + 1:]
+
+    def test_bloc1_fenetres_sautees_portee_plage_segment(self):
+        """§2.6, addendum 2 §B.2. Rougit si : s hors de la portée imprimée ; fenêtre exclue comptée sautée ;
+        segment ignoré (portée du journal) ; ligne absente du bloc 1."""
+        jr = f"[{rang(0)} ; {rang(270)}) (journal entier : première fenêtre ; dernière + w)"
+        seg = {"segment": {"t0": rang(-5), "t_fin": rang(255)}}
+        for kw, port, s in (({}, jr, "calme 0, stress 10"),
+                            ({"exclude_ranges": [(rang(245), rang(252))]}, jr, "calme 0, stress 5"),
+                            (seg, f"[{rang(-5)} ; {rang(255)}) (segment)", "calme 5, stress 10")):
+            b1 = report.render_report(self.c, self.j, **kw).split("[BLOC 2]")[0]
+            self.assertIn(SAUT.format(port, s), b1.splitlines(), kw)
+
+    def test_bloc3_tau_decomposition_bornes(self):
+        """§2.6, ℓ = 240 (z_bloc non publié) ; lignes attendues écrites depuis r1.recompute_from_journal,
+        jamais depuis le rendu. Rougit si : étiquette autre que C-7 ; section avant « R1 discrimine » ; P99 et
+        maximum permutés ; τ_classe absent ; valeur imprimée pour N = 0 ; composante de K permutée ou d'une
+        autre strate ; bornes de calme ≠ z_s à s = 0 ; z_haut sans + s, ou n au lieu de n + s (stress)."""
+        self.assertEqual(report.ETIQUETTE_CENSURE, "bornes à P̂_more fixé, non extérieures ; verdict non "
+                         "identifié sous censure arbitraire des fenêtres sautées")
+        b3, sec = self.section(self.txt)
+        self.assertTrue(b3[b3.index(TETE) - 2].startswith("  « R1 discrimine »"))
+        lab = f"    fenêtres sautées (SHOGEN-CENSURE-INFO-1 ; s au bloc 1) : {report.ETIQUETTE_CENSURE}"
+        self.assertIn(lab, sec)
+        out = r1.recompute_from_journal(self.c, self.j)
+        att = [f"    « {c} » : τ_classe = {o['tau_classe']} ; N = {o['N']}" + (
+            f" ; P99 = {o['P99']} ; maximum = {o['max']}" if o["N"] else " : non défini")
+            for c, o in out["tau_observe"].items()]
+        att += ["    « {} » : K = {} = K[≥ 2 panne_transport] {pt_2_plus} + K[1] {pt_1} + K[0] {pt_0} ; "
+                "K[tous les écarts hors_enveloppe] = {tous_hors_enveloppe} ; c_s = {c}".format(
+                    st, b["K"], **b["decomposition_K"]) for st, b in out["strates"].items()]
+        self.assertEqual(([ln for ln in att if ln not in sec], len(att)), ([], 7))
+        z = strate3(b3, "calme")[3]
+        self.assertIn(f"    « calme » : s = 0 ; z_bas = {z} ; z_haut = {z} ; avec σ̂_bloc : non publiées "
+                      "(z_bloc non publié)", sec)
+        n, k, p, _ = strate3(b3, "stress")
+        bas, haut = re.search(r"« stress » : s = 10 ; z_bas = (\S+) ; z_haut = (\S+) ; avec",
+                              "\n".join(sec)).groups()
+        for x, num in ((bas, k - (n + 10) * p), (haut, k + 10 - (n + 10) * p)):
+            self.assertTrue(proche(x, num * num / ((n + 10) * p * (1 - p)), carre=True)
+                            and (x[0] == "-") == (num < 0))
+
+    def test_variante_sigma_bloc_couture(self):
+        """ℓ = 2 par la couture (garde 60) : z_bloc publiée dans les deux strates. Rougit si : variante sur
+        l'erreur-type binomiale ; σ̂_bloc d'une autre strate ; calme (s = 0) ≠ z_bloc imprimée."""
+        with couture(2):
+            b3, sec = self.section(report.render_report(self.c, self.j))
+        n, k, p, _ = strate3(b3, "stress")
+        for st, s in (("calme", 0), ("stress", 10)):
+            zb, s2 = (re.search(rf"    « {st} » : {m}", "\n".join(b3)).group(1)
+                      for m in (r"z_bloc = (\S+)\n", r"ℓ = 2 ; γ̂₀ = \S+ ; σ̂²_bloc = (\S+) ;"))
+            bas, haut = re.search(rf"« {st} » : s = {s} ; .* avec σ̂_bloc : z_bas = (\S+) ; z_haut = (\S+)$",
+                                  "\n".join(sec), re.M).groups()
+            if not s:
+                self.assertEqual((bas, haut), (zb, zb))
+                continue
+            for x, num in ((bas, k - (n + s) * p), (haut, k + s - (n + s) * p)):
+                self.assertTrue(proche(x, num * num / F(s2), carre=True) and (x[0] == "-") == (num < 0))
+
+    def test_variante_non_publiee_sigma2_nul(self):
+        """Addendum 3 : fixture J3 de test_critere (K = n = 60, z_s publiée, σ̂²_bloc = 0). Rougit si :
+        variante σ̂_bloc calculée sans la garde de publication de z_bloc (division par zéro) ; bornes ≠ z_s à
+        s = 0."""
+        b3, sec = self.section(report.render_report(*journal(60, 0, rotation)))
+        z = strate3(b3, "calme")[3]
+        self.assertIn(f"    « calme » : s = 0 ; z_bas = {z} ; z_haut = {z} ; avec σ̂_bloc : non publiées "
+                      "(z_bloc non publié)", sec)
+
+    def test_sensibilite_comptes_du_bloc1_et_cli(self):
+        """C-12 : avec une plage et un segment, [SENSIBILITÉ] reprend mot pour mot les comptes retirés du
+        bloc 1 (plage seule, union) ; étiquette de la section non dupliquée ; CLI = API. Rougit si : comptes
+        recalculés autrement ou omis ; étiquette D.5 recopiée ; option non transmise au chemin servi."""
+        pl, seg = (rang(245), rang(252)), {"t0": rang(60), "t_fin": rang(255)}
+        txt = report.render_report(self.c, self.j, exclude_ranges=[pl], segment=seg)
+        b1 = txt.split("[BLOC 2]")[0].splitlines()
+        seule = next(ln for ln in b1 if "exclusion_retraits " in ln).split("(assiette : ligne segment) : ")[1]
+        union = next(ln for ln in b1 if "exclusion_retraits_union" in ln).split("segment) : ")[1]
+        sens = txt[txt.index("[SENSIBILITÉ]"):].splitlines()
+        i = next(k for k, ln in enumerate(sens) if ln.startswith("  comptes de pertes par type"))
+        self.assertEqual(sens[i + 1:i + 3], [f"    [{pl[0]} ; {pl[1]}] seule : {seule}",
+                                             f"    union de 1 plage(s) : {union.split(' — ')[0]}"])
+        self.assertEqual(txt.count("biaisée vers le haut par construction"), 1)
+        args = ["--exclude-window-start-range", *pl, "--segment-from", seg["t0"],
+                "--segment-to", seg["t_fin"]]
+        p = subprocess.run([sys.executable, "-B", "-m", "shogen_s2.report", self.d, *map(str, args)],
+                           cwd=HARNESS, capture_output=True)
+        self.assertEqual((p.returncode, p.stdout), (0, f"{txt}\n".encode()))
+
+    def test_week_end_saute_garde_classes_sans_cellule(self):
+        """Addendum 2 §B.5 : fixture de test_sensibilite (3 flux, w = 3 600), ven. 10:00Z et lun. 10:00Z
+        seulement ; week-end entier sauté, strate stress sans marqueur ; calme sous la garde. Rougit si :
+        strate sans marqueur omise du bloc 1 ; bornes imprimées sous la garde §5.4 ; valeur imprimée pour une
+        classe sans cellule."""
+        c, j = fixture(tempfile.mkdtemp(prefix="s2d5g_"), blocs=[range(heure(7, 10), heure(7, 11), H),
+                                                                 range(heure(10, 10), heure(10, 11), H)])
+        txt = report.render_report(c, j)
+        self.assertIn(f"sur [{heure(7, 10)} ; {heure(10, 11)}) (journal entier : première fenêtre ; dernière "
+                      "+ w), sans marqueur window_close, hors plages D5 : calme 23, stress 48 — ", txt)
+        self.assertIn("    « calme » : s = 23 ; bornes non publiées (garde §5.4 : z_s non publié)", txt)
+        self.assertEqual(len(re.findall(r"(?m)^    « \w+ » : τ_classe = \S+ ; N = 0 : non défini$", txt)), 5)
 
 
 if __name__ == "__main__":
