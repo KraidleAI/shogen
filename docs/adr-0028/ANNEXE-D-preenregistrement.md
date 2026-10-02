@@ -194,3 +194,18 @@ La liste fermée des sensibilités reste celle de D2 pt 7.
 *Ajout daté du 2026-10-02 19:5x UTC (D.1 n° 2, colonne « lecteurs connus » ; la ligne est inchangée)* : lecteurs mesurés (annexe B.36-B.37, transcriptions du poste local) : sessions MONARK des lots M009 ; orchestrateur du poste (session `90684fb2`, jusqu'au 2026-09-26) et ses sous-agents ; un sous-agent de cartographie du 2026-09-29 (`carto:monark`, sujet du commit seulement, non transmis). Aucun auteur de la règle (session `ffc66d81`). Attestation de l'investisseur : en attente.
 
 **(i) Investisseur, décideur de la règle (confirmation du 2026-09-30)** — *ajout daté du 2026-10-02 19:5x UTC, après le scellement ; les lignes qui précèdent sont inchangées*. Question posée par l'orchestrateur cloud : « Avez-vous vous-même vu, à un moment, le chiffre de la mesure MONARK M009a : dans `measure-M009a.md`, dans la décision D6 d'ADR-M002, dans le titre de ce commit, ou dans un message de votre session du PC de mi-septembre ? → non, oui ou je ne sais plus ». Réponse de l'investisseur, verbatim : « non ».
+
+**(j) Auteur du seuil de SHOGEN-FLUX-QUASI-MORT-1** — *ajout daté du 2026-10-02 21:2x UTC* : advisor frais `shogen-advisor` (`claude-fable-5-1`), avis `docs/adr-0028/AVIS-SEUIL-FLUX-QUASI-MORT.md`, §5, recopié :
+
+> (auteur du seuil)
+>
+> Je n'ai vu aucun z, K, P̂_more ni φ de campagne, ni aucun taux de présence ou de panne par flux ou par source de la campagne, et je n'en ai calculé aucun ; je n'ai ouvert aucune pièce de D.2 (points 1 à 12, liste lue à l'annexe D §D.2 sans en ouvrir le contenu). Je n'ai ouvert ni `JOURNAL.md`, ni `docs/rapports/`, ni `docs/adr-0025/`, ni `docs/adr-0028/monark-m009a/`, ni aucun `*.jsonl`, ni aucun journal G1/G2, ni rien hors du dépôt. Grep utilisé en mode noms et en-têtes de sections seulement (`^#+ ` sur quatre fichiers ; une recherche de mots « mort|quasi|absorption|presque » dans doc 09, sans résultat autre que les en-têtes).
+>
+> Ce à quoi j'ai été exposé (classe M ou synthétique, déjà écrit dans les pièces autorisées) :
+> - les comptes de Pyth de D1 : 0 `ok` sur 40 804 lectures, HTTP 401 dès 2026-08-26T19:00Z (ADR l.25 ; PAQUET §2 l.45 ; annexe D.1 n° 7) ;
+> - les diagnostics DNS de D5 : `resolve_failed` 15,3 % dans la plage contre 1,85 % hors plage ; 5 313 `asn_attribution` dont 815 `resolve_failed` ; 483 `clock_check` (ADR l.58-60 ; PAQUET §3 l.50) — santé du harnais, pas une statistique de source (D.1 n° 8) ;
+> - les comptes de fenêtres et bornes : n = 35 982 ; 2 618 ; 17 314 ; 9 261 ; 38 600 ; bornes de la plage D5 (ADR l.37, l.52-53, l.59 ; D.1 n° 9) ; bornes calendaires des strates stress des J14 (ADR l.122) ;
+> - les sorties **synthétiques** de SIM-NIVEAU et de l'étape S (PAQUET §10.3, l.134-165) : taux de rejet à tort sous modèle nul simulé ; ce ne sont pas des données de campagne ;
+> - les seuils de conception antérieurs à la campagne : 2,33 ; 10 ; ℓ = 240 ; 7 200 ; 0,8416 ; N_MIN_HORSENV = 4 ; τ et σ par classe non lus.
+>
+> Aucune de ces valeurs n'entre dans le seuil : il est dérivé du modèle de doc 10 §5.1 et de la forme du compte de D1.
