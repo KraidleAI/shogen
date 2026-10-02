@@ -58,6 +58,7 @@ N_MIN_HORSENV = 4                 # N ≥ 4 répondantes pour l'enveloppe leave-
 SEUIL_Z = Decimal("2.33")         # point 99% normale standard (K&L — 10 §5.1)
 ELL_BLOC = 240                    # ℓ, fenêtres : choix de conception, seule valeur rendue (ADR-0028 §1 bis.2)
 GARDE_BLOCS = 30                  # garde de blocs : z_bloc publié si n_s ≥ 30·ℓ (ADR-0028 §1 bis.1 pt 3)
+Z_PUISSANCE = Decimal("0.8416")   # EMD, puissance 0,8 : choix de conception (ADR-0028 §1 bis.1 pt 8)
 ETIQUETTE_POOLEE = "exploratoire, hors famille, hors décision"   # strate poolée (ADR-0028 D2 pt 4)
 A_WINDOW_STATIONARITY = (
     "A(window-stationarity) engagée par le test agrégé (10 §5.3 ; ancre "
@@ -638,6 +639,36 @@ def compute_r1(
 
     return {"pool": pool, "strates": strates_out, "poolee": strate_poolee(strates_out),   # clé à part
             "A_window_stationarity": A_WINDOW_STATIONARITY}
+
+
+def regle_critere(r1_out: dict) -> dict:
+    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : ADR-0028 §1 bis.1, pts 1-11
+    (docs/adr-0028/ADR-0028-decisions-sortie-S2.md, commit f5b8269), non recopié ici (une seule vérité). Lit
+    r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
+    compute_r1 (z, bloc.z_bloc), sans arrondi ni contexte posé, à SEUIL_Z par « ≥ » ; aucune p-valeur (pt 4).
+    Par strate (pt 5) : valeur, cas (garde_5_4, z_sous_seuil, rejette, discordance, rejet_non_qualifiable)
+    et, pour toute strate qui NE REJETTE PAS, EMD = (SEUIL_Z + Z_PUISSANCE)·√max(n·P̂(1 − P̂), σ̂²_bloc)
+    fenêtres et sa fraction de n (pt 8). Rend « R1 discrimine », les strates qui rejettent, les strates
+    testées et m (pt 6)."""
+    par = {}
+    for st, b in r1_out.get("strates", {}).items():
+        z, zb = b["z"], b["bloc"]["z_bloc"]
+        cas = ("garde_5_4" if z is None else "z_sous_seuil" if z < SEUIL_Z else
+               "rejet_non_qualifiable" if zb is None else "rejette" if zb >= SEUIL_Z else "discordance")
+        v = ("NON ÉVALUABLE" if cas in ("garde_5_4", "rejet_non_qualifiable") else
+             "REJETTE" if cas == "rejette" else "NE REJETTE PAS")
+        emd = frac = None
+        if v == "NE REJETTE PAS":
+            with localcontext() as ctx:
+                ctx.prec = DECIMAL_PREC
+                emd = +((SEUIL_Z + Z_PUISSANCE) * max(b["gate_value"], b["bloc"]["sigma2_bloc"]).sqrt())
+                frac = +(emd / Decimal(b["n"]))
+        par[st] = {"valeur": v, "cas": cas, "emd": emd, "emd_fraction": frac}
+    rej = [s for s, e in par.items() if e["valeur"] == "REJETTE"]
+    tst = [s for s, e in par.items() if e["valeur"] != "NON ÉVALUABLE"]
+    nq = [s for s, e in par.items() if e["cas"] == "rejet_non_qualifiable"]
+    return {"strates": par, "rejette": rej, "testees": tst, "m": len(tst), "non_qualifiables": nq,
+            "r1_discrimine": "VRAI" if rej else "FAUX" if tst and not nq else "NON ÉVALUABLE"}
 
 
 def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=(),
