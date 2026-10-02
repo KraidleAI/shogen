@@ -123,6 +123,17 @@ def racine(c: dict) -> str:
     return c["racine"]
 
 
+def head(c: dict) -> str:
+    """Commit gardé : HEAD résolu une fois (git rev-parse --verify HEAD^{commit}, sha complet), lu par (1), (2), (4),
+    la voie (b), l'enregistreur et la relecture (G2, C-2) ; illisible : ValueError."""
+    if "head" not in c:
+        p = git(racine(c), "rev-parse", "--verify", "HEAD^{commit}")
+        if p.returncode:
+            raise ValueError(f"HEAD illisible : {c['depot']}")
+        c["head"] = p.stdout.decode().strip()
+    return c["head"]
+
+
 def g_bloc(c: dict):
     """Paquet lu en octets (sha256 complet), puis son bloc machine (UTF-8 strict)."""
     with open(c["paquet"], "rb") as f:
@@ -132,8 +143,8 @@ def g_bloc(c: dict):
 
 
 def g1(c: dict):
-    """(1) sha256 complet du paquet présent dans JOURNAL.md à HEAD (git show HEAD:JOURNAL.md, blob brut)."""
-    p = git(racine(c), "show", "HEAD:JOURNAL.md")
+    """(1) sha256 complet du paquet présent dans JOURNAL.md à HEAD (git show <head>:JOURNAL.md, blob brut)."""
+    p = git(racine(c), "show", f"{head(c)}:JOURNAL.md")
     if p.returncode:
         return f"JOURNAL.md illisible à HEAD ({p.stderr.decode('utf-8', 'replace').strip()})"
     c["journal_md"] = p.stdout.decode("utf-8", "replace")
@@ -142,12 +153,12 @@ def g1(c: dict):
 
 
 def g2(c: dict):
-    """(2) git diff --quiet <commit_analyse> HEAD -- CHEMINS sort 0, et arbre de travail propre sur CHEMINS (git
+    """(2) git diff --quiet <commit_analyse> <head> -- CHEMINS sort 0, et arbre de travail propre sur CHEMINS (git
     status : aucune modification, indexée ou non, aucun fichier non suivi ni ignoré)."""
     r, commit = racine(c), c["bloc"]["commit_analyse"]
-    d = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, "HEAD", "--", *CHEMINS)
+    d = git(r, "diff", "--quiet", "--no-ext-diff", "--no-textconv", commit, head(c), "--", *CHEMINS)
     if d.returncode:
-        return f"git diff --quiet {commit} HEAD -- {' '.join(CHEMINS)} : code {d.returncode}"
+        return f"git diff --quiet {commit} {head(c)} -- {' '.join(CHEMINS)} : code {d.returncode}"
     s = git(r, "status", "--porcelain", "--untracked-files=all", "--ignored", "--", *CHEMINS)
     if s.returncode or s.stdout:
         return f"arbre de travail modifié sur {' '.join(CHEMINS)} : {s.stdout.decode('utf-8', 'replace')[:300]!r}"
@@ -167,10 +178,17 @@ def g3(c: dict):
 
 
 def g4(c: dict):
-    """(4) sha256 de ce script égal à sha256_script du bloc (garde contre une édition accidentelle, pas une preuve)."""
+    """(4) sha256 de ce script égal à sha256_script du bloc (garde contre une édition accidentelle, pas une preuve) et à
+    celui de s2-harness/tools/rendu_unique.py au commit gardé ; enregistreur chargé (orc) égal à
+    s2-harness/tools/oracle_record.py au commit gardé (G2, C-2)."""
     reel = sha256_fichier(SCRIPT)
     if reel != c["bloc"]["sha256_script"]:
         return f"sha256 du script {reel} ≠ sha256_script du bloc"
+    lances = {"rendu_unique.py": c["bloc"]["sha256_script"], "oracle_record.py": sha256_fichier(orc.__file__)}
+    for nom, attendu in lances.items():
+        p = git(racine(c), "cat-file", "blob", f"{head(c)}:s2-harness/tools/{nom}")
+        if p.returncode or hashlib.sha256(p.stdout).hexdigest() != attendu:
+            return f"s2-harness/tools/{nom} au commit gardé {head(c)} ≠ fichier lancé ou chargé"
 
 
 def gentime(texte: str) -> datetime:
@@ -223,7 +241,7 @@ def voie_b(c: dict) -> datetime:
     go, scelle = lignes_avec(c["journal_md"], sha), lignes_avec(c["journal_md"], c["sha_paquet"])
     if not (go and scelle and go[0] > scelle[0]):
         raise ValueError(f"sha256 du go {sha} absent de JOURNAL.md à HEAD, ou pas après la ligne du scellement")
-    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%ct", "-S" + sha, "HEAD", "--", "JOURNAL.md")
+    p = git(racine(c), "log", "--no-textconv", "--reverse", "--format=%ct", "-S" + sha, head(c), "--", "JOURNAL.md")
     return datetime.fromtimestamp(int(p.stdout.split()[0]), timezone.utc)
 
 
@@ -368,14 +386,14 @@ def produire_tout(c: dict, a, cible: str) -> int:
                         f"{a.deviation}\n")
         o, r = ouverture(c), racine(c)
         os.environ[JETON] = tmp                     # hérité par les runs --produire (C-1)
-        chemin, code = orc.enregistrer(tmp, "rendu", a.auteur, r, "HEAD", RUNS, base=c["bloc"]["commit_analyse"],
+        chemin, code = orc.enregistrer(tmp, "rendu", a.auteur, r, c["head"], RUNS, base=c["bloc"]["commit_analyse"],
                                        paquet_sha256=c["sha_paquet"], sceau_gentime=o["genTime"], journaux=a.journaux,
                                        arret_premier_echec=True)
         if code:                                    # motif nommé pour la ligne du JOURNAL (Q8), sans contenu
             with open(chemin, encoding="utf-8") as f:
                 echecs = [(x["nom"], x["exit"]) for x in json.load(f)["runs"] if x["exit"]]
             raise RuntimeError(f"run en échec : {echecs}")
-        rec = orc.verifier(chemin, "rendu", orc.commit_complet(r, "HEAD"), r)    # exit 0, sha256 de chaque sortie
+        rec = orc.verifier(chemin, "rendu", c["head"], r)          # exit 0, sha256 de chaque sortie, commit gardé
         os.rename(tmp, cible)
         fait = 1
     except Exception as e:

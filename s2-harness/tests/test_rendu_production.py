@@ -4,11 +4,14 @@ des sorties de fixture ; attendus écrits à la main (étiquettes, options, comp
 chemin de recalcul avec ces options ; un mutant par comportement (journal G1)."""
 from __future__ import annotations
 
+import argparse
 import contextlib
 import glob
+import importlib.util
 import io
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -19,7 +22,7 @@ from pathlib import Path
 from unittest import mock
 
 from shogen_s2 import lm, r1, r2, records, report
-from tests.test_oracle_record import OUTIL as ENREGISTREUR, g
+from tests.test_oracle_record import LINT, OUTIL as ENREGISTREUR, g
 from tests import test_rendu_unique as tru
 from tests.test_rendu_unique import LOIN, OPENSSL, OUTIL, PAQUET, SCEAU, epingler, h, monter, poser, ru, texte_bloc
 from tests.test_sensibilite import RA, fixture, t
@@ -155,11 +158,12 @@ RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"] 
 
 
 def lancer(f: dict, *plus: str) -> tuple:
-    """main en processus, sans --gardes-seules, horloge en 2100 : (code, sortie standard, stderr)."""
-    out, err = io.StringIO(), io.StringIO()
+    """main en processus (module f["ru"] si posé, C-2), sans --gardes-seules, horloge en 2100 : (code, sortie
+    standard, stderr)."""
+    m, out, err = f.get("ru", ru), io.StringIO(), io.StringIO()
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = ru.main(["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes",
-                        f["sommes"], "--sortie", sortie(f), "--auteur", "claude-opus-5-5", *plus], maintenant=LOIN)
+        code = m.main(["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes",
+                       f["sommes"], "--sortie", sortie(f), "--auteur", "claude-opus-5-5", *plus], maintenant=LOIN)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -199,8 +203,9 @@ T_OK = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):
 
 def monter_prod(d: str) -> dict:
     """Dépôt jetable : commit c1 = shogen_s2/ et tools/ du harnais (seule la table des sorties de rendu_unique remplacée
-    par TABLE) et une suite triviale ; journaux du collecteur réel et sommes hors dépôt ; paquet, JOURNAL.md, go
-    épinglé (voie (b), 2026-09-01)."""
+    par TABLE), une suite triviale et le lint d'épinglage ; journaux du collecteur réel et sommes hors dépôt ; paquet,
+    JOURNAL.md, go épinglé (voie (b), 2026-09-01) ; f["ru"] : module chargé depuis la copie du dépôt, dont le sha256
+    est sha256_script (C-2)."""
     depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
     os.makedirs(depot), os.makedirs(jx), g(depot, "init", "-q"), g(depot, "config", "core.autocrlf", "false")
     src = Path(OUTIL).read_text(encoding="utf-8")
@@ -209,19 +214,24 @@ def monter_prod(d: str) -> dict:
                                         if n.endswith(".py")]
     c1 = poser(depot, {".gitignore": b"__pycache__/\n", "s2-harness/tests/__init__.py": b"", "s2-harness/tests/"
                        "test_t.py": T_OK, "s2-harness/tools/rendu_unique.py": outil.encode(),
+                       "enforcement/lint-model-pinning.sh": Path(LINT).read_bytes(),
                        **{f"s2-harness/{r}": Path(HARNAIS, r).read_bytes() for r in code}})
     fixture(jx)
     poser(jx, {"campagne.log": b"x\n", "segments.json": b"{}\n"}, commit=False)
     noms = ("control.jsonl", "journal.jsonl", "raw.jsonl", "campagne.log", "segments.json")
     sommes = "".join(f"{h(Path(jx, n).read_bytes())}  {n}\n" for n in noms).encode()
     poser(jx, {"SHA256SUMS.txt": sommes}, commit=False)
-    paquet = texte_bloc([f"commit_analyse {c1}", f"sha256_script {h(Path(OUTIL).read_bytes())}", *(
+    paquet = texte_bloc([f"commit_analyse {c1}", f"sha256_script {h(outil.encode())}", *(
         f"journal {n} {h(Path(jx, n).read_bytes())}" for n in noms[:3]), f"sommes {h(sommes)}",
         "cacert_sha256 " + "1" * 64, "tsa_crt_sha256 " + "2" * 64]).encode()
     poser(depot, {PAQUET: paquet, "JOURNAL.md": f"- scellement du paquet : sha256 {h(paquet)}\n".encode()})
     f = {"depot": depot, "paquet": os.path.join(depot, PAQUET), "journaux": jx, "sha": h(paquet), "c1": c1,
          "sommes": os.path.join(jx, "SHA256SUMS.txt")}
     epingler(f)
+    s = importlib.util.spec_from_file_location("ru_depot", os.path.join(depot, "s2-harness/tools/rendu_unique.py"))
+    f["ru"] = importlib.util.module_from_spec(s)
+    with mock.patch.object(sys, "dont_write_bytecode", True):     # aucun __pycache__ dans le dépôt gardé
+        s.loader.exec_module(f["ru"])
     return f
 
 
@@ -279,6 +289,42 @@ class TestProduction(unittest.TestCase):
         self.assertEqual((code, fichiers(sortie(f)), out), (0, premiere, affichage(dev, *glob.glob(f"{dev}/*.json"))))
         self.assertEqual(Path(dev, "DEVIATION.txt").read_text(encoding="utf-8"), "seconde exécution déclarée (ADR-0028 "
                          f"annexe D.4 b) ; première : {sortie(f)} ; motif : relance déclarée\n")
+
+    def test_script_hors_depot_enregistreur_voisin_modifie(self):
+        """C-2 (sonde du réviseur) : copie du dépôt de rendu_unique.py lancée hors du dépôt, oracle_record.py voisin
+        modifié (run suite retiré), lint d'épinglage copié : refus (4) seul, code 2, rien d'écrit. Rougit si
+        l'enregistreur chargé n'est pas comparé à celui du commit gardé."""
+        f, ailleurs, ancre = monter_prod(tempfile.mkdtemp()), tempfile.mkdtemp(), "    delai = DELAI_DEFAUT if "
+        ru_, orc_ = "s2-harness/tools/rendu_unique.py", "s2-harness/tools/oracle_record.py"
+        copie = {r: Path(f["depot"], r).read_bytes() for r in (ru_, orc_, "enforcement/lint-model-pinning.sh")}
+        src, sans_suite = copie[orc_].decode("utf-8"), "    commandes = tuple(x for x in commandes if x != 'suite')\n"
+        self.assertEqual(src.count(ancre), 1)
+        copie[orc_] = src.replace(ancre, sans_suite + ancre).encode()
+        poser(ailleurs, copie, commit=False)
+        s = importlib.util.spec_from_file_location("ru_ailleurs", os.path.join(ailleurs, ru_))
+        m = importlib.util.module_from_spec(s)
+        s.loader.exec_module(m)
+        avant = sorted(os.listdir(os.path.dirname(f["depot"])))
+        code, out, err = lancer({**f, "ru": m})
+        self.assertEqual((code, out, re.findall(r"^rendu_unique : refus (\S+) : ", err, re.M),
+                          sorted(os.listdir(os.path.dirname(f["depot"])))), (2, "", ["(4)"], avant))
+
+    def test_head_lu_une_fois_production_sur_le_commit_garde(self):
+        """C-2 (sonde du réviseur) : gardes levées sur X ; un commit Y retire le sha du paquet de JOURNAL.md et change
+        le code d'analyse ; production (runs factices) avec le contexte des gardes : code 0, tree.commit = X, jamais Y.
+        Rougit si l'enregistreur ou la relecture relisent HEAD."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        refus, c = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        x = g(f["depot"], "rev-parse", "HEAD")
+        y = poser(f["depot"], {"JOURNAL.md": b"- rien\n", "s2-harness/shogen_s2/m.py": b"x = 2\n"})
+        a = argparse.Namespace(deviation=None, auteur="claude-opus-5-5", journaux=f["journaux"], sortie=sortie(f))
+        p, _ = faux_runs()
+        with p, contextlib.redirect_stdout(io.StringIO()):
+            code = ru.produire_tout(c, a, sortie(f))
+        self.assertEqual((refus, code, x != y), ([], 0, True))
+        (chemin,) = glob.glob(os.path.join(sortie(f), "*.json"))
+        self.assertEqual(json.loads(Path(chemin).read_text(encoding="utf-8"))["tree"]["commit"], x)
 
     def test_gentime_du_jeton_dans_l_enregistrement(self):
         """SHOGEN-RENDU-T0-1 : voie (a) (autorité de test d'openssl), runs factices : sceau.genTime = genTime du jeton,

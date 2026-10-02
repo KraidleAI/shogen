@@ -64,14 +64,17 @@ def texte_bloc(lignes: list) -> str:
 
 
 def monter(d: str, bloc=lambda x: x, journal="- scellement du paquet : sha256 {}\n", texte=texte_bloc,
-           sommes=lambda s: s) -> dict:
-    """Fixture nominale dans d : dépôt jetable dont le commit c1 porte le code d'analyse, puis paquet et JOURNAL.md ;
-    journaux et fichier de sommes (format de sha256sum) hors dépôt. Variantes : bloc(lignes), journal (gabarit,
-    {} = sha du paquet), texte(lignes) du paquet, sommes(texte) du fichier de sommes."""
+           sommes=lambda s: s, code=None) -> dict:
+    """Fixture nominale dans d : dépôt jetable dont le commit c1 porte le code d'analyse (avec les octets de
+    tools/rendu_unique.py et tools/oracle_record.py du harnais, C-2), puis paquet et JOURNAL.md ; journaux et fichier
+    de sommes (format de sha256sum) hors dépôt. Variantes : bloc(lignes), journal (gabarit, {} = sha du paquet),
+    texte(lignes) du paquet, sommes(texte) du fichier de sommes, code (fichiers de c1 remplacés)."""
     depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
     os.makedirs(depot), g(depot, "init", "-q"), g(depot, "config", "core.autocrlf", "false")
+    outils = {f"s2-harness/tools/{n}": Path(HARNESS, "tools", n).read_bytes()
+              for n in ("rendu_unique.py", "oracle_record.py")}
     c1 = poser(depot, {".gitignore": b"__pycache__/\n", "s2-harness/shogen_s2/m.py": b"x = 1\n",
-                       "s2-harness/tools/t.py": b"y = 2\n"})
+                       "s2-harness/tools/t.py": b"y = 2\n", **outils, **(code or {})})
     sommes = sommes("".join(f"{h(v)}  {n}\n" for n, v in SOMMES.items())).encode()
     poser(jx, {**SOMMES, "SHA256SUMS.txt": sommes}, commit=False)
     paquet = texte(bloc(lignes_bloc(c1, sommes))).encode()
@@ -205,10 +208,31 @@ class TestRenduUnique(unittest.TestCase):
         self.assertEqual(self.lancer(f), (2, attendus("(1)")))
 
     def test_garde_4_sha_du_script(self):
-        """(4) : sha256_script du bloc différent du sha256 des octets de l'outil (dernier chiffre changé) : refus (4),
-        rien d'écrit. Rougit si la garde est neutralisée ou hache un autre fichier que l'outil."""
+        """(4) : sha256_script du bloc différent du sha256 des octets de l'outil (dernier chiffre changé) ; outil ou
+        enregistreur du commit gardé autres que ceux qui tournent ((2) levée : mêmes octets à c1 ; C-2) : refus (4),
+        rien d'écrit. Rougit si la garde est neutralisée, hache un autre fichier, ou ne lit pas le commit gardé."""
         f = monter(tempfile.mkdtemp(), bloc=lambda x: [x[0], x[1][:-1] + "01"[x[1][-1] == "0"], *x[2:]])
         self.assertEqual(self.lancer(f), (2, attendus("(4)")))
+        for nom in ("rendu_unique.py", "oracle_record.py"):
+            with self.subTest(commit_garde=nom):
+                f = monter(tempfile.mkdtemp(), code={f"s2-harness/tools/{nom}": b"# autre\n"})
+                self.assertEqual(self.lancer(f), (2, attendus("(4)")))
+
+    def test_gardes_lisent_le_head_resolu_une_fois(self):
+        """C-2 (i) : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de JOURNAL.md, code d'analyse
+        et outil changés) ; la résolution unique de HEAD rend X (enveloppe de git) : gardes levées sur X, contexte
+        head = X. Rougit si (1), (2), (4) ou la voie (b) relisent HEAD au lieu du commit résolu."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        x, vrai = g(f["depot"], "rev-parse", "HEAD"), ru.git
+        g(f["depot"], "checkout", "-q", "--orphan", "y")
+        poser(f["depot"], {"JOURNAL.md": b"- rien\n", "s2-harness/shogen_s2/m.py": b"x = 2\n",
+                           "s2-harness/tools/rendu_unique.py": b"# y\n"})
+        resolu = lambda r, *a: subprocess.CompletedProcess(a, 0, f"{x}\n".encode(), b"") if a == (
+            "rev-parse", "--verify", "HEAD^{commit}") else vrai(r, *a)
+        with mock.patch.object(ru, "git", resolu):
+            refus, c = ru.evaluer_gardes(f["depot"], f["paquet"], f["journaux"], f["sommes"], LOIN)
+        self.assertEqual((refus, c.get("head")), ([], x))
 
     def test_garde_2_code_d_analyse(self):
         """(2) : code d'analyse différent du commit du bloc (commit qui change tools), commit du bloc absent du dépôt,
