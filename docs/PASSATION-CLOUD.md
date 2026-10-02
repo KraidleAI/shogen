@@ -19,6 +19,8 @@ configuration globale `F:\claude-config`. Tout ce qui t'est nécessaire et trans
 
 ---
 
+> **Ajout daté du 2026-10-02 12:52 UTC (session cloud) — état à jour** : **partie 2 FAITE et fusionnée** (commit de fusion `0cc5a92`) sur la branche **`claude/compassionate-noether-szmdyj`**, qui tient lieu de `main` locale (passation + partie 1 + partie 2) tant que KraidleAI/shogen#1 n'est pas fusionnée ; branche de partie `partie-2-rendu` conservée. Suite 376 OK (2 sauts) ; xtask VERT en corpus complet ; Rust 209. **Reprendre à la partie 3** (PAQUET, sceau) après l'accord de l'investisseur ; items dus au G0 du PAQUET : annexe B, blocs B.20 à B.29 (déclencheur « G0 du PAQUET »). Le tableau ci-dessous est l'état du 2026-10-02 matin, gardé tel quel.
+
 ## 1. État exact au moment de la passation
 
 | objet | valeur |
