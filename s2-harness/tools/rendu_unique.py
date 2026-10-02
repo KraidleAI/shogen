@@ -1,10 +1,12 @@
 """Exécution unique du rendu S2, en refus par défaut (ADR-0028 annexe D.4 b ; SHOGEN-RENDU-UNIQUE-1, EX-E1-1 ; G0
 docs/adr-0028/G0-partie-2.md §C). Bibliothèque standard seule ; git et openssl lancés par listes d'arguments, jamais
-par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde qui ne peut s'évaluer refuse."""
+par un shell ; rien n'est écrit (sorties : sous-lot C3). Une garde qui ne peut s'évaluer refuse. --produire : commande
+nommée de l'enregistreur (sortie de la table et raw ; G0 §C, décisions Q1 à Q5 et Q7)."""
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import os
 import re
 import shutil
@@ -23,6 +25,24 @@ PREFIXES = {"cacert_sha256": "2151b611", "tsa_crt_sha256": "8bfb0305"}     # ann
 MOIS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 GO = re.compile(r"date: (\d{4}-\d\d-\d\dT\d\d:\d\d(?::\d\d(?:\.\d{1,6})?)?(?:Z|\+00:00))\nordre: exécuter sans ancre\n"
                 r"signataire: investisseur\n")                          # fichier de go, voie (b) de (6), G0 §C
+HARNAIS = os.path.dirname(os.path.dirname(SCRIPT))      # s2-harness du script : code scellé de l'extraction
+NOMS_JOURNAUX = ("control.jsonl", "journal.jsonl", "raw.jsonl")   # exigés au bloc avant tout rendu (G0 §C, L3)
+# --- table des sorties (ADR-0028 D4, D2 pt 6, D5 ; G0 §C, décisions Q1 à Q4 du 2026-10-02) ---
+T0, PLAGE_D5 = 1787770800, (1790273880, 1790435280)     # 2026-08-26T19:00:00Z ; plage fermée sur window_start
+HORS_J28 = " ; plage D5 non passée : hors du segment (D2 pt 6 l'applique au J28)"      # décision Q2
+SORTIES = (
+    ("j14-principal", {"t0": T0, "t_fin": 1788980400}, (),       # [2026-08-26T19:00Z ; 2026-09-09T19:00Z) (D4)
+     "hors décision, non confirmatoire (ADR-0028 D4, §1 bis.1 pt 9)" + HORS_J28),
+    ("j14-second", {"t0": T0, "t_fin": 1788480060}, (),          # coupe ≤ 2026-09-04T00:00Z, plus w (D4, Q3)
+     "sensibilité de la liste fermée (seconde coupe, décision 270), hors décision, non confirmatoire" + HORS_J28),
+    ("j28", {"t0": T0, "n_fixe": 38600}, (PLAGE_D5,),            # 38 600e fenêtre distincte, plus w (D2 pt 6)
+     "segment confirmatoire de la règle SHOGEN-CRITERE-R1-1 (D2 pt 6) ; la section [SENSIBILITÉ] (plage incluse) "
+     "est hors décision, biaisée vers le haut par construction"),
+)
+# --- fin de la table des sorties ---
+_SPEC = importlib.util.spec_from_file_location("oracle_record", os.path.join(HARNAIS, "tools", "oracle_record.py"))
+orc = importlib.util.module_from_spec(_SPEC)            # enregistreur voisin (liste fermée des commandes)
+_SPEC.loader.exec_module(orc)
 
 
 def git(racine: str, *args: str) -> subprocess.CompletedProcess:
@@ -251,10 +271,39 @@ def verifier_gardes(depot: str, paquet: str, journaux: str, sommes: str, mainten
     return refus
 
 
+def produire(argv: list) -> int:
+    """Commande nommée de l'enregistreur (liste fermée de oracle_record), lancée sur l'extraction du commit : une
+    sortie de SORTIES (étiquette en tête, puis render_report avec ses seules options ; Q1, Q2, Q4) ou raw (verdict de
+    records.verifier_raw, code 0 quel que soit le verdict ; Q7, SHOGEN-RAW-FIN-1). Octets UTF-8 sur la sortie
+    standard, capturée par l'enregistreur."""
+    p = argparse.ArgumentParser(prog="rendu_unique.py --produire")
+    p.add_argument("nom", choices=[s[0] for s in SORTIES] + ["raw"])
+    p.add_argument("--journaux", required=True)
+    a = p.parse_args(argv)
+    if HARNAIS not in sys.path:
+        sys.path.insert(0, HARNAIS)
+    from shogen_s2 import records, report
+    c, j, raw = (os.path.join(a.journaux, n) for n in NOMS_JOURNAUX)
+    if a.nom == "raw":
+        try:
+            v = records.verifier_raw(raw, j)
+            texte = f"conforme — lectures {v['lectures']} ; avec octets {v['avec_octets']}"
+        except ValueError as e:                     # verdict de refus : imprimé, l'exécution continue
+            texte = f"refus — {e}"
+        texte = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}"
+    else:
+        nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
+        texte = f"[ÉTIQUETTE] {nom} : {etiquette}\n" + report.render_report(c, j, exclude_ranges=pl, segment=seg)
+    sys.stdout.buffer.write((texte + "\n").encode("utf-8"))
+    return 0
+
+
 def main(argv: list, maintenant=None) -> int:
     """--depot, --paquet, --journaux (dossier des journaux scellés), --sommes (fichier de sommes), --sortie (C3 ; rien
     n'y est écrit ici). Refus : gardes refusées sur stderr, code 2 ; sinon « gardes levées », code 0. L'horloge n'est
-    jamais une option : maintenant n'est passé qu'en processus, par les tests."""
+    jamais une option : maintenant n'est passé qu'en processus, par les tests. --produire : commande nommée."""
+    if argv[:1] == ["--produire"]:
+        return produire(argv[1:])
     p = argparse.ArgumentParser(prog="rendu_unique.py", description="exécution unique du rendu S2 (ADR-0028 D.4 b)")
     for opt in ("--depot", "--paquet", "--journaux", "--sommes", "--sortie"):
         p.add_argument(opt, required=True)

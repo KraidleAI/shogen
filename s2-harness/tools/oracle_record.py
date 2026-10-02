@@ -27,8 +27,11 @@ SCHEMA = "shogen.oracle-record.v1"
 ROLES = ("G1", "G2", "cp-2", "rendu")
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
-COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"])}  # fermée
 JOURNAUX = "<journaux>"     # marqueur d'argument : dossier des journaux, chemin absolu substitué (jamais un shell)
+PRODUCTION = ("j14-principal", "j14-second", "j28", "raw")   # rendu unique (G0 §C, Q5 à Q7)
+COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]),
+             **{n: ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n, "--journaux", JOURNAUX])
+                for n in PRODUCTION}}                                       # liste fermée
 HEX = re.compile(r"[0-9a-f]{64}")
 CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tree", "python", "env", "runs", "exit",
           "ecrit", "paquet", "sceau")
