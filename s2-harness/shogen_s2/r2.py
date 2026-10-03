@@ -778,20 +778,24 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     k_nominal = len(hosts)
     fbh = flux_by_host(flux_hosts, pool)
 
-    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé)
+    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé) : entre relevés complets
+    # (statut ok, deux bases non muettes) ; un échec ou une base muette n'est ni divergence ni référence
+    # (SHOGEN-ASN-DIVERGENCE-ECHEC-1) ; by_host (k_eff) garde le dernier relevé, quel qu'il soit
     by_host: dict[str, dict] = {}
+    complet: dict[str, dict] = {}
     asn_divergences: list[dict] = []
     for rec in asn_records:
         h = rec.get("host")
-        if h in by_host:
-            prev, cur = by_host[h], rec
-            if (prev.get("asn_ripestat"), prev.get("asn_cymru")) != \
+        if rec.get("status") == "ok" and None not in (rec.get("asn_ripestat"), rec.get("asn_cymru")):
+            prev, cur = complet.get(h), rec
+            if prev is not None and (prev.get("asn_ripestat"), prev.get("asn_cymru")) != \
                (cur.get("asn_ripestat"), cur.get("asn_cymru")):
                 asn_divergences.append({
                     "host": h,
                     "avant": (prev.get("asn_ripestat"), prev.get("asn_cymru"), prev.get("ts")),
                     "apres": (cur.get("asn_ripestat"), cur.get("asn_cymru"), cur.get("ts")),
                 })
+            complet[h] = rec
         by_host[h] = rec
 
     states = {h: _asn_state(by_host.get(h)) for h in hosts}

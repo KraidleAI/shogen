@@ -352,6 +352,21 @@ class TestAsnPartition(unittest.TestCase):
         self.assertEqual(len(part["asn_divergences"]), 1)
         self.assertEqual(part["asn_divergences"][0]["host"], "h0")
 
+    def test_echec_et_base_muette_ne_sont_pas_des_divergences(self):
+        """SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B-1 de R-B) : un relevé resolve_failed, ou à base muette, n'est ni une
+        divergence ni la référence de la suivante ; un changement d'ASN vu à travers un échec en est une (relevé complet
+        précédent) ; k_eff sur le dernier relevé par hôte, inchangé (h3 finit en échec : non attribué, borne
+        supérieure). Rougit si : divergence tirée d'un relevé incomplet (sept à HEAD) ; changement perdu à travers un
+        échec (comparaison au seul relevé précédent, M10 de R-B) ; k_eff lu sur le dernier relevé complet."""
+        fh, ko = self._fh(["h0", "h1", "h2", "h3"]), "resolve_failed"
+        recs = [asn_rec("h0", 1, 1, ts=1.0), asn_rec("h0", status=ko, ts=2.0), asn_rec("h0", 1, 1, ts=3.0),
+                asn_rec("h1", 2, 2, ts=1.0), asn_rec("h1", 2, None, ts=2.0), asn_rec("h1", 2, 2, ts=3.0),
+                asn_rec("h2", 3, 3, ts=1.0), asn_rec("h2", status=ko, ts=2.0), asn_rec("h2", 4, 4, ts=3.0),
+                asn_rec("h3", 5, 5, ts=1.0), asn_rec("h3", status=ko, ts=2.0)]
+        part = r2.compute_partition(recs, fh, list(fh), {"exact_copy_pairs": []})
+        self.assertEqual(part["asn_divergences"], [{"host": "h2", "avant": (3, 3, 1.0), "apres": (4, 4, 3.0)}])
+        self.assertEqual((part["k_eff"], part["k_eff_is_upper_bound"], part["unattributed"]), (4, True, ["h3"]))
+
     def test_rpc_read_path_caveat_carried(self):
         fh = {"chainlink": r2.RPC_READ_PATH_HOST}
         recs = [asn_rec(r2.RPC_READ_PATH_HOST, 10, 10)]
