@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import enum
 import math
+import sys
 from bisect import bisect_left
 from collections import Counter
 from decimal import ROUND_HALF_EVEN, Context, Decimal, DivisionByZero, InvalidOperation, Overflow, localcontext
@@ -396,8 +397,26 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
 def parse_journal(path: str) -> list[dict]:
     """Relit `journal.jsonl` (une ligne par fenêtre×flux). `parse_float=Decimal`
     → `source_ts` exact (ADR-0003) ; `price` reste chaîne (déjà exacte).
-    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F)."""
-    return records.read_jsonl_tolerant(path, parse_float=Decimal)
+    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F).
+    Point unique des lectures de R1, L&M, R2 et du rapport (lot CORR, SHOGEN-PRIX-NON-FINI-1) : un prix non fini (NaN,
+    sNaN, Infinity, toute casse ou forme que Decimal admet) est lu comme absent (None : panne au sens de
+    classify_ecart), quel que soit le statut, compté par flux sur stderr, jamais la valeur ; prix illisible par
+    Decimal : inchangé."""
+    lus, nf = records.read_jsonl_tolerant(path, parse_float=Decimal), Counter()
+    with localcontext(contexte_decimal()):          # « abc » lève sous ce contexte (illisible : inchangé), jamais NaN
+        for r in lus:
+            try:
+                absent = isinstance(r, dict) and r.get("price") is not None and not Decimal(r["price"]).is_finite()
+            except (TypeError, ValueError, ArithmeticError):
+                absent = False
+            if absent:
+                r["price"] = None
+                nf[r.get("flux_id")] += 1
+    if nf:
+        sys.stderr.write(f"[s2-harness] AVERTISSEMENT : prix non fini(s) lu(s) comme absent(s) dans {path}, fichier "
+                         "entier — par flux : " + ", ".join(f"{f} {k}" for f, k in sorted(nf.items(), key=str))
+                         + " (SHOGEN-PRIX-NON-FINI-1 : panne au sens de classify_ecart ; valeurs non reproduites).\n")
+    return lus
 
 
 def build_window_strate(markers: list[dict]) -> dict[int, str]:
