@@ -155,6 +155,7 @@ class TestOracleRecord(unittest.TestCase):
                 ("paquet.sha256", rendu, "rendu", self.c1, lambda r: r["paquet"].update(sha256=SHA[:-1]), {}),
                 ("runs", rendu1, "rendu", self.c1, None, {}), ("runs", rendu, "rendu", self.c1,
                                                                lambda r: r["runs"].reverse(), {}),
+                ("runs", rendu, "rendu", self.c1, lambda r: r["runs"][0].update(nom="raw"), {}),   # tête ≠ suite (M24)
                 ("nuls hors rendu", g2, "G2", self.c1, lambda r: r["sceau"].update(genTime="2026-10-02T05:00Z"), {}),
                 ("served_from", g2, "G2", self.c1, None, {"served_from": {**sert, "sha256": "0" * 64}}),
                 ("served_from", g2, "G2", self.c1, None, {"served_from": {"chemin": ko, "sha256": sha[ko]}})):
