@@ -71,3 +71,5 @@ cloud (P1, JOURNAL du 2026-10-02 21:2x UTC). Toute heure écrite est lue par `da
   lecture directe des journaux) ; contrôle FM-1.1 de la transcription de l'exécution par l'orchestrateur, consigné.
 - Le verdict est celui de la règle scellée (paquet §10.2) tel que rendu ; toute question non prévue est une déviation
   déclarée, jamais une réécriture (pt 11). Rapport `docs/11` : étape R du plan.
+
+> *Ajout daté du 2026-10-03 01:04:33 UTC (second sceau, A-8)* : le paquet a été révisé et rescellé (sha256 `4d2a8276…`, genTime 2026-10-03T01:04:10Z) ; **l'échéance est désormais 2026-10-04T01:04:10Z** et le commit d'analyse `f35a70c19ba8269f1f7e2bcd31775e4fc513da20` (la commande de garde (2) du §1 se lit avec ce commit à la place de `41f087e…`). Lignes ci-dessus conservées. Le constat B-1 de R-C (chemin de `$J` dans un verdict `raw` de refus) est corrigé dans le code (SHOGEN-RAW-CHEMIN-1, lot CORR) ; écrire le chemin de `$J` au JOURNAL reste fait.

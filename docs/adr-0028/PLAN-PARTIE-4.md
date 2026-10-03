@@ -29,3 +29,5 @@ Relecture G2 de la partie par une instance neuve, revue de partie, fusion `--no-
 - Les journaux scellés ne sont ni téléchargés ni ouverts avant l'acte de l'investisseur ; avant lui, seules leurs métadonnées Drive (nom, taille) sont lues.
 - Aucune publication par l'orchestrateur ; `docs/11` est publié sur décision de l'investisseur.
 - Pocket : aucune déclaration publique avant la date de divulgation coordonnée.
+
+> *Ajout daté du 2026-10-03 01:04:33 UTC (second sceau, A-8)* : le paquet a été révisé et rescellé (sha256 `4d2a8276…`, genTime 2026-10-03T01:04:10Z) ; **l'échéance est désormais 2026-10-04T01:04:10Z** et le commit d'analyse `f35a70c19ba8269f1f7e2bcd31775e4fc513da20` (la commande de garde (2) du §1 se lit avec ce commit à la place de `41f087e…`). Lignes ci-dessus conservées. Le constat B-1 de R-C (chemin de `$J` dans un verdict `raw` de refus) est corrigé dans le code (SHOGEN-RAW-CHEMIN-1, lot CORR) ; écrire le chemin de `$J` au JOURNAL reste fait.
