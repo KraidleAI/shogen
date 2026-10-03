@@ -92,6 +92,19 @@ class TestSceauScripts(unittest.TestCase):
                                   sorted(os.listdir(os.path.join(d, SCEAU)))), (2, True, ["chain"]),
                                  p.stdout + p.stderr)
 
+    def test_verify_lie_le_jeton_a_la_requete(self):
+        """SHOGEN-SCEAU-VERIFY-DATA-1, autre moitié (sonde d'équivalence du G1 de P3g, §2) : après le jeton, requête
+        refaite par make-tsq.sh sur le même manifeste (autre nonce) : étape (1) passe, étape (2) refuse, code 3,
+        dernière ligne « JETON : ÉCART », étape (3) jamais atteinte. Rougit si le jeton n'est vérifié que contre les
+        octets du manifeste (-data seul)."""
+        d = self.sceller()
+        q = Path(d, SCEAU, "paquet.tsq").read_bytes()
+        p = script("make-tsq.sh", d, SCEAU, PAQUET)
+        self.assertEqual((p.returncode, Path(d, SCEAU, "paquet.tsq").read_bytes() == q), (0, False), p.stderr)
+        p = script("verify.sh", d)
+        self.assertEqual((p.returncode, f"{PAQUET}: OK" in p.stdout, p.stdout.splitlines()[-1], "== (3)" in p.stdout),
+                         (3, True, "JETON : ÉCART", False), p.stdout + p.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

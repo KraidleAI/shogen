@@ -42,10 +42,12 @@ de collecte de prix. Les enregistrements ASN vont dans `control.jsonl`
     évaluable », JAMAIS un k_eff fabriqué par absence de donnée. Un hôte à résolution
     échouée = singleton « non attribué » ; RIPEstat ≠ Cymru = pas de fusion +
     discordance publiée (jamais « choisir une base »).
-  - **Drapeau 2 tri-état** : levé (z ≥ 2,33 ∧ k_eff = k nominal) / éteint (z publié
-    mais < 2,33 ou k_eff < k nominal) / non évaluable (z non publié par la garde
-    §5.4, ou k_eff non évaluable). La localisation consomme la matrice de co-écarts
-    complète de M1b (lm.pair_phi) sur les paires inter-clusters.
+  - **Drapeau 2 tri-état** (règle SHOGEN-CRITERE-R1-1, pt 10 ; `drapeau_2`) : levé
+    (« R1 discrimine » VRAI ∧ k_eff = k nominal, k_eff non borne supérieure) / éteint
+    (FAUX, ou VRAI ∧ k_eff < k nominal) / non évaluable (k_eff non évaluable, « R1
+    discrimine » NON ÉVALUABLE, ou VRAI ∧ borne supérieure égale à k nominal). La
+    localisation consomme la matrice de co-écarts complète de M1b (lm.pair_phi) sur
+    les paires inter-clusters.
   - **(K,z) co-aberrance** : marginales par signe observées, puis RÉUTILISE tel quel
     le trio r1.gate_value/z_score/binomial_tail_ge avec la garde §5.4 — « la
     machinerie de §5.1 recalculée sur les résidus » (§4.2 (2c)).
@@ -776,20 +778,24 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     k_nominal = len(hosts)
     fbh = flux_by_host(flux_hosts, pool)
 
-    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé)
+    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé) : entre relevés complets
+    # (statut ok, deux bases non muettes) ; un échec ou une base muette n'est ni divergence ni référence
+    # (SHOGEN-ASN-DIVERGENCE-ECHEC-1) ; by_host (k_eff) garde le dernier relevé, quel qu'il soit
     by_host: dict[str, dict] = {}
+    complet: dict[str, dict] = {}
     asn_divergences: list[dict] = []
     for rec in asn_records:
         h = rec.get("host")
-        if h in by_host:
-            prev, cur = by_host[h], rec
-            if (prev.get("asn_ripestat"), prev.get("asn_cymru")) != \
+        if rec.get("status") == "ok" and None not in (rec.get("asn_ripestat"), rec.get("asn_cymru")):
+            prev, cur = complet.get(h), rec
+            if prev is not None and (prev.get("asn_ripestat"), prev.get("asn_cymru")) != \
                (cur.get("asn_ripestat"), cur.get("asn_cymru")):
                 asn_divergences.append({
                     "host": h,
                     "avant": (prev.get("asn_ripestat"), prev.get("asn_cymru"), prev.get("ts")),
                     "apres": (cur.get("asn_ripestat"), cur.get("asn_cymru"), cur.get("ts")),
                 })
+            complet[h] = rec
         by_host[h] = rec
 
     states = {h: _asn_state(by_host.get(h)) for h in hosts}

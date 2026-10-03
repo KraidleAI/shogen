@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import enum
 import math
+import sys
 from bisect import bisect_left
 from collections import Counter
 from decimal import ROUND_HALF_EVEN, Context, Decimal, DivisionByZero, InvalidOperation, Overflow, localcontext
@@ -320,7 +321,8 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
 def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
     """Variance de long terme par blocs d'UNE strate (ADR-0028 §1 bis.1 pt 3 ; A-2) :
     σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} (1 − k/ℓ)·γ̂_k, γ̂_k = Σ (I_t − Ī)(I_{t+k} − Ī) sur les paires de la
-    grille, Ī = K/n. Forme de Künsch 1989 (P-01, OCR seul, [2nd]) : blocs mobiles, noyau de Bartlett, non
+    grille, Ī = K/n. Forme de Künsch 1989 (P-01, versé et lu : Thm 3.1, éq. (3.9), p. 1224 ; avec ces γ̂_k
+    centrés sur Ī, correspondance par les poids, approchée : paquet §10.4) : blocs mobiles, noyau de Bartlett, non
     restreinte. Elle égale (1/ℓ)·Σ_j B_j² (sommes de blocs de la série centrée complétée par des 0), d'où
     σ̂² ≥ 0 et σ̂² = 0 ⇔ K ∈ {0, n} (CRITIQUE v2 §4.1). `serie` : couples (window_start, I_t), window_start
     entiers strictement croissants, écarts multiples de `w`, I_t ∈ {0, 1} ; sinon ValueError. Lag k ⇔ écart
@@ -396,8 +398,26 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
 def parse_journal(path: str) -> list[dict]:
     """Relit `journal.jsonl` (une ligne par fenêtre×flux). `parse_float=Decimal`
     → `source_ts` exact (ADR-0003) ; `price` reste chaîne (déjà exacte).
-    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F)."""
-    return records.read_jsonl_tolerant(path, parse_float=Decimal)
+    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F).
+    Point unique des lectures de R1, L&M, R2 et du rapport (lot CORR, SHOGEN-PRIX-NON-FINI-1) : un prix non fini (NaN,
+    sNaN, Infinity, toute casse ou forme que Decimal admet) est lu comme absent (None : panne au sens de
+    classify_ecart), quel que soit le statut, compté par flux sur stderr, jamais la valeur ; prix illisible par
+    Decimal : inchangé."""
+    lus, nf = records.read_jsonl_tolerant(path, parse_float=Decimal), Counter()
+    with localcontext(contexte_decimal()):          # « abc » lève sous ce contexte (illisible : inchangé), jamais NaN
+        for r in lus:
+            try:
+                absent = isinstance(r, dict) and r.get("price") is not None and not Decimal(r["price"]).is_finite()
+            except (TypeError, ValueError, ArithmeticError):
+                absent = False
+            if absent:
+                r["price"] = None
+                nf[r.get("flux_id")] += 1
+    if nf:
+        sys.stderr.write(f"[s2-harness] AVERTISSEMENT : prix non fini(s) lu(s) comme absent(s) dans {path}, fichier "
+                         "entier — par flux : " + ", ".join(f"{f} {k}" for f, k in sorted(nf.items(), key=str))
+                         + " (SHOGEN-PRIX-NON-FINI-1 : panne au sens de classify_ecart ; valeurs non reproduites).\n")
+    return lus
 
 
 def build_window_strate(markers: list[dict]) -> dict[int, str]:
@@ -675,9 +695,9 @@ def compute_r1(
 
 
 def regle_critere(r1_out: dict) -> dict:
-    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : ADR-0028 §1 bis.1, pts 1-11
-    (docs/adr-0028/ADR-0028-decisions-sortie-S2.md, commit f5b8269), non recopié ici (une seule vérité). Lit
-    r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
+    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : le paquet de pré-enregistrement scellé,
+    docs/adr-0028/PAQUET-PREREG-S2.md §10.2, pts 1-11 (recopie d'ADR-0028 §1 bis.1), non recopié ici (une seule
+    vérité). Lit r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
     compute_r1 (z, bloc.z_bloc), sans arrondi ni contexte posé, à SEUIL_Z par « ≥ » ; aucune p-valeur (pt 4).
     Par strate (pt 5) : valeur, cas (garde_5_4, z_sous_seuil, rejette, discordance, rejet_non_qualifiable)
     et, pour toute strate qui NE REJETTE PAS, EMD = (SEUIL_Z + Z_PUISSANCE)·√max(n·P̂(1 − P̂), σ̂²_bloc)

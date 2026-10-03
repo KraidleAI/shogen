@@ -115,7 +115,10 @@ class TestPoolAnalyse(unittest.TestCase):
         os.mkdir(sans)
         c2, j2 = collecte(sans, 6, lambda f, i: "ok", specs=VIFS)   # même collecte, P privé de f
         txt = report.render_report(c, j)
-        self.assertEqual(txt.split("[BLOC 3]")[1], report.render_report(c2, j2).split("[BLOC 3]")[1])
+        b4, lib = "\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = 2 flux ", "(pool d'analyse, ADR-0028 D1)\n"
+        self.assertIn(b4 + lib, txt)           # libellé du pool d'analyse au cas (a) (C-4 de R-B ; lot CORR, CORR-3)
+        self.assertEqual(txt.split("[BLOC 3]")[1].replace(b4 + lib, b4 + "(pool)\n"),
+                         report.render_report(c2, j2).split("[BLOC 3]")[1])
         self.assertEqual(txt.count("pool_analyse_retrait"), 2)
         dev = [[x for x in t.splitlines() if "devise_composition" in x]
                for t in (txt, report.render_report(c2, j2))]

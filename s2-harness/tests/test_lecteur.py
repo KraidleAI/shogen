@@ -115,6 +115,19 @@ class TestTsNumerique(unittest.TestCase):
                 else:
                     self.assertEqual(records.filtre_horodatage([rec], (), 60, seg), [rec])
 
+    def test_trois_champs_sous_segment_ou_plage_seule(self):
+        """C-2 de R-C (SHOGEN-TESTS-C8-SUITE-1) : même refus nommé pour window_start (window_close), harness_ts
+        (clock_check) et ts (asn_attribution), sous segment comme sous une plage seule. Rougit si le contrôle ne vaut
+        que pour ts (M30 de R-C) ou que sous segment (M29)."""
+        seg, pl = (1787770800, 1788980400), [(1787770860, 1787770920)]
+        for rec, champ in (("window_close", "window_start"), ("clock_check", "harness_ts"), ("asn_attribution", "ts")):
+            for brut in ("true", "NaN", '"1787770900"'):
+                r = json.loads(f'{{"record": "{rec}", "{champ}": {brut}}}')
+                for plages, segment in (((), seg), (pl, None)):
+                    with self.subTest(champ=champ, brut=brut, plages=plages), self.assertRaisesRegex(
+                            ValueError, r"non numérique ou non fini .*SHOGEN-BLOC6-TS-NUM-1"):
+                        records.filtre_horodatage([r], plages, 60, segment)
+
 
 
 class TestRawLecteur(unittest.TestCase):

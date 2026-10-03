@@ -360,9 +360,11 @@ def destination(sortie: str, motif) -> str:
     return f"{sortie}.deviation-{k}"
 
 
-def _decimal(x) -> str:
+def _decimal(x) -> str | list:
     if isinstance(x, Decimal):
         return str(x)                                   # Decimal en chaîne, sous le contexte nommé (appelant)
+    if isinstance(x, (set, frozenset)):
+        return sorted(x)                                # r2, copie exacte : liste triée (SHOGEN-RECALCUL-JSON-COPIE-1)
     raise TypeError(f"{type(x).__name__} hors du JSON du recalcul tiers")
 
 
@@ -374,7 +376,8 @@ def produire(argv: list) -> int:
     standard, capturée par l'enregistreur. Réservée à l'exécution unique (C-1) : JETON absent ou hors d'un répertoire
     existant dont le nom commence par un point, refus, code 2, sortie standard vide. Avertissements du lecteur capturés
     pendant le calcul, réécrits sans le dossier des journaux, écrits dans la sortie (C-5) : lignes [AVERTISSEMENT DU
-    LECTEUR] après l'étiquette (ou le verdict), clé avertissements du JSON de recalcul-tiers."""
+    LECTEUR] après l'étiquette (ou le verdict), clé avertissements du JSON de recalcul-tiers ; verdict raw de refus
+    réécrit de même (SHOGEN-RAW-CHEMIN-1)."""
     v = os.environ.get(JETON, "")
     if not (os.path.isdir(v) and os.path.basename(v).startswith(".")):
         print(f"rendu_unique : refus production : commande nommée réservée à l'exécution unique ({JETON} absente ou "
@@ -394,7 +397,7 @@ def produire(argv: list) -> int:
                 v = records.verifier_raw(raw, j)
                 texte = f"conforme — lectures {v['lectures']} ; avec octets {v['avec_octets']}"
             except ValueError as e:                     # verdict de refus : imprimé, l'exécution continue
-                texte = f"refus — {e}"
+                texte = "refus — " + str(e).replace(os.path.join(a.journaux, ""), "")   # sans dossier (RAW-CHEMIN-1)
             tete, corps = f"verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : {texte}", []
         elif a.nom == "recalcul-tiers":
             var = [*SORTIES, *((n + "-incluse", s, (), INCLUSE) for n, s, pl, _ in SORTIES if pl)]
@@ -423,9 +426,9 @@ def produire_tout(c: dict, a, cible: str) -> int:
     fois, qui refuse une cible présente à cet instant (POSIX : création exclusive de la cible, puis renommage sur cette
     réserve vide ; Windows : os.rename ne remplace jamais ; RENDU-RENAME-POSIX-1). Tout échec : rien ne reste, code 1,
     heure et motif sur stderr. Sortie standard : chemins et sha256 seulement, aucun contenu de sortie."""
-    tmp, fait = tempfile.mkdtemp(prefix=f".{os.path.basename(cible)}.", dir=os.path.dirname(os.path.abspath(cible))), 0
-    reserve = None
-    try:
+    tmp, fait, reserve = None, 0, None
+    try:                                            # parent absent : échec de production nommé (RENDU-MKDTEMP-1)
+        tmp = tempfile.mkdtemp(prefix=f".{os.path.basename(cible)}.", dir=os.path.dirname(os.path.abspath(cible)))
         if a.deviation is not None:
             with open(os.path.join(tmp, "DEVIATION.txt"), "x", encoding="utf-8", newline="\n") as f:
                 f.write(f"seconde exécution déclarée (ADR-0028 annexe D.4 b) ; première : {a.sortie} ; motif : "
@@ -451,7 +454,7 @@ def produire_tout(c: dict, a, cible: str) -> int:
         return 1
     finally:
         os.environ.pop(JETON, None)
-        if not fait:
+        if not fait and tmp is not None:
             shutil.rmtree(tmp, ignore_errors=True)
             if reserve:
                 with contextlib.suppress(OSError):

@@ -543,3 +543,122 @@ Conclusion : aucun auteur de la règle SHOGEN-CRITERE-R1-1 n'a lu le chiffre de 
 
 - **MONARK-S2-M009A-EXPOSITION-1 — fermé** (après le scellement ; déclencheur « avant scellement » dépassé, écart consigné au paquet §8 et au JOURNAL). Mesure : B.34 (dépôts), B.36 (étapes A, B), B.37 (étape C) ; attestation de l'investisseur : annexe D.3 (i), « non ». Résultat : les lecteurs du chiffre de D.1 n° 2 sont les sessions MONARK des lots M009, l'orchestrateur du poste (`90684fb2`) et ses sous-agents, et un sous-agent de cartographie (`carto:monark`, sujet du commit, non transmis) ; aucun auteur de la règle SHOGEN-CRITERE-R1-1 ni décideur, sous les limites de B.37 (jetons exacts, fenêtre de 300 caractères, fichiers textuels) ; plus l'orchestrateur cloud après le scellement (D.1 n° 16). Le paquet scellé n'est pas modifié ; ce résultat est consigné ici, au JOURNAL, et sera repris au rapport de l'exécution.
 - **SHOGEN-MONARK-SUJET-COMMIT-1 — fermé** : les sessions qui ont affiché le sujet du commit `aa04924` sont mesurées (B.36 : deux sous-agents de `90684fb2` le 2026-09-18, `carto:monark` le 2026-09-29 ; orchestrateur cloud le 2026-10-02, D.1 n° 16).
+
+## B.39 Amendement daté du 2026-10-02 21:2x UTC : seuil de SHOGEN-FLUX-QUASI-MORT-1 fixé d'avance (partie 4, P3)
+
+Avis de l'auteur sans exposition (advisor frais `shogen-advisor`, `claude-fable-5-1`) versé tel quel : `docs/adr-0028/AVIS-SEUIL-FLUX-QUASI-MORT.md` (source `513941d0…`). Texte de l'amendement, recopié de l'avis : « Seuil fixé le 2026-10-02 : un flux f est retiré du pool de la strate s si 2·ok(f, s) < n_s, où ok(f, s) est le nombre de fenêtres retenues de s (segment, puis exclusion D5) dont la lecture last-wins de f a `status == "ok"` et un prix, et n_s le nombre de fenêtres retenues de s ; lecture absente = non `ok` ; égalité : le flux reste ; une passe, par strate ; D1 (a)/(b) en sont des cas particuliers. Auteur : advisor `claude-fable-5-1`, attestation D.3 jointe. »
+
+Contrôles de l'orchestrateur : (1) contrôle FM-1.1 de la transcription de l'advisor (72 événements) : 0 fragment des lignes interdites, fichiers ouverts tous hors de D.2 et hors des taux par flux (ADR-0028, annexes B, D, paquet, docs 04, 09, 10, `r1.py`, `records.py`, `biblio/INDEX.md`) ; (2) prédicat et références de code relus (`r1.py` l.180, l.430-436) ; (3) motif recalculé exactement sur un modèle d'essai (deux flux co-défaillants, trois indépendants, un flux f) : surplus de K rapporté à la covariance = 0,83 ; 0,39 ; −0,04 ; −0,48 ; −0,91 pour p_f = 0 ; 0,25 ; 0,5 ; 0,75 ; 1, contre 1 − 2p_f au premier ordre : le signe bascule près de 1/2 (légèrement en deçà, effet du second ordre, couvert par SHOGEN-FLUX-QUASI-MORT-2). Seuil adopté tel quel ; la sensibilité elle-même reste un lot après l'exécution (portée : J28, plage exclue ; étiquette « ajoutée après le pré-enregistrement ; hors décision »).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-FLUX-QUASI-MORT-2 | point de bascule du signal à mesurer sur données synthétiques (modèle nul et alternative de SIM-NIVEAU, un flux à p_f variable, 11 flux) ; la valeur 1/2 n'en dépend pas | orch. | avant tout usage de la sensibilité dans une proposition à l'investisseur | réutilisation de `scripts/sim/` [inféré] | avis P3, L1 |
+| SHOGEN-FLUX-DEVIANT-1 | un flux à taux `ok` élevé mais à taux d'écart > 1/2 (staleness, hors-enveloppe) absorbe de même et n'est pas retiré ; sensibilité sur p̂_f, exploratoire, conditionnée sur une composante du résultat, étiquetée | orch. | après l'exécution | un lot [inféré] | avis P3, L2 |
+| SHOGEN-FLUX-FAIBLE-1 | flux à taux `ok` entre 1/2 et 1 : puissance réduite d'un facteur (1 − 2p_f), non traitée ; puissance de la règle selon le profil des taux `ok`, synthétique | orch. | après l'exécution | une simulation [inféré] | avis P3, L3 |
+| SHOGEN-POOL-MIN-1 | garde explicite de taille de pool (N_MIN_HORSENV = 4) dans la sensibilité : refus nommé si une strate garde moins de 4 flux | orch. | avec le lot de la sensibilité | quelques lignes et un test [inféré] | avis P3, L6 |
+
+## B.40 Amendement daté du 2026-10-02 21:2x UTC : SHOGEN-G2-HISTO-RECALCUL-1, inventaire et G2 de rattrapage (partie 4, P4)
+
+Inventaire du lecteur (`shogen-lecteur`, Gate 0 `claude-sonnet-5-5`) versé : `docs/adr-0028/INVENTAIRE-G2-RECALCUL.md` (source `2a22f47d…`). Chemin de recalcul : neuf modules (`rendu_unique.py`, `oracle_record.py`, `report.py`, `lm.py`, `r1.py`, `r2.py`, `records.py`, `window.py`, `model.py`). Trois rapports G2 lisibles dans le dépôt (parties 2 et 3, ADR-0022) ; les autres cités seulement. Lacunes : **G-1** Phase A et ADR-0021 (rapports non localisés ; la plus grande part des lignes de `r1`, `r2`, `report`, `records`, `lm`, `window`) ; **G-2** `model.py` (aucun G2 déclaré) ; **G-3** corrections de la relecture G2 de la partie 2 (`3ef3b25`, `093c076`, `cfc67f5`, `81b8a87`, `04553a7`), entre les deux périmètres de G2, sans réviseur distinct ; **G-4** rapports de lot sans sha complet dans le dépôt (lot A, B0, B-DEP-2, CRITERE, DOCS-S2-a).
+
+Décision de l'orchestrateur : trois relectures G2 de rattrapage par des réviseurs neufs (`shogen-worker`), lancées le 2026-10-02 vers 21:28 UTC, sur le code gelé, **sans correctif** (tout changement du code d'analyse après le sceau ferait refuser la garde (2) et exigerait un nouveau paquet) ; constats classés A (touche la décision ou fait échouer l'exécution), B (rendu hors décision), C (sans effet) : **R-A** `r1.py`, `records.py`, `window.py`, `model.py` entiers (G-1, G-2, G-4) ; **R-B** `r2.py`, `lm.py`, `report.py` entiers (G-1, G-4) ; **R-C** diff `6eabaa4..0711cc1` sur `rendu_unique.py`, `oracle_record.py`, `records.py` (G-3). Un constat A est porté à l'investisseur avant l'exécution (choix entre exécuter avec la limite déclarée et un nouveau paquet).
+
+Contrôle FM-1.1 de la transcription du lecteur (280 événements) : 0 fragment des lignes interdites. Écarts déclarés par le lecteur : (1) exposé à des valeurs de classe M dans des pièces autorisées (comptes de fenêtres, diagnostics DNS de D5, une durée de stress, un P99 de la calibration d'ADR-0022), aucune recopiée ; (2) une recherche `grep -rn` a parcouru `docs/rapports` et `docs/adr-0025` avant un filtre `grep -v`, sans qu'aucune ligne de ces dossiers ne s'affiche (confirmé : 0 fragment). Constat annexe : `docs/G2-partie-3.md` annonce 28 commits pour `0711cc1..86a8a5b`, `git rev-list --count` en donne 33 (les commits de documents de l'orchestrateur comptés ou non) ; sans effet sur les modules du chemin.
+
+## B.41 Amendement daté du 2026-10-02 21:5x UTC : relecture G2 de rattrapage R-C (lacune G-3)
+
+Rapport versé : `docs/adr-0028/G2-RATTRAPAGE-R-C.md` (réviseur neuf `shogen-worker` ; source `f06a69f0…`). Verdict sur le périmètre (`git diff 6eabaa4 0711cc1` sur `rendu_unique.py`, `oracle_record.py`, `records.py`) : ACCEPTE-AVEC-CONSTATS ; les huit corrections C-1 à C-8 de la partie 2 font ce que demandait leur construction, sans régression mesurée (règle `ea3a2d94…` et épingles inchangées sur `6eabaa4`, `0711cc1` et HEAD ; suites de chaque commit vertes ; 37 mutants, 31 tués, 6 vivants dont 4 équivalents). Contrôle FM-1.1 de sa transcription (448 événements) : 0 fragment des lignes interdites ; une copie complète de l'arbre, supprimée sans lecture des pièces de D.2, déclarée.
+
+Constats et décisions de l'orchestrateur :
+- **H-1 (hors périmètre ; A par la lettre, sans valeur fausse)** : `rendu_unique.py` l.426 crée le répertoire temporaire voisin de la cible hors du `try` ; le dossier parent de `--sortie` prévu par la procédure (`docs/adr-0028/execution/`) n'existait pas : la production aurait levé `FileNotFoundError` après « gardes levées », sans aucun run. **Levé sans toucher au code** : dossier créé et suivi (`docs/adr-0028/execution/README.md`), procédure amendée (§1). Item SHOGEN-RENDU-MKDTEMP-1 (après l'exécution : `mkdtemp` dans le `try`, ligne « échec de production » dans ce cas).
+- **B-1** : verdict du run `raw` dépendant du chemin absolu des journaux si `raw.jsonl` porte une ligne corrompue autre que la dernière (les valeurs de la règle ne bougent pas) : procédure amendée (§2, chemin de `$J` écrit au JOURNAL) ; item SHOGEN-RAW-CHEMIN-1 (après l'exécution : chemin réécrit dans le verdict, comme les avertissements du lecteur).
+- **C-1** (barre finale de `--sortie`) : procédure amendée (§1) ; **C-2**, **C-3** (trous de test : mutants M29, M30, M24 vivants, code juste) : item SHOGEN-TESTS-C8-SUITE-1 (après l'exécution) ; **C-4** (resserrement de la voie (b), voie non utilisée) et **C-5** (style) : sans suite.
+- H-2 : `s2-harness/tests/__pycache__/` ignoré, hors des chemins de la garde (2) : sans effet (procédure §1 inchangée : seuls `shogen_s2` et `tools` sont contrôlés).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RENDU-MKDTEMP-1 | `rendu_unique.py` l.426 : `mkdtemp` hors du `try` ; parent absent = exception non rattrapée, sans ligne « échec de production » | orch. | après l'exécution unique (code gelé) | 2 lignes et un test [inféré] | R-C, H-1 |
+| SHOGEN-RAW-CHEMIN-1 | verdict `raw` : chemin absolu de `$J` dans le message d'une ligne corrompue non finale ; sha dépendant de l'hôte | orch. | après l'exécution unique | 1 ligne et un test [inféré] | R-C, B-1 |
+| SHOGEN-TESTS-C8-SUITE-1 | tests manquants : contrôle de `window_start` et `harness_ts` (C-8 de la partie 2), ordre `suite` en tête des runs (mutants M29, M30, M24 vivants) | orch. | après l'exécution unique | trois tests [inféré] | R-C, C-2, C-3 |
+
+## B.42 Amendement daté du 2026-10-02 22:1x UTC : relecture G2 de rattrapage R-B — CONSTAT A
+
+Rapport versé : `docs/adr-0028/G2-RATTRAPAGE-R-B.md` (réviseur neuf `shogen-worker`, Gate 0 `claude-opus-5-5` ; source `894ed219…`). Périmètre : `r2.py`, `lm.py`, `report.py` entiers à HEAD (inchangés depuis `41f087e`). Contrôle FM-1.1 de sa transcription (637 événements) : 0 fragment des lignes interdites ; écarts déclarés (copies d'arbre contenant D.2 n° 5 et 6, supprimées sans affichage ; noms de `docs/rapports` et `docs/adr-0025` parcourus par `find`).
+
+- **A-1 — confirmé par l'orchestrateur (sonde du réviseur rejouée)** : `r2.py` l.740 et l.757 placent un `frozenset` dans `content["exact_copy_pairs"]` quand une paire de flux a des prix identiques sur au moins `CONTENT_N_MIN` = 300 fenêtres communes ; le run `recalcul-tiers` sérialise ce retour par `json.dumps(default=_decimal)` (`rendu_unique.py` l.363-366, l.412), qui lève `TypeError` ; l'enregistreur s'arrête au premier échec et l'exécution unique **ne laisse aucune sortie** (J14 et J28 compris). Aucune valeur fausse n'est produite. Aucun test ne couvre le cas. Plausibilité sur les journaux réels : non mesurable sans les lire ; la détection de copie exacte existe parce que des copies entre flux d'agrégateurs sont envisagées (doc 10 §4.2 (2b)) [inféré]. Correction minimale envisagée, sérialisation seule : `_decimal` rend `sorted(x)` pour un `set`/`frozenset` (aucune valeur calculée ne change). Code gelé : toute correction change `sha256_script` et le commit d'analyse, donc le bloc machine, le sha du paquet, le jeton et le délai de 24 h (A-8 : nouveau paquet, nouveau sha, nouvelle ancre, le premier sha reste cité). **Décision portée à l'investisseur.**
+- **B-1** : un relevé `resolve_failed` (ou à base muette) est imprimé comme deux « DIVERGENCE ASN », hôtes hors du pool compris (`r2.py` l.779-793, `report.py` l.548-550) ; k_eff et le drapeau 2 n'en dépendent pas ; déclaré au rapport `docs/11`.
+- **B-2** : D3 (paquet §5 : lift, identité φ = (lift−1)·√(…), mention « proxy bruité ») n'est pas rendu au bloc 4 ; le lift reste recalculable des quatre comptes imprimés : à porter au rapport rédigé `docs/11`.
+- **C-1** (pt 10 : cas FAUX avec k_eff non évaluable rendu NON ÉVALUABLE, lecture D-4 du G1 de CRITERE), **C-2**, **C-3** (trous de test : hôte à deux flux, branche « VRAI, borne supérieure < k nominal »), **C-4** (libellés périmés).
+- Durée mesurée sur synthétique à la taille de la campagne : `recalcul-tiers` 402 à 442 s (délai 3 600 s) ; SHOGEN-RENDU-COUT-1 reste ouvert pour les journaux réels.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RECALCUL-JSON-COPIE-1 | A-1 : `frozenset` non sérialisé par le recalcul tiers ; exécution sans sortie si une copie exacte existe | orch. ; investisseur (choix : nouveau paquet ou exécution en l'état) | avant l'exécution unique | 2 lignes de code, un test, un nouveau paquet et un nouveau sceau [inféré] | R-B, A-1 |
+| SHOGEN-ASN-DIVERGENCE-ECHEC-1 | B-1 : divergences ASN imprimées pour des relevés en échec | orch. | après l'exécution ; déclaré au rapport | un test [inféré] | R-B, B-1 |
+| SHOGEN-D3-LIFT-1 | B-2 : lift et identité φ de D3 non rendus par le script ; publiés au rapport rédigé | orch. | rapport `docs/11` | une table [inféré] | R-B, B-2 |
+| SHOGEN-TESTS-HOTE-DEUX-FLUX-1 | C-2, C-3 : fixtures sans hôte à deux flux ; branche « éteint par borne supérieure » non fixée | orch. | après l'exécution | deux tests [inféré] | R-B, C-2, C-3 |
+
+## B.43 Amendement daté du 2026-10-02 22:1x UTC : relecture G2 de rattrapage R-A — CONSTAT A conditionnel ; lot CORR
+
+Rapport versé : `docs/adr-0028/G2-RATTRAPAGE-R-A.md` (réviseur neuf `shogen-worker`, Gate 0 `claude-opus-5-5` ; source `d2fdd8cc…`). Périmètre : `r1.py`, `records.py`, `window.py`, `model.py` entiers. **Oracle indépendant en arithmétique exacte écrit depuis le texte scellé (paquet §2, §3, §6, §10.2 ; doc 10 §5), comparé à `r1.recompute_from_journal` et `regle_critere` sur 585 journaux synthétiques : 0 écart**, les cinq cas de la règle couverts ; table réelle du J28 sur un journal synthétique de taille campagne : égal, ≈ 21 s, pic ≈ 1 Gio. Mutants : 20, 18 tués. Contrôle FM-1.1 (721 événements) : 0 fragment ; écarts déclarés (copie d'arbre supprimée sans lecture ; un `grep` sur `docs/adr-0028/monark-m009a/` sans sortie).
+
+- **A-1 (conditionnel)** : une lecture `ok` à prix non fini (`NaN`…) lève `decimal.InvalidOperation` dans `_median` (`r1.py` l.102-110, l.180-207) : exécution sans sortie. Les décodeurs de la collecte (`sources.py` l.84-215, `ed479c5`) ne contrôlent pas la finitude. Item SHOGEN-PRIX-NON-FINI-1 : traité dans le lot CORR (CORR-2), décision de l'orchestrateur sous la décision de l'investisseur de corriger et resceller.
+- C-1 à C-5 (conformité de D1 au « dernier de la fenêtre » ; deux mutants de bord vivants ; commentaires ; τ observé et PX-Shogen-13 ; docstring de `model.py`) : items SHOGEN-TESTS-BORDS-R1-1 (après S2) et note à PX-Shogen-13.
+
+Lot **CORR** : G0 `docs/adr-0028/G0-lot-CORR.md` (CORR-1 : sérialisation du `frozenset` des copies exactes ; CORR-2 : prix non fini traité comme absent, en un point, avec avertissement compté). Annexe A : ligne CORR à poser au commit du lot.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PRIX-NON-FINI-1 | prix `ok` non fini : exception, exécution sans sortie | orch. | lot CORR, avant le nouveau scellement | quelques lignes, tests [inféré] | R-A, A-1 |
+| SHOGEN-TESTS-BORDS-R1-1 | mutants de bord vivants : staleness `>` / `>=`, garde §5.4 `<` / `<=` (code conforme au texte) | orch. | après S2 | deux tests [inféré] | R-A, C-2 |
+
+## B.44 Amendement daté du 2026-10-03 00:44:44 UTC (heure produite par le script d'écriture) : lot CORR livré, relu et commis
+
+Journal G1 versé à l'octet : `docs/G1-lot-CORR.md` (sha256 `1849053c…ac56`) ; il décrit encore la retouche de
+`model.py` et l'ancien sha de `corr-3c.diff` (`2579c2d7…`) : la décision Q-5 de l'orchestrateur (G0 du lot,
+« Adjudication ») retire ce morceau, `corr-3c.diff` commis est `85ee60e4…5a64`, le blob de `model.py` reste `7264d3fe…`
+(C-4 de la relecture G2). Relecture G2 versée à l'octet : `docs/G2-lot-CORR.md` (réviseur neuf `shogen-worker`,
+seconde instance après un redémarrage de la machine qui a interrompu la première, dont les fichiers ont été écartés
+sans lecture ; sha256 `96210705…680c`) : **ACCEPTE-AVEC-CORRECTIONS**, aucun constat A ni B ; corrections K-1, K-2
+(tests seuls) commises. Contrôle FM-1.1 de sa transcription (535 événements) : 0 fragment ; écarts déclarés E-1
+(`grep -rln` sur `docs/adr-0028/` sans exclure le sous-dossier `monark-m009a`, noms seuls, aucun de ce sous-dossier) et
+E-2 (`grep -n` sur des documents admis) ; sortie `scripts/controle/sorties-fm11/g2-corr.json`.
+
+Items **fermés** par le lot (commits 1 `02f9c00`, 2 `4002239`, 3a `35cd2e2`, 3b `4c831b8`, 3c `e4bc2f1`, 3d `a5a9de9`, K `f35a70c`) : SHOGEN-RECALCUL-JSON-COPIE-1 (B.42), SHOGEN-PRIX-NON-FINI-1 (B.43),
+SHOGEN-SCEAU-VERIFY-REQUETE-1 (B.35), SHOGEN-RENDU-MKDTEMP-1, SHOGEN-RAW-CHEMIN-1, SHOGEN-TESTS-C8-SUITE-1 (B.41),
+SHOGEN-TESTS-HOTE-DEUX-FLUX-1, SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B.42), SHOGEN-TESTS-BORDS-R1-1 (B.43),
+SHOGEN-R1-DOCSTRINGS-1 (B.32) ; commentaires et libellés C-3, C-5 de R-A et C-4 de R-B, sauf la docstring de
+`model.py` (non faite, décision Q-5 : collecte en quarantaine, ADR-0028 D6 i). SHOGEN-SOURCE-TS-NON-FINI-1 (L-3) :
+**fermé sans code**, inatteignable depuis le collecteur (`sources.py` l.122-220, confirmé par la relecture G2 §7.3).
+Les rendus du J14 et du J28 changent, par construction, sur deux points seulement : les lignes « DIVERGENCE ASN » tirées
+d'un relevé incomplet disparaissent ; le bloc 4 dit « (pool d'analyse, ADR-0028 D1) » au cas (a). Un prix non fini
+produit le même rendu qu'un prix nul, plus un avertissement compté par flux.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PRIX-ILLISIBLE-1 | prix illisible par `Decimal` (« abc ») : `InvalidOperation` non nommée, exécution sans sortie (aucune valeur fausse) ; inatteignable depuis le collecteur (prix écrit `str(Decimal)` ou nul) | orch. | après S2 | une branche, un test [inféré] | G1 du lot CORR, L-1 |
+| SHOGEN-PRIX-HORS-CONTEXTE-1 | prix fini d'exposant au-delà d'Emax du contexte nommé : `Overflow` non nommée, exécution sans sortie ; plausibilité très faible | orch. | après S2 | une branche, un test [inféré] | G1 du lot CORR, L-2 |
+| SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 | un changement d'ASN visible sur une seule base d'un relevé partiel (base muette) n'est pas publié | orch. | après S2 | comparaison base par base, un test [inféré] | G1 du lot CORR, L-5 |
+| SHOGEN-ASN-DIVERGENCE-HORS-POOL-1 | divergences ASN publiées pour des hôtes hors du pool d'analyse (flux retirés par D1 cas a) | orch. | rapport `docs/11` (étiquette ou retrait, déclaré) | une phrase au rapport [inféré] | R-B B-1 ; G1 du lot CORR, L-6 |
+| SHOGEN-QUASI-MORT-PREDICAT-1 | contrainte de construction de la sensibilité SHOGEN-FLUX-QUASI-MORT-1 : compter « ok » par le prédicat de `r1.analysis_pools` (statut ok et prix non nul) sur la liste de `r1.parse_journal`, jamais par le statut seul ni par une relecture directe de `journal.jsonl` | orch. | construction de la sensibilité (après l'exécution unique) | aucun (règle de construction) | G2 du lot CORR, C-5 |
+
+## B.45 Amendement daté du 2026-10-03 01:43:15 UTC (heure produite par le script d'écriture) : relecture G2 de la partie 4 (préparation)
+
+Rapport versé : `docs/G2-partie-4.md` (réviseur neuf `shogen-worker`, Gate 0 `claude-opus-5-5` ; sha256
+`46a66f4f…c066` à la livraison ; versé avec une seule retouche typographique, l.89, citation de sortie d'outil anglaise passée de « … » à “…” pour la gate S-G5, comme pour la partie 3 ; sha256 versé `a28bb383…5166`) : **ACCEPTE-AVEC-CORRECTIONS**, aucun constat A ; B-1 à B-5 et C-1 à C-5 traités par les corrections K-1
+à K-8, toutes appliquées (ajouts datés ; rien dans les octets scellés ni dans le code gelé). Essai de téléchargement
+(K-3) fait par l'orchestrateur sur le seul fichier de sommes : HTTP 200, sha256 égal à la clé `sommes`. Contrôles FM-1.1
+versés (`scripts/controle/sorties-fm11/`) : advisor du seuil (B.39, 72 événements), lecteur de l'inventaire (B.40, 280),
+R-C (B.41, 448), R-B (B.42, 637 : le compte écrit en B.42 est exact, égal par coïncidence à celui de la partie 3),
+R-A (B.43, 721), relecture G2 du lot CORR interrompue (272 ; fichiers écartés sans lecture, B.44), relecture G2 de la
+partie 4 (723) : **0 fragment** de la cartographie l.51 ni d'ADR-0025 l.14 dans chacune. L-3 du réviseur (ligne CORR
+de l'annexe A non lue par lui) : comparée par l'orchestrateur, les sept commits cités sont ceux du lot.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-R2-RUNPARAMS-CONCORDANCE-1 | clés porteuses R2 (`records.R2_LOAD_BEARING_KEYS`) non contrôlées présentes et concordantes sur les `run_params` du `control.jsonl` réel (les tests nommés de D.4 a appellent `effective_run_params` avec le seul jeu R1) ; une absence ou une divergence fait refuser les chemins R2 (fail-closed voulu, §E) : exécution unique sans sortie, aucune valeur fausse ; plausibilité très faible (collecte sur `ed479c5`, clés écrites depuis des constantes de `r2` et les specs, `collector.py` l.208-216 à ce commit) | orch. | avant l'exécution unique : limite déclarée ; si le refus « run_params divergents » survient, échec de production consigné, aucune correction du code, déviation déclarée (pt 11) | aucun (disposition) [inféré] | R-B §8 pt 7 ; relecture G2 de la partie 4, B-4 |
+| SHOGEN-D4-PRECEDENCE-RAPPORT-1 | pt 10 : la précédence D-4 (cas FAUX avec k_eff non évaluable rendu NON ÉVALUABLE) n'est pas écrite au paquet ; elle est citée au rapport, avec le drapeau 2, si le cas se présente | orch. ; rédacteur du rapport | rapport `docs/11` | une phrase [inféré] | R-B C-1, §8 pt 4 ; relecture G2 de la partie 4, C-4 |
+
+Note à PX-Shogen-13 annoncée en B.43 (R-A I-3), recopiée de `docs/adr-0028/G2-RATTRAPAGE-R-A.md` l.251-252 : « PX-Shogen-13
+déclare que τ observé (axe (i) atteint) et le P99 de calibration (`closure.py`, toutes cellules évaluables) ne portent
+pas sur la même population. »

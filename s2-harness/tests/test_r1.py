@@ -568,5 +568,27 @@ class TestComputeR1FlagEndToEnd(unittest.TestCase):
         self.assertLess(abs(blk["z"] - ref), D("1e-40"))
 
 
+class TestBordsR1(unittest.TestCase):
+    """SHOGEN-TESTS-BORDS-R1-1 (C-2 de R-A) : bords du texte, « > σ_classe » (doc 10 §5.2) et « < 10 » (§5.4)."""
+
+    def test_staleness_egale_a_sigma_pas_d_ecart(self):
+        """win_end − source_ts = σ = 60 : pas de staleness (N = 3 : non évaluable) ; 61 : staleness. Rougit si
+        « > » devient « ≥ » (M1 de R-A)."""
+        for age, att in ((60, Ecart.NON_EVAL_HORSENV), (61, Ecart.STALENESS)):
+            with self.subTest(age=age):
+                self.assertIs(classify(rd(0, "a", source_ts=D(1000 - age)), [D(1)] * 2, 3, 1000, sigma=D("60")), att)
+
+    def test_garde_egale_a_10_z_publie(self):
+        """40 fenêtres, trois flux en panne chacun 20 fois (p̂ = 1/2) : P̂_more = 3/4 − 2/8 = 1/2, garde = 40·1/4 =
+        10, K = 20 (rangs 10 à 29), z = (20 − 20)/√10 = 0 publié. Rougit si « < 10 » devient « ≤ 10 » (M4 de R-A)."""
+        markers, readings = [mk(i * 60) for i in range(40)], []
+        for i in range(40):
+            for f, panne in (("a", i < 20), ("b", 10 <= i < 30), ("c", i >= 20)):
+                readings.append(rd(i * 60, f, status="panne_http", price=None) if panne else rd(i * 60, f))
+        blk = R1(markers, readings, ["a", "b", "c"], sigma=SIGMA_HUGE)["strates"]["calme"]
+        self.assertEqual((blk["P_more"], blk["gate_value"], blk["K"], blk["flag_historique_insuffisant"], blk["z"]),
+                         (D("0.5"), D(10), 20, False, D(0)))
+
+
 if __name__ == "__main__":
     unittest.main()
