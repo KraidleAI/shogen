@@ -611,3 +611,33 @@ Lot **CORR** : G0 `docs/adr-0028/G0-lot-CORR.md` (CORR-1 : sérialisation du `fr
 |---|---|---|---|---|---|
 | SHOGEN-PRIX-NON-FINI-1 | prix `ok` non fini : exception, exécution sans sortie | orch. | lot CORR, avant le nouveau scellement | quelques lignes, tests [inféré] | R-A, A-1 |
 | SHOGEN-TESTS-BORDS-R1-1 | mutants de bord vivants : staleness `>` / `>=`, garde §5.4 `<` / `<=` (code conforme au texte) | orch. | après S2 | deux tests [inféré] | R-A, C-2 |
+
+## B.44 Amendement daté du 2026-10-03 00:44:44 UTC (heure produite par le script d'écriture) : lot CORR livré, relu et commis
+
+Journal G1 versé à l'octet : `docs/G1-lot-CORR.md` (sha256 `1849053c…ac56`) ; il décrit encore la retouche de
+`model.py` et l'ancien sha de `corr-3c.diff` (`2579c2d7…`) : la décision Q-5 de l'orchestrateur (G0 du lot,
+« Adjudication ») retire ce morceau, `corr-3c.diff` commis est `85ee60e4…5a64`, le blob de `model.py` reste `7264d3fe…`
+(C-4 de la relecture G2). Relecture G2 versée à l'octet : `docs/G2-lot-CORR.md` (réviseur neuf `shogen-worker`,
+seconde instance après un redémarrage de la machine qui a interrompu la première, dont les fichiers ont été écartés
+sans lecture ; sha256 `96210705…680c`) : **ACCEPTE-AVEC-CORRECTIONS**, aucun constat A ni B ; corrections K-1, K-2
+(tests seuls) commises. Contrôle FM-1.1 de sa transcription (535 événements) : 0 fragment ; écarts déclarés E-1
+(`grep -rln` sur `docs/adr-0028/` sans exclure le sous-dossier `monark-m009a`, noms seuls, aucun de ce sous-dossier) et
+E-2 (`grep -n` sur des documents admis) ; sortie `scripts/controle/sorties-fm11/g2-corr.json`.
+
+Items **fermés** par le lot (commits 1 `02f9c00`, 2 `4002239`, 3a `35cd2e2`, 3b `4c831b8`, 3c `e4bc2f1`, 3d `a5a9de9`, K `f35a70c`) : SHOGEN-RECALCUL-JSON-COPIE-1 (B.42), SHOGEN-PRIX-NON-FINI-1 (B.43),
+SHOGEN-SCEAU-VERIFY-REQUETE-1 (B.35), SHOGEN-RENDU-MKDTEMP-1, SHOGEN-RAW-CHEMIN-1, SHOGEN-TESTS-C8-SUITE-1 (B.41),
+SHOGEN-TESTS-HOTE-DEUX-FLUX-1, SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B.42), SHOGEN-TESTS-BORDS-R1-1 (B.43),
+SHOGEN-R1-DOCSTRINGS-1 (B.32) ; commentaires et libellés C-3, C-5 de R-A et C-4 de R-B, sauf la docstring de
+`model.py` (non faite, décision Q-5 : collecte en quarantaine, ADR-0028 D6 i). SHOGEN-SOURCE-TS-NON-FINI-1 (L-3) :
+**fermé sans code**, inatteignable depuis le collecteur (`sources.py` l.122-220, confirmé par la relecture G2 §7.3).
+Les rendus du J14 et du J28 changent, par construction, sur deux points seulement : les lignes « DIVERGENCE ASN » tirées
+d'un relevé incomplet disparaissent ; le bloc 4 dit « (pool d'analyse, ADR-0028 D1) » au cas (a). Un prix non fini
+produit le même rendu qu'un prix nul, plus un avertissement compté par flux.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PRIX-ILLISIBLE-1 | prix illisible par `Decimal` (« abc ») : `InvalidOperation` non nommée, exécution sans sortie (aucune valeur fausse) ; inatteignable depuis le collecteur (prix écrit `str(Decimal)` ou nul) | orch. | après S2 | une branche, un test [inféré] | G1 du lot CORR, L-1 |
+| SHOGEN-PRIX-HORS-CONTEXTE-1 | prix fini d'exposant au-delà d'Emax du contexte nommé : `Overflow` non nommée, exécution sans sortie ; plausibilité très faible | orch. | après S2 | une branche, un test [inféré] | G1 du lot CORR, L-2 |
+| SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 | un changement d'ASN visible sur une seule base d'un relevé partiel (base muette) n'est pas publié | orch. | après S2 | comparaison base par base, un test [inféré] | G1 du lot CORR, L-5 |
+| SHOGEN-ASN-DIVERGENCE-HORS-POOL-1 | divergences ASN publiées pour des hôtes hors du pool d'analyse (flux retirés par D1 cas a) | orch. | rapport `docs/11` (étiquette ou retrait, déclaré) | une phrase au rapport [inféré] | R-B B-1 ; G1 du lot CORR, L-6 |
+| SHOGEN-QUASI-MORT-PREDICAT-1 | contrainte de construction de la sensibilité SHOGEN-FLUX-QUASI-MORT-1 : compter « ok » par le prédicat de `r1.analysis_pools` (statut ok et prix non nul) sur la liste de `r1.parse_journal`, jamais par le statut seul ni par une relecture directe de `journal.jsonl` | orch. | construction de la sensibilité (après l'exécution unique) | aucun (règle de construction) | G2 du lot CORR, C-5 |
