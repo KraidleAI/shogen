@@ -487,7 +487,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
                         sigma_class_of_flux, tau, n_min, pools)
     ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux "
-       + ("(pool d'analyse ; N par strate ci-dessous, ADR-0028 D1)" if cas_b else "(pool)"))
+       + ("(pool d'analyse ; N par strate ci-dessous, ADR-0028 D1)" if cas_b else
+          "(pool d'analyse, ADR-0028 D1)" if pool_an != pool else "(pool)"))      # cas (a) : C-4 de R-B
     for st, blk in lm_out["strates"].items():
         ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}"
            + (f" ; N = {blk['N']}" if cas_b else ""))

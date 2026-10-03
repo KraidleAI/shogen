@@ -321,7 +321,8 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
 def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
     """Variance de long terme par blocs d'UNE strate (ADR-0028 §1 bis.1 pt 3 ; A-2) :
     σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} (1 − k/ℓ)·γ̂_k, γ̂_k = Σ (I_t − Ī)(I_{t+k} − Ī) sur les paires de la
-    grille, Ī = K/n. Forme de Künsch 1989 (P-01, OCR seul, [2nd]) : blocs mobiles, noyau de Bartlett, non
+    grille, Ī = K/n. Forme de Künsch 1989 (P-01, versé et lu : Thm 3.1, éq. (3.9), p. 1224 ; avec ces γ̂_k
+    centrés sur Ī, correspondance par les poids, approchée : paquet §10.4) : blocs mobiles, noyau de Bartlett, non
     restreinte. Elle égale (1/ℓ)·Σ_j B_j² (sommes de blocs de la série centrée complétée par des 0), d'où
     σ̂² ≥ 0 et σ̂² = 0 ⇔ K ∈ {0, n} (CRITIQUE v2 §4.1). `serie` : couples (window_start, I_t), window_start
     entiers strictement croissants, écarts multiples de `w`, I_t ∈ {0, 1} ; sinon ValueError. Lag k ⇔ écart
@@ -694,9 +695,9 @@ def compute_r1(
 
 
 def regle_critere(r1_out: dict) -> dict:
-    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : ADR-0028 §1 bis.1, pts 1-11
-    (docs/adr-0028/ADR-0028-decisions-sortie-S2.md, commit f5b8269), non recopié ici (une seule vérité). Lit
-    r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
+    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : le paquet de pré-enregistrement scellé,
+    docs/adr-0028/PAQUET-PREREG-S2.md §10.2, pts 1-11 (recopie d'ADR-0028 §1 bis.1), non recopié ici (une seule
+    vérité). Lit r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
     compute_r1 (z, bloc.z_bloc), sans arrondi ni contexte posé, à SEUIL_Z par « ≥ » ; aucune p-valeur (pt 4).
     Par strate (pt 5) : valeur, cas (garde_5_4, z_sous_seuil, rejette, discordance, rejet_non_qualifiable)
     et, pour toute strate qui NE REJETTE PAS, EMD = (SEUIL_Z + Z_PUISSANCE)·√max(n·P̂(1 − P̂), σ̂²_bloc)

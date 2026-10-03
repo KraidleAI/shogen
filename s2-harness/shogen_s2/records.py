@@ -7,8 +7,10 @@ de `journal.jsonl` (lectures — une ligne par fenêtre×flux, contrat inchangé
 de `raw.jsonl` (octets bruts). L'écriture passe par `journal.append_jsonl`
 (réutilisé) ; seuls les DICTS sont neufs.
 
-Trois types, discriminés par le champ ``record`` (les lignes de lecture de
-`journal.jsonl` produites par `journal.journal_entry` n'ont PAS ce champ) :
+Quatre types, discriminés par le champ ``record`` (les lignes de lecture de
+`journal.jsonl` produites par `journal.journal_entry` n'ont PAS ce champ) ; le quatrième,
+``asn_attribution`` (relevé ASN daté par hôte, `asn_attribution_record`, lu par `parse_asn`),
+est décrit avec R2 (M1c) :
 
   - ``run_params`` : les paramètres de la campagne (§6.1, bloc Paramètres),
     écrits au démarrage pour rendre « recalculable depuis le journal seul »
@@ -38,7 +40,9 @@ from typing import Optional
 
 # Champs de run_params qui GOUVERNENT LA RECLASSIFICATION : un désaccord entre
 # démarrages ferait recalculer l'historique sous les derniers en silence (§E,
-# le mal visé). Les sept premiers sont les entrées de compute_r1. `strate_calendar`
+# le mal visé). Entrées de compute_r1 : les cinq premiers, `seuil_historique_valeur` et
+# `n_min_hors_enveloppe` ; `decimal_prec` n'en est pas une (r1 calcule à DECIMAL_PREC, la valeur
+# du journal n'est contrôlée qu'en présence et en concordance). `strate_calendar`
 # n'est PAS une entrée de compute_r1 mais gouverne les **étiquettes de strate**
 # des marqueurs que compute_r1/L&M groupent : un changement de calendrier
 # mi-campagne mélangerait DEUX partitions dans le même `n` par strate — même mal

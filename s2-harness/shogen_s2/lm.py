@@ -31,7 +31,7 @@ car Σ_j m_j = Σ_i écarts(i) = n·Σ_i p̂_i. Exercée par test (test_lm).
     (bloc 5, 10 §5.5 pt 4) ; ici, la base commune φ par paire de flux ;
   - agrégation d'indicatrices flux→source (okx_ticker+okx_index → hôte www.okx.com)
     réalisée par la carte flux→hôte de r2 (bloc 5). Ici : phi par paire de **FLUX**
-    (C(12,2)=66 paires).
+    (C(N,2) paires, N flux du pool d'analyse de la strate, ADR-0028 D1).
 
 `Decimal` partout, précision FIXÉE (`r1.DECIMAL_PREC`) sur TOUT chemin numérique
 → recalcul bit-identique par l'oracle (ADR-0003). Caveat publié : `m_j` ne compte
@@ -165,7 +165,7 @@ def compute_lm(
                 e_theta2 = None
                 var_theta = None
 
-        # Corrélations phi SIGNÉES par paire de FLUX (66 paires pour 12).
+        # Corrélations phi SIGNÉES par paire de FLUX (C(N,2) paires pour les N flux de ps).
         pair_phi: dict[str, dict] = {}
         for a, b in combinations(ps, 2):
             n11 = n10 = n01 = n00 = 0
