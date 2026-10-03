@@ -144,6 +144,21 @@ class TestSortiesNommees(unittest.TestCase):
         self.assertNotIn("conforme", p.stdout.decode("utf-8"))
         self.assertTrue(records.verifier_raw(os.path.join(self.d, "raw.jsonl"), self.j))
 
+    def test_raw_refus_sans_chemin_des_journaux(self):
+        """SHOGEN-RAW-CHEMIN-1 (B-1 de R-C) : raw.jsonl à ligne 2 coupée (non finale), mêmes journaux dans deux
+        dossiers : code 0, verdict de refus identique à l'octet, journal nommé sans dossier. Rougit si le chemin des
+        journaux reste dans le verdict (octets dépendants de l'hôte)."""
+        sorties = []
+        for d in (tempfile.mkdtemp(), tempfile.mkdtemp()):
+            for n in ("control.jsonl", "journal.jsonl"):
+                Path(d, n).write_bytes(Path(self.d, n).read_bytes())
+            raw = Path(self.d, "raw.jsonl").read_bytes().split(b"\n")
+            Path(d, "raw.jsonl").write_bytes(b"\n".join([raw[0], raw[1][:20], *raw[2:]]))
+            sorties.append(produire("raw", "--journaux", d))
+        self.assertEqual(sorties, [(0, "verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : refus — ligne "
+                                   "JSON corrompue NON finale dans raw.jsonl (ligne 2) : recalcul impossible "
+                                   "(fail-closed)\n".encode("utf-8"))] * 2)
+
     def test_produire_reserve_a_l_execution_unique(self):
         """C-1 (G2 de la partie 2) : --produire j14-principal, recalcul-tiers et raw en sous-processus (table de
         fixture) : sans SHOGEN_RENDU_PRODUCTION, vide, ou sur un répertoire dont le nom ne commence pas par un point,
@@ -329,6 +344,21 @@ class TestProduction(unittest.TestCase):
         self.assertEqual((code, out, lances, sorted(os.listdir(parent)), os.listdir(sortie(f))),
                          (1, "gardes levées\n", RUNS, sorted(avant + ["sortie"]), []))
         self.assertRegex(err, r"^rendu_unique : échec de production à \S+ : FileExistsError : ")
+
+    def test_parent_de_la_sortie_absent(self):
+        """SHOGEN-RENDU-MKDTEMP-1 (H-1 de R-C) : dossier parent de --sortie absent, gardes levées : « gardes levées »
+        seul sur la sortie standard, « échec de production à <heure> : FileNotFoundError : … » sur stderr, code 1,
+        aucun run, parent toujours absent. Rougit si le temporaire est créé hors du try (exception non rattrapée)."""
+        f = monter(tempfile.mkdtemp())
+        epingler(f)
+        cible, (p, lances) = os.path.join(os.path.dirname(f["depot"]), "absent", "sortie"), faux_runs()
+        out, err = io.StringIO(), io.StringIO()
+        with p, contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = ru.main(["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes",
+                            f["sommes"], "--sortie", cible, "--auteur", "claude-opus-5-5"], maintenant=LOIN)
+        self.assertEqual((code, out.getvalue(), lances, os.path.lexists(os.path.dirname(cible))),
+                         (1, "gardes levées\n", [], False))
+        self.assertRegex(err.getvalue(), r"^rendu_unique : échec de production à \S+ : FileNotFoundError : ")
 
     def test_deviation_seconde_sortie_premiere_intacte(self):
         """D.4 b, G0 §C : première exécution (runs factices) écrite ; relance sans --deviation : refus sortie, rien
