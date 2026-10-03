@@ -1,0 +1,26 @@
+{
+ "oracle": "S-b SHOGEN-CRITERE-GARDE-NIVEAU-1 : table du journal, invariants, référence, r1 à HEAD",
+ "commit_r1": "f35a70c19ba8269f1f7e2bcd31775e4fc513da20",
+ "blob_r1": "95c93d3798e56b9fa345e59f009c569508778d4d",
+ "sha256_r1": "0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f",
+ "json": "garde_niveau.json",
+ "sha256_json": "f421c41944c15d329400fffe700b779ad286236acbad5cf3a6ebcdfd7c18981b",
+ "script_sha256": {
+  "sim_garde_niveau_oracle_r1.py": "7fbc82d35a533164675792c0b97c3f948cf985cfd407e84af05eab3e8725628d",
+  "sim_niveau_calc.py": "815ffd6d98603929ead4d3f4b6ee520a82f3e1340e4b8a728b4512e53e8eacbf",
+  "sim_niveau_oracle_r1.py": "cb844d5b724223def91cd2d3397b4deebef9f6a7353d9aa41e30b3361ca2c11d"
+ },
+ "T0_cas": 20,
+ "T1_invariants": 260,
+ "T1_invariants_4b_ii": 160,
+ "T2_ecart_relatif_max": "7.254463057191854e-45",
+ "T3_replications": 2367,
+ "T3_P_more_egaux_a_l_identique": 378,
+ "T3_ecart_relatif_max": {
+  "P_more": "3.885778285714286e-46",
+  "garde": "3.885953351615643e-46",
+  "z": "4.071090015733891e-44",
+  "z_bloc": "4.0708711073353845e-44"
+ },
+ "tolerance_relative": "1e-40"
+}

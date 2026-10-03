@@ -1,0 +1,53 @@
+{
+ "oracle": "(4) SHOGEN-SIM-NIVEAU-ORACLE4-1 : r1.block_long_run_variance = sigma2 du script",
+ "commit_r1": "f35a70c19ba8269f1f7e2bcd31775e4fc513da20",
+ "blob_r1": "95c93d3798e56b9fa345e59f009c569508778d4d",
+ "sha256_r1": "0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f",
+ "p": "0.02",
+ "ell": 240,
+ "w": 60,
+ "comparaison": "entiers n, K, N : == ; sigma2_bloc Decimal : == et str()",
+ "egalites_total": 320,
+ "cas": [
+  {
+   "L": 1,
+   "n": 10000,
+   "replications": 10
+  },
+  {
+   "L": 1,
+   "n": 25000,
+   "replications": 10
+  },
+  {
+   "L": 5,
+   "n": 10000,
+   "replications": 10
+  },
+  {
+   "L": 5,
+   "n": 25000,
+   "replications": 10
+  },
+  {
+   "L": 20,
+   "n": 10000,
+   "replications": 10
+  },
+  {
+   "L": 20,
+   "n": 25000,
+   "replications": 10
+  },
+  {
+   "L": 60,
+   "n": 10000,
+   "replications": 10
+  },
+  {
+   "L": 60,
+   "n": 25000,
+   "replications": 10
+  }
+ ]
+}

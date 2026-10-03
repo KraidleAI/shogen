@@ -28,3 +28,14 @@ Limites (annexe D.4 c ; paquet §12 pt 16) : le jeton atteste l'existence des oc
 - **genTime : 2026-10-02T17:44:30Z** (horloge de FreeTSA).
 - `scripts/sceau/verify.sh` : sortie 0 (manifeste → paquet OK ; jeton → requête, manifeste et chaîne : `Verification: OK` deux fois). L'avertissement d'OpenSSL “is not a CA cert” (guillemets anglais : sortie d'outil, hors corpus S-G5) porte sur `tsa.crt` passé en `-untrusted` : c'est le certificat de signature de la TSA, pas une autorité ; sans effet sur la vérification.
 - **Échéance du délai de rétractation (A-7) : 2026-10-03T17:44:30Z.** Avant elle, la garde (5) refuse toute exécution ; après elle, l'exécution unique reste ouverte par un acte distinct de l'investisseur.
+
+## Ajout daté du 2026-10-03 00:48:08 UTC (heure produite par le script d'écriture) : sceau remplacé avant toute exécution (A-8)
+
+Ce sceau est **remplacé** avant toute exécution, sur la décision de l'investisseur « Corriger et resceller » (JOURNAL,
+2026-10-02 22:1x UTC ; lot CORR, annexe B.42 à B.44). Il reste cité : fichiers déplacés tels quels (`git mv`, octets
+inchangés ; manifeste `680a95fd…` sous l'attribut `-text`) de `docs/adr-0028/sceau/` vers ce dossier ; la chaîne de
+confiance reste commune (`../chain/`). Vérification rejouée le 2026-10-03 avant le déplacement des octets du paquet :
+`verify.sh` sur une copie de ce dossier avec `chain/` : sortie 0, `Verification: OK` deux fois, genTime
+2026-10-02T17:44:30Z. Après la révision du paquet, le manifeste se vérifie contre le paquet du commit `ddf8c54`
+(`git show ddf8c54:docs/adr-0028/PAQUET-PREREG-S2.md`). Ce jeton n'ouvre plus aucune exécution : la garde (6) lit le
+dossier `docs/adr-0028/sceau/`, la garde (1) le sha du paquet présent.
