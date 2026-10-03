@@ -13,7 +13,7 @@ paquet ni ce que lance l'exécution unique.
 | `render_fixture.py` | `4084c42b59ea7d7ce356f04a0ea05bb1ff3646de25b46dc571156dd249d2b395` | rendus de la fixture de `test_exclusion` sans et avec l'option PLAGE ; sha256 attendus = épingles `SHA_BASE_SANS_OPTION` (`4e62fbb8…`) et `SHA_BASE_AVEC_OPTION` (`d079dd9d…`) | `python3 -B render_fixture.py <arbre s2-harness> <dossier>` |
 
 Sorties FM-1.1 versées (`sorties-fm11/`) : `redacteur.json`, `redacteur-final.json` (annexe B.32, B.33), `validateur.json`,
-`validateur-final.json` (B.33), `g2p3.json` (B.35), `corr-worker.json` (worker G1 du lot CORR, partie 4), `g2-corr.json` (réviseur G2 du lot CORR). Elles portent des comptes, des noms d'outils et des numéros
+`validateur-final.json` (B.33), `g2p3.json` (B.35), `corr-worker.json` (worker G1 du lot CORR, partie 4), `g2-corr.json` (réviseur G2 du lot CORR), `validateur-revision.json` (cp-1 bref du paquet révisé). Elles portent des comptes, des noms d'outils et des numéros
 d'événements, aucun extrait de transcription ; les transcriptions elles-mêmes ne sont pas versées (D.2 n° 11 pour celle
 de l'orchestrateur ; celles des sous-agents restent dans la session).
 
