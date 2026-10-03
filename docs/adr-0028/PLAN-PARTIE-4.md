@@ -31,3 +31,5 @@ Relecture G2 de la partie par une instance neuve, revue de partie, fusion `--no-
 - Pocket : aucune déclaration publique avant la date de divulgation coordonnée.
 
 > *Ajout daté du 2026-10-03 01:04:33 UTC (second sceau, A-8)* : le paquet a été révisé et rescellé (sha256 `4d2a8276…`, genTime 2026-10-03T01:04:10Z) ; **l'échéance est désormais 2026-10-04T01:04:10Z** et le commit d'analyse `f35a70c19ba8269f1f7e2bcd31775e4fc513da20` (la commande de garde (2) du §1 se lit avec ce commit à la place de `41f087e…`). Lignes ci-dessus conservées. Le constat B-1 de R-C (chemin de `$J` dans un verdict `raw` de refus) est corrigé dans le code (SHOGEN-RAW-CHEMIN-1, lot CORR) ; écrire le chemin de `$J` au JOURNAL reste fait.
+
+> *Ajout daté du 2026-10-03 01:43:15 UTC (relecture G2 de la partie 4, `docs/G2-partie-4.md`, K-6 ; C-5)* : dans l'ajout précédent, « la commande de garde (2) du §1 » désigne le §1 de `docs/adr-0028/PROCEDURE-EXECUTION.md` (l.18-19) ; le §1 de ce plan n'en porte pas.

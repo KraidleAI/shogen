@@ -21,3 +21,5 @@ Limites : `fm11.py` ne détecte que les fragments exacts de 40 caractères et le
 détectée) ; son témoin positif (fragment de la l.51 injecté dans un résultat d'outil, détecté) a été rejoué le
 2026-10-02 (annexe B.32) mais n'est pas versé comme test automatique ; `regle_fixtures.py` et `render_fixture.py`
 dépendent des tests du harnais qu'ils importent.
+
+> *Ajout daté du 2026-10-03 01:43:15 UTC (relecture G2 de la partie 4, `docs/G2-partie-4.md`, K-8 ; B-5)* : sorties FM-1.1 des contrôles de la partie 4 versées : `advisor-seuil.json` (B.39), `lecteur-inventaire.json` (B.40), `rattrapage-r-c.json` (B.41), `rattrapage-r-b.json` (B.42 ; 637 événements, égal au compte écrit en B.42), `rattrapage-r-a.json` (B.43), `g2-corr-interrompu.json` (première relecture G2 du lot CORR, interrompue), `g2-partie-4.json` (relecture G2 de la partie 4) ; sha256 dans `SHA256SUMS`.

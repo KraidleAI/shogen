@@ -641,3 +641,24 @@ produit le même rendu qu'un prix nul, plus un avertissement compté par flux.
 | SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 | un changement d'ASN visible sur une seule base d'un relevé partiel (base muette) n'est pas publié | orch. | après S2 | comparaison base par base, un test [inféré] | G1 du lot CORR, L-5 |
 | SHOGEN-ASN-DIVERGENCE-HORS-POOL-1 | divergences ASN publiées pour des hôtes hors du pool d'analyse (flux retirés par D1 cas a) | orch. | rapport `docs/11` (étiquette ou retrait, déclaré) | une phrase au rapport [inféré] | R-B B-1 ; G1 du lot CORR, L-6 |
 | SHOGEN-QUASI-MORT-PREDICAT-1 | contrainte de construction de la sensibilité SHOGEN-FLUX-QUASI-MORT-1 : compter « ok » par le prédicat de `r1.analysis_pools` (statut ok et prix non nul) sur la liste de `r1.parse_journal`, jamais par le statut seul ni par une relecture directe de `journal.jsonl` | orch. | construction de la sensibilité (après l'exécution unique) | aucun (règle de construction) | G2 du lot CORR, C-5 |
+
+## B.45 Amendement daté du 2026-10-03 01:43:15 UTC (heure produite par le script d'écriture) : relecture G2 de la partie 4 (préparation)
+
+Rapport versé : `docs/G2-partie-4.md` (réviseur neuf `shogen-worker`, Gate 0 `claude-opus-5-5` ; sha256
+`46a66f4f…c066` à la livraison ; versé avec une seule retouche typographique, l.89, citation de sortie d'outil anglaise passée de « … » à “…” pour la gate S-G5, comme pour la partie 3 ; sha256 versé `a28bb383…5166`) : **ACCEPTE-AVEC-CORRECTIONS**, aucun constat A ; B-1 à B-5 et C-1 à C-5 traités par les corrections K-1
+à K-8, toutes appliquées (ajouts datés ; rien dans les octets scellés ni dans le code gelé). Essai de téléchargement
+(K-3) fait par l'orchestrateur sur le seul fichier de sommes : HTTP 200, sha256 égal à la clé `sommes`. Contrôles FM-1.1
+versés (`scripts/controle/sorties-fm11/`) : advisor du seuil (B.39, 72 événements), lecteur de l'inventaire (B.40, 280),
+R-C (B.41, 448), R-B (B.42, 637 : le compte écrit en B.42 est exact, égal par coïncidence à celui de la partie 3),
+R-A (B.43, 721), relecture G2 du lot CORR interrompue (272 ; fichiers écartés sans lecture, B.44), relecture G2 de la
+partie 4 (723) : **0 fragment** de la cartographie l.51 ni d'ADR-0025 l.14 dans chacune. L-3 du réviseur (ligne CORR
+de l'annexe A non lue par lui) : comparée par l'orchestrateur, les sept commits cités sont ceux du lot.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-R2-RUNPARAMS-CONCORDANCE-1 | clés porteuses R2 (`records.R2_LOAD_BEARING_KEYS`) non contrôlées présentes et concordantes sur les `run_params` du `control.jsonl` réel (les tests nommés de D.4 a appellent `effective_run_params` avec le seul jeu R1) ; une absence ou une divergence fait refuser les chemins R2 (fail-closed voulu, §E) : exécution unique sans sortie, aucune valeur fausse ; plausibilité très faible (collecte sur `ed479c5`, clés écrites depuis des constantes de `r2` et les specs, `collector.py` l.208-216 à ce commit) | orch. | avant l'exécution unique : limite déclarée ; si le refus « run_params divergents » survient, échec de production consigné, aucune correction du code, déviation déclarée (pt 11) | aucun (disposition) [inféré] | R-B §8 pt 7 ; relecture G2 de la partie 4, B-4 |
+| SHOGEN-D4-PRECEDENCE-RAPPORT-1 | pt 10 : la précédence D-4 (cas FAUX avec k_eff non évaluable rendu NON ÉVALUABLE) n'est pas écrite au paquet ; elle est citée au rapport, avec le drapeau 2, si le cas se présente | orch. ; rédacteur du rapport | rapport `docs/11` | une phrase [inféré] | R-B C-1, §8 pt 4 ; relecture G2 de la partie 4, C-4 |
+
+Note à PX-Shogen-13 annoncée en B.43 (R-A I-3), recopiée de `docs/adr-0028/G2-RATTRAPAGE-R-A.md` l.251-252 : « PX-Shogen-13
+déclare que τ observé (axe (i) atteint) et le P99 de calibration (`closure.py`, toutes cellules évaluables) ne portent
+pas sur la même population. »
