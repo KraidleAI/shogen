@@ -367,6 +367,15 @@ class TestAsnPartition(unittest.TestCase):
         self.assertEqual(part["asn_divergences"], [{"host": "h2", "avant": (3, 3, 1.0), "apres": (4, 4, 3.0)}])
         self.assertEqual((part["k_eff"], part["k_eff_is_upper_bound"], part["unattributed"]), (4, True, ["h3"]))
 
+    def test_ripestat_muette_et_changement_d_une_seule_base(self):
+        """G2 du lot CORR (mutants G07, G08) : un relevé à RIPEstat muette n'est ni divergence ni référence (h0) ; un
+        changement d'ASN d'une seule base entre deux relevés complets est une divergence (h1, Cymru seule)."""
+        fh = self._fh(["h0", "h1"])
+        recs = [asn_rec("h0", 6, 6, ts=1.0), asn_rec("h0", None, 6, ts=2.0), asn_rec("h0", 6, 6, ts=3.0),
+                asn_rec("h1", 7, 7, ts=1.0), asn_rec("h1", 7, 8, ts=2.0)]
+        part = r2.compute_partition(recs, fh, list(fh), {"exact_copy_pairs": []})
+        self.assertEqual(part["asn_divergences"], [{"host": "h1", "avant": (7, 7, 1.0), "apres": (7, 8, 2.0)}])
+
     def test_rpc_read_path_caveat_carried(self):
         fh = {"chainlink": r2.RPC_READ_PATH_HOST}
         recs = [asn_rec(r2.RPC_READ_PATH_HOST, 10, 10)]

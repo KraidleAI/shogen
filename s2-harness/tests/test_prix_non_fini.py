@@ -116,6 +116,16 @@ class TestPrixNonFini(unittest.TestCase):
             with self.subTest(prix=brut, statut=statut):
                 self.assertEqual((lu["price"], err.getvalue()), (prix, AVERT.format(p, "x 1") + "\n" if avert else ""))
 
+    def test_flux_de_l_avertissement_tries_par_nom(self):
+        """G2 du lot CORR (mutant G03) : flux de l'avertissement triés par nom, non dans l'ordre du fichier (zeta y
+        précède alpha)."""
+        p = os.path.join(tempfile.mkdtemp(prefix="s2nf_"), "journal.jsonl")
+        Path(p).write_text('{"flux_id": "zeta", "status": "ok", "price": "NaN"}\n'
+                           '{"flux_id": "alpha", "status": "ok", "price": "NaN"}\n', encoding="utf-8")
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            r1.parse_journal(p)
+        self.assertEqual(err.getvalue(), AVERT.format(p, "alpha 1, zeta 1") + "\n")
+
 
 if __name__ == "__main__":
     unittest.main()
