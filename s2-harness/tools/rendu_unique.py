@@ -360,9 +360,11 @@ def destination(sortie: str, motif) -> str:
     return f"{sortie}.deviation-{k}"
 
 
-def _decimal(x) -> str:
+def _decimal(x) -> str | list:
     if isinstance(x, Decimal):
         return str(x)                                   # Decimal en chaîne, sous le contexte nommé (appelant)
+    if isinstance(x, (set, frozenset)):
+        return sorted(x)                                # r2, copie exacte : liste triée (SHOGEN-RECALCUL-JSON-COPIE-1)
     raise TypeError(f"{type(x).__name__} hors du JSON du recalcul tiers")
 
 
