@@ -914,3 +914,22 @@ S2 (G7) » atteint ; ADR à l'orchestrateur, décision à l'investisseur).
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-SAST-PYTHON-RECALCUL-1 | aucune analyse statique de sécurité (SAST) sur le code Python du chemin de recalcul (G3, réserve 3) | orch. | avant toute qualité « produit » du chemin, avec SHOGEN-G4-RECALCUL-METRIQUES-1 ; outil soumis à R-8 | un outil et une étape [inféré] | cp-2 de clôture, C-2 |
+
+## B.56 Amendement daté du 2026-10-04 14:16:05 UTC (heure produite par le script d'écriture) : lot SG5-INTERDITS commis
+
+Journal G1 du worker versé (`docs/G1-lot-SG5-INTERDITS.md`) ; relecture G2 versée (`docs/G2-lot-SG5-INTERDITS.md`, réviseur neuf ;
+retouche déclarée en fin de fichier : une citation de fixture en “ ”, une ligne de fixture portant une formule interdite élidée) :
+**ACCEPTE-AVEC-CORRECTIONS** ; C-1 et C-2 (tests des bornes des six préfixes et d'une citation trouvée en emplacement interdit,
+prototype du réviseur repris) et C-3 (documentation du module bornée à S-G5, limites nommées) appliquées par l'orchestrateur ;
+les 13 mutants du réviseur rejoués et tués sur la version du worker avec les tests corrigés (C-3 ne touche qu'un commentaire).
+Choix « masquer les emplacements interdits seulement » adopté (lettre du G0 ; contrat G2 antérieur : chaque fragment non contrôlé
+nommé). Item **fermé** (commit `c4cf982`) : SHOGEN-SG5-NOTES-INTERDITS-1. SHOGEN-XTASK-TMP-NOMS-FIXES-1 : déclencheur atteint par ce lot,
+**reporté par décision écrite** au prochain lot qui touche `xtask/tests` après celui-ci (R-25 : lot unitaire ; budget de 198 lignes) ;
+la consigne « TMPDIR dédié par copie » reste en vigueur.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SG4-EXTRAIT-INTERDITS-1 | S-G4 imprime en extrait la ligne entière d'une violation située en emplacement interdit (mesuré sur fixture avec le binaire corrigé) ; latent sur l'arbre réel | orch. | prochain lot sur `sg4.rs`, au plus tard avant tout ajout au registre doc 09 | extrait vide sous `emplacement_interdit`, un test, des mutants [inféré] | G1 et G2 du lot SG5-INTERDITS |
+| SHOGEN-INTERDITS-LISTE-UNIQUE-1 | la liste des emplacements interdits vit dans le code, dans les briefs, dans `fm11.py` et ailleurs, sans lien mécanique ; un emplacement ajouté aux briefs mais pas au code imprimerait son texte | orch. | avec SHOGEN-SG9-CORPUS-1 | une liste versionnée unique et un test [inféré] | G1 et G2 du lot SG5-INTERDITS |
+| SHOGEN-GATES-LIENS-SYMBOLIQUES-1 | le parcours des gates suit les liens symboliques : un lien vers un emplacement interdit expose ses citations sous un chemin autorisé (mesuré sur fixture ; aucun lien versionné) | orch. | prochain lot sur `documents.rs` | refus des liens ou canonisation, un test [inféré] | G1 et G2 du lot SG5-INTERDITS |
+| SHOGEN-HARNAIS-CIBLE-PARTAGEE-1 | deux copies qui partagent un `CARGO_TARGET_DIR` testent le code de l'autre copie sans recompiler (mesuré par le réviseur) | orch. | prochain brief de lot Rust | une consigne de gabarit : cible cargo dédiée par copie [mesuré] | G2 du lot SG5-INTERDITS |
