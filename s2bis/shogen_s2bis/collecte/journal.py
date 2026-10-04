@@ -5,7 +5,10 @@ pour la première). Écriture sans tampon ; `fsync` (injectable) au marqueur de 
 une heure est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
 fenêtre n'est admis que sur la grille et pour une fenêtre non close (ws ≥ `suivante`). Tout refus est nommé
 (ErreurJournal) et n'écrit rien. CB-1 : journal neuf seulement. E-C-16 : un seul écrivain par journal, verrou
-exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture."""
+exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture.
+E-C-20 (CB-2) : un fichier par jour UTC ; le premier enregistrement d'une fenêtre d'un jour nouveau clôt le fichier
+(`cloture`, fsync), inscrit son sha256 au fichier de sommes `<préfixe>.sha256` (format de sha256sum, fsync), puis
+ouvre le fichier du jour par `ouverture` ; la chaîne continue."""
 import fcntl
 import hashlib
 import json
@@ -45,6 +48,11 @@ def jour(ws):
     return time.strftime("%Y-%m-%d", time.gmtime(ws))
 
 
+def _tout(fd, octets):
+    while octets:
+        octets = octets[os.write(fd, octets):]
+
+
 def nom(prefixe, j, k=0):
     """Fichier quotidien `k` (segment) du jour UTC `j`."""
     return f"{prefixe}-{j}-{k}.jsonl"
@@ -69,10 +77,8 @@ class Journal:
             raise ErreurJournal("JOURNAL/fenetre", ws)
         if any(n.startswith(self.prefixe + "-") for n in os.listdir(self.dossier)):
             raise ErreurJournal("JOURNAL/existant", self.prefixe)
-        self.seq, self.prec, self.suivante, self.jour = -1, GENESE, ws + self.w, jour(ws)
-        self.fd = os.open(os.path.join(self.dossier, nom(self.prefixe, self.jour)), os.O_WRONLY | os.O_APPEND |
-                          os.O_CREAT | os.O_EXCL, 0o644)
-        self._ecrire({"type": "ouverture", "jour": self.jour, "suivante": self.suivante})
+        self.seq, self.prec, self.suivante = -1, GENESE, ws + self.w
+        self._creer(jour(ws), 0, "ouverture")
         return self
 
     def ecrire(self, genre, ws, **champs):
@@ -102,12 +108,32 @@ class Journal:
             raise ErreurJournal("JOURNAL/reserve", sorted(champs.keys() & {"seq", "prec"}))
         if type(ws) is not int or ws % self.w or ws < self.suivante:
             raise ErreurJournal("JOURNAL/fenetre", f"{genre} {ws!r} hors grille ou close (suivante {self.suivante})")
+        if jour(ws) > self.jour:                                    # bascule de 00:00 UTC
+            self._ecrire({"type": "cloture", "jour": self.jour})
+            self.fsync(self.fd)
+            os.close(self.fd)
+            self._sommer(nom(self.prefixe, self.jour, self.k), self.h.hexdigest())
+            self._creer(jour(ws), 0, "ouverture")
         return self._ecrire({**champs, "type": genre, "ws": ws})
+
+    def _sommer(self, n, h):
+        """Ligne « sha256  nom » du fichier clos `n` au fichier de sommes (format de sha256sum), puis fsync."""
+        fd = os.open(os.path.join(self.dossier, self.prefixe + ".sha256"), os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+                     0o644)
+        _tout(fd, f"{h}  {n}\n".encode())
+        self.fsync(fd)
+        os.close(fd)
+
+    def _creer(self, j, k, genre, **champs):
+        """Fichier neuf du jour `j`, segment `k`, ouvert par l'enregistrement `genre`, qui porte `suivante`."""
+        self.jour, self.k, self.h = j, k, hashlib.sha256()
+        self.fd = os.open(os.path.join(self.dossier, nom(self.prefixe, j, k)), os.O_WRONLY | os.O_APPEND | os.O_CREAT |
+                          os.O_EXCL, 0o644)
+        return self._ecrire({**champs, "type": genre, "jour": j, "suivante": self.suivante})
 
     def _ecrire(self, enr):
         octets = canonique({**enr, "seq": self.seq + 1, "prec": self.prec})
-        reste = octets
-        while reste:
-            reste = reste[os.write(self.fd, reste):]
+        _tout(self.fd, octets)
+        self.h.update(octets)
         self.seq, self.prec = self.seq + 1, hashlib.sha256(octets).hexdigest()
         return self.seq, self.prec

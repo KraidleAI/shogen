@@ -32,6 +32,7 @@
 | `ouverture` | `jour` (AAAA-MM-JJ, UTC), `suivante` (première fenêtre admise) | l'écrivain : premier enregistrement d'un journal neuf |
 | `marqueur` | `ws` ; champs de la boucle (CB-4) | `marqueur(ws)` : clôt la fenêtre `ws` |
 | `point` | `ws` : fenêtre qui clôt l'heure, (`ws` + w) multiple de 3 600 | l'écrivain, juste après ce marqueur ; son empreinte est la tête exportée (E-C-35) |
+| `cloture` | `jour` : jour UTC du fichier qu'il clôt | l'écrivain : dernier enregistrement d'un fichier quotidien (§6) |
 | tout autre type (`lecture`, `sante`, `run_params`…) | `ws` ; champs de son sous-lot | `ecrire(type, ws, …)` |
 
 Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont réservés à l'écrivain. Un champ nommé
@@ -58,3 +59,18 @@ lecture ou écriture du journal et tenu jusqu'à la fermeture. Une seconde insta
 sans rien lire ni écrire (JournalOccupe). Avec la chaîne, une écriture entrelacée de deux instances serait de toute
 façon visible (`seq` ou `prec` rompu). C'est le moyen de fermeture par construction de SHOGEN-ENTRELACEMENT-D5-1 pour
 S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item reste un acte de l'orchestrateur.
+
+## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
+
+1. Un fichier porte le nom `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` : jour UTC des fenêtres qu'il contient, puis numéro de
+   segment `k` (0 pour le premier fichier du jour ; segments de reprise : §7). La grille divise l'heure (w divise
+   3 600), donc la journée : une fenêtre n'est jamais à cheval sur deux jours.
+2. Le premier enregistrement de fenêtre d'un jour nouveau déclenche la bascule : l'écrivain ajoute `cloture` au fichier
+   courant, appelle `fsync`, le ferme, inscrit sa ligne au fichier de sommes, puis crée le fichier du nouveau jour
+   (création exclusive), ouvert par `ouverture` (`jour`, `suivante`). La chaîne continue : le `seq` et le `prec` de
+   cette ouverture suivent ceux de la clôture.
+3. Le fichier de sommes `<préfixe>.sha256` reçoit une ligne par fichier clos, `<sha256 en hexadécimal>  <nom>` (deux
+   espaces, format de `sha256sum`), ajoutée puis suivie d'un `fsync`. `sha256sum -c <préfixe>.sha256`, lancé dans le
+   dossier, la contrôle.
+4. Limite déclarée : la création d'un fichier n'est pas suivie d'un `fsync` du dossier ; la durabilité de l'entrée de
+   répertoire après une coupure de courant n'est pas établie ici (item proposé à l'orchestrateur).
