@@ -70,8 +70,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 2. Coinbase
@@ -102,8 +102,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 3. Kraken
@@ -134,8 +134,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 4. OKX
@@ -167,8 +167,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 5. Bitstamp
@@ -200,8 +200,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 6. Gemini
@@ -232,8 +232,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 7. Bitfinex
@@ -264,8 +264,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 8. CoinGecko
@@ -297,8 +297,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 9. DefiLlama
@@ -330,8 +330,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 10. Pyth
@@ -361,8 +361,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 11. Chainlink
@@ -393,8 +393,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 12. Cloudflare
@@ -424,8 +424,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 13. Amazon Web Services
@@ -453,8 +453,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 14. Imperva
@@ -482,8 +482,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 15. PublicNode
@@ -513,8 +513,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 16. RIPE NCC
@@ -542,8 +542,8 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
 
 ## 17. Team Cymru
@@ -571,6 +571,6 @@ Any factual error in these passages may be reported to SHOGEN@monarkgate.tech wi
 
 Yours sincerely,
 
-The Shōgen team
-SHOGEN@monarkgate.tech
+The MONARK Team
+https://monarkgate.tech
 ```
