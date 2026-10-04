@@ -46,7 +46,8 @@ jobs:
     # avance par le lot D8c (le job porte désormais des tests).
     runs-on: ubuntu-24.04
     # Étapes mesurées en local (Git Bash, 2026-10-01) : 51 cas du hook en 93 à 98 s, balayage
-    # de l'arbre en 68 à 78 ms. 10 min bornent un blocage sans couper un run normal.
+    # de l'arbre en 68 à 78 ms ; 54 cas en 31 s (lot DETTES-B2, 2026-10-04, Linux de la session
+    # cloud, charge moyenne 17 sur 4 cœurs). 10 min bornent un blocage sans couper un run normal.
     timeout-minutes: 10
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
@@ -61,13 +62,16 @@ jobs:
         # Motif élargi (lot D8c) : marqueur suivi de deux-points, ou introduit par un
         # délimiteur de commentaire ; 0 marqueur mesuré à 293b7a7 et à 40b4cfb (G0 du lot
         # D8c, §5.3). Exclusions : biblio/ (corpus de recherche), .claude/ (instructions
-        # d'agents), ce workflow (fichier vérificateur).
+        # d'agents), ce workflow (fichier vérificateur). Code de git grep capté (lot DETTES-B2,
+        # SHOGEN-G5-ERREUR-GREP-1) : 1 vert, 0 refus, tout autre code refus (un git grep en
+        # erreur sortait en 0 par le if) ; cas H-24 du runner du hook.
         run: |
-          if git grep -nE '(\b(TODO|FIXME):|(//|#|--|;|/\*|\*|<!--)[[:space:]]*(TODO|FIXME)\b)' -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml'; then
-            echo '::error::Marqueur TODO/FIXME nu. Registre de dette + ADR, ou résoudre (R-13).'
-            exit 1
-          fi
-          echo "OK: aucun marqueur de dette nu."
+          g=0; git grep -nE '(\b(TODO|FIXME):|(//|#|--|;|/\*|\*|<!--)[[:space:]]*(TODO|FIXME)\b)' -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml' || g=$?
+          case "$g" in
+            1) echo "OK: aucun marqueur de dette nu." ;;
+            0) echo '::error::Marqueur TODO/FIXME nu. Registre de dette + ADR, ou résoudre (R-13).'; exit 1 ;;
+            *) echo "::error::git grep a échoué (code $g) ; échec fermé."; exit 1 ;;
+          esac
 
   g1-model-pinning:
     # Lot D8a (2026-09-30, ADR-0028 D8, C-14 ; G0 docs/adr-0028/G0-lot-D8a.md, journal
