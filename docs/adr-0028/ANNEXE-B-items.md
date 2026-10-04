@@ -732,3 +732,33 @@ P-03 ; P-03 peut-être caduc, Fisher 1921 versé à `biblio/`) et 13 à 16 (renv
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-ADR0029-STATUT-CP1-1 | la ligne Statut d'ADR-0029 (l.4) liste encore « un cp-1 du validateur sur cette révision » comme condition, alors qu'il est rendu | orch. | révision 3 d'ADR-0029 | une incise datée [inféré] | G2 du lot DETTES-A, A-5 |
+
+## B.49 Amendement daté du 2026-10-04 06:52:59 UTC (heure produite par le script d'écriture) : lot DETTES-B1 commis
+
+Journal G1 versé à l'octet : `docs/G1-lot-DETTES-B1.md` ; sa Q-3 et sa L-4 (« relever le plancher : une ligne ») sont
+inexactes, corrigées par la relecture (C-2 (c) : cinq cas du lanceur échouaient ; les cas sont désormais relatifs à
+`v.PLANCHER`). Relecture G2 versée à l'octet : `docs/G2-lot-DETTES-B1.md` (réviseur neuf `shogen-worker`) :
+**ACCEPTE-AVEC-CORRECTIONS** ; C-1 (cas `"12E+999999"`, le mutant « exposant brut » rejoué par l'orchestrateur : 2 échecs) et
+C-2 (lanceur relatif au plancher ; `PLANCHER = 405`) commises avec B1-1 et B1-6 ; C-3 (conséquence E-8 écrite dans `docs/11`
+§12 et dans `PROCEDURE-EXECUTION.md`, ci-dessous pour SHOGEN-REJEU-HOTE-1), C-4 (choix « plancher » consigné au G0 des lots
+DETTES) et C-5 (ADR-0028 §4.11, G3 opérant) faites par l'orchestrateur au commit de clôture. Adjudications : Q-1 du G1, E-1
+gardé (booléens, listes, objets refusés comme illisibles) ; Q-2, décision SENS-POOLEE adoptée avec la portée de O-5 (motif 1
+formulé trop fort ; motif 3 de procédure ; les « trois z » d'ADR-0025 sont de seconde main ; portée S2 seule, S2-bis renvoyé à
+son propre pré-enregistrement) ; Q-5, forme livrée gardée. Écart du réviseur (variable posée sur un chemin fictif absent,
+contrôlé avant et après, sur ordre du brief) : **accepté**, le brief de l'orchestrateur l'ordonnait. FM-1.1 des transcriptions
+du worker (1 104 événements) et du réviseur (645) : 0 fragment.
+
+Items **fermés** (commits B1-1 `0221a74`, B1-2 `53cff2c`, B1-3 `6b4b49c`, B1-4 `0789d96`, B1-5 `3cc0892`, B1-6 `30db124`, B1-7 `b6c1c95`) : SHOGEN-PRIX-ILLISIBLE-1, SHOGEN-PRIX-HORS-CONTEXTE-1, SHOGEN-ASN-DIVERGENCE-PARTIELLE-1,
+SHOGEN-BLOC5-LIBELLE-1, SHOGEN-KEFF-NOTE-1, SHOGEN-RT-ETIQUETTE-INCLUSE-1, SHOGEN-SENS-POOLEE-1 (fermé sans ligne ajoutée,
+décision écrite au test, portée O-5), SHOGEN-CI-S2-SAUT-1 (sous-lot D8a-3 ; premier passage sur la forge : SHOGEN-CI-S2-FORGE-1),
+SHOGEN-TEST-ENV-HERMETIQUE-1. **SHOGEN-REJEU-HOTE-1** (B.46) reste ouvert, avec cette précision (C-3) : tout rejeu des rendus,
+sur un second hôte comme ici, se fait sur une extraction du commit d'analyse `f35a70c`, jamais à la tête.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ASN-PARTIELLE-S2-1 | effet de SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 sur les journaux scellés de S2 non mesuré (les rendus versés appliquent la sémantique « relevés complets seuls ») | orch. | lot d'après pré-enregistrement, ou limite déclarée au rapport | une analyse hors décision [inféré] | G2 du lot DETTES-B1 |
+| SHOGEN-CI-S2-CABLAGE-1 | aucun test ne lit les étapes du job `s2-harness-unittest` : ramener l'étape à la suite nue passerait tous les contrôles locaux | orch. | SHOGEN-CI-S2-FORGE-1 ou prochain lot qui touche `gates.yml` | un cas de la forme de H-20 [inféré] | G2 du lot DETTES-B1 |
+| SHOGEN-PRIX-ARITH-RESIDU-1 | dépassement `Decimal` non nommé encore possible par combinaison de prix dans la plage du contexte (médiane paire, écart relatif sous une médiane minuscule) ; plausibilité nulle | orch. | prochain lot qui touche `r1.py` | plage de plausibilité ou capture nommée [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-JSON-ENTIER-LONG-1 | un entier JSON de plus de 4 300 chiffres lève une erreur générique dans `records.read_jsonl_tolerant` (mesuré, 5 001 chiffres) ; inatteignable depuis le collecteur | orch. | prochain lot qui touche `records.py` | un refus nommé [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-RT-ETIQUETTE-J14-1 | `r1_discrimine` des entrées J14 du JSON du recalcul tiers étiqueté au seul niveau de l'entrée (forme d'avant le sous-lot 4) | orch. | G0 de la publication (G9) | deux lignes, ou décision « niveau de l'entrée » [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-CI-PLANCHER-SUIVI-1 | le plancher du vérificateur ne suit pas seul la croissance de la suite ; règle : tout lot qui ajoute des tests relève `PLANCHER` au compte mesuré | orch. | chaque lot qui ajoute des tests | une ligne par lot [mesuré : C-2] | G1 et G2 du lot DETTES-B1 |

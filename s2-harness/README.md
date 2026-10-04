@@ -111,6 +111,8 @@ octet (`SHA_BASE_SANS_OPTION`, `tests/test_exclusion.py`, test iv).
   `TestExclusionJournalReel` (`tests/test_exclusion.py`), variable non posée (ADR-0028 annexe D.4 a). Ce
   compte se re-mesure à chaque lot qui le change.
 
+- **2026-10-04 — mesure** (dépôt, branche `partie-4-execution`, tête `b6c1c95`, `SHOGEN_S2_CAMPAGNE_CONTROL` non posée ; lot DETTES-B1) : `python3 -B enforcement/verdict-suite-s2.py` → « Ran 405 tests … OK (skipped=2) », verdict conforme. Le lot DETTES-B1 ajoute 7 tests (sous-lots B1-1 à B1-5 ; B1-6 et B1-7 n'en ajoutent aucun). Les deux tests sautés sont inchangés. Le plancher du vérificateur (`enforcement/verdict-suite-s2.py`, `PLANCHER`) vaut ce compte ; tout lot qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1).
+
 À venir : le rendu servi de la sortie S2 (`docs/11-mesures-pilotes.md`), par la
 chaîne de lots de l'ADR-0028 (annexe A : segments, pool d'analyse, rendu, paquet de
 pré-enregistrement, exécution unique). Ce fichier ne porte aucun résultat de campagne.
