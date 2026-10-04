@@ -1,0 +1,11 @@
+/* Shōgen — brand tokens (direction 3B « Amont commun ») */
+:root{
+  --shogen-ink:#0E3B34;      /* forêt — logotype, traits, nœuds sources */
+  --shogen-coral:#FF6B4A;    /* UNIQUEMENT nœud récepteur */
+  --shogen-mint:#BFE3D8;     /* secondaire, texte sur fond sombre */
+  --shogen-paper:#FAF7F2;    /* fond clair */
+  --shogen-ink-muted:#3E5A51;
+  --shogen-font:'Sora',sans-serif;
+  --shogen-font-mono:'IBM Plex Mono','JetBrains Mono',monospace;
+  --shogen-anim-loop:2.6s;
+}

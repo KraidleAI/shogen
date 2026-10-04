@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#FAF7F2; }
+  a { color:#0E3B34; text-decoration:underline; text-underline-offset:2px; }
+  a:hover { color:#0A2A25; }
+  @keyframes shogenDraw {
+    0% { stroke-dashoffset: 38; opacity: 0; }
+    8% { opacity: 1; }
+    45% { stroke-dashoffset: 0; opacity: 1; }
+    70% { stroke-dashoffset: 0; opacity: 1; }
+    92% { opacity: 0; }
+    100% { stroke-dashoffset: 38; opacity: 0; }
+  }
+  @keyframes shogenReceive {
+    0%, 40% { transform: scale(1); }
+    48% { transform: scale(1.35); }
+    60% { transform: scale(1); }
+    100% { transform: scale(1); }
+  }
+</style>
+</helmet>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="ic-amont" viewBox="0 0 64 64">
+      <path d="M14 18 L32 48" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="38" style="animation:shogenDraw 2.6s ease-in-out infinite;animation-delay:0s"></path>
+      <path d="M32 12 L32 48" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="38" style="animation:shogenDraw 2.6s ease-in-out infinite;animation-delay:.15s"></path>
+      <path d="M50 18 L32 48" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="38" style="animation:shogenDraw 2.6s ease-in-out infinite;animation-delay:.3s"></path>
+      <circle cx="14" cy="16" r="6" fill="currentColor"></circle>
+      <circle cx="32" cy="10" r="6" fill="currentColor"></circle>
+      <circle cx="50" cy="16" r="6" fill="currentColor"></circle>
+      <circle cx="32" cy="50" r="8" fill="#FF6B4A" style="transform-box:fill-box;transform-origin:center;animation:shogenReceive 2.6s ease-in-out infinite;animation-delay:.9s"></circle>
+    </symbol>
+    <symbol id="ic-amont-static" viewBox="0 0 64 64">
+      <path d="M14 18 L32 48 M32 12 L32 48 M50 18 L32 48" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"></path>
+      <circle cx="14" cy="16" r="6" fill="currentColor"></circle>
+      <circle cx="32" cy="10" r="6" fill="currentColor"></circle>
+      <circle cx="50" cy="16" r="6" fill="currentColor"></circle>
+      <circle cx="32" cy="50" r="8" fill="#FF6B4A"></circle>
+    </symbol>
+  </defs>
+</svg>
+
+<section style="max-width:920px;margin:0 auto;padding:56px 40px 100px;display:flex;flex-direction:column;gap:44px;background:#FAF7F2;font-family:'Sora',sans-serif;color:#0E3B34">
+
+  <header style="display:flex;flex-direction:column;gap:16px;border-bottom:2px solid #0E3B34;padding-bottom:28px">
+    <span style="font:500 11px/1 'JetBrains Mono',monospace;letter-spacing:.18em;color:#5C7B72">SHŌGEN — SPÉCIFICATION LOGO · v1.0 · validé pour implémentation</span>
+    <div style="display:flex;align-items:center;gap:18px">
+      <svg width="56" height="56" viewBox="0 0 64 64"><use href="#ic-amont"></use></svg>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font:700 32px/1 'Sora',sans-serif;letter-spacing:-.03em">Shōgen</span>
+        <span style="font:500 14px/1 'Sora',sans-serif;color:#3E5A51">Comptez vos sources. Vraiment.</span>
+      </div>
+    </div>
+    <p style="margin:0;font:400 14px/1.6 'Sora',sans-serif;color:#3E5A51;max-width:680px">Direction retenue : « Amont commun » (référence interne 3B). Symbole : trois sources indépendantes convergeant vers un agrégateur unique. Ce document fixe la construction, les couleurs, la typo et les règles d'usage pour l'implémentation.</p>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">1. Symbole — construction</h2>
+    <div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+      <div style="background:#FFFFFF;border:1px solid #D9D3C4;padding:24px;display:flex;justify-content:center">
+        <svg width="160" height="160" viewBox="0 0 64 64" style="color:#0E3B34"><use href="#ic-amont-static"></use></svg>
+      </div>
+      <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:10px;font:400 13.5px/1.6 'Sora',sans-serif;color:#3E5A51">
+        <p style="margin:0">Viewbox : <code>0 0 64 64</code>. Trois nœuds sources aux coordonnées (14,16), (32,10), (50,16) — rayon 6px, couleur d'encre pleine. Trois traits (largeur 3px, extrémités arrondies) convergent vers le nœud récepteur (32,50) — rayon 8px, unique élément en corail <code>#FF6B4A</code>.</p>
+        <p style="margin:0">Zone de protection minimale : un rayon de nœud source (6px à l'échelle native) tout autour du symbole. Ne jamais recadrer les traits.</p>
+        <p style="margin:0">Taille minimale : 20px de haut pour le symbole seul, 24px pour le lockup complet (symbole + logotype). Sous cette taille, utiliser l'icône simplifiée (section 4).</p>
+      </div>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">2. Animation (spec d'implémentation)</h2>
+    <div style="background:#FFFFFF;border:1px solid #D9D3C4;padding:24px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">
+      <svg width="88" height="88" viewBox="0 0 64 64" style="color:#0E3B34"><use href="#ic-amont"></use></svg>
+      <table style="border-collapse:collapse;font:400 13px/1.5 'IBM Plex Mono',monospace;color:#2E4740">
+        <tbody>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Durée de boucle</td><td style="padding:4px 0">2.6s, ease-in-out, infinie</td></tr>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Trait gauche</td><td style="padding:4px 0">stroke-dashoffset 38→0, delay 0s</td></tr>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Trait central</td><td style="padding:4px 0">stroke-dashoffset 38→0, delay 0.15s</td></tr>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Trait droit</td><td style="padding:4px 0">stroke-dashoffset 38→0, delay 0.3s</td></tr>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Nœud récepteur</td><td style="padding:4px 0">pulse scale 1→1.35→1 à t=0.9s (à l'arrivée des traits)</td></tr>
+          <tr><td style="padding:4px 14px 4px 0;color:#5C7B72">Repos</td><td style="padding:4px 0">version statique (ci-dessus) pour favicon, print, contextes sans animation</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin:0;font:400 13px/1.5 'Sora',sans-serif;color:#3E5A51">Usage : hero/loader/splash uniquement. Jamais en boucle dans une UI dense (nav, listes) — utiliser la version statique.</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">3. Couleurs</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid #D9D3C4">
+      <div style="display:flex;flex-direction:column"><div style="height:70px;background:#0E3B34"></div><div style="padding:10px 12px;background:#fff;font:400 12px/1.5 'IBM Plex Mono',monospace"><div style="font-weight:600">Encre / Forêt</div>#0E3B34<br>rgb(14,59,52)</div></div>
+      <div style="display:flex;flex-direction:column"><div style="height:70px;background:#FF6B4A"></div><div style="padding:10px 12px;background:#fff;font:400 12px/1.5 'IBM Plex Mono',monospace"><div style="font-weight:600">Corail (accent unique)</div>#FF6B4A<br>rgb(255,107,74)</div></div>
+      <div style="display:flex;flex-direction:column"><div style="height:70px;background:#BFE3D8"></div><div style="padding:10px 12px;background:#fff;font:400 12px/1.5 'IBM Plex Mono',monospace"><div style="font-weight:600">Menthe (secondaire)</div>#BFE3D8<br>rgb(191,227,216)</div></div>
+      <div style="display:flex;flex-direction:column"><div style="height:70px;background:#FAF7F2;box-shadow:inset 0 0 0 1px #E4E2DD"></div><div style="padding:10px 12px;background:#fff;font:400 12px/1.5 'IBM Plex Mono',monospace"><div style="font-weight:600">Papier (fond clair)</div>#FAF7F2<br>rgb(250,247,242)</div></div>
+    </div>
+    <p style="margin:0;font:400 13px/1.5 'Sora',sans-serif;color:#3E5A51">Règle : le corail n'apparaît QUE sur le nœud récepteur. Jamais utilisé ailleurs dans l'UI comme couleur décorative — il doit rester associé à « ce qui reçoit/agrège ».</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">4. Fond clair / fond sombre</h2>
+    <div style="display:flex">
+      <div style="flex:1;background:#FAF7F2;border:1px solid #D9D3C4;padding:32px 20px;display:flex;flex-direction:column;align-items:center;gap:12px">
+        <svg width="56" height="56" viewBox="0 0 64 64" style="color:#0E3B34"><use href="#ic-amont"></use></svg>
+        <span style="font:700 22px/1 'Sora',sans-serif;color:#0E3B34">Shōgen</span>
+        <span style="font:400 9.5px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#A8A29A">FOND CLAIR — logotype #0E3B34</span>
+      </div>
+      <div style="flex:1;background:#0E3B34;padding:32px 20px;display:flex;flex-direction:column;align-items:center;gap:12px">
+        <svg width="56" height="56" viewBox="0 0 64 64" style="color:#FAF7F2"><use href="#ic-amont"></use></svg>
+        <span style="font:700 22px/1 'Sora',sans-serif;color:#FFFFFF">Shōgen</span>
+        <span style="font:400 9.5px/1 'JetBrains Mono',monospace;letter-spacing:.14em;color:#5C7B72">FOND SOMBRE — logotype #FFFFFF</span>
+      </div>
+    </div>
+    <p style="margin:0;font:400 13px/1.5 'Sora',sans-serif;color:#3E5A51">Le corail du nœud récepteur ne change JAMAIS entre les deux fonds — c'est le seul élément à couleur fixe du système.</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">5. Icône / favicon</h2>
+    <div style="display:flex;align-items:center;gap:20px;background:#FFFFFF;border:1px solid #D9D3C4;padding:24px">
+      <div style="width:64px;height:64px;border-radius:14px;background:#0E3B34;display:flex;align-items:center;justify-content:center;color:#FAF7F2"><svg width="40" height="40" viewBox="0 0 64 64"><use href="#ic-amont-static"></use></svg></div>
+      <div style="width:32px;height:32px;border-radius:7px;background:#0E3B34;display:flex;align-items:center;justify-content:center;color:#FAF7F2"><svg width="20" height="20" viewBox="0 0 64 64"><use href="#ic-amont-static"></use></svg></div>
+      <div style="width:16px;height:16px;border-radius:4px;background:#0E3B34;display:flex;align-items:center;justify-content:center;color:#FAF7F2"><svg width="10" height="10" viewBox="0 0 64 64"><use href="#ic-amont-static"></use></svg></div>
+      <span style="font:400 12px/1.5 'IBM Plex Mono',monospace;color:#5C7B72;margin-left:auto">64 / 32 / 16 px — coin arrondi 22% de la taille, fond #0E3B34, symbole statique (pas d'animation)</span>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">6. Typographie</h2>
+    <div style="display:flex;flex-direction:column;gap:8px;font:400 13.5px/1.6 'Sora',sans-serif;color:#3E5A51">
+      <p style="margin:0"><strong style="color:#0E3B34">Logotype :</strong> Sora 700, letter-spacing -0.03em.</p>
+      <p style="margin:0"><strong style="color:#0E3B34">Accroche / UI :</strong> Sora 500 (accroche), Sora 400 (texte courant).</p>
+      <p style="margin:0"><strong style="color:#0E3B34">Mono (specs, data, code) :</strong> IBM Plex Mono ou JetBrains Mono 400/500.</p>
+      <p style="margin:0">Une seule famille sans-serif (Sora) pour toute l'UI produit — pas de serif, pas de deuxième sans dans l'identité.</p>
+    </div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <h2 style="margin:0;font:700 18px/1 'Sora',sans-serif">7. À ne pas faire</h2>
+    <ul style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font:400 13.5px/1.6 'Sora',sans-serif;color:#3E5A51">
+      <li>Ne pas recolorer les trois nœuds sources ni les traits — seul le nœud récepteur est en corail.</li>
+      <li>Ne pas faire tourner, dupliquer ou refléter le symbole.</li>
+      <li>Ne pas placer le symbole sur une photo ou un fond texturé sans plaque de couleur pleine derrière.</li>
+      <li>Ne pas animer le symbole dans une UI dense (nav, tableaux, listes) — version statique uniquement.</li>
+      <li>Ne pas utiliser le corail comme couleur d'accent générale dans le produit (boutons, liens, etc.).</li>
+    </ul>
+  </section>
+
+  <footer style="border-top:1px solid #D9D3C4;padding-top:18px;font:400 12px/1.5 'JetBrains Mono',monospace;color:#8C8478">Shōgen — Amont commun (3B) · Validé le 7 sept. 2026 · Document de handoff pour implémentation</footer>
+
+</section>
+</x-dc>
+</body>
+</html>
