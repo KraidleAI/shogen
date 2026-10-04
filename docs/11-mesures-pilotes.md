@@ -989,6 +989,62 @@ ici, aucune n'entre dans la règle ni ne peut changer le verdict (paquet §7, §
 | SHOGEN-POOLEE-BLOC-1 | un plancher d'erreur-type par blocs pour la strate poolée et le niveau de z_pool sous le modèle nul, par simulation | annexe B.13, B.18 |
 | PX-Shogen-13 | la re-dérivation de τ après le rendu, jamais appliquée aux z confirmatoires ; réserve : τ observé et P99 de calibration ne portent pas sur la même population | annexe D.5 ; paquet §12 pt 13 ; annexe B.45 |
 
+### 11.1 Ajout daté du 2026-10-04 : analyses faites après le pré-enregistrement (lot POST-PREREG), hors décision
+
+Chaque sortie porte en première ligne : « ajoutée après le pré-enregistrement, hors décision ; ne change pas le verdict
+de la règle scellée (« R1 discrimine » = FAUX, docs/11 §3) ». Aucune n'entre dans la règle ni ne remplace une valeur
+d'un rendu ; le verdict reste celui du §3. Code : `scripts/post-s2/`, qui réutilise les lecteurs du harnais sans
+modifier `s2-harness` ; sorties : `docs/adr-0028/execution/post-prereg-2026-10-04/` (abrégé PP/ ci-dessous ; sha256 dans
+`SHA256SUMS`) ; journal G1 du worker (`docs/G1-lot-POST-PREREG.md`), où les paramètres sont écrits le 2026-10-04 à
+04:18:36 UTC, avant toute exécution sur les journaux. Exposition déclarée au moment de les fixer : bloc 3 du rendu J28
+et ce rapport. Le seuil de FLUX-QUASI-MORT-1 vient de l'avis d'un auteur sans exposition (annexe B.39) ; celui de
+FLUX-DEVIANT-1 (p̂_f > 1/2) est la valeur de la variante V2 du même avis, appliquée par le worker. Les constructions
+viennent de l'annexe B, écrite avant l'exécution, sauf la forme du critère de HOST-DEGRADED-2 (sonde ASN du démarrage,
+dernier marqueur, `clock_check` hors critère), choix du worker non écrit à l'annexe. Ces choix du worker sont fixés
+avant l'exécution, après l'exposition déclarée ci-dessus, et nommés dans le journal G1. Contrôle de cohérence : chaque
+sortie recompte n, K et P̂_more par strate et les trouve égaux, chaîne pour chaîne, au bloc 3 du J28 (PP/*.txt l.7-8).
+Arrondis « ≈ » à 3 chiffres significatifs ; valeurs complètes aux lignes citées.
+
+| item | ce qui est calculé | résultat | sortie |
+|---|---|---|---|
+| SHOGEN-FLUX-QUASI-MORT-1 (avec QUASI-MORT-PREDICAT-1 et POOL-MIN-1) | règle scellée recalculée par strate sans les flux à 2·ok(f, s) < n_s, ok compté par le prédicat de `r1.analysis_pools` | aucun flux retiré (taux `ok` minimal ≈ 0,981 en calme, bitstamp ; ≈ 0,980 en stress, defillama [calc]) ; règle recalculée identique à la règle scellée ; « R1 discrimine » recalculé = FAUX | PP/quasi-mort.txt l.10-16 |
+| SHOGEN-FLUX-DEVIANT-1 (exploratoire, conditionnée sur p̂_f) | même recalcul sans les flux à p̂_f > 1/2 | aucun flux retiré (p̂_f maximal ≈ 0,0193 en calme, ≈ 0,0198 en stress [calc]) ; identique ; FAUX | PP/deviant.txt l.10-16 |
+| SHOGEN-POOLEE-BLOC-1 (a) | z_pool,bloc = Σ_s (K_s − n_s·P̂_more,s)/√(Σ_s σ̂²_bloc,s) | ≈ 2,60 (z_pool binomial ≈ 33,4) ; exploratoire, hors famille ; niveau non mesuré (POOLEE-BLOC-1 (b), lot DETTES-SIM) | PP/poolee-bloc.txt l.12-13 |
+| SHOGEN-HOST-DEGRADED-2 | règle recalculée sans les fenêtres des démarrages dont la sonde ASN porte un `resolve_failed` | 631 démarrages sur 4 172 ; fenêtres retirées 3 341 en calme et 720 en stress ; K passe de 154 à 70 et de 133 à 59 ; calme : z_s ≈ 18,1, z_bloc ≈ 1,80, NE REJETTE PAS (discordance), EMD_s ≈ 104 ; stress : garde ≈ 6,03 < 10, NON ÉVALUABLE ; FAUX | PP/hote-degrade.txt l.10-18 |
+| SHOGEN-HORLOGE-ETENDUE-1 | offset médian des 3 610 `clock_check` retenus | aucun non évaluable ; minimum ≈ −52,2 s, médiane ≈ 1,42 s, maximum ≈ 96,3 s, étendue ≈ 148 s | PP/horloge-etendue.txt l.10-11 |
+| SHOGEN-CENSURE-INFO-2 | bornes extérieures de z_s sous censure arbitraire des fenêtres sautées ; valeur de la règle sous deux imputations témoins | calme : z_s ∈ [≈ −169 ; ≈ 121] ; stress : [≈ −88,6 ; ≈ 81,5], bornes atteintes ; toutes fenêtres sautées propres : FAUX ; 19 fenêtres sautées en calme (42 en stress) imputées à deux écarts : REJETTE, d'où « R1 discrimine » VRAI sous cette imputation ; lecture : **non identifié sous censure arbitraire** | PP/censure.txt l.10-21 |
+| SHOGEN-SIGMA-BLOC-INDEP-1 | classification, série I_t et σ̂²_bloc par un code indépendant de `r1` | 0 désaccord sur 270 435 cellules en calme et 125 367 en stress ; γ̂₀ et σ̂²_bloc égaux, chaîne pour chaîne, au bloc 3 | PP/sigma-indep.txt l.9-13 |
+| SHOGEN-DEP-FENETRES-2 (b), qui est SHOGEN-R1-PLUGIN-1 (a) | variance par blocs de la fonction d'influence de K/n − P_more(p̂) (Künsch 1989, Ex. 2.2 et (2.14)) | σ̂²_IF,bloc ≈ 0,672·σ̂²_bloc en calme, ≈ 0,677 en stress ; z_IF,bloc ≈ 2,37 en calme, ≈ 2,12 en stress ; exploratoire, niveau non mesuré | PP/influence.txt l.10-11 |
+| SHOGEN-DEP-FENETRES-2 (c) | runs de I_t pris comme unités, loi nulle iid à P̂_more | R = 119 contre E[R] ≈ 33,5 en calme (z_R ≈ 14,8) ; 130 contre ≈ 16,7 en stress (z_R ≈ 27,8) | PP/influence.txt l.13-14 |
+| SHOGEN-R1-PLUGIN-1 (b), descriptif | comptes de m_t contre la loi de Poisson-binomiale de p̂ | calme : m = 1 observé 1 001 contre ≈ 1 380 attendus, m ≥ 3 observé 49 contre ≈ 0,424 [calc] ; stress : m = 1, 214 contre ≈ 659, m ≥ 3, 118 contre ≈ 0,224 [calc] ; aucun test | PP/influence.txt l.17-40 |
+| SHOGEN-CONTENU-DEP-1 | taille effective N_eff de ρ̂ (variance par blocs de sa fonction d'influence) contre le SE de Fisher | ρ̂ égaux au bloc 5 pour les 55 paires ; N_eff/N médian ≈ 0,0535 (ρ_raw) et ≈ 0,0556 (ρ_resid) ; N_eff < N_min = 300 pour 3 paires (ρ_raw) et 2 (ρ_resid) | PP/contenu.txt l.10-66 |
+
+**Ce que ces analyses permettent de dire.** Le verdict du §3 ne dépend d'aucun flux presque mort ni d'aucun flux à taux
+d'écart supérieur à 1/2 : il n'y en a pas au J28. σ̂²_bloc,s, dont dépend la discordance, est reproduit par un code
+distinct de `r1` sur les journaux réels, lecteurs communs mis à part (seconde moitié de la limite 12 du §9.3). Les
+fenêtres de K se concentrent dans les démarrages dont la sonde ASN du harnais porte un `resolve_failed` : 84 des 154
+fenêtres de K en calme et 74 des 133 en stress y tombent, pour 13,6 % et 6,3 % des fenêtres [calc]. Le verdict FAUX
+n'est pas identifié sous censure arbitraire des fenêtres sautées : il repose sur l'hypothèse H_perte (doc 08,
+A(loss-non-informative)) ; une imputation de 19 fenêtres sautées en calme, ou de 42 en stress, donne « R1 discrimine »
+VRAI. La taille effective estimée des séries de contenu est de l'ordre de 5 % de N en médiane et reste sous N pour les
+55 paires, sur ρ_raw comme sur ρ_resid : pour chacune, le SE de Fisher (paquet §12 pt 12), qui suppose des paires
+indépendantes, est plus petit que le SE par blocs (rapport de 1,50 à 15,0 [calc]).
+
+**Ce qu'elles ne permettent pas de dire.** Aucune n'identifie une cause : la concentration de K dans les démarrages
+dégradés est compatible avec un mode commun de l'observateur, sans l'établir. Deux statistiques exploratoires à
+erreur-type par blocs franchissent 2,33 là où z_bloc,s ne le fait pas : z_pool,bloc ≈ 2,60 et z_IF,bloc ≈ 2,37 en
+calme ; aucune n'est dans la règle ni dans la famille, leur niveau en échantillon fini n'est pas mesuré, et elles ne
+changent pas le verdict (même statut que les sorties hors décision du §9.3 pt 11). Les runs pris comme unités gardent un
+excès sous une loi nulle iid qui ignore la persistance propre de chaque source ; ce n'est pas un test de la dépendance
+de portée ≥ ℓ. La loi de m_t est décrite, pas testée. Rien n'est dit de l'indépendance des sources (doc 09).
+
+**Restes.** Non faits, avec leur motif : la forme fixed-b de DEP-FENETRES-2 (a) (Kiefer-Vogelsang, P-05, non versée) ;
+une tolérance et une loi nulle de la statistique par événements (c) ; le test de la loi de m_t de R1-PLUGIN-1 (b)
+(statistique et niveau à sourcer) ; une borne extérieure de z_bloc sous censure arbitraire (CENSURE-INFO-2 ; attribution
+« de type Manski » [inféré : P-08 non versée]) ; le niveau de z_IF,bloc et de z_pool,bloc (simulation synthétique). Le
+`clock_check` n'entre pas au critère de HOST-DEGRADED-2 : ses signaux de dégradation dépendent des sources qui répondent
+à la sonde ; écart au libellé de l'item, déclaré au journal G1.
+
 ## 12. Reproduire
 
 - **Entrées** : les trois journaux scellés, désignés par leurs sha256 (bloc machine, paquet l.217-219 ; §8.3), et le
