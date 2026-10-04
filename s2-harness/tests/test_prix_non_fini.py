@@ -11,12 +11,13 @@ import io
 import json
 import os
 import tempfile
+import traceback
 import unittest
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 
-from shogen_s2 import collector, r1, window
+from shogen_s2 import collector, r1, report, window
 from shogen_s2.model import Reading, Status
 from tests.test_collector import BY_ID, DELTA, TAU, FakeClock, _taumap, frozen_reading, sbc_huge
 from tests.test_rendu_blocs import SAM
@@ -69,7 +70,7 @@ def variante(src: str, prix: dict) -> str:
 class TestPrixNonFini(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        src = tempfile.mkdtemp(prefix="s2nf_")
+        cls.src = src = tempfile.mkdtemp(prefix="s2nf_")
         journaux(src)
         cls.a, cls.b = variante(src, NON_FINIS), variante(src, dict.fromkeys(NON_FINIS))
 
@@ -100,13 +101,14 @@ class TestPrixNonFini(unittest.TestCase):
     def test_formes_lues_comme_absentes_ou_inchangees(self):
         """r1.parse_journal sur une ligne : toute forme non finie que Decimal admet (casse, signe, sNaN, charge utile,
         espaces, jetons JSON NaN et Infinity), lecture en panne comprise : prix None, avertissement « x 1 » ; prix fini
-        (chaîne, entier, flottant JSON), null et prix illisible par Decimal : inchangés, aucun avertissement. Rougit
-        si : chaînes seules ; libellés exacts ; NaN seul ; statut ok exigé ; illisible lu comme absent ; fini touché."""
+        (chaîne, entier, flottant JSON) et null : inchangés, aucun avertissement ; prix illisible : refus nommé
+        (SHOGEN-PRIX-ILLISIBLE-1, test suivant). Rougit si : chaînes seules ; libellés exacts ; NaN seul ; statut ok
+        exigé ; fini touché."""
         nf = ('"NaN"', '"nan"', '"-NaN"', '"sNaN"', '"-sNaN"', '"NaN12"', '" nan "', '"Infinity"', '"-Infinity"',
               '"inf"', '"+INF"', "NaN", "Infinity", "-Infinity")
         cas = [(x, "ok", None, 1) for x in nf] + [('"NaN"', "panne_http", None, 1)] + [(x, "ok", v, 0) for x, v in (
             ('"64475.75"', "64475.75"), ('"-0"', "-0"), ('"1E+2"', "1E+2"), ("3", 3), ("1.5", Decimal("1.5")),
-            ("null", None), ('"abc"', "abc"), ("[1]", [1]))]
+            ("null", None))]
         for brut, statut, prix, avert in cas:
             p = os.path.join(tempfile.mkdtemp(prefix="s2nf_"), "journal.jsonl")
             Path(p).write_text(f'{{"window_start": 0, "flux_id": "x", "status": "{statut}", "price": {brut}}}\n',
@@ -115,6 +117,57 @@ class TestPrixNonFini(unittest.TestCase):
                 (lu,) = r1.parse_journal(p)
             with self.subTest(prix=brut, statut=statut):
                 self.assertEqual((lu["price"], err.getvalue()), (prix, AVERT.format(p, "x 1") + "\n" if avert else ""))
+
+    def test_illisible_ou_hors_contexte_refus_nomme(self):
+        """SHOGEN-PRIX-ILLISIBLE-1, SHOGEN-PRIX-HORS-CONTEXTE-1 (annexe B.44 ; L-1, L-2 du G1 du lot CORR) :
+        r1.parse_journal sur une ligne, lecture ok ou en panne. Prix ni chaîne ni nombre JSON (liste, objet, booléen)
+        ou chaîne que Decimal ne lit pas : PrixIllisible ; prix fini d'exposant ajusté au-delà d'Emax = 999999 du
+        contexte nommé (chaîne ou jeton JSON) : PrixHorsContexte ; message : item, flux, window_start, jamais la valeur.
+        Inchangés, sans avertissement : exposant ajusté 999999 (Emax), zéro d'exposant 2000000, 1E-1000000 (sous Emin :
+        aucun dépassement). Rougit si : illisible inchangé ou lu comme absent ; booléen lu 0 ou 1 ; liste lue comme
+        triplet Decimal ; borne « > Emax » devenue « ≥ » ; exposant brut au lieu de l'exposant ajusté (12E+999999 :
+        ajusté 1000000, brut 999999) ; zéro refusé ; valeur dans le message."""
+        refus = [(x, "PrixIllisible", "SHOGEN-PRIX-ILLISIBLE-1") for x in (
+            '"abc"', '""', '"1,5"', "[1]", "[0, [1], 0]", "{}", "true", "false")] + [(x, "PrixHorsContexte",
+            "SHOGEN-PRIX-HORS-CONTEXTE-1") for x in ('"1E+1000000"', '"-1E+1000000"', "1E+1000000",
+                                                     '"12E+999999"')]
+        for (brut, nom, item), statut in ((c, s) for c in refus for s in ("ok", "panne_http")):
+            p = os.path.join(tempfile.mkdtemp(prefix="s2nf_"), "journal.jsonl")
+            Path(p).write_text(f'{{"window_start": 7, "flux_id": "x", "status": "{statut}", "price": {brut}}}\n',
+                               encoding="utf-8")
+            with self.subTest(prix=brut, statut=statut):
+                with self.assertRaises(ValueError) as cm:
+                    r1.parse_journal(p)
+                self.assertEqual(type(cm.exception).__name__, nom)
+                self.assertIn(f"{item})", str(cm.exception))
+                self.assertIn(f"{p} (flux 'x', window_start 7 ; valeur non reproduite)", str(cm.exception))
+                if brut.strip('"'):              # chemin retiré : son suffixe aléatoire ne compte pas
+                    self.assertNotIn(brut.strip('"'), str(cm.exception).replace(p, ""))
+        for brut, prix in (('"1E+999999"', "1E+999999"), ('"-9.5E+999999"', "-9.5E+999999"), ('"0E+2000000"',
+                           "0E+2000000"), ('"1E-1000000"', "1E-1000000"), ("1E+999999", Decimal("1E+999999"))):
+            p = os.path.join(tempfile.mkdtemp(prefix="s2nf_"), "journal.jsonl")
+            Path(p).write_text(f'{{"window_start": 7, "flux_id": "x", "status": "ok", "price": {brut}}}\n',
+                               encoding="utf-8")
+            with self.subTest(prix=brut), contextlib.redirect_stderr(io.StringIO()) as err:
+                (lu,) = r1.parse_journal(p)
+                self.assertEqual((lu["price"], err.getvalue()), (prix, ""))
+
+    def test_recalcul_et_rendu_refus_nomme_au_lecteur(self):
+        """Fixture de la classe, prix de la lecture ok (rang 10, bitfinex) : « abc » → PrixIllisible et « 1E+1000000 » →
+        PrixHorsContexte, levées par r1.parse_journal depuis r1.recompute_from_journal et report.render_report, à la
+        place de decimal.InvalidOperation (_classify_window) et decimal.Overflow (classify_ecart) de la base (sonde du
+        journal G1). Rougit si : exception non nommée ; refus levé ailleurs qu'au lecteur."""
+        for prix, nom in (("abc", "PrixIllisible"), ("1E+1000000", "PrixHorsContexte")):
+            d = variante(self.src, {(10, "bitfinex"): prix})
+            c, j = os.path.join(d, "control.jsonl"), os.path.join(d, "journal.jsonl")
+            for f in (r1.recompute_from_journal, report.render_report):
+                try:
+                    f(c, j)
+                    lu = None
+                except Exception as e:      # pile lue ici : assertRaises la retire de l'exception qu'il garde
+                    lu = (type(e).__name__, traceback.extract_tb(e.__traceback__)[-1].name)
+                with self.subTest(prix=prix, f=f.__name__):
+                    self.assertEqual(lu, (nom, "parse_journal"))
 
     def test_flux_de_l_avertissement_tries_par_nom(self):
         """G2 du lot CORR (mutant G03) : flux de l'avertissement triés par nom, non dans l'ordre du fichier (zeta y
