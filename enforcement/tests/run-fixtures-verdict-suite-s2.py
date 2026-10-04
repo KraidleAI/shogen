@@ -2,17 +2,24 @@
 cas du vérificateur enforcement/verdict-suite-s2.py. V : sorties de suite écrites ici (résumé, sauts, codes) ; E :
 suites factices lancées dans des dossiers temporaires, hors du dépôt (rejeux R8, MT-5, MT-9 du lot CI-S2 ; variable
 retirée de l'environnement de la suite) ; C : point d'entrée sur une suite factice de 398 tests. Variable scellée
-jamais transmise à un processus (valeur fictive dans un mapping seulement). Sortie : 0 tout passe, 1 un cas échoue, 3
+jamais transmise à un processus (valeur fictive dans un mapping seulement). Lot COLLECTE-BIS, CB-0 (G0
+docs/adr-0029/g0-collecte/) : V-14, V-15, C-03 à C-05 (suite s2bis : aucun saut admis, plancher en option) ; K-01, K-02
+(SHOGEN-CI-S2-CABLAGE-1 : étapes des deux jobs unittest lues dans gates.yml). Sortie : 0 tout passe, 1 un cas échoue, 3
 erreur."""
 import contextlib
 import importlib.util
 import io
 import os
+import re
 import shutil
 import sys
 import tempfile
 
 ICI = os.path.dirname(os.path.abspath(__file__))
+GY = os.path.join(ICI, "..", "..", ".github", "workflows", "gates.yml")
+if not os.path.isfile(GY):
+    print(f"ERREUR : {GY} introuvable", file=sys.stderr)
+    sys.exit(3)
 try:
     _S = importlib.util.spec_from_file_location("verdict", os.path.join(ICI, "..", "verdict-suite-s2.py"))
     v = importlib.util.module_from_spec(_S)
@@ -59,6 +66,8 @@ cas("V-11 ligne non vide après le résumé", v.verdict(sortie(apres="Ran 999 te
     "résumé final absent")
 cas("V-12 aucun saut, OK (variable posée hors du job)", v.verdict(sortie(sauts=()), 0), None)
 cas("V-13 motif entre guillemets doubles", v.verdict(sortie(sauts=(NOMME, f"\"{VAR} : l'autre\"")), 0), None)
+cas("V-14 aucun saut admis : sauts nommant la variable refusés", v.verdict(sortie(), 0, variable=None), "aucun admis")
+cas("V-15 aucun saut admis : suite sans saut conforme", v.verdict(sortie(sauts=()), 0, variable=None), None)
 
 
 def factice(d, corps, nom="test_f.py", n=1):
@@ -87,13 +96,41 @@ try:
       "in os.environ", None, environ={**os.environ, VAR: "/chemin/fictif/inexistant"})
     deux = "".join(f"    def test_s{i}(self):\n        self.skipTest({NOMME})\n" for i in (1, 2))
     sortie0 = "    def test_x(self):\n        os._exit(0)"
-    for nom, corps, rc in (("C-01 point d'entrée : tests au plancher, deux sauts nommés, code 0", deux, 0),
-                           ("C-02 point d'entrée : os._exit(0), code 1", sortie0, 1)):
-        d = factice(os.path.join(W, nom[:4]), corps, n=v.PLANCHER - 3 if rc == 0 else v.PLANCHER)
+    s2bis = ["--aucun-saut", "--plancher", "3"]
+    for nom, corps, rc, n, opt in (
+            ("C-01 point d'entrée : tests au plancher, deux sauts nommés, code 0", deux, 0, v.PLANCHER - 3, []),
+            ("C-02 point d'entrée : os._exit(0), code 1", sortie0, 1, v.PLANCHER, []),
+            ("C-03 --aucun-saut --plancher 3 : deux sauts nommés, code 1", deux, 1, 0, s2bis),
+            ("C-04 --aucun-saut --plancher 3 : trois tests sans saut, code 0", "    pass", 0, 2, s2bis),
+            ("C-05 option illisible, code 3", "    pass", 3, 1, ["--plancher", "x"])):
+        d = factice(os.path.join(W, nom[:4]), corps, n=n)
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            r = v.main([d])
+            r = v.main([d, *opt])
         cas(nom, [] if r == rc else [f"code {r}, attendu {rc}"], None)
 finally:
     shutil.rmtree(W)
+
+
+def job(nom):
+    """Lignes, sans indentation, du job `nom` de gates.yml : de sa clé à la clé de job suivante ; [] s'il manque."""
+    with open(GY, encoding="utf-8") as f:
+        lignes = f.read().splitlines()
+    if f"  {nom}:" not in lignes:
+        return []
+    i = lignes.index(f"  {nom}:") + 1
+    fin = next((k for k in range(i, len(lignes)) if re.fullmatch(r"  [\w-]+:", lignes[k])), len(lignes))
+    return [x.strip() for x in lignes[i:fin]]
+
+
+ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1",
+          "run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py")
+for nom, appel in (("K-01 s2-harness-unittest", r"python3 -B enforcement/verdict-suite-s2\.py"),
+                   ("K-02 s2bis-unittest", r"python3 -B enforcement/verdict-suite-s2\.py s2bis --aucun-saut "
+                                           r"--plancher [1-9][0-9]*")):
+    l = job(nom[5:])
+    k = [i for i, x in enumerate(l) if re.fullmatch(appel, x)]
+    bon = (len(k) == 1 and all(e in l[:k[0]] for e in ETAPES)
+           and not any("-m unittest" in x or "continue-on-error" in x for x in l))
+    cas(f"{nom} : étapes du job lues dans gates.yml (runner, puis vérificateur)", [] if bon else [f"{l!r}"], None)
 print(f"verdict-suite-s2 : {OK_} ok, {KO} échec")
 sys.exit(1 if KO else 0)

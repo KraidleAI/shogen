@@ -5,7 +5,8 @@
 # D8) : ce workflow porte G5 (g5-no-naked-todo, R-13, avec les cas du hook pre-commit
 # versionné), G1 (g1-model-pinning, R-1 : épinglage des modèles), le G3 des secrets
 # (g3-secrets, plancher de motifs) et le G3 du chemin de recalcul S2
-# (s2-harness-unittest). Les gates de forge du code Rust vivent dans squelette.yml,
+# (s2-harness-unittest) ; s2bis-unittest ajouté le 2026-10-04 (lot COLLECTE-BIS, CB-0 :
+# paquet s2bis/ d'ADR-0029). Les gates de forge du code Rust vivent dans squelette.yml,
 # mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
 # s2-harness a deux périmètres (ADR-0028 D6 (i)) :
 #   - chemin de recalcul : records (hors append_asn), window, r1, lm, r2 (hors
@@ -190,3 +191,26 @@ jobs:
           unset SHOGEN_S2_CAMPAGNE_CONTROL
           python3 --version
           python3 -B enforcement/verdict-suite-s2.py
+
+  s2bis-unittest:
+    # Lot COLLECTE-BIS, sous-lot CB-0 (2026-10-04 ; ADR-0029 §2.9 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION
+    # §1 pt 6, E-C-40, E-C-41) : suite unittest du paquet s2bis/ (bibliothèque standard seule, fixtures, garde
+    # réseau posée par s2bis/tests/__init__.py). Verdict par le vérificateur de s2-harness-unittest : résumé final
+    # exigé, aucun saut admis, Ran ≥ plancher committé ci-dessous (SHOGEN-CI-S2-SAUT-1), relevé au compte mesuré à
+    # chaque sous-lot (SHOGEN-CI-PLANCHER-SUIVI-1). Étapes lues par le cas K-02 du runner (SHOGEN-CI-S2-CABLAGE-1).
+    name: s2bis-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas du vérificateur de la suite (câblage des deux jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de s2bis (fixtures, garde réseau), jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --plancher 10
