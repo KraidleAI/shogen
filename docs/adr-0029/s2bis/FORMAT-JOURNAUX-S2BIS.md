@@ -8,7 +8,7 @@
   collecteur. Code de référence : `s2bis/shogen_s2bis/collecte/journal.py`. Le test de conformité d'un journal produit
   par le collecteur entier (E-C-24) est celui du sous-lot CB-18.
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
-  de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1).
+  de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -143,3 +143,6 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    est close par un saut de ligne, jamais réécrite.
 3. Une ligne d'imbrication excessive (le décodeur JSON lève RecursionError) est non intègre : elle et la suite forment
    une queue (§7). L'écrivain refuse d'écrire un tel enregistrement (`JOURNAL/type`).
+4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
+   le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
+   partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure.

@@ -1,6 +1,6 @@
 """CB-1, E-C-16, E-C-18, E-C-19 : écrivain chaîné. Octets attendus et sha256 écrits à la main (printf et sha256sum,
 journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits.
-CB-2d (C-2 de la G2 de P1) : après une OSError, l'écrivain refuse tout ; `fermer` rend toujours le verrou."""
+CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une OSError ; cycle refusé en temps borné."""
 import errno
 import fcntl
 import hashlib
@@ -42,16 +42,17 @@ class Base(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
-        self.d, self.fsyncs, self.panne = d.name, [], None
+        self.d, self.fsyncs, self.tailles, self.panne = d.name, [], [], None
 
     def espion(self, fd):
-        """fsync injecté : relève l'inode du fichier ; lève `panne` si elle est posée (C-2)."""
+        """fsync injecté : relève l'inode et la taille du fichier ; lève `panne` si elle est posée (C-2)."""
         if self.panne:
             raise self.panne
         self.fsyncs.append(os.fstat(fd).st_ino)
+        self.tailles.append(os.fstat(fd).st_size)
 
-    def journal(self, ws=WS):
-        jl = j.Journal(self.d, "pool", fsync=self.espion)
+    def journal(self, ws=WS, prefixe="pool"):
+        jl = j.Journal(self.d, prefixe, fsync=self.espion)
         self.addCleanup(jl.fermer)
         return jl.ouvrir(ws)
 
@@ -80,21 +81,23 @@ class Ecrivain(Base):
         self.assertEqual([e["ws"] for e in enrs if e["type"] == "point"], [WS + 60, WS + 61 * 60])
 
     def test_fsync_un_appel_par_marqueur_sur_le_journal(self):
-        jl, n = self.journal(), []
+        jl, n, t = self.journal(), [], []
         for ws in (WS + 60, WS + 120):                         # 22:59 porte aussi un point de contrôle
             jl.ecrire("lecture", ws, k=1)
             n.append(len(self.fsyncs))
             jl.marqueur(ws)
             n.append(len(self.fsyncs))
+            t.append(len(self.etat()[FICHIER]))                 # C-5 (M-07) : fsync après le point
         self.assertEqual((n, set(self.fsyncs)), ([0, 1, 1, 2], {os.stat(os.path.join(self.d, FICHIER)).st_ino}))
+        self.assertEqual(self.tailles, t)
 
     def test_seconde_instance_refusee_sans_ecriture(self):
-        self.jl = self.journal()
+        self.jl, seconde = self.journal(), j.Journal(self.d, "pool")
         avant, res = self.etat(), []
 
         def essai():
             try:
-                j.Journal(self.d, "pool").ouvrir(WS + 600)
+                seconde.ouvrir(WS + 600)
                 res.append("ouvert")
             except j.JournalOccupe as e:
                 res.append(e.code)
@@ -102,6 +105,7 @@ class Ecrivain(Base):
         t.start()
         t.join(5)
         self.assertEqual((res, self.etat()), (["JOURNAL/occupe"], avant))
+        self.assertEqual((seconde.fd, seconde.verrou), (None, None))     # C-5 (G-19) : descripteur fermé
         self.jl.fermer()                                       # fermer libère le verrou : un tiers le prend aussitôt
         with open(os.path.join(self.d, "pool.verrou"), "rb") as f:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -115,6 +119,7 @@ class Ecrivain(Base):
                             ("JOURNAL/type", lambda: jl.ecrire("lecture", WS + 120, d={1: 2})),
                             ("JOURNAL/reserve", lambda: jl.ecrire("marqueur", WS + 120)),
                             ("JOURNAL/reserve", lambda: jl.ecrire("lecture", WS + 120, seq=9)),
+                            ("JOURNAL/reserve", lambda: jl.ecrire("lecture", WS + 120, prec="0")),    # C-5 (G-13)
                             ("JOURNAL/fenetre", lambda: jl.ecrire("lecture", WS + 60, k=2)),
                             ("JOURNAL/fenetre", lambda: jl.marqueur(WS + 60)),
                             ("JOURNAL/fenetre", lambda: jl.ecrire("lecture", WS + 150, k=2)),
@@ -145,3 +150,30 @@ class Ecrivain(Base):
         self.assertRaises(OSError, jl.fermer)
         with open(os.path.join(self.d, "pool.verrou"), "rb") as f:
             fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+    def test_refus_nommes_a_l_ouverture(self):                          # C-5 : G-03, G-04, G-05
+        with open(os.path.join(self.d, "vide-2026-10-04-0.jsonl"), "wb") as f:
+            f.write(b'{"jour":')                                # aucun enregistrement intègre
+        for code, appel in (("JOURNAL/grille", lambda: j.Journal(self.d, "pool", w=7)),
+                            ("JOURNAL/fenetre", lambda: self.journal(WS + 1)),
+                            ("JOURNAL/illisible", lambda: self.journal(prefixe="vide"))):
+            with self.subTest(code=code):
+                with self.assertRaises(j.ErreurJournal) as e:
+                    appel()
+                self.assertEqual(e.exception.code, code)
+
+    def test_structure_cyclique_refusee_en_temps_borne(self):          # C-3 (sonde S-7 de la G2)
+        jl, boucle, partage, res = self.journal(), [], [1], []
+        boucle.append(boucle)
+        avant = self.etat()
+
+        def essai():
+            try:
+                jl.ecrire("lecture", WS + 60, c=boucle)
+            except Exception as e:                                # refus attendu : ErreurJournal nommée
+                res.append(getattr(e, "code", repr(e)))
+        t = threading.Thread(target=essai, daemon=True)          # une boucle sans fin pendrait le fil, pas la suite
+        t.start()
+        t.join(5)
+        self.assertEqual((res, self.etat()), (["JOURNAL/type"], avant))
+        self.assertEqual(j.canonique({"a": partage, "b": partage}), b'{"a":[1],"b":[1]}\n')   # partage sans cycle

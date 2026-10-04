@@ -40,8 +40,9 @@ class AvecJournal(Base):
 
 class Reprise(AvecJournal):
     def test_reprise_dans_le_meme_fichier_fenetre_du_redemarrage_refusee(self):
-        avant = self.preparer()
+        avant, n = self.preparer(), len(self.fsyncs)
         jl = self.journal(m(7))                                 # redémarrage pendant la fenêtre de 23:05
+        self.assertEqual(self.fsyncs[n:], [os.stat(os.path.join(self.d, FICHIER)).st_ino])   # C-5 (G-06) : fsync
         self.assertRaises(j.ErreurJournal, jl.ecrire, "lecture", m(7), k=0)
         jl.ecrire("lecture", m(8), k=8)
         octets = self.etat()[FICHIER]
@@ -135,6 +136,51 @@ class Reprise(AvecJournal):
 
     def test_segment_ouvert_par_un_marqueur_repli(self):
         self.segment(lambda s, p: ligne(s, p, type="marqueur", ws=m(4)))
+
+    def test_segment_ouvert_par_un_seq_non_entier_repli(self):         # C-5 (G-07)
+        self.segment(lambda s, p: ligne(True, p, type="reprise", ws=m(5), suivante=m(4), queue=None))
+
+    def test_deux_queues_declarees_dans_l_ordre(self):                 # C-5 (G-08)
+        seq, prec, _e = chaine(self.preparer())
+        for n, q in ((FICHIER, b'{"k":4'), (SEG1, b'{"jour":')):
+            with open(os.path.join(self.d, n), "ab") as f:
+                f.write(q)
+        self.journal(m(7)).fermer()
+        self.assertEqual([x["fichier"] for x in chaine(self.etat()[SEG2], seq, prec)[2][0]["queue"]], [FICHIER, SEG1])
+
+    def test_reprise_sur_fichier_clos_fichier_neuf(self):              # C-5 (G-02)
+        seq, prec, _e = chaine(self.preparer())
+        with open(os.path.join(self.d, FICHIER), "ab") as f:
+            f.write(ligne(seq, prec, type="cloture", jour="2026-10-04"))
+        clos = self.etat()[FICHIER]
+        self.journal(m(7)).fermer()
+        e = self.etat()
+        self.assertEqual((e[FICHIER], chaine(e[SEG1], *chaine(clos)[:2])[2][0]["type"]), (clos, "reprise"))
+
+    def test_reprise_un_jour_plus_tard_cloture_a_la_veille(self):      # C-5 (G-01, M-18)
+        avant = self.preparer()
+        self.journal(J2 + 3600).fermer()                        # 2026-10-05 01:00 : fichier de la veille propre
+        e = self.etat()
+        seq, prec, enrs = chaine(e[FICHIER])
+        self.assertEqual((e[FICHIER][:len(avant)], sans_chaine(enrs[-1:])), (avant, [{"type": "cloture",
+                                                                                         "jour": "2026-10-04"}]))
+        self.assertEqual(sans_chaine(chaine(e["pool-2026-10-05-0.jsonl"], seq, prec)[2]), [
+            {"type": "reprise", "ws": J2 + 3600, "suivante": m(4), "queue": None}])
+        self.assertEqual(e["pool.sha256"], f"{hashlib.sha256(e[FICHIER]).hexdigest()}  {FICHIER}\n".encode())
+
+    def test_ligne_de_limite_octets_admise_un_de_plus_refusee(self):   # C-5 (G-10, G-11)
+        self.preparer()
+        jl = self.journal(m(8))
+        seq, prec, _e = chaine(self.etat()[FICHIER])
+        x = "a" * (j.LIMITE - len(ligne(seq, prec, type="lecture", ws=m(9), x="")))
+        jl.ecrire("lecture", m(9), x=x)                         # LIMITE octets : écrite
+        self.assertRaises(j.ErreurJournal, jl.ecrire, "lecture", m(9), x=x + "a")      # LIMITE + 1 : refusée
+        jl.fermer()
+        seq, prec, _e = chaine(self.etat()[FICHIER])            # relue intègre
+        with open(os.path.join(self.d, FICHIER), "ab") as f:
+            f.write(ligne(seq, prec, type="lecture", ws=m(9), x=x + "a"))     # LIMITE + 1, chaînée : une queue
+        self.journal(m(10)).fermer()
+        self.assertEqual(chaine(self.etat()[SEG1], seq, prec)[2][0]["queue"][0]["octets"], j.LIMITE + 1)
 
     def test_horloge_reculee_d_un_jour_segment_du_jour_repris(self):
         jl = self.journal(J1 - 60)

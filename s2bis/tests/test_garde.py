@@ -20,10 +20,11 @@ class Garde(unittest.TestCase):
             s.settimeout(1)
             for appel in (lambda: s.connect(("192.0.2.1", 443)), lambda: u.sendto(b"x", ("192.0.2.1", 53)),
                           lambda: socket.gethostbyname("example.invalid"), attrape_tout,
-                          lambda: socket.create_connection(("192.0.2.1", 443), timeout=1)):
+                          lambda: socket.create_connection(("192.0.2.1", 443), timeout=1),
+                          lambda: s.connect_ex(("192.0.2.1", 443))):                    # C-5 (M-26 de la G2)
                 self.assertRaises(tests.ReseauInterdit, appel)
         self.assertEqual([h for _n, h in tests.TENTATIVES[n:]],
-                         ["192.0.2.1", "192.0.2.1", "example.invalid", "example.invalid", "192.0.2.1"])
+                         ["192.0.2.1", "192.0.2.1", "example.invalid", "example.invalid", "192.0.2.1", "192.0.2.1"])
 
     def test_boucle_locale_permise(self):
         with socket.socket() as srv:

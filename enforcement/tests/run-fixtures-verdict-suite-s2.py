@@ -4,8 +4,9 @@ suites factices lancées dans des dossiers temporaires, hors du dépôt (rejeux 
 retirée de l'environnement de la suite) ; C : point d'entrée sur une suite factice de 398 tests. Variable scellée
 jamais transmise à un processus (valeur fictive dans un mapping seulement). Lot COLLECTE-BIS, CB-0 (G0
 docs/adr-0029/g0-collecte/) : V-14, V-15, C-03 à C-05 (suite s2bis : aucun saut admis, plancher en option) ; K-01, K-02
-(SHOGEN-CI-S2-CABLAGE-1 : étapes des deux jobs unittest lues dans gates.yml). Sortie : 0 tout passe, 1 un cas échoue, 3
-erreur."""
+(SHOGEN-CI-S2-CABLAGE-1 : étapes des deux jobs unittest lues dans gates.yml). CB-2e (G2 de P1, C-4 et Q-2) : C-06 à
+C-08, V-16, V-17 (plancher par défaut et option exercés ; `--egal`) ; aucun `if:` dans les deux jobs. Sortie : 0 tout
+passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -68,6 +69,8 @@ cas("V-12 aucun saut, OK (variable posée hors du job)", v.verdict(sortie(sauts=
 cas("V-13 motif entre guillemets doubles", v.verdict(sortie(sauts=(NOMME, f"\"{VAR} : l'autre\"")), 0), None)
 cas("V-14 aucun saut admis : sauts nommant la variable refusés", v.verdict(sortie(), 0, variable=None), "aucun admis")
 cas("V-15 aucun saut admis : suite sans saut conforme", v.verdict(sortie(sauts=()), 0, variable=None), None)
+cas("V-16 --egal : Ran plancher + 1 refusé", v.verdict(sortie(n=v.PLANCHER + 1, sauts=()), 0, egal=True), "--egal")
+cas("V-17 --egal : Ran égal au plancher conforme", v.verdict(sortie(sauts=()), 0, egal=True), None)
 
 
 def factice(d, corps, nom="test_f.py", n=1):
@@ -96,13 +99,17 @@ try:
       "in os.environ", None, environ={**os.environ, VAR: "/chemin/fictif/inexistant"})
     deux = "".join(f"    def test_s{i}(self):\n        self.skipTest({NOMME})\n" for i in (1, 2))
     sortie0 = "    def test_x(self):\n        os._exit(0)"
-    s2bis = ["--aucun-saut", "--plancher", "3"]
+    s2bis = ["--aucun-saut", "--egal", "--plancher", "3"]
     for nom, corps, rc, n, opt in (
             ("C-01 point d'entrée : tests au plancher, deux sauts nommés, code 0", deux, 0, v.PLANCHER - 3, []),
             ("C-02 point d'entrée : os._exit(0), code 1", sortie0, 1, v.PLANCHER, []),
-            ("C-03 --aucun-saut --plancher 3 : deux sauts nommés, code 1", deux, 1, 0, s2bis),
-            ("C-04 --aucun-saut --plancher 3 : trois tests sans saut, code 0", "    pass", 0, 2, s2bis),
-            ("C-05 option illisible, code 3", "    pass", 3, 1, ["--plancher", "x"])):
+            ("C-03 --aucun-saut --egal --plancher 3 : deux sauts nommés, code 1", deux, 1, 0, s2bis),
+            ("C-04 --aucun-saut --egal --plancher 3 : trois tests sans saut, code 0", "    pass", 0, 2, s2bis),
+            ("C-05 option illisible, code 3", "    pass", 3, 1, ["--plancher", "x"]),
+            ("C-06 point d'entrée : plancher − 1 tests sans saut, code 1", "    pass", 1, v.PLANCHER - 2, []),
+            ("C-07 --aucun-saut --plancher 4 : trois tests, code 1", "    pass", 1, 2,
+             ["--aucun-saut", "--plancher", "4"]),
+            ("C-08 --aucun-saut --egal --plancher 3 : quatre tests, code 1", "    pass", 1, 3, s2bis)):
         d = factice(os.path.join(W, nom[:4]), corps, n=n)
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             r = v.main([d, *opt])
@@ -126,11 +133,11 @@ ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba80582
           "run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py")
 for nom, appel in (("K-01 s2-harness-unittest", r"python3 -B enforcement/verdict-suite-s2\.py"),
                    ("K-02 s2bis-unittest", r"python3 -B enforcement/verdict-suite-s2\.py s2bis --aucun-saut "
-                                           r"--plancher [1-9][0-9]*")):
+                                           r"--egal --plancher [1-9][0-9]*")):
     l = job(nom[5:])
     k = [i for i, x in enumerate(l) if re.fullmatch(appel, x)]
     bon = (len(k) == 1 and all(e in l[:k[0]] for e in ETAPES)
-           and not any("-m unittest" in x or "continue-on-error" in x for x in l))
+           and not any("-m unittest" in x or "continue-on-error" in x or x.startswith(("if:", "- if:")) for x in l))
     cas(f"{nom} : étapes du job lues dans gates.yml (runner, puis vérificateur)", [] if bon else [f"{l!r}"], None)
 print(f"verdict-suite-s2 : {OK_} ok, {KO} échec")
 sys.exit(1 if KO else 0)

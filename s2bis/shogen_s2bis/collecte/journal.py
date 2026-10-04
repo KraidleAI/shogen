@@ -39,17 +39,19 @@ class JournalOccupe(ErreurJournal):
 
 
 def canonique(enr):
-    """Octets canoniques de `enr` ; flottant, clé non textuelle ou valeur hors JSON : refus JOURNAL/type."""
+    """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Le
+    contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3)."""
+    try:
+        octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+    except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication
+        raise ErreurJournal("JOURNAL/type", e) from None
     pile = [enr]
     while pile:
         v = pile.pop()
         if isinstance(v, float) or isinstance(v, dict) and not all(isinstance(k, str) for k in v):
             raise ErreurJournal("JOURNAL/type", repr(v)[:80])
         pile += v.values() if isinstance(v, dict) else v if isinstance(v, (list, tuple)) else []
-    try:
-        return json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
-    except (TypeError, ValueError, RecursionError) as e:          # RecursionError : imbrication excessive
-        raise ErreurJournal("JOURNAL/type", e) from None
+    return octets
 
 
 def jour(ws):

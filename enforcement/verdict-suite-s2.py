@@ -8,9 +8,10 @@ tests in …s », ligne vide, « OK » ou « OK (skipped=k) ») ; exactement k l
 nommant SHOGEN_S2_CAMPAGNE_CONTROL (annexe D.4 a) ; N ≥ PLANCHER, plancher committé, sans égalité figée (choix du G0
 de D8a-3 : plancher, et non manifeste des modules ; journal G1 du lot DETTES-B1). Bibliothèque standard seule (R-8).
 Lot COLLECTE-BIS, CB-0 (G0 docs/adr-0029/g0-collecte/, PROPOSITION §1 pt 6) : `--aucun-saut` refuse tout saut, même
-nommant la variable (suite s2bis) ; `--plancher N` remplace PLANCHER ; sans option, verdict de S2 inchangé.
-Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--plancher N] ; sortie 0 conforme, 1 refus (motifs
-sur stderr), 3 erreur."""
+nommant la variable (suite s2bis) ; `--plancher N` remplace PLANCHER ; sans option, verdict de S2 inchangé. CB-2e
+(Q-2 de la G2 de P1, job s2bis seul) : `--egal` exige Ran = plancher (SHOGEN-CI-PLANCHER-SUIVI-1 mécanisé).
+Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
+(motifs sur stderr), 3 erreur."""
 import os
 import re
 import subprocess
@@ -24,9 +25,9 @@ FIN = re.compile(r"\n-{70}\nRan (\d+) tests? in \d+\.\d+s\n\n(OK(?: \(skipped=(\
 SAUT = re.compile(r" \.\.\. skipped (['\"])(.*)\1$", re.M)
 
 
-def verdict(texte: str, code: int, plancher: int = PLANCHER, variable=VARIABLE) -> list:
+def verdict(texte: str, code: int, plancher: int = PLANCHER, variable=VARIABLE, egal=False) -> list:
     """Motifs de refus du flux `texte` (stderr) d'une suite unittest -v sortie avec `code` ; liste vide : conforme.
-    `variable` None : aucun saut admis."""
+    `variable` None : aucun saut admis ; `egal` : Ran = plancher exigé."""
     refus = [f"code de sortie {code}, 0 exigé"] if code else []
     m = FIN.search(texte)
     if not m:
@@ -39,6 +40,8 @@ def verdict(texte: str, code: int, plancher: int = PLANCHER, variable=VARIABLE) 
               for _q, r in sauts if not variable or variable not in r]
     if n < plancher:
         refus.append(f"Ran {n} < plancher {plancher} : module sorti du motif test*.py ou tests retirés")
+    elif egal and n > plancher:
+        refus.append(f"Ran {n} > plancher {plancher} (--egal) : plancher à relever au compte des tests")
     return refus
 
 
@@ -51,6 +54,9 @@ def lancer(harnais: str, environ=None) -> tuple:
 
 def main(argv: list) -> int:
     reste, plancher, variable = list(argv), PLANCHER, VARIABLE
+    egal = "--egal" in reste
+    if egal:
+        reste.remove("--egal")
     if "--aucun-saut" in reste:
         reste.remove("--aucun-saut")
         variable = None
@@ -69,12 +75,12 @@ def main(argv: list) -> int:
     err, out, code = lancer(harnais)
     sys.stdout.write(err + out)
     sys.stdout.flush()
-    refus = verdict(err, code, plancher, variable)
+    refus = verdict(err, code, plancher, variable, egal)
     for r in refus:
         print(f"verdict-suite-s2 : refus : {r}", file=sys.stderr)
     if not refus:
         sauts = f"sauts nommant {variable}" if variable else "aucun saut"
-        print(f"verdict-suite-s2 : conforme (code 0, résumé final, {sauts}, Ran ≥ {plancher})")
+        print(f"verdict-suite-s2 : conforme (code 0, résumé final, {sauts}, Ran {'=' if egal else '≥'} {plancher})")
     return 1 if refus else 0
 
 

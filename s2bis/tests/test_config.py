@@ -41,6 +41,8 @@ class Config(unittest.TestCase):
                 ("CONFIG/borne", r(b"60", b"3601"), "$.w = 3601"), ("CONFIG/borne", r(b"60", b"0"), "$.w = 0"),
                 ("CONFIG/borne", r(b'"pool"', b'"pool-long"'), "$.nom"), ("CONFIG/borne", r(b": 5}", b": 6}"), "[0].n"),
                 ("CONFIG/borne", r(b"60", b"1" * 5000), "5000"), ("CONFIG/cle-double", r(b"{", b'{"w": 60, ', 1), "w"),
+                ("CONFIG/borne", r(b"60", b"1" * 31), "entier de 31 chiffres"),     # C-5 (G-20) : 31 refusé à la
+                ("CONFIG/borne", r(b"60", b"1" * 30), "$.w = 1111"),                # lecture, 30 lu puis hors schéma
                 ("CONFIG/non-fini", r(b"60", b"NaN"), "NaN"), ("CONFIG/flottant", r(b"60", b"60.0"), "60.0"),
                 ("CONFIG/json", b"\xff", "utf-8"), ("CONFIG/json", b"{", ""),
                 ("CONFIG/json", b"[" * 100000 + b"]" * 100000, "recursion")):

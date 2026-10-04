@@ -198,6 +198,7 @@ jobs:
     # réseau posée par s2bis/tests/__init__.py). Verdict par le vérificateur de s2-harness-unittest : résumé final
     # exigé, aucun saut admis, Ran ≥ plancher committé ci-dessous (SHOGEN-CI-S2-SAUT-1), relevé au compte mesuré à
     # chaque sous-lot (SHOGEN-CI-PLANCHER-SUIVI-1). Étapes lues par le cas K-02 du runner (SHOGEN-CI-S2-CABLAGE-1).
+    # Diff CB-2e (Q-2 de la G2 de P1) : --egal exige Ran = plancher ; un plancher oublié ou abaissé fait échouer le job.
     name: s2bis-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -213,4 +214,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --plancher 42
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 49
