@@ -47,7 +47,7 @@ faite par l agent ; chaque message reçu est signalé tel quel à l investisseur
   PR (adresse réservée aux demandes média et marketing, « A member from the Binance PR Team will contact you shortly »).
 - 20:02 UTC, de `MAILER-DAEMON@mailchannels.net`, « Undelivered Mail Returned to Sender » : `press@chainlink.com` rejetée, 550 5.1.1,
   « Recipient address rejected: User unknown ». Le préavis Chainlink n est pas parvenu : adresse à remplacer (décision de l orchestrateur).
-- 20:03 UTC, de `press@ripe.net`, « PRES-159 Private advance notice… » : accusé automatique du support RIPE NCC (« Just confirming that
-  we got your request »), ticket PRES-159.
+- 20:03 UTC, de `press@ripe.net`, « PRES-159 Private advance notice… » : accusé automatique du support RIPE NCC (“Just confirming that
+  we got your request”), ticket PRES-159.
 - 20:18 UTC, de `support@coingecko.com` : « Please verify your email address » (vérifiée par l investisseur), puis accusé automatique du
   ticket #139007 (« a support ticket (#139007) has been created for you »).
