@@ -833,3 +833,18 @@ faite ; restent le libellé Windows, la limite « pas d'épinglage par digest d'
 | SHOGEN-SECRETS-NOMS-REFS-1 | les noms de refs ne sont jamais balayés ; git imprime en clair le nom d'une ref cassée qui porte une forme (mesuré en `--history` et en `--hors-refs`) | orch. | prochain lot qui touche la gate des secrets | un flux de plus et un masque [inféré] | G2 du lot DETTES-B2, N-1 |
 | SHOGEN-SG9-COPIE-INTERDITS-1 | sur une copie sans dossiers interdits, S-G9 rougit sur une référence vers un dossier absent ; convention à écrire (dossier interdit absent en entier : référence listée en note ; sinon contrôle plein) | orch. | prochain lot qui touche S-G9 | une règle et deux tests [inféré] | G2 du lot DETTES-B2, N-2 |
 | SHOGEN-SG9-STRUCTURE-1 | contrôles (g) formes proscrites et (h) structure des tables S et T de l'oracle `verif_refs.py` non mécanisés | orch. | avec SG9-PERIMETRE-1 | deux contrôles [inféré] | G2 du lot DETTES-B2, N-3 (C-4) |
+
+## B.52 Amendement daté du 2026-10-04 08:28:17 UTC (heure produite par le script d'écriture) : ADR-0029 révision 3 validée et versée
+
+L'ADR-0029 révision 3 (report des décisions d'architecture D-1 à D-9, telles que corrigées par le §7 et le §8 de
+`docs/adr-0029/DECISIONS-ARCHITECTURE-S2BIS.md`) est versée (sha256 `926fdeff…471c`) avec son journal G1
+(`docs/adr-0029/G1-ADR-0029-v3.md`), son cp-1 complet (`docs/adr-0029/CP1-ADR0029-V3.md`, validateur frais `claude-fable-5-1` :
+ACCEPTE-AVEC-CORRECTIONS, onze corrections de texte appliquées mot pour mot, aucune escalade) et l'avis de l'advisor sur les
+cinq questions techniques (`docs/adr-0029/AVIS-QUESTIONS-TECHNIQUES-V3.md`, `claude-fable-5-1`), dont les cinq recommandations
+sont adoptées par l'orchestrateur (carte en processus et journal séparés ; formules de σ et des planchers ; condition de
+CALIB-ACTIFS classe par classe ; vote binaire de la variable d'état, seuil 0,5 % scellé ; statistique S imprimée hors décision).
+Budget du §3 et durée de mesure inchangés ; l'ordre de grandeur d'une seconde vague (26 à 52 € HT, base de l'avis) est cité sans
+nouveau calcul de budget (écart F-2 du rédacteur, accepté : au taux haut de la v2, la borne haute serait d'environ 55 € HT).
+Item **fermé** : SHOGEN-ADR0029-STATUT-CP1-1 (B.48). SHOGEN-ENTRELACEMENT-D5-1 (B.50) est rattaché au G0 du lot COLLECTE-BIS de
+l'ADR-0029. Restent ouverts au texte de l'ADR : la q. 4 (c) du §8.2 (G0 de RECALC-BIS), les valeurs de σ, des planchers et d'une
+éventuelle vague (G0 de CALIB-ACTIFS), et les vingt questions de valeur du §6, à l'investisseur.
