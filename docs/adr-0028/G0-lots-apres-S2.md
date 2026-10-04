@@ -16,3 +16,11 @@ D10 ; directive de l'investisseur du 2026-10-04 (JOURNAL, verbatim) ; avis d'un 
 Hors lots, par construction : « benchmark continu » (déclencheur D6 (vi) non atteint : « R1 discrimine » FAUX) ; S4
 (conditionné à D9 (i) et (ii)). Décisions de valeur posées à l'investisseur : arrêt de la collecte S2, financement de
 S2-bis, publication (G9), envergure (§4.7).
+
+## Décision technique sur le lot G4 (ajout daté du 2026-10-04 03:09:29 UTC, orchestrateur sur l'avis `docs/adr-0028/AVIS-G4-NOTAIRE.md`)
+
+- **Option retenue** : notaire tiers indépendant qui construit et exécute lui-même la demi-notaire à la révision épinglée `0fe3c32d`, clé générée et gardée par lui, publiée en liste datée (entrée séparée du vérificateur, jamais portée par le lot) ; jeton RFC 3161 pris par Shōgen à la collecte ; pluralité k = 2 en seconde étape (axe R2).
+- **Repli** : notaire en enclave AWS Nitro opéré par Shōgen, image reproductible, attestation publiée, verdict « auto-opéré » ; déclenché si aucun opérateur tiers à l'échéance fixée par l'investisseur.
+- **Amont** : rester sur TLSNotary épinglé et auditer ; instruire le mode proxy par ADR sans l'adopter ; critères de bascule à écrire dans l'ADR du notaire.
+- **S2-bis** : mesure R1/R2 sans témoignage notarié (brin exploratoire facultatif sur un VPS distinct, hors décision).
+- **Suite du lot** : SHOGEN-G4-BIBLIO-1 (versement des sources web), puis ADR du notaire tiers (liste de clés, contrôle dans `shogen-verifier`, jeton de collecte, registre 08, tests t1-t8). Contacts extérieurs et budget : questions à l'investisseur.
