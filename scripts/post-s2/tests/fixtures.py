@@ -42,12 +42,12 @@ def ecrire(dossier, controle, lectures):
 
 def journaux(dossier, fenetres, motif, pool=POOL, avant=(), **sur):
     """Un démarrage (enregistrements `avant`, puis run_params, clés `sur` comprises) puis, par fenêtre, les lectures du
-    pool (motif(i, f) → état, ou (état, source_ts) ; None : lecture absente) et le marqueur."""
+    pool (motif(i, f) → état, ou (état, source_ts[, prix]) ; None : lecture absente) et le marqueur."""
     controle, lectures = [*avant, params(pool, **sur)], []
     for i, ws in enumerate(fenetres):
         for f in pool:
             if (e := motif(i, f)) is not None:
-                etat, ts = e if isinstance(e, tuple) else (e, None)
-                lectures.append(lecture(ws, f, etat, source_ts=ts))
+                etat, ts, prix = (*e, "100")[:3] if isinstance(e, tuple) else (e, None, "100")
+                lectures.append(lecture(ws, f, etat, prix, source_ts=ts))
         controle.append(marqueur(ws))
     return ecrire(dossier, controle, lectures)
