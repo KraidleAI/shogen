@@ -26,6 +26,7 @@ pub mod sg5;
 pub mod sg6;
 pub mod sg7a;
 pub mod sg8;
+pub mod sg9;
 pub mod source;
 
 use std::path::{Path, PathBuf};
@@ -65,6 +66,7 @@ pub fn verifier_tout(racine: &Path, avec_outils_cargo: bool) -> i32 {
         sg6::executer(racine),
         sg7a::executer(racine),
         sg8::executer(racine),
+        sg9::executer(racine),
     ];
 
     let mut rouge = false;

@@ -736,3 +736,95 @@ fn mutant_sg8_ligne_de_table_entierement_vide() {
     let rapports = gates_documentaires(&racine);
     exiger_rouge(rapport_de(&rapports, "S-G8"), "malformée");
 }
+
+// ---------------------------------------------------------------------------
+// S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
+// l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
+// ajoute UNE forme fautive et exige le ROUGE pour son motif ; les survivants de la revue G2 d'E1 (résidu en
+// majuscules, apostrophes, décimal, pour-cent en lettres, nom nu de D.2 n° 8) ont leur test, la borne des
+// lots MONARK son témoin.
+// ---------------------------------------------------------------------------
+
+/// L'arbre synthétique : `@@@ chemin` ouvre un fichier, les lignes suivantes sont son contenu.
+const ARBRE_MENACE: &str = "\
+@@@ docs/17-modele-de-menace.md
+# modèle de menace synthétique
+
+Statut du 2026-10-04 ; lot T1 ; lots MONARK G2 et G7 ; PX-Shogen-1 ; FM-1.1, FM-3.3, §4.10, 1.97.1.
+Code : `crates/exemple.rs:2-3`, `crates/LISEZMOI:1`, `biblio/source.pdf.sidecar:9`,
+`F:/Monark@0123456789abcdef0123456789abcdef01234567:apps/x.ts:4`. Résidu A(exemple-residu) ;
+item SHOGEN-EXEMPLE-1 ; la source dit « une phrase française de la source, citée telle quelle ».
+Formes non fautives : SOMMA(x), A(…), items MONARK-SHOGEN-* transmis, lot G9, 3 maisons, « bref ».
+L'acte d'E1 et l'avis des pairs' sont lus ; « this quotation is English and is not checked here ».
+
+| T | a | b | c | contrôle | r | i |
+|---|---|---|---|---|---|---|
+| T-01 x | a | b | c | [hors chemin servi] `crates/exemple.rs:1` | r | i |
+| T-02 x | a | b | c | [aucun contrôle] motif écrit | r | i |
+@@@ docs/08-assumptions.md
+| A(exemple-residu) | énoncé |
+@@@ docs/adr-0028/ANNEXE-A-lots.md
+| **T1** (2026-10-04) | objet ; consommateur : docs/11 (lot G9) |
+@@@ docs/adr-0028/ANNEXE-B-items.md
+| SHOGEN-EXEMPLE-1 | objet | SHOGEN-MENTION-1 |
+| 9 | ligne sans identifiant en tête | SHOGEN-MENTION-2 |
+@@@ docs/source.md
+Selon lui, une phrase française de la source, citée telle quelle, fait foi.
+@@@ crates/exemple.rs
+ligne 1
+ligne 2
+ligne 3
+@@@ crates/LISEZMOI
+fichier sans extension
+";
+
+fn arbre_menace(nom_du_cas: &str) -> PathBuf {
+    let racine = std::env::temp_dir().join(format!("shogen-mutant-sg9-{nom_du_cas}"));
+    let _ = std::fs::remove_dir_all(&racine);
+    for bloc in ARBRE_MENACE.split("@@@ ").skip(1) {
+        let (relatif, contenu) = bloc.split_once('\n').expect("bloc : chemin puis contenu");
+        ecrire(&racine, relatif, contenu);
+    }
+    racine
+}
+
+/// S-G9 sur l'arbre synthétique augmenté de `ajout` : VERT exigé, couverture pleine ; rend les notes.
+fn notes_sg9_vert(cas: &str, ajout: &str) -> String {
+    let racine = arbre_menace(cas);
+    ajouter(&racine, xtask::sg9::PERIMETRE, ajout);
+    let rapport = xtask::sg9::executer(&racine);
+    rapport.imprimer();
+    assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
+    assert_eq!((rapport.examines, rapport.presents), (4, 4), "couverture");
+    rapport.notes.join("\n")
+}
+
+#[test]
+fn temoin_sg9_arbre_menace_intact_est_vert() {
+    notes_sg9_vert("temoin", "");
+}
+
+#[test]
+fn mutant_couverture_sg9_perimetre_absent() {
+    let racine = arbre_menace("perimetre-absent");
+    std::fs::remove_file(racine.join(xtask::sg9::PERIMETRE)).expect("suppression de docs/17");
+    exiger_rouge(&xtask::sg9::executer(&racine), "fichier absent : docs/17");
+}
+
+fn exiger_rouge_sg9(cas: &str, fragment: &str, attendu: &str) {
+    let racine = arbre_menace(cas);
+    ajouter(&racine, xtask::sg9::PERIMETRE, fragment);
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+/// Un test par mutant : une seule forme fautive ajoutée à docs/17, un seul motif exigé.
+macro_rules! mutants_sg9 {
+    ($($nom:ident : $fragment:expr => $attendu:expr),* $(,)?) => {
+        $(#[test] fn $nom() { exiger_rouge_sg9(stringify!($nom), $fragment, $attendu); })*
+    };
+}
+
+mutants_sg9! {
+    mutant_sg9_b_residu_invente: "\nRésidu A(residu-invente).\n" => "résidu non défini",
+    mutant_sg9_b_residu_en_majuscules: "\nRésidu A(EXEMPLE-RESIDU).\n" => "résidu non défini",
+}
