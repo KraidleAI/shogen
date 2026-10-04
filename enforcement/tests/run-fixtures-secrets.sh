@@ -178,10 +178,42 @@ r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal r
 mkdir -p "$R/.git/info" && printf '%s %s\n' "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD~2)" > "$R/.git/info/grafts" || fatal greffe; A=--history; cas T-74 2 SECRETS/tronque greffes
 r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r; g="$W/greffes-$K"
 printf '%s %s\n' "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD~2)" > "$g" || fatal greffe; A=--history; GIT_GRAFT_FILE="$g" cas T-74b 2 SECRETS/tronque greffes
-r; git -C "$R" tag tb "$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" || fatal tag; A=--history; cas T-75 2 SECRETS/echec 'blob ou un arbre'
+r; git -C "$R" tag tb "$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" || fatal tag; A=--history; cas T-75 2 SECRETS/historique '^refs/tags/tb:\(objet\)$' QQQQ
 r; echo x > "$R/$V.txt"; ci nom; git -C "$R" rm -q -- "$V.txt" || fatal rm; ci r
 A=--history; cas T-76 2 SECRETS/historique ':\[forme masquée\];\.txt:\(chemin\)$' QQQQ
 r; git -C "$R" tag -a ta -m t || fatal tag; A=--history; cas T-75b 0 'historique, 1 commit(s)'
+# Lot D8d (2026-10-04) : refs vers un blob ou un arbre balayées au lieu du refus (T-75 en refus d'historique, T-75c, T-75d,
+# T-75e : exclusion du contrat dans l'arbre) ; messages de commit et de tag annoté (T-94 à T-96) ; objets hors refs (T-97 à
+# T-99, T-101 : --hors-refs) ; bundle de custodie, cloné puis balayé par --history (T-100).
+r; git -C "$R" tag tc "$(printf 'propre\n' | git -C "$R" hash-object -w --stdin)" || fatal tag; A=--history; cas T-75c 0 'historique, 1 commit(s)'
+r; b="$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" && s="$(printf '100644 blob %s\tx.py\n' "$b" | git -C "$R" mktree)" &&
+  s="$(printf '040000 tree %s\ttests\n' "$s" | git -C "$R" mktree)" && s="$(printf '040000 tree %s\tenforcement\n' "$s" | git -C "$R" mktree)" &&
+  git -C "$R" update-ref refs/arbres/e "$s" || fatal arbre; A=--history; cas T-75e 0 'historique, 1 commit(s)'
+t="$(printf '100644 blob %s\tc.py\n' "$b" | git -C "$R" mktree)" && git -C "$R" update-ref refs/arbres/x "$t" || fatal arbre
+A=--history; cas T-75d 2 SECRETS/historique '^refs/arbres/x:\(objet\)$' QQQQ
+# Ref vers un arbre dont une entrée porte un nom en forme d'identifiant, contenu propre (T-75f ; revue G2, C-3).
+r; b="$(printf 'propre\n' | git -C "$R" hash-object -w --stdin)" && t="$(printf '100644 blob %s\t%s.txt\n' "$b" "$V" | git -C "$R" mktree)" &&
+  git -C "$R" update-ref refs/arbres/n "$t" || fatal arbre; A=--history; cas T-75f 2 SECRETS/historique '^refs/arbres/n:\(objet\)$' QQQQ
+r; echo x > "$R/a.txt"; git -C "$R" add a.txt && git -C "$R" commit -qm "k = $V" || fatal commit; c1=$(h); A=--history; cas T-94 2 SECRETS/historique "^$c1:\(message\)\$" QQQQ
+r; git -C "$R" tag -a tm -m "$G" || fatal tag; A=--history; cas T-95 2 SECRETS/historique '^refs/tags/tm:\(message\)$' QQQQ
+r; echo x > "$R/a.txt"; git -C "$R" add a.txt && git -C "$R" commit -qm sujet -m "commit 0000000000000000000000000000000000000000" -m "$V" || fatal commit
+c1=$(h); A=--history; cas T-96 2 SECRETS/historique "^$c1:\(message\)\$" '^000000000000:'
+# Tag annoté imbriqué (tag d'un tag ; seul le tag externe a une ref) : message intérieur balayé (T-105), propre (T-105b).
+r; git -C "$R" tag -a ti -m "$G" && git -C "$R" tag -a tx ti -m propre 2>/dev/null && git -C "$R" tag -d ti >/dev/null || fatal tag
+A=--history; cas T-105 2 SECRETS/historique '^refs/tags/tx:\(message\)$' QQQQ
+r; git -C "$R" tag -a ti -m propre && git -C "$R" tag -a tx ti -m propre 2>/dev/null && git -C "$R" tag -d ti >/dev/null || fatal tag
+A=--history; cas T-105b 0 'historique, 1 commit(s)'
+r; printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin >/dev/null || fatal objet; A=--hors-refs; cas T-97 2 SECRETS/hors-refs ' dans 1 objet\(s\) hors refs' QQQQ
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci c; git -C "$R" reset -q --hard HEAD~1 || fatal reset; A=--history; cas T-98a 0 'historique, 1 commit(s)'
+A=--hors-refs; cas T-98b 2 SECRETS/hors-refs ' dans 3 objet\(s\) hors refs'
+r; A=--hors-refs; cas T-99 0 'hors refs, 0 objet(s) hors refs sur 3'
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r; git -C "$R" bundle create -q "$W/b$K.bundle" --all 2>/dev/null &&
+  git clone -q "$W/b$K.bundle" "$W/bc$K" 2>/dev/null || fatal bundle; D="$W/bc$K"; A=--history; cas T-100 2 SECRETS/historique
+D="$W/sup"; A=--hors-refs; cas T-101 2 SECRETS/tronque superficiel
+# grep en erreur sur les flux de D8d-2 (enveloppe gv de T-82) : hors refs (T-102), objet d'une ref (T-103), message (T-104).
+r; printf 'k # ECHEC-GREP\n' | git -C "$R" hash-object -w --stdin >/dev/null || fatal objet; P="$W/gv:$PATH"; A=--hors-refs; cas T-102 2 SECRETS/echec 'grep a échoué \(hors refs\)'
+r; git -C "$R" tag te "$(printf 'k # ECHEC-GREP\n' | git -C "$R" hash-object -w --stdin)" || fatal tag; P="$W/gv:$PATH"; A=--history; cas T-103 2 SECRETS/echec 'grep a échoué \(refs\)'
+r; git -C "$R" commit -q --allow-empty -m 'k # ECHEC-GREP' || fatal commit; P="$W/gv:$PATH"; A=--history; cas T-104 2 SECRETS/echec 'grep a échoué \(messages\)'
 
 echo "secrets : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]

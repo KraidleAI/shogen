@@ -113,8 +113,10 @@ jobs:
     runs-on: ubuntu-24.04
     # Étapes mesurées en local (Git Bash) : 113 cas en 136 à 139 s (2026-10-01, re-revue rr1) ;
     # l'arbre du dépôt (302 à 304 fichiers, boucle par fichier du moteur porté) en 63 à 68 s et
-    # l'historique (141 commits, --all) en 1,5 à 1,6 s (2026-09-30, après la revue G2). 15 min
-    # bornent un blocage sans couper un run normal.
+    # l'historique (141 commits, --all) en 1,5 à 1,6 s (2026-09-30, après la revue G2) ; lot D8d
+    # (2026-10-04, Linux de la session cloud, 4 cœurs) : 144 cas en 57 à 66 s sous une charge moyenne
+    # de 17, 146 cas en 15 à 20 s sous une charge de 1 à 3 ; historique avec messages et objets des
+    # refs (346 à 351 commits) en 2,4 à 5,5 s. 15 min bornent un blocage sans couper un run normal.
     timeout-minutes: 15
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
