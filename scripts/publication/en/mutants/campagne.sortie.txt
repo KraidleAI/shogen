@@ -1,0 +1,115 @@
+=== Campagne de mutants du lot DOCS11-EN ===
+T-0a témoin code (tests sur le module réel) : sortie 0 — OK
+T-0b témoin texte (contrôle réel sur la traduction) : sortie 0 — OK
+T-0c témoin d'épingle (contrôle réel sur la source précédente) : sortie 3 — OK (refus attendu)
+
+MC-01 tué (sortie 1) — virgule décimale française non convertie — tests en échec : test_fr_decimale, test_jetons_unite_citation_gardee_fr, test_jetons_unite_egaux, test_main_conforme, test_nombres_par_unite_ok
+MC-02 tué (sortie 1) — espace de milliers français non retirée — tests en échec : test_fr_groupe, test_jetons_unite_egaux, test_main_conforme, test_nombres_par_unite_ok
+MC-03 tué (sortie 1) — virgule de milliers anglaise non retirée — tests en échec : test_en_groupe, test_jetons_unite_egaux, test_main_conforme, test_nombres_par_unite_ok
+MC-04 tué (sortie 1) — vecteurs entre crochets non protégés — tests en échec : test_fr_vecteur
+MC-05 tué (sortie 1) — famille composite débranchée — tests en échec : test_fr_vecteur, test_jetons, test_jetons_unite_code_brut
+MC-06 tué (sortie 1) — gloses comptées dans les nombres — tests en échec : test_jetons_unite_egaux, test_jetons_unite_glose_exclue, test_main_conforme, test_nombres_par_unite_ok
+MC-07 tué (sortie 1) — citations gardées lues à l'anglaise — tests en échec : test_jetons_unite_citation_gardee_fr, test_mots_unite_zones
+MC-08 tué (sortie 1) — mots composés à trait d'union comptés — tests en échec : test_mots_composes_non_comptes
+MC-09 tué (sortie 1) — « third party » compté comme ordinal — tests en échec : test_mots_tiers_non_compte
+MC-10 tué (sortie 1) — nombres en lettres jamais comptés par unité — tests en échec : test_mots_nombres_par_unite, test_mots_unite_zones
+MC-11 tué (sortie 1) — toute ligne « | » prise pour une ligne de table — tests en échec : test_unites_ligne_pipe_dans_paragraphe, test_unites_table_avec_delimiteur
+MC-12 tué (sortie 1) — paragraphes de citation non séparés — tests en échec : test_aligner_ok, test_entete_ok, test_main_conforme, test_unites_bloc_paragraphes, test_unites_genres_traduction
+MC-13 tué (sortie 1) — accent grave impair non fatal — tests en échec : test_masquer_impair
+MC-14 tué (sortie 1) — imbrication des guillemets ignorée — tests en échec : test_citations_fr_imbriquees
+MC-15 tué (sortie 1) — paire vide “ ” prise pour une citation — tests en échec : test_citations_en_vide_ignoree
+MC-16 tué (sortie 1) — blocs de code non comparés — tests en échec : test_code_modifie
+MC-17 tué (sortie 1) — codes en ligne non comparés — tests en échec : test_code_en_ligne_par_unite
+MC-18 tué (sortie 1) — titres non contrôlés — tests en échec : test_main_structure, test_titre_non_conforme
+MC-19 tué (sortie 1) — ordre des nombres par unité non contrôlé — tests en échec : test_nombres_echanges_dans_une_unite
+MC-20 tué (sortie 1) — multiensemble par unité non contrôlé — tests en échec : test_nombres_par_unite_ecart
+MC-21 tué (sortie 1) — citations traduites non contrôlées — tests en échec : test_citation_traduite_absente, test_main_citations
+MC-22 tué (sortie 1) — glose à la première occurrence non exigée — tests en échec : test_glose_pas_a_la_premiere
+MC-23 tué (sortie 1) — nombre de gloses non contrôlé — tests en échec : test_glose_double
+MC-24 tué (sortie 1) — nombres ajoutés par une glose non contrôlés — tests en échec : test_glose_nombres
+MC-25 tué (sortie 1) — citation française nouvelle non signalée — tests en échec : test_citation_gardee_modifiee
+MC-26 tué (sortie 1) — passages protégés jamais en écart — tests en échec : test_main_proteges, test_proteges_ecart
+MC-27 tué (sortie 1) — libellés comptés sans normaliser les espaces — tests en échec : test_libelles_espaces_normalises
+MC-28 tué (sortie 1) — motif anglais « Pyth est mort » retiré — tests en échec : test_motifs_anglais
+MC-29 tué (sortie 1) — registre : bornes de mot ignorées — tests en échec : test_registre_bornes
+MC-30 tué (sortie 1) — registre : exceptions ignorées — tests en échec : test_registre_k_sources
+MC-31 tué (sortie 1) — résidus français jamais signalés — tests en échec : test_main_residu_francais, test_residus
+MC-32 tué (sortie 1) — mots en capitales pris pour des mots-outils — tests en échec : test_main_conforme
+MC-33 tué (sortie 1) — virgule décimale française en zone anglaise non signalée — tests en échec : test_convention, test_main_convention
+MC-34 tué (sortie 1) — chiffre dans l'en-tête ajouté non signalé — tests en échec : test_entete_chiffre
+MC-35 tué (sortie 1) — glossaire final jamais en écart — tests en échec : test_glossaire_ligne_manquante, test_main_glossaire
+MC-36 tué (sortie 1) — citation de la source non couverte acceptée — tests en échec : test_verifier_donnees_citation_non_couverte
+MC-37 tué (sortie 1) — main rend 0 sur échec — tests en échec : test_main_citations, test_main_convention, test_main_entete, test_main_gloses, test_main_glossaire, test_main_motif, test_main_nombres, test_main_nombres_deplaces, test_main_proteges, test_main_registre, test_main_residu_francais, test_main_structure
+MC-38 tué (sortie 1) — en-tête absent non signalé par separer — tests en échec : test_entete_absente
+MC-39 tué (sortie 1) — nombre d'unités non comparé — tests en échec : test_aligner_unite_manquante
+MC-40 tué (sortie 1) — ligne de délimitation jamais reconnue — tests en échec : test_aligner_ok, test_glossaire_ok, test_main_conforme, test_table_cellules, test_unites_genres_source, test_unites_genres_traduction, test_unites_table_avec_delimiteur
+MC-41 tué (sortie 1) — gloses jamais reconnues — tests en échec : test_citations_en, test_citations_ok, test_glose_inconnue, test_gloses, test_jetons_unite_egaux, test_jetons_unite_glose_exclue, test_main_conforme, test_mots_unite_zones, test_nombres_par_unite_ok, test_retirer_gloses
+MC-42 tué (sortie 1) — citations « … » laissées dans les zones anglaises — tests en échec : test_zones_anglaises
+MC-43 tué (sortie 1) — citation de la source non déclarée non signalée — tests en échec : test_citation_fr_non_declaree
+MC-44 tué (sortie 1) — motifs jamais en échec dans main — tests en échec : test_main_motif
+MC-45 tué (sortie 1) — registre jamais en échec dans main — tests en échec : test_main_registre
+MC-46 tué (sortie 1) — convention jamais en échec dans main — tests en échec : test_main_convention
+MC-47 tué (sortie 1) — résidus jamais en échec dans main — tests en échec : test_main_residu_francais
+MC-48 tué (sortie 1) — glossaire final jamais en échec dans main — tests en échec : test_main_glossaire
+MC-49 tué (sortie 1) — en-tête jamais en échec dans main — tests en échec : test_main_entete
+MC-50 tué (sortie 1) — citations jamais en échec dans main — tests en échec : test_main_citations
+MC-51 tué (sortie 1) — gloses jamais en échec dans main — tests en échec : test_main_gloses
+MC-52 tué (sortie 1) — passages protégés jamais en échec dans main — tests en échec : test_main_proteges
+MC-53 tué (sortie 1) — structure jamais en échec dans main — tests en échec : test_main_structure
+MC-54 tué (sortie 1) — nombres par unité jamais en échec dans main — tests en échec : test_main_nombres_deplaces
+MC-55 tué (sortie 1) — titres du glossaire non confrontés à la source — tests en échec : test_main_donnees_incoherentes
+MC-56 tué (sortie 1) — fonction gloses rend toujours vide — tests en échec : test_glose_inconnue, test_gloses
+MC-57 tué (sortie 1) — zone brute normalisée à la française — tests en échec : test_brut, test_jetons_unite_code_brut
+MC-58 tué (sortie 1) — normalisation anglaise qui efface aussi le point décimal — tests en échec : test_en_decimale, test_jetons_unite_citation_gardee_fr, test_jetons_unite_egaux, test_main_conforme, test_nombres_par_unite_ok
+MC-59 tué (sortie 1) — toute virgule française convertie en point — tests en échec : test_fr_virgule_espace
+MC-60 tué (sortie 1) — glose après un gras non reconnue (faux positif) — tests en échec : test_gloses_ok, test_main_conforme
+MC-61 tué (sortie 1) — motifs à zéro occurrence rapportés (faux positif) — tests en échec : test_main_conforme, test_motifs_propre
+MC-62 tué (sortie 1) — passages protégés égaux signalés (comparaison inversée) — tests en échec : test_main_conforme, test_main_proteges, test_proteges_ecart, test_proteges_ok
+MC-63 tué (sortie 1) — mots des identifiants pris pour des résidus français — tests en échec : test_residus_identifiants
+MC-64 tué (sortie 1) — titres comparés sans la table de traduction — tests en échec : test_main_conforme, test_structure_ok
+MC-65 tué (sortie 1) — passage protégé présent jugé absent (faux fatal) — tests en échec : test_main_citations, test_main_conforme, test_main_convention, test_main_entete, test_main_gloses, test_main_glossaire, test_main_motif, test_main_nombres, test_main_nombres_deplaces, test_main_proteges, test_main_registre, test_main_residu_francais, test_main_structure, test_verifier_donnees_ok
+MC-66 tué (sortie 1) — source non épinglée acceptée — tests en échec : test_epingle_autre_source, test_main_source_non_epinglee
+MC-67 tué (sortie 1) — empreinte de source absente remplacée par celle de la source — tests en échec : test_epingle_absente
+MC-68 tué (sortie 1) — épingle non appelée par main — tests en échec : test_main_source_non_epinglee
+MC-69 tué (sortie 1) — épingle inversée (source attendue refusée) — tests en échec : test_epingle_autre_source, test_epingle_ok, test_main_citations, test_main_conforme, test_main_convention, test_main_entete, test_main_gloses, test_main_glossaire, test_main_motif, test_main_nombres, test_main_nombres_deplaces, test_main_proteges, test_main_registre, test_main_residu_francais, test_main_source_non_epinglee, test_main_structure
+
+MT-01 tué (sortie 1) — nombre changé — VERDICT : NON CONFORME — 2. nombres (sortie 1)
+MT-02 tué (sortie 1) — deux nombres échangés dans une unité — VERDICT : NON CONFORME — 2. nombres (sortie 1)
+MT-03 tué (sortie 1) — nombre écrit en lettres changé — VERDICT : NON CONFORME — 2. nombres (sortie 1)
+MT-04 tué (sortie 1) — bloc de code retouché — VERDICT : NON CONFORME — 1. structure et alignement (sortie 1)
+MT-05 tué (sortie 1) — citation gardée modifiée — VERDICT : NON CONFORME — 3. citations ; 4. gloses (sortie 1)
+MT-06 tué (sortie 1) — libellé de verdict traduit — VERDICT : NON CONFORME — 5. passages protégés et libellés (sortie 1)
+MT-07 tué (sortie 1) — verdict inversé — VERDICT : NON CONFORME — 4. gloses ; 5. passages protégés et libellés (sortie 1)
+MT-08 tué (sortie 1) — glose retirée — VERDICT : NON CONFORME — 4. gloses (sortie 1)
+MT-09 tué (sortie 1) — formule interdite du registre — VERDICT : NON CONFORME — 7. registre (sortie 1)
+MT-10 tué (sortie 1) — locution S-G4 — VERDICT : NON CONFORME — 7. registre (sortie 1)
+MT-11 tué (sortie 1) — chemin d'hôte — VERDICT : NON CONFORME — 6. motifs interdits (sortie 1)
+MT-12 tué (sortie 1) — Pocket — VERDICT : NON CONFORME — 6. motifs interdits (sortie 1)
+MT-13 tué (sortie 1) — identifiant de session — VERDICT : NON CONFORME — 6. motifs interdits (sortie 1)
+MT-14 tué (sortie 1) — formule écartée par l'investisseur — VERDICT : NON CONFORME — 6. motifs interdits (sortie 1)
+MT-15 tué (sortie 1) — pièces présentées comme remises — VERDICT : NON CONFORME — 6. motifs interdits (sortie 1)
+MT-16 tué (sortie 1) — phrase laissée en français — VERDICT : NON CONFORME — 8. résidus français (sortie 1)
+MT-17 tué (sortie 1) — virgule décimale française — VERDICT : NON CONFORME — 2. nombres ; 9. convention des nombres (sortie 1)
+MT-18 tué (sortie 1) — mention « Draft — not published » retirée — VERDICT : NON CONFORME — 1. structure et alignement ; 2. nombres ; 3. citations ; 10. en-tête (sortie 1)
+MT-19 tué (sortie 1) — glossaire final modifié — VERDICT : NON CONFORME — 11. glossaire final (sortie 1)
+MT-20 tué (sortie 1) — paragraphe supprimé — VERDICT : NON CONFORME — 1. structure et alignement ; 2. nombres ; 3. citations (sortie 1)
+MT-21 tué (sortie 1) — titre non conforme — VERDICT : NON CONFORME — 1. structure et alignement (sortie 1)
+MT-22 tué (sortie 1) — cellule ajoutée — VERDICT : NON CONFORME — 1. structure et alignement (sortie 1)
+MT-23 tué (sortie 1) — sortie imprimée traduite au lieu d'être gardée — VERDICT : NON CONFORME — 3. citations ; 4. gloses (sortie 1)
+MT-24 tué (sortie 1) — empreinte modifiée — VERDICT : NON CONFORME — 1. structure et alignement ; 2. nombres (sortie 1)
+MT-25 tué (sortie 1) — chiffres transposés — VERDICT : NON CONFORME — 2. nombres (sortie 1)
+MT-26 tué (sortie 1) — séparateur de milliers déplacé — VERDICT : NON CONFORME — 2. nombres ; 9. convention des nombres (sortie 1)
+MT-27 tué (sortie 1) — libellé « hors décision » traduit — VERDICT : NON CONFORME — 4. gloses ; 5. passages protégés et libellés (sortie 1)
+MT-28 tué (sortie 1) — phrase d'en-tête du brief altérée — VERDICT : NON CONFORME — 10. en-tête (sortie 1)
+MT-29 tué (sortie 1) — citation traduite altérée — VERDICT : NON CONFORME — 3. citations (sortie 1)
+MT-31 tué (sortie 1) — nombre ajouté par une glose — VERDICT : NON CONFORME — 4. gloses (sortie 1)
+MT-32 tué (sortie 1) — glose déplacée après la première occurrence — VERDICT : NON CONFORME — 4. gloses (sortie 1)
+MT-33 tué (sortie 1) — liste E-19 de l'en-tête ramenée à l'ancienne — VERDICT : NON CONFORME — 5. passages protégés et libellés (sortie 1)
+MT-34 tué (sortie 1) — phrase E-19 du contrôle du sceau retirée — VERDICT : NON CONFORME — 5. passages protégés et libellés (sortie 1)
+MT-35 tué (sortie 1) — liste E-19 du §12 ramenée à l'ancienne — VERDICT : NON CONFORME — 5. passages protégés et libellés (sortie 1)
+MT-30 tué (sortie 1) — témoin négatif : la source passée comme traduction — VERDICT : NON CONFORME — 1. structure et alignement ; 2. nombres ; 3. citations ; 4. gloses ; 5. passages protégés et libellés ; 8. résidus français ; 9. convention des nombres ; 10. en-tête ; 11. glossaire final (sortie 1)
+
+étapes rouges lues : etape-rouge-2.sortie.txt (3), etape-rouge-3.sortie.txt (2), etape-rouge-4.sortie.txt (1), etape-rouge-5.sortie.txt (3), etape-rouge.sortie.txt (72)
+tests : 101 ; vus en échec au moins une fois (étapes rouges ou mutants) : 101
+
+BILAN : 104 mutants ; tués 104 ; vivants 0 ; FATAL 0 ; témoins OK

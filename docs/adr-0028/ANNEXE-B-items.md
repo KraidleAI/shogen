@@ -970,3 +970,21 @@ scellés), SHOGEN-FICHE-WORKER-POSTEXEC-1 (exception écrite au G0 du lot ; la f
 | SHOGEN-PLAN-S2BIS-GARDES-1 | cinq mutants du réviseur (RV-06, RV-07, RV-16, RV-17, RV-18) vivants sur des gardes secondaires du lot, hors liste fermée | orch. | prochain lot qui touche `scripts/plan-s2bis/` | quelques tests [inféré] | G2 du lot PLAN-S2BIS |
 | SHOGEN-WORKER-TMPDIR-1 | des tests qui emploient `tempfile` écrivent par défaut sous `/tmp`, hors du dossier du lot ; consigne « TMPDIR dédié par copie » à porter à la fiche worker et au gabarit de brief | orch. | prochaine révision de la fiche worker | une consigne [mesuré] | G1 du lot PLAN-S2BIS (E-1) ; B.56 |
 | SHOGEN-FICHE-WORKER-POSTEXEC-2 | la fiche `shogen-worker` dit encore « fixtures seulement » sans l'exception qu'un G0 accorde pour lire des journaux scellés par les scripts du lot seuls | orch. | prochaine révision de la fiche worker | une consigne [inféré] | B.50 ; G0 du lot PLAN-S2BIS |
+
+## B.59 Amendement daté du 2026-10-04 17:55:06 UTC (heure produite par le script d'écriture) : brouillon public du rapport de S2 en anglais versé (lot DOCS11-EN)
+
+Brouillon anglais versé, **non publié** : `docs/publication/11-pilot-measurements-public-en.md` (sha256 `60f7dc7a…21d6`), traduction de
+la source française épinglée `c101998b…6561` (retouche E-19 comprise) ; journal G1 du traducteur (`docs/G1-lot-DOCS11-EN.md`) ; relecture
+G2 bilingue neuve (`docs/G2-lot-DOCS11-EN.md` : fidèle, aucun contresens ni surclamation ; ACCEPTE-AVEC-CORRECTIONS C-1 à C-10,
+appliquées) ; table et sortie du contrôle dans `docs/publication/interne/` ; outils, tests et mutants dans `scripts/publication/en/`
+(le contrôle refuse toute source française autre que l'épinglée). Contrôle conforme (onze points), 101 tests, 104 mutants tués ; gates S-G4,
+S-G5, S-G6 vertes. Adjudications : en-tête “English translation of the accepted report” ; paragraphe “Translation conventions” gardé.
+Exposition déclarée du traducteur (E-1 : deux lignes d'un dossier Pocket affichées par une recherche récursive, rien dans la traduction).
+FM-1.1 du traducteur et du réviseur : 0 fragment. Item **fermé** : I-G2-5 (harmonisation de la liste des pièces, E-19).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PUBLIC-EN-SYNCHRO-1 | toute retouche du brouillon français impose la retouche de l'anglais et le rejeu du contrôle (mécanisé en partie : le contrôle anglais refuse une source non épinglée) | orch. | toute retouche du brouillon français | une passe de traduction [mesuré] | G1 du lot DOCS11-EN, I-9 |
+| SHOGEN-SG5-GUILLEMETS-ANGLAIS-1 | S-G5 n'extrait pas les citations “…” ; S-G4 les exclut ; les 43 citations traduites du brouillon anglais échappent aux deux gates (couvertes par le contrôle du lot) | orch. | prochain lot qui touche `sg4.rs` ou `sg5.rs` | une extraction et des tests [inféré] | G1 et G2 du lot DOCS11-EN |
+| SHOGEN-PUBLIC-EN-TERMES-1 | l'emploi des termes du glossaire dans le corps n'est mesuré que par un relevé informatif (22 manques expliqués), sans tests ni mutants | orch. | avant la publication, si une retouche anglaise a lieu | un contrôle et des tests [inféré] | G1 et G2 du lot DOCS11-EN |
+| SHOGEN-HARNAIS-COMPACTION-TRANSCRIPT-1 | après une compaction de contexte, la note de reprise d'un agent peut renvoyer à sa transcription `*.jsonl` (pièce interdite aux agents) | orch. | prochaine révision de la fiche worker | une consigne [mesuré] | G1 du lot DOCS11-EN, E-9 |

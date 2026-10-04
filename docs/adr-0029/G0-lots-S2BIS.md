@@ -21,3 +21,5 @@ l'acte de l'investisseur (lot 7 d'ADR-0029) ; Pocket : aucun accès.
 Première vague (ce G0) : SG5-INTERDITS, DOCS11-PUBLIC, CALIB-ACTIFS-G0, en parallèle. Les autres lots reçoivent leur G0 avant tout
 travail. Roster : workers `claude-opus-5-5` effort max ; lecteurs `claude-sonnet-5-5` effort high ; validateurs et advisors
 `claude-fable-5-1`.
+
+> *Ajout daté du 2026-10-04 17:55:06 UTC (item G2 I-G2-1 du lot DOCS11-EN)* : ligne de lot ajoutée après coup : **DOCS11-EN** — traduction anglaise fidèle du brouillon public du rapport de S2 (demande de l'investisseur du 2026-10-04 : « le rapport doit être en anglais […] pro et institutionnel ») ; sortie `docs/publication/11-pilot-measurements-public-en.md` (brouillon, non publié) ; ne lit aucune donnée de campagne ; contrôle par script (nombres, registre transposé, motifs, blocs recopiés), tests et mutants versés à `scripts/publication/en/`.
