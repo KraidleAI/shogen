@@ -762,3 +762,41 @@ sur un second hôte comme ici, se fait sur une extraction du commit d'analyse `f
 | SHOGEN-JSON-ENTIER-LONG-1 | un entier JSON de plus de 4 300 chiffres lève une erreur générique dans `records.read_jsonl_tolerant` (mesuré, 5 001 chiffres) ; inatteignable depuis le collecteur | orch. | prochain lot qui touche `records.py` | un refus nommé [inféré] | G1 du lot DETTES-B1 §14 |
 | SHOGEN-RT-ETIQUETTE-J14-1 | `r1_discrimine` des entrées J14 du JSON du recalcul tiers étiqueté au seul niveau de l'entrée (forme d'avant le sous-lot 4) | orch. | G0 de la publication (G9) | deux lignes, ou décision « niveau de l'entrée » [inféré] | G1 du lot DETTES-B1 §14 |
 | SHOGEN-CI-PLANCHER-SUIVI-1 | le plancher du vérificateur ne suit pas seul la croissance de la suite ; règle : tout lot qui ajoute des tests relève `PLANCHER` au compte mesuré | orch. | chaque lot qui ajoute des tests | une ligne par lot [mesuré : C-2] | G1 et G2 du lot DETTES-B1 |
+
+## B.50 Amendement daté du 2026-10-04 07:51:15 UTC (heure produite par le script d'écriture) : lot POST-PREREG commis
+
+Analyses **ajoutées après le pré-enregistrement, hors décision** : aucune ne change le verdict scellé de S2 (« R1 discrimine »
+FAUX, `docs/11`). Journal G1 versé à l'octet (`docs/G1-lot-POST-PREREG.md`, sha256 `0b84a1c3…cf3a`) ; relecture G2 versée à
+l'octet (`docs/G2-lot-POST-PREREG.md`, réviseur neuf `shogen-worker`, sha256 `768f263d…2020`) : **ACCEPTE-AVEC-CORRECTIONS**,
+C-1 à C-6 appliquées par un worker de correction (note `docs/adr-0028/execution/post-prereg-2026-10-04/CORRECTIONS-G2.md`) ;
+aucune ne touche un script d'analyse ni une sortie. **Mesure du rejeu après DETTES-B1** (question du G2 §6) : les neuf scripts
+rejoués à `dad3bc6`, harnais modifié par le lot DETTES-B1, donnent des sorties identiques à l'octet aux sorties versées, sans
+refus nommé : l'item SHOGEN-PP-REJEU-B1-1 n'est pas formé ; la version de référence reste le commit d'analyse `f35a70c` (README
+des sorties, C-6).
+
+Adjudications de l'orchestrateur : **Q-1** — le critère de SHOGEN-HOST-DEGRADED-2 (sonde ASN du démarrage en échec, dernier
+marqueur, `clock_check` hors critère, contre le libellé de la l.100 qui nomme `clock_check`) est **adjugé** comme la forme de
+l'item, avec cette déclaration : la forme a été fixée par le worker **avant** l'exécution sur les journaux (état `PP-d`, 04:36:07
+UTC, sortie de même sha), **après** son exposition au bloc 3 du rendu et à `docs/11` ; le seuil de FLUX-DEVIANT-1 (p̂_f > 1/2) est
+la valeur de la variante V2 de l'avis B.39, appliquée par le worker (§11.1, C-4). Q-2 : aucune entrée neuve au registre doc 09.
+**Q-3** : les statistiques exploratoires à erreur-type par blocs qui franchissent 2,33 (z_pool,bloc ≈ 2,60 ; z_IF,bloc ≈ 2,37 en
+calme) sont signalées à l'investisseur comme sorties hors décision, sans valeur de verdict ; la lecture « non identifié sous
+censure arbitraire » l'est aussi. FM-1.1 des transcriptions du worker (1 192 événements) et du réviseur (544) : 0 fragment ; écart
+commun déclaré (fiche « fixtures seulement » contre l'exception du G0 pour ce lot) : accepté, item formé ci-dessous.
+
+Items **fermés** (commits PP-a1 `1ed64e3`, PP-a2 `519bd12`, PP-b `b80b625`, PP-c `ff919a5`, PP-d1 `d97ce4a`, PP-d2 `f0b2554`, PP-e1 `e411d0a`, PP-e2 `7a5df73`, PP-f `cb44084`, PP-g `5d45248`, PP-h `be1c1a4`, PP-i1 `3538344`, PP-i2 `f90c580`, PP-j `5c8b5b9`) : SHOGEN-FLUX-QUASI-MORT-1, SHOGEN-QUASI-MORT-PREDICAT-1, SHOGEN-POOL-MIN-1, SHOGEN-FLUX-DEVIANT-1,
+SHOGEN-HOST-DEGRADED-2 (forme adjugée, Q-1), SHOGEN-HORLOGE-ETENDUE-1, SHOGEN-SIGMA-BLOC-INDEP-1 (indépendance limitée à la
+classification et à la variance : lecteurs communs, item ci-dessous), SHOGEN-CONTENU-DEP-1. **Restent ouverts** :
+SHOGEN-POOLEE-BLOC-1 (part (a) faite ici ; part (b) au lot DETTES-SIM) ; SHOGEN-CENSURE-INFO-2 (bornes de z_s et lecture faites ;
+reste l'attribution, en attente de P-08) ; SHOGEN-DEP-FENETRES-2 ((b) fait, (c) fait en exploratoire ; restent (a), P-05 non
+détenue, et la tolérance et la loi nulle de (c)) ; SHOGEN-R1-PLUGIN-1 ((a) et (b) descriptif faits ; reste le test sourcé).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ZIF-NIVEAU-1 | niveau de z_IF,bloc et de z_IF,0 sous le modèle nul non mesuré | orch. | avant toute proposition qui cite ces statistiques | une simulation synthétique sur le modèle de SIM-NIVEAU [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-CENSURE-ZBLOC-1 | borne extérieure de z_bloc sous censure arbitraire non établie : aucune lecture « identifié » possible sans elle | orch. | avant toute lecture « identifié » | un calcul de bornes [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-ENTRELACEMENT-D5-1 | 74 démarrages ouverts par un `clock_check` après un `run_params` sans `clock_check`, tous dans la plage D5 : écritures possiblement entrelacées de deux instances du harnais pendant l'incident ; sans effet sur le J28 | orch. | G0 du collecteur de S2-bis (ADR-0029) | une qualification [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-PEARSON-IF-SOURCE-1 | fonction d'influence de Pearson employée sur forme classique [inféré], sans source détenue | orch. | avant toute publication qui cite N_eff | un versement de source, sans code | G1 du lot POST-PREREG §8 |
+| SHOGEN-POSTPREREG-PARAMS-SCEAU-1 | « paramètres fixés avant l'exécution » attesté seulement par des horodatages de fichiers : pour tout lot d'après pré-enregistrement, épingler le sha256 des paramètres ou du code au JOURNAL avant de lancer sur les journaux | orch. | prochain lot qui lit les journaux scellés | une ligne de JOURNAL par lot [inféré] | G2 du lot POST-PREREG §8 |
+| SHOGEN-FICHE-WORKER-POSTEXEC-1 | la fiche `shogen-worker` dit « fixtures seulement (D.4 a) » sans l'exception qu'un G0 peut accorder après l'exécution unique (lecture des journaux scellés par les scripts du lot seuls) | orch. | prochain lot de ce type | une consigne au corps de la fiche [inféré] | G2 du lot POST-PREREG §8 ; écarts communs du worker et du réviseur |
+| SHOGEN-LECTEUR-INDEP-1 | les analyses et le rendu partagent les lecteurs `r1.parse_journal` et `filtre_lecture` : aucun lecteur indépendant des journaux (première moitié de la limite 12 du §9.3 de `docs/11`) | orch. | avant G9 (publication) ou le recalcul externe | un lecteur distinct et un oracle [inféré] | G2 du lot POST-PREREG §8 |
