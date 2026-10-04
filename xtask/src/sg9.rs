@@ -16,12 +16,17 @@
 //!
 //! Bornes imprimées, jamais tues : MONARK (dépôt hors arbre), `biblio/` sans octets (DEVOPS §1,
 //! prédicat de S-G6), PX (registre hors dépôt, D.2 n° 10), lots MONARK. Non mécanisés, déclarés :
-//! lignes de D.2 par sha256, graine et clé du constat, contenu de docs/16. Résidu : la fidélité des
-//! lignes citées reste au G2.
+//! lignes de D.2 par sha256, graine et clé du constat, contenu de docs/16 ; (g) deux formes
+//! proscrites et (h) structure des tables S et T (ligne T retirée, S sans menace ni motif, cellule de
+//! résidu vide, jeton de chemin servi absent, marqueur entre guillemets au lieu du jeton) de
+//! `verif_refs.py` (`docs/G1-lot-E1-modele-de-menace.md` §5) ; (i) et (j), propres au lot E1, sans
+//! objet. Résidu : la fidélité des lignes citées reste au G2.
 //! Coquille hors rôle S-G3 : tranches et indices bornés par construction (positions de motifs).
 
-use crate::documents::prose_sans_code;
+use crate::documents::{fichiers_markdown, normaliser_pour_recherche, prose_sans_code};
 use crate::rapport::{Rapport, lire};
+use crate::roles::chemin_relatif;
+use crate::sg5::{LONGUEUR_MINIMALE, parait_anglais};
 use crate::source::{ligne_de, occurrences_nues};
 use std::path::Path;
 
@@ -46,9 +51,12 @@ pub fn executer(racine: &Path) -> Rapport {
     controle_b(&mut r, &t, &registre);
     controle_c(&mut r, &t, &prose, &a, &b);
     controle_nombres(&mut r, &t, &prose);
+    controle_e(&mut r, racine, &t, &prose);
+    controle_f(&mut r, &t);
     r.notes.push(String::from(
         "non mécanisés : lignes de D.2 par sha256 (outil FM-1.1), graine et clé du constat, contenu \
-         de docs/16 ; résidu : la fidélité des lignes citées reste la lecture du G2",
+         de docs/16, (g) formes proscrites et (h) structure des tables S et T de verif_refs.py ; \
+         résidu : la fidélité des lignes citées reste la lecture du G2",
     ));
     r
 }
@@ -324,6 +332,9 @@ fn controle_c(r: &mut Rapport, t: &str, prose: &str, annexe_a: &str, annexe_b: &
     ));
 }
 
+const MOIS: &str = "janvier février mars avril mai juin juillet août septembre octobre novembre \
+    décembre january february march april may june july august september october november december";
+
 /// Suites de groupes de chiffres reliés par un même séparateur : (début, longueurs, séparateur).
 fn suites(t: &str, separateurs: &[u8]) -> Vec<(usize, Vec<usize>, u8)> {
     let o = t.as_bytes();
@@ -364,6 +375,20 @@ fn controle_nombres(r: &mut Rapport, t: &str, prose: &str) {
             viol(r, t, debut, "(d) date hors forme ISO (AAAA-MM-JJ)", "");
         }
     }
+    let bas = prose.to_ascii_lowercase();
+    for mois in MOIS.split(' ') {
+        for p in occurrences_nues(&bas, mois) {
+            let (tete, queue) = (&bas[..p], &bas[p + mois.len()..]);
+            let tete_nue = tete.trim_end().trim_end_matches("er");
+            let nombre_avant = tete_nue.ends_with(|c: char| c.is_ascii_digit());
+            let nombre_apres = queue.trim_start().starts_with(|c: char| c.is_ascii_digit());
+            let isole =
+                !tete.ends_with(char::is_alphabetic) && !queue.starts_with(char::is_alphabetic);
+            if isole && (nombre_avant || nombre_apres) {
+                viol(r, t, p, "(d) date hors forme ISO (nom de mois)", "");
+            }
+        }
+    }
     for (debut, l, sep) in suites(t, b".,") {
         let exempte = avant(t, debut).is_some_and(|c| c.is_alphanumeric() || "§.-_/".contains(c));
         if sep == b'.' && l.len() == 4 && l.iter().all(|n| *n <= 3) {
@@ -373,6 +398,153 @@ fn controle_nombres(r: &mut Rapport, t: &str, prose: &str) {
         }
     }
     r.notes.push(format!(
-        "(d) {iso} date(s) ISO ; formes numériques non ISO refusées"
+        "(d) {iso} date(s) ISO ; non ISO et noms de mois refusés"
+    ));
+}
+
+const E_APOSTROPHES: &str = "(e) citation entre apostrophes hors span de code";
+const E_FRANCAISE: &str = "(e) citation française introuvable dans le dépôt";
+
+fn controle_e(r: &mut Rapport, racine: &Path, t: &str, prose: &str) {
+    for (p, _) in prose.match_indices('"') {
+        viol(r, t, p, "(e) guillemet droit hors span de code", "");
+    }
+    let mut base = 0;
+    for ligne in prose.split_inclusive('\n') {
+        if let Some(p) = apostrophe_de_citation(ligne) {
+            viol(r, t, base + p, E_APOSTROPHES, "");
+        }
+        base += ligne.len();
+    }
+    let (mut controlees, mut ecartees, mut anglaises) = (0, 0, 0);
+    let (mut corpus, mut reste) = (None, prose);
+    while let Some(ouverture) = reste.find('\u{ab}') {
+        let p = prose.len() - reste.len() + ouverture;
+        let suite = &reste[ouverture + '\u{ab}'.len_utf8()..];
+        let Some((citation, apres)) = suite.split_once('\u{bb}') else {
+            viol(r, t, p, "(e) guillemet ouvrant jamais refermé", "");
+            break;
+        };
+        reste = apres;
+        let n = normaliser_pour_recherche(citation);
+        let n = n.trim_matches(|c: char| !c.is_alphanumeric());
+        if parait_anglais(n) {
+            anglaises += 1;
+        } else if n.len() < LONGUEUR_MINIMALE {
+            ecartees += 1;
+        } else {
+            controlees += 1;
+            let pieces: &Vec<String> = corpus.get_or_insert_with(|| corpus_francais(r, racine));
+            if !pieces.iter().any(|piece| piece.contains(n)) {
+                viol(r, t, p, E_FRANCAISE, "");
+            }
+        }
+    }
+    r.notes.push(format!(
+        "(e) guillemets droits et apostrophes de citation refusés hors du code ; françaises : \
+         {controlees} contrôlée(s), {ecartees} sous {LONGUEUR_MINIMALE} octets (borne) ; \
+         {anglaises} anglaise(s) laissée(s) à S-G5"
+    ));
+}
+
+/// Position d'une apostrophe ouvrante (précédée d'un blanc, d'une parenthèse ou d'un crochet) refermée
+/// sur la ligne par une apostrophe qu'aucune lettre ne suit : une élision (`l'acte`) n'ouvre rien.
+fn apostrophe_de_citation(ligne: &str) -> Option<usize> {
+    let c: Vec<(usize, char)> = ligne.char_indices().collect();
+    let lu = |k: usize| c.get(k).map(|x| x.1);
+    let apostrophe = |k: usize| matches!(lu(k), Some('\'' | '\u{2018}' | '\u{2019}'));
+    let ouvre = |k: usize| {
+        let devant =
+            k == 0 || lu(k - 1).is_some_and(|p| p.is_whitespace() || "([\u{ab}".contains(p));
+        apostrophe(k) && devant && lu(k + 1).is_some_and(|s| !s.is_whitespace())
+    };
+    let ferme = |k: usize| {
+        let derriere = lu(k + 1).is_none_or(|s| !s.is_alphanumeric());
+        apostrophe(k) && lu(k - 1).is_some_and(|p| !p.is_whitespace()) && derriere
+    };
+    let k = (0..c.len()).find(|k| ouvre(*k) && (k + 2..c.len()).any(ferme))?;
+    c.get(k).map(|x| x.0)
+}
+
+/// Où une citation française de docs/17 doit se trouver : `docs/**/*.md` hors docs/17 et les `.md`
+/// de la racine ; un texte de docs/17 ne valide jamais sa propre citation.
+fn corpus_francais(r: &mut Rapport, racine: &Path) -> Vec<String> {
+    let docs = fichiers_markdown(racine, "docs").fichiers;
+    let entrees = std::fs::read_dir(racine).into_iter().flatten().flatten();
+    let md = |p: &std::path::PathBuf| p.extension().is_some_and(|e| e == "md");
+    let racine_md = entrees.map(|e| e.path()).filter(md);
+    let mut pieces = Vec::new();
+    for chemin in docs.into_iter().chain(racine_md) {
+        let relatif = chemin_relatif(racine, &chemin);
+        match std::fs::read_to_string(&chemin) {
+            _ if relatif == PERIMETRE => {}
+            Ok(texte) => pieces.push(normaliser_pour_recherche(&texte)),
+            Err(e) => r.incident(format!("corpus de (e) illisible ({relatif}) : {e}")),
+        }
+    }
+    pieces
+}
+
+/// (f) Pièces de l'annexe D.2 d'ADR-0028 (liste fermée à `5afbdd2`) par nom de fichier ou de dossier,
+/// séparés par `|` : un nom nu suffit (D.2 n° 8). `SHA256SUMS-cloture-…`, admis, n'y figure pas.
+const NOMS_D2: &str = "shogen-j28|baseline_step0|campagne-copie|measure-M009a|measure-m009a|\
+    G1-lot-m009|G2-lot-m009|ADR-M002-phase1|campagne.md|_result.json|_workflow-output.json|\
+    shogen-campagne|REPAIR-|INCIDENT-|CLOTURE-|J0-STATUS.txt|LISEZ-MOI.txt|ARCHIVE-shogen-interne|\
+    AVIS-advisor-2026-09-26|etude-2026-09-25-pocket|PAROXYSME-Shogen.md|M009 measured on S2 traces";
+const STATISTIQUES: [&str; 7] = ["z", "K", "k_eff", "φ", "ρ", "P_more", "P̂_more"];
+
+/// (f) Motifs nus du texte entier (casse comprise, ou casse ASCII pliée), avec leur libellé.
+fn motifs_f(t: &str) -> Vec<(usize, &'static str)> {
+    let bas = t.to_ascii_lowercase();
+    let mut trouves = Vec::new();
+    for nom in NOMS_D2.split('|') {
+        let positions = occurrences_nues(t, nom);
+        let libelle = |p| (p, "(f) pièce de D.2 nommée");
+        trouves.extend(positions.into_iter().map(libelle));
+    }
+    for motif in ["%", "pour cent", "pour-cent", "pourcent"] {
+        let positions = occurrences_nues(&bas, motif);
+        trouves.extend(positions.into_iter().map(|p| (p, "(f) pour-cent")));
+    }
+    trouves
+}
+
+fn controle_f(r: &mut Rapport, t: &str) {
+    let mut trouves = motifs_f(t);
+    let hexa = |c: char| c.is_ascii_hexdigit();
+    for (p, _) in t.match_indices("::") {
+        if t[..p].ends_with(hexa) || t[p + 2..].starts_with(hexa) {
+            trouves.push((p, "(f) adresse IP"));
+        }
+    }
+    for (p, _) in t.match_indices('@') {
+        let queue = &t[p + 1..];
+        let fin = queue.find(|c: char| !(c.is_ascii_alphanumeric() || "-.".contains(c)));
+        let domaine = queue[..fin.unwrap_or(queue.len())].trim_end_matches('.');
+        let fin_de_domaine = domaine.rsplit_once('.').filter(|(d, _)| !d.is_empty());
+        let lettres = |x: &str| x.len() > 1 && x.chars().all(|c| c.is_ascii_alphabetic());
+        let tld = fin_de_domaine.is_some_and(|x| lettres(x.1));
+        if tld && t[..p].ends_with(|c: char| c.is_ascii_alphanumeric()) {
+            trouves.push((p, "(f) adresse électronique"));
+        }
+    }
+    for symbole in STATISTIQUES {
+        for p in occurrences_nues(t, symbole) {
+            let suite = t[p + symbole.len()..].trim_start();
+            let signes = ["=", "≈", "<", ">", "≤", "≥"];
+            let signe = signes.into_iter().find_map(|s| suite.strip_prefix(s));
+            let nombre = signe.map(|s| s.trim_start().trim_start_matches(['-', '−', '+']));
+            let chiffre = nombre.is_some_and(|n| n.starts_with(|c: char| c.is_ascii_digit()));
+            if chiffre && !mot(avant(t, p)) {
+                trouves.push((p, "(f) valeur statistique"));
+            }
+        }
+    }
+    for (p, motif) in trouves {
+        viol(r, t, p, motif, "");
+    }
+    r.notes.push(String::from(
+        "(f) pièces de D.2 (noms nus compris), pour-cent (signe et lettres), décimaux (hors §, FM-, \
+         versions), statistiques, adresses : aucune forme recopiée en sortie",
     ));
 }

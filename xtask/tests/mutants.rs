@@ -808,13 +808,15 @@ fn temoin_sg9_arbre_menace_intact_est_vert() {
     );
 }
 
-/// Bornes de (c) (revue G2 d'E1, C-G2-6) : un lot MONARK ou un PX n'est pas résolu ici, il est LISTÉ.
+/// Bornes de (c) (revue G2 d'E1, C-G2-6) : un lot MONARK ou un PX n'est pas résolu ici, il est LISTÉ ;
+/// (g) et (h) de l'oracle, non mécanisés, sont déclarés (revue G2 de DETTES-B2, C-4).
 #[test]
 fn temoin_sg9_bornes_monark_et_px_listees() {
     let notes = notes_sg9_vert("bornes", "\nlots MONARK G2, G99 et G8 ; PX-Shogen-99.\n");
     let listes = [
         "lots MONARK : [G2, G7, G99, G8]",
         "PX : [PX-Shogen-1, PX-Shogen-99]",
+        "(g) formes proscrites et (h) structure des tables S et T",
     ];
     assert!(
         listes.iter().all(|l| notes.contains(l)),
@@ -904,6 +906,19 @@ mutants_sg9! {
     mutant_sg9_d_aaaa_m_j: "\nLe 2026-9-30.\n" => "date hors forme ISO",
     mutant_sg9_d_jj_mm_aaaa_tirets: "\nLe 30-09-2026.\n" => "date hors forme ISO",
     mutant_sg9_d_aaaa_mm_jj_points: "\nLe 2026.09.30.\n" => "date hors forme ISO",
+    mutant_sg9_d_jour_et_mois: "\nLe 1er mars.\n" => "date hors forme ISO",
+    mutant_sg9_d_mois_et_annee: "\nEn septembre 2026.\n" => "date hors forme ISO",
+    mutant_sg9_e_guillemets_droits: "\nIl est écrit \"the verifier is never wrong about it\".\n" => "guillemet droit",
+    mutant_sg9_e_apostrophes: "\nIl est écrit 'the verifier is never wrong about it'.\n" => "citation entre apostrophes",
+    mutant_sg9_e_francaise_introuvable: "\nIl dit « une phrase qui ne figure dans aucun document ».\n" => "citation française introuvable",
+    mutant_sg9_e_guillemet_orphelin: "\nIl dit « une phrase jamais refermée.\n" => "jamais refermé",
+    mutant_sg9_f_chemin_de_d2: "\nVoir `F:/tmp/shogen-carto-2026-09-29/campagne.md`.\n" => "pièce de D.2",
+    mutant_sg9_f_nom_nu_de_d2_n8: "\nVoir J0-STATUS.txt.\n" => "pièce de D.2",
+    mutant_sg9_f_pour_cent_signe: "\nUn taux de 12 %.\n" => "pour-cent",
+    mutant_sg9_f_pour_cent_en_lettres: "\nUn taux de douze pour cent.\n" => "pour-cent",
     mutant_sg9_f_nombre_decimal: "\nUn taux de 0,013.\n" => "nombre décimal",
+    mutant_sg9_f_valeur_statistique: "\nOn mesure z = 3 sur la strate.\n" => "valeur statistique",
     mutant_sg9_f_ipv4: "\nHôte 192.0.2.1 contacté.\n" => "adresse IP",
+    mutant_sg9_f_ipv6: "\nHôte 2001:db8::1 contacté.\n" => "adresse IP",
+    mutant_sg9_f_adresse_electronique: "\nÉcrire à quelqu.un@example.org.\n" => "adresse électronique",
 }
