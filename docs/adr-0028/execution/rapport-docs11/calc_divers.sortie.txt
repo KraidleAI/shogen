@@ -1,0 +1,15 @@
+calme : √σ̂²_bloc = 61.9 ; √garde = 5.78 ; max = σ̂_bloc
+stress : √σ̂²_bloc = 66.7 ; √garde = 4.09 ; max = σ̂_bloc
+K/nombre de runs : calme 154/119 = 1.29411764706 ; stress 133/130 = 1.02307692308
+sautées non attribuées : 5684 + 1944 = 7628 ; harnais vivant : 17 + 150 = 167
+durée de la production : 0:22:20 (1340 s)
+τ agregateur : P99/τ = 0.115 ; max/τ = 0.679 ; P99 < τ : True ; max > τ : False
+τ oracle_chainlink : P99/τ = 0.274 ; max/τ = 1.08 ; P99 < τ : True ; max > τ : True
+τ place_horodatee : P99/τ = 0.189 ; max/τ = 0.689 ; P99 < τ : True ; max > τ : False
+τ sans_horodatage : P99/τ = 0.371 ; max/τ = 1.87 ; P99 < τ : True ; max > τ : True
+z_pool recompté = 33.4353667803
+garde J14p stress = 1.39 < 10 : True
+garde J14s calme = 0.116 < 10 : True
+garde J14s stress = 0.0245 < 10 : True
+calme : Σ écarts = 1451 (Σ mⱼ imprimé 1451 : égal = True) ; pannes 1443 ; staleness 4 ; hors-enveloppe 4 ; non évaluables 0 ; pannes + staleness + hors-env = 1451
+stress : Σ écarts = 693 (Σ mⱼ imprimé 693 : égal = True) ; pannes 691 ; staleness 2 ; hors-enveloppe 0 ; non évaluables 3 ; pannes + staleness + hors-env = 693
