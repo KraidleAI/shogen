@@ -219,6 +219,21 @@ class TestSortiesNommees(unittest.TestCase):
         self.assertEqual((x[0].startswith("verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : conforme"),
                           x[1].startswith(tete) and " dans raw.jsonl (ligne " in x[1]), (True, True))
 
+    def test_poolee_des_deux_variantes_du_j28_dans_le_recalcul_tiers(self):
+        """SHOGEN-SENS-POOLEE-1 (annexe B.12, B.13 ; décision du lot DETTES-B1 : aucune ligne ajoutée à [SENSIBILITÉ]) :
+        la strate poolée stratifiée des deux variantes du J28, plage exclue et plage incluse, est publiée par le JSON
+        du recalcul tiers (clé r1.poolee de chaque entrée), étiquetée « exploratoire, hors famille, hors décision »,
+        égale à celle de recompute_from_journal sous les options de la variante ; les deux diffèrent (n de la plage).
+        Texte écrit ici. Rougit si : poolée absente d'une variante, étiquette autre, valeurs d'une autre variante."""
+        with mock.patch.object(ru, "SORTIES", TABLE):
+            out = json.loads(produire("recalcul-tiers", "--journaux", self.d)[1])
+        po = {n: out[n]["r1"].get("poolee") for n in ("j28", "j28-incluse")}
+        for n, pl in (("j28", (RA,)), ("j28-incluse", ())):
+            with self.subTest(variante=n):
+                self.assertEqual((po[n] or {}).get("etiquette"), "exploratoire, hors famille, hors décision")
+                self.assertEqual(po[n], en_json(r1.recompute_from_journal(self.c, self.j, pl, TABLE[2][1])["poolee"]))
+        self.assertNotEqual(po["j28"]["strates"], po["j28-incluse"]["strates"])
+
 
 RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]     # Q8 puis ordre de D.4 b
 
