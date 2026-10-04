@@ -709,3 +709,26 @@ Items **fermés** :
 |---|---|---|---|---|---|
 | SHOGEN-TEST-ENV-HERMETIQUE-1 | `test_oracle_record.test_enregistrement_champs_et_sha` lit l'environnement ambiant : il échoue quand `SHOGEN_S2_CAMPAGNE_CONTROL` est posée | orch. | lot DETTES-B1 | quelques lignes de test [inféré] | rejeu de l'orchestrateur (ENREG-VARIABLE-1) |
 | SHOGEN-SCEAU-OTS-1 | ancre (2) OpenTimestamps des sceaux (paquet §9) jamais faite ni disposée ; recommandée systématique pour S2-bis (avis produit) | investisseur (go, dépendance nouvelle R-8) | avant le sceau de S2-bis | client OTS et un go [inféré] | état du registre (résidu sans identifiant) |
+
+## B.48 Amendement daté du 2026-10-04 06:28:58 UTC (heure produite par le script d'écriture) : lot DETTES-A commis
+
+Relecture G2 versée à l'octet : `docs/G2-lot-DETTES-A.md` (réviseur neuf `shogen-worker` ; sha256 `4e2082f9…664c`) :
+**ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-6 appliquées par le script du réviseur (chaque remplacement à occurrence unique).
+Écart déclaré (acte A-1 du réviseur) : le texte de C-1 valait à `3e275a2` ; relu à la tête, il dit en plus que l'étude de
+marché est versée et les décisions d'architecture prises (commit `a7199bd`), à reporter dans une révision 3 d'ADR-0029.
+C-5 : l'orchestrateur a lu la section du JOURNAL du 2026-09-27 (l.55-64) ; aucun checkpoint-1 d'ADR-0026 ni d'ADR-0027 n'y
+est consigné (les checkpoint-1 nommés visent trois G0 non désignés et le doc 16) : la colonne statut reste telle quelle.
+Cette lecture a touché de la matière Pocket du JOURNAL : rien n'en est repris ici. A-3 : la ligne d'index d'ADR-0026 ne
+cite que l'intitulé et la l.3 (statut), sans matière Pocket ; FM-1.1 de la transcription du worker (678 événements) :
+0 fragment. A-2 : sans objet à ce lot (le point 2 du §8, amendement d'ADR-0025, reste à poser).
+
+Items **fermés** (commits A-1 `6aba9c0`, A-2 `23c1fc0`, A-3 `1264477`) : SHOGEN-REGISTRES-S2-1, SHOGEN-DOC-HARNAIS-2 (pour la mesure 398 ; règle récurrente
+maintenue : tout lot qui change la suite re-mesure le README), SHOGEN-HARNAIS-ECHAPPEMENTS-1, SHOGEN-WORKTREE-BASE-HOOK-1,
+SHOGEN-HARNAIS-TACHE-10MIN-1, SHOGEN-HARNAIS-BASH-WSL-1, SHOGEN-MUT-FATAL-1. **Reste ouvert** : SHOGEN-ERRATA-ADR0028-1
+(points 1, 3 et 4 du §8 posés ; restent les points 2, 5, 6) ; sa liste restante est étendue aux actes 8 (WISHLIST P-01,
+P-03 ; P-03 peut-être caduc, Fisher 1921 versé à `biblio/`) et 13 à 16 (renvois datés de doc 10 §5.4, §5.6, §7 et doc 04
+§2) de §1 bis.11, non posés (relecture G2, §1).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ADR0029-STATUT-CP1-1 | la ligne Statut d'ADR-0029 (l.4) liste encore « un cp-1 du validateur sur cette révision » comme condition, alors qu'il est rendu | orch. | révision 3 d'ADR-0029 | une incise datée [inféré] | G2 du lot DETTES-A, A-5 |
