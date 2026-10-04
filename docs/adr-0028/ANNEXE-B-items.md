@@ -988,3 +988,27 @@ FM-1.1 du traducteur et du réviseur : 0 fragment. Item **fermé** : I-G2-5 (har
 | SHOGEN-SG5-GUILLEMETS-ANGLAIS-1 | S-G5 n'extrait pas les citations “…” ; S-G4 les exclut ; les 43 citations traduites du brouillon anglais échappent aux deux gates (couvertes par le contrôle du lot) | orch. | prochain lot qui touche `sg4.rs` ou `sg5.rs` | une extraction et des tests [inféré] | G1 et G2 du lot DOCS11-EN |
 | SHOGEN-PUBLIC-EN-TERMES-1 | l'emploi des termes du glossaire dans le corps n'est mesuré que par un relevé informatif (22 manques expliqués), sans tests ni mutants | orch. | avant la publication, si une retouche anglaise a lieu | un contrôle et des tests [inféré] | G1 et G2 du lot DOCS11-EN |
 | SHOGEN-HARNAIS-COMPACTION-TRANSCRIPT-1 | après une compaction de contexte, la note de reprise d'un agent peut renvoyer à sa transcription `*.jsonl` (pièce interdite aux agents) | orch. | prochaine révision de la fiche worker | une consigne [mesuré] | G1 du lot DOCS11-EN, E-9 |
+
+## B.60 Amendement daté du 2026-10-04 22:40:17 UTC (heure produite par le script d'écriture) : partie P1 du collecteur de S2-bis, tranche A, commise (CB-0a à CB-2e)
+
+Neuf commits sous le G0 `docs/adr-0029/g0-collecte/G0-COLLECTE-RECALC-DEPLOI.md` : CB-0a à CB-2c (worker `claude-opus-5-5`), puis
+CB-2d et CB-2e (corrections G2, worker neuf) ; chaque commit précédé de `cargo --locked xtask verify` VERT sur le dépôt réel. Pièces
+versées dans `docs/adr-0029/s2bis/revue-p1a/` : briefs, rapport du worker, relecture G2 neuve (`G2-P1A.md`, `claude-opus-5-5` :
+ACCEPTE-AVEC-CORRECTIONS C-1 à C-6), rapport des corrections (transcrit d'un message par l'orchestrateur), contre-contrôle
+(`CONTRE-CONTROLE-P1A.md` : CONFORME). Chiffres : 49 tests du collecteur sous Python 3.10 à 3.13 ; mutants de la G2 73/73, mutants
+propres des corrections 30/30, mutants neufs du contre-contrôle 19/19 ; suite S2 405 tests, comportement par défaut du vérificateur
+inchangé. Adjudications : lecture de C-1 (après redémarrage `ws ≤ dernière` refusé ; dans une exécution, `ws < dernière` seulement) ;
+Q-4 (fenêtre du redémarrage refusée) ; Q-2 (`--egal` réservé au job s2bis). Écarts déclarés : réviseur G2 (un `git grep` sur le dépôt
+hors dossiers interdits ; un `grep -r --include=*.md` qui a listé `monark-m009a` sans y lire de fichier) ; worker de correction E-1 à
+E-9 ; FM-1.1 des transcriptions : 0 fragment. Retouche de versement : chemin du dossier de travail remplacé par `<scratchpad>/` et motif
+de session remplacé par sa description. La tranche B (CB-3, CB-4, CB-5, CB-10, CB-11) se rejoue après CB-2e.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-S2BIS-ENREG-ROLE-1 | l'enregistreur `s2-harness/tools/oracle_record.py` ne couvre pas `s2bis` (liste fermée de commandes, commit exigé) : SHOGEN-G2-ENREG-ROLE-1 ne se tient pas mécaniquement pour S2-bis | orch. | avant la G2 complète de P1 | une extension et des tests [inféré] | G2 P1-A, N-1 |
+| SHOGEN-S2BIS-HORLOGE-RECUL-JOURNAL-1 | un recul d'horloge pendant l'exécution, sans redémarrage, fait refuser tout enregistrement (santé comprise) sans que rien ne le journalise | orch. | G0 de CB-4 et de CB-11 | une ligne de journal et des tests [inféré] | G2 P1-A, N-3 |
+| SHOGEN-S2BIS-CORPS-BORNE-1 | corps des réponses à borner sous LIMITE, base64 compris (E-C-17), sinon `JOURNAL/taille` fait perdre la lecture ; graphe partagé à expansion exponentielle non borné en temps dans `canonique` | orch. | G0 de CB-3 | une borne et des tests [inféré] | G2 P1-A, N-4 ; corrections, I-C4 |
+| SHOGEN-S2BIS-RETENTION-1 | la rétention (DB-4) ne supprime ni ne recrée `<préfixe>.verrou`, ne réécrit pas `<préfixe>.sha256`, ne supprime pas le fichier du jour ni le dernier fichier qui contient un enregistrement de fenêtre ; tolère une dernière ligne de sommes incomplète ; « clos » = « inscrit aux sommes » | orch. | G0 de DB-4 | des règles et des tests [inféré] | G2 P1-A, N-5 ; corrections, I-C1 |
+| SHOGEN-S2BIS-ECRIVAIN-USAGE-1 | garde mécanique d'un seul fil (fil propriétaire noté à `ouvrir`) ; refus nommés pour un écrivain fermé puis réutilisé et pour un second `ouvrir` ; toute méthode publique d'écriture de `Journal` porte `_terminal` (contrôle mécanique) ; la boucle ferme et sort sur `OSError` ou `JOURNAL/casse` | orch. | G0 de CB-4 (et CB-11 pour `_terminal`) | une garde, un contrôle et des tests [inféré] | G2 P1-A, N-6 et I-6 ; corrections, I-C2, I-C3 ; contre-contrôle, OC-3 |
+| SHOGEN-S2BIS-G3-LIGNE-JOB-1 | tant que la forge ne lance pas les jobs, le G3 opérant lance la ligne du job s2bis telle qu'écrite dans `gates.yml`, `--egal` compris (le runner vérifie le câblage, pas le compte) ; garder la forme fidèle de M-12 au jeu de référence | orch. | chaque passe qui touche `s2bis/` | une consigne [mesuré] | contre-contrôle P1-A, OC-1, OC-2 |
+| SHOGEN-S2BIS-P1-ESTIMATION-1 | P1 mesuré à ×1,78 l'estimation pour CB-0 à CB-2 (998 lignes contre ≈ 560), environ ×2 avec corrections : P1 ≈ 2 900 à 3 200 lignes au lieu de ≈ 1 620 ; à porter au calendrier et à l'information de l'investisseur | orch. | prochain point d'étape à l'investisseur | une phrase au calendrier [calc] | G2 P1-A, I-7 |
