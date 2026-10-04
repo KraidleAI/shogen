@@ -33,7 +33,7 @@ Pour : l'agent Claude Code du PC de l'investisseur. De : l'orchestrateur de Shō
 | 8 | CoinGecko | https://support.coingecko.com/hc/en-us/requests/new (support request form) | non |
 | 9 | DefiLlama | https://defillama.com/support (support page) | non |
 | 10 | Pyth | press@pyth.network | oui (PDF) |
-| 11 | Chainlink | press@chainlink.com | oui (PDF) |
+| 11 | Chainlink | press@chain.link | oui (PDF) |
 | 12 | Cloudflare | press@cloudflare.com | oui (PDF) |
 | 13 | Amazon Web Services | aws-pr@amazon.com | non |
 | 14 | Imperva | impervaPR@imperva.com | non |
@@ -367,7 +367,7 @@ https://monarkgate.tech
 
 ## 11. Chainlink
 
-- **À** : press@chainlink.com
+- **À** : press@chain.link
 - **Objet** : Private advance notice: report naming Chainlink, publication planned on 25 October 2026
 - **Pièce jointe** : `Shogen-S2-pilot-measurements-DRAFT.pdf`
 
