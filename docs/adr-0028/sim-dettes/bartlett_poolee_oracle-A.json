@@ -1,0 +1,20 @@
+{
+ "oracle": "SHOGEN-BARTLETT-BIAIS-1 et SHOGEN-POOLEE-BLOC-1 (b) : pré-enregistrement, références exactes, taux, r1",
+ "commit_r1": "dad3bc6",
+ "blob_r1": "83584dd2d86ff030b64e176d6106ea4b9c04c539",
+ "sha256_r1": "c5666e8d9bd9f10d96898ef8d8f77360a017873a14e9af6341f941676be77a4b",
+ "json": {
+  "bartlett_poolee.json": "c099986c769ef12a6f9029c5b526ac0f4a4a91eca4231e96822031e4f9bd65ed"
+ },
+ "script_sha256": {
+  "sim_bartlett_poolee_oracle.py": "a501290c6c70be059961f6dee511a036c5ce403b33508ab09efb715a008cb878",
+  "sim_niveau_oracle_r1.py": "cb844d5b724223def91cd2d3397b4deebef9f6a7353d9aa41e30b3361ca2c11d"
+ },
+ "B1_references": 40,
+ "B1_ecart_relatif_max": 5.2665231195968436e-11,
+ "B2_taux": 52,
+ "B3_replications": 80,
+ "B3_ecart_relatif_max": "9.978349127167886e-47",
+ "tolerance_relative_B3": "1e-40",
+ "B4_replications_recomptees": 0
+}

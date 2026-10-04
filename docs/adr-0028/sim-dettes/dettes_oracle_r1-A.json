@@ -1,0 +1,24 @@
+{
+ "oracle": "MODELES-1, FLUX-QUASI-MORT-2, FLUX-FAIBLE-1 : pré-enregistrement, invariants, exact, r1",
+ "commit_r1": "dad3bc6",
+ "blob_r1": "83584dd2d86ff030b64e176d6106ea4b9c04c539",
+ "sha256_r1": "c5666e8d9bd9f10d96898ef8d8f77360a017873a14e9af6341f941676be77a4b",
+ "json": {
+  "runs/A/mo/modeles.json": "827ee8ed06882e63af815ef27c9232274509fdd0527f0be495cbb50f67a235b5",
+  "runs/A/fx/flux.json": "c95e434d99086a406368e401bd170d77964ba212edda4280fdce939f847dba02"
+ },
+ "script_sha256": {
+  "sim_dettes_oracle_r1.py": "23de1000f9c22c6731a2a6422570846b9aec205c5e3db6055ede0d9c50de7590",
+  "sim_dettes_calc.py": "65ed2257eb5296e5574da9e6d92b4a93089041e456f14ca49ba195212b8d24ee",
+  "sim_niveau_oracle_r1.py": "cb844d5b724223def91cd2d3397b4deebef9f6a7353d9aa41e30b3361ca2c11d"
+ },
+ "M0_cas": 18,
+ "M0_profils": 40,
+ "M0_parametres_extensions": 5,
+ "M1_invariants_4b_ii": 464,
+ "M2_ecart_relatif_max": "8.551832729851518e-17",
+ "M3_replications": 300,
+ "M3_ecart_relatif_max": "2.892398121876283e-45",
+ "tolerance_relative_M3": "1e-40",
+ "M4_replications_recomptees": 0
+}
