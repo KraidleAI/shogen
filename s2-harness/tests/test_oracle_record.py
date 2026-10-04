@@ -68,8 +68,11 @@ class TestOracleRecord(unittest.TestCase):
         """Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la
         sortie, nom shogen-<sha court>-<rôle>-<date>-<pid>.json. Rougit si : autre commit extrait, sha d'un fichier
         faux, commande hors liste, sortie non hachée, static_only vrai, variable non consignée ou tests comptés lancés
-        avec elle, exit faux, champ nul hors rendu rempli, env non consigné (PYTHONHASHSEED posé ; C-11, R17)."""
+        avec elle, exit faux, champ nul hors rendu rempli, env non consigné (PYTHONHASHSEED posé ; C-11, R17).
+        Hermétique (SHOGEN-TEST-ENV-HERMETIQUE-1) : variable scellée retirée de l'environnement du test, posée ou non
+        dans celui de la suite ; os.environ rendu intact à la sortie (mock.patch.dict)."""
         with mock.patch.dict(os.environ, {"PYTHONHASHSEED": "17"}):       # jamais la variable scellée
+            os.environ.pop("SHOGEN_S2_CAMPAGNE_CONTROL", None)
             chemin, code = orc.enregistrer(self.sortie, "G2", "claude-opus-5-5", self.depot, self.c1[:10])
         self.assertRegex(os.path.basename(chemin), rf"^shogen-{self.c1[:7]}-G2-\d{{8}}T\d{{6}}Z-\d+\.json$")
         rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
