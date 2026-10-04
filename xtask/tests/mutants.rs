@@ -808,6 +808,20 @@ fn temoin_sg9_arbre_menace_intact_est_vert() {
     );
 }
 
+/// Bornes de (c) (revue G2 d'E1, C-G2-6) : un lot MONARK ou un PX n'est pas résolu ici, il est LISTÉ.
+#[test]
+fn temoin_sg9_bornes_monark_et_px_listees() {
+    let notes = notes_sg9_vert("bornes", "\nlots MONARK G2, G99 et G8 ; PX-Shogen-99.\n");
+    let listes = [
+        "lots MONARK : [G2, G7, G99, G8]",
+        "PX : [PX-Shogen-1, PX-Shogen-99]",
+    ];
+    assert!(
+        listes.iter().all(|l| notes.contains(l)),
+        "bornes :\n{notes}"
+    );
+}
+
 #[test]
 fn mutant_couverture_sg9_perimetre_absent() {
     let racine = arbre_menace("perimetre-absent");
@@ -880,4 +894,16 @@ mutants_sg9! {
     mutant_sg9_a_aucun_controle_sans_motif: "| T-03 x | a | b | c | [aucun contrôle] | r | i |\n" => "cellule de contrôle",
     mutant_sg9_b_residu_invente: "\nRésidu A(residu-invente).\n" => "résidu non défini",
     mutant_sg9_b_residu_en_majuscules: "\nRésidu A(EXEMPLE-RESIDU).\n" => "résidu non défini",
+    mutant_sg9_c_item_inexistant: "\nItem SHOGEN-INEXISTANT-9.\n" => "item non défini",
+    mutant_sg9_c_item_mentionne_non_defini: "\nItem SHOGEN-MENTION-1.\n" => "item non défini",
+    mutant_sg9_c_item_en_troisieme_cellule: "\nItem SHOGEN-MENTION-2.\n" => "item non défini",
+    mutant_sg9_c_lot_absent: "\nVoir le lot ZZ9.\n" => "lot absent de l'annexe A",
+    mutant_sg9_d_jj_mm_aaaa: "\nLe 30/09/2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_point_final: "\nLe 30.09.2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_mm_jj_barres: "\nLe 2026/09/30.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_m_j: "\nLe 2026-9-30.\n" => "date hors forme ISO",
+    mutant_sg9_d_jj_mm_aaaa_tirets: "\nLe 30-09-2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_mm_jj_points: "\nLe 2026.09.30.\n" => "date hors forme ISO",
+    mutant_sg9_f_nombre_decimal: "\nUn taux de 0,013.\n" => "nombre décimal",
+    mutant_sg9_f_ipv4: "\nHôte 192.0.2.1 contacté.\n" => "adresse IP",
 }

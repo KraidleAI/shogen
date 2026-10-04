@@ -20,6 +20,7 @@
 //! lignes citées reste au G2.
 //! Coquille hors rôle S-G3 : tranches et indices bornés par construction (positions de motifs).
 
+use crate::documents::prose_sans_code;
 use crate::rapport::{Rapport, lire};
 use crate::source::{ligne_de, occurrences_nues};
 use std::path::Path;
@@ -37,11 +38,14 @@ pub fn executer(racine: &Path) -> Rapport {
     let mut r = Rapport::nouveau("S-G9", TITRE);
     let chemins = std::iter::once(PERIMETRE).chain(REGISTRES);
     let lus: Vec<_> = chemins.map(|c| lire_exact(&mut r, racine, c)).collect();
-    let Ok([Some(t), Some(registre), Some(_), Some(_)]) = <[_; 4]>::try_from(lus) else {
+    let Ok([Some(t), Some(registre), Some(a), Some(b)]) = <[_; 4]>::try_from(lus) else {
         return r;
     };
+    let prose = prose_sans_code(&t);
     controle_a(&mut r, racine, &t);
     controle_b(&mut r, &t, &registre);
+    controle_c(&mut r, &t, &prose, &a, &b);
+    controle_nombres(&mut r, &t, &prose);
     r.notes.push(String::from(
         "non mécanisés : lignes de D.2 par sha256 (outil FM-1.1), graine et clé du constat, contenu \
          de docs/16 ; résidu : la fidélité des lignes citées reste la lecture du G2",
@@ -224,4 +228,151 @@ fn controle_b(r: &mut Rapport, t: &str, registre: &str) {
     }
     r.notes
         .push(format!("(b) {resolus} résidu(s) résolu(s) au registre 08"));
+}
+
+/// Identifiant `SHOGEN-…-n`, `MONARK-…-n` ou `PX-Shogen-n` qui commence en `position`.
+fn identifiant(t: &str, position: usize) -> Option<&str> {
+    let reste = t.get(position..)?;
+    let prefixes = ["SHOGEN-", "MONARK-", "PX-Shogen-"];
+    let prefixe = prefixes.into_iter().find(|p| reste.starts_with(p))?;
+    let fin = reste.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-'));
+    let fin = fin.unwrap_or(reste.len());
+    let jeton = reste[..fin].trim_end_matches('-');
+    let dernier = jeton.rsplit('-').next().unwrap_or("");
+    let numero = !dernier.is_empty() && dernier.bytes().all(|o| o.is_ascii_digit());
+    let majuscules = prefixe.starts_with("PX") || !jeton.bytes().any(|o| o.is_ascii_lowercase());
+    let libre = !mot(avant(t, position)) && avant(t, position) != Some('-');
+    (libre && majuscules && numero && jeton.len() > prefixe.len()).then_some(jeton)
+}
+
+/// Identifiant défini en tête de cellule (la première qui en porte un) : seul, ou suivi d'une espace
+/// ou d'une parenthèse.
+fn definition(cellule: &str) -> Option<&str> {
+    let cellule = cellule.trim();
+    let id = identifiant(cellule, 0)?;
+    let suite = &cellule[id.len()..];
+    (suite.is_empty() || suite.starts_with([' ', '('])).then_some(id)
+}
+
+/// Lots cités après « lot » ou « lots », en liste (« lots D8b et D8c ») ; vrai pour un lot MONARK.
+fn lots(prose: &str) -> Vec<(usize, &str, bool)> {
+    let mut cites = Vec::new();
+    for (p, _) in prose.to_ascii_lowercase().match_indices("lot") {
+        let suite = &prose[p + 3..];
+        let suite = suite.strip_prefix('s').unwrap_or(suite);
+        let Some(suite) = suite.strip_prefix(' ').filter(|_| !mot(avant(prose, p))) else {
+            continue;
+        };
+        let monark = suite.strip_prefix("MONARK ");
+        let mut reste = monark.unwrap_or(suite);
+        loop {
+            let fin = reste.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-'));
+            let fin = fin.unwrap_or(reste.len());
+            let nom = reste[..fin].trim_end_matches('-');
+            if !nom.starts_with(|c: char| c.is_ascii_uppercase()) {
+                break;
+            }
+            cites.push((prose.len() - reste.len(), nom, monark.is_some()));
+            let apres = reste[fin..].strip_prefix(", ");
+            match apres.or_else(|| reste[fin..].strip_prefix(" et ")) {
+                Some(s) => reste = s,
+                None => break,
+            }
+        }
+    }
+    cites
+}
+
+fn controle_c(r: &mut Rapport, t: &str, prose: &str, annexe_a: &str, annexe_b: &str) {
+    let mut definis = Vec::new();
+    for ligne in annexe_b.lines().map(str::trim_start) {
+        let puce = ligne.strip_prefix("- **");
+        definis.extend(puce.and_then(|x| identifiant(x, 0)));
+        let tete = ligne.strip_prefix('|').map(|l| l.split('|').take(2));
+        definis.extend(tete.into_iter().flatten().find_map(definition));
+    }
+    let (mut items, mut px) = (0, Vec::new());
+    for (p, _) in t.char_indices() {
+        match identifiant(t, p) {
+            Some(id) if id.starts_with("PX-") => px.extend(Some(id).filter(|i| !px.contains(i))),
+            Some(id) if definis.contains(&id) => items += 1,
+            Some(id) => viol(r, t, p, "(c) item non défini à l'annexe B", id),
+            None => {}
+        }
+    }
+    let (mut presents, mut monark) = (0, Vec::new());
+    for (p, nom, de_monark) in lots(prose) {
+        let phrase = format!("lot {nom}");
+        let libre = |s: &str| s.starts_with(|c: char| !(c.is_ascii_alphanumeric() || c == '-'));
+        let suites = annexe_a.match_indices(&phrase);
+        let cite = suites
+            .map(|(q, _)| &annexe_a[q + phrase.len()..])
+            .any(libre);
+        if de_monark {
+            monark.extend(Some(nom).filter(|n| !monark.contains(n)));
+        } else if cite || annexe_a.contains(&format!("**{nom}**")) {
+            presents += 1;
+        } else {
+            viol(r, t, p, "(c) lot absent de l'annexe A", nom);
+        }
+    }
+    r.notes.push(format!(
+        "(c) {items} item(s) défini(s) à l'annexe B, {presents} lot(s) à l'annexe A ; non résolus, \
+         listés : PX : [{}] (registre hors dépôt, D.2 n° 10) ; lots MONARK : [{}]",
+        px.join(", "),
+        monark.join(", ")
+    ));
+}
+
+/// Suites de groupes de chiffres reliés par un même séparateur : (début, longueurs, séparateur).
+fn suites(t: &str, separateurs: &[u8]) -> Vec<(usize, Vec<usize>, u8)> {
+    let o = t.as_bytes();
+    let chiffre = |i: usize| o.get(i).is_some_and(u8::is_ascii_digit);
+    let (mut trouvees, mut i) = (Vec::new(), 0);
+    while i < o.len() {
+        if !chiffre(i) || (i > 0 && chiffre(i - 1)) {
+            i += 1;
+            continue;
+        }
+        let (debut, mut longueurs, mut sep) = (i, Vec::new(), 0);
+        loop {
+            let depart = i;
+            while chiffre(i) {
+                i += 1;
+            }
+            longueurs.push(i - depart);
+            let s = o.get(i).copied().unwrap_or(0);
+            if !(separateurs.contains(&s) && chiffre(i + 1) && (sep == 0 || sep == s)) {
+                break;
+            }
+            (sep, i) = (s, i + 1);
+        }
+        trouvees.push((debut, longueurs, sep));
+    }
+    trouvees
+}
+
+/// (d) dates, sur la prose ; (f) décimaux et adresses IPv4, sur tout le texte.
+fn controle_nombres(r: &mut Rapport, t: &str, prose: &str) {
+    let mut iso = 0;
+    for (debut, l, sep) in suites(prose, b"/.-") {
+        let devant = l.len() == 3 && l[0] == 4 && l[1] <= 2 && l[2] <= 2;
+        let derriere = l.len() == 3 && l[2] == 4 && l[0] <= 2 && l[1] <= 2;
+        if sep == b'-' && l == [4, 2, 2] {
+            iso += 1;
+        } else if devant || derriere {
+            viol(r, t, debut, "(d) date hors forme ISO (AAAA-MM-JJ)", "");
+        }
+    }
+    for (debut, l, sep) in suites(t, b".,") {
+        let exempte = avant(t, debut).is_some_and(|c| c.is_alphanumeric() || "§.-_/".contains(c));
+        if sep == b'.' && l.len() == 4 && l.iter().all(|n| *n <= 3) {
+            viol(r, t, debut, "(f) adresse IP", "");
+        } else if l.len() == 2 && !exempte {
+            viol(r, t, debut, "(f) nombre décimal", "");
+        }
+    }
+    r.notes.push(format!(
+        "(d) {iso} date(s) ISO ; formes numériques non ISO refusées"
+    ));
 }
