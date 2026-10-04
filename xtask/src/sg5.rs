@@ -33,6 +33,14 @@
 //! **Résidu nommé** : la gate vérifie « la citation existe dans le corpus »,
 //! pas « la citation est fidèle à sa source » — la fidélité reste
 //! l'adjudication de l'orchestrateur au versement (méthodologie doc 03).
+//!
+//! **Emplacements interdits** (lot SG5-INTERDITS, 2026-10-04 ;
+//! SHOGEN-SG5-NOTES-INTERDITS-1, ADR-0028 annexe B.51) : une citation
+//! introuvable située sous `EMPLACEMENTS_INTERDITS` se rapporte par
+//! `chemin:ligne` seul, en note comme en violation, jamais par son texte.
+//! Verdict et comptes n'en dépendent pas. Limites : le masque ne couvre que
+//! S-G5 (S-G4 imprime encore la ligne en extrait) ; un emplacement absent de
+//! la liste, ou atteint par un lien symbolique, imprime son texte.
 
 use crate::documents::{
     compte_declare_en_tete, fichiers_du_repertoire, fichiers_markdown, normaliser_pour_recherche,
@@ -68,6 +76,27 @@ const OCCURRENCES_MINIMALES: usize = 2;
 const EXTENSIONS_TEXTE: &[&str] = &[
     "html", "htm", "txt", "md", "sidecar", "json", "xml", "rs", "toml", "yml", "yaml", "lock",
 ];
+
+/// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
+/// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
+/// séparateur `/` (invariant 1 d'ADR-0013). `docs/15-` et `docs/16-` couvrent
+/// fichier ou dossier ; les autres finissent par `/`.
+pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
+    "docs/15-",
+    "docs/16-",
+    "docs/pocket-report/",
+    "docs/rapports/",
+    "docs/adr-0025/",
+    "docs/adr-0028/monark-m009a/",
+];
+
+/// Vrai si `relatif` (chemin relatif, séparateur `/`) est sous un emplacement
+/// interdit : ses citations se rapportent par `chemin:ligne` seul.
+pub(crate) fn emplacement_interdit(relatif: &str) -> bool {
+    EMPLACEMENTS_INTERDITS
+        .iter()
+        .any(|prefixe| relatif.starts_with(prefixe))
+}
 
 pub fn executer(racine: &Path) -> Rapport {
     let mut rapport = Rapport::nouveau("S-G5", "citations (une-citation-un-grep, mécanisée)");
@@ -161,12 +190,14 @@ pub fn executer(racine: &Path) -> Rapport {
     // 2. Les citations des documents du périmètre.
     let mut controlees = 0usize;
     let mut ecartes = 0usize;
+    let mut masques = 0usize;
     let mut non_controlables = Vec::new();
     for chemin in &fichiers {
         let Some(texte) = lire(&mut rapport, racine, chemin) else {
             continue;
         };
         let relatif = chemin_relatif(racine, chemin);
+        let interdit = emplacement_interdit(&relatif);
         for (decalage, citation) in citations_francaises(&texte) {
             for fragment in fragments(&citation) {
                 let normalise = normaliser_pour_recherche(&fragment);
@@ -198,17 +229,28 @@ pub fn executer(racine: &Path) -> Rapport {
                     continue;
                 }
                 let (ligne, _) = ligne_de(&texte, decalage);
+                // Emplacement interdit : `chemin:ligne` seul, jamais le texte
+                // (SHOGEN-SG5-NOTES-INTERDITS-1) ; le verdict est le même.
+                if interdit {
+                    masques = masques.saturating_add(1);
+                }
                 if corpus_incomplet {
-                    non_controlables.push(format!("{relatif}:{ligne} — « {normalise} »"));
+                    non_controlables.push(if interdit {
+                        format!("{relatif}:{ligne}")
+                    } else {
+                        format!("{relatif}:{ligne} — « {normalise} »")
+                    });
                 } else {
-                    rapport.violation(
-                        relatif.clone(),
-                        ligne,
+                    let motif = if interdit {
+                        String::from(
+                            "citation introuvable dans le registre et les octets détenus (emplacement interdit : texte jamais imprimé)",
+                        )
+                    } else {
                         format!(
                             "citation introuvable dans le registre et les octets détenus : « {normalise} »"
-                        ),
-                        String::new(),
-                    );
+                        )
+                    };
+                    rapport.violation(relatif.clone(), ligne, motif, String::new());
                 }
             }
         }
@@ -217,6 +259,9 @@ pub fn executer(racine: &Path) -> Rapport {
     rapport.notes.push(format!(
         "{controlees} fragment(s) de citation contrôlé(s), {ecartes} écarté(s) sous seuil (longueur ou langue — borne de couverture) ; corpus : INDEX + {octets_presents} artefact(s) local(aux) sur {} déclaré(s)",
         declares.map_or_else(|| String::from("?"), |n| n.to_string())
+    ));
+    rapport.notes.push(format!(
+        "emplacements interdits (SHOGEN-SG5-NOTES-INTERDITS-1) : {masques} fragment(s) introuvable(s) rapporté(s) par chemin:ligne seul, texte jamais imprimé ; verdict inchangé"
     ));
     if corpus_incomplet {
         rapport.notes.push(format!(

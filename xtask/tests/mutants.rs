@@ -738,6 +738,152 @@ fn mutant_sg8_ligne_de_table_entierement_vide() {
 }
 
 // ---------------------------------------------------------------------------
+// S-G5 et emplacements interdits (lot SG5-INTERDITS, 2026-10-04 ; SHOGEN-SG5-NOTES-INTERDITS-1,
+// ADR-0028 annexe B.51) : une citation introuvable située dans un emplacement interdit ne
+// s'imprime que par `chemin:ligne`, jamais par son texte, et le verdict ne change pas. La sortie
+// contrôlée est celle du binaire (`xtask gates`), pas un champ du rapport. Les six emplacements
+// sont recopiés de la liste des briefs, indépendamment du code.
+// ---------------------------------------------------------------------------
+
+const FACTICES_INTERDITS: [&str; 6] = [
+    "docs/15-factice.md",
+    "docs/16-factice.md",
+    "docs/pocket-report/factice.md",
+    "docs/rapports/factice.md",
+    "docs/adr-0025/factice.md",
+    "docs/adr-0028/monark-m009a/factice.md",
+];
+
+/// Écrit, ligne 3 de `relatif`, une citation anglaise introuvable au corpus, portant `marque`.
+fn citation_factice(racine: &Path, relatif: &str, marque: &str) {
+    let texte = format!(
+        "# fixture factice\n\nUne citation : « the {marque} sentence of this file is not in the corpus ».\n"
+    );
+    ecrire(racine, relatif, &texte);
+}
+
+/// L'arbre augmenté des six fixtures interdites, marquées `zorglub0` à `zorglub5`.
+fn avec_factices_interdits(racine: PathBuf) -> PathBuf {
+    for (rang, relatif) in FACTICES_INTERDITS.iter().enumerate() {
+        citation_factice(&racine, relatif, &format!("zorglub{rang}"));
+    }
+    racine
+}
+
+/// Sortie du binaire (stdout puis stderr) : `xtask gates`, lexical, sans sous-processus cargo.
+fn sortie_du_binaire(racine: &Path) -> String {
+    ecrire(racine, "Cargo.toml", "[workspace]\n");
+    let sortie = std::process::Command::new(env!("CARGO_BIN_EXE_xtask"))
+        .arg("gates")
+        .current_dir(racine)
+        .output()
+        .expect("lancement du binaire xtask");
+    // Rouge global attendu (arbre sans rôles) : toute autre sortie est un lancement manqué.
+    assert_eq!(
+        sortie.status.code(),
+        Some(1),
+        "binaire : {:?}",
+        sortie.status
+    );
+    let (stdout, stderr) = (&sortie.stdout, &sortie.stderr);
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(stdout),
+        String::from_utf8_lossy(stderr)
+    )
+}
+
+/// Exige : S-G5 imprimée, aucune marque `zorglub` (le texte), chaque fixture en `chemin:3`.
+fn exiger_chemin_ligne_sans_texte(sortie: &str, avant: &str, apres: &str) {
+    assert!(sortie.contains("--- S-G5"), "S-G5 absente :\n{sortie}");
+    assert!(
+        !sortie.contains("zorglub"),
+        "texte d'une citation en emplacement interdit imprimé :\n{sortie}"
+    );
+    for relatif in FACTICES_INTERDITS {
+        let attendu = format!("{avant}{relatif}:3{apres}");
+        assert!(
+            sortie.contains(&attendu),
+            "« {attendu} » absent :\n{sortie}"
+        );
+    }
+}
+
+const NOTE_MASQUES: &str = "fragment(s) introuvable(s) rapporté(s) par chemin:ligne seul";
+
+#[test]
+fn mutant_sg5_interdits_complet_chemin_ligne_sans_texte() {
+    let racine = avec_factices_interdits(arbre_documentaire("sg5-interdits-complet"));
+    // Une citation trouvée au corpus, en emplacement interdit : ni violation, ni masque.
+    ajouter(
+        &racine,
+        "docs/rapports/factice.md",
+        "\n« this quotation is present in the corpus and it is checked by the gate ».\n",
+    );
+    // Verdict inchangé : ROUGE, six violations, une par fixture, ligne 3.
+    let rapport = xtask::sg5::executer(&racine);
+    let motifs = motifs(&rapport);
+    assert_eq!(
+        rapport.violations.len(),
+        6,
+        "six violations attendues :\n{motifs}"
+    );
+    for relatif in FACTICES_INTERDITS {
+        let attendu = format!("{relatif}:3 citation introuvable");
+        assert!(
+            motifs.contains(&attendu),
+            "« {attendu} » absent :\n{motifs}"
+        );
+    }
+    exiger_chemin_ligne_sans_texte(&sortie_du_binaire(&racine), "VIOLATION ", " — ");
+    let notes = rapport.notes.join("\n");
+    assert!(notes.contains(&format!(": 6 {NOTE_MASQUES}")), "{notes}");
+}
+
+#[test]
+fn mutant_sg5_interdits_incomplet_chemin_ligne_sans_texte() {
+    let racine = avec_factices_interdits(arbre_documentaire_sans_octets("sg5-interdits-partiel"));
+    // Verdict inchangé : VERT, huit fragments non contrôlés (deux de l'arbre, six factices).
+    let rapport = xtask::sg5::executer(&racine);
+    let notes = rapport.notes.join("\n");
+    assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
+    assert!(notes.contains(": 8 fragment(s) NON contrôlé(s)"), "{notes}");
+    exiger_chemin_ligne_sans_texte(&sortie_du_binaire(&racine), "non contrôlé : ", "\n");
+    assert!(notes.contains(&format!(": 6 {NOTE_MASQUES}")), "{notes}");
+}
+
+/// Témoin des bornes (préfixes exacts) : hors des six emplacements, le texte reste imprimé.
+#[test]
+fn temoin_sg5_interdits_voisins_gardent_le_texte() {
+    let racine = arbre_documentaire("sg5-interdits-voisins");
+    let voisins = [
+        "docs/150-voisin.md",
+        "docs/160-voisin.md",
+        "docs/rapports-publics/voisin.md",
+        "docs/pocket-reportage/voisin.md",
+        "docs/adr-00250/voisin.md",
+        "docs/adr-0028/voisin.md",
+        "docs/adr-0028/monark-m009ab/voisin.md",
+        "s2-harness/docs/rapports/voisin.md",
+    ];
+    for relatif in voisins {
+        citation_factice(&racine, relatif, "visible");
+    }
+    let rapport = xtask::sg5::executer(&racine);
+    let motifs = motifs(&rapport);
+    assert_eq!(rapport.violations.len(), voisins.len(), "{motifs}");
+    for relatif in voisins {
+        let attendu = format!(
+            "{relatif}:3 citation introuvable dans le registre et les octets détenus : « the visible sentence of this file is not in the corpus »"
+        );
+        assert!(
+            motifs.contains(&attendu),
+            "« {attendu} » absent :\n{motifs}"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
 // ajoute UNE forme fautive et exige le ROUGE pour son motif ; les survivants de la revue G2 d'E1 (résidu en
