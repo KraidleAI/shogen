@@ -68,6 +68,19 @@ class TestHoteDeuxFlux(unittest.TestCase):
                          "< k nominal du segment = 3 : recouvrement R2 mesuré explique au moins en partie la "
                          "co-défaillance")
 
+    def test_bloc5_d_un_seul_cluster_a_deux_flux(self):
+        """SHOGEN-BLOC5-LIBELLE-1 (annexe B.46 ; docs/11 point 9) : un AS par hôte ; www.okx.com porte deux flux, les
+        deux autres hôtes un chacun : un seul cluster à ≥ 2 flux, donc aucune paire de clusters ; le bloc 5 (d) le
+        dit, sans « aucun cluster à ≥ 2 flux (1) ». Compte écrit à la main. Rougit si : libellé d'origine ; compte
+        imprimé autre que celui des clusters à ≥ 2 flux."""
+        a = {"api.exchange.coinbase.com": 64512, "api.kraken.com": 64513, "www.okx.com": 64514}
+        c, j = journal4(lambda h: (a[h], a[h]))
+        txt = report.render_report(c, j)
+        self.assertEqual(r2.recompute_r2_from_journal(c, j)["cluster_correlations"]["n_multi_clusters"], 1)
+        self.assertIn("\n      moins de deux clusters à ≥ 2 flux (1) : aucune paire de clusters → tout reste au φ par "
+                      "paire de flux (bloc 4)\n", txt)
+        self.assertNotIn("aucun cluster à ≥ 2 flux", txt)
+
 
 if __name__ == "__main__":
     unittest.main()

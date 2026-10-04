@@ -38,8 +38,10 @@ PLAGE = (WS[2], WS[4])
 # sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant a7f5cbfd…72bb544) ;
 # puis au sous-lot A3 (bloc 1 : ligne run_params_non_porteurs insérée ; avant 19865d4f…be90233) ; puis au
 # sous-lot B1 de l'étape B (bloc 6 : ligne « sans ts » insérée, SHOGEN-BLOC6-TS-1 ; avant c4f45f47…6a5d144) ; puis au
-# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 37dfcacb…0c00a96).
-SHA_BASE_SANS_OPTION = "4e62fbb8a4a7a29c0761c719c8f731a8247ef407be7a7a04c44219bd093c9a01"
+# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 37dfcacb…0c00a96) ; puis au
+# lot DETTES-B1, sous-lot 3 (bloc 5 (d) et note k_eff du bloc 6 : deux libellés corrigés, SHOGEN-BLOC5-LIBELLE-1 et
+# SHOGEN-KEFF-NOTE-1, lignes remplacées seules ; avant 4e62fbb8…93c9a01).
+SHA_BASE_SANS_OPTION = "57a72f7f830a516344c636eb9fa762a4e7bc00f6d80a63e75b836e897011e686"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 

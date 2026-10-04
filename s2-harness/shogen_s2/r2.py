@@ -887,7 +887,7 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     k_eff_is_upper_bound = False
     if not measured:
         k_eff = None
-        k_eff_note = ("axe ASN NON MESURÉ (aucun enregistrement asn_attribution) — k_eff "
+        k_eff_note = ("axe ASN NON MESURÉ (aucun enregistrement asn_attribution retenu) — k_eff "   # SHOGEN-KEFF-NOTE-1
                       "NON ÉVALUABLE ; une partition en singletons ici ne serait pas une "
                       "indépendance mesurée mais une absence de donnée (fail-closed §5.6)")
     elif not all_probed:

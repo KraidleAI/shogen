@@ -609,8 +609,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         for k, v in sorted(cc["cluster_pairs"].items()):
             ap(f"      {k} : ρ(Θ̂)={_fmt_dec(v['rho'])} ({v['signe']}) [{v['note']}]")
     else:
-        ap(f"      aucun cluster à ≥ 2 flux ({cc['n_multi_clusters']}) → tout reste au φ "
-           "par paire de flux (bloc 4)")
+        ap(f"      moins de deux clusters à ≥ 2 flux ({cc['n_multi_clusters']}) : aucune paire de clusters → tout "
+           "reste au φ par paire de flux (bloc 4)")              # SHOGEN-BLOC5-LIBELLE-1
 
     # 5e. Les 7 résidus de l'axe ASN (§4.1) — publiés avec l'observable
     ap("\n  (e) LES 7 RÉSIDUS DE L'AXE ASN (§4.1) — un observable est un témoignage "
