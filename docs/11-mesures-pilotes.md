@@ -1009,3 +1009,5 @@ ici, aucune n'entre dans la règle ni ne peut changer le verdict (paquet §7, §
   pas publiés, et leur publication conditionne le test de composition SHOGEN-S2-TUYAU-MONARK-1 côté MONARK (ADR §3 ;
   §4 pt 4). Les rendus et le sceau sont au même dépôt privé : un tiers à qui l'on remet les rendus et le sceau sans
   les journaux peut contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus.
+
+> *Ajout daté du 2026-10-04 06:52:35 UTC (relecture G2 du lot DETTES-B1, C-3 ; points « Code » et « Rejeu » ci-dessus)* : à partir du commit `0221a74` (lot DETTES-B1, B1-1 ; `rendu_unique.py` à partir de `0789d96`, B1-4), `s2-harness/shogen_s2` et `s2-harness/tools` diffèrent du commit d'analyse `f35a70c` (sha256 de `rendu_unique.py` à la tête `5ee95dbf…` ≠ `sha256_script` `06d189cf…`) : les gardes (2) et (4) refusent à la tête ; tout rejeu (`recompute_*`) ou ré-exécution du rendu de S2 se fait sur une extraction de `f35a70c` ; à la tête, les sorties diffèrent par construction (bloc 5 (d), note k_eff, clé `etiquette` du drapeau 2 de `j28-incluse`, divergences ASN de relevés partiels).

@@ -34,3 +34,5 @@ posées à l'investisseur en une fois ; elles ne sont pas des dettes oubliées.
   par l'orchestrateur (SHOGEN-ENREG-VARIABLE-1), déviation consignée.
 - Contrôle FM-1.1 de la transcription de l'exécution (procédure §5) : non consigné ; fait après par l'orchestrateur.
 - Ancre OpenTimestamps (paquet §9) : formée en item (SHOGEN-SCEAU-OTS-1), décision de l'investisseur.
+
+> *Ajout daté du 2026-10-04 06:52:35 UTC (relecture G2 du lot DETTES-B1, C-4 ; annexe B.4)* : pour SHOGEN-CI-S2-SAUT-1, l'orchestrateur retient un **plancher** du nombre de tests, et non un manifeste des modules (motifs du journal G1 du lot, §9 : le plancher refuse les deux pertes mesurées par le lot CI-S2, module renommé et retrait partiel, alors qu'un manifeste de modules ne voit pas un retrait partiel dans un module ; limite : après une croissance de la suite, un retrait inférieur à l'écart au plancher passe) ; valeur `PLANCHER = 405`, le compte mesuré après le lot ; il suit le compte aux lots suivants (SHOGEN-CI-PLANCHER-SUIVI-1). B.4 réservait ce choix à un G0 ; le G0 de D8a ne l'avait pas tranché.
