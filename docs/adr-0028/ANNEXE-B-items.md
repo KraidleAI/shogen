@@ -662,3 +662,26 @@ de l'annexe A non lue par lui) : comparée par l'orchestrateur, les sept commits
 Note à PX-Shogen-13 annoncée en B.43 (R-A I-3), recopiée de `docs/adr-0028/G2-RATTRAPAGE-R-A.md` l.251-252 : « PX-Shogen-13
 déclare que τ observé (axe (i) atteint) et le P99 de calibration (`closure.py`, toutes cellules évaluables) ne portent
 pas sur la même population. »
+
+## B.46 Amendement daté du 2026-10-04 03:32:36 UTC (heure produite par le script d'écriture) : rapport de S2 `docs/11` validé et versé (partie 4, étape R)
+
+Rapport `docs/11-mesures-pilotes.md` (sha256 `ecd6f893…072e`) : rédacteur frais `claude-opus-5-5` (texte livré
+`4604fff3…`, journal G1 versé `docs/G1-rapport-docs11.md`, scripts `docs/adr-0028/execution/rapport-docs11/`) ; cp-1 complet d'un
+validateur frais `claude-fable-5-1` (`docs/adr-0028/CP1-RAPPORT-DOCS11-2026-10-04.md`) : **ACCEPTE-AVEC-CORRECTIONS**, une
+correction (C-1, entrées `basis:doc`), appliquée mot pour mot ; 80 valeurs `Decimal` contrôlées à leur ligne, 0 écart ; énoncés
+scellés identiques ; lift de D3 rejoué ; `cargo --locked xtask verify` VERT. FM-1.1 du rédacteur (741 événements) et du
+validateur (169) : 0 fragment.
+
+Items **fermés** sur ce rapport : SHOGEN-D3-LIFT-1 (B.42 ; lift et identité φ publiés, §6, en arithmétique exacte) ;
+SHOGEN-ASN-DIVERGENCE-HORS-POOL-1 (B.44 ; aucune divergence ASN dans aucun rendu, `asn_divergences: []`) ;
+SHOGEN-D4-PRECEDENCE-RAPPORT-1 (B.45 ; le cas ne se présente pas au J28 : k_eff évaluable).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-BLOC5-LIBELLE-1 | bloc 5 (d) : « aucun cluster à ≥ 2 flux (1) » trompeur, le recalcul tiers porte `n_multi_clusters` = 1 | orch. | lot de code d'après S2 | une ligne et un test [inféré] | rédacteur du rapport, (a) |
+| SHOGEN-RT-ETIQUETTE-INCLUSE-1 | JSON du recalcul tiers : `r1_discrimine` VRAI de la variante incluse étiqueté seulement au niveau de l'entrée | orch. | lot de code d'après S2 | quelques lignes et un test [inféré] | rédacteur du rapport, (b) |
+| SHOGEN-REJEU-HOTE-1 | égalité à l'octet d'un rejeu des rendus sur un autre hôte non mesurée | orch. | avant G9 (publication) ou S2-bis | un rejeu sur un second hôte [inféré] | rédacteur du rapport, (c) |
+| SHOGEN-HORLOGE-ETENDUE-1 | étendue des écarts du contrôle d'horloge (3 610 relevés) non calculée | orch. | analyses ajoutées après le pré-enregistrement | ≈ 30 lignes [inféré] | rédacteur du rapport, (d) ; paquet §12 pt 17 |
+| SHOGEN-CENSURE-S2BIS-1 | censure large (7 795 fenêtres sautées dont 7 628 sans cause attribuée ; 4 093 démarrages du harnais) : entrée de conception de S2-bis | orch. ; rédacteur de l'ADR-0029 | ADR-0029 | aucun (entrée de conception) | rédacteur du rapport, (e) |
+| SHOGEN-SIGMA-BLOC-INDEP-1 | σ̂²_bloc non recalculé par un code indépendant sur les journaux réels | orch. | analyses ajoutées après le pré-enregistrement | ≈ 60 lignes [inféré] | rédacteur du rapport, (f) |
+| SHOGEN-DOCS11-PUBLIC-1 | version publique du rapport : quatorze points relevés par le validateur (mention « Non publié », modèles, chemins Windows, dépôts privés, identifiants de session, décisions d'affaires, renvois internes, tiers nommés avec préavis) | orch. ; investisseur (feu vert) | avant G9 | une version filtrée et un cp-1 bref [inféré] | cp-1 du rapport, liste « publication » |
