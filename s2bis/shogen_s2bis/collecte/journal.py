@@ -8,10 +8,11 @@ fenêtre n'est admis que sur la grille et pour une fenêtre non close (ws ≥ `s
 exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture.
 E-C-20 (CB-2) : un fichier par jour UTC ; le premier enregistrement d'une fenêtre d'un jour nouveau clôt le fichier
 (`cloture`, fsync), inscrit son sha256 au fichier de sommes `<préfixe>.sha256` (format de sha256sum, fsync), puis
-ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21 (CB-2) : un journal existant reprend au
-dernier enregistrement intègre ; une queue non intègre (ligne coupée, octets NUL, ligne de plus de LIMITE octets)
+ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21, E-C-22 (CB-2) : un journal existant reprend
+au dernier enregistrement intègre ; une queue non intègre (ligne coupée, octets NUL, ligne de plus de LIMITE octets)
 n'est jamais réécrite : un segment neuf s'ouvre par `reprise`, qui la déclare (fichier, position, octets, sha256). La
-fenêtre du redémarrage et toute fenêtre close restent refusées."""
+fenêtre du redémarrage et toute fenêtre close restent refusées ; le marqueur qui suit des fenêtres sans marqueur est
+précédé d'un `trou` (cause `arret`, `horloge_reculee` ou `saut`)."""
 import fcntl
 import hashlib
 import json
@@ -45,7 +46,7 @@ def canonique(enr):
         pile += v.values() if isinstance(v, dict) else v if isinstance(v, (list, tuple)) else []
     try:
         return json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
-    except (TypeError, ValueError) as e:
+    except (TypeError, ValueError, RecursionError) as e:          # RecursionError : imbrication excessive
         raise ErreurJournal("JOURNAL/type", e) from None
 
 
@@ -96,7 +97,7 @@ class Journal:
         if fichiers:
             self._reprendre(ws, fichiers)
         else:
-            self.seq, self.prec, self.suivante, self.attendu = -1, GENESE, ws + self.w, ws + self.w
+            self.seq, self.prec, self.suivante, self.attendu, self.cause = -1, GENESE, ws + self.w, ws + self.w, "saut"
             self._creer(jour(ws), 0, {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
         return self
 
@@ -112,7 +113,7 @@ class Journal:
         if (ws + self.w) % HEURE == 0:
             tete = self._ecrire({"type": "point", "ws": ws})
         self.fsync(self.fd)
-        self.suivante = self.attendu = ws + self.w
+        self.suivante, self.attendu, self.cause = ws + self.w, ws + self.w, "saut"
         return tete
 
     def fermer(self):
@@ -133,6 +134,9 @@ class Journal:
             os.close(self.fd)
             self._sommer(nom(self.prefixe, self.jour, self.k), self.h.hexdigest())
             self._creer(jour(ws), 0, {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
+        if genre == "marqueur" and ws > self.attendu:
+            self._ecrire({"type": "trou", "de": self.attendu, "a": ws - self.w, "cause": self.cause})
+            self.attendu, self.cause = ws, "saut"
         return self._ecrire({**champs, "type": genre, "ws": ws})
 
     def _sommer(self, n, h):
@@ -165,12 +169,12 @@ class Journal:
                         lien = t in ("ouverture", "reprise") and type(e["seq"]) is int
                     if t in ("ouverture", "reprise"):
                         attendu = e["suivante"]                # première fenêtre ni close ni déclarée en trou
-                    elif t == "marqueur":
-                        attendu = e["ws"] + self.w
+                    elif t in ("marqueur", "trou"):
+                        attendu = e["ws" if t == "marqueur" else "a"] + self.w
                     else:
                         attendu = etat["attendu"]
                     intact = lien and type(attendu) is int and canonique(e) == ligne
-                except (ValueError, KeyError, TypeError, ErreurJournal):
+                except (ValueError, KeyError, TypeError, RecursionError, ErreurJournal):
                     intact = False
                 if not intact:
                     break
@@ -180,7 +184,8 @@ class Journal:
         return pos, etat, h
 
     def _reprendre(self, ws, fichiers):
-        """Reprise au dernier intègre, queues déclarées ; segment neuf si queue, fichier clos ou jour passé."""
+        """Reprise au dernier intègre ; queues déclarées, fichiers achevés sommés ; segment neuf si queue, fichier clos
+        ou jour passé (clos ici)."""
         queues = []
         for j, k, n in reversed(fichiers):
             pos, etat, h = self._lire(n)
@@ -194,20 +199,39 @@ class Journal:
         self.seq, self.prec, self.attendu = etat["seq"], etat["prec"], etat["attendu"]
         self.jour, self.k, self.h = j, k, h
         self.suivante = max(self.attendu, ws + self.w)
+        self.cause = "horloge_reculee" if ws + self.w < self.attendu else "arret"
         ouvert = not queues and etat["type"] != "cloture"
         if ouvert:
             self.fd = os.open(os.path.join(self.dossier, n), os.O_WRONLY | os.O_APPEND)
         reprise = {"type": "reprise", "ws": ws, "suivante": self.attendu, "queue": queues or None}
         if ouvert and jour(ws) <= j:
+            self._sommes([x for _j, _k, x in fichiers if x != n])
             self._ecrire(reprise)
         else:
             if ouvert:
                 self._ecrire({"type": "cloture", "jour": j})
                 self.fsync(self.fd)
                 os.close(self.fd)
+            self._sommes([x for _j, _k, x in fichiers])
             jn = max(jour(ws), j)
             self._creer(jn, 1 + max([kk for jj, kk, _x in fichiers if jj == jn], default=-1), reprise)
         self.fsync(self.fd)
+
+    def _sommes(self, noms):
+        """Inscrit au fichier de sommes chaque fichier de `noms` qui n'y est pas (coupure avant l'inscription) ; une
+        dernière ligne coupée y est close par un saut de ligne, jamais réécrite."""
+        chemin, texte = os.path.join(self.dossier, self.prefixe + ".sha256"), ""
+        if os.path.exists(chemin):
+            with open(chemin, encoding="utf-8", errors="replace") as f:
+                texte = f.read()
+        if texte and not texte.endswith("\n"):
+            fd = os.open(chemin, os.O_WRONLY | os.O_APPEND)
+            _tout(fd, b"\n")
+            os.close(fd)
+        lus = {ligne.split("  ", 1)[-1] for ligne in texte.split("\n")}
+        for x in noms:
+            if x not in lus:
+                self._sommer(x, _empreinte(os.path.join(self.dossier, x))[0])
 
     def _ecrire(self, enr):
         octets = canonique({**enr, "seq": self.seq + 1, "prec": self.prec})

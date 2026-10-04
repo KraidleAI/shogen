@@ -34,6 +34,7 @@
 | `point` | `ws` : fenêtre qui clôt l'heure, (`ws` + w) multiple de 3 600 | l'écrivain, juste après ce marqueur ; son empreinte est la tête exportée (E-C-35) |
 | `cloture` | `jour` : jour UTC du fichier qu'il clôt | l'écrivain : dernier enregistrement d'un fichier quotidien (§6) |
 | `reprise` | `ws` (fenêtre de l'horloge au redémarrage), `suivante`, `queue` | l'écrivain, au redémarrage (§7) |
+| `trou` | `de`, `a`, `cause` | l'écrivain, juste avant le marqueur qui suit des fenêtres sans marqueur (§7) |
 | tout autre type (`lecture`, `sante`, `run_params`…) | `ws` ; champs de son sous-lot | `ecrire(type, ws, …)` |
 
 Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont réservés à l'écrivain. Un champ nommé
@@ -60,6 +61,7 @@ lecture ou écriture du journal et tenu jusqu'à la fermeture. Une seconde insta
 sans rien lire ni écrire (JournalOccupe). Avec la chaîne, une écriture entrelacée de deux instances serait de toute
 façon visible (`seq` ou `prec` rompu). C'est le moyen de fermeture par construction de SHOGEN-ENTRELACEMENT-D5-1 pour
 S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item reste un acte de l'orchestrateur.
+L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pour la boucle du pool, sous-lot CB-4).
 
 ## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
 
@@ -100,3 +102,18 @@ S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item 
    ne crée jamais une seconde chaîne dans le même dossier.
 7. Limite déclarée : la reprise ne contrôle pas le lien entre la première ligne d'un fichier et la dernière du fichier
    précédent ; ce contrôle revient au lecteur du recalcul (RB-1) et au lecteur indépendant (RB-18).
+
+## 8. Trous et sommes rattrapées (CB-2c, E-C-22, E-C-20)
+
+1. Toute fenêtre sans marqueur porte sa cause. Quand un marqueur arrive pour ws > `suivante` de l'état (première
+   fenêtre ni close ni déclarée), l'écrivain écrit d'abord `trou` : `de` = `suivante`, `a` = ws − w, `cause` :
+   - `arret` pour le premier trou qui suit une reprise ;
+   - `horloge_reculee` si l'horloge du redémarrage était en arrière de la dernière fenêtre close (fenêtre du
+     redémarrage + w < `suivante`) ;
+   - `saut` pour des fenêtres sautées pendant l'exécution.
+   Le trou avance l'état : un même intervalle n'est jamais déclaré deux fois, même si le marqueur est ensuite refusé.
+2. À la reprise, chaque fichier achevé (clos, abandonné à une queue, ou laissé pour un segment neuf) reçoit sa ligne
+   au fichier de sommes s'il n'y figure pas, sha256 pris sur ses octets ; une dernière ligne coupée du fichier de sommes
+   est close par un saut de ligne, jamais réécrite.
+3. Une ligne d'imbrication excessive (le décodeur JSON lève RecursionError) est non intègre : elle et la suite forment
+   une queue (§7). L'écrivain refuse d'écrire un tel enregistrement (`JOURNAL/type`).

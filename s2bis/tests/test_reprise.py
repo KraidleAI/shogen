@@ -1,5 +1,5 @@
 """CB-2, E-C-21 : reprise au dernier enregistrement intègre, queue non intègre conservée à l'octet et déclarée dans un
-segment neuf, fenêtre du redémarrage refusée. Queues calculées sur les octets écrits par le test."""
+segment neuf, fenêtre du redémarrage refusée, sommes rattrapées. Queues calculées sur les octets du test."""
 import hashlib
 import json
 import os
@@ -59,6 +59,7 @@ class Reprise(AvecJournal):
         enrs = chaine(e[SEG1], seq, prec)[2]                      # la chaîne reprend au dernier enregistrement intègre
         self.assertEqual(sans_chaine(enrs), [{"type": "reprise", "ws": m(7), "suivante": m(4), "queue": [
             {"fichier": FICHIER, "position": len(intact), "octets": len(q), "sha256": hashlib.sha256(q).hexdigest()}]}])
+        self.assertEqual(e["pool.sha256"], f"{hashlib.sha256(intact + q).hexdigest()}  {FICHIER}\n".encode())
 
     def test_queue_ligne_coupee(self):
         self.queue(lambda s, p: b'{"k":4,"prec":"5e3')
@@ -78,6 +79,15 @@ class Reprise(AvecJournal):
             self.journal(m(9)).ecrire("lecture", m(10), x="a" * j.LIMITE)
         self.assertEqual(e.exception.code, "JOURNAL/taille")
 
+    def test_queue_imbrication_profonde_et_refus_a_l_ecriture(self):
+        self.queue(lambda s, p: b"[" * 100000 + b"]" * 100000 + b"\n")
+        x = []
+        for _i in range(100000):
+            x = [x]
+        with self.assertRaises(j.ErreurJournal) as e:
+            self.journal(m(9)).ecrire("lecture", m(10), x=x)
+        self.assertEqual(e.exception.code, "JOURNAL/type")
+
     def segment(self, fabrique):
         """Segment 1 illisible dès sa première ligne : repli sur le segment 0, segment 1 déclaré, segment 2 ouvert."""
         intact = self.preparer()
@@ -85,10 +95,13 @@ class Reprise(AvecJournal):
         contenu = fabrique(seq, prec)
         with open(os.path.join(self.d, SEG1), "wb") as f:
             f.write(contenu)
-        self.journal(m(7))
+        self.journal(m(7)).fermer()
         e = self.etat()
         self.assertEqual(chaine(e[SEG2], seq, prec)[2][0]["queue"], [
             {"fichier": SEG1, "position": 0, "octets": len(contenu), "sha256": hashlib.sha256(contenu).hexdigest()}])
+        sommes = f"{hashlib.sha256(intact).hexdigest()}  {FICHIER}\n{hashlib.sha256(contenu).hexdigest()}  {SEG1}\n"
+        self.journal(m(9))                                      # seconde reprise : aucune somme inscrite deux fois
+        self.assertEqual((e["pool.sha256"], self.etat()["pool.sha256"]), (sommes.encode(), sommes.encode()))
 
     def test_segment_neuf_tronque_repli_sur_le_precedent(self):
         self.segment(lambda s, p: b'{"jour":')                  # coupure juste après la création du segment
@@ -106,3 +119,14 @@ class Reprise(AvecJournal):
         self.journal(J1 - 120)                                  # l'horloge dit la veille, 23:57
         self.assertEqual(sorted(n for n in self.etat() if n.endswith(".jsonl")), [
             FICHIER, "pool-2026-10-05-0.jsonl", "pool-2026-10-05-1.jsonl"])
+
+    def test_sommes_rattrapees_et_ligne_coupee_close(self):
+        jl = self.journal(J1 - 60)
+        jl.marqueur(J1)
+        jl.marqueur(J2)
+        jl.fermer()
+        with open(os.path.join(self.d, "pool.sha256"), "wb") as f:
+            f.write(b"0123")                                    # coupure pendant l'inscription de la somme
+        self.journal(J2 + 120)
+        e = self.etat()
+        self.assertEqual(e["pool.sha256"], f"0123\n{hashlib.sha256(e[FICHIER]).hexdigest()}  {FICHIER}\n".encode())
