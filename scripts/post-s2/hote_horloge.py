@@ -1,4 +1,5 @@
-"""SHOGEN-HOST-DEGRADED-2 (ADR-0028 annexe B.6 l.100), J28, plage exclue, hors décision.
+"""SHOGEN-HOST-DEGRADED-2 (ADR-0028 annexe B.6 l.100) et SHOGEN-HORLOGE-ETENDUE-1 (annexe B.46 l.684 ; paquet §12
+pt 17), J28, plage exclue, hors décision.
 
 HOST-DEGRADED-2 : critère sur les seuls enregistrements de diagnostic du harnais, jamais sur un statut de source.
 Démarrage : groupe ouvert par un run_params (ou par un clock_check « startup » qui n'en suit pas un), auquel se
@@ -7,11 +8,14 @@ chunk précède son run_params, run_campaign.run_segment). Démarrage dégradé 
 resolve_failed.
 Fenêtre retirée : le démarrage de son dernier marqueur (last-wins) est dégradé. Le clock_check n'entre pas au critère :
 ses signaux (« non évaluable », offset médian) dépendent des sources du pool qui ont répondu à la sonde ; ses comptes sont
-imprimés. Recalcul : D1 (r1.analysis_pools) sur les fenêtres restantes, r1.compute_r1, r1.regle_critere."""
+imprimés. Recalcul : D1 (r1.analysis_pools) sur les fenêtres restantes, r1.compute_r1, r1.regle_critere.
+HORLOGE-ETENDUE-1 : median_offset des clock_check retenus par le filtre de lecture (Decimal du texte JSON) : nombre, non
+évaluables, minimum, médiane, maximum, étendue (max − min). Aucun seuil."""
 from __future__ import annotations
 
 import sys
 from collections import Counter
+from decimal import Decimal, localcontext
 
 import commun
 from commun import dec, r1, records
@@ -91,11 +95,28 @@ def hote_degrade(d: dict) -> dict:
     return {"r1": r, "regle": v, "retirees": out, "lignes": lignes}
 
 
-ANALYSES = {"hote": ("SHOGEN-HOST-DEGRADED-2", lambda d: hote_degrade(d)["lignes"])}
+def horloge(d: dict) -> dict:
+    vals = [Decimal(repr(c["median_offset"])) for c in d["clock"] if c.get("median_offset") is not None]
+    with localcontext(r1.contexte_decimal()):
+        h = {"n": len(d["clock"]), "non_evaluables": len(d["clock"]) - len(vals), "min": min(vals, default=None),
+             "max": max(vals, default=None), "mediane": r1._median(vals) if vals else None}
+        h["etendue"] = None if not vals else +(h["max"] - h["min"])
+    h["lignes"] = ["[SHOGEN-HORLOGE-ETENDUE-1] offset médian (harness_ts − source_ts, médiane par relevé) des "
+                   "clock_check retenus par le filtre de lecture (segment, plage D5 sur harness_ts) ; descriptif, sans "
+                   "seuil",
+                   f"relevés retenus : {h['n']} (phases : {dict(Counter(c.get('phase') for c in d['clock']))}) ; non "
+                   f"évaluables (médiane nulle) : {h['non_evaluables']}",
+                   f"minimum = {dec(h['min'])} s ; médiane = {dec(h['mediane'])} s ; maximum = {dec(h['max'])} s ; "
+                   f"étendue = {dec(h['etendue'])} s"]
+    return h
+
+
+ANALYSES = {"hote": ("SHOGEN-HOST-DEGRADED-2", lambda d: hote_degrade(d)["lignes"]),
+            "horloge": ("SHOGEN-HORLOGE-ETENDUE-1", lambda d: horloge(d)["lignes"])}
 
 
 def main(argv: list) -> int:
-    """hote_horloge.py hote --journaux D --sortie F (options de commun.executer)."""
+    """hote_horloge.py {hote | horloge} --journaux D --sortie F (options de commun.executer)."""
     quoi, *reste = argv
     items, analyse = ANALYSES[quoi]
     return commun.executer(f"hote_horloge.py {quoi}", items, analyse, reste)
