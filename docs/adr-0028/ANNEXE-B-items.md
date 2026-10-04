@@ -894,3 +894,23 @@ SHOGEN-E1-AVIS-FRAICHEUR-1 (JOURNAL, même heure). Le G3 opérant complet, compt
 | SHOGEN-G2-ENREG-ROLE-1 | aucune relecture G2 du chemin ne cite d'enregistrement de rôle G2 (`shogen.oracle-record.v1`), que D6 (viii) attend et que le cp-2 contrôle | orch. | prochain lot relu en G2 sur le chemin | une commande par relecture [inféré] | dossier G7, G2 |
 | SHOGEN-G1-JOURNAUX-MANQUANTS-1 | journal G1 absent du dépôt pour CI-S2 (provenance dans le seul message de commit) et DETTES-A | orch. | avant G9 | un versement ou une limite écrite [inféré] | dossier G7, G1 |
 | SHOGEN-G6-PIECE-RECALCUL-1 | aucune pièce G6 écrite pour le chemin de recalcul (SBOM, réglementaire) ; bibliothèque standard seule, licence MIT OR Apache-2.0 | orch. | avant G9 | une pièce courte [inféré] | dossier G7, G6 |
+
+## B.55 Amendement daté du 2026-10-04 09:36:41 UTC (heure produite par le script d'écriture) : cp-2 et G7 rendus, S2 close
+
+cp-2 du validateur frais versé à l'octet (`docs/adr-0028/CP2-S2.md`, sha256 `6bfbd835…fce3` tel que rendu ; copie versée retouchée à la l.89, guillemets d'une citation d'outil pour S-G5, retouche déclarée en fin de fichier) : **ACCEPTE-AVEC-CORRECTIONS**,
+C-1 à C-8 appliquées au commit de clôture ; son enregistrement de rôle cp-2 et sa sortie versés
+(`docs/adr-0028/execution/cp2-2026-10-04/`, sha256 `4baac09b…597d` et `efe6e02d…0cd9`). Verdict G7 de
+l'orchestrateur : `docs/adr-0028/G7-S2.md` (**S2 close ; l'énoncé D6 « qualité produit sous G0-G7 complets » n'est pas prononcé**,
+G4 non tenu). Corrections : C-1 (G7), C-2 (item SAST ci-dessous), C-3 et C-5 (G7, pièces), C-4 (SHOGEN-D8-AMONT-ERRATUM-1 re-daté
+« avant G9 » par décision écrite : l'erratum porte sur la provenance de `enforcement/`, sans effet sur la mesure ; BUNDLE-CLOTURE-1 et
+PAROXYSME-REGISTRE-1 dus sur le poste local, déclenchés par ce commit), C-6 (ajout daté sous D6 (ii)), C-7 (limite datée au
+rapport, `docs/11`), C-8 (versement). FM-1.1 des transcriptions du lecteur du dossier et du validateur : 0 fragment.
+
+Items **fermés** : SHOGEN-CP2-RUNS-RENDU-1 (« conforme » par `--verifier --depot` ; six runs, exit 0, sha et genTime exacts) ;
+SHOGEN-INSTRUMENT-S2-1 (G0 à G7 rendus sur le chemin de recalcul ; verdict G7 avec réserves ; la qualité « produit » non prononcée est
+portée par SHOGEN-G4-RECALCUL-METRIQUES-1 et les items de B.54). **Devenu dû** : SHOGEN-PASSAGE-PUBLIC-EXPORT-1 (déclencheur « clôture
+S2 (G7) » atteint ; ADR à l'orchestrateur, décision à l'investisseur).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SAST-PYTHON-RECALCUL-1 | aucune analyse statique de sécurité (SAST) sur le code Python du chemin de recalcul (G3, réserve 3) | orch. | avant toute qualité « produit » du chemin, avec SHOGEN-G4-RECALCUL-METRIQUES-1 ; outil soumis à R-8 | un outil et une étape [inféré] | cp-2 de clôture, C-2 |

@@ -194,6 +194,7 @@ Les items 13 à 16 sont les renvois datés que le cp-1 de l'amendement a trouvé
     - G3 : voir (iii) ;
     - G4 à G6 selon doc 02 ;
     - G7 = orchestrateur, puis cp-2.
+    - *Ajout daté du 2026-10-04 09:36:41 UTC (cp-2 de clôture, C-6)* : pour la clôture de S2, l'ordre retenu est celui de D9 voie A et de l'annexe A : cp-2, puis G7, puis clôture (annexe B.54 ; `docs/adr-0028/G7-S2.md`).
   - **(iii) Job CI et G3.** Le job `s2-harness-unittest` (unittest de la bibliothèque standard, sans réseau, variable `SHOGEN_S2_CAMPAGNE_CONTROL` non posée) est ajouté à `gates.yml` au lot CI-S2, premier lot sous cette ADR. L'en-tête de `gates.yml` (l.3-6, « s2-harness est JETABLE ») est corrigé : « jetable » ne vaut plus que pour la collecte en quarantaine. Tant que la forge est morte (GC-01), le G3 opérant est l'oracle local, rejoué par l'orchestrateur, avec enregistrement d'oracle (viii).
   - **(iv) Défauts du rapport soldés avant le rendu** : HS2-05 (bloc 1 : dates de campagne) au lot B-SEG ; HS2-06 (bloc 3 : définition d'écart) et HS2-07 (bloc 6 : date de partition) au lot B ; HS2-11 (README, RUNBOOK) au lot DOCS-S2. Le bloc 6 est rendu avec la date de partition, en descriptif seulement (C-10 v). G10 (k_eff servi) reste après J28 (D9).
   - **(v) Sortie branchée** : `docs/11-mesures-pilotes.md`, consommé par MONARK comme fichier publié (arête G9). État aujourd'hui : **absent** (§3, C-17).
