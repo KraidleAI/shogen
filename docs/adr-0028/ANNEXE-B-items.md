@@ -952,3 +952,21 @@ SHOGEN-PUBLIC-PERIMETRE-1 (rapport seul), SHOGEN-PUBLIC-MOTIFS-OUVERTS-1 (aucun 
 |---|---|---|---|---|---|
 | SHOGEN-PUBLIC-MENTION-FEU-VERT-1 | la mention « brouillon, non publié » de l'en-tête attend le feu vert écrit de l'investisseur ; la remplacer ajoute une date : retouche déclarée et contrôle rejoué | orch. | feu vert écrit de l'investisseur | une retouche et un rejeu [inféré] | G1 et G2 du lot DOCS11-PUBLIC |
 | SHOGEN-PUBLIC-PREAVIS-1 | préavis privé aux acteurs nommés (liste interne) avant toute publication (décision q. 15 du 2026-10-04) | orch. ; envoi : investisseur | après le feu vert de lecture, avant la publication | un message par acteur [inféré] | décision de l'investisseur, q. 15 |
+
+## B.58 Amendement daté du 2026-10-04 17:01:22 UTC (heure produite par le script d'écriture) : lot PLAN-S2BIS exécuté (préparation de S2-bis)
+
+Code et paramètres commis (`scripts/plan-s2bis/`), relus en G2 neuve (`docs/adr-0029/plan-s2bis/G2-lot-PLAN-S2BIS.md` :
+ACCEPTE-AVEC-CORRECTIONS C-1 à C-5, appliquées ; adjudications A-1 population de σ = règle de clôture, A-2 refus à la borne haute de τ,
+A-3 exception écrite pour le test qui pose la variable fictive ; ADR-0029 §2.6 amendée le 2026-10-04 16:20:56 UTC), **épinglés au
+JOURNAL (16:57:31 UTC) avant toute lecture des journaux**, puis exécutés une fois (16:59:04Z à 17:00:31Z) : trois sorties versées à
+`docs/adr-0029/plan-s2bis/`, cohérence au bloc 3 du J28 tenue, pool D1-bis de 10 hôtes dans chaque strate (aucun retrait), aucun refus
+de τ. FM-1.1 des transcriptions du worker et du réviseur : 0 fragment. Items **fermés** : SHOGEN-TAU-REDERIV-1 (valeurs destinées au
+paquet de S2-bis), SHOGEN-R1-HOTE-STRUCTUREL-1 (contribution de la paire OKX : 4 fenêtres sur 154 en calme, 1 sur 133 en stress),
+SHOGEN-POSTPREREG-PARAMS-SCEAU-1 (épinglage avant exécution pratiqué et consigné ; règle maintenue pour tout lot qui lit des journaux
+scellés), SHOGEN-FICHE-WORKER-POSTEXEC-1 (exception écrite au G0 du lot ; la fiche reste à compléter par l'item ci-dessous).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PLAN-S2BIS-GARDES-1 | cinq mutants du réviseur (RV-06, RV-07, RV-16, RV-17, RV-18) vivants sur des gardes secondaires du lot, hors liste fermée | orch. | prochain lot qui touche `scripts/plan-s2bis/` | quelques tests [inféré] | G2 du lot PLAN-S2BIS |
+| SHOGEN-WORKER-TMPDIR-1 | des tests qui emploient `tempfile` écrivent par défaut sous `/tmp`, hors du dossier du lot ; consigne « TMPDIR dédié par copie » à porter à la fiche worker et au gabarit de brief | orch. | prochaine révision de la fiche worker | une consigne [mesuré] | G1 du lot PLAN-S2BIS (E-1) ; B.56 |
+| SHOGEN-FICHE-WORKER-POSTEXEC-2 | la fiche `shogen-worker` dit encore « fixtures seulement » sans l'exception qu'un G0 accorde pour lire des journaux scellés par les scripts du lot seuls | orch. | prochaine révision de la fiche worker | une consigne [inféré] | B.50 ; G0 du lot PLAN-S2BIS |

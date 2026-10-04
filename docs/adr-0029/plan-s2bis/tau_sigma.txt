@@ -1,0 +1,58 @@
+préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)
+tau_sigma — TAU-SIGMA-S2BIS (ADR-0029 §2.6 ; SHOGEN-TAU-REDERIV-1)
+script tau_sigma.py ; modules du lot chargés : commun.py sha256 14920e8703febf43de324960975413e276227ac2281bb4f85380cf465d47b3f2 ; regles.py sha256 a01401880714e2baa792d1e7a2c36414df2b848c055c73429e22b4646d2f88a6 ; tau_sigma.py sha256 3e9f9c79a9e03f0cb34eaab443326ff30dc87f6a13a58d4bf900c98d1b39069d ; parametres.json sha256 7e214864e23634e9b3a4174745e3f5bbabf8c5a74d8e78e0411b449ee7d1d632
+harnais : extraction du commit d'analyse f35a70c19ba8269f1f7e2bcd31775e4fc513da20 ; modules épinglés : __init__.py 4db0d8d6d85c374a72a3e4def3047f0baacf118e71a24db8daf24ea695d8b4dc ; model.py e56240c74be546e631189280711115095a2c9ff48690d28230c6461ff3948480 ; records.py a2e9a7744d8d60a017a888efe10de5b8fc0073c08b571671189d83de4a58edd2 ; window.py f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94 ; r1.py 0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f
+journaux : control.jsonl sha256 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff ; journal.jsonl sha256 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+portée : segment [1787770800 ; 1790558880) (t0 = 1787770800, n fixe = 38600), plages exclues [(1790273880, 1790435280)]
+pool S2 (D1) : « calme » 11 flux ; « stress » 11 flux ; retraits : « calme » pyth (ok 0 sur 24585 lectures) ; « stress » pyth (ok 0 sur 11397 lectures)
+pool D1-bis : « calme » 10 hôtes ; « stress » 10 hôtes ; retraits : aucun
+rendu de contrôle shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out : sha256 égal à l'épingle ; bloc 3 relu égal aux valeurs épinglées
+contrôle de cohérence (bloc 3 du rendu J28) « calme » : recompté (n, K, P̂_more) = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') ; épinglé = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') : égaux
+contrôle de cohérence (bloc 3 du rendu J28) « stress » : recompté (n, K, P̂_more) = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') ; épinglé = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') : égaux
+[TAU-SIGMA-S2BIS] BTC/USD seul ; population de τ : cellules arrivées à l'axe (i) sous le σ de S2, pool D1-bis de la strate ; σ au paquet : population (B) de clôture ; valeurs destinées au paquet de S2-bis, jamais re-réglées ensuite (ADR-0029 §2.6 ; adjudications A-1 et A-2 de l'orchestrateur, 2026-10-04)
+classe « agregateur » : unités D1-bis coingecko, defillama ; τ committé de S2 0.026 ; σ committé de S2 1140.0 s
+  « calme » : N = 48955 cellules à l'axe (i) ; P99,9 = 0.0071539297985682391768588623568239176858862356823918 ; P99 = 0.0033407992508798863772795430568292415019247913638558 ; maximum = 0.017518031990708282050736278279509039301146017361168
+  « calme » staleness : population (B) de clôture N = 48956, au-delà du σ de S2 1, P99 = 390.0 s ; population (A) de l'axe (i) N = 48955, P99 = 390.0 s
+  « stress » : N = 22440 cellules à l'axe (i) ; P99,9 = 0.0027753065604121791400424964184311454365580523390224 ; P99 = 0.0016491462175488791839266553780401753317079584816764 ; maximum = 0.0044054868405630309526750363252783593201571312681665
+  « stress » staleness : population (B) de clôture N = 22441, au-delà du σ de S2 0, P99 = 380.0 s ; population (A) de l'axe (i) N = 22440, P99 = 380.0 s
+  τ_c = 0.0110 (1.1000 %) = grid-ceil(1.5 × max_s P99,9 = 0.0071539297985682391768588623568239176858862356823918, 0.0005) ; bornes : non atteintes
+  τ de la règle au maximum (descriptif, hors paquet) = 0.0265 (grid-ceil(1.5 × 0.017518031990708282050736278279509039301146017361168)) ; bornes : non atteintes
+  σ_c, population (B) de clôture (au paquet) = 1170.0 s = max(plancher 300, 3 × max_s P99 staleness) ; règle appliquée
+  σ, population (A) de l'axe (i) (descriptif, hors paquet) = 1170.0 s = max(plancher 300, 3 × max_s P99 staleness) ; règle appliquée
+classe « oracle_chainlink » : unités D1-bis chainlink ; τ committé de S2 0.0165 ; σ committé de S2 10695.0 s
+  « calme » : N = 24516 cellules à l'axe (i) ; P99,9 = 0.0058207126742031209405040270200051961548454143933489 ; P99 = 0.0046111092574407774853209151650131605588175744077749 ; maximum = 0.017710958439999048428717920466169762820857941676193
+  « calme » staleness : population (B) de clôture N = 24516, au-delà du σ de S2 0, P99 = 3577.0 s ; population (A) de l'axe (i) N = 24516, P99 = 3577.0 s
+  « stress » : N = 11284 cellules à l'axe (i) ; P99,9 = 0.0048038130250870989884860965406483532139202963308337 ; P99 = 0.0038419385708353666874497411315443162473043683346234 ; maximum = 0.0058809795768108521208431059924424085088756915297242
+  « stress » staleness : population (B) de clôture N = 11284, au-delà du σ de S2 0, P99 = 3589.0 s ; population (A) de l'axe (i) N = 11284, P99 = 3589.0 s
+  τ_c = 0.0090 (0.9000 %) = grid-ceil(1.5 × max_s P99,9 = 0.0058207126742031209405040270200051961548454143933489, 0.0005) ; bornes : non atteintes
+  τ de la règle au maximum (descriptif, hors paquet) = 0.0270 (grid-ceil(1.5 × 0.017710958439999048428717920466169762820857941676193)) ; bornes : non atteintes
+  σ_c, population (B) de clôture (au paquet) = 10767.0 s = max(plancher 5400, 3 × max_s P99 staleness) ; règle appliquée
+  σ, population (A) de l'axe (i) (descriptif, hors paquet) = 10767.0 s = max(plancher 5400, 3 × max_s P99 staleness) ; règle appliquée
+classe « place_horodatee » : unités D1-bis bitstamp, coinbase, gemini, okx_ticker ; τ committé de S2 0.0045 ; σ committé de S2 180.0 s
+  « calme » : N = 97677 cellules à l'axe (i) ; P99,9 = 0.00125 ; P99 = 0.00094328498997759698148803207168965923829737059309044 ; maximum = 0.0033543512048421132437862495103551978165000821339668
+  « calme » staleness : population (B) de clôture N = 97680, au-delà du σ de S2 3, P99 = 60.0 s ; population (A) de l'axe (i) N = 97677, P99 = 60.0 s
+  « stress » : N = 45510 cellules à l'axe (i) ; P99,9 = 0.00064354175601253126843249728661063397100603548346122 ; P99 = 0.00047127957319766986038327088184161173382846518666380 ; maximum = 0.0012634448257900446605161089868028892912672437764442
+  « stress » staleness : population (B) de clôture N = 45513, au-delà du σ de S2 2, P99 = 60.0 s ; population (A) de l'axe (i) N = 45510, P99 = 60.0 s
+  τ_c = 0.0020 (0.2000 %) = grid-ceil(1.5 × max_s P99,9 = 0.00125, 0.0005) ; bornes : non atteintes
+  τ de la règle au maximum (descriptif, hors paquet) = 0.0055 (grid-ceil(1.5 × 0.0033543512048421132437862495103551978165000821339668)) ; bornes : non atteintes
+  σ_c, population (B) de clôture (au paquet) = 180.0 s = max(plancher 30, 3 × max_s P99 staleness) ; règle appliquée
+  σ, population (A) de l'axe (i) (descriptif, hors paquet) = 180.0 s = max(plancher 30, 3 × max_s P99 staleness) ; règle appliquée
+classe « sans_horodatage » : unités D1-bis binance, bitfinex, kraken ; τ committé de S2 0.0045 ; σ committé de S2 aucun
+  « calme » : N = 73319 cellules à l'axe (i) ; P99,9 = 0.0029186215822682413848891765086555573531790972334574 ; P99 = 0.0017154584477842647811419678945554429903808996626526 ; maximum = 0.0084619370073849135892728051716876429365885569120720
+  « calme » staleness : population (B) de clôture N = 0, au-delà du σ de S2 -, P99 = - s ; population (A) de l'axe (i) N = 0, P99 = - s
+  « stress » : N = 34048 cellules à l'axe (i) ; P99,9 = 0.0025276585794080770092883216747530639704975152980512 ; P99 = 0.0013073780642653130966675967757611479845371975708477 ; maximum = 0.0039538184094247132242211659426262526105736755018189
+  « stress » staleness : population (B) de clôture N = 0, au-delà du σ de S2 -, P99 = - s ; population (A) de l'axe (i) N = 0, P99 = - s
+  τ_c = 0.0045 (0.4500 %) = grid-ceil(1.5 × max_s P99,9 = 0.0029186215822682413848891765086555573531790972334574, 0.0005) ; bornes : non atteintes
+  τ de la règle au maximum (descriptif, hors paquet) = 0.0130 (grid-ceil(1.5 × 0.0084619370073849135892728051716876429365885569120720)) ; bornes : non atteintes
+  σ_c, population (B) de clôture (au paquet) = aucun = max(plancher aucun, 3 × max_s P99 staleness) ; aucun plancher : axe staleness non évaluable pour la classe
+  σ, population (A) de l'axe (i) (descriptif, hors paquet) = aucun = max(plancher aucun, 3 × max_s P99 staleness) ; aucun plancher : axe staleness non évaluable pour la classe
+limite écrite : population (A) censurée à σ_S2 : σ_c ≤ max(plancher, 3 × σ_S2) par construction (adjudication A-1) ; pour Chainlink (heartbeat d'environ 1 h), σ = 3 × P99 de la staleness rend l'axe staleness presque aveugle par construction (ADR-0029 §2.6) ; choix de conception
+[VALEURS POUR LE PAQUET DE S2-BIS]
+tau agregateur 0.0110
+tau oracle_chainlink 0.0090
+tau place_horodatee 0.0020
+tau sans_horodatage 0.0045
+sigma agregateur 1170.0
+sigma oracle_chainlink 10767.0
+sigma place_horodatee 180.0
+sigma sans_horodatage aucun
