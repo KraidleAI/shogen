@@ -1,0 +1,4 @@
+{"regle":"Pour chaque taille : on part des protocoles du perimetre A+B, hors familles deja etudiees (Aave, Spark, Morpho, Euler, Compound, Kamino, Venus), hors fournisseurs d oracle ; un seul protocole par organisation (parent) ; on privilegie (1) au moins 2 oracles externes declares, (2) un incident d oracle classe par DefiLlama, (3) l etalement sur les chaines (max 2-3 par chaine principale) ; choix final a la main, ecrit ici pour etre rejouable.",
+"G":["Jito Liquid Staking","Lista Lending","Jupiter Lend","Steakhouse Financial","Gauntlet","Maple","USDD","Ethena USDe","Pendle V2","JustLend V1"],
+"M":["Dolomite","HyperLend Pooled","NAVI Lending","Rhea Lend","Blend Pools V2","Save","River Omni-CDP","GMX V2 Perps","Benqi Lending","Usual USD0"],
+"P":["Echelon Market","Scallop Lend","Silo V2","Moonwell Lending","EVAA Protocol","Folks Finance Lending","Gearbox","HypurrFi Pooled","YeiLend","Ostium"]}

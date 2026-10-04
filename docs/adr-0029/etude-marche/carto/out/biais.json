@@ -1,0 +1,226 @@
+{
+ "base": {
+  "n": 424,
+  "tvl_m": 93313,
+  "decl": 246,
+  "decl_tvl_m": 67750
+ },
+ "deadurl": {
+  "n": 24,
+  "tvl_m": 353,
+  "decl": 15,
+  "decl_tvl_m": 82,
+  "nA": 20,
+  "nB": 4,
+  "names": [
+   [
+    "RealT Tokens",
+    155
+   ],
+   [
+    "AZverse Perps",
+    52
+   ],
+   [
+    "Alpaca Leveraged Yield Farming",
+    37
+   ],
+   [
+    "RealT RMM Marketplace V2",
+    29
+   ],
+   [
+    "Set Protocol",
+    15
+   ],
+   [
+    "Alpaca Finance 2.0",
+    14
+   ]
+  ]
+ },
+ "sans_rng_por": {
+  "n": 423,
+  "tvl_m": 93310,
+  "decl": 244,
+  "decl_tvl_m": 67349,
+  "nA": 345,
+  "nB": 78,
+  "chainlink": 128,
+  "witnet": 0,
+  "chainlink_base": 129
+ },
+ "typed": [
+  {
+   "name": "Re",
+   "cat": "RWA",
+   "scope": "A",
+   "tvl_m": 398.2,
+   "oracle": "Chainlink",
+   "type": "PoR"
+  },
+  {
+   "name": "PoolTogether V5",
+   "cat": "Yield Lottery",
+   "scope": "B",
+   "tvl_m": 2.4,
+   "oracle": "Witnet",
+   "type": "RNG"
+  }
+ ],
+ "non_type": [
+  {
+   "name": "Polymarket International",
+   "cat": "Prediction Market",
+   "tvl_m": 368.4,
+   "oracles": [
+    "UMA"
+   ]
+  },
+  {
+   "name": "Across",
+   "cat": "Cross Chain Bridge",
+   "tvl_m": 21.0,
+   "oracles": [
+    "UMA"
+   ]
+  },
+  {
+   "name": "PoolTogether V3",
+   "cat": "Yield Lottery",
+   "tvl_m": 5.0,
+   "oracles": [
+    "Chainlink"
+   ]
+  }
+ ],
+ "grands_multi": [
+  {
+   "name": "SparkLend",
+   "studied": true,
+   "next": 3,
+   "tvl_m": 5607
+  },
+  {
+   "name": "Steakhouse Financial",
+   "studied": false,
+   "next": 4,
+   "tvl_m": 2529
+  },
+  {
+   "name": "Gauntlet",
+   "studied": false,
+   "next": 3,
+   "tvl_m": 1651
+  },
+  {
+   "name": "Compound V3",
+   "studied": true,
+   "next": 3,
+   "tvl_m": 1515
+  },
+  {
+   "name": "Kamino Lend",
+   "studied": true,
+   "next": 2,
+   "tvl_m": 1397
+  },
+  {
+   "name": "Venus Core Pool",
+   "studied": true,
+   "next": 3,
+   "tvl_m": 1343
+  },
+  {
+   "name": "Lista Lending",
+   "studied": false,
+   "next": 4,
+   "tvl_m": 1040
+  }
+ ],
+ "vivier_G": {
+  "n": 13,
+  "hors_ethereum": 7,
+  "names": [
+   [
+    "Sky Lending",
+    "Ethereum",
+    1
+   ],
+   [
+    "Ethena USDe",
+    "Ethereum",
+    0
+   ],
+   [
+    "JustLend V1",
+    "Tron",
+    0
+   ],
+   [
+    "Maple",
+    "Ethereum",
+    1
+   ],
+   [
+    "Steakhouse Financial",
+    "Base",
+    4
+   ],
+   [
+    "Sentora Curator",
+    "Ethereum",
+    1
+   ],
+   [
+    "Falcon Finance",
+    "Ethereum",
+    0
+   ],
+   [
+    "Gauntlet",
+    "Base",
+    3
+   ],
+   [
+    "Jupiter Lend",
+    "Solana",
+    1
+   ],
+   [
+    "USDD",
+    "Tron",
+    1
+   ],
+   [
+    "Jito Liquid Staking",
+    "Solana",
+    1
+   ],
+   [
+    "Pendle V2",
+    "Ethereum",
+    1
+   ],
+   [
+    "Lista Lending",
+    "BNB Chain",
+    4
+   ]
+  ]
+ },
+ "cinq_oracles": [
+  {
+   "name": "River Omni-CDP",
+   "tvl_m": 106.6
+  },
+  {
+   "name": "Re7 Labs",
+   "tvl_m": 94.3
+  },
+  {
+   "name": "ZeroLend Lending",
+   "tvl_m": 1.4
+  }
+ ]
+}
