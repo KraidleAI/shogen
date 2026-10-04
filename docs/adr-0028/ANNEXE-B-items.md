@@ -848,3 +848,30 @@ nouveau calcul de budget (écart F-2 du rédacteur, accepté : au taux haut de l
 Item **fermé** : SHOGEN-ADR0029-STATUT-CP1-1 (B.48). SHOGEN-ENTRELACEMENT-D5-1 (B.50) est rattaché au G0 du lot COLLECTE-BIS de
 l'ADR-0029. Restent ouverts au texte de l'ADR : la q. 4 (c) du §8.2 (G0 de RECALC-BIS), les valeurs de σ, des planchers et d'une
 éventuelle vague (G0 de CALIB-ACTIFS), et les vingt questions de valeur du §6, à l'investisseur.
+
+## B.53 Amendement daté du 2026-10-04 08:57:16 UTC (heure produite par le script d'écriture) : lot DETTES-SIM commis
+
+Journal G1 et pré-enregistrement du worker versés (`docs/G1-lot-DETTES-SIM.md`, note de corrections
+`docs/G1-lot-DETTES-SIM-corrections.md`) ; relecture G2 versée à l'octet (`docs/G2-lot-DETTES-SIM.md`, réviseur neuf
+`shogen-worker`, sha256 `93b5881f…7c2b`) : **ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-8 appliquées (oracles B1 et M0 resserrés ;
+journal corrigé ; journaux d'exécution `.log.txt` retirés des sorties, leurs sha256 gardés au journal). Le worker a trouvé et
+corrigé avant livraison un desserrement introduit par sa première écriture de C-1 (E-14 du journal, preuve par mutant).
+Aucun résultat ne change ℓ, le seuil 2,33, la règle `ea3a2d94…` ni le seuil 1/2 de QUASI-MORT-1, qui sont scellés. Le G2
+signale, sans application : le seuil 1/2 n'est pas le point de bascule exact (0,456 avec huit autres flux à 0,02), et plusieurs
+flux faibles sous 1/2 peuvent inverser le signal ensemble (item FLUX-ABSORPTION-COLLECTIVE-1 ci-dessous). Erratum de sujet de
+commit : le sujet de DS-3c nomme SHOGEN-SIM-NIVEAU-P-1 ; P-1 est produit par le script existant `sim_niveau.py` (aucun fichier
+existant modifié) et ses sorties sont versées par DS-V (`sim-dettes/sim_niveau_p/`).
+
+Items **fermés** (commits DS-0 `55e6adb`, DS-1 `a10a17f`, DS-2a `1263b41`, DS-2b `3eea5ff`, DS-3b `2e7ee85`, DS-3a `fef258c`, DS-3c `039fb96`, DS-3d `6a96fed`, DS-V `dcb44b8`) : SHOGEN-SIM-NIVEAU-P-1 (déviation déclarée : R = 5 000 au lieu de 10⁵ ; la règle reste ≤ 0,0024),
+SHOGEN-GARDE-NIVEAU-N-1, SHOGEN-BARTLETT-BIAIS-1, SHOGEN-SIM-NIVEAU-MODELES-1, SHOGEN-FLUX-QUASI-MORT-2 (alternative « choc commun »
+admise), SHOGEN-FLUX-FAIBLE-1, SHOGEN-POOLEE-BLOC-1 (part (b) ici ; part (a) au lot POST-PREREG, B.50 : **item fermé en entier**).
+SIM-PLATEFORME-2 : pas d'item neuf, rattaché comme limite déclarée à la limite L-7 de l'étape S (annexe B l.464).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-FLUX-ABSORPTION-COLLECTIVE-1 | le critère de retrait par flux (2·ok < n_s) ne voit pas l'absorption collective : le signe de l'excès dû à une co-défaillance de paire est celui de 1 − Σ p_j/(1 − p_j) ; deux flux à 0,4 d'écart (non retirés) ou quatre à 0,25 l'inversent déjà ; pour un flux seul, le point de bascule exact (exact en c et en n) est 0,4556, non 1/2 | orch. | pré-enregistrement de S2-bis (ADR-0029) | un critère collectif pré-enregistré [inféré] | G1 et G2 du lot DETTES-SIM (absorbe l'ex-QUASI-MORT-3) |
+| SHOGEN-FLUX-SERIEL-1 | QUASI-MORT-2 et FAIBLE-1 simulés à fenêtres iid et pour une co-défaillance de paire seulement ; sous dépendance sérielle, l'espérance devient (r₀ − r₁)·n·(c − κ) ; co-défaillance d'ordre ≥ 3 ou impliquant le flux faible non couverte | orch. | avant le sceau de S2-bis | le même script, flux markoviens, alternatives de triplet [inféré] | G1 et G2 du lot DETTES-SIM |
+| SHOGEN-SIM-REGEN-1 | les générateurs étendus n'ont pas de régénération indépendante dans les oracles : forme de la queue de Lomax, durée des trous, emploi des paramètres des extensions tenus par relecture seulement (mutants C-geom, A-trou30 vivants) | orch. | avant toute réutilisation des générateurs étendus | un régénérateur indépendant [inféré] | G1 et G2 du lot DETTES-SIM (C-3) |
+| SHOGEN-EMD-PROFIL-1 | l'EMD_s est un excès de K ; la co-défaillance qu'il représente dépend du profil des taux du pool (facteur r₀ − r₁, qui peut s'annuler puis changer de signe) ; non imprimé | orch. | lot de la sensibilité, ou G0 du rapport public | une ligne descriptive hors décision, ou une limite écrite [inféré] | G1 du lot DETTES-SIM |
+| SHOGEN-GARDE-NIVEAU-ZSEUL-2 | z_s seul mesuré au-dessus de 0,01 en estimation ponctuelle aux petits p et sous n = 7 200 (0,0116, SE 0,0015 ; 0,0107, SE 0,0009), sans l'être à deux erreurs-types | orch. | avant toute lecture de z_s seul | R = 10⁵ sur les quatre cellules L = 1 des deux plus petits p, choisies par le motif du G0 §3, pré-enregistré ; ≈ 2,1 h de CPU [G2] | G1 et G2 du lot DETTES-SIM |
+| SHOGEN-POOLEE-NIVEAU-1 | z_pool (exploratoire) rejette à tort 8,3 % à 33,1 % sous dépendance sérielle synthétique ; son approximation normale ne tient qu'à fenêtres iid ; à écrire à côté de la poolée (z_pool,bloc ≈ 2,60 du lot POST-PREREG, B.50) | orch. | prochain texte qui cite la poolée (rapport public) | une limite écrite [inféré] | G1 du lot DETTES-SIM |
