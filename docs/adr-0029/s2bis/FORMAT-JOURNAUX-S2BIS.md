@@ -50,3 +50,11 @@ Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont 
 L'écriture se fait sans tampon. `fsync` est appelé à chaque marqueur (après le point de contrôle s'il y en a un), et
 seulement là. Un arrêt brutal peut donc perdre les enregistrements postérieurs au dernier marqueur, ou laisser une
 dernière ligne tronquée.
+
+## 5. Un seul écrivain (CB-1b, E-C-16)
+
+Le fichier `<préfixe>.verrou` du dossier du journal porte un verrou `flock` exclusif, pris sans attente avant toute
+lecture ou écriture du journal et tenu jusqu'à la fermeture. Une seconde instance qui trouve le verrou pris s'arrête
+sans rien lire ni écrire (JournalOccupe). Avec la chaîne, une écriture entrelacée de deux instances serait de toute
+façon visible (`seq` ou `prec` rompu). C'est le moyen de fermeture par construction de SHOGEN-ENTRELACEMENT-D5-1 pour
+S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item reste un acte de l'orchestrateur.

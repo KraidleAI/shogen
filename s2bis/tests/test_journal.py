@@ -1,9 +1,11 @@
-"""CB-1, E-C-18, E-C-19 : écrivain chaîné. Octets attendus et sha256 écrits à la main (printf et sha256sum,
+"""CB-1, E-C-16, E-C-18, E-C-19 : écrivain chaîné. Octets attendus et sha256 écrits à la main (printf et sha256sum,
 journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits."""
+import fcntl
 import hashlib
 import json
 import os
 import tempfile
+import threading
 import unittest
 
 from shogen_s2bis.collecte import journal as j
@@ -77,6 +79,24 @@ class Ecrivain(Base):
             jl.marqueur(ws)
             n.append(len(self.fsyncs))
         self.assertEqual((n, set(self.fsyncs)), ([0, 1, 1, 2], {os.stat(os.path.join(self.d, FICHIER)).st_ino}))
+
+    def test_seconde_instance_refusee_sans_ecriture(self):
+        self.jl = self.journal()
+        avant, res = self.etat(), []
+
+        def essai():
+            try:
+                j.Journal(self.d, "pool").ouvrir(WS + 600)
+                res.append("ouvert")
+            except j.JournalOccupe as e:
+                res.append(e.code)
+        t = threading.Thread(target=essai, daemon=True)      # un verrou bloquant pendrait le fil, pas la suite
+        t.start()
+        t.join(5)
+        self.assertEqual((res, self.etat()), (["JOURNAL/occupe"], avant))
+        self.jl.fermer()                                       # fermer libère le verrou : un tiers le prend aussitôt
+        with open(os.path.join(self.d, "pool.verrou"), "rb") as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
     def test_refus_nommes_sans_ecriture(self):
         jl = self.journal()

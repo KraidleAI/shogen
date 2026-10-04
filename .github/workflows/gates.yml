@@ -213,4 +213,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --plancher 14
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --plancher 15

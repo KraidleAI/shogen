@@ -4,7 +4,9 @@ qui porte `seq` (rang depuis 0) et `prec` (sha256 des octets de la ligne précé
 pour la première). Écriture sans tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt
 une heure est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
 fenêtre n'est admis que sur la grille et pour une fenêtre non close (ws ≥ `suivante`). Tout refus est nommé
-(ErreurJournal) et n'écrit rien. CB-1 : journal neuf seulement."""
+(ErreurJournal) et n'écrit rien. CB-1 : journal neuf seulement. E-C-16 : un seul écrivain par journal, verrou
+exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture."""
+import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +21,10 @@ class ErreurJournal(Exception):
     def __init__(self, code, detail):
         super().__init__(f"{code} : {detail}")
         self.code = code
+
+
+class JournalOccupe(ErreurJournal):
+    pass
 
 
 def canonique(enr):
@@ -49,10 +55,16 @@ class Journal:
         if type(w) is not int or w <= 0 or HEURE % w:
             raise ErreurJournal("JOURNAL/grille", w)
         self.dossier, self.prefixe, self.w, self.fsync = dossier, prefixe, w, fsync
-        self.fd = None
+        self.fd = self.verrou = None
 
     def ouvrir(self, ws):
-        """Journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal."""
+        """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal."""
+        self.verrou = os.open(os.path.join(self.dossier, self.prefixe + ".verrou"), os.O_RDWR | os.O_CREAT, 0o644)
+        try:
+            fcntl.flock(self.verrou, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            self.fermer()
+            raise JournalOccupe("JOURNAL/occupe", self.prefixe) from None
         if type(ws) is not int or ws % self.w:
             raise ErreurJournal("JOURNAL/fenetre", ws)
         if any(n.startswith(self.prefixe + "-") for n in os.listdir(self.dossier)):
@@ -79,10 +91,11 @@ class Journal:
         return tete
 
     def fermer(self):
-        """Ferme le fichier, sans fsync : n'est durable que ce qui précède le dernier marqueur."""
-        if self.fd is not None:
-            os.close(self.fd)
-        self.fd = None
+        """Ferme le fichier et libère le verrou, sans fsync : n'est durable que ce qui précède le dernier marqueur."""
+        for fd in (self.fd, self.verrou):
+            if fd is not None:
+                os.close(fd)
+        self.fd = self.verrou = None
 
     def _fenetre(self, genre, ws, champs):
         if champs.keys() & {"seq", "prec"}:
