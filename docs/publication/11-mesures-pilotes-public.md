@@ -8,7 +8,7 @@
 > de l'investisseur, le constat sur Pyth et une consigne de l'investisseur sont reformulés en termes factuels et
 > neutres. La publication porte sur ce rapport seul : les autres pièces citées (journal du projet, ADR et annexes,
 > paquet scellé, rendus, sceau, enregistrements, scripts) sont au dépôt privé du projet et
-> ne sont pas publiées ; le sceau, les rendus et les enregistrements sont remis sur demande, sous accord (section
+> ne sont pas publiées ; le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur demande, sous accord (section
 > « Reproduire », « Ce qui n'est pas public »). Le verdict, les valeurs, les limites, les déviations déclarées, le
 > pré-enregistrement, le sceau et la procédure de reproduction sont repris ; aucun nombre n'est changé ni ajouté.
 >
@@ -1073,7 +1073,7 @@ une tolérance et une loi nulle de la statistique par événements (c) ; le test
   rejouent ses calculs depuis les seuls rendus, sans les journaux.
 - **Ce qui n'est pas public** : le dépôt du projet est privé (paquet §12 pt 16) ; les journaux scellés ne sont
   pas publiés, et leur publication conditionne le test de composition SHOGEN-S2-TUYAU-MONARK-1 côté MONARK (ADR §3 ;
-  §4 pt 4). Les rendus, le sceau et les enregistrements sont au même dépôt privé et ne sont pas publiés : pièces remises sur demande, sous accord ; un tiers à qui l'on remet les rendus et le sceau sans
+  §4 pt 4). Le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont au même dépôt privé et ne sont pas publiés : pièces remises sur demande, sous accord. Le contrôle du sceau exige le paquet scellé, remis avec le sceau sur demande : un tiers à qui l'on remet le paquet scellé, le sceau et les rendus sans
   les journaux peut contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus.
 
 > *Ajout daté du 2026-10-04 06:52:35 UTC (relecture G2 du lot DETTES-B1, C-3 ; points « Code » et « Rejeu » ci-dessus)* : à partir du commit `0221a74` (lot DETTES-B1, B1-1 ; `rendu_unique.py` à partir de `0789d96`, B1-4), `s2-harness/shogen_s2` et `s2-harness/tools` diffèrent du commit d'analyse `f35a70c` (sha256 de `rendu_unique.py` à la tête `5ee95dbf…` ≠ `sha256_script` `06d189cf…`) : les gardes (2) et (4) refusent à la tête ; tout rejeu (`recompute_*`) ou ré-exécution du rendu de S2 se fait sur une extraction de `f35a70c` ; à la tête, les sorties diffèrent par construction (bloc 5 (d), note k_eff, clé `etiquette` du drapeau 2 de `j28-incluse`, divergences ASN de relevés partiels).

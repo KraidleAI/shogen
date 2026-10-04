@@ -2,9 +2,9 @@
 source    : /home/user/shogen/docs/11-mesures-pilotes.md
             sha256 fcf93b87f95eb793d565232cb488ccffc504ae7cb9fe045cee737c6e876353b7
 brouillon : 11-mesures-pilotes-public.md
-            sha256 4de986544cee9622a0848f585103cea594352df65d02e8f51e6ef4c593fc7688
+            sha256 c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561
 table     : TABLE-CORRESPONDANCE.md
-            sha256 2b3a34ebb19467905c0e9f6de6a17fb7bf8715e9b99c08f9fcc1ca29ad97b689
+            sha256 d78b65fdb19e17774cbcd0466311065a47a4aa8490c60be758a591b1c76040ec
 
 --- 1. Nombres (aucun inventé, aucun ajouté) ---
   composite : source 1051 distincts / 2564 occurrences ; brouillon 1047 distincts / 2557 occurrences
@@ -67,6 +67,7 @@ table     : TABLE-CORRESPONDANCE.md
   [décision de l'investisseur] « Pyth est mort » : source 1 (l.892) ; brouillon 0
   [décision de l'investisseur] consigne verbatim « pas sur mon PC » : source 2 (l.213,214) ; brouillon 0
   [décision de l'investisseur] pièces présentées comme remises avec le rapport : source 2 (l.502,794) ; brouillon 0
+  [adjudication B.57] liste des pièces remises sans le paquet ni les scripts : source 1 (l.1066) ; brouillon 0
   motifs présents dans le brouillon : 0 => OK
 
 --- 3. Registre du doc 09 (S-G4 et extension) ---
@@ -111,15 +112,24 @@ table     : TABLE-CORRESPONDANCE.md
   OK « 41 676 139, 148 930 880 et 204 107 558 octets » : 1 = 1
   OK « Une nouvelle production par `rendu_unique.py` serait une seconde exécution, déviation décl… » : 1 = 1
   OK « tout rejeu (`recompute_*`) ou ré-exécution du rendu de S2 se fait sur une extraction de `f… » : 1 = 1
-  OK « un tiers à qui l'on remet les rendus et le sceau sans » : 1 = 1
+  OK « peut contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus » : 1 = 1
   => OK (30 passages)
+  passages exigés par les décisions de l'investisseur et l'adjudication B.57 : 7 ; absents du brouillon : 0
+    présent ×1 « Aucune donnée de prix n'a été reçue de Pyth sur toute la campagne »
+    présent ×1 « rien ne montre une panne de Pyth »
+    présent ×1 « La publication porte sur ce rapport seul »
+    présent ×1 « le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur … »
+    présent ×1 « pièces remises sur demande, sous accord »
+    présent ×1 « Le contrôle du sceau exige le paquet scellé, remis avec le sceau sur demande »
+    présent ×1 « poste personnel de l'investisseur »
+  => OK
 
 --- 5. Sections modifiées contre sections déclarées par la table ---
   sections de la source : 58 ; du brouillon : 58
   modifiées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
   déclarées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
   sections identiques à l'octet : 46 sur 58
-  rejeu de la table sur la source (18 retouches, chacune exactement une fois) : brouillon identique à l'octet
+  rejeu de la table sur la source (20 retouches, chacune exactement une fois) : brouillon identique à l'octet
   => OK
 
 --- 6. Structure ---

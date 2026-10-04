@@ -4,9 +4,10 @@
 (modèle `claude-opus-5-5`). Rattachement : brief du lot, point 4 ; décision de l'investisseur, q. 15, « acteurs mesurés
 nommés avec préavis privé » (JOURNAL l.382) ; G0 `docs/adr-0029/G0-lots-S2BIS.md` l.13.
 
-Brouillon visé : `11-mesures-pilotes-public.md`, sha256 `4de986544cee9622a0848f585103cea594352df65d02e8f51e6ef4c593fc7688`.
+Brouillon visé : `11-mesures-pilotes-public.md`, sha256 `c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561`.
 *Mise à jour datée du 2026-10-04 (14:5x UTC, `date -u`), après les corrections de la relecture G2 (C-1 à C-3, O-1, O-2) : nouvelle empreinte du brouillon ; son en-tête compte deux lignes de plus, d'où les renvois de ligne décalés de deux et le relevé du §1 régénéré ; aucun fait ni aucun compte de mentions ne change.*
 *Mise à jour datée du 2026-10-04 (15:03 UTC, `date -u`), après les décisions de l'investisseur (JOURNAL l.390, 14:52:24 UTC) : nouvelle empreinte du brouillon ; l'en-tête compte encore deux lignes de plus (renvois décalés de deux) ; Pyth passe de 19 à 21 mentions (libellé factuel du §9.3 pt 8, mention de l'en-tête) ; §2, §4 et §5 suivent les décisions.*
+*Mise à jour datée du 2026-10-04 (17:39 UTC, `date -u`), après la retouche E-19 (adjudication B.57 de l'orchestrateur, item I-G2-5) : nouvelle empreinte du brouillon ; lignes et mentions inchangées (relevé identique) ; §5 pt 5 : liste des pièces remises sur demande portée au paquet scellé et aux scripts.*
 Chaque nombre ci-dessous est recopié du brouillon, à la ligne citée (« b. l.N » = ligne N du brouillon) ; aucun n'est
 calculé ici. Aucun contact n'a été pris ; aucun texte de préavis n'est rédigé : le contenu et le calendrier du préavis
 sont à l'investisseur (ADR-0028 §4 pt 4 : « contacts de préavis »).
@@ -99,5 +100,5 @@ la source, par la retouche E-09 qui remplace un nom de dépôt privé par « dé
    journaux du harnais, dans une plage exclue, pas un fait des sources.
 5. **Ordre.** ADR-0028 §4 pt 4 lie publication et « contacts de préavis » ; le J14 (§7.1, §7.2) nomme aussi des
    sources ; il est publié avec son étiquette « hors décision », par décision de l'investisseur du 2026-10-04
-   (JOURNAL l.390 ; ADR-0028 D4). Le rapport est publié seul ; le sceau, les rendus et les enregistrements sont
-   remis sur demande, sous accord.
+   (JOURNAL l.390 ; ADR-0028 D4). Le rapport est publié seul ; le paquet scellé, le sceau, les rendus, les enregistrements et
+   les scripts sont remis sur demande, sous accord (adjudication B.57 de l'orchestrateur).

@@ -330,3 +330,82 @@ SHOGEN-PUBLIC-MENTION-FEU-VERT-1 : la mention de brouillon de l'en-tête attend 
   sur demande comme les autres pièces ? De même, « sceau » couvre-t-il le paquet scellé, nécessaire pour contrôler le
   sceau ? Le brouillon ne tranche aucun des deux points.
 - S-G4 et S-G5 n'ont pas été rejouées (même motif que E-9) ; la suite `s2-harness` non plus (dépôt non touché).
+
+## Ajout daté du 2026-10-04 (17:28 à 17:40 UTC, `date -u`) : retouche E-19 (adjudication B.57, item I-G2-5)
+
+Commande de l'orchestrateur : retouche numérotée E-19 du brouillon français. Gate 0 : `claude-opus-5-5`. Rien de ce qui
+précède n'est réécrit.
+
+**Rattachement.**
+- Annexe B d'ADR-0028, B.57, l.937-955 [lu, à `665898a`] : « Adjudications de l'orchestrateur sur les deux questions du
+  worker : les scripts du rédacteur et le paquet scellé suivent le régime « remis sur demande, sous accord » (sans le
+  paquet, le sceau ne se contrôle pas) ».
+- Item I-G2-5 de la relecture G2 bilingue, `scratchpad/s2bis/en/g2/G2-DOCS11-EN.md` l.362 [lu, ce seul passage],
+  sha256 `14e1d7183d82f9221d7a575f881f5dc74534447ebc276d2edf5d6bc3610fe6cf`.
+- Base : tête `665898a`, arbre propre. Le brouillon versé (`docs/publication/11-mesures-pilotes-public.md`) est égal
+  au mien d'avant (`4de98654…7688`) ; `docs/11` est inchangé.
+
+**Retouche.** Elle porte sur le texte de retouches antérieures (E-01 pour l'en-tête, E-16 pour le §12). Le script
+admet désormais des retouches « de second ordre » (champ `base`). Leur passage « avant » doit être :
+- absent de la source ;
+- lié au texte « après » de la base ;
+- postérieur à la base.
+
+La table les marque « après E-xx ». Deux lignes donc, sous un seul numéro :
+- E-19a (en-tête) : « le sceau, les rendus et les enregistrements sont remis sur demande, sous accord » devient « le
+  paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur demande, sous accord ».
+- E-19b (§12) : « Le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont au même dépôt privé
+  et ne sont pas publiés : pièces remises sur demande, sous accord. Le contrôle du sceau exige le paquet scellé, remis
+  avec le sceau sur demande : un tiers à qui l'on remet le paquet scellé, le sceau et les rendus sans les journaux peut
+  contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus. »
+
+Aucun chiffre, aucune ligne ajoutée. La puce « Sceau » du §12 (contenu du sceau et commande `verify.sh`) est examinée
+et gardée : elle ne dit pas qu'on peut contrôler le sceau sans le paquet.
+
+**Contrôle resserré.**
+- Un motif « adjudication B.57 » interdit les anciennes listes.
+- Sept passages exigés dans le brouillon : décisions de l'investisseur et B.57.
+- Le passage protégé « un tiers à qui l'on remet les rendus et le sceau sans », que B.57 change, est remplacé par la
+  suite inchangée de la phrase, « peut contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus ».
+  Elle reste protégée mot pour mot. Un test interdit le retour de l'ancienne liste.
+
+**Commandes et sorties.**
+
+| heure | commande | sortie |
+|---|---|---|
+| 17:28:58 | `date -u` ; `git status` ; brouillon versé ; B.57 | `665898a`, arbre propre ; `4de98654…` égal ; B.57 lue |
+| 17:2x-17:3x | recherche de « I-G2-5 » | dépôt : aucun ; `s2bis/en/g2/G2-DOCS11-EN.md` (recherche ciblée) ; l.362 lue |
+| 17:34:51 | tests E-19 (second ordre, contenu, motif du contrôle) | une erreur (exception non convertie) : étape rouge non valide, test corrigé |
+| 17:35:01 | même étape | 7 échecs, 0 erreur, sortie 1 |
+| 17:35:50 | E-19 et second ordre implémentés | 81 OK |
+| 17:35:56 | construction ; contrôle | brouillon `c101998b…`. Contrôle NON CONFORME sur le passage protégé « un tiers à qui l'on remet les rendus et le sceau sans » : B.57 change cette phrase |
+| 17:36:19 | test de la liste protégée | 1 échec, sortie 1 |
+| 17:36:28 | liste protégée adaptée | 82 OK ; contrôle CONFORME |
+| 17:3x | deux tests de second ordre (passage dans la source, base postérieure) | 84 OK |
+| 17:38:12 / 17:38:24 | tests des passages exigés : d'abord 14 erreurs (fonction absente), puis version factice | 3 échecs, 0 erreur, sortie 1 |
+| 17:38:49 | passages exigés implémentés ; construction ; contrôle | 87 OK ; brouillon inchangé `c101998b…` ; 7 exigés présents ; CONFORME |
+| 17:39:02-17:39:15 | campagne (MB-24 à MB-30, MC-38 à MC-42, MD-22, MD-23) | 96 mutants, 96 tués, 0 vivant, 0 FATAL ; MD-23, qui aurait survécu sans les passages exigés, est tué ; les 86 noms de tests ont tous échoué au moins une fois |
+| 17:39 | relevé des acteurs ; `ACTEURS-NOMMES.md` | relevé identique ; empreinte, mention datée, §5 pt 5 ; 17 renvois conformes |
+
+**Empreintes.**
+
+| pièce | sha256 |
+|---|---|
+| `11-mesures-pilotes-public.md` (99 515 octets, 1 081 lignes) | `c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561` |
+| `TABLE-CORRESPONDANCE.md` (20 retouches, 18 passages gardés) | `d78b65fdb19e17774cbcd0466311065a47a4aa8490c60be758a591b1c76040ec` |
+| `diff-source-brouillon.txt` | `6e1b4fa8faf0b8353b6465122192abfc02d87ef09b0d49ece3aa74b4e39058ba` |
+| `controle_public.sortie.txt` | `1d6248004691077687657b35a974beb38edc38744bd46e37ed27879e5561c66b` |
+| `ACTEURS-NOMMES.md` | `ac4d6f6ada11b3d95cfc0b791b9f086e397063731e459d549108b3590e984dd5` |
+| `acteurs_nommes.sortie.txt` (inchangée) | `5fe978378aeb6637b87b9c0605e8fe52fd2c70bdb19aa67363ee6ef1e3ce3678` |
+| `outils/construire_public.py` | `cfcded63659b503469a50c65b316ecdc739117465ab6828afbc9f2253971dfd4` |
+| `outils/controle_public.py` | `35ba9a6cf5fe9d6f004f5e673c670d74f9bd565b93d3374734b3d59ed07f2067` |
+| `mutants/campagne.sortie.txt` | `789d616d8075db17fed8b5e9fdd140022794f17b6b439378a97acd7a6ccf6e08` |
+
+**Écarts de cette passe.**
+- E-12 : une première recherche de « I-G2-5 » sur tout le dépôt (dossiers interdits et `*.jsonl` exclus, noms de
+  fichiers seuls) a dépassé deux minutes. Passée en tâche de fond, elle a ensuite parcouru le scratchpad entier sans
+  exclure les `*.jsonl`, que d'autres lots peuvent y tenir. Je l'ai arrêtée (sortie 144) dès que je l'ai vue ; elle
+  n'avait rien affiché. La recherche ciblée qui a suivi a trouvé l'item. Le contrôle FM-1.1 de ma transcription vous
+  revient.
+- E-13 : le contrôle a changé de liste protégée (motif B.57 ci-dessus). C'est un remplacement motivé et testé, pas un
+  desserrage : l'ancienne formulation devient un motif interdit, et le contenu nouveau est exigé.
