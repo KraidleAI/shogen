@@ -14,21 +14,23 @@
 #   drapeaux forcés contre la config locale ; verdict par grep seul, attribution par awk pour
 #   le message seulement. Lancement ramené à la racine du dépôt, quel que soit le dossier courant.
 #   Objets réels, ceux que la poussée transmet : objets de remplacement (refs/replace) ignorés.
+#   Lot D8d (2026-10-04, SHOGEN-D8D-SECRETS-1) : modes indexé et arbre, noms de chemin de la
+#   portée balayés, toute entrée comprise ; entrée lue à l'étage 0 nommé (":0:<chemin>").
 # HORS PORTÉE, déclaré : fichiers de garde (enforcement/gate-*, enforcement/lint-*) et
 #   enforcement/tests/, dans tous les modes (ils nomment leurs motifs ; avis à chaque lancement ;
-#   le reste d'enforcement/ est balayé) ; liens symboliques (120000) et gitlinks (160000),
-#   ignorés avec un avis ; secret coupé sur deux lignes ; formats nouveaux ; entropie. Aucun
+#   le reste d'enforcement/ est balayé) ; contenu des liens symboliques (120000) et des gitlinks
+#   (160000), ignoré avec un avis ; secret coupé sur deux lignes ; formats nouveaux ; entropie. Aucun
 #   scanner dédié ne tourne dans Shōgen (items SHOGEN-SECRETS-SCANNER-DEDIE-1 et
 #   SHOGEN-FORGE-SECRET-SCANNING-1) : ce plancher n'a aucun filet derrière lui. Objets hors
 #   refs (inatteignables, journaux de refs, bundles) : item SHOGEN-SECRETS-HORS-REFS-1.
 # ÉCHEC FERMÉ (sortie 2) : erreur git, hors d'un dépôt, échec de mktemp, exclusion refusée,
 #   argument inconnu (écart au blob, où un argument inconnu retombait sur le mode indexé),
 #   historique superficiel ou greffé (info/grafts, GIT_GRAFT_FILE), ref vers un blob ou un
-#   arbre, directe ou par un tag (hors du flux d'historique).
+#   arbre, directe ou par un tag (hors du flux d'historique) ; grep sorti au-delà de 1 (D8d).
 # SORTIE MASQUÉE PAR CONSTRUCTION : aucun octet de contenu n'est dirigé vers la sortie ; seuls
 #   le chemin, la ligne et, en historique, le commit que la gate calcule ; troncature annoncée.
-#   Chemin en forme d'identifiant : masqué dans les constats et les avis non-blob, en clair dans
-#   les messages d'exclusion et d'échec (item SHOGEN-SECRETS-MASQUE-EXCLUSION-1).
+#   Chemin ou pathspec en forme d'identifiant : masqué partout, constats, avis, messages
+#   d'exclusion, des greffes et d'échec compris (lot D8d).
 # Amont : versions 1 à 4 rejetées en revue G2 dans VibeGates (ADR-0004 de VibeGates,
 #   docs/adr/ADR-0004-guard-escalation-adjudication.md ; VibeGates docs/passes/pass-4-report.md,
 #   section U2, commit 1263f2a).
@@ -57,36 +59,43 @@ cd "$TOP" || echec "cd vers la racine du dépôt impossible"
 VENDOR='AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|xox[baprs]-[0-9A-Za-z-]{10,}|sk-[A-Za-z0-9]{20,}T3BlbkFJ[A-Za-z0-9]{20,}|sk-ant-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|eyJhbGciOi[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{10,}'
 GENERIC='(api[_-]?key|secret|passwd|password|token)[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9+/_-]{16,}["'"'"']|(api[_-]?key|secret|passwd|password|token|aws_[a-z_]*key[a-z_]*)=[A-Za-z0-9+/]{16,}'
 
-masque() { sed -E "s#$VENDOR#[forme masquée]#g; s#$GENERIC#[forme masquée]#gI"; }   # chemin en forme d'identifiant : masqué dans les constats et les avis non-blob (CH-14)
+masque() { sed -E "s#$VENDOR#[forme masquée]#g; s#$GENERIC#[forme masquée]#gI"; }   # tout chemin ou pathspec imprimé passe par masque (CH-14 ; I-G2-4, lot D8d)
+mq() { printf '%s' "$1" | masque; }
+# formes <préfixe> <fichier> : numéros des lignes qui portent une forme (VENDOR, ou GENERIC sans casse) après le préfixe,
+#   triés ; sortie 2 si un grep sort au-delà de 1 : une erreur de grep n'est jamais un vert (I-G2-2, lot D8d).
+formes() { local v g; v="$( set -o pipefail; grep -anE "$1($VENDOR)" "$2" | cut -d: -f1 )"; [ $? -le 1 ] || return 2
+  g="$( set -o pipefail; grep -aniE "$1($GENERIC)" "$2" | cut -d: -f1 )"; [ $? -le 1 ] || return 2
+  printf '%s\n%s\n' "$v" "$g" | sed '/^$/d' | sort -un; }
 EXCLUDES=()
 if [ -f "$EXCL_FILE" ]; then
   git ls-files --error-unmatch -- "$EXCL_FILE" >/dev/null 2>&1 ||
     refus exclusion "$EXCL_FILE existe sans être suivi (une exclusion non suivie n'atteint jamais la revue)"
   while IFS= read -r line; do
     case "$line" in ''|'#'*) continue ;; esac
-    printf '%s' "$line" | grep -q 'ADR-' || refus exclusion "entrée de $EXCL_FILE sans marqueur ADR- (R-23) : $line"
+    printf '%s' "$line" | grep -q 'ADR-' || refus exclusion "$(mq "entrée de $EXCL_FILE sans marqueur ADR- (R-23) : $line")"
     p="${line%% #*}"; p="${p%"${p##*[![:space:]]}"}"
     [ -z "$p" ] && continue
     pn="$(printf '%s' "$p" | sed 's|//*|/|g; s|/$||')"   # normalisation : // réduits, / final retiré
-    case "$pn" in .|\*|\*\*|'') refus exclusion "pathspec global '$p' refusé" ;; esac
-    case "$pn" in *..*) refus exclusion "pathspec traversant '$p' refusé" ;; esac
-    git ls-files -- ":(exclude)$p" >/dev/null 2>&1 || refus exclusion "pathspec inutilisable '$p' dans $EXCL_FILE"
+    case "$pn" in .|\*|\*\*|'') refus exclusion "$(mq "pathspec global '$p' refusé")" ;; esac
+    case "$pn" in *..*) refus exclusion "$(mq "pathspec traversant '$p' refusé")" ;; esac
+    git ls-files -- ":(exclude)$p" >/dev/null 2>&1 || refus exclusion "$(mq "pathspec inutilisable '$p' dans $EXCL_FILE")"
     NREM=$(git ls-files -- "$p" 2>/dev/null | wc -l); NTOT=$(git ls-files | wc -l)
-    [ "$NREM" -ge "$NTOT" ] && [ "$NTOT" -gt 0 ] && refus exclusion "l'exclusion '$p' retirerait toute la portée"
-    echo "AVIS (secrets) : l'exclusion '$p' retire $NREM fichier(s) suivi(s) de la portée ($EXCL_FILE)." >&2
+    [ "$NREM" -ge "$NTOT" ] && [ "$NTOT" -gt 0 ] && refus exclusion "$(mq "l'exclusion '$p' retirerait toute la portée")"
+    echo "AVIS (secrets) : l'exclusion '$p' retire $NREM fichier(s) suivi(s) de la portée ($EXCL_FILE)." | masque >&2
     EXCLUDES+=(":(exclude)$p")
   done < "$EXCL_FILE"
 fi
 echo "AVIS (secrets) : fichiers de garde (enforcement/gate-*, enforcement/lint-*) et enforcement/tests/ exclus par contrat (ils nomment leurs motifs) ; le reste d'enforcement/ est balayé." >&2
 
-TMP="$(mktemp)" && [ -n "$TMP" ] && [ -w "$TMP" ] || echec "mktemp a échoué"
-trap 'rm -f "$TMP"' EXIT
+T="$(mktemp -d)" && [ -n "$T" ] && [ -d "$T" ] && [ -w "$T" ] || echec "mktemp a échoué"
+trap 'rm -rf "$T"' EXIT
+TMP="$T/l"; C="$T/c"   # liste ou flux ; contenu d'un fichier, ou liste des noms
 PS=(-- . ':(exclude)enforcement/gate-*' ':(exclude)enforcement/lint-*' ':(exclude)enforcement/tests/' ${EXCLUDES[@]+"${EXCLUDES[@]}"})
 if [ "$MODE" = --history ]; then
   [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = false ] ||
     refus tronque "historique superficiel ou illisible : le balayage exige tout l'historique (fetch-depth: 0 en CI)"
   GF="$(git rev-parse --git-path info/grafts 2>/dev/null)" && [ -n "$GF" ] || echec "erreur git (greffes)"
-  [ ! -e "$GF" ] || refus tronque "greffes ($GF) : l'historique affiché n'est pas celui des objets"
+  [ ! -e "$GF" ] || refus tronque "$(mq "greffes ($GF) : l'historique affiché n'est pas celui des objets")"
   NX="$( set -o pipefail; git for-each-ref --format='%(objecttype) %(*objecttype)' | awk '!/^(commit |tag commit)$/ { n++ } END { print n + 0 }' )" || echec "erreur git (refs)"
   [ "$NX" = 0 ] || echec "$NX ref(s) vers un blob ou un arbre, hors du flux d'historique"
   NC="$(git rev-list --count --all 2>/dev/null)" || echec "erreur git (compte des commits)"
@@ -95,7 +104,7 @@ if [ "$MODE" = --history ]; then
     -c diff.noprefix=false -c diff.mnemonicPrefix=false -c diff.dstPrefix=b/ -c diff.suppressBlankEmpty=false log -p --text --no-color \
     --no-ext-diff --no-textconv --no-renames --diff-merges=first-parent --full-history --no-notes --no-show-signature \
     --format='commit %H' --all "${PS[@]}" 2>/dev/null | tr -d '\000' ) >"$TMP" || echec "erreur git (historique)"
-  HITS="$( { grep -an '^+' "$TMP" | grep -aE "$VENDOR"; grep -an '^+' "$TMP" | grep -aiE "$GENERIC"; } | cut -d: -f1 | sort -un )"
+  HITS="$(formes '^\+.*' "$TMP")" || echec "grep a échoué (historique) ; un vert serait faux"
   [ -z "$HITS" ] && { echo "OK (secrets) : historique, $NC commit(s) (--all), sans forme d'identifiant ajoutée."; exit 0; }
   echo "REFUS (SECRETS/historique) : $(printf '%s\n' "$HITS" | wc -l) ligne(s) ajoutée(s) en forme d'identifiant (sortie masquée ; 20 au plus, commit:chemin:ligne) :" >&2
   # Attribution, pour le message seulement : en-têtes commit, +++ hors hunk, compteurs des @@ (ligne vide = contexte).
@@ -113,19 +122,27 @@ else
   git diff --cached --name-only -z --diff-filter=d "${PS[@]}" >"$TMP" 2>/dev/null || echec "erreur git (liste des fichiers)"
 fi
 
-FOUND=0; NF=0
+FOUND=0; NF=0; HC=0
+# Noms de chemin de la portée, toute entrée comprise (I-G2-3, lot D8d) ; un nom coupé par un saut de ligne n'échappe pas
+# au verdict, seule son attribution, pour le message, en pâtit.
+tr '\000' '\n' < "$TMP" > "$C" && NOMS="$(formes '' "$C")" || echec "grep a échoué (noms de chemin) ; un vert serait faux"
+if [ -n "$NOMS" ]; then
+  FOUND=1; echo "REFUS (SECRETS/forme) : nom de chemin en forme d'identifiant (sortie masquée ; 8 au plus) :" >&2
+  printf '%s\n' "$NOMS" | head -8 | while IFS= read -r n; do sed -n "${n}s/\$/:(chemin)/p" "$C"; done | masque >&2
+fi
 while IFS= read -r -d '' f; do
   m="$(git ls-files -s -- ":(literal)$f" 2>/dev/null | awk '{print $1; exit}')"
   case "$m" in
     120000|160000) echo "AVIS (secrets) : '$f' ignoré, entrée non-blob (mode $m, hors portée du contrat)." | masque >&2; continue ;;
   esac
-  git show ":$f" >/dev/null 2>&1 || echec "git show a échoué pour '$f'"
+  # ":0:" nomme l'étage 0 : un chemin « 0:x » est lu tel quel, jamais comme l'étage 0 de « x » (I-G2-1, lot D8d).
+  ( set -o pipefail; git show ":0:$f" 2>/dev/null | tr -d '\000' ) > "$C" || echec "$(mq "git show a échoué pour '$f'")"
   NF=$((NF + 1))
   # Octets, NUL retirés : un NUL ne coupe pas le balayage ; l'UTF-16 devient lisible.
-  LNS="$(git show ":$f" 2>/dev/null | tr -d '\000' | { grep -anE "$VENDOR"; git show ":$f" 2>/dev/null | tr -d '\000' | grep -aniE "$GENERIC"; } | cut -d: -f1 | sort -un || true)"
+  LNS="$(formes '' "$C")" || echec "grep a échoué (contenu) ; un vert serait faux"
   if [ -n "$LNS" ]; then
-    [ "$FOUND" -eq 0 ] && echo "REFUS (SECRETS/forme) : contenu en forme d'identifiant (sortie masquée par construction ; inspecter en local les lignes nommées) :" >&2
-    FOUND=1
+    [ "$HC" -eq 0 ] && echo "REFUS (SECRETS/forme) : contenu en forme d'identifiant (sortie masquée par construction ; inspecter en local les lignes nommées) :" >&2
+    FOUND=1; HC=1
     N=$(printf '%s\n' "$LNS" | wc -l)
     { printf '%s\n' "$LNS" | head -8 | while IFS= read -r ln; do printf '%s:%s: [contenu masqué]\n' "$f" "$ln"; done
       [ "$N" -gt 8 ] && printf '%s : (+%d ligne(s) non listée(s))\n' "$f" "$((N - 8))"; } | masque >&2

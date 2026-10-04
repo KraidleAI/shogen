@@ -9,6 +9,7 @@
 # par core.hooksPath (jamais --no-verify), toute commande git en -C <dépôt jetable>.
 # Chaque cas vérifie la sortie ET le jeton, ou le message OK et son compte ; un motif requis ou
 # interdit précise le message quand le jeton seul ne tranche pas. Un seul résumé fait foi.
+# Lot D8d (2026-10-04, lot DETTES-B2) : cas ajoutés et révisés sous des commentaires de bloc datés.
 # Usage : run-fixtures-secrets.sh [gate]   Sortie : 0 tout passe, 1 un cas échoue, 3 erreur fatale.
 
 set -u
@@ -41,14 +42,14 @@ r() {
 }
 ci() { git -C "$R" add -A && git -C "$R" commit -q -m "$1" || fatal "commit"; }
 st() { git -C "$R" add -- "$@" || fatal "add"; }
-# cas ID sortie jeton|fin-du-message-OK [requis] [interdit] : gate lancée depuis ${D:-$R}, arguments $A.
+# cas ID sortie jeton|fin-du-message-OK [requis] [interdit] : gate lancée depuis ${D:-$R}, arguments $A, PATH ${P:-$PATH}.
 cas() {
-  o="$(cd "${D:-$R}" && bash "$GATE" $A 2>&1)"; c=$?
+  o="$(cd "${D:-$R}" && PATH="${P:-$PATH}" bash "$GATE" $A 2>&1)"; c=$?
   if [ "$2" = 0 ]; then e="OK (secrets) : $3"; else e="REFUS ($3)"; fi
   if [ "$c" = "$2" ] && printf '%s\n' "$o" | grep -qF -- "$e" && { [ -z "${4-}" ] || printf '%s\n' "$o" | grep -qE -- "$4"; } &&
      { [ -z "${5-}" ] || ! printf '%s\n' "$o" | grep -qE -- "$5"; }; then OK=$((OK + 1))
   else KO=$((KO + 1)); echo "ÉCHEC $1 : attendu $2 $3, obtenu $c" >&2; printf '%s\n' "$o" | head -3 >&2; fi
-  D=; A=
+  D=; A=; P=
 }
 
 r; printf 'k = "%s"\n' "$V" > "$R/s.py"; st s.py; cas T-01 2 SECRETS/forme
@@ -98,8 +99,30 @@ A=--tree; cas T-72 2 SECRETS/forme '^c\.py:1: '
 r; printf 'k = "%s"\n' "$V" > "$R/$V.txt"; st "$V.txt"; cas T-77 2 SECRETS/forme '^\[forme masquée\];\.txt:1: ' QQQQ
 r; b="$(printf 'k = "%s"\n' "$V" | git -C "$R" hash-object -w --stdin)" && git -C "$R" update-index --add --cacheinfo "100644,$b,Enforcement/Tests/x.py" || fatal index
 A=--tree; GIT_ICASE_PATHSPECS=1 cas T-78 2 SECRETS/forme '^Enforcement/Tests/x\.py:1: '
-r; l="$(printf 'c' | git -C "$R" hash-object -w --stdin)" && git -C "$R" update-index --add --cacheinfo "120000,$l,$V.lnk" || fatal lien; cas T-79 0 '0 fichier(s)' "'\[forme masquée\];\.lnk' ignoré" QQQQ
+r; l="$(printf 'c' | git -C "$R" hash-object -w --stdin)" && git -C "$R" update-index --add --cacheinfo "120000,$l,$V.lnk" || fatal lien; cas T-79 2 SECRETS/forme "'\[forme masquée\];\.lnk' ignoré" QQQQ
 r; n="$(forme G-09)" || fatal "sonde G-09"; printf 'k = "%s"\n' "$V" > "$R/$n.txt"; st "$n.txt"; cas T-80 2 SECRETS/forme '^\[forme masquée\];\.txt:1: ' QQQQ
+# Lot D8d (2026-10-04) : chemin d'étage (T-81, T-81b) ; grep en erreur (T-82, T-82b, T-83 : enveloppe de PATH posée pour la
+# seule gate, sortie 2 sur l'appel VENDOR -anE ou GENERIC -aniE d'un fichier marqué ECHEC-GREP, grep réel sinon) ; messages
+# masqués du contrat d'exclusion, des greffes et de git show (T-84 à T-90) ; noms de chemin (T-91 à T-93 ; T-79 en refus).
+r; echo propre > "$R/x"; printf 'k = "%s"\n' "$V" > "$R/0:x"; st x 0:x; cas T-81 2 SECRETS/forme '^0:x:1: '; A=--tree; cas T-81b 2 SECRETS/forme '^0:x:1: '
+G0="$(command -v grep)" || fatal "grep introuvable"
+gr() { mkdir "$W/$1" && printf '#!/bin/sh\nfor a; do f="$a"; done\n[ "$1" = %s ] && [ -f "$f" ] && "%s" -q ECHEC-GREP "$f" && exit 2\nexec "%s" "$@"\n' \
+  "$2" "$G0" "$G0" > "$W/$1/grep" && chmod +x "$W/$1/grep" || fatal "enveloppe grep"; }
+gr gv -anE; gr gg -aniE
+r; printf 'k = "%s" # ECHEC-GREP\n' "$V" > "$R/s.py"; st s.py; P="$W/gv:$PATH"; cas T-82 2 SECRETS/echec 'grep a échoué \(contenu\)'
+r; echo x > "$R/ECHEC-GREP.txt"; st ECHEC-GREP.txt; P="$W/gg:$PATH"; cas T-82b 2 SECRETS/echec 'grep a échoué \(noms de chemin\)'
+r; printf 'k = "%s" # ECHEC-GREP\n' "$V" > "$R/c.py"; ci c; P="$W/gg:$PATH"; A=--history; cas T-83 2 SECRETS/echec 'grep a échoué \(historique\)'
+r; echo x > "$R/l.py"; st l.py; ex "$V"; cas T-84 2 SECRETS/exclusion 'sans marqueur ADR-' QQQQ
+ex "$V/../x  # ADR-0001"; cas T-85 2 SECRETS/exclusion traversant QQQQ; ex "/$V  # ADR-0001"; cas T-86 2 SECRETS/exclusion inutilisable QQQQ
+ex "$V/  # ADR-0001"; cas T-87 2 SECRETS/forme "l'exclusion '\[forme masquée\];/' retire" QQQQ
+r -; echo x > "$R/$V.txt"; st "$V.txt"; ex "[$V.]*  # ADR-0001"; cas T-88 2 SECRETS/exclusion 'toute la portée' QQQQ
+r; printf 'k = "%s"\n' "$V" > "$R/c.py"; ci a; git -C "$R" rm -q c.py || fatal rm; ci r; g="$W/$V-greffes"
+printf '%s %s\n' "$(git -C "$R" rev-parse HEAD)" "$(git -C "$R" rev-parse HEAD~2)" > "$g" || fatal greffe; A=--history; GIT_GRAFT_FILE="$g" cas T-89 2 SECRETS/tronque greffes QQQQ
+r; echo x > "$R/$V.txt"; st "$V.txt"; b="$(git -C "$R" ls-files -s -- "$V.txt" | cut -d' ' -f2)" && rm -f "$R/.git/objects/${b:0:2}/${b:2}" || fatal objet
+cas T-90 2 SECRETS/echec 'git show a échoué' QQQQ
+r; echo x > "$R/$V.txt"; st "$V.txt"; cas T-91 2 SECRETS/forme '^\[forme masquée\];\.txt:\(chemin\)$' QQQQ; A=--tree; cas T-91b 2 SECRETS/forme '^\[forme masquée\];\.txt:\(chemin\)$' QQQQ
+r; n="$(forme G-09)" || fatal "sonde G-09"; echo x > "$R/$n.txt"; st "$n.txt"; cas T-92 2 SECRETS/forme '^\[forme masquée\];\.txt:\(chemin\)$' QQQQ
+r; printf 'k = "%s"\n' "$V" > "$R/$V.txt"; st "$V.txt"; cas T-93 2 SECRETS/forme "contenu en forme d'identifiant" QQQQ
 # Table des sondes (T-31 : VENDOR, par alternative ; T-32 : GENERIC, par forme ; T-33 à T-35 : seuils ajoutés au G1).
 for id in $(awk -F '\t' '!/^#/ { print $1 }' "$FX"); do
   case "$id" in V-*) l="T-31/$id" ;; G-*) l="T-32/$id" ;; *) l="$id" ;; esac
