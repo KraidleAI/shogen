@@ -25,11 +25,12 @@ def marqueur(ws):
     return records.window_close_record(ws, window.strate_from_spec(ws, window.WEEKEND_STRATE_SPEC), ws + 55.0)
 
 
-def lecture(ws, f, etat="ok", prix="100"):
-    """etat : « ok », « nul » (statut ok sans prix) ou un statut de panne ; source_ts frais (ws + 50)."""
+def lecture(ws, f, etat="ok", prix="100", source_ts=None):
+    """etat : « ok », « nul » (statut ok sans prix) ou un statut de panne ; source_ts frais (ws + 50) par défaut."""
     return {"window_start": ws, "flux_id": f, "kind": "place", "currency": "USD",
             "status": "ok" if etat == "nul" else etat, "http_status": 200, "price": None if etat == "nul" else prix,
-            "source_ts": ws + 50.0, "fetch_ts": ws + 55.0, "sha256_raw": None, "extra": {}}
+            "source_ts": ws + 50.0 if source_ts is None else source_ts, "fetch_ts": ws + 55.0, "sha256_raw": None,
+            "extra": {}}
 
 
 def ecrire(dossier, controle, lectures):
@@ -39,11 +40,14 @@ def ecrire(dossier, controle, lectures):
     return dossier
 
 
-def journaux(dossier, fenetres, motif, pool=POOL, avant=()):
-    """Un démarrage (enregistrements `avant`, puis run_params) puis, par fenêtre, les lectures du pool
-    (motif(i, f) → état ; None : lecture absente) et le marqueur."""
-    controle, lectures = [*avant, params(pool)], []
+def journaux(dossier, fenetres, motif, pool=POOL, avant=(), **sur):
+    """Un démarrage (enregistrements `avant`, puis run_params, clés `sur` comprises) puis, par fenêtre, les lectures du
+    pool (motif(i, f) → état, ou (état, source_ts) ; None : lecture absente) et le marqueur."""
+    controle, lectures = [*avant, params(pool, **sur)], []
     for i, ws in enumerate(fenetres):
-        lectures += [lecture(ws, f, e) for f in pool if (e := motif(i, f)) is not None]
+        for f in pool:
+            if (e := motif(i, f)) is not None:
+                etat, ts = e if isinstance(e, tuple) else (e, None)
+                lectures.append(lecture(ws, f, etat, source_ts=ts))
         controle.append(marqueur(ws))
     return ecrire(dossier, controle, lectures)
