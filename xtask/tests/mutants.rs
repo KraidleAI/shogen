@@ -801,7 +801,11 @@ fn notes_sg9_vert(cas: &str, ajout: &str) -> String {
 
 #[test]
 fn temoin_sg9_arbre_menace_intact_est_vert() {
-    notes_sg9_vert("temoin", "");
+    let notes = notes_sg9_vert("temoin", "");
+    assert!(
+        notes.contains("biblio/ sans octets, non contrôlée(s) ici (DEVOPS §1) : [biblio/source"),
+        "borne biblio/ :\n{notes}"
+    );
 }
 
 #[test]
@@ -809,6 +813,42 @@ fn mutant_couverture_sg9_perimetre_absent() {
     let racine = arbre_menace("perimetre-absent");
     std::fs::remove_file(racine.join(xtask::sg9::PERIMETRE)).expect("suppression de docs/17");
     exiger_rouge(&xtask::sg9::executer(&racine), "fichier absent : docs/17");
+}
+
+/// Borne `biblio/` (revue G2 de DETTES-B2, C-1) : posée sans octets `biblio/` seulement (prédicat de
+/// S-G6) ; `biblio/` peuplée, une référence pendante est introuvable, une plage hors du fichier refusée.
+fn exiger_rouge_sg9_biblio(cas: &str, sidecar: Option<&str>, attendu: &str) {
+    let racine = arbre_menace(cas);
+    ecrire(&racine, "biblio/factice.pdf", "octets versés");
+    if let Some(contenu) = sidecar {
+        ecrire(&racine, "biblio/source.pdf.sidecar", contenu);
+    }
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+#[test]
+fn mutant_sg9_a_biblio_peuplee_reference_pendante() {
+    exiger_rouge_sg9_biblio("biblio-pendante", None, "fichier introuvable");
+}
+
+#[test]
+fn mutant_sg9_a_biblio_peuplee_plage_hors_du_fichier() {
+    exiger_rouge_sg9_biblio("biblio-plage", Some("1\n2\n3\n"), "plage hors du fichier");
+}
+
+/// Sans octet versé (`INDEX.md` et sidecars seuls, extension en toute casse), la borne tient.
+#[test]
+fn temoin_sg9_biblio_sidecars_seuls_sans_octets() {
+    let racine = arbre_menace("biblio-sidecars");
+    ecrire(&racine, "biblio/INDEX.md", "registre\n");
+    ecrire(&racine, "biblio/autre.PDF.SIDECAR", "texte extrait\n");
+    let rapport = xtask::sg9::executer(&racine);
+    let notes = rapport.notes.join("\n");
+    assert!(
+        rapport.vert() && notes.contains("sans octets"),
+        "{}",
+        motifs(&rapport)
+    );
 }
 
 fn exiger_rouge_sg9(cas: &str, fragment: &str, attendu: &str) {
@@ -825,6 +865,19 @@ macro_rules! mutants_sg9 {
 }
 
 mutants_sg9! {
+    mutant_sg9_a_plage_hors_du_fichier: "\nVoir `crates/exemple.rs:3-4`.\n" => "plage hors du fichier",
+    mutant_sg9_a_fichier_inexistant: "\nVoir `crates/absent.rs:1`.\n" => "fichier introuvable",
+    mutant_sg9_a_reference_courte: "\nVoir `exemple.rs:2`.\n" => "fichier introuvable",
+    mutant_sg9_a_chemin_absolu: "\nVoir `/crates/exemple.rs:2`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_segment_parent: "\nVoir `crates/../crates/exemple.rs:2`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_sans_extension_introuvable: "\nVoir `crates/LISEZ:1`.\n" => "fichier introuvable",
+    mutant_sg9_a_monark_sans_sha: "\nVoir `F:/Monark:apps/x.ts:4`.\n" => "référence MONARK sans sha",
+    mutant_sg9_a_monark_sha_court: "\nVoir `F:/Monark@0123abcd:apps/x.ts:4`.\n" => "référence MONARK sans sha",
+    mutant_sg9_a_chemin_lecteur: "\nVoir `F:/tmp/x.md:3`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_plage_inversee: "\nVoir `crates/exemple.rs:3-2`.\n" => "plage hors du fichier",
+    mutant_sg9_a_ligne_zero: "\nVoir `crates/exemple.rs:0`.\n" => "plage hors du fichier",
+    mutant_sg9_a_cellule_de_controle: "| T-03 x | a | b | c | [hors chemin servi] rien | r | i |\n" => "cellule de contrôle",
+    mutant_sg9_a_aucun_controle_sans_motif: "| T-03 x | a | b | c | [aucun contrôle] | r | i |\n" => "cellule de contrôle",
     mutant_sg9_b_residu_invente: "\nRésidu A(residu-invente).\n" => "résidu non défini",
     mutant_sg9_b_residu_en_majuscules: "\nRésidu A(EXEMPLE-RESIDU).\n" => "résidu non défini",
 }

@@ -14,9 +14,10 @@
 //! ni apostrophe de citation hors du code ; citation française « … » présente ailleurs dans le dépôt.
 //! (f) ni pièce de D.2, ni pour-cent, ni décimal, ni statistique, ni adresse IP ou électronique.
 //!
-//! Bornes imprimées, jamais tues : MONARK (dépôt hors arbre), `biblio/` absente (DEVOPS §1), PX
-//! (registre hors dépôt, D.2 n° 10), lots MONARK. Non mécanisés, déclarés : lignes de D.2 par sha256,
-//! graine et clé du constat, contenu de docs/16. Résidu : la fidélité des lignes citées reste au G2.
+//! Bornes imprimées, jamais tues : MONARK (dépôt hors arbre), `biblio/` sans octets (DEVOPS §1,
+//! prédicat de S-G6), PX (registre hors dépôt, D.2 n° 10), lots MONARK. Non mécanisés, déclarés :
+//! lignes de D.2 par sha256, graine et clé du constat, contenu de docs/16. Résidu : la fidélité des
+//! lignes citées reste au G2.
 //! Coquille hors rôle S-G3 : tranches et indices bornés par construction (positions de motifs).
 
 use crate::rapport::{Rapport, lire};
@@ -39,6 +40,7 @@ pub fn executer(racine: &Path) -> Rapport {
     let Ok([Some(t), Some(registre), Some(_), Some(_)]) = <[_; 4]>::try_from(lus) else {
         return r;
     };
+    controle_a(&mut r, racine, &t);
     controle_b(&mut r, &t, &registre);
     r.notes.push(String::from(
         "non mécanisés : lignes de D.2 par sha256 (outil FM-1.1), graine et clé du constat, contenu \
@@ -73,6 +75,128 @@ fn avant(t: &str, position: usize) -> Option<char> {
 /// Vrai si `c` prolonge un mot (lettre, chiffre ou soulignement).
 fn mot(c: Option<char>) -> bool {
     c.is_some_and(|c| c.is_alphanumeric() || c == '_')
+}
+
+const A_MONARK: &str = "(a) référence MONARK sans sha de 40 chiffres";
+const A_CHEMIN: &str = "(a) référence : chemin absolu ou non canonique";
+const A_ABSENT: &str = "(a) référence : fichier introuvable depuis la racine";
+const A_PLAGE: &str = "(a) référence : plage hors du fichier";
+const A_CELLULE: &str = "(a) cellule de contrôle sans référence ni motif";
+
+/// Spans de code `inline` (deux backticks sur une ligne) : décalage du contenu, contenu.
+fn spans(t: &str) -> Vec<(usize, &str)> {
+    let (mut trouves, mut base) = (Vec::new(), 0usize);
+    for ligne in t.split_inclusive('\n') {
+        let mut morceaux = ligne.split('`');
+        let mut position = base + morceaux.next().map_or(0, str::len);
+        while let (Some(contenu), Some(apres)) = (morceaux.next(), morceaux.next()) {
+            trouves.push((position + 1, contenu));
+            position += contenu.len() + apres.len() + 2;
+        }
+        base += ligne.len();
+    }
+    trouves
+}
+
+/// `12` ou `12-14` : la plage d'une référence.
+fn plage(texte: &str) -> Option<(usize, usize)> {
+    let (a, b) = texte.split_once('-').unwrap_or((texte, texte));
+    let chiffres = |s: &str| !s.is_empty() && s.bytes().all(|o| o.is_ascii_digit());
+    (chiffres(a) && chiffres(b)).then(|| Some((a.parse().ok()?, b.parse().ok()?)))?
+}
+
+fn sha_monark(chemin: &str) -> bool {
+    let reste = chemin.strip_prefix("F:/Monark@");
+    let sha = reste.and_then(|x| x.split_once(':'));
+    let hexa = |o: u8| matches!(o, b'0'..=b'9' | b'a'..=b'f');
+    sha.is_some_and(|(s, _)| s.len() == 40 && s.bytes().all(hexa))
+}
+
+fn canonique(chemin: &str) -> bool {
+    let normal = |s: &str| !s.is_empty() && s != "." && s != "..";
+    let segments = chemin.split('/').all(normal);
+    segments && !chemin.contains(['\\', ':'])
+}
+
+fn nombre_de_lignes(fichier: &Path) -> Option<usize> {
+    let o = std::fs::read(fichier).ok()?;
+    let ouverte = o.last().is_some_and(|x| *x != b'\n');
+    Some(o.iter().filter(|x| **x == b'\n').count() + usize::from(ouverte))
+}
+
+fn controle_a(r: &mut Rapport, racine: &Path, t: &str) {
+    let (mut resolues, mut monark, mut absentes) = (0, 0, Vec::new());
+    let sans_octets = biblio_sans_octets(racine);
+    for (p, span) in spans(t) {
+        let Some((chemin, lignes)) = span.rsplit_once(':') else {
+            continue;
+        };
+        let Some((debut, fin)) = plage(lignes) else {
+            continue;
+        };
+        if span.starts_with("F:/Monark") {
+            monark += 1;
+            if !sha_monark(chemin) {
+                viol(r, t, p, A_MONARK, span);
+            }
+            continue;
+        }
+        if chemin.contains(char::is_whitespace) || !chemin.contains(['/', '.']) {
+            continue;
+        }
+        let fichier = racine.join(chemin);
+        let motif = if !canonique(chemin) {
+            A_CHEMIN
+        } else if sans_octets && chemin.starts_with("biblio/") && !fichier.exists() {
+            absentes.push(span);
+            continue;
+        } else {
+            match nombre_de_lignes(&fichier) {
+                None => A_ABSENT,
+                Some(n) if debut == 0 || debut > fin || fin > n => A_PLAGE,
+                Some(_) => {
+                    resolues += 1;
+                    continue;
+                }
+            }
+        };
+        viol(r, t, p, motif, span);
+    }
+    let mut base = 0;
+    for ligne in t.split_inclusive('\n') {
+        let cellule = ligne.split('|').nth(5);
+        let ligne_t = ligne.trim_start().starts_with("| T-");
+        if cellule.is_some_and(|c| ligne_t && !cellule_controle(c)) {
+            viol(r, t, base, A_CELLULE, "");
+        }
+        base += ligne.len();
+    }
+    let borne = if sans_octets {
+        "sans octets, non contrôlée(s) ici (DEVOPS §1)"
+    } else {
+        "peuplée, contrôle plein"
+    };
+    r.notes.push(format!(
+        "(a) {resolues} référence(s) résolue(s) ; {monark} MONARK (forme du sha seule, dépôt hors \
+         arbre) ; biblio/ {borne} : [{}]",
+        absentes.join(", ")
+    ));
+}
+
+/// Borne `biblio/` de (a) : le prédicat de S-G6, aucun octet versé à `biblio/` (dossier absent compris).
+fn biblio_sans_octets(racine: &Path) -> bool {
+    let dossier = racine.join("biblio");
+    let index = dossier.join("INDEX.md");
+    !dossier.exists()
+        || crate::documents::fichiers_du_repertoire(&dossier)
+            .is_ok_and(|f| !f.iter().any(|c| crate::sg6::octet_verse(c, &index)))
+}
+
+/// Une cellule de contrôle porte une référence `…:ligne`, ou `[aucun contrôle]` suivi d'un motif.
+fn cellule_controle(c: &str) -> bool {
+    let reference = |s: &(usize, &str)| s.1.rsplit_once(':').and_then(|x| plage(x.1)).is_some();
+    let motif = c.split_once("[aucun contrôle]").map(|x| x.1);
+    spans(c).iter().any(reference) || motif.is_some_and(|m| m.contains(char::is_alphanumeric))
 }
 
 const B_RESIDU: &str = "(b) résidu non défini au registre 08 (casse comprise)";
