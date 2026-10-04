@@ -800,3 +800,36 @@ détenue, et la tolérance et la loi nulle de (c)) ; SHOGEN-R1-PLUGIN-1 ((a) et 
 | SHOGEN-POSTPREREG-PARAMS-SCEAU-1 | « paramètres fixés avant l'exécution » attesté seulement par des horodatages de fichiers : pour tout lot d'après pré-enregistrement, épingler le sha256 des paramètres ou du code au JOURNAL avant de lancer sur les journaux | orch. | prochain lot qui lit les journaux scellés | une ligne de JOURNAL par lot [inféré] | G2 du lot POST-PREREG §8 |
 | SHOGEN-FICHE-WORKER-POSTEXEC-1 | la fiche `shogen-worker` dit « fixtures seulement (D.4 a) » sans l'exception qu'un G0 peut accorder après l'exécution unique (lecture des journaux scellés par les scripts du lot seuls) | orch. | prochain lot de ce type | une consigne au corps de la fiche [inféré] | G2 du lot POST-PREREG §8 ; écarts communs du worker et du réviseur |
 | SHOGEN-LECTEUR-INDEP-1 | les analyses et le rendu partagent les lecteurs `r1.parse_journal` et `filtre_lecture` : aucun lecteur indépendant des journaux (première moitié de la limite 12 du §9.3 de `docs/11`) | orch. | avant G9 (publication) ou le recalcul externe | un lecteur distinct et un oracle [inféré] | G2 du lot POST-PREREG §8 |
+
+## B.51 Amendement daté du 2026-10-04 08:25:38 UTC (heure produite par le script d'écriture) : lot DETTES-B2 commis
+
+Rapport du worker versé à l'octet (`docs/G1-lot-DETTES-B2.md`) avec sa note de corrections (`docs/G1-lot-DETTES-B2-corrections.md`) ;
+relecture G2 versée à l'octet (`docs/G2-lot-DETTES-B2.md`, réviseur neuf `shogen-worker`, sha256 `e0612252…a386a7`) :
+**ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-5 appliquées par le worker (rouge avant, vert après ; mutants du réviseur 37 sur 38 tués
+après corrections, MX-12 survivant hors liste, observation O-3). Écart du worker sur C-1 (le cas « plage hors fichier » ne peut pas
+être rouge sur le code livré ; il tue MX-06) : accepté. Adjudications de l'orchestrateur : Q-1, actes posés en 10c, dans le
+commit de XR-3 ; Q-2, le diff 05 (`windows-2025`) **n'est pas appliqué** tant que le libellé et la valeur par défaut de
+`core.autocrlf` ne sont pas lus sur place ; Q-3, T-75 (ref vers un blob ou un arbre balayée au lieu d'être refusée, B.15
+extension datée de l'item 5), T-79 (resserrement) et T-105b (tag imbriqué propre accepté) actés ; Q-4, amendement daté
+d'ADR-0028 §4.11 posé (forme A : l'amendement du lot D8b n'est pas réécrit) ; Q-5, item formé (I-3) ; Q-6, puce datée posée
+en fin de `docs/17-modele-de-menace.md` (T-04 : l'annexe B fait foi, choix de l'orchestrateur : c'est le registre des items).
+FM-1.1 des transcriptions du worker et du réviseur : 0 fragment. Contrôle `cargo --locked xtask verify` sur l'arbre réel :
+VERDICT GLOBAL VERT ; S-G9 ne contrôle encore que `docs/17`.
+
+Items **fermés** (commits D8d-1 `ba9d61a`, D8d-2 `44fec62`, G5 `27189d7`, RUNNERS `26c2c41`, XR-1 `1c2f0f2`, XR-2 `ef657b9`, XR-3 `7c4861a`, XR-4 `c278b48`) : SHOGEN-D8D-SECRETS-1 avec SHOGEN-SECRETS-CHEMIN-ETAGE-1, SHOGEN-SECRETS-GREP-STATUT-1,
+SHOGEN-SECRETS-MASQUE-EXCLUSION-1, SHOGEN-SECRETS-MESSAGES-1 ; SHOGEN-SECRETS-HORS-REFS-1 (reste un acte local : `--hors-refs`
+avant toute copie brute de `.git` en custodie, ADR-0028 §4.11) ; SHOGEN-G5-ERREUR-GREP-1 ; SHOGEN-E1-XTASK-REFS-1 (gate S-G9
+sur `docs/17`, contrôles (a) à (f) ; (g) et (h) déclarés non mécanisés). **Reste ouvert** : SHOGEN-CI-RUNNERS-1 (part Linux
+faite ; restent le libellé Windows, la limite « pas d'épinglage par digest d'un runner hébergé » à écrire, le résidu B.47 sur
+`3d3c42e5` et les noms des contrôles qui portent `matrix.os`) ; la ligne B.4:80 (douze définitions) est périmée : onze restaient.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SG5-NOTES-INTERDITS-1 | **priorité haute** : la gate S-G5 imprime le texte des citations de tout `docs/**/*.md`, dossiers interdits compris (mesuré : une note Pocket) ; un `verify` lancé par un worker sur l'arbre réel lui affiche de la matière interdite | orch. | prochain lot qui touche `xtask` ; d'ici là, sortie de `verify` redirigée, lignes de verdict seules (consigne des briefs) | n'imprimer que `chemin:ligne` [inféré] | G1 du lot DETTES-B2, I-1 ; G2 |
+| SHOGEN-SG9-PERIMETRE-1 | S-G9 ne contrôle que `docs/17` ; 157 références courtes des autres documents ne se résolvent pas sans convention | orch. | après SG9-COPIE-INTERDITS-1 | une convention et une extension [inféré] | G1 du lot DETTES-B2, I-2 (B.7:143) |
+| SHOGEN-SG9-CORPUS-1 | le corpus du contrôle (e) contient des dossiers interdits et des pièces D.2 ; à exclure (resserrement), sans effet aujourd'hui | orch. | avec SG9-PERIMETRE-1 | une liste d'exclusion [inféré] | G1 du lot DETTES-B2, I-3 ; Q-5 |
+| SHOGEN-SECRETS-COMMIT-MSG-1 | aucun hook `commit-msg` : les messages de commit ne sont vus que par `--history` (job g3 et G3 opérant), pas au moment du commit, alors que `docs/17` l.112 l'attend du hook | orch. | prochain lot qui touche les hooks | un hook et ses cas [inféré] | G1 du lot DETTES-B2, I-4 |
+| SHOGEN-XTASK-TMP-NOMS-FIXES-1 | les tests de `xtask` écrivent sous `temp_dir()` à des noms fixes : deux sessions sur le même hôte entrent en collision | orch. | prochain lot qui touche `xtask/tests` ; d'ici là, un `TMPDIR` dédié par copie | des noms uniques [inféré] | G1 du lot DETTES-B2, I-6 |
+| SHOGEN-SECRETS-NOMS-REFS-1 | les noms de refs ne sont jamais balayés ; git imprime en clair le nom d'une ref cassée qui porte une forme (mesuré en `--history` et en `--hors-refs`) | orch. | prochain lot qui touche la gate des secrets | un flux de plus et un masque [inféré] | G2 du lot DETTES-B2, N-1 |
+| SHOGEN-SG9-COPIE-INTERDITS-1 | sur une copie sans dossiers interdits, S-G9 rougit sur une référence vers un dossier absent ; convention à écrire (dossier interdit absent en entier : référence listée en note ; sinon contrôle plein) | orch. | prochain lot qui touche S-G9 | une règle et deux tests [inféré] | G2 du lot DETTES-B2, N-2 |
+| SHOGEN-SG9-STRUCTURE-1 | contrôles (g) formes proscrites et (h) structure des tables S et T de l'oracle `verif_refs.py` non mécanisés | orch. | avec SG9-PERIMETRE-1 | deux contrôles [inféré] | G2 du lot DETTES-B2, N-3 (C-4) |
