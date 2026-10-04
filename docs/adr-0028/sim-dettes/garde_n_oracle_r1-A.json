@@ -1,0 +1,34 @@
+{
+ "oracle": "SHOGEN-GARDE-NIVEAU-N-1 : table du pré-enregistrement, invariants, référence, déduction (T4), r1",
+ "commit_r1": "5afbdd2",
+ "blob_r1": "95c93d3798e56b9fa345e59f009c569508778d4d",
+ "sha256_r1": "0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f",
+ "json": {
+  "garde_n.json": "86d0ccf27c32cb5f4f4b850cda117d7fd0d21023b8950d152ceea493b0ebe3b5"
+ },
+ "p1": {
+  "runs/A/p1/p=0.0043196/sim_niveau.json": "56000497a68084cc2c7c98122b81f6c06410a94041f36d2a3b29db229d2a3d02",
+  "runs/A/p1/p=0.005/sim_niveau.json": "ff7133d9f344fd1f336af195e6b373394445477cba10847b2509f791c9dbdbcf",
+  "runs/A/p1/p=0.01/sim_niveau.json": "663cc4539b50887fe2fad553c7fbe705ab0f7cc21639d7403b5c64ca134651b7",
+  "runs/A/p1/p=0.05/sim_niveau.json": "a1240bd8ac4e3bd4f79d24ac5458d8f6b3b7c54c8cf3a2dcfead192d2ab9a4f1"
+ },
+ "script_sha256": {
+  "sim_garde_n_oracle_r1.py": "f80a24f717d95535efb48ed4036615578a1bfa1a98b8d5dd99851ae51c2d2031",
+  "sim_garde_niveau_oracle_r1.py": "7fbc82d35a533164675792c0b97c3f948cf985cfd407e84af05eab3e8725628d",
+  "sim_niveau_oracle_r1.py": "cb844d5b724223def91cd2d3397b4deebef9f6a7353d9aa41e30b3361ca2c11d"
+ },
+ "T0_cas": 20,
+ "T1_invariants": 260,
+ "T1_invariants_4b_ii": 416,
+ "T2_ecart_relatif_max": "1.811834508451762e-45",
+ "T3_replications": 12381,
+ "T3_P_more_egaux_a_l_identique": 349,
+ "T3_ecart_relatif_max": {
+  "P_more": "2.815817142857143e-46",
+  "garde": "2.8157426905951383e-46",
+  "z": "1.1144594001524396e-45",
+  "z_bloc": "6.160391562984183e-46"
+ },
+ "T4_cas": 20,
+ "tolerance_relative": "1e-40"
+}

@@ -88,6 +88,15 @@ pub fn prose_hors_citations(source: &str) -> ProseBlanchie {
     }
 }
 
+/// Blanchit le code seul (blocs clôturés et code `inline`), même longueur et mêmes sauts de ligne : la prose et
+/// ses citations restent lisibles (S-G9, lot DETTES-B2). Une clôture jamais refermée est l'incident de S-G4.
+pub fn prose_sans_code(source: &str) -> String {
+    let mut sortie = source.as_bytes().to_vec();
+    blanchir_blocs_clotures(source, &mut sortie, &mut Vec::new());
+    blanchir_inline(&mut sortie);
+    String::from_utf8_lossy(&sortie).into_owned()
+}
+
 fn blanchir(sortie: &mut [u8], debut: usize, fin: usize) {
     let mut position = debut;
     while position < fin && position < sortie.len() {

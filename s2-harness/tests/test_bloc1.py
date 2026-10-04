@@ -199,6 +199,18 @@ class TestBloc1(unittest.TestCase):
         self.assertIn("aucun enregistrement asn_attribution au journal (collect_asn non lancé", sans)
         self.assertNotIn("retenu pour les hôtes du pool", sans)
 
+    def test_note_keff_aucune_sonde_retenue(self):
+        """SHOGEN-KEFF-NOTE-1 (annexe B.9) : fixture de test_bloc5_sondes_toutes_retirees_message_vrai, [w0 ; w5 − 1]
+        retire les 5·H sondes du journal : la note k_eff du bloc 6 dit « aucun enregistrement asn_attribution retenu »,
+        comme la ligne (a) du bloc 5 ; journal sans sonde : même note, vraie aussi. Rougit si : note d'origine
+        (« aucun enregistrement asn_attribution », fausse sous ce filtre)."""
+        note = ("\n  k_eff     = -  — axe ASN NON MESURÉ (aucun enregistrement asn_attribution retenu) — k_eff NON "
+                "ÉVALUABLE ; ")
+        txt = report.render_report(self.c, self.j, exclude_ranges=[(WS[0], WS[5] - 1)])
+        sans = report.render_report(*build_fixture(tempfile.mkdtemp(prefix="s2bloc1n_")))
+        for t in (txt, sans):
+            self.assertIn(note, t)
+
     def test_asn_retirees_ventilees_par_statut_sur_l_assiette(self):
         """SHOGEN-ASN-STATUT-1 : une sonde « resolve_failed » par hôte à A + 30. Plage [w2 ; w4] : A, A + 30, B,
         B + 59 retirées (ok 3·H, resolve_failed H), ligne de la plage, union et copie de [SENSIBILITÉ] ; sous le

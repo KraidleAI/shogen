@@ -353,10 +353,11 @@ class TestAsnPartition(unittest.TestCase):
         self.assertEqual(part["asn_divergences"][0]["host"], "h0")
 
     def test_echec_et_base_muette_ne_sont_pas_des_divergences(self):
-        """SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B-1 de R-B) : un relevé resolve_failed, ou à base muette, n'est ni une
-        divergence ni la référence de la suivante ; un changement d'ASN vu à travers un échec en est une (relevé complet
-        précédent) ; k_eff sur le dernier relevé par hôte, inchangé (h3 finit en échec : non attribué, borne
-        supérieure). Rougit si : divergence tirée d'un relevé incomplet (sept à HEAD) ; changement perdu à travers un
+        """SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B-1 de R-B) : un relevé resolve_failed n'est ni une divergence ni une
+        référence, un relevé à base muette sans changement de sa base non muette n'est pas une divergence
+        (SHOGEN-ASN-DIVERGENCE-PARTIELLE-1, test suivant) ; un changement d'ASN vu à travers un échec en est une ;
+        k_eff sur le dernier relevé par hôte, inchangé (h3 finit en échec : non attribué, borne supérieure). Rougit
+        si : divergence tirée d'un échec ou d'une base muette inchangée (sept à HEAD) ; changement perdu à travers un
         échec (comparaison au seul relevé précédent, M10 de R-B) ; k_eff lu sur le dernier relevé complet."""
         fh, ko = self._fh(["h0", "h1", "h2", "h3"]), "resolve_failed"
         recs = [asn_rec("h0", 1, 1, ts=1.0), asn_rec("h0", status=ko, ts=2.0), asn_rec("h0", 1, 1, ts=3.0),
@@ -368,13 +369,36 @@ class TestAsnPartition(unittest.TestCase):
         self.assertEqual((part["k_eff"], part["k_eff_is_upper_bound"], part["unattributed"]), (4, True, ["h3"]))
 
     def test_ripestat_muette_et_changement_d_une_seule_base(self):
-        """G2 du lot CORR (mutants G07, G08) : un relevé à RIPEstat muette n'est ni divergence ni référence (h0) ; un
-        changement d'ASN d'une seule base entre deux relevés complets est une divergence (h1, Cymru seule)."""
+        """G2 du lot CORR (mutants G07, G08) : un relevé à RIPEstat muette, Cymru inchangée, n'est pas une divergence
+        (h0) ; un changement d'ASN d'une seule base entre deux relevés complets est une divergence (h1, Cymru seule)."""
         fh = self._fh(["h0", "h1"])
         recs = [asn_rec("h0", 6, 6, ts=1.0), asn_rec("h0", None, 6, ts=2.0), asn_rec("h0", 6, 6, ts=3.0),
                 asn_rec("h1", 7, 7, ts=1.0), asn_rec("h1", 7, 8, ts=2.0)]
         part = r2.compute_partition(recs, fh, list(fh), {"exact_copy_pairs": []})
         self.assertEqual(part["asn_divergences"], [{"host": "h1", "avant": (7, 7, 1.0), "apres": (7, 8, 2.0)}])
+
+    def test_base_muette_changement_visible_publie_une_fois(self):
+        """SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 (annexe B.44 ; L-5 du G1 du lot CORR) : comparaison base par base des
+        valeurs non muettes ; référence de chaque base = son dernier relevé ok où elle n'est pas muette. h0 : Cymru
+        change sur un relevé à RIPEstat muette, publié une fois (le relevé complet suivant le confirme sans
+        divergence) ; h1 : RIPEstat change sur un relevé à Cymru muette ; h2 : deux bases changées depuis deux relevés
+        de référence distincts, une entrée par référence ; h3 : bases disjointes, aucune référence commune ; h4 : à
+        travers un échec. Attendus écrits à la main. Rougit si : relevé partiel ignoré (état du lot CORR) ; référence
+        d'une base non mise à jour par un relevé partiel (publication double) ; une seule entrée par relevé ;
+        référence unique par hôte."""
+        fh, ko = self._fh(["h0", "h1", "h2", "h3", "h4"]), "resolve_failed"
+        recs = [asn_rec("h0", 1, 1, ts=1.0), asn_rec("h0", None, 2, ts=2.0), asn_rec("h0", 1, 2, ts=3.0),
+                asn_rec("h1", 3, 3, ts=1.0), asn_rec("h1", 4, None, ts=2.0),
+                asn_rec("h2", 5, 5, ts=1.0), asn_rec("h2", None, 5, ts=2.0), asn_rec("h2", 6, 6, ts=3.0),
+                asn_rec("h3", 7, None, ts=1.0), asn_rec("h3", None, 8, ts=2.0), asn_rec("h3", 7, 8, ts=3.0),
+                asn_rec("h4", 9, 9, ts=1.0), asn_rec("h4", status=ko, ts=2.0), asn_rec("h4", None, 10, ts=3.0)]
+        part = r2.compute_partition(recs, fh, list(fh), {"exact_copy_pairs": []})
+        self.assertEqual(part["asn_divergences"], [
+            {"host": "h0", "avant": (1, 1, 1.0), "apres": (None, 2, 2.0)},
+            {"host": "h1", "avant": (3, 3, 1.0), "apres": (4, None, 2.0)},
+            {"host": "h2", "avant": (5, 5, 1.0), "apres": (6, 6, 3.0)},
+            {"host": "h2", "avant": (None, 5, 2.0), "apres": (6, 6, 3.0)},
+            {"host": "h4", "avant": (9, 9, 1.0), "apres": (None, 10, 3.0)}])
 
     def test_rpc_read_path_caveat_carried(self):
         fh = {"chainlink": r2.RPC_READ_PATH_HOST}

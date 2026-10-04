@@ -45,7 +45,7 @@ use std::path::Path;
 
 /// Longueur minimale (octets, après normalisation) d'un fragment contrôlé —
 /// en dessous, le fragment est trop court pour identifier une source.
-const LONGUEUR_MINIMALE: usize = 15;
+pub(crate) const LONGUEUR_MINIMALE: usize = 15;
 
 /// Mots-fonction anglais **forts** (aucun n'est aussi un mot français ni un
 /// mot de titre isolé). Un fragment est réputé citation anglaise s'il en
@@ -371,7 +371,7 @@ fn retirer_balises(texte: &str) -> String {
 /// Heuristique de langue : le corpus détenu est anglophone ; un fragment
 /// sous `OCCURRENCES_MINIMALES` mots-fonction anglais est de la prose ou un
 /// titre du projet, hors périmètre (borne de couverture, imprimée en note).
-fn parait_anglais(fragment: &str) -> bool {
+pub(crate) fn parait_anglais(fragment: &str) -> bool {
     let bas = format!(" {} ", fragment.to_ascii_lowercase());
     let occurrences: usize = MOTS_ANGLAIS
         .iter()

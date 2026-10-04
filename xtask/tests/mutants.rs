@@ -736,3 +736,189 @@ fn mutant_sg8_ligne_de_table_entierement_vide() {
     let rapports = gates_documentaires(&racine);
     exiger_rouge(rapport_de(&rapports, "S-G8"), "malformée");
 }
+
+// ---------------------------------------------------------------------------
+// S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
+// l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
+// ajoute UNE forme fautive et exige le ROUGE pour son motif ; les survivants de la revue G2 d'E1 (résidu en
+// majuscules, apostrophes, décimal, pour-cent en lettres, nom nu de D.2 n° 8) ont leur test, la borne des
+// lots MONARK son témoin.
+// ---------------------------------------------------------------------------
+
+/// L'arbre synthétique : `@@@ chemin` ouvre un fichier, les lignes suivantes sont son contenu.
+const ARBRE_MENACE: &str = "\
+@@@ docs/17-modele-de-menace.md
+# modèle de menace synthétique
+
+Statut du 2026-10-04 ; lot T1 ; lots MONARK G2 et G7 ; PX-Shogen-1 ; FM-1.1, FM-3.3, §4.10, 1.97.1.
+Code : `crates/exemple.rs:2-3`, `crates/LISEZMOI:1`, `biblio/source.pdf.sidecar:9`,
+`F:/Monark@0123456789abcdef0123456789abcdef01234567:apps/x.ts:4`. Résidu A(exemple-residu) ;
+item SHOGEN-EXEMPLE-1 ; la source dit « une phrase française de la source, citée telle quelle ».
+Formes non fautives : SOMMA(x), A(…), items MONARK-SHOGEN-* transmis, lot G9, 3 maisons, « bref ».
+L'acte d'E1 et l'avis des pairs' sont lus ; « this quotation is English and is not checked here ».
+
+| T | a | b | c | contrôle | r | i |
+|---|---|---|---|---|---|---|
+| T-01 x | a | b | c | [hors chemin servi] `crates/exemple.rs:1` | r | i |
+| T-02 x | a | b | c | [aucun contrôle] motif écrit | r | i |
+@@@ docs/08-assumptions.md
+| A(exemple-residu) | énoncé |
+@@@ docs/adr-0028/ANNEXE-A-lots.md
+| **T1** (2026-10-04) | objet ; consommateur : docs/11 (lot G9) |
+@@@ docs/adr-0028/ANNEXE-B-items.md
+| SHOGEN-EXEMPLE-1 | objet | SHOGEN-MENTION-1 |
+| 9 | ligne sans identifiant en tête | SHOGEN-MENTION-2 |
+@@@ docs/source.md
+Selon lui, une phrase française de la source, citée telle quelle, fait foi.
+@@@ crates/exemple.rs
+ligne 1
+ligne 2
+ligne 3
+@@@ crates/LISEZMOI
+fichier sans extension
+";
+
+fn arbre_menace(nom_du_cas: &str) -> PathBuf {
+    let racine = std::env::temp_dir().join(format!("shogen-mutant-sg9-{nom_du_cas}"));
+    let _ = std::fs::remove_dir_all(&racine);
+    for bloc in ARBRE_MENACE.split("@@@ ").skip(1) {
+        let (relatif, contenu) = bloc.split_once('\n').expect("bloc : chemin puis contenu");
+        ecrire(&racine, relatif, contenu);
+    }
+    racine
+}
+
+/// S-G9 sur l'arbre synthétique augmenté de `ajout` : VERT exigé, couverture pleine ; rend les notes.
+fn notes_sg9_vert(cas: &str, ajout: &str) -> String {
+    let racine = arbre_menace(cas);
+    ajouter(&racine, xtask::sg9::PERIMETRE, ajout);
+    let rapport = xtask::sg9::executer(&racine);
+    rapport.imprimer();
+    assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
+    assert_eq!((rapport.examines, rapport.presents), (4, 4), "couverture");
+    rapport.notes.join("\n")
+}
+
+#[test]
+fn temoin_sg9_arbre_menace_intact_est_vert() {
+    let notes = notes_sg9_vert("temoin", "");
+    assert!(
+        notes.contains("biblio/ sans octets, non contrôlée(s) ici (DEVOPS §1) : [biblio/source"),
+        "borne biblio/ :\n{notes}"
+    );
+}
+
+/// Bornes de (c) (revue G2 d'E1, C-G2-6) : un lot MONARK ou un PX n'est pas résolu ici, il est LISTÉ ;
+/// (g) et (h) de l'oracle, non mécanisés, sont déclarés (revue G2 de DETTES-B2, C-4).
+#[test]
+fn temoin_sg9_bornes_monark_et_px_listees() {
+    let notes = notes_sg9_vert("bornes", "\nlots MONARK G2, G99 et G8 ; PX-Shogen-99.\n");
+    let listes = [
+        "lots MONARK : [G2, G7, G99, G8]",
+        "PX : [PX-Shogen-1, PX-Shogen-99]",
+        "(g) formes proscrites et (h) structure des tables S et T",
+    ];
+    assert!(
+        listes.iter().all(|l| notes.contains(l)),
+        "bornes :\n{notes}"
+    );
+}
+
+#[test]
+fn mutant_couverture_sg9_perimetre_absent() {
+    let racine = arbre_menace("perimetre-absent");
+    std::fs::remove_file(racine.join(xtask::sg9::PERIMETRE)).expect("suppression de docs/17");
+    exiger_rouge(&xtask::sg9::executer(&racine), "fichier absent : docs/17");
+}
+
+/// Borne `biblio/` (revue G2 de DETTES-B2, C-1) : posée sans octets `biblio/` seulement (prédicat de
+/// S-G6) ; `biblio/` peuplée, une référence pendante est introuvable, une plage hors du fichier refusée.
+fn exiger_rouge_sg9_biblio(cas: &str, sidecar: Option<&str>, attendu: &str) {
+    let racine = arbre_menace(cas);
+    ecrire(&racine, "biblio/factice.pdf", "octets versés");
+    if let Some(contenu) = sidecar {
+        ecrire(&racine, "biblio/source.pdf.sidecar", contenu);
+    }
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+#[test]
+fn mutant_sg9_a_biblio_peuplee_reference_pendante() {
+    exiger_rouge_sg9_biblio("biblio-pendante", None, "fichier introuvable");
+}
+
+#[test]
+fn mutant_sg9_a_biblio_peuplee_plage_hors_du_fichier() {
+    exiger_rouge_sg9_biblio("biblio-plage", Some("1\n2\n3\n"), "plage hors du fichier");
+}
+
+/// Sans octet versé (`INDEX.md` et sidecars seuls, extension en toute casse), la borne tient.
+#[test]
+fn temoin_sg9_biblio_sidecars_seuls_sans_octets() {
+    let racine = arbre_menace("biblio-sidecars");
+    ecrire(&racine, "biblio/INDEX.md", "registre\n");
+    ecrire(&racine, "biblio/autre.PDF.SIDECAR", "texte extrait\n");
+    let rapport = xtask::sg9::executer(&racine);
+    let notes = rapport.notes.join("\n");
+    assert!(
+        rapport.vert() && notes.contains("sans octets"),
+        "{}",
+        motifs(&rapport)
+    );
+}
+
+fn exiger_rouge_sg9(cas: &str, fragment: &str, attendu: &str) {
+    let racine = arbre_menace(cas);
+    ajouter(&racine, xtask::sg9::PERIMETRE, fragment);
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+/// Un test par mutant : une seule forme fautive ajoutée à docs/17, un seul motif exigé.
+macro_rules! mutants_sg9 {
+    ($($nom:ident : $fragment:expr => $attendu:expr),* $(,)?) => {
+        $(#[test] fn $nom() { exiger_rouge_sg9(stringify!($nom), $fragment, $attendu); })*
+    };
+}
+
+mutants_sg9! {
+    mutant_sg9_a_plage_hors_du_fichier: "\nVoir `crates/exemple.rs:3-4`.\n" => "plage hors du fichier",
+    mutant_sg9_a_fichier_inexistant: "\nVoir `crates/absent.rs:1`.\n" => "fichier introuvable",
+    mutant_sg9_a_reference_courte: "\nVoir `exemple.rs:2`.\n" => "fichier introuvable",
+    mutant_sg9_a_chemin_absolu: "\nVoir `/crates/exemple.rs:2`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_segment_parent: "\nVoir `crates/../crates/exemple.rs:2`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_sans_extension_introuvable: "\nVoir `crates/LISEZ:1`.\n" => "fichier introuvable",
+    mutant_sg9_a_monark_sans_sha: "\nVoir `F:/Monark:apps/x.ts:4`.\n" => "référence MONARK sans sha",
+    mutant_sg9_a_monark_sha_court: "\nVoir `F:/Monark@0123abcd:apps/x.ts:4`.\n" => "référence MONARK sans sha",
+    mutant_sg9_a_chemin_lecteur: "\nVoir `F:/tmp/x.md:3`.\n" => "chemin absolu ou non canonique",
+    mutant_sg9_a_plage_inversee: "\nVoir `crates/exemple.rs:3-2`.\n" => "plage hors du fichier",
+    mutant_sg9_a_ligne_zero: "\nVoir `crates/exemple.rs:0`.\n" => "plage hors du fichier",
+    mutant_sg9_a_cellule_de_controle: "| T-03 x | a | b | c | [hors chemin servi] rien | r | i |\n" => "cellule de contrôle",
+    mutant_sg9_a_aucun_controle_sans_motif: "| T-03 x | a | b | c | [aucun contrôle] | r | i |\n" => "cellule de contrôle",
+    mutant_sg9_b_residu_invente: "\nRésidu A(residu-invente).\n" => "résidu non défini",
+    mutant_sg9_b_residu_en_majuscules: "\nRésidu A(EXEMPLE-RESIDU).\n" => "résidu non défini",
+    mutant_sg9_c_item_inexistant: "\nItem SHOGEN-INEXISTANT-9.\n" => "item non défini",
+    mutant_sg9_c_item_mentionne_non_defini: "\nItem SHOGEN-MENTION-1.\n" => "item non défini",
+    mutant_sg9_c_item_en_troisieme_cellule: "\nItem SHOGEN-MENTION-2.\n" => "item non défini",
+    mutant_sg9_c_lot_absent: "\nVoir le lot ZZ9.\n" => "lot absent de l'annexe A",
+    mutant_sg9_d_jj_mm_aaaa: "\nLe 30/09/2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_point_final: "\nLe 30.09.2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_mm_jj_barres: "\nLe 2026/09/30.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_m_j: "\nLe 2026-9-30.\n" => "date hors forme ISO",
+    mutant_sg9_d_jj_mm_aaaa_tirets: "\nLe 30-09-2026.\n" => "date hors forme ISO",
+    mutant_sg9_d_aaaa_mm_jj_points: "\nLe 2026.09.30.\n" => "date hors forme ISO",
+    mutant_sg9_d_jour_et_mois: "\nLe 1er mars.\n" => "date hors forme ISO",
+    mutant_sg9_d_mois_et_annee: "\nEn septembre 2026.\n" => "date hors forme ISO",
+    mutant_sg9_e_guillemets_droits: "\nIl est écrit \"the verifier is never wrong about it\".\n" => "guillemet droit",
+    mutant_sg9_e_apostrophes: "\nIl est écrit 'the verifier is never wrong about it'.\n" => "citation entre apostrophes",
+    mutant_sg9_e_francaise_introuvable: "\nIl dit « une phrase qui ne figure dans aucun document ».\n" => "citation française introuvable",
+    mutant_sg9_e_guillemet_orphelin: "\nIl dit « une phrase jamais refermée.\n" => "jamais refermé",
+    mutant_sg9_f_chemin_de_d2: "\nVoir `F:/tmp/shogen-carto-2026-09-29/campagne.md`.\n" => "pièce de D.2",
+    mutant_sg9_f_nom_nu_de_d2_n8: "\nVoir J0-STATUS.txt.\n" => "pièce de D.2",
+    mutant_sg9_f_pour_cent_signe: "\nUn taux de 12 %.\n" => "pour-cent",
+    mutant_sg9_f_pour_cent_en_lettres: "\nUn taux de douze pour cent.\n" => "pour-cent",
+    mutant_sg9_f_nombre_decimal: "\nUn taux de 0,013.\n" => "nombre décimal",
+    mutant_sg9_f_valeur_statistique: "\nOn mesure z = 3 sur la strate.\n" => "valeur statistique",
+    mutant_sg9_f_ipv4: "\nHôte 192.0.2.1 contacté.\n" => "adresse IP",
+    mutant_sg9_f_ipv6: "\nHôte 2001:db8::1 contacté.\n" => "adresse IP",
+    mutant_sg9_f_adresse_electronique: "\nÉcrire à quelqu.un@example.org.\n" => "adresse électronique",
+}

@@ -70,3 +70,6 @@ docs/adr-0028/sceau/premier-2026-10-02/PAQUET.sha256 -text
 # Sorties du poste local versées telles quelles (MONARK-S2-M009A-EXPOSITION-1, annexe B.36) : octets reçus, fins de ligne
 # Windows comprises ; aucune normalisation (SHA256SUMS du dossier).
 docs/adr-0028/monark-m009a/*.txt -text
+
+# Sorties de l'exécution unique S2 (annexe D.4 b) : versées à l'octet, aucune normalisation de fins de ligne.
+docs/adr-0028/execution/rendu-*/** -text

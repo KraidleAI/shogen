@@ -1,0 +1,62 @@
+auto-test (trois flux à 1/2, valeurs à la main) : OK
+== strate calme : n = 24585, K = 154 (J28 l.435451)
+   P̂₀                    écart relatif au rendu = 3.21E-51
+   P̂₁                    écart relatif au rendu = 7.52E-51
+   P̂_more                écart relatif au rendu = 3.27E-51
+   n·P̂(1−P̂)             écart relatif au rendu = 1.38E-51
+   z_s                    écart relatif au rendu = 2.72E-50
+   γ̂₀ = K(n−K)/n         écart relatif au rendu = 4.24E-51
+   z_bloc (σ̂² imprimé)   écart relatif au rendu = 6.62E-51
+   FIV                    écart relatif au rendu = 7.55E-51
+   R_centrage             écart relatif au rendu = 1.27E-50
+   FIV_série              écart relatif au rendu = 1.71E-50
+   cv théorique           écart relatif au rendu = 2.66E-50
+   EMD_s                  écart relatif au rendu = 1.62E-50
+   fraction EMD_s/n_s     écart relatif au rendu = 2.21E-50
+   garde tenue (≥ 10) : True ; z_s ≥ 2,33 : True ; z_bloc ≥ 2,33 : False
+   valeur recomptée : NE REJETTE PAS (discordance) ; valeur imprimée (l.435516) : NE REJETTE PAS (discordance) ; égales : True
+   censure z_bas            écart relatif au rendu = 2.10E-50 (J28 l.435536)
+   censure z_haut           écart relatif au rendu = 1.93E-51 (J28 l.435536)
+   censure z_bas (σ̂_bloc)  écart relatif au rendu = 4.21E-50 (J28 l.435536)
+   censure z_haut (σ̂_bloc) écart relatif au rendu = 1.10E-50 (J28 l.435536)
+   [SENSIBILITÉ] écart de z = z(incluse) − z(exclue) : écart relatif au rendu = 0
+== strate stress : n = 11397, K = 133 (J28 l.435471)
+   P̂₀                    écart relatif au rendu = 1.77E-51
+   P̂₁                    écart relatif au rendu = 7.58E-51
+   P̂_more                écart relatif au rendu = 1.65E-50
+   n·P̂(1−P̂)             écart relatif au rendu = 5.74E-51
+   z_s                    écart relatif au rendu = 3.62E-51
+   γ̂₀ = K(n−K)/n         écart relatif au rendu = 1.49E-50
+   z_bloc (σ̂² imprimé)   écart relatif au rendu = 1.13E-50
+   FIV                    écart relatif au rendu = 5.06E-51
+   R_centrage             écart relatif au rendu = 1.62E-50
+   FIV_série              écart relatif au rendu = 2.53E-50
+   cv théorique           écart relatif au rendu = 1.66E-50
+   EMD_s                  écart relatif au rendu = 1.75E-50
+   fraction EMD_s/n_s     écart relatif au rendu = 2.60E-50
+   garde tenue (≥ 10) : True ; z_s ≥ 2,33 : True ; z_bloc ≥ 2,33 : False
+   valeur recomptée : NE REJETTE PAS (discordance) ; valeur imprimée (l.435519) : NE REJETTE PAS (discordance) ; égales : True
+   censure z_bas            écart relatif au rendu = 1.09E-50 (J28 l.435537)
+   censure z_haut           écart relatif au rendu = 1.42E-50 (J28 l.435537)
+   censure z_bas (σ̂_bloc)  écart relatif au rendu = 1.33E-50 (J28 l.435537)
+   censure z_haut (σ̂_bloc) écart relatif au rendu = 8.50E-52 (J28 l.435537)
+   [SENSIBILITÉ] écart de z = z(incluse) − z(exclue) : écart relatif au rendu = 0
+== strate poolée (exploratoire) : z_pool écart relatif au rendu = 6.70E-51 (J28 l.435510)
+== écart relatif maximal sur tous les contrôles : 4.21E-50
+== identités entières
+   24585 + 11397 = 35982 ; 1709 + 909 = 2618 ; 38600 − 2618 = 35982
+   grille du segment [t0 ; T_fin) : (1790558880 − 1787770800)/60 = 46468 fenêtres ; plage D5 fermée : 2691 fenêtres
+   grille − marqueurs (38600) − sans marqueur dans la plage (73) = 7795 ; 5701 + 2094 = 7795
+   T_fin = dernier window_start (1790558820) + 60 = 1790558880
+   K décomposé : calme 153 + 1 + 0 = 154 ; stress 133 + 0 + 0 = 133
+   t0 = 1787770800 = 2026-08-26T19:00:00+00:00
+   T_fin = 1790558880 = 2026-09-28T01:28:00+00:00
+   A (D5) = 1790273880 = 2026-09-24T18:18:00+00:00
+   B (D5) = 1790435280 = 2026-09-26T15:08:00+00:00
+   B + 60 = 1790435340 = 2026-09-26T15:09:00+00:00
+== verdict du journal brut (…943.5-raw.out) : window_start des cinq lectures en cause dans [A ; B] ?
+   1790275920 = 2026-09-24T18:52:00+00:00 ; dans [A ; B] : True
+   1790277780 = 2026-09-24T19:23:00+00:00 ; dans [A ; B] : True
+   1790283600 = 2026-09-24T21:00:00+00:00 ; dans [A ; B] : True
+   1790283840 = 2026-09-24T21:04:00+00:00 ; dans [A ; B] : True
+   1790285940 = 2026-09-24T21:39:00+00:00 ; dans [A ; B] : True

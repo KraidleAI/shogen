@@ -37,8 +37,10 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant b0b4f3b7…67d2d0) ;
 # puis du sous-lot A3 (bloc 1 et [SENSIBILITÉ] : deux lignes insérées ; avant c1fd5391…c397686) ; puis du
 # sous-lot B1 de l'étape B (bloc 6 : ligne « sans ts » insérée, SHOGEN-BLOC6-TS-1 ; avant d0f785eb…fe5eeb0) ; puis du
-# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 7b6059f5…e0dbf90).
-SHA_BASE_AVEC_OPTION = "d079dd9d62a3f585a136779330cb21017a300ae853bef5cb63024bb6412de608"
+# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 7b6059f5…e0dbf90) ; puis du
+# lot DETTES-B1, sous-lot 3 (bloc 5 (d) et note k_eff du bloc 6 : deux libellés corrigés, SHOGEN-BLOC5-LIBELLE-1 et
+# SHOGEN-KEFF-NOTE-1, lignes remplacées seules ; avant d079dd9d…12de608).
+SHA_BASE_AVEC_OPTION = "f53fab05af0b8f4da0f4918a9d404f23faa7f4882a1213c3c9def908a3c694c6"
 
 
 class Coupure(Exception):

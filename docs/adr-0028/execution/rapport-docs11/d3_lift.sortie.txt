@@ -1,0 +1,35 @@
+auto-test (tables [2 1 1 6] et [0 5 5 90], valeurs calculées à la main) : OK
+tables lues : 110 (55 par strate attendues) ; identité exacte vérifiée sur 110/110
+écart maximal |phi recalculé (prec 80) − phi imprimé| sur 110 tables : 2.38E-50
+
+Paires de singletons de la partition R2 du J28 (bloc 6 : {binance}, {gemini}, {bitstamp}) :
+  calme  binance×bitstamp (J28 l.435547) : [n11 n10 n01 n00] = [52 320 423 23790] ; n = 24585
+      p_A = 124/8195 ; p_B = 95/4917
+      lift = 21307/2945 = 7.23497453311
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.0173978414435
+      (lift − 1)·√(…) = 0.108475098331 ; phi recalculé = 0.108475098331 ; phi imprimé = 0.10847509833108362918259591106802162184159185904700 ; identité exacte : oui
+  calme  bitstamp×gemini (J28 l.435551) : [n11 n10 n01 n00] = [21 454 47 24063] ; n = 24585
+      p_A = 95/4917 ; p_B = 68/24585
+      lift = 103257/6460 = 15.9840557276
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.00739211972867
+      (lift − 1)·√(…) = 0.110763933959 ; phi recalculé = 0.110763933959 ; phi imprimé = 0.11076393395917706370581636186843800964431146805970 ; identité exacte : oui
+  calme  binance×gemini (J28 l.435552) : [n11 n10 n01 n00] = [20 352 48 24165] ; n = 24585
+      p_A = 124/8195 ; p_B = 68/24585
+      lift = 40975/2108 = 19.4378557875
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.00652781686160
+      (lift − 1)·√(…) = 0.120358945901 ; phi recalculé = 0.120358945901 ; phi imprimé = 0.12035894590128557980983967111642447373272429106910 ; identité exacte : oui
+  stress binance×bitstamp (J28 l.435622) : [n11 n10 n01 n00] = [4 42 35 11316] ; n = 11397
+      p_A = 46/11397 ; p_B = 13/3799
+      lift = 7598/299 = 25.4113712375
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.00373029540546
+      (lift − 1)·√(…) = 0.0910616259682 ; phi recalculé = 0.0910616259682 ; phi imprimé = 0.091061625968168214579556752802535961836177686365615 ; identité exacte : oui
+  stress binance×gemini (J28 l.435624) : [n11 n10 n01 n00] = [3 43 18 11333] ; n = 11397
+      p_A = 46/11397 ; p_B = 7/3799
+      lift = 11397/322 = 35.3944099379
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.00273512204339
+      (lift − 1)·√(…) = 0.0940729087904 ; phi recalculé = 0.0940729087904 ; phi imprimé = 0.094072908790429061895721354843595547904877588394058 ; identité exacte : oui
+  stress bitstamp×gemini (J28 l.435627) : [n11 n10 n01 n00] = [3 36 18 11340] ; n = 11397
+      p_A = 13/3799 ; p_B = 7/3799
+      lift = 3799/91 = 41.7472527473
+      √(p_A·p_B/((1−p_A)(1−p_B))) = 0.00251765505523
+      (lift − 1)·√(…) = 0.102587526866 ; phi recalculé = 0.102587526866 ; phi imprimé = 0.10258752686577574340266708561888701645711988440463 ; identité exacte : oui

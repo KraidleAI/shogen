@@ -5,6 +5,10 @@
 > critère binaire n'est pas un jalon. Les jalons sont séquentiels sauf
 > mention ; les recherches (R-x) peuvent courir en parallèle des jalons.
 
+> *Ajout daté du 2026-10-04 (REG-04, item SHOGEN-REGISTRES-S2-1 ; lot DETTES-A)* : état de S2 porté au
+> 2026-10-04 (section S2, paragraphe « État au 2026-10-04 ») ; les autres jalons gardent leur dernier état
+> daté, que ce lot ne re-mesure pas.
+
 ## S0 — Fondations épistémiques *(en cours, presque clos)*
 
 Fait : vision (02), ADR-0001, forme canonique de témoignage (03),
@@ -157,6 +161,32 @@ phénomène que le marché cite sans le mesurer, et il date l'antériorité S5).
 se publie avant que S2 ait produit ses n/K/z (Shōgen se note 0/5 à sa propre
 grille aujourd'hui — dossier GTP, ADR-0019 §coût ; le critère vendu, la diversité
 mesurée, est le moins avancé). Le gratuit précède le payant (D3).
+
+**État au 2026-10-04** (ajout daté ; REG-04, item SHOGEN-REGISTRES-S2-1, lot DETTES-A ; chiffres
+recopiés de `docs/11-mesures-pilotes.md` §1, §2.3, §2.4, §3.1, §4.1 et §8.1) : **S2 est mesurée et son
+rapport est validé.** Segment J28 [2026-08-26T19:00Z ; 2026-09-28T01:28Z), 38 600 fenêtres distinctes
+(règle d'arrêt à n fixe d'ADR-0024) ; paquet de pré-enregistrement scellé, jeton RFC 3161 de genTime
+2026-10-03T01:04:10Z (ADR-0028 D2), avant l'exécution unique du 2026-10-04 ; rapport `11-mesures-pilotes.md`
+validé le même jour (cp-1 complet ; JOURNAL ; annexe A d'ADR-0028, ligne R-S2). Le livrable du critère
+ci-dessus y figure, après l'exclusion d'ADR-0025 amendée (ADR-0028 D5) et le retrait de Pyth du pool
+d'analyse (ADR-0028 D1) : n = 35 982 fenêtres (24 585 calmes, 11 397 de week-end) ; K = 154 et 133 ;
+z ≈ 20,8 et ≈ 28,5, tandis que le plancher d'erreur-type par blocs donne z_bloc ≈ 1,95 et ≈ 1,74 ; partition R2
+constatée sur l'axe ASN, quatre classes (un cluster de sept hôtes sur AS13335, Cloudflare, côté livraison,
+et trois singletons), soit k_eff = 4 pour k nominal = 10 hôtes. Verdict de la règle scellée
+SHOGEN-CRITERE-R1-1 : NE REJETTE PAS dans les deux strates, au titre de la discordance, avec l'énoncé scellé
+« le modèle binomial de doc 10 §5.1, à fenêtres indépendantes, est rejeté ; la cause n'est pas identifiée
+entre co-défaillance des sources et dépendance sérielle des fenêtres » ; **« R1 discrimine » = FAUX**.
+*Résultat négatif = résultat* : la branche pré-enregistrée est « priorité à G4 et révision de 04 »
+(ADR-0028 D9). Décisions de l'investisseur du 2026-10-04 (JOURNAL, recopiées en 11 §1) : collecte S2,
+« L'arrêter (Recommandé) » ; S2-bis, « Oui, préparer S2-bis (Recommandé) » ; publication, « Oui, en
+principe (Recommandé) », le feu vert final restant à l'investisseur après lecture du rapport validé ;
+priorité, « Position d'abord (Recommandé) ». **S2-bis est proposée** : ADR-0029 (observateurs multiples
+sur VPS), statut « proposée » ; son cp-1 complet est rendu le 2026-10-04 (ACCEPTE-AVEC-CORRECTIONS,
+sept corrections de texte appliquées ; `docs/adr-0029/CP1-ADR0029.md`) ; étude de marché versée et
+décisions d'architecture prises le 2026-10-04 (`docs/adr-0029/DECISIONS-ARCHITECTURE-S2BIS.md`), à reporter dans
+une révision 3 avant le sceau de S2-bis ; restent les actes de l'investisseur (§6) ; elle ne s'applique qu'après la clôture de S2. Reste pour clore S2 : cp-2 d'un validateur
+frais et G7 (lot CP2-G7, `docs/adr-0028/G0-lots-DETTES.md`) ; la publication (G9) reste une décision de
+l'investisseur.
 
 ## S2.5 — Les fondations d'ingénierie *(gate d'entrée du code produit)*
 

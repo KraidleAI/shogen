@@ -395,22 +395,41 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
 
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
 
+class PrixIllisible(ValueError):
+    """Prix de journal.jsonl ni chaîne ni nombre JSON, ou chaîne que Decimal ne lit pas (SHOGEN-PRIX-ILLISIBLE-1)."""
+
+
+class PrixHorsContexte(ValueError):
+    """Prix fini de journal.jsonl d'exposant ajusté au-delà d'Emax du contexte nommé (SHOGEN-PRIX-HORS-CONTEXTE-1)."""
+
+
 def parse_journal(path: str) -> list[dict]:
     """Relit `journal.jsonl` (une ligne par fenêtre×flux). `parse_float=Decimal`
     → `source_ts` exact (ADR-0003) ; `price` reste chaîne (déjà exacte).
     Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F).
     Point unique des lectures de R1, L&M, R2 et du rapport (lot CORR, SHOGEN-PRIX-NON-FINI-1) : un prix non fini (NaN,
     sNaN, Infinity, toute casse ou forme que Decimal admet) est lu comme absent (None : panne au sens de
-    classify_ecart), quel que soit le statut, compté par flux sur stderr, jamais la valeur ; prix illisible par
-    Decimal : inchangé."""
-    lus, nf = records.read_jsonl_tolerant(path, parse_float=Decimal), Counter()
-    with localcontext(contexte_decimal()):          # « abc » lève sous ce contexte (illisible : inchangé), jamais NaN
-        for r in lus:
-            try:
-                absent = isinstance(r, dict) and r.get("price") is not None and not Decimal(r["price"]).is_finite()
-            except (TypeError, ValueError, ArithmeticError):
-                absent = False
-            if absent:
+    classify_ecart), quel que soit le statut, compté par flux sur stderr, jamais la valeur. Refus nommés, quel que soit
+    le statut, valeur jamais reproduite : prix ni chaîne ni nombre JSON (booléen, liste, objet), ou chaîne que Decimal
+    ne lit pas, PrixIllisible (SHOGEN-PRIX-ILLISIBLE-1) ; prix fini non nul d'exposant ajusté au-delà d'Emax du
+    contexte nommé, PrixHorsContexte (SHOGEN-PRIX-HORS-CONTEXTE-1) ; tout autre prix fini : inchangé."""
+    lus, nf, ctx = records.read_jsonl_tolerant(path, parse_float=Decimal), Counter(), contexte_decimal()
+    with localcontext(ctx):                         # « abc » lève sous ce contexte (illisible : refus), jamais NaN
+        for r in (x for x in lus if isinstance(x, dict) and x.get("price") is not None):
+            p = r["price"]
+            try:                                    # float : jetons JSON NaN, Infinity (parse_float ne les lit pas)
+                d = Decimal(p) if isinstance(p, (str, int, float, Decimal)) and not isinstance(p, bool) else None
+            except (ValueError, ArithmeticError):
+                d = None
+            if d is None or d.is_finite() and d and d.adjusted() > ctx.Emax:
+                ou = (f"dans {path} (flux {r.get('flux_id')!r}, window_start {r.get('window_start')!r} ; valeur non "
+                      "reproduite)")
+                if d is None:
+                    raise PrixIllisible(f"prix ni chaîne ni nombre JSON lu par Decimal {ou} — refus "
+                                        "(SHOGEN-PRIX-ILLISIBLE-1)")
+                raise PrixHorsContexte(f"prix fini d'exposant au-delà d'Emax = {ctx.Emax} du contexte nommé {ou} — "
+                                       "refus (SHOGEN-PRIX-HORS-CONTEXTE-1)")
+            if not d.is_finite():
                 r["price"] = None
                 nf[r.get("flux_id")] += 1
     if nf:

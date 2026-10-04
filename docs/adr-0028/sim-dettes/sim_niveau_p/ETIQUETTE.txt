@@ -1,0 +1,1 @@
+SHOGEN-SIM-NIVEAU-P-1 : exploratoire, hors G0 principal (G0-lot-SIM-NIVEAU l.238) ; scripts/sim/sim_niveau.py inchange, --p sur la grille {0.0043196 ; 0.005 ; 0.01 ; 0.05}, R = 5000 par cas au lieu de 1e5 (deviation declaree, journal G1 docs/G1-lot-DETTES-SIM.md) ; ajoutee apres l'execution unique ; synthetique ; hors decision.

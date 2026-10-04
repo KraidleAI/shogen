@@ -19,7 +19,7 @@
 #
 # POURQUOI UN WORKFLOW SÉPARÉ, et non un job de `squelette` : `squelette`
 # tourne sur une matrice Windows + Linux, et le bit-à-bit n'est ratifié QUE
-# sur Linux. L'y ajouter imposerait un `if: matrix.os == 'ubuntu-latest'`,
+# sur Linux. L'y ajouter imposerait un `if: matrix.os == 'ubuntu-24.04'`,
 # c'est-à-dire une asymétrie de plateforme cachée dans une matrice qui promet
 # le contraire. Ici l'asymétrie est le nom du fichier, et le coût publié
 # d'ADR-0012 (« Asymétrie de plateforme publiée ») est lisible sans lire un
@@ -58,7 +58,7 @@ defaults:
 jobs:
   double-build:
     name: double-build D6 (x86_64-unknown-linux-gnu)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
     steps:
       - name: Checkout
         # actions/checkout, épinglé par SHA de commit — tag v7.0.1, le même

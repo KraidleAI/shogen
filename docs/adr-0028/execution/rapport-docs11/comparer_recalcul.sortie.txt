@@ -1,0 +1,1 @@
+valeurs comparées : 126 ; égales à la chaîne près : 126 ; différentes : 0

@@ -662,3 +662,255 @@ de l'annexe A non lue par lui) : comparée par l'orchestrateur, les sept commits
 Note à PX-Shogen-13 annoncée en B.43 (R-A I-3), recopiée de `docs/adr-0028/G2-RATTRAPAGE-R-A.md` l.251-252 : « PX-Shogen-13
 déclare que τ observé (axe (i) atteint) et le P99 de calibration (`closure.py`, toutes cellules évaluables) ne portent
 pas sur la même population. »
+
+## B.46 Amendement daté du 2026-10-04 03:32:36 UTC (heure produite par le script d'écriture) : rapport de S2 `docs/11` validé et versé (partie 4, étape R)
+
+Rapport `docs/11-mesures-pilotes.md` (sha256 `ecd6f893…072e`) : rédacteur frais `claude-opus-5-5` (texte livré
+`4604fff3…`, journal G1 versé `docs/G1-rapport-docs11.md`, scripts `docs/adr-0028/execution/rapport-docs11/`) ; cp-1 complet d'un
+validateur frais `claude-fable-5-1` (`docs/adr-0028/CP1-RAPPORT-DOCS11-2026-10-04.md`) : **ACCEPTE-AVEC-CORRECTIONS**, une
+correction (C-1, entrées `basis:doc`), appliquée mot pour mot ; 80 valeurs `Decimal` contrôlées à leur ligne, 0 écart ; énoncés
+scellés identiques ; lift de D3 rejoué ; `cargo --locked xtask verify` VERT. FM-1.1 du rédacteur (741 événements) et du
+validateur (169) : 0 fragment.
+
+Items **fermés** sur ce rapport : SHOGEN-D3-LIFT-1 (B.42 ; lift et identité φ publiés, §6, en arithmétique exacte) ;
+SHOGEN-ASN-DIVERGENCE-HORS-POOL-1 (B.44 ; aucune divergence ASN dans aucun rendu, `asn_divergences: []`) ;
+SHOGEN-D4-PRECEDENCE-RAPPORT-1 (B.45 ; le cas ne se présente pas au J28 : k_eff évaluable).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-BLOC5-LIBELLE-1 | bloc 5 (d) : « aucun cluster à ≥ 2 flux (1) » trompeur, le recalcul tiers porte `n_multi_clusters` = 1 | orch. | lot de code d'après S2 | une ligne et un test [inféré] | rédacteur du rapport, (a) |
+| SHOGEN-RT-ETIQUETTE-INCLUSE-1 | JSON du recalcul tiers : `r1_discrimine` VRAI de la variante incluse étiqueté seulement au niveau de l'entrée | orch. | lot de code d'après S2 | quelques lignes et un test [inféré] | rédacteur du rapport, (b) |
+| SHOGEN-REJEU-HOTE-1 | égalité à l'octet d'un rejeu des rendus sur un autre hôte non mesurée | orch. | avant G9 (publication) ou S2-bis | un rejeu sur un second hôte [inféré] | rédacteur du rapport, (c) |
+| SHOGEN-HORLOGE-ETENDUE-1 | étendue des écarts du contrôle d'horloge (3 610 relevés) non calculée | orch. | analyses ajoutées après le pré-enregistrement | ≈ 30 lignes [inféré] | rédacteur du rapport, (d) ; paquet §12 pt 17 |
+| SHOGEN-CENSURE-S2BIS-1 | censure large (7 795 fenêtres sautées dont 7 628 sans cause attribuée ; 4 093 démarrages du harnais) : entrée de conception de S2-bis | orch. ; rédacteur de l'ADR-0029 | ADR-0029 | aucun (entrée de conception) | rédacteur du rapport, (e) |
+| SHOGEN-SIGMA-BLOC-INDEP-1 | σ̂²_bloc non recalculé par un code indépendant sur les journaux réels | orch. | analyses ajoutées après le pré-enregistrement | ≈ 60 lignes [inféré] | rédacteur du rapport, (f) |
+| SHOGEN-DOCS11-PUBLIC-1 | version publique du rapport : quatorze points relevés par le validateur (mention « Non publié », modèles, chemins Windows, dépôts privés, identifiants de session, décisions d'affaires, renvois internes, tiers nommés avec préavis) | orch. ; investisseur (feu vert) | avant G9 | une version filtrée et un cp-1 bref [inféré] | cp-1 du rapport, liste « publication » |
+
+## B.47 Amendement daté du 2026-10-04 04:14:10 UTC (heure produite par le script d'écriture) : fermetures d'après l'exécution, lots DETTES (premier versement)
+
+Contrat : `docs/adr-0028/G0-lots-DETTES.md` ; état de départ : `docs/adr-0028/ETAT-REGISTRE-2026-10-04.md`.
+
+Items **fermés** :
+- **SHOGEN-G4-BIBLIO-1** : 19 pages et rapports cités par la recherche G4 et l'étude des enclaves versés à `biblio/` (section du
+  2026-10-04 de l'INDEX, sha256) ; 21 citations sur 24 retrouvées mot pour mot, les deux citations inexactes corrigées par erratum
+  daté dans les deux documents (et le nombre de pages du rapport Veridise).
+- **SHOGEN-E1-MAST-VERSEMENT-1** : arXiv:2503.13657v3 (Cemri et al., 47 p.) versé, page de titre lue.
+- **SHOGEN-BIBLIO-GIT-CHECKOUT-1** : manuels git (git-log, git-rev-list, git-cat-file, git-diff en 2.55.0 ; git-rev-parse et
+  git-clone servis en 2.52.0 et 2.54.0 par redirection de git-scm.com) et `action.yml` d'actions/checkout au SHA
+  `3d3c42e5aac5ba805825da76410c181273ba90b1` versés ; résidu : appartenance du SHA au tag cité par `gates.yml` non vérifiée
+  (github.com refusé par le proxy de la session), reportée sur SHOGEN-CI-RUNNERS-1.
+- **SHOGEN-ENREG-VARIABLE-1** : suite lancée sous l'enregistreur (rôle cp-2) avec la variable posée sur la copie scellée :
+  `tests_avec_variable` rempli ; enregistrement et sortie versés (`docs/adr-0028/execution/apres-execution/`) ; l'échec d'un test
+  non hermétique y est formé (ci-dessous).
+- **SHOGEN-R2-RUNPARAMS-CONCORDANCE-1** (B.45) : disposition « avant l'exécution » ; l'exécution unique n'a pas levé le refus
+  « run_params divergents » (six runs sortie 0, JOURNAL du 2026-10-04) : sans objet, fermé.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-TEST-ENV-HERMETIQUE-1 | `test_oracle_record.test_enregistrement_champs_et_sha` lit l'environnement ambiant : il échoue quand `SHOGEN_S2_CAMPAGNE_CONTROL` est posée | orch. | lot DETTES-B1 | quelques lignes de test [inféré] | rejeu de l'orchestrateur (ENREG-VARIABLE-1) |
+| SHOGEN-SCEAU-OTS-1 | ancre (2) OpenTimestamps des sceaux (paquet §9) jamais faite ni disposée ; recommandée systématique pour S2-bis (avis produit) | investisseur (go, dépendance nouvelle R-8) | avant le sceau de S2-bis | client OTS et un go [inféré] | état du registre (résidu sans identifiant) |
+
+## B.48 Amendement daté du 2026-10-04 06:28:58 UTC (heure produite par le script d'écriture) : lot DETTES-A commis
+
+Relecture G2 versée à l'octet : `docs/G2-lot-DETTES-A.md` (réviseur neuf `shogen-worker` ; sha256 `4e2082f9…664c`) :
+**ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-6 appliquées par le script du réviseur (chaque remplacement à occurrence unique).
+Écart déclaré (acte A-1 du réviseur) : le texte de C-1 valait à `3e275a2` ; relu à la tête, il dit en plus que l'étude de
+marché est versée et les décisions d'architecture prises (commit `a7199bd`), à reporter dans une révision 3 d'ADR-0029.
+C-5 : l'orchestrateur a lu la section du JOURNAL du 2026-09-27 (l.55-64) ; aucun checkpoint-1 d'ADR-0026 ni d'ADR-0027 n'y
+est consigné (les checkpoint-1 nommés visent trois G0 non désignés et le doc 16) : la colonne statut reste telle quelle.
+Cette lecture a touché de la matière Pocket du JOURNAL : rien n'en est repris ici. A-3 : la ligne d'index d'ADR-0026 ne
+cite que l'intitulé et la l.3 (statut), sans matière Pocket ; FM-1.1 de la transcription du worker (678 événements) :
+0 fragment. A-2 : sans objet à ce lot (le point 2 du §8, amendement d'ADR-0025, reste à poser).
+
+Items **fermés** (commits A-1 `6aba9c0`, A-2 `23c1fc0`, A-3 `1264477`) : SHOGEN-REGISTRES-S2-1, SHOGEN-DOC-HARNAIS-2 (pour la mesure 398 ; règle récurrente
+maintenue : tout lot qui change la suite re-mesure le README), SHOGEN-HARNAIS-ECHAPPEMENTS-1, SHOGEN-WORKTREE-BASE-HOOK-1,
+SHOGEN-HARNAIS-TACHE-10MIN-1, SHOGEN-HARNAIS-BASH-WSL-1, SHOGEN-MUT-FATAL-1. **Reste ouvert** : SHOGEN-ERRATA-ADR0028-1
+(points 1, 3 et 4 du §8 posés ; restent les points 2, 5, 6) ; sa liste restante est étendue aux actes 8 (WISHLIST P-01,
+P-03 ; P-03 peut-être caduc, Fisher 1921 versé à `biblio/`) et 13 à 16 (renvois datés de doc 10 §5.4, §5.6, §7 et doc 04
+§2) de §1 bis.11, non posés (relecture G2, §1).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ADR0029-STATUT-CP1-1 | la ligne Statut d'ADR-0029 (l.4) liste encore « un cp-1 du validateur sur cette révision » comme condition, alors qu'il est rendu | orch. | révision 3 d'ADR-0029 | une incise datée [inféré] | G2 du lot DETTES-A, A-5 |
+
+## B.49 Amendement daté du 2026-10-04 06:52:59 UTC (heure produite par le script d'écriture) : lot DETTES-B1 commis
+
+Journal G1 versé à l'octet : `docs/G1-lot-DETTES-B1.md` ; sa Q-3 et sa L-4 (« relever le plancher : une ligne ») sont
+inexactes, corrigées par la relecture (C-2 (c) : cinq cas du lanceur échouaient ; les cas sont désormais relatifs à
+`v.PLANCHER`). Relecture G2 versée à l'octet : `docs/G2-lot-DETTES-B1.md` (réviseur neuf `shogen-worker`) :
+**ACCEPTE-AVEC-CORRECTIONS** ; C-1 (cas `"12E+999999"`, le mutant « exposant brut » rejoué par l'orchestrateur : 2 échecs) et
+C-2 (lanceur relatif au plancher ; `PLANCHER = 405`) commises avec B1-1 et B1-6 ; C-3 (conséquence E-8 écrite dans `docs/11`
+§12 et dans `PROCEDURE-EXECUTION.md`, ci-dessous pour SHOGEN-REJEU-HOTE-1), C-4 (choix « plancher » consigné au G0 des lots
+DETTES) et C-5 (ADR-0028 §4.11, G3 opérant) faites par l'orchestrateur au commit de clôture. Adjudications : Q-1 du G1, E-1
+gardé (booléens, listes, objets refusés comme illisibles) ; Q-2, décision SENS-POOLEE adoptée avec la portée de O-5 (motif 1
+formulé trop fort ; motif 3 de procédure ; les « trois z » d'ADR-0025 sont de seconde main ; portée S2 seule, S2-bis renvoyé à
+son propre pré-enregistrement) ; Q-5, forme livrée gardée. Écart du réviseur (variable posée sur un chemin fictif absent,
+contrôlé avant et après, sur ordre du brief) : **accepté**, le brief de l'orchestrateur l'ordonnait. FM-1.1 des transcriptions
+du worker (1 104 événements) et du réviseur (645) : 0 fragment.
+
+Items **fermés** (commits B1-1 `0221a74`, B1-2 `53cff2c`, B1-3 `6b4b49c`, B1-4 `0789d96`, B1-5 `3cc0892`, B1-6 `30db124`, B1-7 `b6c1c95`) : SHOGEN-PRIX-ILLISIBLE-1, SHOGEN-PRIX-HORS-CONTEXTE-1, SHOGEN-ASN-DIVERGENCE-PARTIELLE-1,
+SHOGEN-BLOC5-LIBELLE-1, SHOGEN-KEFF-NOTE-1, SHOGEN-RT-ETIQUETTE-INCLUSE-1, SHOGEN-SENS-POOLEE-1 (fermé sans ligne ajoutée,
+décision écrite au test, portée O-5), SHOGEN-CI-S2-SAUT-1 (sous-lot D8a-3 ; premier passage sur la forge : SHOGEN-CI-S2-FORGE-1),
+SHOGEN-TEST-ENV-HERMETIQUE-1. **SHOGEN-REJEU-HOTE-1** (B.46) reste ouvert, avec cette précision (C-3) : tout rejeu des rendus,
+sur un second hôte comme ici, se fait sur une extraction du commit d'analyse `f35a70c`, jamais à la tête.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ASN-PARTIELLE-S2-1 | effet de SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 sur les journaux scellés de S2 non mesuré (les rendus versés appliquent la sémantique « relevés complets seuls ») | orch. | lot d'après pré-enregistrement, ou limite déclarée au rapport | une analyse hors décision [inféré] | G2 du lot DETTES-B1 |
+| SHOGEN-CI-S2-CABLAGE-1 | aucun test ne lit les étapes du job `s2-harness-unittest` : ramener l'étape à la suite nue passerait tous les contrôles locaux | orch. | SHOGEN-CI-S2-FORGE-1 ou prochain lot qui touche `gates.yml` | un cas de la forme de H-20 [inféré] | G2 du lot DETTES-B1 |
+| SHOGEN-PRIX-ARITH-RESIDU-1 | dépassement `Decimal` non nommé encore possible par combinaison de prix dans la plage du contexte (médiane paire, écart relatif sous une médiane minuscule) ; plausibilité nulle | orch. | prochain lot qui touche `r1.py` | plage de plausibilité ou capture nommée [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-JSON-ENTIER-LONG-1 | un entier JSON de plus de 4 300 chiffres lève une erreur générique dans `records.read_jsonl_tolerant` (mesuré, 5 001 chiffres) ; inatteignable depuis le collecteur | orch. | prochain lot qui touche `records.py` | un refus nommé [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-RT-ETIQUETTE-J14-1 | `r1_discrimine` des entrées J14 du JSON du recalcul tiers étiqueté au seul niveau de l'entrée (forme d'avant le sous-lot 4) | orch. | G0 de la publication (G9) | deux lignes, ou décision « niveau de l'entrée » [inféré] | G1 du lot DETTES-B1 §14 |
+| SHOGEN-CI-PLANCHER-SUIVI-1 | le plancher du vérificateur ne suit pas seul la croissance de la suite ; règle : tout lot qui ajoute des tests relève `PLANCHER` au compte mesuré | orch. | chaque lot qui ajoute des tests | une ligne par lot [mesuré : C-2] | G1 et G2 du lot DETTES-B1 |
+
+## B.50 Amendement daté du 2026-10-04 07:51:15 UTC (heure produite par le script d'écriture) : lot POST-PREREG commis
+
+Analyses **ajoutées après le pré-enregistrement, hors décision** : aucune ne change le verdict scellé de S2 (« R1 discrimine »
+FAUX, `docs/11`). Journal G1 versé à l'octet (`docs/G1-lot-POST-PREREG.md`, sha256 `0b84a1c3…cf3a`) ; relecture G2 versée à
+l'octet (`docs/G2-lot-POST-PREREG.md`, réviseur neuf `shogen-worker`, sha256 `768f263d…2020`) : **ACCEPTE-AVEC-CORRECTIONS**,
+C-1 à C-6 appliquées par un worker de correction (note `docs/adr-0028/execution/post-prereg-2026-10-04/CORRECTIONS-G2.md`) ;
+aucune ne touche un script d'analyse ni une sortie. **Mesure du rejeu après DETTES-B1** (question du G2 §6) : les neuf scripts
+rejoués à `dad3bc6`, harnais modifié par le lot DETTES-B1, donnent des sorties identiques à l'octet aux sorties versées, sans
+refus nommé : l'item SHOGEN-PP-REJEU-B1-1 n'est pas formé ; la version de référence reste le commit d'analyse `f35a70c` (README
+des sorties, C-6).
+
+Adjudications de l'orchestrateur : **Q-1** — le critère de SHOGEN-HOST-DEGRADED-2 (sonde ASN du démarrage en échec, dernier
+marqueur, `clock_check` hors critère, contre le libellé de la l.100 qui nomme `clock_check`) est **adjugé** comme la forme de
+l'item, avec cette déclaration : la forme a été fixée par le worker **avant** l'exécution sur les journaux (état `PP-d`, 04:36:07
+UTC, sortie de même sha), **après** son exposition au bloc 3 du rendu et à `docs/11` ; le seuil de FLUX-DEVIANT-1 (p̂_f > 1/2) est
+la valeur de la variante V2 de l'avis B.39, appliquée par le worker (§11.1, C-4). Q-2 : aucune entrée neuve au registre doc 09.
+**Q-3** : les statistiques exploratoires à erreur-type par blocs qui franchissent 2,33 (z_pool,bloc ≈ 2,60 ; z_IF,bloc ≈ 2,37 en
+calme) sont signalées à l'investisseur comme sorties hors décision, sans valeur de verdict ; la lecture « non identifié sous
+censure arbitraire » l'est aussi. FM-1.1 des transcriptions du worker (1 192 événements) et du réviseur (544) : 0 fragment ; écart
+commun déclaré (fiche « fixtures seulement » contre l'exception du G0 pour ce lot) : accepté, item formé ci-dessous.
+
+Items **fermés** (commits PP-a1 `1ed64e3`, PP-a2 `519bd12`, PP-b `b80b625`, PP-c `ff919a5`, PP-d1 `d97ce4a`, PP-d2 `f0b2554`, PP-e1 `e411d0a`, PP-e2 `7a5df73`, PP-f `cb44084`, PP-g `5d45248`, PP-h `be1c1a4`, PP-i1 `3538344`, PP-i2 `f90c580`, PP-j `5c8b5b9`) : SHOGEN-FLUX-QUASI-MORT-1, SHOGEN-QUASI-MORT-PREDICAT-1, SHOGEN-POOL-MIN-1, SHOGEN-FLUX-DEVIANT-1,
+SHOGEN-HOST-DEGRADED-2 (forme adjugée, Q-1), SHOGEN-HORLOGE-ETENDUE-1, SHOGEN-SIGMA-BLOC-INDEP-1 (indépendance limitée à la
+classification et à la variance : lecteurs communs, item ci-dessous), SHOGEN-CONTENU-DEP-1. **Restent ouverts** :
+SHOGEN-POOLEE-BLOC-1 (part (a) faite ici ; part (b) au lot DETTES-SIM) ; SHOGEN-CENSURE-INFO-2 (bornes de z_s et lecture faites ;
+reste l'attribution, en attente de P-08) ; SHOGEN-DEP-FENETRES-2 ((b) fait, (c) fait en exploratoire ; restent (a), P-05 non
+détenue, et la tolérance et la loi nulle de (c)) ; SHOGEN-R1-PLUGIN-1 ((a) et (b) descriptif faits ; reste le test sourcé).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-ZIF-NIVEAU-1 | niveau de z_IF,bloc et de z_IF,0 sous le modèle nul non mesuré | orch. | avant toute proposition qui cite ces statistiques | une simulation synthétique sur le modèle de SIM-NIVEAU [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-CENSURE-ZBLOC-1 | borne extérieure de z_bloc sous censure arbitraire non établie : aucune lecture « identifié » possible sans elle | orch. | avant toute lecture « identifié » | un calcul de bornes [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-ENTRELACEMENT-D5-1 | 74 démarrages ouverts par un `clock_check` après un `run_params` sans `clock_check`, tous dans la plage D5 : écritures possiblement entrelacées de deux instances du harnais pendant l'incident ; sans effet sur le J28 | orch. | G0 du collecteur de S2-bis (ADR-0029) | une qualification [inféré] | G1 du lot POST-PREREG §8 |
+| SHOGEN-PEARSON-IF-SOURCE-1 | fonction d'influence de Pearson employée sur forme classique [inféré], sans source détenue | orch. | avant toute publication qui cite N_eff | un versement de source, sans code | G1 du lot POST-PREREG §8 |
+| SHOGEN-POSTPREREG-PARAMS-SCEAU-1 | « paramètres fixés avant l'exécution » attesté seulement par des horodatages de fichiers : pour tout lot d'après pré-enregistrement, épingler le sha256 des paramètres ou du code au JOURNAL avant de lancer sur les journaux | orch. | prochain lot qui lit les journaux scellés | une ligne de JOURNAL par lot [inféré] | G2 du lot POST-PREREG §8 |
+| SHOGEN-FICHE-WORKER-POSTEXEC-1 | la fiche `shogen-worker` dit « fixtures seulement (D.4 a) » sans l'exception qu'un G0 peut accorder après l'exécution unique (lecture des journaux scellés par les scripts du lot seuls) | orch. | prochain lot de ce type | une consigne au corps de la fiche [inféré] | G2 du lot POST-PREREG §8 ; écarts communs du worker et du réviseur |
+| SHOGEN-LECTEUR-INDEP-1 | les analyses et le rendu partagent les lecteurs `r1.parse_journal` et `filtre_lecture` : aucun lecteur indépendant des journaux (première moitié de la limite 12 du §9.3 de `docs/11`) | orch. | avant G9 (publication) ou le recalcul externe | un lecteur distinct et un oracle [inféré] | G2 du lot POST-PREREG §8 |
+
+## B.51 Amendement daté du 2026-10-04 08:25:38 UTC (heure produite par le script d'écriture) : lot DETTES-B2 commis
+
+Rapport du worker versé à l'octet (`docs/G1-lot-DETTES-B2.md`) avec sa note de corrections (`docs/G1-lot-DETTES-B2-corrections.md`) ;
+relecture G2 versée à l'octet (`docs/G2-lot-DETTES-B2.md`, réviseur neuf `shogen-worker`, sha256 `e0612252…a386a7`) :
+**ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-5 appliquées par le worker (rouge avant, vert après ; mutants du réviseur 37 sur 38 tués
+après corrections, MX-12 survivant hors liste, observation O-3). Écart du worker sur C-1 (le cas « plage hors fichier » ne peut pas
+être rouge sur le code livré ; il tue MX-06) : accepté. Adjudications de l'orchestrateur : Q-1, actes posés en 10c, dans le
+commit de XR-3 ; Q-2, le diff 05 (`windows-2025`) **n'est pas appliqué** tant que le libellé et la valeur par défaut de
+`core.autocrlf` ne sont pas lus sur place ; Q-3, T-75 (ref vers un blob ou un arbre balayée au lieu d'être refusée, B.15
+extension datée de l'item 5), T-79 (resserrement) et T-105b (tag imbriqué propre accepté) actés ; Q-4, amendement daté
+d'ADR-0028 §4.11 posé (forme A : l'amendement du lot D8b n'est pas réécrit) ; Q-5, item formé (I-3) ; Q-6, puce datée posée
+en fin de `docs/17-modele-de-menace.md` (T-04 : l'annexe B fait foi, choix de l'orchestrateur : c'est le registre des items).
+FM-1.1 des transcriptions du worker et du réviseur : 0 fragment. Contrôle `cargo --locked xtask verify` sur l'arbre réel :
+VERDICT GLOBAL VERT ; S-G9 ne contrôle encore que `docs/17`.
+
+Items **fermés** (commits D8d-1 `ba9d61a`, D8d-2 `44fec62`, G5 `27189d7`, RUNNERS `26c2c41`, XR-1 `1c2f0f2`, XR-2 `ef657b9`, XR-3 `7c4861a`, XR-4 `c278b48`) : SHOGEN-D8D-SECRETS-1 avec SHOGEN-SECRETS-CHEMIN-ETAGE-1, SHOGEN-SECRETS-GREP-STATUT-1,
+SHOGEN-SECRETS-MASQUE-EXCLUSION-1, SHOGEN-SECRETS-MESSAGES-1 ; SHOGEN-SECRETS-HORS-REFS-1 (reste un acte local : `--hors-refs`
+avant toute copie brute de `.git` en custodie, ADR-0028 §4.11) ; SHOGEN-G5-ERREUR-GREP-1 ; SHOGEN-E1-XTASK-REFS-1 (gate S-G9
+sur `docs/17`, contrôles (a) à (f) ; (g) et (h) déclarés non mécanisés). **Reste ouvert** : SHOGEN-CI-RUNNERS-1 (part Linux
+faite ; restent le libellé Windows, la limite « pas d'épinglage par digest d'un runner hébergé » à écrire, le résidu B.47 sur
+`3d3c42e5` et les noms des contrôles qui portent `matrix.os`) ; la ligne B.4:80 (douze définitions) est périmée : onze restaient.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SG5-NOTES-INTERDITS-1 | **priorité haute** : la gate S-G5 imprime le texte des citations de tout `docs/**/*.md`, dossiers interdits compris (mesuré : une note Pocket) ; un `verify` lancé par un worker sur l'arbre réel lui affiche de la matière interdite | orch. | prochain lot qui touche `xtask` ; d'ici là, sortie de `verify` redirigée, lignes de verdict seules (consigne des briefs) | n'imprimer que `chemin:ligne` [inféré] | G1 du lot DETTES-B2, I-1 ; G2 |
+| SHOGEN-SG9-PERIMETRE-1 | S-G9 ne contrôle que `docs/17` ; 157 références courtes des autres documents ne se résolvent pas sans convention | orch. | après SG9-COPIE-INTERDITS-1 | une convention et une extension [inféré] | G1 du lot DETTES-B2, I-2 (B.7:143) |
+| SHOGEN-SG9-CORPUS-1 | le corpus du contrôle (e) contient des dossiers interdits et des pièces D.2 ; à exclure (resserrement), sans effet aujourd'hui | orch. | avec SG9-PERIMETRE-1 | une liste d'exclusion [inféré] | G1 du lot DETTES-B2, I-3 ; Q-5 |
+| SHOGEN-SECRETS-COMMIT-MSG-1 | aucun hook `commit-msg` : les messages de commit ne sont vus que par `--history` (job g3 et G3 opérant), pas au moment du commit, alors que `docs/17` l.112 l'attend du hook | orch. | prochain lot qui touche les hooks | un hook et ses cas [inféré] | G1 du lot DETTES-B2, I-4 |
+| SHOGEN-XTASK-TMP-NOMS-FIXES-1 | les tests de `xtask` écrivent sous `temp_dir()` à des noms fixes : deux sessions sur le même hôte entrent en collision | orch. | prochain lot qui touche `xtask/tests` ; d'ici là, un `TMPDIR` dédié par copie | des noms uniques [inféré] | G1 du lot DETTES-B2, I-6 |
+| SHOGEN-SECRETS-NOMS-REFS-1 | les noms de refs ne sont jamais balayés ; git imprime en clair le nom d'une ref cassée qui porte une forme (mesuré en `--history` et en `--hors-refs`) | orch. | prochain lot qui touche la gate des secrets | un flux de plus et un masque [inféré] | G2 du lot DETTES-B2, N-1 |
+| SHOGEN-SG9-COPIE-INTERDITS-1 | sur une copie sans dossiers interdits, S-G9 rougit sur une référence vers un dossier absent ; convention à écrire (dossier interdit absent en entier : référence listée en note ; sinon contrôle plein) | orch. | prochain lot qui touche S-G9 | une règle et deux tests [inféré] | G2 du lot DETTES-B2, N-2 |
+| SHOGEN-SG9-STRUCTURE-1 | contrôles (g) formes proscrites et (h) structure des tables S et T de l'oracle `verif_refs.py` non mécanisés | orch. | avec SG9-PERIMETRE-1 | deux contrôles [inféré] | G2 du lot DETTES-B2, N-3 (C-4) |
+
+## B.52 Amendement daté du 2026-10-04 08:28:17 UTC (heure produite par le script d'écriture) : ADR-0029 révision 3 validée et versée
+
+L'ADR-0029 révision 3 (report des décisions d'architecture D-1 à D-9, telles que corrigées par le §7 et le §8 de
+`docs/adr-0029/DECISIONS-ARCHITECTURE-S2BIS.md`) est versée (sha256 `926fdeff…471c`) avec son journal G1
+(`docs/adr-0029/G1-ADR-0029-v3.md`), son cp-1 complet (`docs/adr-0029/CP1-ADR0029-V3.md`, validateur frais `claude-fable-5-1` :
+ACCEPTE-AVEC-CORRECTIONS, onze corrections de texte appliquées mot pour mot, aucune escalade) et l'avis de l'advisor sur les
+cinq questions techniques (`docs/adr-0029/AVIS-QUESTIONS-TECHNIQUES-V3.md`, `claude-fable-5-1`), dont les cinq recommandations
+sont adoptées par l'orchestrateur (carte en processus et journal séparés ; formules de σ et des planchers ; condition de
+CALIB-ACTIFS classe par classe ; vote binaire de la variable d'état, seuil 0,5 % scellé ; statistique S imprimée hors décision).
+Budget du §3 et durée de mesure inchangés ; l'ordre de grandeur d'une seconde vague (26 à 52 € HT, base de l'avis) est cité sans
+nouveau calcul de budget (écart F-2 du rédacteur, accepté : au taux haut de la v2, la borne haute serait d'environ 55 € HT).
+Item **fermé** : SHOGEN-ADR0029-STATUT-CP1-1 (B.48). SHOGEN-ENTRELACEMENT-D5-1 (B.50) est rattaché au G0 du lot COLLECTE-BIS de
+l'ADR-0029. Restent ouverts au texte de l'ADR : la q. 4 (c) du §8.2 (G0 de RECALC-BIS), les valeurs de σ, des planchers et d'une
+éventuelle vague (G0 de CALIB-ACTIFS), et les vingt questions de valeur du §6, à l'investisseur.
+
+## B.53 Amendement daté du 2026-10-04 08:57:16 UTC (heure produite par le script d'écriture) : lot DETTES-SIM commis
+
+Journal G1 et pré-enregistrement du worker versés (`docs/G1-lot-DETTES-SIM.md`, note de corrections
+`docs/G1-lot-DETTES-SIM-corrections.md`) ; relecture G2 versée à l'octet (`docs/G2-lot-DETTES-SIM.md`, réviseur neuf
+`shogen-worker`, sha256 `93b5881f…7c2b`) : **ACCEPTE-AVEC-CORRECTIONS**, C-1 à C-8 appliquées (oracles B1 et M0 resserrés ;
+journal corrigé ; journaux d'exécution `.log.txt` retirés des sorties, leurs sha256 gardés au journal). Le worker a trouvé et
+corrigé avant livraison un desserrement introduit par sa première écriture de C-1 (E-14 du journal, preuve par mutant).
+Aucun résultat ne change ℓ, le seuil 2,33, la règle `ea3a2d94…` ni le seuil 1/2 de QUASI-MORT-1, qui sont scellés. Le G2
+signale, sans application : le seuil 1/2 n'est pas le point de bascule exact (0,456 avec huit autres flux à 0,02), et plusieurs
+flux faibles sous 1/2 peuvent inverser le signal ensemble (item FLUX-ABSORPTION-COLLECTIVE-1 ci-dessous). Erratum de sujet de
+commit : le sujet de DS-3c nomme SHOGEN-SIM-NIVEAU-P-1 ; P-1 est produit par le script existant `sim_niveau.py` (aucun fichier
+existant modifié) et ses sorties sont versées par DS-V (`sim-dettes/sim_niveau_p/`).
+
+Items **fermés** (commits DS-0 `55e6adb`, DS-1 `a10a17f`, DS-2a `1263b41`, DS-2b `3eea5ff`, DS-3b `2e7ee85`, DS-3a `fef258c`, DS-3c `039fb96`, DS-3d `6a96fed`, DS-V `dcb44b8`) : SHOGEN-SIM-NIVEAU-P-1 (déviation déclarée : R = 5 000 au lieu de 10⁵ ; la règle reste ≤ 0,0024),
+SHOGEN-GARDE-NIVEAU-N-1, SHOGEN-BARTLETT-BIAIS-1, SHOGEN-SIM-NIVEAU-MODELES-1, SHOGEN-FLUX-QUASI-MORT-2 (alternative « choc commun »
+admise), SHOGEN-FLUX-FAIBLE-1, SHOGEN-POOLEE-BLOC-1 (part (b) ici ; part (a) au lot POST-PREREG, B.50 : **item fermé en entier**).
+SIM-PLATEFORME-2 : pas d'item neuf, rattaché comme limite déclarée à la limite L-7 de l'étape S (annexe B l.464).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-FLUX-ABSORPTION-COLLECTIVE-1 | le critère de retrait par flux (2·ok < n_s) ne voit pas l'absorption collective : le signe de l'excès dû à une co-défaillance de paire est celui de 1 − Σ p_j/(1 − p_j) ; deux flux à 0,4 d'écart (non retirés) ou quatre à 0,25 l'inversent déjà ; pour un flux seul, le point de bascule exact (exact en c et en n) est 0,4556, non 1/2 | orch. | pré-enregistrement de S2-bis (ADR-0029) | un critère collectif pré-enregistré [inféré] | G1 et G2 du lot DETTES-SIM (absorbe l'ex-QUASI-MORT-3) |
+| SHOGEN-FLUX-SERIEL-1 | QUASI-MORT-2 et FAIBLE-1 simulés à fenêtres iid et pour une co-défaillance de paire seulement ; sous dépendance sérielle, l'espérance devient (r₀ − r₁)·n·(c − κ) ; co-défaillance d'ordre ≥ 3 ou impliquant le flux faible non couverte | orch. | avant le sceau de S2-bis | le même script, flux markoviens, alternatives de triplet [inféré] | G1 et G2 du lot DETTES-SIM |
+| SHOGEN-SIM-REGEN-1 | les générateurs étendus n'ont pas de régénération indépendante dans les oracles : forme de la queue de Lomax, durée des trous, emploi des paramètres des extensions tenus par relecture seulement (mutants C-geom, A-trou30 vivants) | orch. | avant toute réutilisation des générateurs étendus | un régénérateur indépendant [inféré] | G1 et G2 du lot DETTES-SIM (C-3) |
+| SHOGEN-EMD-PROFIL-1 | l'EMD_s est un excès de K ; la co-défaillance qu'il représente dépend du profil des taux du pool (facteur r₀ − r₁, qui peut s'annuler puis changer de signe) ; non imprimé | orch. | lot de la sensibilité, ou G0 du rapport public | une ligne descriptive hors décision, ou une limite écrite [inféré] | G1 du lot DETTES-SIM |
+| SHOGEN-GARDE-NIVEAU-ZSEUL-2 | z_s seul mesuré au-dessus de 0,01 en estimation ponctuelle aux petits p et sous n = 7 200 (0,0116, SE 0,0015 ; 0,0107, SE 0,0009), sans l'être à deux erreurs-types | orch. | avant toute lecture de z_s seul | R = 10⁵ sur les quatre cellules L = 1 des deux plus petits p, choisies par le motif du G0 §3, pré-enregistré ; ≈ 2,1 h de CPU [G2] | G1 et G2 du lot DETTES-SIM |
+| SHOGEN-POOLEE-NIVEAU-1 | z_pool (exploratoire) rejette à tort 8,3 % à 33,1 % sous dépendance sérielle synthétique ; son approximation normale ne tient qu'à fenêtres iid ; à écrire à côté de la poolée (z_pool,bloc ≈ 2,60 du lot POST-PREREG, B.50) | orch. | prochain texte qui cite la poolée (rapport public) | une limite écrite [inféré] | G1 du lot DETTES-SIM |
+
+## B.54 Amendement daté du 2026-10-04 09:20:41 UTC (heure produite par le script d'écriture) : préparation du cp-2 de clôture de S2 (lot CP2-G7)
+
+Dossier de preuves G0 à G6 du chemin de recalcul versé : `docs/adr-0028/DOSSIER-G7-S2.md` (lecteur `claude-opus-5-5`, tête
+`b24ff86`). Décisions de l'orchestrateur : (1) **ordre** : cp-2, puis G7, puis clôture (D9 voie A et annexe A ; D6 (ii) l.196
+dit « G7 puis cp-2 » : écart déclaré, deux sources contre une) ; (2) **gel jugé** : le commit d'analyse `f35a70c`, qui a produit les
+rendus de S2 ; les changements postérieurs du chemin (lot DETTES-B1) sont couverts par leurs propres G1 et G2 (B.49) ; (3)
+SHOGEN-ERRATA-ADR0028-1 : déclencheur échu (« au commit de cette ADR ») **re-daté par décision écrite** : « avant G9 (publication) » ;
+restent les points 2, 5, 6 du §8 et les actes 8 et 13 à 16 de §1 bis.11 (B.48) ; motif : le point 2 (amendement d'ADR-0025) se pose
+par la procédure D.2 n° 6, hors de portée des agents ; les autres sont des renvois datés sans effet sur la mesure. Item **fermé** :
+SHOGEN-E1-AVIS-FRAICHEUR-1 (JOURNAL, même heure). Le G3 opérant complet, comptes `--hors-refs` compris, est consigné au JOURNAL.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-G4-RECALCUL-METRIQUES-1 | G4 non tenu sur le chemin de recalcul : aucune baseline de métriques (R-15) ni fonction de fitness, que l'audit d'entrée exige au premier code produit (`docs/AUDIT-ENTREE.md` l.17, l.37) | orch. | avant toute qualité « produit » du chemin (recalcul externe payant, G9) | une baseline et une ou deux fonctions de fitness [inféré] | dossier G7, G4 |
+| SHOGEN-G2-CHECKLIST-CORPUS-1 | aucune relecture G2 ne cite la checklist G2 du corpus ; les tests de la phase A n'ont pas de relecture G2 au dépôt ; les rapports G2 de la partie 1 et de CI-S2 sont hors dépôt | orch. | prochain lot relu en G2 ; versement des rapports à la custodie du poste local | une ligne de brief et un versement [inféré] | dossier G7, G2 |
+| SHOGEN-G2-ENREG-ROLE-1 | aucune relecture G2 du chemin ne cite d'enregistrement de rôle G2 (`shogen.oracle-record.v1`), que D6 (viii) attend et que le cp-2 contrôle | orch. | prochain lot relu en G2 sur le chemin | une commande par relecture [inféré] | dossier G7, G2 |
+| SHOGEN-G1-JOURNAUX-MANQUANTS-1 | journal G1 absent du dépôt pour CI-S2 (provenance dans le seul message de commit) et DETTES-A | orch. | avant G9 | un versement ou une limite écrite [inféré] | dossier G7, G1 |
+| SHOGEN-G6-PIECE-RECALCUL-1 | aucune pièce G6 écrite pour le chemin de recalcul (SBOM, réglementaire) ; bibliothèque standard seule, licence MIT OR Apache-2.0 | orch. | avant G9 | une pièce courte [inféré] | dossier G7, G6 |
+
+## B.55 Amendement daté du 2026-10-04 09:36:41 UTC (heure produite par le script d'écriture) : cp-2 et G7 rendus, S2 close
+
+cp-2 du validateur frais versé à l'octet (`docs/adr-0028/CP2-S2.md`, sha256 `6bfbd835…fce3` tel que rendu ; copie versée retouchée à la l.89, guillemets d'une citation d'outil pour S-G5, retouche déclarée en fin de fichier) : **ACCEPTE-AVEC-CORRECTIONS**,
+C-1 à C-8 appliquées au commit de clôture ; son enregistrement de rôle cp-2 et sa sortie versés
+(`docs/adr-0028/execution/cp2-2026-10-04/`, sha256 `4baac09b…597d` et `efe6e02d…0cd9`). Verdict G7 de
+l'orchestrateur : `docs/adr-0028/G7-S2.md` (**S2 close ; l'énoncé D6 « qualité produit sous G0-G7 complets » n'est pas prononcé**,
+G4 non tenu). Corrections : C-1 (G7), C-2 (item SAST ci-dessous), C-3 et C-5 (G7, pièces), C-4 (SHOGEN-D8-AMONT-ERRATUM-1 re-daté
+« avant G9 » par décision écrite : l'erratum porte sur la provenance de `enforcement/`, sans effet sur la mesure ; BUNDLE-CLOTURE-1 et
+PAROXYSME-REGISTRE-1 dus sur le poste local, déclenchés par ce commit), C-6 (ajout daté sous D6 (ii)), C-7 (limite datée au
+rapport, `docs/11`), C-8 (versement). FM-1.1 des transcriptions du lecteur du dossier et du validateur : 0 fragment.
+
+Items **fermés** : SHOGEN-CP2-RUNS-RENDU-1 (« conforme » par `--verifier --depot` ; six runs, exit 0, sha et genTime exacts) ;
+SHOGEN-INSTRUMENT-S2-1 (G0 à G7 rendus sur le chemin de recalcul ; verdict G7 avec réserves ; la qualité « produit » non prononcée est
+portée par SHOGEN-G4-RECALCUL-METRIQUES-1 et les items de B.54). **Devenu dû** : SHOGEN-PASSAGE-PUBLIC-EXPORT-1 (déclencheur « clôture
+S2 (G7) » atteint ; ADR à l'orchestrateur, décision à l'investisseur).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SAST-PYTHON-RECALCUL-1 | aucune analyse statique de sécurité (SAST) sur le code Python du chemin de recalcul (G3, réserve 3) | orch. | avant toute qualité « produit » du chemin, avec SHOGEN-G4-RECALCUL-METRIQUES-1 ; outil soumis à R-8 | un outil et une étape [inféré] | cp-2 de clôture, C-2 |

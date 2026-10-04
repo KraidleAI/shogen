@@ -113,14 +113,32 @@ class TestSortiesNommees(unittest.TestCase):
         self.assertEqual((code, list(out), out["avertissements"]), (0, ["avertissements", *sorted(n for n, *_ in var)],
                                                                     []))
         for n, s, pl, e in var:
+            attendu = en_json({"etiquette": e, "segment": s, "plages": [list(x) for x in pl], **{
+                k: f(self.c, self.j, pl, s) for k, f in (
+                    ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
+                    ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}})
+            if n == "j28-incluse":              # SHOGEN-RT-ETIQUETTE-INCLUSE-1 (test suivant)
+                attendu["r2"]["drapeau_2"]["etiquette"] = incluse
             with self.subTest(sortie=n):
-                self.assertEqual(out[n], en_json({"etiquette": e, "segment": s, "plages": [list(x) for x in pl], **{
-                    k: f(self.c, self.j, pl, s) for k, f in (
-                        ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
-                        ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}}))
+                self.assertEqual(out[n], attendu)
         sens = report.render_report(self.c, self.j, exclude_ranges=[RA], segment=TABLE[2][1]).split("[SENSIBILITÉ]")[1]
         for st, b in out["j28-incluse"]["r1"]["strates"].items():
             self.assertIn(f"  {st:8} {'incluse (sensibilité)':22} : n = {b['n']} ; K = {b['K']} ; ", sens)
+
+    def test_r1_discrimine_de_la_variante_incluse_etiquete(self):
+        """SHOGEN-RT-ETIQUETTE-INCLUSE-1 (annexe B.46 ; docs/11 point 10) : dans le JSON du recalcul tiers, le drapeau
+        2 de la variante incluse, qui porte « R1 discrimine », porte aussi l'étiquette de la variante (clé etiquette,
+        comme la strate poolée) ; aucune autre entrée n'en reçoit ; valeur de r1_discrimine inchangée. Texte écrit
+        ici. Rougit si : étiquette absente, autre, ou posée sur une entrée de la table ; valeur modifiée."""
+        with mock.patch.object(ru, "SORTIES", TABLE):
+            out = json.loads(produire("recalcul-tiers", "--journaux", self.d)[1])
+        incluse = ("sensibilité « plage incluse » de la liste fermée (D2 pt 7), hors décision, biaisée vers le haut "
+                   "par construction")
+        d2 = {n: out[n]["r2"]["drapeau_2"] for n in ("j14-principal", "j14-second", "j28", "j28-incluse")}
+        self.assertEqual({n: d.get("etiquette") for n, d in d2.items()},
+                         {"j14-principal": None, "j14-second": None, "j28": None, "j28-incluse": incluse})
+        self.assertEqual(d2["j28-incluse"]["r1_discrimine"],
+                         r2.recompute_r2_from_journal(self.c, self.j, (), TABLE[2][1])["drapeau_2"]["r1_discrimine"])
 
     def test_raw_verdict_et_exit_0(self):
         """Q7, SHOGEN-RAW-FIN-1 : verdict de records.verifier_raw écrit sur la sortie, code 0 conforme comme en refus
@@ -200,6 +218,21 @@ class TestSortiesNommees(unittest.TestCase):
         x = sorties[0]["raw"].split("\n")
         self.assertEqual((x[0].startswith("verdict raw.jsonl (records.verifier_raw ; SHOGEN-RAW-FIN-1) : conforme"),
                           x[1].startswith(tete) and " dans raw.jsonl (ligne " in x[1]), (True, True))
+
+    def test_poolee_des_deux_variantes_du_j28_dans_le_recalcul_tiers(self):
+        """SHOGEN-SENS-POOLEE-1 (annexe B.12, B.13 ; décision du lot DETTES-B1 : aucune ligne ajoutée à [SENSIBILITÉ]) :
+        la strate poolée stratifiée des deux variantes du J28, plage exclue et plage incluse, est publiée par le JSON
+        du recalcul tiers (clé r1.poolee de chaque entrée), étiquetée « exploratoire, hors famille, hors décision »,
+        égale à celle de recompute_from_journal sous les options de la variante ; les deux diffèrent (n de la plage).
+        Texte écrit ici. Rougit si : poolée absente d'une variante, étiquette autre, valeurs d'une autre variante."""
+        with mock.patch.object(ru, "SORTIES", TABLE):
+            out = json.loads(produire("recalcul-tiers", "--journaux", self.d)[1])
+        po = {n: out[n]["r1"].get("poolee") for n in ("j28", "j28-incluse")}
+        for n, pl in (("j28", (RA,)), ("j28-incluse", ())):
+            with self.subTest(variante=n):
+                self.assertEqual((po[n] or {}).get("etiquette"), "exploratoire, hors famille, hors décision")
+                self.assertEqual(po[n], en_json(r1.recompute_from_journal(self.c, self.j, pl, TABLE[2][1])["poolee"]))
+        self.assertNotEqual(po["j28"]["strates"], po["j28-incluse"]["strates"])
 
 
 RUNS = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]     # Q8 puis ordre de D.4 b
