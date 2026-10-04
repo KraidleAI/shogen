@@ -19,6 +19,11 @@ imports de chaque module par analyse syntaxique et refuse tout module hors de la
 sous-paquet (frontière de la PROPOSITION §1 pt 2), ainsi que les imports dynamiques. Rien n'est installé : aucun
 contrôle de registre R-8 n'est dû pour le paquet Python.
 
+**Plate-forme : POSIX seulement** (C-6 (e) de la relecture G2 de la tranche A de P1, ajout du diff CB-2d,
+2026-10-04). Le journal (`collecte/journal.py`) importe `fcntl` pour le verrou exclusif `flock` (E-C-16) ; ce module
+de la bibliothèque standard n'existe pas sous Windows. Le paquet tourne sur Linux (observateurs Debian, image
+`ubuntu-24.04` de la CI) et sur les systèmes POSIX qui fournissent `flock` ; sa suite de tests aussi.
+
 ## 2. À compléter à DB-0
 
 Paquets système des observateurs (chrony, unbound pour O1, rsync, outil de pare-feu, python3) : tableau R-8 écrit

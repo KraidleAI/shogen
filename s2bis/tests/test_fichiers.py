@@ -27,3 +27,9 @@ class Fichiers(Base):
         self.assertEqual(e["pool.sha256"], sommes.encode())
         ino = {n: os.stat(os.path.join(self.d, n)).st_ino for n in (NOMS[0], "pool.sha256")}
         self.assertEqual((self.fsyncs.count(ino[NOMS[0]]), self.fsyncs.count(ino["pool.sha256"])), (2, 2))
+
+    def test_bascule_en_echec_puis_fermer(self):              # C-2 : fichier du lendemain déjà présent (O-3 de la G2)
+        jl = self.journal(J1 - 60)
+        open(os.path.join(self.d, NOMS[1]), "wb").close()
+        self.assertRaises(FileExistsError, jl.marqueur, J2)
+        jl.fermer()                                             # le descripteur clos à la bascule n'est pas refermé

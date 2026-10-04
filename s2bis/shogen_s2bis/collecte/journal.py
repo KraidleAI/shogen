@@ -3,16 +3,18 @@ JSON canonique (clés triées, séparateurs « , » et « : », UTF-8 sans écha
 qui porte `seq` (rang depuis 0) et `prec` (sha256 des octets de la ligne précédente, saut de ligne compris ; GENESE
 pour la première). Écriture sans tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt
 une heure est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
-fenêtre n'est admis que sur la grille et pour une fenêtre non close (ws ≥ `suivante`). Tout refus est nommé
-(ErreurJournal) et n'écrit rien. E-C-16 : un seul écrivain par journal, verrou
+fenêtre n'est admis que sur la grille, pour une fenêtre non close (ws ≥ `suivante`) et jamais avant la dernière
+fenêtre écrite (C-1). Tout refus est nommé (ErreurJournal) et n'écrit rien : l'enregistrement est contrôlé avant
+toute bascule et tout trou (C-6). Après une OSError, tout appel est refusé (JOURNAL/casse, C-2). E-C-16 : un seul
+écrivain par journal, verrou
 exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture.
 E-C-20 (CB-2) : un fichier par jour UTC ; le premier enregistrement d'une fenêtre d'un jour nouveau clôt le fichier
 (`cloture`, fsync), inscrit son sha256 au fichier de sommes `<préfixe>.sha256` (format de sha256sum, fsync), puis
 ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21, E-C-22 (CB-2) : un journal existant reprend
 au dernier enregistrement intègre ; une queue non intègre (ligne coupée, octets NUL, ligne de plus de LIMITE octets)
 n'est jamais réécrite : un segment neuf s'ouvre par `reprise`, qui la déclare (fichier, position, octets, sha256). La
-fenêtre du redémarrage et toute fenêtre close restent refusées ; le marqueur qui suit des fenêtres sans marqueur est
-précédé d'un `trou` (cause `arret`, `horloge_reculee` ou `saut`)."""
+fenêtre du redémarrage, toute fenêtre close et toute fenêtre jusqu'à la dernière écrite restent refusées (C-1) ; le
+marqueur qui suit des fenêtres sans marqueur est précédé d'un `trou` (cause `arret`, `horloge_reculee` ou `saut`)."""
 import fcntl
 import hashlib
 import json
@@ -75,13 +77,30 @@ def nom(prefixe, j, k=0):
     return f"{prefixe}-{j}-{k}.jsonl"
 
 
+def _terminal(methode):
+    """C-2 : une OSError (ouverture, écriture, fsync, fermeture de fichier) rend l'écrivain inutilisable ; tout
+    appel suivant est refusé (JOURNAL/casse) sans rien écrire ; `fermer` rend le verrou ; l'instance suivante
+    déclare la queue (`reprise`)."""
+    def appel(self, *a, **k):
+        if self.casse:
+            raise ErreurJournal("JOURNAL/casse", self.casse)
+        try:
+            return methode(self, *a, **k)
+        except OSError as e:
+            self.casse = f"{methode.__name__} : {e!r}"
+            raise
+    appel.__doc__ = methode.__doc__
+    return appel
+
+
 class Journal:
     def __init__(self, dossier, prefixe, w=60, fsync=os.fsync):
         if type(w) is not int or w <= 0 or HEURE % w:
             raise ErreurJournal("JOURNAL/grille", w)
         self.dossier, self.prefixe, self.w, self.fsync = dossier, prefixe, w, fsync
-        self.fd = self.verrou = None
+        self.fd = self.verrou = self.casse = None
 
+    @_terminal
     def ouvrir(self, ws):
         """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal."""
         self.verrou = os.open(os.path.join(self.dossier, self.prefixe + ".verrou"), os.O_RDWR | os.O_CREAT, 0o644)
@@ -101,12 +120,14 @@ class Journal:
             self._creer(jour(ws), 0, {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
         return self
 
+    @_terminal
     def ecrire(self, genre, ws, **champs):
         """Enregistrement `genre` de la fenêtre non close `ws` ; rend la tête (seq, sha256)."""
         if not isinstance(genre, str) or genre in RESERVES:
             raise ErreurJournal("JOURNAL/reserve", genre)
         return self._fenetre(genre, ws, champs)
 
+    @_terminal
     def marqueur(self, ws, **champs):
         """Clôt la fenêtre `ws` : marqueur, point de contrôle si elle clôt une heure, un seul fsync ; rend la tête."""
         tete = self._fenetre("marqueur", ws, champs)
@@ -117,27 +138,39 @@ class Journal:
         return tete
 
     def fermer(self):
-        """Ferme le fichier et libère le verrou, sans fsync : n'est durable que ce qui précède le dernier marqueur."""
-        for fd in (self.fd, self.verrou):
-            if fd is not None:
-                os.close(fd)
-        self.fd = self.verrou = None
+        """Ferme le fichier et libère le verrou, sans fsync : n'est durable que ce qui précède le dernier marqueur. Le
+        verrou est rendu même si la fermeture du fichier échoue (C-2)."""
+        try:
+            if self.fd is not None:
+                self._clore()
+        finally:
+            verrou, self.verrou = self.verrou, None
+            if verrou is not None:
+                os.close(verrou)
+
+    def _clore(self):
+        """Ferme le fichier courant ; son descripteur est oublié d'abord : un numéro rendu n'est jamais refermé."""
+        fd, self.fd = self.fd, None
+        os.close(fd)
 
     def _fenetre(self, genre, ws, champs):
         if champs.keys() & {"seq", "prec"}:
             raise ErreurJournal("JOURNAL/reserve", sorted(champs.keys() & {"seq", "prec"}))
         if type(ws) is not int or ws % self.w or ws < self.suivante:
-            raise ErreurJournal("JOURNAL/fenetre", f"{genre} {ws!r} hors grille ou close (suivante {self.suivante})")
-        if jour(ws) > self.jour:                                    # bascule de 00:00 UTC
+            raise ErreurJournal("JOURNAL/fenetre", f"{genre} {ws!r} hors grille ou passée (suivante {self.suivante})")
+        enr, bascule = {**champs, "type": genre, "ws": ws}, jour(ws) > self.jour
+        trou = genre == "marqueur" and ws > self.attendu
+        self._ligne(enr, self.seq + 1 + 2 * bascule + trou)         # C-6 : refus avant toute bascule et tout trou
+        if bascule:                                                 # bascule de 00:00 UTC
             self._ecrire({"type": "cloture", "jour": self.jour})
             self.fsync(self.fd)
-            os.close(self.fd)
+            self._clore()
             self._sommer(nom(self.prefixe, self.jour, self.k), self.h.hexdigest())
             self._creer(jour(ws), 0, {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
-        if genre == "marqueur" and ws > self.attendu:
+        if trou:
             self._ecrire({"type": "trou", "de": self.attendu, "a": ws - self.w, "cause": self.cause})
-            self.attendu, self.cause = ws, "saut"
-        return self._ecrire({**champs, "type": genre, "ws": ws})
+        self.suivante = ws                                          # C-1 : ws non décroissant dans l'exécution
+        return self._ecrire(enr)
 
     def _sommer(self, n, h):
         """Ligne « sha256  nom » du fichier clos `n` au fichier de sommes (format de sha256sum), puis fsync."""
@@ -156,7 +189,8 @@ class Journal:
 
     def _lire(self, n):
         """(position de la queue, état, empreinte du préfixe intègre) du fichier `n`. Intègre : ligne canonique, chaînée
-        à la précédente ; la première est une `ouverture` ou une `reprise`. État : celui du dernier intègre, ou None."""
+        à la précédente ; la première est une `ouverture` ou une `reprise`. État : celui du dernier intègre, ou None ;
+        `derniere` : ws du dernier enregistrement écrit par `ecrire` ou `marqueur`, None si le fichier n'en a pas."""
         etat, pos, h = None, 0, hashlib.sha256()
         with open(os.path.join(self.dossier, n), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
@@ -173,22 +207,25 @@ class Journal:
                         attendu = e["ws" if t == "marqueur" else "a"] + self.w
                     else:
                         attendu = etat["attendu"]
-                    intact = lien and type(attendu) is int and canonique(e) == ligne
+                    derniere = e["ws"] if t == "marqueur" or t not in RESERVES else etat and etat["derniere"]
+                    intact = lien and type(attendu) is int and canonique(e) == ligne and (
+                        derniere is None or type(derniere) is int)
                 except (ValueError, KeyError, TypeError, RecursionError, ErreurJournal):
                     intact = False
                 if not intact:
                     break
-                etat = {"seq": e["seq"], "prec": hashlib.sha256(ligne).hexdigest(), "type": t, "attendu": attendu}
+                etat = {"seq": e["seq"], "prec": hashlib.sha256(ligne).hexdigest(), "type": t, "attendu": attendu,
+                        "derniere": derniere}
                 h.update(ligne)
                 pos += len(ligne)
         return pos, etat, h
 
     def _reprendre(self, ws, fichiers):
         """Reprise au dernier intègre ; queues déclarées, fichiers achevés sommés ; segment neuf si queue, fichier clos
-        ou jour passé (clos ici)."""
-        queues = []
-        for j, k, n in reversed(fichiers):
-            pos, etat, h = self._lire(n)
+        ou jour passé (clos ici). C-1 : la dernière fenêtre écrite, cherchée au besoin dans les fichiers précédents, et
+        toute fenêtre antérieure restent refusées."""
+        queues, lus = [], ((j, k, n, *self._lire(n)) for j, k, n in reversed(fichiers))
+        for j, k, n, pos, etat, h in lus:
             q, taille = _empreinte(os.path.join(self.dossier, n), pos)
             if taille:
                 queues.insert(0, {"fichier": n, "position": pos, "octets": taille, "sha256": q})
@@ -196,9 +233,12 @@ class Journal:
                 break
         else:
             raise ErreurJournal("JOURNAL/illisible", "aucun enregistrement intègre")
+        derniere = etat["derniere"]
+        while derniere is None and (x := next(lus, None)):        # fichier sans fenêtre écrite : le précédent
+            derniere = x[4] and x[4]["derniere"]
         self.seq, self.prec, self.attendu = etat["seq"], etat["prec"], etat["attendu"]
         self.jour, self.k, self.h = j, k, h
-        self.suivante = max(self.attendu, ws + self.w)
+        self.suivante = max(self.attendu, (derniere or 0) + self.w, ws + self.w)
         self.cause = "horloge_reculee" if ws + self.w < self.attendu else "arret"
         ouvert = not queues and etat["type"] != "cloture"
         if ouvert:
@@ -211,7 +251,7 @@ class Journal:
             if ouvert:
                 self._ecrire({"type": "cloture", "jour": j})
                 self.fsync(self.fd)
-                os.close(self.fd)
+                self._clore()
             self._sommes([x for _j, _k, x in fichiers])
             jn = max(jour(ws), j)
             self._creer(jn, 1 + max([kk for jj, kk, _x in fichiers if jj == jn], default=-1), reprise)
@@ -234,10 +274,16 @@ class Journal:
                 self._sommer(x, _empreinte(os.path.join(self.dossier, x))[0])
 
     def _ecrire(self, enr):
-        octets = canonique({**enr, "seq": self.seq + 1, "prec": self.prec})
-        if len(octets) > LIMITE:
-            raise ErreurJournal("JOURNAL/taille", len(octets))
+        octets = self._ligne(enr, self.seq + 1, self.prec)
         _tout(self.fd, octets)
         self.h.update(octets)
         self.seq, self.prec = self.seq + 1, hashlib.sha256(octets).hexdigest()
         return self.seq, self.prec
+
+    def _ligne(self, enr, seq, prec=GENESE):
+        """Octets canoniques de `enr` au rang `seq` ; un `prec` fictif a la longueur du vrai. Plus de LIMITE octets :
+        refus JOURNAL/taille."""
+        octets = canonique({**enr, "seq": seq, "prec": prec})
+        if len(octets) > LIMITE:
+            raise ErreurJournal("JOURNAL/taille", len(octets))
+        return octets

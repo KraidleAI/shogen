@@ -1,8 +1,10 @@
 """CB-2, E-C-21 : reprise au dernier enregistrement intègre, queue non intègre conservée à l'octet et déclarée dans un
 segment neuf, fenêtre du redémarrage refusée, sommes rattrapées. Queues calculées sur les octets du test."""
+import errno
 import hashlib
 import json
 import os
+from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
 from tests.test_fichiers import J1, J2
@@ -73,11 +75,36 @@ class Reprise(AvecJournal):
     def test_queue_ligne_canonique_mal_chainee(self):
         self.queue(lambda s, p: ligne(s, "0" * 64, type="lecture", ws=m(4), k=4))
 
+    def test_queue_fenetre_non_entiere(self):                   # C-1 : jamais prise pour la dernière fenêtre écrite
+        self.queue(lambda s, p: ligne(s, p, type="lecture", ws="23:02", k=4))
+
     def test_queue_ligne_chainee_trop_longue_et_refus_a_l_ecriture(self):
         self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x="a" * j.LIMITE))
         with self.assertRaises(j.ErreurJournal) as e:
             self.journal(m(9)).ecrire("lecture", m(10), x="a" * j.LIMITE)
         self.assertEqual(e.exception.code, "JOURNAL/taille")
+
+    def test_ecriture_partielle_ecrivain_casse_queue_declaree(self):     # C-2 (sonde S-6 de la G2)
+        jl = self.journal()
+        jl.marqueur(m(1))
+        intact = self.etat()[FICHIER]
+
+        def coupe(fd, octets):                                  # disque plein : 40 octets écrits, puis ENOSPC
+            os.write(fd, octets[:40])
+            raise OSError(errno.ENOSPC, "disque plein (simulé)")
+        with mock.patch.object(j, "_tout", coupe):
+            self.assertRaises(OSError, jl.ecrire, "lecture", m(2), k=2)
+        for appel in (lambda: jl.ecrire("lecture", m(2), k=2), lambda: jl.marqueur(J2)):
+            with self.assertRaises(j.ErreurJournal) as e:
+                appel()
+            self.assertEqual(e.exception.code, "JOURNAL/casse")
+        jl.fermer()
+        self.journal(m(3)).fermer()
+        e, (seq, prec, _e) = self.etat(), chaine(intact)
+        q = e[FICHIER][len(intact):]
+        self.assertEqual(chaine(e[SEG1], seq, prec)[2][0]["queue"], [
+            {"fichier": FICHIER, "position": len(intact), "octets": 40, "sha256": hashlib.sha256(q).hexdigest()}])
+        self.assertEqual(e["pool.sha256"], f"{hashlib.sha256(e[FICHIER]).hexdigest()}  {FICHIER}\n".encode())
 
     def test_queue_imbrication_profonde_et_refus_a_l_ecriture(self):
         self.queue(lambda s, p: b"[" * 100000 + b"]" * 100000 + b"\n")

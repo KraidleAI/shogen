@@ -7,6 +7,8 @@
 - **Statut** : texte tenu à jour à chaque sous-lot du collecteur ; il est scellé au paquet de S2-bis avec le commit du
   collecteur. Code de référence : `s2bis/shogen_s2bis/collecte/journal.py`. Le test de conformité d'un journal produit
   par le collecteur entier (E-C-24) est celui du sous-lot CB-18.
+- **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
+  de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -40,12 +42,20 @@
 Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont réservés à l'écrivain. Un champ nommé
 `seq` ou `prec` est refusé.
 
+Tout refus est nommé (`JOURNAL/…`) et n'écrit rien (CB-2d, C-6 de la G2 de P1) : l'enregistrement demandé est contrôlé
+(type des valeurs, borne LIMITE du §7) avant la bascule de jour (§6) ou le `trou` (§8) qu'il appellerait.
+
 ## 3. Fenêtres
 
 1. `ws` est un entier, multiple de w = 60 s depuis l'époque Unix : la fenêtre est l'intervalle demi-ouvert [ws, ws + w).
-2. Un enregistrement de fenêtre (tout type sauf `ouverture` et `point`) porte `ws` ≥ `suivante` : aucune ligne n'est
-   écrite pour une fenêtre déjà close par son marqueur. Le marqueur de `ws` porte `suivante` à ws + w ; les marqueurs
-   sont donc strictement croissants.
+2. Un **enregistrement de fenêtre** est un enregistrement écrit par `ecrire` ou `marqueur` (types autres que
+   `ouverture`, `point`, `cloture`, `reprise` et `trou`). Il porte `ws` ≥ `suivante` et `ws` ≥ la dernière fenêtre
+   écrite (CB-2d, C-1) :
+   - aucune ligne n'est écrite pour une fenêtre déjà close par son marqueur ; le marqueur de `ws` porte `suivante` à
+     ws + w ; les marqueurs sont donc strictement croissants ;
+   - dans une exécution, `window_start` est non décroissant : plusieurs enregistrements d'une même fenêtre se suivent,
+     jamais un enregistrement d'une fenêtre antérieure. En particulier, un enregistrement d'un jour J n'entre jamais
+     dans le fichier de J + 1 après la clôture de J.
 3. Un journal neuf ouvert pendant la fenêtre ws0 admet ws ≥ ws0 + w ; après une reprise, voir §7.
 
 ## 4. Durabilité
@@ -53,6 +63,13 @@ Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont 
 L'écriture se fait sans tampon. `fsync` est appelé à chaque marqueur (après le point de contrôle s'il y en a un), et
 seulement là. Un arrêt brutal peut donc perdre les enregistrements postérieurs au dernier marqueur, ou laisser une
 dernière ligne tronquée.
+
+**Arrêt sur erreur d'entrée-sortie** (CB-2d, C-2) : toute `OSError` levée par une écriture, un `fsync`, une ouverture
+ou une fermeture de fichier pendant `ouvrir`, `ecrire` ou `marqueur` (bascule, sommes et reprise comprises) laisse
+l'écrivain inutilisable. L'erreur remonte à l'appelant ; tout appel suivant est refusé (`JOURNAL/casse`) sans rien
+écrire. `fermer` rend toujours le verrou, même si la fermeture du fichier échoue. L'instance suivante déclare la
+ligne déchirée comme queue (§7) : aucun enregistrement n'est écrit après elle, et chaque ligne du fichier de sommes
+reste égale au sha256 des octets de son fichier.
 
 ## 5. Un seul écrivain (CB-1b, E-C-16)
 
@@ -95,9 +112,16 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    trou, lue dans l'état repris) et `queue` : liste de `{fichier, position, octets, sha256}` (octet de début de la
    queue, longueur, empreinte de ses octets), ou null. Un `fsync` suit son écriture. La chaîne reprend au dernier
    enregistrement intègre : le `prec` de la `reprise` est l'empreinte de sa ligne.
-5. Après une reprise, un enregistrement de fenêtre exige ws ≥ max(`suivante`, fenêtre du redémarrage + w) : la
-   fenêtre du redémarrage et toute fenêtre déjà close restent refusées, même si l'horloge a reculé ; `window_start`
-   est strictement croissant d'un démarrage au suivant.
+5. Après une reprise, un enregistrement de fenêtre exige ws ≥ max(`suivante`, dernière fenêtre écrite + w, fenêtre
+   du redémarrage + w) (CB-2d, C-1). La **dernière fenêtre écrite** est le `ws` du dernier enregistrement de fenêtre
+   (§3.2) dans l'ordre de la chaîne ; si le fichier repris n'en contient aucun (coupure entre une `ouverture` ou une
+   `reprise` et le premier enregistrement de fenêtre), elle est cherchée dans les fichiers précédents, du plus récent
+   au plus ancien. Ainsi la fenêtre du redémarrage, toute fenêtre déjà close et toute fenêtre entamée sans marqueur
+   par l'exécution précédente restent refusées, même si l'horloge a reculé : `window_start` est strictement croissant
+   d'un démarrage au suivant. Une fenêtre entamée puis interrompue est déclarée par le `trou` qui précède le marqueur
+   suivant (§8), jamais complétée par l'exécution suivante. La fenêtre du redémarrage reste refusée même si elle n'a
+   encore aucune ligne (Q-4 de la G2, adjugée par l'orchestrateur) : un redémarrage coûte une fenêtre, déclarée
+   `arret`.
 6. Aucun enregistrement intègre dans tout le journal : refus nommé `JOURNAL/illisible` ; l'écrivain ne démarre pas et
    ne crée jamais une seconde chaîne dans le même dossier.
 7. Limite déclarée : la reprise ne contrôle pas le lien entre la première ligne d'un fichier et la dernière du fichier
@@ -111,7 +135,9 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    - `horloge_reculee` si l'horloge du redémarrage était en arrière de la dernière fenêtre close (fenêtre du
      redémarrage + w < `suivante`) ;
    - `saut` pour des fenêtres sautées pendant l'exécution.
-   Le trou avance l'état : un même intervalle n'est jamais déclaré deux fois, même si le marqueur est ensuite refusé.
+   Un marqueur refusé n'écrit pas son trou (§2, CB-2d). Un `trou` écrit avance l'état, relu à la reprise
+   (`suivante` = `a` + w) : après une coupure entre un trou et son marqueur, le même intervalle n'est jamais déclaré
+   deux fois.
 2. À la reprise, chaque fichier achevé (clos, abandonné à une queue, ou laissé pour un segment neuf) reçoit sa ligne
    au fichier de sommes s'il n'y figure pas, sha256 pris sur ses octets ; une dernière ligne coupée du fichier de sommes
    est close par un saut de ligne, jamais réécrite.

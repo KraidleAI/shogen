@@ -1,5 +1,7 @@
 """CB-1, E-C-16, E-C-18, E-C-19 : écrivain chaîné. Octets attendus et sha256 écrits à la main (printf et sha256sum,
-journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits."""
+journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits.
+CB-2d (C-2 de la G2 de P1) : après une OSError, l'écrivain refuse tout ; `fermer` rend toujours le verrou."""
+import errno
 import fcntl
 import hashlib
 import json
@@ -40,10 +42,16 @@ class Base(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
-        self.d, self.fsyncs = d.name, []
+        self.d, self.fsyncs, self.panne = d.name, [], None
+
+    def espion(self, fd):
+        """fsync injecté : relève l'inode du fichier ; lève `panne` si elle est posée (C-2)."""
+        if self.panne:
+            raise self.panne
+        self.fsyncs.append(os.fstat(fd).st_ino)
 
     def journal(self, ws=WS):
-        jl = j.Journal(self.d, "pool", fsync=lambda fd: self.fsyncs.append(os.fstat(fd).st_ino))
+        jl = j.Journal(self.d, "pool", fsync=self.espion)
         self.addCleanup(jl.fermer)
         return jl.ouvrir(ws)
 
@@ -116,3 +124,24 @@ class Ecrivain(Base):
                     appel()
                 self.assertEqual(e.exception.code, code)
         self.assertEqual((self.etat(), len(self.fsyncs)), (avant, 1))
+
+    def test_fsync_en_echec_ecrivain_casse_sans_doublon(self):          # C-2 (sonde S-5 de la G2)
+        jl = self.journal()
+        jl.marqueur(WS + 60)
+        self.panne = OSError(errno.EIO, "fsync en échec (simulé)")
+        self.assertRaises(OSError, jl.marqueur, WS + 120)
+        self.panne, avant = None, self.etat()
+        for appel in (lambda: jl.marqueur(WS + 120), lambda: jl.ecrire("lecture", WS + 180), lambda: jl.ouvrir(WS)):
+            with self.assertRaises(j.ErreurJournal) as e:
+                appel()
+            self.assertEqual((e.exception.code, self.etat()), ("JOURNAL/casse", avant))
+        self.assertEqual([e["ws"] for e in chaine(avant[FICHIER])[2] if e["type"] == "marqueur"], [WS + 60, WS + 120])
+        jl.fermer()                                             # verrou rendu : l'instance suivante reprend
+        self.journal(WS + 240)
+
+    def test_fermer_rend_le_verrou_si_la_fermeture_du_fichier_echoue(self):     # C-2
+        jl = self.journal()
+        os.close(jl.fd)                                         # la fermeture du fichier échouera (EBADF)
+        self.assertRaises(OSError, jl.fermer)
+        with open(os.path.join(self.d, "pool.verrou"), "rb") as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
