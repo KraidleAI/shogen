@@ -404,6 +404,8 @@ def produire(argv: list) -> int:
             out = {n: {"etiquette": e, "segment": s, "plages": [list(x) for x in pl], **{k: f(c, j, pl, s) for k, f in (
                 ("r1", r1.recompute_from_journal), ("d5", r1.recompute_d5_from_journal),
                 ("lm", lm.recompute_lm_from_journal), ("r2", r2.recompute_r2_from_journal))}} for n, s, pl, e in var}
+            for n in (v[0] for v in var if v[3] == INCLUSE):    # « R1 discrimine » de la variante incluse étiqueté
+                out[n]["r2"]["drapeau_2"]["etiquette"] = INCLUSE    # à son niveau (SHOGEN-RT-ETIQUETTE-INCLUSE-1)
         else:
             nom, seg, pl, etiquette = next(x for x in SORTIES if x[0] == a.nom)
             tete, corps = f"[ÉTIQUETTE] {nom} : {etiquette}", [report.render_report(c, j, exclude_ranges=pl,

@@ -70,10 +70,12 @@ class TestRecalculCopieExacte(unittest.TestCase):
         for n, seg, pl in [x[:3] for x in TABLE] + [("j28-incluse", TABLE[1][1], ())]:
             with self.subTest(sortie=n):
                 self.assertEqual(out[n]["r2"]["content"]["exact_copy_pairs"], [["coingecko", "defillama"]])
-                self.assertEqual({k: out[n][k] for k in ("r1", "d5", "lm", "r2")}, relu({k: f(
-                    self.c, self.j, pl, seg) for k, f in (("r1", r1.recompute_from_journal), ("d5",
+                attendu = relu({k: f(self.c, self.j, pl, seg) for k, f in (("r1", r1.recompute_from_journal), ("d5",
                     r1.recompute_d5_from_journal), ("lm", lm.recompute_lm_from_journal), ("r2",
-                    r2.recompute_r2_from_journal))}))
+                    r2.recompute_r2_from_journal))})
+                if n == "j28-incluse":      # SHOGEN-RT-ETIQUETTE-INCLUSE-1 ; texte contrôlé dans test_rendu_production
+                    attendu["r2"]["drapeau_2"]["etiquette"] = ru.INCLUSE
+                self.assertEqual({k: out[n][k] for k in ("r1", "d5", "lm", "r2")}, attendu)
 
     def test_decimal_ensembles_en_listes_triees(self):
         """_decimal (default de json.dumps) : frozenset et set en liste triée ({8, 1} s'itère 8 puis 1 sous CPython :
