@@ -1,6 +1,6 @@
 # Shōgen — kit logo (direction 3B « Amont commun »)
 
-Choix validé. Accroche : **Comptez vos sources. Vraiment.** (EN : *Count your sources. For real.*)
+Choix validé. Accroche : **Many lights. How many roots?** (FR : *Beaucoup de lumières. Combien de racines ?*) — choisie par l'investisseur le 2026-10-04, à la place de « Comptez vos sources. Vraiment. ».
 
 Symbole : trois sources indépendantes convergeant vers un agrégateur unique (corail).
 
@@ -33,3 +33,7 @@ Fonts : https://fonts.google.com/specimen/Sora
 ## Provenance (versement de l'orchestrateur, 2026-10-04 02:59:27 UTC)
 
 Remis par l'investisseur le 2026-10-04 (« voici la charte graphique de SHOGEN »), archive `CHARTE_SHOGEN.zip` (sha256 `f515f2284bb65819768905a69a6b489a8001328eb02b467fe09791f0f701e75c`), export Claude Design ; versé ici le seul kit retenu (`project/shogen-brand/`, direction 3B « Amont commun »), à l'octet sauf ce paragraphe ; les explorations (`Logos Shogen.dc.html`) et les doublons ne sont pas versés. `support.js` est le runtime généré qui affiche `Shogen Brand Guidelines.dc.html` ; il n'est pas du code produit. Empreintes : `SHA256SUMS` (calculées avant l'ajout de ce paragraphe pour `README.md`).
+
+## Changement d'accroche (2026-10-04 03:12:01 UTC)
+
+Sur demande de l'investisseur (« je n'aime pas l'accroche. mais celle que tu as utilisé hier me plait, ROOTS... ») : l'accroche devient « Many lights. How many roots? » (FR « Beaucoup de lumières. Combien de racines ? »), reprise du fil publié le 2026-10-02. Remplacée dans `logo/lockup.svg`, `logo/lockup-dark.svg` et `Shogen Brand Guidelines.dc.html` (texte seul, même police, même position). Les manifestes C2PA de ces deux SVG décrivent la version d'origine : ils ne valent plus pour la version modifiée. `SHA256SUMS` recalculé.
