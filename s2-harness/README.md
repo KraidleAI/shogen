@@ -98,6 +98,26 @@ octet (`SHA_BASE_SANS_OPTION`, `tests/test_exclusion.py`, test iv).
   seul : 206 (DOCS-S2-b ajoute le test `test_v_ligne_nmin_suit_le_journal`). Ce compte se re-mesure à
   chaque lot qui change le compte.
 
+- **2026-10-04 — mesure** (copie `git archive` du commit `5afbdd2`, branche `partie-4-execution`,
+  `SHOGEN_S2_CAMPAGNE_CONTROL` non posée ; lot DETTES-A, item SHOGEN-DOC-HARNAIS-2) :
+  `python3 -B -m unittest discover -s tests -t .` → « Ran 398 tests … OK (skipped=2) ». Lots qui ont touché
+  `s2-harness/tests` depuis la mesure du 2026-10-02 : partie 2 (étape A : A1, A2, qui est DOCS-S2-b, commit `37db486`, et A3 ;
+  étape B, RENDU-2 : B0 à B6b ; étape C, RENDU-1 : C1a à C3f ; corrections G2a à G2f), partie 3 (P3a à
+  P3g) et lot CORR de la partie 4 (CORR-1 à CORR-3d, corrections K-1 et K-2 ; commit d'analyse `f35a70c`).
+  Comptes re-mesurés par ce lot sur une copie de chaque commit, même commande : 307 à `b323f03`
+  (D5-AMEND-b), 376 à la fusion de la partie 2 (`0cc5a92`), 383 à la fusion de la partie 3 (`fdc7252`),
+  398 à `f35a70c` ; inchangé depuis (`git diff f35a70c 5afbdd2 -- s2-harness` est vide : ni l'exécution
+  unique ni le rapport ne touchent ce dossier). Les deux tests sautés restent les deux tests (ii) de
+  `TestExclusionJournalReel` (`tests/test_exclusion.py`), variable non posée (ADR-0028 annexe D.4 a). Ce
+  compte se re-mesure à chaque lot qui le change.
+
 À venir : le rendu servi de la sortie S2 (`docs/11-mesures-pilotes.md`), par la
 chaîne de lots de l'ADR-0028 (annexe A : segments, pool d'analyse, rendu, paquet de
 pré-enregistrement, exécution unique). Ce fichier ne porte aucun résultat de campagne.
+
+> *Ajout daté du 2026-10-04 (lot DETTES-A, item SHOGEN-DOC-HARNAIS-2)* : ce qui était « à venir » est
+> fait. L'exécution unique a eu lieu le 2026-10-04 (rendus versés à l'octet dans
+> `docs/adr-0028/execution/rendu-2026-10-04/`) et le rapport `docs/11-mesures-pilotes.md` est validé
+> (cp-1 complet, 2026-10-04) ; ses chiffres restent hors de ce fichier. Collecte S2 : « L'arrêter
+> (Recommandé) », décision de l'investisseur du 2026-10-04 (JOURNAL, recopiée en
+> `docs/11-mesures-pilotes.md` §1). La suite est proposée par ADR-0029 (S2-bis, statut « proposée »).
