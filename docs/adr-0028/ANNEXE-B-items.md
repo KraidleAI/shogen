@@ -875,3 +875,22 @@ SIM-PLATEFORME-2 : pas d'item neuf, rattaché comme limite déclarée à la limi
 | SHOGEN-EMD-PROFIL-1 | l'EMD_s est un excès de K ; la co-défaillance qu'il représente dépend du profil des taux du pool (facteur r₀ − r₁, qui peut s'annuler puis changer de signe) ; non imprimé | orch. | lot de la sensibilité, ou G0 du rapport public | une ligne descriptive hors décision, ou une limite écrite [inféré] | G1 du lot DETTES-SIM |
 | SHOGEN-GARDE-NIVEAU-ZSEUL-2 | z_s seul mesuré au-dessus de 0,01 en estimation ponctuelle aux petits p et sous n = 7 200 (0,0116, SE 0,0015 ; 0,0107, SE 0,0009), sans l'être à deux erreurs-types | orch. | avant toute lecture de z_s seul | R = 10⁵ sur les quatre cellules L = 1 des deux plus petits p, choisies par le motif du G0 §3, pré-enregistré ; ≈ 2,1 h de CPU [G2] | G1 et G2 du lot DETTES-SIM |
 | SHOGEN-POOLEE-NIVEAU-1 | z_pool (exploratoire) rejette à tort 8,3 % à 33,1 % sous dépendance sérielle synthétique ; son approximation normale ne tient qu'à fenêtres iid ; à écrire à côté de la poolée (z_pool,bloc ≈ 2,60 du lot POST-PREREG, B.50) | orch. | prochain texte qui cite la poolée (rapport public) | une limite écrite [inféré] | G1 du lot DETTES-SIM |
+
+## B.54 Amendement daté du 2026-10-04 09:20:41 UTC (heure produite par le script d'écriture) : préparation du cp-2 de clôture de S2 (lot CP2-G7)
+
+Dossier de preuves G0 à G6 du chemin de recalcul versé : `docs/adr-0028/DOSSIER-G7-S2.md` (lecteur `claude-opus-5-5`, tête
+`b24ff86`). Décisions de l'orchestrateur : (1) **ordre** : cp-2, puis G7, puis clôture (D9 voie A et annexe A ; D6 (ii) l.196
+dit « G7 puis cp-2 » : écart déclaré, deux sources contre une) ; (2) **gel jugé** : le commit d'analyse `f35a70c`, qui a produit les
+rendus de S2 ; les changements postérieurs du chemin (lot DETTES-B1) sont couverts par leurs propres G1 et G2 (B.49) ; (3)
+SHOGEN-ERRATA-ADR0028-1 : déclencheur échu (« au commit de cette ADR ») **re-daté par décision écrite** : « avant G9 (publication) » ;
+restent les points 2, 5, 6 du §8 et les actes 8 et 13 à 16 de §1 bis.11 (B.48) ; motif : le point 2 (amendement d'ADR-0025) se pose
+par la procédure D.2 n° 6, hors de portée des agents ; les autres sont des renvois datés sans effet sur la mesure. Item **fermé** :
+SHOGEN-E1-AVIS-FRAICHEUR-1 (JOURNAL, même heure). Le G3 opérant complet, comptes `--hors-refs` compris, est consigné au JOURNAL.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-G4-RECALCUL-METRIQUES-1 | G4 non tenu sur le chemin de recalcul : aucune baseline de métriques (R-15) ni fonction de fitness, que l'audit d'entrée exige au premier code produit (`docs/AUDIT-ENTREE.md` l.17, l.37) | orch. | avant toute qualité « produit » du chemin (recalcul externe payant, G9) | une baseline et une ou deux fonctions de fitness [inféré] | dossier G7, G4 |
+| SHOGEN-G2-CHECKLIST-CORPUS-1 | aucune relecture G2 ne cite la checklist G2 du corpus ; les tests de la phase A n'ont pas de relecture G2 au dépôt ; les rapports G2 de la partie 1 et de CI-S2 sont hors dépôt | orch. | prochain lot relu en G2 ; versement des rapports à la custodie du poste local | une ligne de brief et un versement [inféré] | dossier G7, G2 |
+| SHOGEN-G2-ENREG-ROLE-1 | aucune relecture G2 du chemin ne cite d'enregistrement de rôle G2 (`shogen.oracle-record.v1`), que D6 (viii) attend et que le cp-2 contrôle | orch. | prochain lot relu en G2 sur le chemin | une commande par relecture [inféré] | dossier G7, G2 |
+| SHOGEN-G1-JOURNAUX-MANQUANTS-1 | journal G1 absent du dépôt pour CI-S2 (provenance dans le seul message de commit) et DETTES-A | orch. | avant G9 | un versement ou une limite écrite [inféré] | dossier G7, G1 |
+| SHOGEN-G6-PIECE-RECALCUL-1 | aucune pièce G6 écrite pour le chemin de recalcul (SBOM, réglementaire) ; bibliothèque standard seule, licence MIT OR Apache-2.0 | orch. | avant G9 | une pièce courte [inféré] | dossier G7, G6 |
