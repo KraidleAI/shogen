@@ -933,3 +933,22 @@ la consigne « TMPDIR dédié par copie » reste en vigueur.
 | SHOGEN-INTERDITS-LISTE-UNIQUE-1 | la liste des emplacements interdits vit dans le code, dans les briefs, dans `fm11.py` et ailleurs, sans lien mécanique ; un emplacement ajouté aux briefs mais pas au code imprimerait son texte | orch. | avec SHOGEN-SG9-CORPUS-1 | une liste versionnée unique et un test [inféré] | G1 et G2 du lot SG5-INTERDITS |
 | SHOGEN-GATES-LIENS-SYMBOLIQUES-1 | le parcours des gates suit les liens symboliques : un lien vers un emplacement interdit expose ses citations sous un chemin autorisé (mesuré sur fixture ; aucun lien versionné) | orch. | prochain lot sur `documents.rs` | refus des liens ou canonisation, un test [inféré] | G1 et G2 du lot SG5-INTERDITS |
 | SHOGEN-HARNAIS-CIBLE-PARTAGEE-1 | deux copies qui partagent un `CARGO_TARGET_DIR` testent le code de l'autre copie sans recompiler (mesuré par le réviseur) | orch. | prochain brief de lot Rust | une consigne de gabarit : cible cargo dédiée par copie [mesuré] | G2 du lot SG5-INTERDITS |
+
+## B.57 Amendement daté du 2026-10-04 15:07:12 UTC (heure produite par le script d'écriture) : brouillon de la version publique du rapport de S2 versé (lot DOCS11-PUBLIC)
+
+Brouillon versé, **non publié** : `docs/publication/11-mesures-pilotes-public.md` (sha256 `4de98654…7688`) ; pièces internes, jamais à
+publier : `docs/publication/interne/` (table de correspondance, qui recopie les passages retirés ; liste des acteurs nommés pour le
+préavis privé ; sortie du contrôle). Journal G1 du worker (`docs/G1-lot-DOCS11-PUBLIC.md`) et relecture G2 neuve
+(`docs/G2-lot-DOCS11-PUBLIC.md` : ACCEPTE-AVEC-CORRECTIONS C-1 à C-3, appliquées). Décisions de l'investisseur du 2026-10-04 (JOURNAL,
+14:52:24 UTC) intégrées : J14 publié, libellé factuel pour Pyth (E-14), MONARK nommé, rapport seul (E-16 à E-18), phrase neutre à la
+place de la consigne citée (E-15). Les retouches E-14 à E-18, postérieures à la relecture G2, sont tenues par le contrôle par script
+(nombres, motifs, registre, passages protégés, rejeu à l'octet) et par 75 tests et 82 mutants ; la lecture de l'investisseur avant
+son feu vert vaut validation finale. Adjudications de l'orchestrateur sur les deux questions du worker : les scripts du rédacteur et le
+paquet scellé suivent le régime « remis sur demande, sous accord » (sans le paquet, le sceau ne se contrôle pas). FM-1.1 du worker et
+du réviseur : 0 fragment. Items **tranchés ou fermés** : SHOGEN-PUBLIC-J14-1, SHOGEN-PUBLIC-PYTH-LIBELLE-1, SHOGEN-PUBLIC-MONARK-1,
+SHOGEN-PUBLIC-PERIMETRE-1 (rapport seul), SHOGEN-PUBLIC-MOTIFS-OUVERTS-1 (aucun nom privé signalé).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PUBLIC-MENTION-FEU-VERT-1 | la mention « brouillon, non publié » de l'en-tête attend le feu vert écrit de l'investisseur ; la remplacer ajoute une date : retouche déclarée et contrôle rejoué | orch. | feu vert écrit de l'investisseur | une retouche et un rejeu [inféré] | G1 et G2 du lot DOCS11-PUBLIC |
+| SHOGEN-PUBLIC-PREAVIS-1 | préavis privé aux acteurs nommés (liste interne) avant toute publication (décision q. 15 du 2026-10-04) | orch. ; envoi : investisseur | après le feu vert de lecture, avant la publication | un message par acteur [inféré] | décision de l'investisseur, q. 15 |
