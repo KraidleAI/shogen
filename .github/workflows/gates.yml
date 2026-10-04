@@ -141,6 +141,11 @@ jobs:
     # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
     # l'oracle local la rejoue sous garde réseau (0 tentative). Le job ne coupe pas
     # le réseau du runner (item SHOGEN-CI-S2-FORGE-1).
+    # Sous-lot D8a-3 (2026-10-04, lot DETTES-B1 ; SHOGEN-CI-S2-SAUT-1, ADR-0028
+    # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
+    # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final
+    # exigé, sauts dont le motif nomme la variable scellée seuls admis, Ran ≥ plancher
+    # committé) ; ses cas tournent avant la suite.
     # name: = identifiant du job, un seul nom pour le futur required check.
     name: s2-harness-unittest
     # Image épinglée : ubuntu-latest bascule vers Ubuntu 26 à partir du 2026-10-19
@@ -149,8 +154,9 @@ jobs:
     # que python3 le désigne est inféré, la ligne python3 --version le mesure au
     # premier run.
     runs-on: ubuntu-24.04
-    # Suite mesurée à moins de 10 s en local (188 tests, 2026-09-29) : 10 min
-    # bornent un blocage sans couper un run normal.
+    # Suite mesurée à moins de 10 s en local (188 tests, 2026-09-29) ; 398 tests en
+    # 63 à 168 s dans le conteneur Linux du lot DETTES-B1 (2026-10-04), cas du
+    # vérificateur en 1 à 2 s : 10 min bornent un blocage sans couper un run normal.
     timeout-minutes: 10
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1,
@@ -161,16 +167,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
-      - name: suite unittest de s2-harness (fixtures, sans variable scellée)
+      - name: cas du vérificateur de la suite (D8a-3, SHOGEN-CI-S2-SAUT-1)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de s2-harness (fixtures, sans variable scellée), jugée par le vérificateur
         # shell: bash, soit bash --noprofile --norc -eo pipefail {0} (syntaxe des
         # workflows GitHub, table du mot-clé shell).
         # SHOGEN_S2_CAMPAGNE_CONTROL n'est pas posée par ce job, et unset la retire
-        # si l'environnement la portait : sans elle, le test (ii) de test_exclusion,
-        # seul lecteur du control.jsonl scellé (ADR-0028, annexe D.2 pt 7), lève
-        # SkipTest. L'option -v imprime chaque test et le motif de ce saut.
+        # si l'environnement la portait (le vérificateur la retire aussi de celui de
+        # la suite) : sans elle, les deux tests nommés de test_exclusion, seuls
+        # lecteurs du control.jsonl scellé (ADR-0028, annexe D.4 a), lèvent SkipTest.
+        # Le vérificateur lance la suite avec -v (chaque test et le motif de chaque
+        # saut), recopie sa sortie, puis juge résumé, sauts et compte.
         shell: bash
         run: |
           unset SHOGEN_S2_CAMPAGNE_CONTROL
           python3 --version
-          cd s2-harness
-          python3 -B -m unittest discover -s tests -t . -v
+          python3 -B enforcement/verdict-suite-s2.py
