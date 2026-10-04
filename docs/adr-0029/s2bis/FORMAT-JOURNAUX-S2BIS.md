@@ -29,10 +29,11 @@
 
 | type | champs propres | écrit par |
 |---|---|---|
-| `ouverture` | `jour` (AAAA-MM-JJ, UTC), `suivante` (première fenêtre admise) | l'écrivain : premier enregistrement d'un journal neuf |
+| `ouverture` | `jour` (AAAA-MM-JJ, UTC), `suivante` (première fenêtre ni close ni déclarée en trou) | l'écrivain : premier enregistrement d'un journal neuf, puis de chaque fichier quotidien (§6) |
 | `marqueur` | `ws` ; champs de la boucle (CB-4) | `marqueur(ws)` : clôt la fenêtre `ws` |
 | `point` | `ws` : fenêtre qui clôt l'heure, (`ws` + w) multiple de 3 600 | l'écrivain, juste après ce marqueur ; son empreinte est la tête exportée (E-C-35) |
 | `cloture` | `jour` : jour UTC du fichier qu'il clôt | l'écrivain : dernier enregistrement d'un fichier quotidien (§6) |
+| `reprise` | `ws` (fenêtre de l'horloge au redémarrage), `suivante`, `queue` | l'écrivain, au redémarrage (§7) |
 | tout autre type (`lecture`, `sante`, `run_params`…) | `ws` ; champs de son sous-lot | `ecrire(type, ws, …)` |
 
 Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont réservés à l'écrivain. Un champ nommé
@@ -44,7 +45,7 @@ Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont 
 2. Un enregistrement de fenêtre (tout type sauf `ouverture` et `point`) porte `ws` ≥ `suivante` : aucune ligne n'est
    écrite pour une fenêtre déjà close par son marqueur. Le marqueur de `ws` porte `suivante` à ws + w ; les marqueurs
    sont donc strictement croissants.
-3. Un journal neuf ouvert pendant la fenêtre ws0 admet ws ≥ ws0 + w.
+3. Un journal neuf ouvert pendant la fenêtre ws0 admet ws ≥ ws0 + w ; après une reprise, voir §7.
 
 ## 4. Durabilité
 
@@ -74,3 +75,28 @@ S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item 
    dossier, la contrôle.
 4. Limite déclarée : la création d'un fichier n'est pas suivie d'un `fsync` du dossier ; la durabilité de l'entrée de
    répertoire après une coupure de courant n'est pas établie ici (item proposé à l'orchestrateur).
+
+## 7. Reprise et segments (CB-2b, E-C-21)
+
+1. À l'ouverture d'un journal existant, verrou pris, l'écrivain relit les fichiers du plus récent au plus ancien, ligne
+   à ligne (LIMITE = 4 194 304 octets au plus par ligne, saut compris ; l'écrivain refuse d'écrire une ligne plus
+   longue), jusqu'au premier fichier qui contient un enregistrement intègre. Intègre : ligne terminée par 0x0A, objet
+   JSON canonique, chaîné à la ligne précédente (`seq` + 1, `prec`) ; la première ligne d'un fichier est une
+   `ouverture` ou une `reprise`. La lecture d'un fichier s'arrête à la première ligne non intègre : elle et tout ce qui
+   suit forment la **queue** du fichier.
+2. Une queue n'est jamais réécrite ni tronquée. S'il en existe une (dans le fichier repris, ou un fichier plus récent
+   sans enregistrement intègre), l'écrivain ouvre un **segment** neuf : numéro suivant du jour le plus tardif entre le
+   jour repris et celui de l'horloge (l'ordre des noms reste l'ordre de la chaîne), premier enregistrement `reprise`.
+3. Sans queue : un fichier repris d'un jour passé reçoit sa `cloture`, puis le fichier du jour s'ouvre par `reprise` ;
+   un fichier repris déjà clos laisse place à un fichier neuf ouvert par `reprise` ; sinon `reprise` s'écrit à sa suite.
+4. `reprise` porte `ws` (fenêtre de l'horloge au redémarrage), `suivante` (première fenêtre ni close ni déclarée en
+   trou, lue dans l'état repris) et `queue` : liste de `{fichier, position, octets, sha256}` (octet de début de la
+   queue, longueur, empreinte de ses octets), ou null. Un `fsync` suit son écriture. La chaîne reprend au dernier
+   enregistrement intègre : le `prec` de la `reprise` est l'empreinte de sa ligne.
+5. Après une reprise, un enregistrement de fenêtre exige ws ≥ max(`suivante`, fenêtre du redémarrage + w) : la
+   fenêtre du redémarrage et toute fenêtre déjà close restent refusées, même si l'horloge a reculé ; `window_start`
+   est strictement croissant d'un démarrage au suivant.
+6. Aucun enregistrement intègre dans tout le journal : refus nommé `JOURNAL/illisible` ; l'écrivain ne démarre pas et
+   ne crée jamais une seconde chaîne dans le même dossier.
+7. Limite déclarée : la reprise ne contrôle pas le lien entre la première ligne d'un fichier et la dernière du fichier
+   précédent ; ce contrôle revient au lecteur du recalcul (RB-1) et au lecteur indépendant (RB-18).
