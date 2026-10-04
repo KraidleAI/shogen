@@ -94,7 +94,7 @@ Aucune installation. Aucun fichier suivi modifié. Aucune opération git. Pièce
 **Option B : notaire en enclave attestée (SGX, TDX, SEV-SNP, Nitro).**
 
 - Position de l'amont (billet 2026-06-23) [lu] :
-  - une enclave “moves it from Peer to AWS, a far better-resourced and more accountable custodian” : amélioration d'intégrité contre un opérateur unique ;
+  - une enclave “it moves from Peer to AWS, a far better-resourced and more accountable custodian” : amélioration d'intégrité contre un opérateur unique ;
   - « A measurement is a hash, not a meaning » : il faut les sources, une construction reproductible et le hash qui concorde ;
   - la racine est le fournisseur : « AWS is the root, unconditionally » ;
   - et la combinaison recommandée est « run the zkTLS verifier inside the enclave », la confidentialité restant du côté du prouveur. Pour Shōgen la confidentialité est sans objet (endpoints publics, sans clé : `session/src/main.rs` l. 20-25), seule l'intégrité compte.
@@ -121,7 +121,7 @@ Aucune installation. Aucun fichier suivi modifié. Aucune opération git. Pièce
 | Projet | Ce que la source dit | Compatible avec la pile (`tlsn` épinglé) ? |
 |---|---|---|
 | Reclaim | « An "attestor" is a server that sits between the reclaim user & the internet » (README) ; protection contre un attestor compromis : « The only protection against fake proofs here is decentralisation or self-hosting of the attestor » (FAQ détenue, relue) ; décentralisation par un AVS Eigen, **exemple sur Holesky (chainId 17000)**, « Presently there is no claim fee » (`docs/avs.md`) [lu] | Non : implémentation TypeScript, mode proxy, format propre [inféré d'après le README] |
-| Primus | nœuds attestors « inside a Trusted Execution Environment » (Phala), clés générées par le KMS dans la TEE ; mise en gage et pénalités ; **pénalités “not introduced on the first day of the mainnet”** ; “only authorized nodes will be allowed to join the network” en phase de démarrage ; modes MPC et proxy ; docs non datées (« Understand Primus Network », « Attestor Security ») [lu] | Non établi : protocole propre (QuickSilver, whitepaper non lu) |
+| Primus | nœuds attestors « inside a Trusted Execution Environment » (Phala), clés générées par le KMS dans la TEE ; mise en gage et pénalités ; **pénalités “will not be introduced on the first day of the mainnet launch”** ; “only authorized nodes will be allowed to join the network” en phase de démarrage ; modes MPC et proxy ; docs non datées (« Understand Primus Network », « Attestor Security ») [lu] | Non établi : protocole propre (QuickSilver, whitepaper non lu) |
 | zkPass | mode hybride proxy + MPC ; le texte même dit que le mode MPC « still relies on a "trusted notary" … A malicious notary could cache session data and collude with a compromised client » ; « Decentralized MPC nodes verify data integrity before a proof is accepted » ; page « Get Started » « currently undergoing updates » [lu] | Non : protocole propre (VOLE-ZK) |
 | vlayer | opérateur unique, voir option A | Version alpha.12 : à tester |
 | Opacity | voir option A | Non établi |
@@ -269,3 +269,6 @@ Raison : c'est la seule option qui change le signe de A(self-attestation) tout e
 | `nitro_verify.raw` | `64d366a2ef19084b` |
 | `rekorv2.raw` | `3acb6cbb365925eb` |
 | `tlsn_crate.raw` (`crates/tlsn/Cargo.toml` main) | `ed9bc7d226bc34ea` (sha256 complet identique à `tlsn-crate-tlsn-cargo-toml-2026-08-12.toml` de l'INDEX : manifeste inchangé) |
+
+
+> *Erratum de l'orchestrateur (2026-10-04 04:11:18 UTC)* : deux citations corrigées mot pour mot contre les sources versées à `biblio/` (lot DETTES-BIBLIO) : « it moves from Peer to AWS… » (au lieu de « moves it from Peer to AWS… ») et « will not be introduced on the first day of the mainnet launch » (au lieu de « not introduced on the first day of the mainnet ») ; le rapport Veridise compte 58 pages (et non 21), la citation de la p. 13 est exacte. Les citations “…” de ce document renvoient désormais à des sources détenues (`biblio/INDEX.md`, section du 2026-10-04).

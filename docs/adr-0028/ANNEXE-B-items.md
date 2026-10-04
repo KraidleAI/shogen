@@ -685,3 +685,27 @@ SHOGEN-D4-PRECEDENCE-RAPPORT-1 (B.45 ; le cas ne se présente pas au J28 : k_eff
 | SHOGEN-CENSURE-S2BIS-1 | censure large (7 795 fenêtres sautées dont 7 628 sans cause attribuée ; 4 093 démarrages du harnais) : entrée de conception de S2-bis | orch. ; rédacteur de l'ADR-0029 | ADR-0029 | aucun (entrée de conception) | rédacteur du rapport, (e) |
 | SHOGEN-SIGMA-BLOC-INDEP-1 | σ̂²_bloc non recalculé par un code indépendant sur les journaux réels | orch. | analyses ajoutées après le pré-enregistrement | ≈ 60 lignes [inféré] | rédacteur du rapport, (f) |
 | SHOGEN-DOCS11-PUBLIC-1 | version publique du rapport : quatorze points relevés par le validateur (mention « Non publié », modèles, chemins Windows, dépôts privés, identifiants de session, décisions d'affaires, renvois internes, tiers nommés avec préavis) | orch. ; investisseur (feu vert) | avant G9 | une version filtrée et un cp-1 bref [inféré] | cp-1 du rapport, liste « publication » |
+
+## B.47 Amendement daté du 2026-10-04 04:14:10 UTC (heure produite par le script d'écriture) : fermetures d'après l'exécution, lots DETTES (premier versement)
+
+Contrat : `docs/adr-0028/G0-lots-DETTES.md` ; état de départ : `docs/adr-0028/ETAT-REGISTRE-2026-10-04.md`.
+
+Items **fermés** :
+- **SHOGEN-G4-BIBLIO-1** : 19 pages et rapports cités par la recherche G4 et l'étude des enclaves versés à `biblio/` (section du
+  2026-10-04 de l'INDEX, sha256) ; 21 citations sur 24 retrouvées mot pour mot, les deux citations inexactes corrigées par erratum
+  daté dans les deux documents (et le nombre de pages du rapport Veridise).
+- **SHOGEN-E1-MAST-VERSEMENT-1** : arXiv:2503.13657v3 (Cemri et al., 47 p.) versé, page de titre lue.
+- **SHOGEN-BIBLIO-GIT-CHECKOUT-1** : manuels git (git-log, git-rev-list, git-cat-file, git-diff en 2.55.0 ; git-rev-parse et
+  git-clone servis en 2.52.0 et 2.54.0 par redirection de git-scm.com) et `action.yml` d'actions/checkout au SHA
+  `3d3c42e5aac5ba805825da76410c181273ba90b1` versés ; résidu : appartenance du SHA au tag cité par `gates.yml` non vérifiée
+  (github.com refusé par le proxy de la session), reportée sur SHOGEN-CI-RUNNERS-1.
+- **SHOGEN-ENREG-VARIABLE-1** : suite lancée sous l'enregistreur (rôle cp-2) avec la variable posée sur la copie scellée :
+  `tests_avec_variable` rempli ; enregistrement et sortie versés (`docs/adr-0028/execution/apres-execution/`) ; l'échec d'un test
+  non hermétique y est formé (ci-dessous).
+- **SHOGEN-R2-RUNPARAMS-CONCORDANCE-1** (B.45) : disposition « avant l'exécution » ; l'exécution unique n'a pas levé le refus
+  « run_params divergents » (six runs sortie 0, JOURNAL du 2026-10-04) : sans objet, fermé.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-TEST-ENV-HERMETIQUE-1 | `test_oracle_record.test_enregistrement_champs_et_sha` lit l'environnement ambiant : il échoue quand `SHOGEN_S2_CAMPAGNE_CONTROL` est posée | orch. | lot DETTES-B1 | quelques lignes de test [inféré] | rejeu de l'orchestrateur (ENREG-VARIABLE-1) |
+| SHOGEN-SCEAU-OTS-1 | ancre (2) OpenTimestamps des sceaux (paquet §9) jamais faite ni disposée ; recommandée systématique pour S2-bis (avis produit) | investisseur (go, dépendance nouvelle R-8) | avant le sceau de S2-bis | client OTS et un go [inféré] | état du registre (résidu sans identifiant) |
