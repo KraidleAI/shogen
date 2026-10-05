@@ -1,0 +1,10 @@
+{
+ "lot": "SIM-BIS",
+ "schema": "shogen.sim-bis.v1",
+ "rattachement": "G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md (sha256 eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39) : PROPOSITION.md (0e78afabc981d6952a68dd1fc3d5df9c72e5f87d3255969433f7a8d5985c9dd6) corrigée par AVIS.md (aaf70a4f1183d0181c38cf666b3d627566e66575d87a2fb63966dc07e46b24e9) ; ADR-0029 révision 3, acceptée, avec ses ajouts datés (b908842dec7dc436a0a201b195e25356be55757886985fb80aaf60484ab2cbef)",
+ "entrees": {
+  "sommes": {"chemin": "docs/adr-0029/plan-s2bis/SHA256SUMS", "sha256": "f21f929329f11e9baf00057e3a7b250e5fb3a05a31fd5bcc64bb9860218f601f"},
+  "episodes": {"chemin": "docs/adr-0029/plan-s2bis/episodes.txt", "sha256": "c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6"},
+  "source": "E-S-02 : sorties versées de PLAN-S2BIS (episodes.txt, « EP », seule entrée de calibration ; sa ligne de SHA256SUMS) ; empreintes mesurées par sha256sum le 2026-10-04 à la tête 435fa12"
+ }
+}
