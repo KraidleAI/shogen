@@ -32,7 +32,7 @@
 | type | champs propres | écrit par |
 |---|---|---|
 | `ouverture` | `jour` (AAAA-MM-JJ, UTC), `suivante` (première fenêtre ni close ni déclarée en trou) | l'écrivain : premier enregistrement d'un journal neuf, puis de chaque fichier quotidien (§6) |
-| `marqueur` | `ws` ; champs de la boucle (CB-4) | `marqueur(ws)` : clôt la fenêtre `ws` |
+| `marqueur` | `ws` ; aucun champ propre : la boucle (CB-4) n'en écrit pas, ses comptes vont à `sante` (§11) | `marqueur(ws)` : clôt la fenêtre `ws` |
 | `point` | `ws` : fenêtre qui clôt l'heure, (`ws` + w) multiple de 3 600 | l'écrivain, juste après ce marqueur ; son empreinte est la tête exportée (E-C-35) |
 | `cloture` | `jour` : jour UTC du fichier qu'il clôt | l'écrivain : dernier enregistrement d'un fichier quotidien (§6) |
 | `reprise` | `ws` (fenêtre de l'horloge au redémarrage), `suivante`, `queue` | l'écrivain, au redémarrage (§7) |
@@ -191,3 +191,32 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    redirection n'est suivie (S2 suivait celles d'urllib) : un code 3xx est un `panne_http`.
 4. Toute autre anomalie (défaut imprévu, requête dont l'hôte, le chemin ou la méthode sort de l'ASCII imprimable sans
    espace) donne `panne_transport` de sous-type `autre`. Une lecture ne lève jamais.
+
+## 11. Boucle du pool : lectures planifiées, échéance, santé de la boucle (CB-4 ; E-C-09, E-C-11 à E-C-15)
+
+1. **Instants de la fenêtre ws** (ADR-0029 l.233 ; avis OPS Q7) : départ D = ws + w − δ, δ = 20 s ; échéance
+   E = ws + w − 1 s. La lecture d'une forme part à D plus le décalage de la forme : 0, sauf sur un hôte dont la limite
+   impose l'espacement, où la k-ième lecture de l'hôte part k s après D (k de 0 à 4) ; au plus 5 lectures par hôte et
+   par fenêtre, au-delà le regroupement s'impose (l.234).
+2. **Enregistrement `lecture`** : aux champs du §9 s'ajoutent `forme` (nom de la forme de requête) et `prevu`
+   (instant planifié, en microsecondes). `depart` est l'instant où la boucle lance la lecture ; le délai global de la
+   lecture court depuis cet instant.
+3. **Pool borné** : une lecture ne part que si une place du pool est libre ; une place reste prise jusqu'à la fin de
+   la lecture, même abandonnée. Une lecture qui ne part pas n'a **aucun** enregistrement `lecture` : ce n'est jamais
+   une panne de source (Q-C-02) ; elle est comptée dans la santé (`non_parties`).
+4. **Échéance** : à E, le fil principal, seul écrivain, écrit une `lecture` pour chaque lecture partie. Une lecture non
+   finie est `panne_transport`, de sous-type `dns` si la résolution n'a pas rendu (aucune phase `dns`), sinon
+   `delai` ; `fin` est l'instant de l'échéance ; `phases` et `adresse` sont celles atteintes ; son fil est abandonné.
+   Une lecture dont la fonction lève est `panne_transport` de sous-type `autre`.
+5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
+   puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Une fenêtre dont l'échéance est déjà passée quand la boucle
+   l'atteint n'est pas lue : le trou est déclaré au marqueur suivant (cause `saut`).
+6. **Enregistrement `sante` de la boucle** (valeurs brutes, aucun jugement) :
+   - `d2.retard_max` : plus grand retard au départ (instant de lancement moins instant planifié, en microsecondes)
+     parmi les lectures parties ; null si aucune n'est partie. `d2.non_parties` : nombre de lectures planifiées qui ne
+     sont pas parties faute de place. D-2 se juge au recalcul (règle Q-C-02 de l'avis : toute lecture partie plus de
+     5 s après son instant planifié, ou non partie, dégrade l'observateur dans la fenêtre) ;
+   - `fils.abandonnes` : fils de lecture abandonnés encore vivants, après le classement de la fenêtre ;
+     `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
+     est arrivé depuis la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15).
+7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter.
