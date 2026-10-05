@@ -12,8 +12,9 @@ de P1 (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1) : K-01 à K-03 passent aussi par l'analy
 `name: >`, `if: false`, `continue-on-error`, bloc plié, `set +e`, heredoc, autre job, étape ajoutée,
 `working-directory`, `env` de l'étape, autre shell, `env` du job, `defaults`, clé `run` répétée, job répété, U+2028,
 commentaire dans le bloc, runner dans un `name: >`, clé de premier niveau `env :`, entre guillemets ou répétée ;
-A-01 et A-02, l'analyseur seul (étapes exclues, U+2028), que les contrôles d'avant masquent. Sortie : 0 tout passe,
-1 un cas échoue, 3 erreur."""
+A-01 et A-02, l'analyseur seul (étapes exclues, U+2028), que les contrôles d'avant masquent. CB-18m : K-01 exige
+`--egal` à la ligne du job s2-harness-unittest (Ran = PLANCHER du vérificateur) ; L-22, la même ligne sans `--egal`,
+refusée. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -156,7 +157,8 @@ def cable(texte, nom, appel):
 with open(GY, encoding="utf-8") as f:
     GYT = f.read()
 APPEL = "python3 -B enforcement/verdict-suite-s2[.]py s2bis --aucun-saut --egal --plancher [1-9][0-9]*"
-for nom, appel in (("K-01 s2-harness-unittest", "python3 -B enforcement/verdict-suite-s2[.]py"),
+APPEL_S2 = "python3 -B enforcement/verdict-suite-s2[.]py --egal"          # CB-18m : Ran = PLANCHER du vérificateur
+for nom, appel in (("K-01 s2-harness-unittest", APPEL_S2),
                    ("K-02 s2bis-unittest", APPEL),
                    ("K-03 sim-bis-unittest", APPEL.replace(" s2bis ", " scripts/sim-bis "))):
     bon = cable(GYT, nom[5:], appel)
@@ -198,6 +200,9 @@ for nom, lignes in (                                    # leurres contre l'analy
     attendu = nom.startswith("L-00")
     admis = cable(chr(10).join(lignes), "s2bis-unittest", APPEL)
     cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
+S2 = [x.replace("s2bis-unittest", "s2-harness-unittest") for x in DEBUT] + SUITE[:3] + [L + V]
+cas("L-22 job S2 sans --egal : refusé (CB-18m)", ["admis"] if cable(chr(10).join(S2), "s2-harness-unittest", APPEL_S2)
+    else [], None)
 EXCLUES = DEBUT + SUITE[:1] + ["        if: false"] + SUITE[1:] + SUITE[:1] + ["        continue-on-error: true"]
 EXCLUES += SUITE[1:]
 for nom, texte, attendu in (                            # analyseur seul : ce que les contrôles d'avant voyaient déjà

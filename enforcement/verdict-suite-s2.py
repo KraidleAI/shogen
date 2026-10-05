@@ -9,7 +9,11 @@ nommant SHOGEN_S2_CAMPAGNE_CONTROL (annexe D.4 a) ; N ≥ PLANCHER, plancher com
 de D8a-3 : plancher, et non manifeste des modules ; journal G1 du lot DETTES-B1). Bibliothèque standard seule (R-8).
 Lot COLLECTE-BIS, CB-0 (G0 docs/adr-0029/g0-collecte/, PROPOSITION §1 pt 6) : `--aucun-saut` refuse tout saut, même
 nommant la variable (suite s2bis) ; `--plancher N` remplace PLANCHER ; sans option, verdict de S2 inchangé. CB-2e
-(Q-2 de la G2 de P1, job s2bis seul) : `--egal` exige Ran = plancher (SHOGEN-CI-PLANCHER-SUIVI-1 mécanisé).
+(Q-2 de la G2 de P1, job s2bis seul) : `--egal` exige Ran = plancher (SHOGEN-CI-PLANCHER-SUIVI-1 mécanisé). CB-18m
+(G2 de la tranche C de P1, décision de l'orchestrateur) : le job s2-harness-unittest passe `--egal` à son tour, Ran =
+PLANCHER. Le couplage avec le test de comptes de B-SEG-1, motif de l'inégalité au G0 de D8a-3, ne tient plus : ses deux
+tests nommés lèvent SkipTest dans leur corps, et un test sauté compte dans Ran, variable posée ou non (`lancer` la
+retire).
 SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : `etapes` et `lignes_du_job`, analyseur unique de la
 ligne d'un job de gates.yml, partagé par les cas K du runner et par l'enregistreur de rôle
 (s2-harness/tools/oracle_record.py).
@@ -22,8 +26,8 @@ import sys
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 PLANCHER = 406      # tests de la suite après le diff ENREG-ROLE de CB-18 (2026-10-05 ; 405 après DETTES-B1) ; un lot
-                    # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1) ; l'abaisser desserre la gate :
-                    # décision datée seulement
+                    # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
+                    # (--egal) ; l'abaisser desserre la gate : décision datée seulement
 SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
 FIN = re.compile(r"\n-{70}\nRan (\d+) tests? in \d+\.\d+s\n\n(OK(?: \(skipped=(\d+)\))?)\n*\Z")
 SAUT = re.compile(r" \.\.\. skipped (['\"])(.*)\1$", re.M)

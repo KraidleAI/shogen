@@ -153,7 +153,9 @@ jobs:
     # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
     # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final
     # exigé, sauts dont le motif nomme la variable scellée seuls admis, Ran ≥ plancher
-    # committé) ; ses cas tournent avant la suite.
+    # committé) ; ses cas tournent avant la suite. Diff CB-18m (G2 de la tranche C de P1,
+    # décision de l'orchestrateur) : --egal exige Ran = PLANCHER du vérificateur ; un
+    # plancher oublié ou abaissé fait échouer le job (SHOGEN-CI-PLANCHER-SUIVI-1).
     # name: = identifiant du job, un seul nom pour le futur required check.
     name: s2-harness-unittest
     # Image épinglée : ubuntu-latest bascule vers Ubuntu 26 à partir du 2026-10-19
@@ -191,7 +193,7 @@ jobs:
         run: |
           unset SHOGEN_S2_CAMPAGNE_CONTROL
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py
+          python3 -B enforcement/verdict-suite-s2.py --egal
 
   s2bis-unittest:
     # Lot COLLECTE-BIS, sous-lot CB-0 (2026-10-04 ; ADR-0029 §2.9 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION

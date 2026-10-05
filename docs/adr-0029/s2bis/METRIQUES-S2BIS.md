@@ -848,3 +848,21 @@ clé `run` en ligne avant le bloc), et la campagne a été relancée en entier (
 niveau écrite `env :` ou entre guillemets échappait au contrôle de `defaults` et d'`env` (L-19 et L-20 rouges, comme
 L-21, clé `jobs` répétée) : les clés de premier niveau sont désormais fermées, et toute la campagne a été rejouée.
 Suite S2 : 406 tests, inchangée.
+
+## CB-18m (2026-10-05) : `--egal` au job s2-harness-unittest (décision de l'orchestrateur, G2 de la tranche C)
+
+Objet : la ligne du job S2 devient `python3 -B enforcement/verdict-suite-s2.py --egal` : Ran = PLANCHER du
+vérificateur, 406. K-01 l'exige, et L-22 refuse la même ligne sans `--egal`. Le couplage avec le test de comptes de
+B-SEG-1 (motif de l'inégalité au G0 de D8a-3, rappelé par Q-2 de la G2 de P1-A) a été vérifié. Les deux tests nommés
+de `test_exclusion` lèvent SkipTest dans leur corps, et un test sauté compte dans Ran, variable posée ou non ; le
+vérificateur retire la variable de l'environnement de la suite. Ran ne dépend donc pas d'elle, et `--egal` est tenable.
+MR-25 du réviseur (PLANCHER rendu à 405) est tué.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/verdict-suite-s2.py` | 152 | — |
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 214 | 58 cas (1 de plus : L-22 ; K-01 exige `--egal`) |
+
+Mutants (commande du job s2-harness-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
+0 FATAL), dont `--egal` retiré de la ligne du job et K-01 desserré (tué par L-22). MR-25 du réviseur est tué, rejoué
+sur l'état final. Suite S2 : 406 tests ; PLANCHER : 406, égalité exigée (`--egal`).
