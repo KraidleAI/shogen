@@ -5,7 +5,8 @@ Ligne (§1.1, §1.2, §7.1 a et b, §8.3) : octets terminés par 0x0A, objet JSO
 (échappements de `json` : Q-R18-3), dont tout entier a au plus CHIFFRES chiffres, signe exclu, et tout conteneur un
 niveau d'au plus NIVEAUX, l'objet de la ligne au niveau 1 ; les niveaux sont comptés ici sur le texte, avant le
 décodeur, jamais par son exception (lettres C-1 et C-4 du FORMAT). Hors de ces bornes, la ligne n'est pas intègre :
-jamais un refus. Champs communs (§1.3) : `type` chaîne, `seq` entier, `prec` 64 chiffres hexadécimaux minuscules.
+jamais un refus. Champs (§1.3, §2, §7.1 c et d ; lettre C-2) : `type` chaîne, `seq` entier, `prec` 64 chiffres
+hexadécimaux minuscules ; champs propres d'un type réservé, `ws` de tout autre type, présents et aux types du §2.
 Fichiers (§6.1, §7.2) : `<préfixe>-AAAA-MM-JJ-k.jsonl`, k décimal sans zéro de tête, en ordre (jour, k entier) ;
 autres noms ignorés (Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A,
 plus de LIMITE octets, non canonique, sans les champs communs, non chaînée ; la première est une `ouverture` ou une
@@ -27,6 +28,9 @@ CHIFFRES = 640              # chiffres d'un entier au plus, signe exclu (§1.2) 
 NIVEAUX = 64                # niveau d'un conteneur au plus, l'objet de la ligne au niveau 1 (§8.3)
 GENESE, NL, BS = "0" * 64, bytes((10,)), chr(92)
 HEX = re.compile("[0-9a-f]{64}")
+PROPRES = {"ouverture": "jour suivante", "marqueur": "ws", "point": "ws", "cloture": "jour",
+           "reprise": "ws suivante queue", "trou": "de a cause"}             # champs propres des types réservés (§2)
+SORTES = {"type": (str,), "prec": (str,), "jour": (str,), "cause": (str,), "queue": (list, type(None))}  # sinon int
 ECHAPPEMENTS, CHAINES, AUTRES = re.compile(BS * 2 + "."), re.compile('"[^"]*"'), re.compile("[^][{}]+")
 FORMAT = "shogen.s2bis.oracle-indep.v1"
 
@@ -77,9 +81,13 @@ def objet(ligne):
 
 
 def champs(e):
-    """Champs communs du FORMAT §1.3 ; un booléen n'est pas un entier."""
-    return (type(e.get("type")) is str and type(e.get("seq")) is int and type(e.get("prec")) is str
-            and HEX.fullmatch(e["prec"]) is not None)
+    """Types des champs de l'objet `e` (§7.1 c et d) : `seq`, `prec`, puis les champs propres du type (`ws` pour un type
+    non réservé), présents ; `jour` et `cause` chaînes, `queue` liste ou null, les autres entiers. Un booléen n'est
+    jamais un entier ; un champ de plus est admis."""
+    if type(e.get("type")) is not str:
+        return False
+    noms = ["seq", "prec", *PROPRES.get(e["type"], "ws").split()]
+    return all(n in e and type(e[n]) in SORTES.get(n, (int,)) for n in noms) and HEX.fullmatch(e["prec"]) is not None
 
 
 def fichiers(dossier, prefixe):

@@ -1678,3 +1678,22 @@ Mutants (commande du job, `--plancher 246`, borne de 300 s ; python3.12 ; résea
 retiré, échappements laissés dans les chaînes, crochets des chaînes comptés, fermetures non décomptées, racine au niveau
 0, borne 641, signe compté, entier long lu par int, flottant admis, ligne non objet admise, dossier absent en exception
 nue. Suite : 246 tests ; plancher du job : 246, égalité exigée (`--egal`).
+
+## RB-18f (2026-10-05) : champs propres typés, `queue` ni liste ni null (C-9, C-6 de la G2 de RB-18 ; lettre C-2)
+
+Objet : `champs` suit le §7.1 c et d : `seq` entier, `prec` 64 chiffres hexadécimaux minuscules, puis les champs propres
+du §2 (`jour` et `cause` chaînes, `queue` liste ou null, `suivante`, `ws`, `de`, `a` entiers), présents ; le `ws` d'un
+type non réservé est requis et entier ; un booléen n'est jamais un entier ; un champ de plus est admis. C-6 : une
+`reprise` dont `queue` n'est ni une liste ni null n'est pas intègre (§7.1 d ; le §7.4 le dit d'un objet nu) : elle ouvre
+la queue de son fichier, au lieu d'être lue comme déclaration (défaut E11). Rouge : sur le code de RB-18e, champs
+propres manquants admis, et un objet nu `queue` égal à la queue en attente la déclarait.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 204 | — |
+| `tests/test_oracle_indep.py` | 437 | 34 (2 de plus : champs propres des types réservés et `ws` des autres ; `queue` objet, chaîne, entier ou booléen ; lignes de genèse écrites avec leurs champs propres) |
+
+Mutants (commande du job, `--plancher 248`, borne de 300 s ; python3.12 ; réseau isolé) : 13 tués sur 13 (0 vivant,
+0 FATAL) : suivante d'ouverture, queue de reprise, cause de trou, jour de clôture, ws du marqueur, du point et d'un type
+non réservé non exigés, objet nu admis pour queue, booléen admis pour un entier, jour typé entier, cause entière admise,
+champ manquant lu comme null, seq non contrôlé. Suite : 248 tests ; plancher du job : 248, égalité exigée (`--egal`).

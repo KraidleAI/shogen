@@ -94,6 +94,21 @@ class Champs(unittest.TestCase):
         for k in ("type", "seq", "prec"):
             self.assertFalse(o.champs({x: v for x, v in bon.items() if x != k}), k)
 
+    def test_champs_propres_des_types(self):                               # §2, §7.1 d (lettre C-2)
+        bons = {"ouverture": {"jour": "2026-10-04", "suivante": 60}, "marqueur": {"ws": 0}, "point": {"ws": -60},
+                "cloture": {"jour": ""}, "reprise": {"ws": 60, "suivante": 120, "queue": None},
+                "trou": {"de": 0, "a": 60, "cause": "saut"}, "lecture": {"ws": 60}, "x": {"ws": 0}}
+        faux = {"jour": (1, None, True, ["a"]), "suivante": (True, "60", None, 1.0), "queue": ({}, "q", 0, True),
+                "ws": (True, False, "0", None, [0]), "de": (False, "0"), "a": (True, None), "cause": (0, ["saut"])}
+        for t, propres in bons.items():
+            e = {"type": t, "seq": 1, "prec": PREC, **propres}
+            self.assertTrue(o.champs({**e, "autre": True}), t)              # un champ de plus est admis
+            for k in propres:
+                self.assertFalse(o.champs({x: v for x, v in e.items() if x != k}), (t, k))     # champ manquant
+                for v in faux[k]:
+                    self.assertFalse(o.champs({**e, k: v}), (t, k, v))
+        self.assertTrue(o.champs({"type": "reprise", "seq": 1, "prec": PREC, "ws": 0, "suivante": 0, "queue": []}))
+
 
 class Noms(unittest.TestCase):
     def test_grammaire_et_ordre(self):                                      # FORMAT §6.1, §7.2 ; Q-R18-5
@@ -224,8 +239,10 @@ class Journaux(unittest.TestCase):
         for t, seq, prec, attendu in (("ouverture", 0, z, (1, [], 0)), ("reprise", 0, z, (1, [["genese"]], 0)),
                                       ("ouverture", 0, "1" * 64, (1, [["genese"]], 0)),
                                       ("ouverture", 1, z, (1, [["genese"]], 0)), ("lecture", 0, z, (0, [], 1))):
-            with open(os.path.join(self.d, J1), "wb") as f:
-                f.write(ligne('{"prec":"' + prec + '","seq":' + str(seq) + ',"type":"' + t + '"}'))
+            avant, apres = '"jour":"2026-10-04",' * (t == "ouverture"), '"queue":null,' * (t == "reprise")
+            with open(os.path.join(self.d, J1), "wb") as f:                 # champs propres du §2, `ws` en plus
+                f.write(ligne("{" + avant + '"prec":"' + prec + '",' + apres + '"seq":' + str(seq) + ',"suivante":60,'
+                              '"type":"' + t + '","ws":60}'))
             r, flux = self.lire()
             self.assertEqual((len(flux), [x["causes"] for x in r["ruptures"]], len(r["queue_finale"])), attendu, t)
 
@@ -323,6 +340,20 @@ class Journaux(unittest.TestCase):
         self.assertEqual((r["fichiers"], flux), ([J1, J3, j7], j1 + j3 + [(j7, p, h) for _n, p, h in j2]))
         self.assertEqual(r["ruptures"], [{"fichier": J3, "position": 0, "seq": 9, "causes": ["lien"], "queues": []},
                                          {"fichier": j7, "position": 0, "seq": 5, "causes": ["lien"], "queues": []}])
+
+    def test_queue_ni_liste_ni_null(self):                                # §7.1 d, §7.4 (C-6) : reprise non intègre
+        self.ecrivain(T0 - 600, (T0 - 540,), dernier=T0 - 480)
+        q = self.couper(J1, 3)
+        objet = '{"fichier":"%s","octets":%d,"position":%d,"sha256":"%s"}' % tuple(q[k] for k in sorted(q))
+        for queue, declaree in (("[" + objet + "]", True), (objet, False), ('"q"', False), ("0", 0), ("true", 0)):
+            l0 = ligne('{"prec":"' + self.lignes(J1)[-1][2] + '","queue":' + queue + ',"seq":3,"suivante":1791157800,'
+                       '"type":"reprise","ws":1791157800}')
+            with open(os.path.join(self.d, J1S1), "wb") as f:              # segment de reprise écrit à la main
+                f.write(l0)
+            r, flux = self.lire()
+            q2 = {"fichier": J1S1, "position": 0, "octets": len(l0), "sha256": sha(l0)}
+            attendu = (self.lignes(J1) + self.lignes(J1S1), [q], []) if declaree else (self.lignes(J1), [], [q, q2])
+            self.assertEqual((flux, r["queues_declarees"], r["queue_finale"], r["ruptures"]), (*attendu, []), queue)
 
     def test_reprise_au_milieu_ne_declare_rien(self):                     # §7.3 : à la suite, `queue` null
         self.ecrivain(T0 - 600, (T0 - 540,))
