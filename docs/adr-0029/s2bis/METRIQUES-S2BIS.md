@@ -495,3 +495,25 @@ Mutants (commande du job, runner puis `--plancher 155`, borne de 300 s, réseau 
 visé (0 vivant, 0 FATAL), dont « σ des oracles comparé à celui de BTC » (l.188 contredit), « classe absente de BTC
 admise » et les bornes de R et du seuil d'avant Q-RB-6. Suite : 155 tests ; plancher du job : 155, égalité exigée
 (`--egal`).
+
+## RB-1f (2026-10-05) : décision Q-RB-13 et précisions Q-RB-5, Q-RB-6, Q-RB-12 et Q-RB-14 de la tranche 1 (rotation)
+
+Objet : noms d'unité aux seuls caractères d'un nom d'hôte, en minuscules (lettres a à z, chiffres, « - » et « . », de 1
+à 253 caractères), par une seule règle `HOTE` de `rotation.py`, appliquée aux décalages (`ROTATION/unite`) et au
+chargeur (`ANALYSE/unite`) : espace, tilde, majuscule et « _ » refusés (Q-RB-13). Contrat `ROTATION-S2BIS.md` : règle
+des noms (§1 pt 6) ; ordre strict des points de code sur les noms d'hôte de la configuration, précision de l.200, la
+première unité effective étant imprimée au rendu (§1 pt 8 ; Q-RB-5, item pour RB-15) ; R et seuil exacts au chargeur,
+paramètres de `lois` (§1 pt 9 ; Q-RB-6) ; six points de cohérence avec SIM-BIS (§8 ; Q-RB-12). Mutant obligatoire
+« modulo n_s au lieu de n′_s » (PROPOSITION §3.4) : dû au sous-lot RB-7, où n_s et n′_s coexistent, déclaré au §7 du
+contrat et dans la docstring de `tests/test_rotation.py` (Q-RB-14).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/rotation.py` | 111 | 8 (`tests/test_rotation.py`, 141 lignes) |
+| `shogen_s2bis/recalc/config_analyse.py` | 166 | 13 (`tests/test_config_analyse.py`, 204 lignes) |
+
+Mutants (commande du job, runner puis `--plancher 155`, borne de 300 s, réseau isolé) : 11 tués sur 11 par leur test
+visé (0 vivant, 0 FATAL), dont « espace admise » (G-02 du réviseur transposé sur la règle) et « préfixe seul
+contrôlé » ; M-1f-07 (nom vide admis), tué au premier passage par `test_refus_nommes` sous un test visé mal déclaré,
+a été rejoué avec ce test visé. Mutant dû au sous-lot RB-7 : « modulo n_s au lieu de n′_s ». Suite : 155 tests,
+tests des noms récrits ; plancher du job : 155, égalité exigée (`--egal`).

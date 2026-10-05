@@ -153,13 +153,16 @@ class Oracles(Base):                       # C-1 et Q-RB-4 de la G2 de RB-T1 ; A
 
 
 class Unites(Base):
-    def test_noms_ascii_imprimable_sans_deux_points(self):  # Q-R-02 de l'AVIS du G0, complément (3)
-        bords = VALIDE.replace(b'"BTC": ["api.binance.com", ', b'"BTC": [" !", "api.binance.com", ').replace(
-            b'"ethereum-rpc.publicnode.com"]', b'"ethereum-rpc.publicnode.com", "~"]')    # 0x20, 0x21, 0x7e admis
-        self.assertEqual(self.charger(bords)[0]["unites"]["BTC"], [" !", "api.binance.com", "api.kraken.com",
-                                                                  "ethereum-rpc.publicnode.com", "~"])
+    def test_noms_d_hote_en_minuscules(self):    # Q-RB-13 : a à z, 0 à 9, « - » et « . », de 1 à 253 caractères
+        bords = VALIDE.replace(b'"BTC": [', b'"BTC": ["-", ".", "0", "' + b"a" * 253 + b'", ').replace(
+            b'"ethereum-rpc.publicnode.com"]', b'"ethereum-rpc.publicnode.com", "z"]')
+        self.assertEqual(self.charger(bords)[0]["unites"]["BTC"], ["-", ".", "0", "a" * 253, "api.binance.com",
+                                                                  "api.kraken.com", "ethereum-rpc.publicnode.com", "z"])
         self.refus([("ANALYSE/unite", VALIDE.replace(b'"USDT": ["api.binance.com"]', b'"USDT": [' + n + b"]"), d)
-                    for n, d in ((b'"api:443"', "'api:443'"), (b'"\xc3\xa9"', "'\xe9'"), (b'"a\\tb"', "'a\\tb'"),
+                    for n, d in ((b'" !"', "' !'"), (b'"~"', "'~'"), (b'"Api.binance.com"', "'Api.binance.com'"),
+                                 (b'"api binance.com"', "'api binance.com'"), (b'"a_b"', "'a_b'"),
+                                 (b'"' + b"a" * 254 + b'"', "= '" + "a" * 254 + "'"), (b'"api:443"', "'api:443'"),
+                                 (b'"\xc3\xa9"', "'\xe9'"), (b'"a\\tb"', "'a\\tb'"),
                                  (b'"a\\u007f"', "'a\\x7f'"), (b'"a\\u001f"', "'a\\x1f'"), (b"7", "= 7"))])
 
 

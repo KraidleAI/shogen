@@ -12,6 +12,8 @@ import json
 import re
 from decimal import Decimal
 
+from .rotation import HOTE
+
 ACTIFS = ("BTC", "ETH", "USDC", "USDT")
 # Planchers de σ en secondes, par classe de source (ADR-0029 l.182 : planchers d'ADR-0020) ; 0,05 % <= τ < 2,85 %
 # (E-R-09 ; ADR-0029 l.181, l.183 : refus nommé, jamais d'écrêtage).
@@ -55,9 +57,9 @@ def _fraction(v, ou):                                        # fraction décimal
 
 
 def _nom(v, ou):
-    """Unité : nom d'hôte de configuration (E-R-15), ASCII imprimable sans « : », séparateur de l'entrée de SHA-256
-    des décalages (Q-R-02 de l'AVIS du G0, complément (3))."""
-    if type(v) is not str or not v or ":" in v or not all(" " <= c <= "~" for c in v):
+    """Unité : nom d'hôte de configuration (E-R-15), règle HOTE des décalages (rotation.py ; Q-RB-13 de la G2 de RB-T1,
+    resserrement du complément (3) de l'AVIS Q-R-02)."""
+    if type(v) is not str or not HOTE.fullmatch(v):
         _refus("ANALYSE/unite", f"{ou} = {v!r}")
 
 

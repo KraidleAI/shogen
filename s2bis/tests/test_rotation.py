@@ -1,6 +1,8 @@
 """RB-6 : loi de rotation de R1-2 (E-R-16 à E-R-18 ; AVIS Q-R-02). Vecteurs de o(r, u) calculés hors du code :
 `printf '%s' "<graine>:<strate>:<r>:<u>" | sha256sum`, puis entier big-endian et modulo par `bc` (journal G1 de RB-6a,
-script vecteurs_rb6.sh) ; masques décalés écrits à la main."""
+script vecteurs_rb6.sh) ; masques décalés écrits à la main. Mutant obligatoire « modulo n_s au lieu de n′_s »
+(PROPOSITION §3.4) : dû au sous-lot RB-7, où n_s et n′_s coexistent ; ce module ne reçoit que n (Q-RB-14 de la G2 de
+RB-T1 ; ROTATION-S2BIS.md §7)."""
 import hashlib
 import os
 import random
@@ -42,7 +44,12 @@ class Decalage(unittest.TestCase):
                 with self.assertRaises(rot.RefusRotation) as e:
                     rot.decalage(*args)
                 self.assertEqual(e.exception.code, code)
-        self.assertEqual([rot.decalage(G, "calme", 9999, u, 1) for u in (" !", "~")], [0, 0])     # bornes admises
+        for u in (" !", "~", "A", "api.Kraken.com", "a b", "a_b", "a" * 254):            # Q-RB-13 : nom d'hôte
+            with self.subTest(u=u):
+                with self.assertRaises(rot.RefusRotation) as e:
+                    rot.decalage(G, "calme", 1, u, 7)
+                self.assertEqual(e.exception.code, "ROTATION/unite")
+        self.assertEqual([rot.decalage(G, "calme", 9999, u, 1) for u in ("-", ".", "0", "z", "a" * 253)], [0] * 5)
 
 
 class Tourner(unittest.TestCase):
@@ -78,7 +85,7 @@ class Lois(unittest.TestCase):
         alea = random.Random(20261005)
         for essai in range(24):
             n, strate = alea.randint(1, 24), ("calme", "stress")[essai % 2]
-            btc = {u: alea.getrandbits(n) & alea.getrandbits(n) for u in ("a.b", "a.c", "api.okx.com", "e.f", "~")
+            btc = {u: alea.getrandbits(n) & alea.getrandbits(n) for u in ("a.b", "a.c", "api.okx.com", "e.f", "z")
                    if alea.random() < 0.8}
             eth = {u: alea.getrandbits(n) for u in sorted(btc) if alea.random() < 0.7}
             premiere = (min(btc) if btc else None, "a.b", None)[essai % 3]
@@ -114,6 +121,7 @@ class Lois(unittest.TestCase):
                            ("ROTATION/classes", (G, "calme", 3, {1: {"a": 1}}, None, 9, 0)),
                            ("ROTATION/unite", (G, "calme", 3, {"BTC": {"a:b": 1}}, None, 9, 0)),
                            ("ROTATION/unite", (G, "calme", 3, bon, "", 9, 0)),
+                           ("ROTATION/unite", (G, "calme", 3, {"BTC": {"A": 1}}, None, 9, 0)),
                            ("ROTATION/masque", (G, "calme", 3, {"BTC": {"a": 8}}, None, 9, 0)),
                            ("ROTATION/masque", (G, "calme", 3, {"BTC": {"a": -1}}, None, 9, 0)),
                            ("ROTATION/masque", (G, "calme", 3, {"BTC": {"a": True}}, None, 9, 0)),

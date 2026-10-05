@@ -11,6 +11,10 @@ from fractions import Fraction
 
 STRATES = ("calme", "stress")                             # libellés scellés (AVIS Q-R-02, complément (1))
 GRAINE = re.compile("[0-9a-f]{64}")                        # sha256 du manifeste, forme imprimée au README du sceau
+# Unité : nom d'hôte de configuration (E-R-15) en minuscules, lettres a à z, chiffres, « - » et « . », de 1 à 253
+# caractères (Q-RB-13 de la G2 de RB-T1, resserrement du complément (3) de l'AVIS Q-R-02 : ni « : », séparateur de
+# l'entrée de SHA-256, ni espace, ni majuscule) ; la même règle au chargeur (`config_analyse._nom`).
+HOTE = re.compile("[a-z0-9.-]{1,253}")
 
 
 class RefusRotation(Exception):
@@ -29,8 +33,8 @@ def _entier(v, bas, haut=None):
 
 
 def _unite(u):
-    """Nom d'hôte de configuration : ASCII imprimable, sans « : » (séparateur de l'entrée de SHA-256)."""
-    return type(u) is str and u != "" and ":" not in u and all(" " <= c <= "~" for c in u)
+    """Nom d'hôte de configuration, règle HOTE."""
+    return type(u) is str and HOTE.fullmatch(u) is not None
 
 
 def _entrees(graine, strate, n):

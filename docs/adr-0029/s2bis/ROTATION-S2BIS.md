@@ -22,16 +22,22 @@
 4. **Position** : t = 0, 1, …, n − 1, rang de la fenêtre dans la suite comprimée, en ordre chronologique (t = 0 pour la
    première fenêtre retenue).
 5. **r** : entier de 1 à 9 999, écrit en décimal sans zéro de tête (AVIS Q-R-02, complément (2)).
-6. **Unité u** : nom d'hôte de configuration (E-R-15), chaîne non vide de caractères ASCII imprimables (0x20 à 0x7E),
-   sans « : », le séparateur de l'entrée (AVIS Q-R-02, complément (3)).
+6. **Unité u** : nom d'hôte de configuration (E-R-15), en minuscules : lettres a à z, chiffres, « - » et « . », de 1 à
+   253 caractères (constante `HOTE` du module, appliquée aussi par le chargeur `config_analyse`) ; donc ni « : », le
+   séparateur de l'entrée (AVIS Q-R-02, complément (3)), ni espace, ni majuscule. Resserrement du complément (3),
+   adjugé par l'orchestrateur le 2026-10-05 (Q-RB-13 de la relecture G2 de la tranche 1 de P3).
 7. **Séries** : `classes` = {classe : {unité : masque}} ; le masque d'une unité est un entier, 0 ≤ masque < 2^n, dont le
    bit t vaut D(u, t), l'indicatrice d'écart consolidé au quorum de la fenêtre de rang t (§2.2 de l'ADR ; construite aux
    sous-lots RB-3 à RB-5).
-8. **Première unité** : `premiere`, le premier hôte du pool BTC D1-bis de la strate (ordre des points de code des noms,
-   « ordre alphabétique » de l.200), ou None. Elle n'est décalée dans aucune classe ; si elle manque à une classe, toutes
-   les unités de cette classe sont décalées (l.200).
-9. **R et seuil** : R de 1 à 9 999 et seuil entier ≥ 0, pris du bloc `rotations` de `s2bis/config/analyse.json` :
-   R = 9 999 et seuil = 99 au paquet ((99 + 1)/(9 999 + 1) = 0,01, l.202).
+8. **Première unité** : `premiere`, le premier hôte du pool BTC D1-bis de la strate, ou None. Elle n'est décalée dans
+   aucune classe ; si elle manque à une classe, toutes les unités de cette classe sont décalées (l.200). *Précision de
+   l.200 (Q-RB-5, adjugée le 2026-10-05)* : « ordre alphabétique » s'entend comme l'ordre strict des points de code
+   (octets ASCII) des noms d'hôte de la configuration, celui que le chargeur exige de chaque liste d'unités
+   (`unites-ordre`) ; ainsi un nom `api-x` précède un nom `api.y` (0x2D < 0x2E). La première unité effective de chaque
+   strate dépend du pool D1-bis (sous-lot RB-7) : elle sera imprimée au rendu (item pour le sous-lot RB-15).
+9. **R et seuil** : paramètres de `lois`, R de 1 à 9 999 et seuil entier ≥ 0 (tests, oracle croisé). Au paquet, ils
+   viennent du bloc `rotations` de `s2bis/config/analyse.json`, où le chargeur exige R = 9 999 et seuil = 99
+   exactement (Q-RB-6), la cohérence (99 + 1)/(9 999 + 1) = 0,01 (l.202) restant contrôlée en seconde garde.
 
 ## 2. Décalages
 
@@ -107,6 +113,26 @@ standard seule.
 ## 7. Limites
 
 1. Le module ne reçoit que la longueur n de la suite retenue : la confusion entre n_s et n′_s ne peut s'y écrire ; elle
-   se contrôle là où les deux valeurs coexistent (sous-lot RB-7).
+   se contrôle là où les deux valeurs coexistent (sous-lot RB-7), où le mutant obligatoire « modulo n_s au lieu de
+   n′_s » (PROPOSITION §3.4) est dû (Q-RB-14).
 2. La construction des masques (suite comprimée, n_s premières fenêtres évaluables, écarts consolidés) relève des
    sous-lots RB-3 à RB-5 ; ce contrat suppose des masques déjà construits.
+
+## 8. Cohérence avec SIM-BIS (SB-7, SB-13)
+
+Points tenus des deux côtés pour que l'oracle croisé (E-S-51) compare o(r, u) et K^(r) à l'octet (Q-RB-12, d'après
+l'AVIS de la tranche 1 de P3, §2 ; adjugé le 2026-10-05) :
+
+1. **Positions** : le bit t d'un masque est la position t de la suite comprimée, rang chronologique 0, 1, … (§1 pts 4
+   et 7) ; c'est la convention de la compression de SIM-BIS (`scripts/sim-bis/calendrier.py`, `comprimer` : bits aux
+   fenêtres retenues, dans l'ordre, en positions 0, 1, …).
+2. **Identifiants des unités** : u est le nom d'hôte de configuration (§1 pt 6), jamais un nom court. SIM-BIS tient ses
+   hôtes en noms courts (`sources.indices_hotes` de `scripts/sim-bis/parametres.json`) : l'oracle croisé hache les noms
+   d'hôte, par la table scellée de correspondance de l'item SHOGEN-SIM-BIS-INDICES-IDENTIFIANTS-1 (annexe B d'ADR-0028).
+3. **Première unité** : la règle du §1 pt 8 (ordre strict des points de code des noms d'hôte de la configuration), la
+   même des deux côtés.
+4. **R et seuil** : paramètres de `lois` (§1 pt 9) ; l'oracle compare à R égal, à R = 999 comme à R = 9 999.
+5. **Libellés de strate** : `calme` et `stress` (§1 pt 2), ceux de `calibration.strates` de
+   `scripts/sim-bis/parametres.json`.
+6. **Masques** : 0 ≤ masque < 2^n (§1 pt 7) ; `ROTATION/masque` refuse tout masque de plus de n bits (§4) : SIM-BIS
+   fournit des masques tronqués à n bits, ce que sa compression fait par construction.
