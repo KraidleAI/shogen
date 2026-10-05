@@ -6,7 +6,9 @@
   l.55).
 - **Statut** : texte tenu à jour à chaque sous-lot du collecteur ; il est scellé au paquet de S2-bis avec le commit du
   collecteur. Code de référence : `s2bis/shogen_s2bis/collecte/journal.py`. Le test de conformité d'un journal produit
-  par le collecteur entier (E-C-24) est celui du sous-lot CB-18.
+  par le collecteur entier (E-C-24) est `s2bis/tests/test_bout_en_bout.py` (sous-lot CB-18e) : le point d'entrée
+  tourne en sous-processus, et chaque enregistrement de son journal est contrôlé contre ce texte (champs exacts,
+  types, grille, instants, ordre de la fenêtre), par un code de test qui n'importe rien du collecteur.
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
@@ -16,7 +18,8 @@
   pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12) ; le diff CB-18b ferme SHOGEN-S2BIS-SOMMEIL-MURAL-1
   (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle, SHOGEN-S2BIS-PLAN-CABLAGE-1
   (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14) ; le diff CB-18d achève
-  SHOGEN-S2BIS-ECRIVAIN-USAGE-1 (fermeture au point d'entrée, §14).
+  SHOGEN-S2BIS-ECRIVAIN-USAGE-1 (fermeture au point d'entrée, §14) ; le diff CB-18e verse le test de conformité de
+  bout en bout (E-C-24).
 
 ## 1. Ligne et chaîne (CB-1)
 

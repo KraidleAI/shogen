@@ -640,3 +640,26 @@ visé (0 vivant, 0 FATAL), dont « `--fenetres` ignoré » (la boucle ne s'arrê
 les tests, dans le fil borné du test (10 s), et le test échoue sans pendre la suite. Dernier passage sur l'état
 corrigé : les fichiers du journal y sont lus par `pathlib` (un `open` sans `with` levait un ResourceWarning sous
 `-X dev`), campagne entière rejouée, même bilan. Suite : 168 tests ; plancher du job : 168, égalité exigée (`--egal`).
+
+## CB-18e (2026-10-05) : test de bout en bout, conformité au FORMAT (E-C-24)
+
+Objet : le collecteur entier tourne en sous-processus (garde réseau posée par `import tests`, temps réel, w = 1 s ;
+sondes au délai de 0,2 s, D-3 par `/bin/echo` : sous la charge de l'hôte, une sonde D-3 `python3 -c` dépassait le
+délai de 0,1 s des configurations de `test_entree`, relevé à deux états ; à 0,4 s, D-4 et D-5, sans réponse sur la
+boucle locale, finissaient après l'échéance, nulles, et un mutant DNS survivait ; le test exige désormais au moins
+une requête D-4 ou D-5 relevée) :
+exécution A par `entree.main` sans TLS vers un serveur en clair de boucle locale (trois fenêtres : lectures `ok`,
+`panne_http` 503, `panne_transport` `connexion`), puis exécution B par le point d'entrée `python3 -m
+shogen_s2bis.collecte` tel quel, qui reprend le même journal (deux fenêtres, poignée TLS refusée). Le journal est
+validé contre le FORMAT par `anomalies`, code de test écrit d'après le texte, sans import du collecteur : champs
+exacts par type, grille, instants planifiés et échéance, phases, adresse, corps et empreinte, santé (D-2 recalculé,
+sondes, disque, résolveur), `run_params`, ordre de la fenêtre, marqueurs croissants, trous, points, sommes. Aucun code
+de production : le rouge se lit sur les mutants (« champ obligatoire omis », PROPOSITION §2.4).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_bout_en_bout.py` | 193 | 1 (deux exécutions et une reprise, journal conforme au FORMAT) |
+
+Mutants (commande du job, `--plancher 169`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par le test
+de bout en bout (0 vivant, 0 FATAL), dont trois « champ obligatoire omis » (`adresse`, `horloges`, `python` de
+`run_params`). Suite : 169 tests ; plancher du job : 169, égalité exigée (`--egal`).
