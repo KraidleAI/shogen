@@ -169,6 +169,17 @@ class TestDecision(unittest.TestCase):
         self.assertEqual(regle.premiere(["kraken", "binance", "okx"]), "binance")
         self.assertIsNone(regle.premiere([]))
 
+    def test_unites_series_nulles_e_s_28(self):
+        """C-2 (b) de la G2 de la tranche 3 (E-S-28 ; ADR-0029 l.203 : au moins deux unités avec au moins un écart
+        consolidé) : tester sur trois séries dont une seule non nulle (binance {0, 3} ; coinbase et kraken
+        nulles), R = 1, α = 1/2 (seuil 0), n = 8, n_s = 10, à la main : unites = 1 (séries nulles non comptées), K = 0,
+        aucun run ; aucune rotation calculée, K^(1) = 0 : C = 1, C1 = 0 → NON ÉVALUABLE, causes unites, k_crit et
+        runs. Mutation V-22 du réviseur (unités comptées sur toutes les séries)."""
+        prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2]))
+        out = regle.tester({"binance": bits(0, 3), "coinbase": 0, "kraken": 0}, "binance", G, "calme", 8, 10, prm, 1)
+        self.assertEqual((out["unites"], out["K"], out["runs"], out["C"], out["C1"], out["valeur"], out["causes"]),
+                         (1, 0, 0, 1, 0, "NON ÉVALUABLE", ["unites", "k_crit", "runs"]))
+
 
 HOTES = ["binance", "bitfinex", "bitstamp", "chainlink", "coinbase", "coingecko"]
 
@@ -206,9 +217,13 @@ class TestModeComplet(unittest.TestCase):
     def test_arret_anticipe_t_reg_2(self):
         """T-REG-2, oracle exact (E-S-29) : 200 instances (R = 999, seuil 9), valeur et causes de l'arrêt anticipé
         égales à celles du mode à R complet, et cause k_crit ⇔ K_crit < 2 ; les instances couvrent REJETTE, NE REJETTE
-        PAS et NON ÉVALUABLE, dont des arrêts avant R et la cause k_crit. oracle() rend le résultat anticipé et refuse
-        un écart (REGLE/oracle ; désaccord de causes seul forcé par mock.patch.object sur complet). Mutations M-REG-6
-        (arrêt à C ≥ seuil), M-REG-7 (C1 non suivi), M-8A-03 (oracle sans comparaison des causes)."""
+        PAS et NON ÉVALUABLE, dont des arrêts avant R et la cause k_crit. S suivie (C-1 de la G2 de la tranche 3), sur
+        les 60 premières : même valeur, mêmes causes et même réponse à « C_S ≤ seuil » dans les deux modes ; elles
+        couvrent C_S ≤ 9 et C_S > 9, des arrêts et des passes complètes, dont une que seul C_S retient (C > 9, C1 > 9,
+        C_S ≤ 9). oracle() rend le résultat anticipé et refuse un écart (REGLE/oracle ; désaccords forcés par
+        mock.patch.object sur complet : causes seules ; S suivie, C_S passé de l'autre côté du seuil, instance 2).
+        Mutations M-REG-6 (arrêt à C ≥ seuil), M-REG-7 (C1 non suivi), M-8A-03 (oracle sans comparaison des causes),
+        M-8D-01 (oracle sans comparaison de C_S), M-8D-02 (C_S comparé à l'unité près, non par « ≤ seuil »)."""
         vus = set()
         for i in range(200):
             series, n, graine = instance(i)
@@ -218,12 +233,23 @@ class TestModeComplet(unittest.TestCase):
             self.assertEqual(regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999), a)
             vus |= {a["valeur"], "arrêt" if a["r"] < 999 else "complet"} | set(a["causes"])
         self.assertLessEqual({"REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE", "arrêt", "complet", "k_crit"}, vus)
-        series, n, graine = instance(0)
+        vus = set()
+        for i in range(60):
+            series, n, graine = instance(i)
+            a, f = regle.deux_modes(series, "binance", graine, "calme", n, n, PRM, 999, True)
+            self.assertEqual((a["valeur"], a["causes"], a["C_S"] <= 9), (f["valeur"], f["causes"], f["C_S"] <= 9), i)
+            self.assertEqual(regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999, True), a)
+            vus |= {"C_S ≤ 9" if a["C_S"] <= 9 else "C_S > 9", "arrêt" if a["r"] < 999 else "complet"}
+            vus |= {"seul C_S"} if a["C"] > 9 and a["C1"] > 9 and a["C_S"] <= 9 else set()
+        self.assertLessEqual({"C_S ≤ 9", "C_S > 9", "arrêt", "complet", "seul C_S"}, vus)
         vrai = regle.complet
-        with mock.patch.object(regle, "complet", lambda *x: dict(vrai(*x), causes=["k_crit"])):
-            with self.assertRaises(commun.Refus) as c:
-                regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999)
-        self.assertEqual(c.exception.code, "REGLE/oracle")
+        for j, avec_S, faux in ((0, False, lambda *x: dict(vrai(*x), causes=["k_crit"])),
+                                (2, True, lambda *x: dict(vrai(*x), C_S=999 if vrai(*x)["C_S"] <= 9 else 0))):
+            series, n, graine = instance(j)
+            with mock.patch.object(regle, "complet", faux):
+                with self.assertRaises(commun.Refus) as c:
+                    regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999, avec_S)
+            self.assertEqual(c.exception.code, "REGLE/oracle", j)
 
     def test_sequence_et_f3_t_reg_3(self):
         """T-REG-3 (E-S-30, E-S-31 ; ADR-0029 l.204) : ETH (F2) testé seulement si BTC REJETTE dans la strate, sinon

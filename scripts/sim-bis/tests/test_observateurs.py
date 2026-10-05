@@ -177,6 +177,17 @@ class TestValidite(unittest.TestCase):
         self.assertEqual(lg, {2, 5})
         self.assertIn(1, ld)
 
+    def test_loi_des_absences_parametres(self):
+        """C-2 (c) de la G2 de la tranche 3 (E-S-17 ; Q-T3-2) : la loi des absences de parametres.json (5, 180 et 4 320
+        fenêtres, poids égaux) est celle que tire Couche.validites : absences de part 1/2, 40 réplications de 20 000
+        fenêtres, quatre observateurs ; longueurs des épisodes entiers (ni coupés à 0 ni à l'horizon) = {5, 180, 4 320}
+        exactement. Mutation V-20 du réviseur (loi réduite à ses deux premières longueurs)."""
+        lg, n = set(), 20000
+        for i in range(40):
+            for v in observateurs.Couche(PRM, couche(absences=Fraction(1, 2)), "T-C2", i, n).validites():
+                lg |= {b - a for a, b in calendrier.segments(((1 << n) - 1) & ~v) if 0 < a and b < n}
+        self.assertEqual(lg, {5, 180, 4320})
+
 
 class TestVotes(unittest.TestCase):
     def test_chemins_epsilon(self):
@@ -223,6 +234,29 @@ class TestVotes(unittest.TestCase):
                                 {("obs-artefacts", 0): suite(0.3, 0.8, 0.95)}).vues({}, {})
         attendu = {("artefact", o, h): bits(0, 1, 3, 4) for o in (0, 1, 2) for h in PRM["sources"]["as13335"]}
         self.assertEqual({k: w for k, w in v.items() if w}, attendu)
+
+    def test_artefacts_consolides_e_s_21(self):
+        """C-2 (a) de la G2 de la tranche 3 (E-S-21, E-S-22), à la main sur 4 fenêtres, état vrai nul : O1 à O3 en
+        artefact sur kraken (AS13335) en fenêtres 1 et 2, binance intact. M_j = 4 (q_j = 3) : trois statuts « panne »,
+        donc trois votes → D(kraken) = {1, 2} ; en 1 et 2, un seul statut non panne (O4) → ok(kraken) = {0, 3} ; binance
+        : D = 0, ok = {0, 1, 2, 3}. Repli (O4 non valide, M_j = 3, q_j = 2) : même résultat. Couche.consolidation,
+        artefacts d'essai (ρ = 720 par jour, durée 2, débuts en 0 et 3 : u = 0,3 ; 0,8 ; 0,95, comme ci-dessus), horizon
+        8 : D = {0, 1, 3, 4} et ok = {2, 5, 6, 7} sur les 7 hôtes AS13335 ; D = 0 et ok = {0, …, 7} sur binance,
+        bitstamp et gemini. Mutations V-02 (artefact hors du calcul de « ok ») et V-25 (artefact hors du statut
+        « panne ») du réviseur."""
+        etat = {("kraken", "BTC"): (0, 0), ("binance", "BTC"): (0, 0)}
+        vues = {("artefact", o, "kraken"): bits(1, 2) for o in (0, 1, 2)}
+        attendu = {("kraken", "BTC"): (bits(1, 2), bits(0, 3)), ("binance", "BTC"): (0, bits(0, 1, 2, 3))}
+        for valides in ([15] * 4, [15, 15, 15, 0]):
+            self.assertEqual(observateurs.consolider(etat, observateurs.Quorum(valides, 15), vues), attendu, valides)
+        prm = dict(PRM, observateurs=dict(PRM["observateurs"], duree_artefact=2))
+        etat = {(h, "BTC"): (0, 0) for h, _f in PRM["calibration"]["unites"]}
+        _q, s = observateurs.Couche(prm, couche(artefacts=Fraction(720)), "T-C2", 0, 8,
+                                    {("obs-artefacts", 0): suite(0.3, 0.8, 0.95)}).consolidation(etat, {})
+        as13335 = PRM["sources"]["as13335"]
+        self.assertEqual({h: x for (h, _c), x in s.items()},
+                         {h: (bits(0, 1, 3, 4), bits(2, 5, 6, 7)) if h in as13335 else (0, 255)
+                          for h, _f in PRM["calibration"]["unites"]})
 
     def test_regionale_et_manques(self):
         """À la main, panne vraie de kraken (BTC et ETH) en 1, 2, 5, 6, 7, écart d'ETH en 3. Panne régionale (π = 1/2,

@@ -9,6 +9,7 @@ E-S-31). SB-8b : compte d'événements à tolérance g et critère collectif d'a
 SB-8c : alignement sur le contrat de rotation de RB-6 (docs/adr-0029/s2bis/ROTATION-S2BIS.md, diffs RB-6a et RB-6b en
 relecture G2 ; adjugé par l'orchestrateur, risque R-2) : libellés de strate calme et stress, r et R de 1 à 9 999, refus
 nommés de toutes les entrées avant tout calcul (graine, n, noms d'unité, unité non décalée, masques de [0, 2^n)).
+SB-8d (C-1 de la G2 de la tranche 3) : l'oracle d'équivalence compare aussi « C_S ≤ seuil » quand S est suivie.
 Entiers et rationnels seuls : aucun flottant, aucune puissance."""
 import hashlib
 from fractions import Fraction
@@ -232,11 +233,17 @@ def deux_modes(series: dict, premier, graine: str, strate: str, n: int, n_s: int
 
 def oracle(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S=False) -> dict:
     """Oracle d'équivalence de l'arrêt anticipé (E-S-29 : sous-ensemble pré-déclaré, les 200 premières réplications de
-    chaque cellule) : rend le résultat anticipé si sa valeur et ses causes égalent celles du mode à R complet, sinon
-    REGLE/oracle."""
+    chaque cellule) : rend le résultat anticipé si sa valeur et ses causes égalent celles du mode à R complet et, S
+    suivie, si « C_S ≤ seuil » y a la même réponse (C-1 de la G2 de la tranche 3 : l'arrêt attend aussi C_S > seuil),
+    sinon REGLE/oracle."""
     a, f = deux_modes(series, premier, graine, strate, n, n_s, prm, R, avec_S)
-    if (a["valeur"], a["causes"]) != (f["valeur"], f["causes"]):
-        raise commun.Refus("REGLE/oracle", f"anticipé {a['valeur']} {a['causes']}, complet {f['valeur']} {f['causes']}")
+    s_ = seuil(R, prm["regle"]["alpha"])
+
+    def cle(x):
+        return x["valeur"], x["causes"], avec_S and x["C_S"] <= s_
+    if cle(a) != cle(f):
+        raise commun.Refus("REGLE/oracle", f"anticipé {a['valeur']} {a['causes']} C_S {a['C_S']}, complet "
+                                           f"{f['valeur']} {f['causes']} C_S {f['C_S']}")
     return a
 
 
