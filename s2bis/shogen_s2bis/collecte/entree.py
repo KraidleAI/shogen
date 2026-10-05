@@ -8,7 +8,9 @@ OSError ou un refus de l'écrivain (JOURNAL/casse compris) arrête la boucle et 
 (SHOGEN-S2BIS-ECRIVAIN-USAGE-1). Sortie : 0 après les fenêtres demandées (`--fenetres`, essais), 1 arrêt sur le
 journal, 2 refus avant l'ouverture du journal. CB-18g (C-1 de la G2 de la tranche C) : `formes.json` scelle la
 tolérance de départ de D-2 (`tolerance`, 5 s en production) ; la règle `budget` est celle de l'ADR-0029 l.233-234 :
-tolérance + plus grand décalage + délai + marge ≤ δ."""
+tolérance + plus grand décalage + délai + marge ≤ δ. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) : places du pool au moins
+égales au nombre de formes, hôte en minuscules (HOTE, règle de Q-RB-13 du recalcul), chemin en « / » puis ASCII
+imprimable sans espace."""
 import argparse
 import ipaddress
 import os
@@ -19,6 +21,7 @@ from shogen_s2bis.collecte import boucle, config, dns, http, journal, sante
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
+HOTE = "[a-z0-9.-]{1,253}"            # nom d'hôte ou IPv4 : même règle que le recalcul (Q-RB-13 de sa tranche 1)
 FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "chemin": (str, 1, 2048),
          "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None)}
 SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": (int, 1, MAX), "delai": (int, 1, MAX),
@@ -56,9 +59,12 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("noms-uniques", lambda f: len({x["nom"] for x in f["formes"]}) == len(f["formes"])),
                         ("methode-corps", lambda f: all((x["methode"], x["corps"] == "") in (("GET", True), (
                             "POST", False)) for x in f["formes"])),
+                        ("hote-forme", lambda f: all(re.fullmatch(HOTE, x["hote"]) for x in f["formes"])),
+                        ("chemin-forme", lambda f: all(re.fullmatch("/[!-~]*", x["chemin"]) for x in f["formes"])),
                         ("espace-par-hote", lambda f: len({(x["hote"], x["espace"]) for x in f["formes"]}) == len(
                             {x["hote"] for x in f["formes"]})),
-                        ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"])),
+                        ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"]),
+                        ("places-formes", lambda f: f["places"] >= len(f["formes"]))),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
              "descripteur": (("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),

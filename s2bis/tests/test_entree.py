@@ -3,7 +3,9 @@ CABLAGE-1 pour les sondes). CB-18d : point d'entrée `pool`, `run_params`, ferme
 SHOGEN-S2BIS-ECRIVAIN-USAGE-1). Configurations de test écrites ici, sha256 attendus calculés par hashlib sur les
 octets écrits ; temps réel, w = 1 s ; lectures vers un port local fermé ; sondes vers des adresses de boucle locale
 où rien n'écoute (délai de 0,1 s). CB-18g (C-1 de la G2 de la tranche C) : tolérance de départ scellée (`tolerance`),
-budget de l'ADR-0029 l.233-234 à la borne, valeurs prises au texte de l'ADR."""
+budget de l'ADR-0029 l.233-234 à la borne, valeurs prises au texte de l'ADR. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) :
+places du pool, forme de l'hôte (règle `[a-z0-9.-]{1,253}` de Q-RB-13 du recalcul) et du chemin, commit en minuscules,
+délai des sondes à la borne."""
 import contextlib
 import errno
 import fcntl
@@ -82,6 +84,9 @@ class Entree(unittest.TestCase):
                ("CONFIG/incoherent : budget", {**f, "delai": S}, s, d),
                ("CONFIG/incoherent : noms-uniques", {**f, "formes": [x, x]}, s, d),
                ("CONFIG/incoherent : methode-corps", {**f, "formes": [x, {**y, "methode": "POST"}]}, s, d),
+               ("CONFIG/incoherent : hote-forme", {**f, "formes": [x, {**y, "hote": "Api.example"}]}, s, d),
+               ("CONFIG/incoherent : chemin-forme", {**f, "formes": [x, {**y, "chemin": "b"}]}, s, d),
+               ("CONFIG/incoherent : places-formes", {**f, "places": 1}, s, d),
                ("CONFIG/incoherent : espace-par-hote", {**f, "formes": [x, {**y, "espace": True}]}, s, d),
                ("CONFIG/incoherent : empreinte-hex", f, s, {**d, "empreinte": "E" * 64}),
                ("CONFIG/incoherent : temoins-ipv4", f, {**s, "temoins": ["127.0.9.01"]}, d),
@@ -116,6 +121,29 @@ class Entree(unittest.TestCase):
             with self.subTest(formes={k: formes[k] for k in ("delta", "tolerance", "delai", "marge")}):
                 r = refus(lambda: entree.configurer(self.ecrire(formes, {**s, "delai": 2 * S}, d)[1], COMMIT))
                 self.assertEqual(r and r[:len(budget)], attendu)
+
+    def test_regles_de_configuration_a_la_borne(self):                  # CB-18h, SHOGEN-S2BIS-CONFIG-REGLES-1
+        """Places : autant que de formes, admis ; une de moins, refusé (pool dimensionné sur les lectures, ADR-0029
+        l.234). Hôte : minuscules, chiffres, « . » et « - » seuls (Q-RB-13). Chemin : « / » puis ASCII imprimable sans
+        espace (la lecture refuserait tout autre chemin à chaque fenêtre, FORMAT §10.4). Délai des sondes + marge = δ,
+        admis ; 1 µs de plus, refusé. Commit : 40 chiffres hexadécimaux minuscules, seuls admis."""
+        f, s, d = configurations(1)
+        x, y = f["formes"]
+        ok = None
+        cas = [({**f, "places": 2}, s, COMMIT, ok), ({**f, "places": 1}, s, COMMIT, "places-formes"),
+               (f, {**s, "delai": 2 * S // 5}, COMMIT, ok), (f, {**s, "delai": 2 * S // 5 + 1}, COMMIT, "delai-sondes"),
+               (f, s, COMMIT.upper(), "commit"), (f, s, COMMIT[:39] + "g", "commit"), (f, s, COMMIT[:39], "commit")]
+        cas += [({**f, "formes": [x, {**y, "hote": h}]}, s, COMMIT, ok) for h in ("api.example", "a-1.b", "z" * 253)]
+        cas += [({**f, "formes": [x, {**y, "hote": h}]}, s, COMMIT, "hote-forme") for h in (
+            "API.EXAMPLE", "a b", "a:443", "a_b", "é.example", "a/b")]
+        cas += [({**f, "formes": [x, {**y, "chemin": c}]}, s, COMMIT, ok) for c in ("/", "/a/b?c=1&d=%20~")]
+        cas += [({**f, "formes": [x, {**y, "chemin": c}]}, s, COMMIT, "chemin-forme") for c in (
+            "b", "*", "/a b", "/é", "/a" + chr(127), "http://h/a")]
+        for formes, sante, commit, regle in cas:
+            attendu = regle and (["CONFIG/commit", commit] if regle == "commit" else ["CONFIG/incoherent", regle])
+            with self.subTest(formes=formes, sante=sante["delai"], commit=commit):
+                r = refus(lambda: entree.configurer(self.ecrire(formes, sante, d)[1], commit))
+                self.assertEqual(r and r.split(" : ")[:2], attendu)
 
     def test_cablage_des_sondes_et_de_la_boucle(self):                  # SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Les sondes reçoivent la commande, les témoins, les noms et le délai de `sante.json`, le résolveur et sa

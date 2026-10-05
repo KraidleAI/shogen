@@ -743,3 +743,20 @@ la sonde telle quelle est refusée en `CONFIG/champ-absent`. FORMAT §14.1, §14
 Mutants (commande du job, `--plancher 176`, borne de 300 s ; python3.12 ; réseau isolé) : 6 tués sur 6 (0 vivant,
 0 FATAL), dont la règle d'avant C-1 rétablie. MR-17 du réviseur (égalité refusée) est tué par le test à la borne,
 rejoué sur l'état final. Suite : 176 tests ; plancher du job : 176, égalité exigée (`--egal`).
+
+## CB-18h (2026-10-05) : règles de forme des configurations (SHOGEN-S2BIS-CONFIG-REGLES-1)
+
+Objet : trois règles nommées de `formes.json` : `places-formes` (places ≥ nombre de formes : le pool est dimensionné
+sur le nombre de lectures, ADR-0029 l.234), `hote-forme` (`[a-z0-9.-]{1,253}`, la règle du recalcul, Q-RB-13 de sa
+tranche 1) et `chemin-forme` (« / » puis ASCII imprimable sans espace, choix du lot : la lecture refuserait tout autre
+chemin à chaque fenêtre, FORMAT §10.4). Tests à la borne du délai des sondes (`delai` + `marge` = δ admis, 1 µs de
+plus refusé ; tue MR-18) et du commit (majuscules refusées ; tue MR-22). FORMAT §14.1.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 125 | — |
+| `tests/test_entree.py` | 218 | 6 (1 de plus : règles à la borne ; 3 refus nommés de plus au test des refus) |
+
+Mutants (commande du job, `--plancher 177`, borne de 300 s ; python3.12 ; réseau isolé) : 10 tués sur 10 (0 vivant,
+0 FATAL). MR-18 et MR-22 du réviseur sont tués, rejoués sur l'état final. Suite : 177 tests ; plancher du job : 177,
+égalité exigée (`--egal`).

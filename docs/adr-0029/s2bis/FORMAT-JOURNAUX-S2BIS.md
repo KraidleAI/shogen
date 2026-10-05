@@ -15,7 +15,8 @@
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
   le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3) ; le diff ENTIER-ECRIVAIN,
-  I-1 (§1.2, §2). Relecture G2 de la tranche C de P1 (2026-10-05) : le diff CB-18g applique C-1 (§14.1, §14.4).
+  I-1 (§1.2, §2). Relecture G2 de la tranche C de P1 (2026-10-05) : le diff CB-18g applique C-1 (§14.1, §14.4) ; le
+  diff CB-18h ferme l'item SHOGEN-S2BIS-CONFIG-REGLES-1 (§14.1).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -376,10 +377,15 @@ résolution et sans envoi (ADR-0029 l.109).
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +
      `delai` + `marge` ≤ `delta`, égalité admise (en production, 5 + 4 + 10 + 1 = 20 ≤ 20 s) ; une lecture partie
-     dans la tolérance finit ainsi avant l'échéance (§11.1). Avant C-1, la règle omettait la tolérance ;
+     dans la tolérance finit ainsi avant l'échéance (§11.1). Avant C-1, la règle omettait la tolérance. Règles de
+     forme (CB-18h, SHOGEN-S2BIS-CONFIG-REGLES-1) : `places` ≥ nombre de formes (`places-formes` : le pool est
+     dimensionné sur le nombre de lectures, ADR-0029 l.234) ; `hote` de forme `[a-z0-9.-]{1,253}` (`hote-forme` :
+     minuscules, chiffres, « . » et « - » seuls, même règle que le recalcul, Q-RB-13 de sa tranche 1) ; `chemin`
+     de forme « / » suivi d'ASCII imprimable sans espace (`chemin-forme`, choix du lot : la lecture refuserait tout
+     autre chemin à chaque fenêtre, §10.4) ;
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
-     littérales canoniques), `noms` (D-5, noms DNS valides), `delai` (µs ; `delai` + `marge` ≤ `delta` : les sondes
-     sont jointes avant l'échéance) ;
+     littérales canoniques), `noms` (D-5, noms DNS valides), `delai` (µs ; `delai` + `marge` ≤ `delta`, égalité
+     admise : les sondes sont jointes avant l'échéance) ;
    - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur`, `fournisseur`,
      `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
      configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256
