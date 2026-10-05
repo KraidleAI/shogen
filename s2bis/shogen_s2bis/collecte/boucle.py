@@ -1,10 +1,12 @@
 """Boucle du pool (CB-4 ; E-C-09, E-C-11 à E-C-15 ; ADR-0029 §2.9 l.233-234). Dans la fenêtre ws, chaque lecture part
 à son instant planifié (départ ws + w − δ, plus le décalage de sa forme) si une place du pool borné est libre, sinon
-elle ne part pas : comptée, jamais écrite en panne de source (Q-C-02). Le fil principal attend l'échéance ws + w − 1 s,
-puis écrit seul (l'écrivain ne se partage pas) : une `lecture` par lecture partie (non finie : `panne_transport`, `dns`
-si la résolution n'a pas rendu, sinon `delai` ; son fil est abandonné), la `sante`, le marqueur. Un résultat tardif est
-compté avec sa latence dans la santé suivante, jamais écrit (Q-C-15). Fils démons et futurs de concurrent.futures, pas
-de ThreadPoolExecutor : il joint ses fils à la sortie, un fil pendu bloquerait le processus (essai, 3.10 à 3.13)."""
+elle ne part pas : comptée, jamais écrite en panne de source (Q-C-02). Le fil principal attend l'échéance
+E = ws + w − 1 s, relève alors une seule fois l'état des lectures et des sondes, puis écrit seul (l'écrivain ne se
+partage pas) : une `lecture` par lecture partie (non finie au relevé, ou finie après E : `panne_transport`, `dns` si
+la résolution n'avait pas rendu à E, sinon `delai`, `fin` = E ; son fil est abandonné), la `sante`, le marqueur (C-1
+de la G2 de P1-B). Un résultat tardif est compté avec sa latence dans la santé suivante, jamais écrit (Q-C-15). Fils
+démons et futurs de concurrent.futures, pas de ThreadPoolExecutor : il joint ses fils à la sortie, un fil pendu
+bloquerait le processus (essai, 3.10 à 3.13)."""
 import concurrent.futures
 import threading
 import time
@@ -62,28 +64,31 @@ class Boucle:
             threading.Thread(target=self._lire, args=(nom, suivi, futur), daemon=True).start()
             lancees.append((nom, depart + decalage, suivi, futur))
         self.attendre([f for *_x, f in lancees] + [f for _c, f in sondes], echeance)
+        releve = [(nom, prevu, suivi["depart"], futur, futur.result() if futur.done() else None,  # relevé unique, C-1
+                   dict(suivi.get("phases", {})), suivi.get("adresse")) for nom, prevu, suivi, futur in lancees]
+        champs = self.sondes.joindre(sondes) if self.sondes else {}
         finis, vivants = concurrent.futures.wait(self.abandons, timeout=0)
         tardives, self.abandons = sorted(f.result().fin - f.result().depart for f in finis), list(vivants)
-        for nom, prevu, suivi, futur in lancees:
-            if futur.done():
-                lu = futur.result()
-            else:
-                phases = dict(suivi.get("phases", {}))
-                lu = Lecture("panne_transport", suivi["depart"], self.horloge(), phases, suivi.get("adresse"),
+        for nom, prevu, dep, futur, lu, phases, adresse in releve:
+            if lu is None or lu.fin > echeance:                     # non finie à l'échéance : état atteint à E
+                phases = {k: t for k, t in phases.items() if t <= echeance}
+                lu = Lecture("panne_transport", dep, echeance, phases, adresse if "dns" in phases else None,
                              sous_type="delai" if "dns" in phases else "dns")
                 self.abandons.append(futur)
             self.journal.ecrire("lecture", ws, forme=nom, prevu=prevu, **lu.enregistrement())
         self.journal.ecrire("sante", ws, d2={"retard_max": max(retards, default=None), "non_parties": non_parties},
-                            fils={"abandonnes": len(self.abandons), "tardives": tardives},
-                            **(self.sondes.joindre(sondes) if self.sondes else {}))
+                            fils={"abandonnes": len(self.abandons), "tardives": tardives}, **champs)
         self.journal.marqueur(ws)
 
     def _lire(self, nom, suivi, futur):
+        """Fil d'une lecture. Le futur rend toujours, une `Lecture` : une BaseException suit son cours (O-5)."""
+        lu = None
         try:
             lu = self.lectures[nom](suivi)
         except Exception:                                           # attrape-tout : une lecture ne lève jamais
-            lu = Lecture("panne_transport", suivi["depart"], self.horloge(), suivi.get("phases"), suivi.get("adresse"),
-                         sous_type="autre")
+            pass
         finally:
             self.places.release()
-        futur.set_result(lu)
+            futur.set_result(lu if isinstance(lu, Lecture) else Lecture(
+                "panne_transport", suivi["depart"], self.horloge(), suivi.get("phases"), suivi.get("adresse"),
+                sous_type="autre"))

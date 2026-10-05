@@ -1,5 +1,6 @@
 """CB-11, E-C-25 à E-C-29 : sondes de santé, commande d'horloge, requêtes DNS et lancement injectés ; branchement à la
-boucle (liste blanche des clés de `sante`). sha256 de la configuration du résolveur par printf et sha256sum."""
+boucle (liste blanche des clés de `sante`). sha256 de la configuration du résolveur par printf et sha256sum. CB-11c
+(G2 de P1-B) : boucle dans un fil joint en temps borné (C-6) ; sondes relevées à l'échéance (C-1)."""
 import concurrent.futures
 import os
 import subprocess
@@ -11,7 +12,7 @@ import unittest
 
 from shogen_s2bis.collecte import boucle, sante
 from shogen_s2bis.collecte.lecture import S
-from tests.test_boucle import D, Temps, rapide
+from tests.test_boucle import D, Lent, Temps, borne, rapide
 from tests.test_journal import FICHIER, Base, chaine
 from tests.test_reprise import m, sans_chaine
 
@@ -102,8 +103,8 @@ class Branchement(Base):
             return {"statut": "reponse"}
         s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", self.d, os.path.join(self.d, "absent"),
                          interroger=interroger, lancer=Faux().lancer)
-        boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(S, "a")], 8, horloge=temps, dormir=temps.dormir,
-                      attendre=temps.attendre, sondes=s).tourner(1)
+        borne(self, boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(S, "a")], 8, horloge=temps, dormir=temps.dormir,
+                                  attendre=temps.attendre, sondes=s).tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((sorted(enr), sorted(enr["d2"]), sorted(enr["fils"])),
                          (["d2", "d3", "d4", "d5", "disque", "fils", "resolveur", "type", "ws"],
@@ -112,3 +113,20 @@ class Branchement(Base):
                          (0, [{"adresse": TEMOINS[0], "statut": "reponse"}], [{"nom": NOMS[0], "statut": "reponse"}],
                           None, [D, D]))
         self.assertEqual(temps.appels[:2], [("dormir", D), ("dormir", D + S)])
+
+    def test_sonde_finie_apres_l_echeance_vaut_null(self):
+        """C-1 : les sondes sont relevées avec les lectures, une seule fois à l'échéance, avant toute écriture : une
+        sonde qui rend pendant l'écriture des lectures (écrivain ralenti) vaut null."""
+        temps, porte = Temps(m(2) * S + 5 * S), threading.Event()
+        self.addCleanup(porte.set)
+
+        def interroger(*a, **k):
+            porte.wait(5)
+            return {"statut": "reponse"}
+        s = sante.Sondes(["horloge"], TEMOINS[:1], [], "192.0.2.53", self.d, interroger=interroger,
+                         lancer=Faux().lancer)
+        b = boucle.Boucle(Lent(self.journal(m(2)), temps, porte), {"a": rapide}, [(0, "a")], 8, horloge=temps,
+                          dormir=temps.dormir, attendre=temps.attendre, sondes=s)
+        borne(self, b.tourner, 1)
+        enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
+        self.assertEqual((enr["type"], enr["d3"]["code"], enr["d4"]), ("sante", 0, [None]))

@@ -15,7 +15,7 @@ import unittest
 
 from shogen_s2bis.collecte import boucle, http, journal
 from shogen_s2bis.collecte.lecture import S, Lecture
-from tests.test_boucle import D, E, Temps, pendue, rapide
+from tests.test_boucle import D, E, Temps, borne, pendue, rapide
 from tests.test_http_reseau import Resolveur, repondre, servir
 from tests.test_journal import FICHIER, Base, chaine
 from tests.test_reprise import m, sans_chaine
@@ -47,10 +47,7 @@ class LecturePendue(Base):
             self.temps = Temps(m(2) * S + 5 * S)
             self.b = boucle.Boucle(self.journal(m(2)), lectures, plan, places, horloge=self.temps,
                                    dormir=self.temps.dormir, attendre=self.temps.attendre)
-        fil = threading.Thread(target=self.b.tourner, args=(n,), daemon=True)
-        fil.start()
-        fil.join(5)
-        self.assertFalse(fil.is_alive(), "la boucle pend")
+        borne(self, self.b.tourner, n)
         return sans_chaine(chaine(self.etat()[FICHIER])[2])[1:]
 
     def test_tlp1_lecture_qui_ne_rend_jamais(self):

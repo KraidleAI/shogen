@@ -8,7 +8,8 @@
   collecteur. Code de référence : `s2bis/shogen_s2bis/collecte/journal.py`. Le test de conformité d'un journal produit
   par le collecteur entier (E-C-24) est celui du sous-lot CB-18.
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
-  de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4).
+  de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
+  de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -204,10 +205,14 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
 3. **Pool borné** : une lecture ne part que si une place du pool est libre ; une place reste prise jusqu'à la fin de
    la lecture, même abandonnée. Une lecture qui ne part pas n'a **aucun** enregistrement `lecture` : ce n'est jamais
    une panne de source (Q-C-02) ; elle est comptée dans la santé (`non_parties`).
-4. **Échéance** : à E, le fil principal, seul écrivain, écrit une `lecture` pour chaque lecture partie. Une lecture non
-   finie est `panne_transport`, de sous-type `dns` si la résolution n'a pas rendu (aucune phase `dns`), sinon
-   `delai` ; `fin` est l'instant de l'échéance ; `phases` et `adresse` sont celles atteintes ; son fil est abandonné.
-   Une lecture dont la fonction lève est `panne_transport` de sous-type `autre`.
+4. **Échéance** (C-1) : à E, le fil principal relève **une seule fois**, avant toute écriture, l'état de chaque
+   lecture partie et de chaque sonde (§13.2) ; puis, seul écrivain, il écrit une `lecture` pour chaque lecture partie.
+   Une lecture est **non finie** si son résultat n'était pas rendu au relevé, ou s'il porte `fin` > E (rendu entre E
+   et le relevé). Elle est alors `panne_transport`, de sous-type `dns` si la résolution n'avait pas rendu à E (aucune
+   phase `dns` d'instant au plus E), sinon `delai` ; `fin` vaut E ; `phases` et `adresse` sont celles atteintes à E
+   (instants au plus E ; `adresse` null sans phase `dns`) ; son fil est abandonné, et son résultat suit le chemin des
+   résultats tardifs (§11.6). Une lecture dont la fonction lève, BaseException comprise (O-5 : l'exception suit son
+   cours, le résultat est rendu), ou ne rend pas une lecture, est `panne_transport` de sous-type `autre`.
 5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
    puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Une fenêtre dont l'échéance est déjà passée quand la boucle
    l'atteint n'est pas lue : le trou est déclaré au marqueur suivant (cause `saut`).
@@ -216,10 +221,14 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
      parmi les lectures parties ; null si aucune n'est partie. `d2.non_parties` : nombre de lectures planifiées qui ne
      sont pas parties faute de place. D-2 se juge au recalcul (règle Q-C-02 de l'avis : toute lecture partie plus de
      5 s après son instant planifié, ou non partie, dégrade l'observateur dans la fenêtre) ;
-   - `fils.abandonnes` : fils de lecture abandonnés encore vivants, après le classement de la fenêtre ;
+   - `fils.abandonnes` : lectures abandonnées, à savoir celles de la fenêtre (non finies à E, §11.4, même si leur
+     résultat est arrivé entre E et le relevé), plus celles des fenêtres précédentes dont le résultat n'était pas
+     arrivé au relevé ;
      `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
-     est arrivé depuis la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15).
-7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter.
+     est arrivé depuis le relevé de la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15).
+7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter. D'où des futurs
+   `concurrent.futures` sans `ThreadPoolExecutor`, qui joint ses fils à la sortie de l'interpréteur, même après
+   `shutdown(wait=False, cancel_futures=True)` (essais du worker et de la G2 de la tranche B, Python 3.10 à 3.13).
 
 ## 12. Résultat d'une requête DNS (CB-10 ; E-C-27, E-C-28)
 
@@ -247,7 +256,7 @@ aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-002
    les seuils scellés, E-C-26).
 2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
    hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
-   cours à l'échéance vaut null.
+   cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null.
 3. `d3` : sortie brute de la commande d'horloge scellée (configuration de l'observateur ; relevé chrony, ADR-0029
    l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard lue en UTF-8 (octet invalide
    remplacé par U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur`

@@ -224,3 +224,22 @@ oui). Suite : 91 tests ; plancher du job : 91, égalité exigée (`--egal`).
 Mutants : 10 tués sur 10 au dernier passage (0 vivant, 0 FATAL). Premier passage : 9 tués, 1 hors cible (M-11b-02,
 mutant mal écrit : bloc vide, erreur de syntaxe, le test nommé n'a pas tourné) ; mutant corrigé, campagne relancée.
 Suite : 92 tests ; plancher du job : 92, égalité exigée (`--egal`).
+
+## CB-11c (2026-10-05) : corrections C-1, C-6 et C-7 (boucle), observation O-5, de la relecture G2 de la tranche B
+
+Objet : état des lectures et des sondes relevé une seule fois à l'échéance, avant toute écriture ; lecture non finie
+au relevé, ou finie après E, classée à E (`fin` = E, phases et adresse atteintes à E) et comptée tardive ensuite (C-1) ;
+boucle des tests dans un fil joint en temps borné, exception du fil relevée dans le test (C-6) ; tests nommés des
+mutants vivants MG-11, MG-13 et MG-29 (C-7) ; futur rendu même si une lecture lève une BaseException (O-5).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 94 | — |
+| `tests/test_boucle.py` | 225 | 10 (4 de plus : échéance exacte sous écrivain ralenti, place rendue, pool plein sans attente, BaseException) |
+| `tests/test_sante.py` | 132 | 6 (1 de plus : sonde rendue après l'échéance, null) |
+| `tests/test_lecture_pendue.py` | 131 | 8 (fil borné partagé, `borne` de `test_boucle`) |
+
+Mutants, classés par la commande du job (SHOGEN-S2BIS-MUT-COMMANDE-1 : ligne `verdict-suite-s2.py s2bis --aucun-saut
+--egal --plancher 97` de `gates.yml`, suite entière, borne de 300 s, dépassement FATAL) : 14 tués sur 14 par leur test
+visé (0 vivant, 0 FATAL), dont MG-11, MG-13, MG-29 du réviseur et M-LP-3 du worker, qui sort désormais en 1 en 76 s
+(la suite pendait). Suite : 97 tests ; plancher du job : 97, égalité exigée (`--egal`).
