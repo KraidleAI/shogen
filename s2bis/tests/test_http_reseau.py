@@ -1,6 +1,7 @@
 """CB-3, E-C-03 à E-C-05 : lecture par phases sur serveurs factices de boucle locale, résolveur injecté. CB-11e (C-4 de
 la G2 de P1-B) : délais sur l'horloge monotone, horloge murale reculée pendant une lecture. CB-11g (C-3) : contexte TLS
-d'urllib (attributs et ClientHello écrit en mémoire, sans réseau), chemin TLS réussi par une couche injectée ; MG-31."""
+d'urllib (attributs et ClientHello écrit en mémoire, sans réseau), chemin TLS réussi par une couche injectée ; MG-31.
+CB-18b (limite E-4 levée) : le délai court depuis le départ monotone que la boucle porte dans le suivi."""
 import contextlib
 import socket
 import ssl
@@ -10,7 +11,7 @@ import time
 import unittest
 
 from shogen_s2bis.collecte import http
-from shogen_s2bis.collecte.lecture import S, horloge
+from shogen_s2bis.collecte.lecture import S, horloge, monotone
 from tests.test_http import CORPS, OK7, REQUETE
 
 
@@ -189,10 +190,19 @@ class Client(unittest.TestCase):
         self.assertEqual((lu.sous_type, sorted(lu.phases)), ("delai", ["connexion", "dns"]))   # statut contrôlé
 
     def test_depart_pose_par_la_boucle_et_suivi(self):
-        suivi = {"depart": horloge() - S}
-        lu = http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(1), tls=None, delai=S)
-        self.assertEqual((lu.statut, lu.sous_type, lu.depart, sorted(suivi)),
-                         ("panne_transport", "dns", suivi["depart"], ["adresse", "depart", "phases"]))
+        """CB-18b (SOMMEIL-MURAL-1, limite E-4 levée) : le délai court depuis le départ que la boucle porte dans le
+        suivi sur l'horloge monotone (`monotone`), jamais depuis l'horloge murale (`depart`) : départ monotone 1 s
+        avant, délai de 1 s épuisé dès la résolution (`dns`) ; départ mural 5 s avant, départ monotone présent : le
+        délai court encore, la connexion est tentée (port fermé : `connexion`)."""
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]                               # port rendu : rien n'y écoute
+        for mono, mural, attendu in ((monotone() - S, horloge(), "dns"), (monotone(), horloge() - 5 * S, "connexion")):
+            suivi = {"depart": mural, "monotone": mono}
+            lu = http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(port), tls=None, delai=S)
+            with self.subTest(attendu=attendu):
+                self.assertEqual((lu.statut, lu.sous_type, lu.depart, sorted(suivi)),
+                                 ("panne_transport", attendu, mural, ["adresse", "depart", "monotone", "phases"]))
 
     def test_delai_sur_l_horloge_monotone_malgre_un_recul(self):
         """C-4 (S-C1 de la G2) : l'horloge murale recule de 3 s, 0,1 s après le départ d'une lecture servie octet par
@@ -209,8 +219,9 @@ class Client(unittest.TestCase):
         self.assertLess(lu.fin, lu.depart)
 
     def test_depart_pose_apres_le_debut_ne_prolonge_pas_le_delai(self):
-        """C-4 : `depart` posé 5 s après le début de la lecture (horloge murale reculée entre la boucle et le fil) : le
-        temps écoulé, négatif, compte pour zéro ; le délai de 0,2 s court depuis le début de la lecture."""
+        """C-4, CB-18b : `depart` posé 5 s après le début de la lecture (horloge murale reculée entre la boucle et le
+        fil), sans départ monotone : le délai de 0,2 s court depuis le début de la lecture, l'horloge murale n'y entre
+        pas."""
         def muet(conn, recues):
             conn.recv(4096)
             conn.recv(4096)                                         # jusqu'à la fermeture par le client

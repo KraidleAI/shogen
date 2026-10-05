@@ -4,7 +4,10 @@ l'échéance. D-3 : sortie brute de la commande d'horloge scellée, sans analyse
 recalcul l'analyse, sur pièce) ; D-4 : SOA de « . » vers chaque témoin, adresse IPv4 littérale, sans récursion ; D-5 :
 A de chaque nom témoin, par le résolveur de l'observateur ; délai de 2 s (l.109-110). S'y ajoutent, au relevé, le
 disque du journal et l'empreinte de la configuration du résolveur. Valeurs brutes, aucun jugement (E-C-26). Une sonde
-dont l'instance précédente n'a pas rendu n'est pas relancée : au plus un fil par sonde (C-5 de la G2 de P1-B)."""
+dont l'instance précédente n'a pas rendu n'est pas relancée : au plus un fil par sonde (C-5 de la G2 de P1-B).
+CB-18b (SHOGEN-S2BIS-SONDES-ECHEANCE-1) : chaque sonde rend aussi l'instant de sa fin sur l'horloge monotone de la
+boucle (jamais journalisé) ; au relevé, une sonde finie après l'échéance vaut null, et disque et empreinte ne se
+relèvent qu'après l'état des futurs."""
 import concurrent.futures
 import hashlib
 import os
@@ -12,7 +15,7 @@ import subprocess
 import threading
 
 from shogen_s2bis.collecte import dns
-from shogen_s2bis.collecte.lecture import S, horloge
+from shogen_s2bis.collecte.lecture import S, horloge, monotone
 
 SORTIE = 4096                                                       # caractères gardés de la sortie D-3
 
@@ -57,9 +60,10 @@ class Sondes:
         self.dossier, self.resolv, self.delai = dossier, resolv, delai
         self.interroger, self.lanceur, self.encours = interroger, lancer, {}           # rang → dernier futur (C-5)
 
-    def lancer(self):
+    def lancer(self, monotone=monotone):
         """Lance chaque sonde sur un fil démon ; rend [(clé, futur)] dans l'ordre : d3, témoins, noms. Une sonde dont
-        l'instance précédente n'a pas rendu n'est pas relancée : futur None, elle vaut null (C-5)."""
+        l'instance précédente n'a pas rendu n'est pas relancée : futur None, elle vaut null (C-5). Le futur rend
+        (valeur, fin sur l'horloge `monotone`, celle de la boucle) (CB-18b)."""
         taches = [("d3", lambda: horloge_systeme(self.commande, self.delai, self.lanceur))]
         taches += [("d4", lambda a=a: {"adresse": a, **self.interroger(a, ".", "SOA", recursion=False,
                                                                        delai=self.delai)}) for a in self.temoins]
@@ -71,7 +75,7 @@ class Sondes:
                 lancees.append((cle, None))
                 continue
             futur = self.encours[rang] = concurrent.futures.Future()
-            threading.Thread(target=_sonder, args=(tache, futur), daemon=True).start()
+            threading.Thread(target=_sonder, args=(tache, futur, monotone), daemon=True).start()
             lancees.append((cle, futur))
         return lancees
 
@@ -79,11 +83,13 @@ class Sondes:
         """Instances de sonde encore en cours (C-5) : au plus une par sonde."""
         return sum(not f.done() for f in self.encours.values())
 
-    def joindre(self, lancees):
-        """Champs de santé des sondes, plus disque et résolveur ; une sonde inachevée ou non relancée vaut None."""
+    def joindre(self, lancees, limite=None):
+        """Champs de santé des sondes ; une sonde inachevée, non relancée, ou finie après `limite` (échéance sur
+        l'horloge monotone de `lancer`, CB-18b) vaut None. Disque et résolveur se relèvent après l'état des futurs."""
+        etats = [(cle, futur.result() if futur is not None and futur.done() else (None, 0)) for cle, futur in lancees]
         r = {"d3": None, "d4": [], "d5": [], "disque": disque(self.dossier), "resolveur": empreinte(self.resolv)}
-        for cle, futur in lancees:
-            v = futur.result() if futur is not None and futur.done() else None
+        for cle, (v, fin) in etats:
+            v = None if limite is not None and fin > limite else v
             if cle == "d3":
                 r["d3"] = v
             else:
@@ -91,13 +97,13 @@ class Sondes:
         return r
 
 
-def _sonder(tache, futur):
-    """Fil d'une sonde. Le futur rend toujours : une sonde qui lève vaut None et repart à la fenêtre suivante (C-5) ;
-    une BaseException suit son cours."""
+def _sonder(tache, futur, monotone):
+    """Fil d'une sonde. Le futur rend toujours (valeur, fin sur l'horloge `monotone`) : une sonde qui lève vaut None et
+    repart à la fenêtre suivante (C-5) ; une BaseException suit son cours."""
     v = None
     try:
         v = tache()
     except Exception:                                               # attrape-tout : une sonde ne lève jamais
         pass
     finally:
-        futur.set_result(v)
+        futur.set_result((v, monotone()))

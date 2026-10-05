@@ -8,7 +8,12 @@ de la G2 de P1-B). Un résultat tardif est compté avec sa latence dans la sant�
 démons et futurs de concurrent.futures, pas de ThreadPoolExecutor : il joint ses fils à la sortie, un fil pendu
 bloquerait le processus (essai, 3.10 à 3.13). Sans sondes, la `sante` reste complète, champs des sondes nuls (O-7).
 Chaque relevé lit aussi l'horloge murale et l'horloge monotone : la `sante` journalise, brut, le temps écoulé sur
-chacune depuis le relevé précédent ; un recul de l'horloge murale s'y lit (C-4)."""
+chacune depuis le relevé précédent ; un recul de l'horloge murale s'y lit (C-4). CB-18b : départ et échéance
+s'attendent sur l'horloge murale, relue au moins chaque seconde (SHOGEN-S2BIS-SOMMEIL-MURAL-1) ; le départ de chaque
+lecture est aussi relevé sur l'horloge monotone et porté dans son suivi (limite E-4 levée) ; un nom du plan sans
+lecture est refusé à la construction (SHOGEN-S2BIS-PLAN-CABLAGE-1) ; au relevé, une sonde finie après E vaut
+null, sur l'horloge monotone, et disque et empreinte se relèvent après l'état des futurs
+(SHOGEN-S2BIS-SONDES-ECHEANCE-1)."""
 import concurrent.futures
 import threading
 import time
@@ -16,19 +21,36 @@ import time
 from shogen_s2bis.collecte.lecture import S, Lecture, horloge, monotone
 
 DELTA, MARGE, PAR_HOTE = 20 * S, S, 5                     # δ, marge de l'échéance, lectures par hôte (ADR l.233-234)
+PAS = S                                                 # attente d'un seul tenant au plus : l'horloge murale est relue
 NULS = {"d3": None, "d4": [], "d5": [], "disque": None, "resolveur": None}           # santé sans sondes (O-7)
+
+
+class RefusBoucle(ValueError):
+    """Refus nommé (`code`) à la construction : BOUCLE/hote, BOUCLE/plan (CB-18b)."""
+    def __init__(self, code, detail):
+        super().__init__(f"{code} : {detail}")
+        self.code = code
 
 
 def planifier(formes, espaces=()):
     """[(décalage, nom)] trié depuis `formes` [(nom, hôte)] : sur un hôte de `espaces` (sa limite l'exige), la k-ième
-    lecture part k s après le départ ; ailleurs, au départ. Plus de PAR_HOTE lectures sur un hôte : ValueError."""
+    lecture part k s après le départ ; ailleurs, au départ. Plus de PAR_HOTE lectures sur un hôte : BOUCLE/hote."""
     rangs, plan = {}, []
     for nom, hote in formes:
         k = rangs[hote] = rangs.get(hote, -1) + 1
         if k >= PAR_HOTE:
-            raise ValueError(f"plus de {PAR_HOTE} lectures par fenêtre sur {hote} : le regroupement s'impose")
+            raise RefusBoucle("BOUCLE/hote", f"plus de {PAR_HOTE} lectures par fenêtre sur {hote} : regroupement")
         plan.append((k * S if hote in espaces else 0, nom))
     return sorted(plan)
+
+
+def jusqu_a(t, horloge, attente):
+    """Attend que l'horloge murale `horloge` atteigne `t` (µs), par attentes `attente(d)` d'au plus PAS µs, en la
+    relisant après chacune : un recul de l'horloge prolonge l'attente, une avance l'abrège (CB-18b). Une attente qui
+    rend vrai (futurs tous rendus) y met fin."""
+    while (reste := t - horloge()) > 0:
+        if attente(min(reste, PAS)):
+            return
 
 
 class Boucle:
@@ -36,12 +58,17 @@ class Boucle:
                  dormir=None, attendre=None, sondes=None, monotone=monotone):
         """`lectures` {nom: lire(suivi)} ; `plan` de `planifier` ; `places` : taille scellée du pool ; attentes à t ;
         `sondes` (sante.Sondes, CB-11) : lancées au départ, jointes avant l'échéance, versées à `sante` ; `monotone` :
-        horloge monotone du relevé (C-4)."""
+        horloge monotone du relevé (C-4), des départs et des fins de sondes (CB-18b). Nom du plan sans lecture :
+        BOUCLE/plan."""
+        manquants = sorted({nom for _d, nom in plan} - lectures.keys())
+        if manquants:
+            raise RefusBoucle("BOUCLE/plan", f"noms du plan sans lecture : {manquants}")
         self.journal, self.lectures, self.plan, self.horloge, self.w = journal, lectures, plan, horloge, w
         self.sondes, self.monotone, self.repere = sondes, monotone, None    # repère : relevé (murale, monotone), C-4
         self.delta, self.marge, self.places, self.abandons = delta, marge, threading.BoundedSemaphore(places), []
-        self.dormir = dormir or (lambda t: time.sleep(max(0, t - horloge()) / S))
-        self.attendre = attendre or (lambda futurs, t: concurrent.futures.wait(futurs, max(0, t - horloge()) / S))
+        self.dormir = dormir or (lambda t: jusqu_a(t, horloge, lambda d: time.sleep(d / S)))
+        self.attendre = attendre or (lambda futurs, t: jusqu_a(t, horloge, lambda d: not concurrent.futures.wait(
+            futurs, d / S).not_done))
 
     def tourner(self, n=None):
         """`n` fenêtres (sans fin si None) depuis la première que le journal admet ; une fenêtre dont l'échéance est
@@ -57,21 +84,23 @@ class Boucle:
         lancees, non_parties, retards, sondes = [], 0, [], []
         if self.sondes:                                             # sondes de santé au départ (Q-C-03)
             self.dormir(depart)
-            sondes = self.sondes.lancer()
+            sondes = self.sondes.lancer(self.monotone)
         for decalage, nom in self.plan:
             self.dormir(depart + decalage)
             if not self.places.acquire(blocking=False):
                 non_parties += 1
                 continue
-            suivi, futur = {"depart": self.horloge()}, concurrent.futures.Future()
+            suivi, futur = {"depart": self.horloge(), "monotone": self.monotone()}, concurrent.futures.Future()
             retards.append(suivi["depart"] - depart - decalage)
             threading.Thread(target=self._lire, args=(nom, suivi, futur), daemon=True).start()
             lancees.append((nom, depart + decalage, suivi, futur))
         self.attendre([f for *_x, f in lancees] + [f for _c, f in sondes if f is not None], echeance)
-        releve = [(nom, prevu, suivi["depart"], futur, futur.result() if futur.done() else None,  # relevé unique, C-1
+        murale, mono = self.horloge(), self.monotone()            # relevé unique (C-1) : instant, lectures, sondes
+        releve = [(nom, prevu, suivi["depart"], futur, futur.result() if futur.done() else None,
                    dict(suivi.get("phases", {})), suivi.get("adresse")) for nom, prevu, suivi, futur in lancees]
-        champs, vivantes = (self.sondes.joindre(sondes), self.sondes.vivantes()) if self.sondes else (dict(NULS), 0)
-        murale, mono = self.horloge(), self.monotone()
+        champs, vivantes = dict(NULS), 0
+        if self.sondes:                                             # E sur l'horloge monotone, lue au relevé
+            champs, vivantes = self.sondes.joindre(sondes, mono - (murale - echeance)), self.sondes.vivantes()
         horloges = None if self.repere is None else {"murale": murale - self.repere[0],
                                                      "monotone": mono - self.repere[1]}
         self.repere = murale, mono

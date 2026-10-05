@@ -3,15 +3,18 @@
 la G2 de P1-B (CB-11c) : boucle dans un fil joint en temps borné (C-6) ; échéance exacte sous écrivain ralenti (C-1) ;
 mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5). CB-11d : santé complète sans sondes (O-7),
 sondes vivantes comptées (C-5). CB-11e : horloges murale et monotone injectées, recul entre deux fenêtres (C-4).
-CB-18a : journal ouvert et boucle lancée dans le même fil du test (garde d'un seul fil de l'écrivain)."""
+CB-18a : journal ouvert et boucle lancée dans le même fil du test (garde d'un seul fil de l'écrivain). CB-18b :
+sommeil jusqu'à l'instant mural malgré un saut de l'horloge, départ monotone dans le suivi, plan câblé."""
 import concurrent.futures
 import queue
 import threading
 import time
+import types
+from unittest import mock
 
 from shogen_s2bis.collecte import boucle
 from shogen_s2bis.collecte.lecture import S, Lecture
-from tests.test_journal import FICHIER, Base, chaine
+from tests.test_journal import FICHIER, Base, chaine, code
 from tests.test_reprise import m, sans_chaine
 
 D, E = 1791154900 * S, 1791154919 * S                      # départ et échéance de la fenêtre m(3), 23:01 UTC
@@ -74,6 +77,24 @@ class Temps:
         self.futurs = futurs
         concurrent.futures.wait(futurs, 0.5)
         self.avancer(max(self.t, t) + self.saut)
+
+
+class Mural:
+    """Horloges factices (CB-18b) : `sleep(s)` les avance de s ; la première attente déplace aussi l'horloge murale de
+    `saut` µs (recul si négatif) : horloge réglée pendant le sommeil de la boucle."""
+    def __init__(self, t, saut):
+        self.t, self.m, self.saut, self.sommeils = t, 0, saut, []
+
+    def __call__(self):
+        return self.t
+
+    def monotone(self):
+        return self.m
+
+    def sleep(self, s):
+        d = round(s * S)
+        self.t, self.m, self.saut = self.t + d + self.saut, self.m + d, 0
+        self.sommeils.append(d)
 
 
 class Lent:
@@ -256,3 +277,36 @@ class Boucle(Base):
         self.assertEqual([(e["ws"], e["horloges"]) for e in enrs if e["type"] == "sante"],
                          [(m(3), None), (m(4), {"murale": 60 * S, "monotone": 240 * S}),
                           (m(5), {"murale": 60 * S, "monotone": 60 * S})])
+
+    def test_sommeil_jusqu_a_l_instant_mural_malgre_un_saut(self):      # CB-18b, SHOGEN-S2BIS-SOMMEIL-MURAL-1
+        """Sommeil par défaut, horloge murale reculée de 1 s ou avancée de 30 s pendant le premier sommeil : la lecture
+        part à son instant planifié sur l'horloge murale (retard nul), et nul sommeil ne dure plus de PAS = 1 s. Avant
+        CB-18b : départ 1 s trop tôt (mesures du worker et du réviseur des corrections de P1-B), ou 30 s trop tard."""
+        for i, saut in enumerate((-S, 30 * S)):
+            h, jl = Mural(m(2) * S + 5 * S, saut), borne(self, self.journal, m(2), f"p{i}")
+            b = boucle.Boucle(jl, {"a": rapide}, [(0, "a")], 8, horloge=h, monotone=h.monotone)
+            with mock.patch.object(boucle, "time", types.SimpleNamespace(sleep=h.sleep)):
+                borne(self, b.tourner, 1)
+            enrs = [e for e in chaine(self.etat()[f"p{i}-2026-10-04-0.jsonl"])[2] if e["type"] in ("lecture", "sante")]
+            with self.subTest(saut=saut):
+                self.assertEqual((enrs[0]["depart"] - enrs[0]["prevu"], enrs[1]["d2"]["retard_max"],
+                                  max(h.sommeils) <= S), (0, 0, True))
+
+    def test_depart_monotone_porte_dans_le_suivi(self):                 # CB-18b, limite E-4 levée
+        """Le départ de chaque lecture est relevé aussi sur l'horloge monotone de la boucle et porté dans `suivi`
+        (`monotone`), dont le client fait partir son délai ; le journal ne le porte pas (C-4)."""
+        vus = {}
+
+        def lire(nom):
+            return lambda suivi: vus.update({nom: suivi.get("monotone")}) or rapide(suivi)
+        enrs = self.tourner({"a": lire("a"), "b": lire("b")}, [(0, "a"), (S, "b")])
+        self.assertEqual((vus, [e["type"] for e in enrs]), ({"a": 95 * S, "b": 96 * S},
+                                                            ["lecture", "lecture", "sante", "marqueur"]))
+
+    def test_nom_du_plan_sans_lecture_refuse_a_la_construction(self):  # CB-18b, SHOGEN-S2BIS-PLAN-CABLAGE-1
+        """Un nom du plan sans lecture est refusé à la construction (BOUCLE/plan), avant tout lancement (O-6 : il
+        donnait `panne_transport:autre` à chaque fenêtre) ; plus de cinq lectures sur un hôte : BOUCLE/hote."""
+        jl = self.journal(m(2))
+        self.assertEqual([code(lambda: boucle.Boucle(jl, {"a": rapide}, [(0, "a"), (S, "b")], 8)),
+                          code(lambda: boucle.planifier([(str(k), "h") for k in range(6)]))],
+                         ["BOUCLE/plan", "BOUCLE/hote"])

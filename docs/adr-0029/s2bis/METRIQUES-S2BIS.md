@@ -573,3 +573,29 @@ le journal dans le fil où elle tourne (`borne` : un fil par test). FORMAT §5 ;
 Mutants (commande du job : runner, puis la ligne `verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 159` de
 `gates.yml`, suite entière, borne de 300 s, dépassement FATAL ; python3.12 ; réseau isolé, `lo` allumée) : 12 tués sur
 12 par leur test visé (0 vivant, 0 FATAL). Suite : 159 tests ; plancher du job : 159, égalité exigée (`--egal`).
+
+## CB-18b (2026-10-05) : attentes sur l'horloge murale, départ monotone, plan câblé, sondes à l'échéance
+
+Objet : départ et échéance attendus sur l'horloge murale par pas d'au plus 1 s, l'horloge relue après chaque pas
+(SHOGEN-S2BIS-SOMMEIL-MURAL-1 ; mesures du worker et du réviseur des corrections de la tranche B rejouées : départ en
+avance de 999 850 et 1 498 115 µs avant, en retard de 198 et 173 µs après) ; départ de chaque lecture relevé aussi sur
+l'horloge monotone et porté dans le suivi, d'où le client fait partir son délai (limite E-4 levée) ; nom du plan sans
+lecture refusé à la construction (`BOUCLE/plan`), plus de cinq lectures par hôte refusées par un refus nommé
+(`BOUCLE/hote`) (SHOGEN-S2BIS-PLAN-CABLAGE-1, volet boucle) ; règle `fin` > E appliquée aux sondes sur l'horloge
+monotone de la boucle, disque et empreinte relevés après l'état des futurs (SHOGEN-S2BIS-SONDES-ECHEANCE-1). FORMAT
+§10.2, §11.4, §11.8, §11.9, §13.2.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 131 | — |
+| `shogen_s2bis/collecte/sante.py` | 109 | — |
+| `shogen_s2bis/collecte/http.py` | 132 | — |
+| `tests/test_boucle.py` | 312 | 14 (3 de plus : sommeil malgré un recul de 1 s ou une avance de 30 s ; départ monotone dans le suivi ; plan sans lecture refusé) |
+| `tests/test_sante.py` | 239 | 12 (2 de plus : sonde rendue après E et avant le relevé, null ; état des futurs relevé avant le disque) |
+| `tests/test_http_reseau.py` | 272 | 14 (1 réécrit : le délai court depuis le départ monotone, jamais depuis l'horloge murale) |
+
+Mutants (commande du job, `--plancher 164`, borne de 300 s ; python3.12 ; réseau isolé) : 13 tués sur 13 par leur test
+visé au dernier passage (0 vivant, 0 FATAL). Premier passage : 12 tués, 1 vivant (M-18b-10, disque relevé avant les
+futurs) : à la boucle, l'instant du relevé lu d'abord et la règle `fin` > E rendent cet ordre sans effet ; le test est
+devenu un test de `joindre` sans échéance, où seul l'ordre décide, et la campagne entière a été relancée. Suite : 164
+tests ; plancher du job : 164, égalité exigée (`--egal`).

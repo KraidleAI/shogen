@@ -1,7 +1,9 @@
 """CB-11, E-C-25 à E-C-29 : sondes de santé, commande d'horloge, requêtes DNS et lancement injectés ; branchement à la
 boucle (liste blanche des clés de `sante`). sha256 de la configuration du résolveur par printf et sha256sum. CB-11c
 (G2 de P1-B) : boucle dans un fil joint en temps borné (C-6) ; sondes relevées à l'échéance (C-1). CB-11d : sonde
-pendue jamais relancée, sondes vivantes comptées (C-5) ; disque du dossier du journal (MG-26)."""
+pendue jamais relancée, sondes vivantes comptées (C-5) ; disque du dossier du journal (MG-26). CB-18b
+(SHOGEN-S2BIS-SONDES-ECHEANCE-1) : règle `fin` > E des sondes sur l'horloge monotone ; disque relevé après l'état
+des futurs."""
 import concurrent.futures
 import os
 import subprocess
@@ -10,6 +12,7 @@ import threading
 import time
 import types
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import boucle, sante
 from shogen_s2bis.collecte.lecture import S
@@ -122,6 +125,25 @@ class Sondes(unittest.TestCase):
         concurrent.futures.wait([x for _c, x in l1], 5)
         self.assertEqual((s.joindre(l1)["d4"], [x is None for _c, x in s.lancer()]), ([None], [False, False]))
 
+    def test_disque_et_empreinte_releves_apres_l_etat_des_futurs(self):    # CB-18b, SONDES-ECHEANCE-1
+        """`joindre` relève l'état des futurs avant le disque et l'empreinte (deux entrées-sorties) : un témoin rendu
+        pendant le relevé du disque (lent) n'était pas rendu, et vaut null. Sans échéance donnée, seul cet ordre en
+        décide ; à la boucle, relevée après E, la règle `fin` > E le nulle aussi."""
+        porte = threading.Event()
+        self.addCleanup(porte.set)
+        f = Faux(porte=porte)
+        s = sante.Sondes(["horloge"], TEMOINS[:1], [], "192.0.2.53", ".", interroger=f.interroger, lancer=f.lancer)
+        lancees = s.lancer()
+        concurrent.futures.wait([lancees[0][1]], 5)                         # la sonde d'horloge finit seule
+
+        def disque_lent(dossier):                                   # le témoin rend pendant le relevé du disque
+            porte.set()
+            concurrent.futures.wait([x for _c, x in lancees], 5)
+            return {"total": 1, "libre": 1}
+        with mock.patch.object(sante, "disque", disque_lent):
+            r = s.joindre(lancees)
+        self.assertEqual((r["d3"]["code"], r["d4"], r["disque"]), (0, [None], {"total": 1, "libre": 1}))
+
     def test_disque_du_dossier_du_journal(self):
         """MG-26 : `disque` se relève sur le dossier donné aux sondes (ici absent), jamais sur un autre."""
         with tempfile.TemporaryDirectory() as d:
@@ -190,3 +212,28 @@ class Branchement(Base):
         self.assertEqual([(e["d3"], e["d4"], e["d5"], e["fils"]["sondes"]) for e in enrs],
                          [(None, [None], [None], 3)] * 3)
         self.assertEqual(comptes, [(3, 3)] * 3)
+
+    def test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null(self):  # CB-18b, SONDES-ECHEANCE-1
+        """Règle `fin` > E appliquée aux sondes, sur l'horloge monotone de la boucle (E-1 des corrections de P1-B) :
+        l'attente déborde de 1 ms ; le premier témoin, rendu à E, est gardé ; le second, rendu après E mais avant le
+        relevé, vaut null."""
+        temps, portes = Temps(m(2) * S + 5 * S), [threading.Event(), threading.Event()]
+        for p in portes:
+            self.addCleanup(p.set)
+
+        def interroger(a, *x, **k):
+            portes[TEMOINS.index(a)].wait(5)
+            return {"statut": "reponse"}
+
+        def attendre(futurs, t):                                    # futurs : lecture, d3, puis les deux témoins
+            for porte, futur, instant in zip(portes, futurs[2:], (t, t + 1000)):
+                temps.avancer(instant)
+                porte.set()
+                concurrent.futures.wait([futur], 5)
+        s = sante.Sondes(["horloge"], TEMOINS[:2], [], "192.0.2.53", self.d, interroger=interroger,
+                         lancer=Faux().lancer)
+        jl = borne(self, self.journal, m(2))
+        borne(self, boucle.Boucle(jl, {"a": rapide}, [(0, "a")], 8, horloge=temps, dormir=temps.dormir,
+                                  attendre=attendre, sondes=s, monotone=temps.monotone).tourner, 1)
+        enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
+        self.assertEqual((enr["d3"]["code"], enr["d4"]), (0, [{"adresse": TEMOINS[0], "statut": "reponse"}, None]))

@@ -13,7 +13,9 @@
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
-  pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12).
+  pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12) ; le diff CB-18b ferme SHOGEN-S2BIS-SOMMEIL-MURAL-1
+  (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle, SHOGEN-S2BIS-PLAN-CABLAGE-1
+  (§11.9).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -203,10 +205,11 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
    qui reste, jamais un délai par opération ; un délai épuisé pendant une phase autre que `dns` donne le sous-type
    `delai`. La résolution est un appel bloquant que le client ne peut pas interrompre : l'échéance de la boucle (§11)
    la borne. Le délai se compte sur l'horloge monotone du système, les instants journalisés sur l'horloge murale
-   (C-4) : un recul ou une avance de l'horloge murale pendant la lecture ne change pas son délai. Le temps écoulé
-   entre `depart`, posé par la boucle, et le début de la lecture se lit sur l'horloge murale, jamais négatif, et se
-   retranche du délai (limite : une avance de l'horloge murale dans cet intervalle, celui du lancement du fil, le
-   raccourcit d'autant).
+   (C-4) : un recul ou une avance de l'horloge murale pendant la lecture ne change pas son délai. Il court depuis le
+   départ de la lecture, que la boucle relève aussi sur l'horloge monotone et porte dans le suivi de la lecture, sans
+   le journaliser (CB-18b) : le lancement du fil compte dans le délai, et l'horloge murale n'y entre jamais (limite
+   E-4 des corrections de la tranche B, levée). Une lecture lancée hors de la boucle compte son délai depuis son
+   début.
 3. Réponse lue entière : code 200, statut `ok` ; tout autre code, `panne_http` avec ce code et le corps reçu. Aucune
    redirection n'est suivie (S2 suivait celles d'urllib) : un code 3xx est un `panne_http`.
 4. Toute autre anomalie (défaut imprévu, requête dont l'hôte, le chemin ou la méthode sort de l'ASCII imprimable sans
@@ -228,8 +231,10 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 3. **Pool borné** : une lecture ne part que si une place du pool est libre ; une place reste prise jusqu'à la fin de
    la lecture, même abandonnée. Une lecture qui ne part pas n'a **aucun** enregistrement `lecture` : ce n'est jamais
    une panne de source (Q-C-02) ; elle est comptée dans la santé (`non_parties`).
-4. **Échéance** (C-1) : à E, le fil principal relève **une seule fois**, avant toute écriture, l'état de chaque
-   lecture partie et de chaque sonde (§13.2) ; puis, seul écrivain, il écrit une `lecture` pour chaque lecture partie.
+4. **Échéance** (C-1) : à E, le fil principal relève **une seule fois**, avant toute écriture, l'instant du relevé
+   (horloges murale et monotone), puis l'état de chaque lecture partie et de chaque sonde (§13.2), et seulement
+   ensuite le disque et l'empreinte du résolveur (CB-18b) ; puis, seul écrivain, il écrit une `lecture` pour chaque
+   lecture partie.
    Une lecture est **non finie** si son résultat n'était pas rendu au relevé, ou s'il porte `fin` > E (rendu entre E
    et le relevé). Elle est alors `panne_transport`, de sous-type `dns` si la résolution n'avait pas rendu à E (aucune
    phase `dns` d'instant au plus E), sinon `delai` ; `fin` vaut E ; `phases` et `adresse` sont celles atteintes à E
@@ -258,6 +263,19 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter. D'où des futurs
    `concurrent.futures` sans `ThreadPoolExecutor`, qui joint ses fils à la sortie de l'interpréteur, même après
    `shutdown(wait=False, cancel_futures=True)` (essais du worker et de la G2 de la tranche B, Python 3.10 à 3.13).
+8. **Attentes sur l'horloge murale** (CB-18b, SHOGEN-S2BIS-SOMMEIL-MURAL-1) : la boucle attend le départ de chaque
+   lecture et l'échéance par pas d'au plus 1 s, en relisant l'horloge murale après chaque pas, jusqu'à l'instant
+   visé ; l'attente de l'échéance cesse aussi quand toutes les lectures et sondes ont rendu. Un recul de l'horloge
+   murale pendant l'attente la prolonge, une avance l'abrège d'autant : une lecture ne part ni avant son instant
+   planifié (avant CB-18b, un recul de 1 s la faisait partir 1 s trop tôt : mesures du worker et du réviseur des
+   corrections de la tranche B, rejouées) ; après une avance, elle part au plus un pas après que l'horloge murale a
+   atteint son instant, et une avance qui franchit cet instant la fait partir à la relecture suivante, retard que
+   `retard_max` journalise. `d2.retard_max` reste donc positif ou nul ; une valeur négative ne peut venir que d'un
+   recul entre la dernière lecture de l'horloge et le départ. La règle de validité du recalcul lit `retard_max` et
+   `horloges` (§11.6).
+9. **Plan câblé** (CB-18b, SHOGEN-S2BIS-PLAN-CABLAGE-1) : la boucle refuse à sa construction un plan dont un nom n'a
+   pas de lecture (`BOUCLE/plan`), et le planificateur plus de cinq lectures sur un hôte (`BOUCLE/hote`) ; avant
+   CB-18b, un tel nom donnait `panne_transport` de sous-type `autre` à chaque fenêtre (O-6 de la G2 de la tranche B).
 
 ## 12. Résultat d'une requête DNS (CB-10 ; E-C-27, E-C-28)
 
@@ -296,7 +314,10 @@ résolution et sans envoi (ADR-0029 l.109).
    même liste : `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
 2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
    hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
-   cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null. Une sonde dont l'instance précédente n'a pas
+   cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null, de même qu'une sonde finie après E (règle
+   `fin` > E des lectures, CB-18b, SHOGEN-S2BIS-SONDES-ECHEANCE-1) : la fin de chaque sonde est relevée sur l'horloge
+   monotone de la boucle, sans être journalisée, et comparée à E rapportée à cette horloge au relevé (instant monotone
+   du relevé, moins son retard sur E à l'horloge murale). Une sonde dont l'instance précédente n'a pas
    rendu **n'est pas relancée** (C-5) : elle vaut null dans la fenêtre, et repart à la première fenêtre où l'instance
    précédente a rendu ; une sonde qui lève vaut null et repart de même. Le nombre d'instances encore en cours est
    journalisé (`fils.sondes`, §11.6) : les fils de sonde restent bornés, au plus un par sonde.
