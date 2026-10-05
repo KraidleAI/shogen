@@ -277,3 +277,68 @@ class TestEvenementsEtAbsorption(unittest.TestCase):
         self.assertEqual(regle.absorption({"u": f(1), "v": f(1, 10)}, f(1, 2)), (["u"], f(1, 9)))
         series = {"a": (1 << 10) - 1, "b": (1 << 5) - 1, "c": 3, "d": 3, "e": 1}
         self.assertEqual(regle.filtrer(series, 20, PRM), ({"c": 3, "d": 3, "e": 1}, ["a", "b"], f(47, 171)))
+
+
+G6 = "6fce4df75bac7db6ff01817b407f6331e49ec2ebf31f02e6672d3ab8a3bc9688"  # printf … SHOGEN-RB6-VECTEURS | sha256sum
+
+
+class TestContratRB6(unittest.TestCase):
+    def test_vecteurs_du_contrat_rb6(self):
+        """Contrat de rotation de RB-6 (docs/adr-0029/s2bis/ROTATION-S2BIS.md §2 et §5, diffs RB-6a et RB-6b, en
+        relecture G2) : ses six vecteurs o(r, u), recalculés par sha256sum et bc (journal de la tranche 3
+        « vecteurs-rb6.txt »), noms d'hôte de configuration compris, dont o = 0 et o = n − 1, et la même entrée sous n
+        et n/2 ; ses huit masques décalés à la main (la valeur de la position t va en (t + o) mod n) ; ses libellés de
+        strate, égaux à calibration.strates. Mutations M-8C-01 (unité réduite aux lettres et chiffres), M-8C-02 (strates
+        du contrat autres que calibration.strates)."""
+        for s, r, u, n, o in (("calme", 1, "api.binance.com", 109440, 107527),
+                              ("stress", 9999, "ethereum-rpc.publicnode.com", 43776, 24225),
+                              ("calme", 4242, "api.kraken.com", 54720, 39743), ("calme", 1, "api.coinbase.com", 7, 0),
+                              ("calme", 7, "api.coinbase.com", 7, 6), ("calme", 1, "api.binance.com", 54720, 52807)):
+            self.assertEqual(regle.decalage(G6, s, r, u, n), o, (s, r, u, n))
+        tous = bits(0, 1, 2, 3, 4)
+        for m, o, n, attendu in ((bits(0, 3, 6), 2, 7, bits(1, 2, 5)), (bits(0, 3, 6), 6, 7, bits(2, 5, 6)),
+                                 (bits(0, 3, 6), 0, 7, bits(0, 3, 6)), (bits(4), 1, 5, bits(0)),
+                                 (bits(0), 3, 5, bits(3)), (tous, 4, 5, tous), (0, 3, 5, 0), (bits(0), 0, 1, bits(0))):
+            self.assertEqual(regle.tourner(m, o, n), attendu, (m, o, n))
+        self.assertEqual(list(regle.STRATES), PRM["calibration"]["strates"])
+
+    def test_refus_du_contrat_rb6(self):
+        """Refus nommés du contrat RB-6 (§1 et §4), avant tout calcul. decalage : strate hors de calme et stress
+        (REGLE/libelle) ; r au-delà de 9 999, booléen ou chaîne, n booléen (REGLE/entier) ; graine en octets ou de 65
+        caractères (REGLE/graine) ; unité vide, avec « : », DEL ou tabulation (REGLE/libelle) ; bornes ASCII imprimables
+        admises (« ! » précédé d'une espace, « ~ »). seuil : R au-delà de 9 999 (REGLE/seuil, α = 1/2). tester,
+        loi_evenements et filtrer contrôlent toutes leurs entrées, même quand aucune rotation n'est calculée (une seule
+        série non nulle, ou unité non décalée seule) : graine (REGLE/graine), n nul (REGLE/entier), nom d'unité ou unité
+        non décalée hors du contrat (REGLE/libelle), masque négatif, booléen ou au-delà de n bits (REGLE/masque), R de
+        loi_evenements au-delà de 9 999 et n booléen de filtrer (REGLE/entier). Mutations M-8C-03 à M-8C-15."""
+        def refus(code, f, *a):
+            with self.subTest(code=code, f=f.__name__, a=a):
+                with self.assertRaises(commun.Refus) as c:
+                    f(*a)
+                self.assertEqual(c.exception.code, code)
+        for code, a in (("REGLE/libelle", (G6, "crise", 1, "a", 7)), ("REGLE/libelle", (G6, "Calme", 1, "a", 7)),
+                        ("REGLE/entier", (G6, "calme", 10000, "a", 7)), ("REGLE/entier", (G6, "calme", True, "a", 7)),
+                        ("REGLE/entier", (G6, "calme", "01", "a", 7)), ("REGLE/entier", (G6, "calme", 1, "a", True)),
+                        ("REGLE/graine", (bytes.fromhex(G6), "calme", 1, "a", 7)),
+                        ("REGLE/graine", (G6 + "0", "calme", 1, "a", 7)), ("REGLE/libelle", (G6, "calme", 1, "", 7)),
+                        ("REGLE/libelle", (G6, "calme", 1, "a:4", 7)),
+                        ("REGLE/libelle", (G6, "calme", 1, "a" + chr(127), 7)),
+                        ("REGLE/libelle", (G6, "calme", 1, "a" + chr(9) + "b", 7))):
+            refus(code, regle.decalage, *a)
+        self.assertEqual([regle.decalage(G6, "calme", 9999, u, 1) for u in (" !", "~")], [0, 0])
+        refus("REGLE/seuil", regle.seuil, 10001, [1, 2])
+        self.assertEqual(regle.seuil(9999, [1, 2]), 4999)
+        for code, series, premier, g, n in (("REGLE/graine", {"a": 1, "b": 0}, "a", G6.upper(), 3),
+                                            ("REGLE/entier", {"a": 0}, None, G6, 0),
+                                            ("REGLE/libelle", {"a:b": 1}, None, G6, 3),
+                                            ("REGLE/libelle", {"a": 1, "a:b": 2}, "a:b", G6, 3),
+                                            ("REGLE/libelle", {"a": 1}, "", G6, 3),
+                                            ("REGLE/masque", {"a": 8}, None, G6, 3),
+                                            ("REGLE/masque", {"a": -1}, None, G6, 3),
+                                            ("REGLE/masque", {"a": True, "b": 1}, "b", G6, 3)):
+            refus(code, regle.tester, series, premier, g, "calme", n, 3, PRM, 9999)
+            refus(code, regle.loi_evenements, series, premier, g, "calme", n, 9, PRM)
+        refus("REGLE/entier", regle.loi_evenements, {"a": 1}, "a", G6, "calme", 3, 10000, PRM)
+        for code, series in (("REGLE/masque", {"a": 8}), ("REGLE/masque", {"a": -1}), ("REGLE/masque", {"a": True})):
+            refus(code, regle.filtrer, series, 3, PRM)
+        refus("REGLE/entier", regle.filtrer, {"a": 1}, True, PRM)

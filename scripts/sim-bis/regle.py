@@ -6,6 +6,9 @@ compteur « au moins deux » et S = Σ_j C(m_j, 2) par plans de bits (E-S-26). S
 flux presque mort (E-S-24), unité non décalée, décision par strate avec arrêt anticipé exact et garde d'information
 (E-S-28, E-S-29). SB-8a : mode à R complet, oracle d'équivalence de l'arrêt anticipé, séquence d'ETH et F3 (E-S-29 à
 E-S-31). SB-8b : compte d'événements à tolérance g et critère collectif d'absorption candidat (E-S-34, E-S-35).
+SB-8c : alignement sur le contrat de rotation de RB-6 (docs/adr-0029/s2bis/ROTATION-S2BIS.md, diffs RB-6a et RB-6b en
+relecture G2 ; adjugé par l'orchestrateur, risque R-2) : libellés de strate calme et stress, r et R de 1 à 9 999, refus
+nommés de toutes les entrées avant tout calcul (graine, n, noms d'unité, unité non décalée, masques de [0, 2^n)).
 Entiers et rationnels seuls : aucun flottant, aucune puissance."""
 import hashlib
 from fractions import Fraction
@@ -14,6 +17,7 @@ import calendrier
 import commun
 
 SEP = ":"
+STRATES, R_MAX = ("calme", "stress"), 9999      # libellés et borne de r scellés (E-S-27 ; contrat RB-6 §1, pts 2 et 5)
 
 
 def _libelle(v, nom: str) -> str:
@@ -22,15 +26,25 @@ def _libelle(v, nom: str) -> str:
     raise commun.Refus("REGLE/libelle", f"{nom} = {v!r} : ASCII imprimable, sans « {SEP} »")
 
 
-def decalage(graine: str, strate: str, r: int, u: str, n: int) -> int:
-    """o(r, u) (E-S-27 ; ADR-0029 l.200 ; Q-R-02 adjugée, AVIS-C l.57-63) : entier big-endian des 32 octets de SHA-256
-    de la chaîne ASCII « <graine>:<strate>:<r>:<u> », modulo n (n_s, ou n′_s, de la strate). Graine : 64 hexadécimaux
-    minuscules (sinon REGLE/graine) ; strate et unité en ASCII imprimable, sans « : » (sinon REGLE/libelle) ; r ≥ 1,
-    en décimal sans zéro de tête, et n ≥ 1 entiers (sinon REGLE/entier)."""
+def _cle(graine: str, strate: str, n: int) -> None:
+    """Graine (64 hexadécimaux minuscules, sinon REGLE/graine), strate parmi STRATES (sinon REGLE/libelle) et n entier
+    ≥ 1 (sinon REGLE/entier) de l'entrée des décalages, contrôlés avant tout calcul (contrat RB-6 §4)."""
     if not commun.hex64(graine):
         raise commun.Refus("REGLE/graine", f"{graine!r} : 64 hexadécimaux minuscules attendus")
-    if type(r) is not int or r < 1 or type(n) is not int or n < 1:
-        raise commun.Refus("REGLE/entier", f"r = {r!r}, n = {n!r} : entiers ≥ 1 attendus")
+    if strate not in STRATES:
+        raise commun.Refus("REGLE/libelle", f"strate {strate!r} : {' ou '.join(STRATES)} attendu")
+    if type(n) is not int or n < 1:
+        raise commun.Refus("REGLE/entier", f"n = {n!r} : entier ≥ 1 attendu")
+
+
+def decalage(graine: str, strate: str, r: int, u: str, n: int) -> int:
+    """o(r, u) (E-S-27 ; ADR-0029 l.200 ; Q-R-02 adjugée, AVIS-C l.57-63 ; contrat RB-6 §2) : entier big-endian des 32
+    octets de SHA-256 de la chaîne ASCII « <graine>:<strate>:<r>:<u> », modulo n (n_s, ou n′_s, de la strate). Graine,
+    strate et n : _cle ; r de 1 à 9 999, en décimal sans zéro de tête (sinon REGLE/entier) ; unité en ASCII
+    imprimable, sans « : » (sinon REGLE/libelle)."""
+    _cle(graine, strate, n)
+    if type(r) is not int or not 1 <= r <= R_MAX:
+        raise commun.Refus("REGLE/entier", f"r = {r!r} : entier de 1 à {R_MAX} attendu")
     chaine = SEP.join([graine, _libelle(strate, "strate"), str(r), _libelle(u, "unité")])
     return int.from_bytes(hashlib.sha256(chaine.encode("ascii")).digest(), "big") % n
 
@@ -75,8 +89,8 @@ CAUSES = ("unites", "k_crit", "runs", "n_prime")
 
 def seuil(R: int, alpha) -> int:
     """Seuil entier de C (ADR-0029 l.202) : C ≤ seuil ⇔ (C + 1)/(R + 1) ≤ α, soit seuil = α·(R + 1) − 1 (99 à R = 9 999,
-    9 à R = 999 : AVIS Q-S-06), entier ≥ 0 exigé, sinon REGLE/seuil."""
-    s = Fraction(*alpha) * (R + 1) - 1 if type(R) is int and R >= 1 else Fraction(-1)
+    9 à R = 999 : AVIS Q-S-06), entier ≥ 0 exigé, R entier de 1 à 9 999 (contrat RB-6 §1, pt 9), sinon REGLE/seuil."""
+    s = Fraction(*alpha) * (R + 1) - 1 if type(R) is int and 1 <= R <= R_MAX else Fraction(-1)
     if s.denominator != 1 or s < 0:
         raise commun.Refus("REGLE/seuil", f"R = {R!r}, α = {alpha!r} : α·(R + 1) − 1 entier ≥ 0 attendu")
     return int(s)
@@ -142,12 +156,33 @@ def rotation(series: dict, premier, graine: str, strate: str, r: int, n: int) ->
     return [x if u == premier else tourner(x, decalage(graine, strate, r, u, n), n) for u, x in series.items()]
 
 
-def _entrees(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S: bool):
-    """(base, arguments de decider et complet, générateur des (K^(r), S^(r)), S) d'une classe dans une strate : strate
-    parmi calibration.strates (sinon REGLE/libelle) ; avec au plus une série non nulle, K^(r) = S^(r) = 0 pour tout r,
-    exactement : aucune rotation calculée."""
+def _masques(series: dict, n: int) -> None:
+    """n entier ≥ 1 (sinon REGLE/entier) ; chaque série, masque entier de [0, 2^n), booléen refusé (bit t = position t
+    de la suite comprimée ; sinon REGLE/masque ; contrat RB-6 §1, pt 7)."""
+    if type(n) is not int or n < 1:
+        raise commun.Refus("REGLE/entier", f"n = {n!r} : entier ≥ 1 attendu")
+    for u, x in series.items():
+        if type(x) is not int or x < 0 or x >> n:
+            raise commun.Refus("REGLE/masque", f"{u!r} : {x!r} hors de [0, 2^{n})")
+
+
+def _controler(series: dict, premier, graine: str, strate: str, n: int, prm: dict) -> None:
+    """Refus nommés de toutes les entrées, avant tout calcul, même sans rotation (contrat RB-6 §4) : strate parmi
+    calibration.strates (REGLE/libelle), graine, strate et n (_cle), noms des unités et de l'unité non décalée
+    (REGLE/libelle), masques (_masques)."""
     if strate not in prm["calibration"]["strates"]:
         raise commun.Refus("REGLE/libelle", f"strate {strate!r}")
+    _cle(graine, strate, n)
+    for u in [*series, *([] if premier is None else [premier])]:
+        _libelle(u, "unité")
+    _masques(series, n)
+
+
+def _entrees(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S: bool):
+    """(base, arguments de decider et complet, générateur des (K^(r), S^(r)), S) d'une classe dans une strate, entrées
+    contrôlées par _controler ; avec au plus une série non nulle, K^(r) = S^(r) = 0 pour tout r, exactement : aucune
+    rotation calculée."""
+    _controler(series, premier, graine, strate, n, prm)
     vals = list(series.values())
     i, unites, S = deux(vals), sum(1 for x in vals if x), paires(vals) if avec_S else None
 
@@ -239,9 +274,11 @@ def evenements(i: int, g: int, n: int) -> int:
 
 def loi_evenements(series: dict, premier, graine: str, strate: str, n: int, R: int, prm: dict) -> dict:
     """Loi de rotation du compte d'événements (E-S-34 : mêmes rotations r = 1..R que K, R complet, statistique hors
-    décision) pour chaque tolérance g de regle.tolerances : {g : {"E" : compte observé, "C" : #{r : E^(r) ≥ E}}}."""
-    if strate not in prm["calibration"]["strates"]:
-        raise commun.Refus("REGLE/libelle", f"strate {strate!r}")
+    décision) pour chaque tolérance g de regle.tolerances : {g : {"E" : compte observé, "C" : #{r : E^(r) ≥ E}}} ;
+    entrées contrôlées par _controler, R entier de 1 à 9 999 (sinon REGLE/entier), avant tout calcul."""
+    _controler(series, premier, graine, strate, n, prm)
+    if type(R) is not int or not 1 <= R <= R_MAX:
+        raise commun.Refus("REGLE/entier", f"R = {R!r} : entier de 1 à {R_MAX} attendu")
     gs, i = prm["regle"]["tolerances"], deux(list(series.values()))
     obs, c = {g: evenements(i, g, n) for g in gs}, {g: 0 for g in gs}
     for r in range(1, R + 1):
@@ -269,7 +306,9 @@ def absorption(p: dict, c_etoile) -> tuple:
 
 def filtrer(series: dict, n: int, prm: dict) -> tuple:
     """Séries restées après le critère collectif (valeurs « avec » ; les valeurs « sans » prennent toutes les séries) :
-    p̂_u = écarts consolidés de u sur la suite comprimée / n ; rend (séries restées, retirées, indice final)."""
+    p̂_u = écarts consolidés de u sur la suite comprimée / n ; rend (séries restées, retirées, indice final). Masques
+    et n contrôlés par _masques."""
+    _masques(series, n)
     p = {u: Fraction(x.bit_count(), n) for u, x in series.items()}
     ret, ind = absorption(p, Fraction(*prm["regle"]["c_etoile"]))
     return {u: x for u, x in series.items() if u not in ret}, ret, ind
