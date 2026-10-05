@@ -6,7 +6,8 @@
 # versionné), G1 (g1-model-pinning, R-1 : épinglage des modèles), le G3 des secrets
 # (g3-secrets, plancher de motifs) et le G3 du chemin de recalcul S2
 # (s2-harness-unittest) ; s2bis-unittest ajouté le 2026-10-04 (lot COLLECTE-BIS, CB-0 :
-# paquet s2bis/ d'ADR-0029). Les gates de forge du code Rust vivent dans squelette.yml,
+# paquet s2bis/ d'ADR-0029) ; sim-bis-unittest ajouté le même jour (lot SIM-BIS, SB-0 :
+# scripts/sim-bis/ d'ADR-0029 §6 lot 4). Les gates de forge du code Rust vivent dans squelette.yml,
 # mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
 # s2-harness a deux périmètres (ADR-0028 D6 (i)) :
 #   - chemin de recalcul : records (hors append_asn), window, r1, lm, r2 (hors
@@ -215,3 +216,27 @@ jobs:
         run: |
           python3 --version
           python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 49
+
+  sim-bis-unittest:
+    # Lot SIM-BIS, sous-lot SB-0 (2026-10-04 ; ADR-0029 §6 lot 4 ; G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md, PROPOSITION
+    # Q-S-20 (a), adoptée par l'AVIS) : suite unittest de scripts/sim-bis (bibliothèque standard seule, données
+    # synthétiques et sorties versées de PLAN-S2BIS). Verdict par le vérificateur des jobs unittest : résumé final exigé,
+    # aucun saut admis, Ran = plancher committé ci-dessous (--egal), relevé au compte mesuré à chaque sous-lot ; étapes
+    # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Tant que la forge ne lance pas les jobs, le G3 opérant
+    # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20).
+    name: sim-bis-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas du vérificateur de la suite (câblage des jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de scripts/sim-bis, jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 13

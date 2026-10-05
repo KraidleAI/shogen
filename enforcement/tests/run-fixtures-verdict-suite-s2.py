@@ -5,8 +5,9 @@ retirée de l'environnement de la suite) ; C : point d'entrée sur une suite fac
 jamais transmise à un processus (valeur fictive dans un mapping seulement). Lot COLLECTE-BIS, CB-0 (G0
 docs/adr-0029/g0-collecte/) : V-14, V-15, C-03 à C-05 (suite s2bis : aucun saut admis, plancher en option) ; K-01, K-02
 (SHOGEN-CI-S2-CABLAGE-1 : étapes des deux jobs unittest lues dans gates.yml). CB-2e (G2 de P1, C-4 et Q-2) : C-06 à
-C-08, V-16, V-17 (plancher par défaut et option exercés ; `--egal`) ; aucun `if:` dans les deux jobs. Sortie : 0 tout
-passe, 1 un cas échoue, 3 erreur."""
+C-08, V-16, V-17 (plancher par défaut et option exercés ; `--egal`) ; aucun `if:` dans les deux jobs. Lot SIM-BIS, SB-0
+(G0 docs/adr-0029/g0-sim/) : K-03, étapes du job sim-bis-unittest (`--egal`, aucun `if:`). Sortie : 0 tout passe, 1 un
+cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -133,7 +134,9 @@ ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba80582
           "run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py")
 for nom, appel in (("K-01 s2-harness-unittest", r"python3 -B enforcement/verdict-suite-s2\.py"),
                    ("K-02 s2bis-unittest", r"python3 -B enforcement/verdict-suite-s2\.py s2bis --aucun-saut "
-                                           r"--egal --plancher [1-9][0-9]*")):
+                                           r"--egal --plancher [1-9][0-9]*"),
+                   ("K-03 sim-bis-unittest", "python3 -B enforcement/verdict-suite-s2[.]py scripts/sim-bis --aucun-saut "
+                                             "--egal --plancher [1-9][0-9]*")):
     l = job(nom[5:])
     k = [i for i, x in enumerate(l) if re.fullmatch(appel, x)]
     bon = (len(k) == 1 and all(e in l[:k[0]] for e in ETAPES)
