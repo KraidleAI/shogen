@@ -1,13 +1,20 @@
-"""Points d'entrée du collecteur (CB-18c ; E-C-02, E-C-23 ; ADR-0029 §2.9 l.238 ; PROPOSITION §2.1). `configurer`
-charge et contrôle les configurations scellées (`formes.json` : paramètres de la boucle et formes de requête ;
-`sante.json` : sondes) et le descripteur de l'observateur (refus nommés CONFIG/…, BOUCLE/…) ; `construire` câble
-lectures, plan, sondes et boucle (SHOGEN-S2BIS-PLAN-CABLAGE-1). La commande `pool` vient au diff suivant (CB-18d)."""
+"""Points d'entrée du collecteur (CB-18c, CB-18d ; E-C-02, E-C-16, E-C-23 ; ADR-0029 §2.9 l.238 ; PROPOSITION §2.1).
+`configurer` charge et contrôle les configurations scellées (`formes.json` : paramètres de la boucle et formes de
+requête ; `sante.json` : sondes) et le descripteur de l'observateur (refus nommés CONFIG/…, BOUCLE/…) ; `construire`
+câble lectures, plan, sondes et boucle (SHOGEN-S2BIS-PLAN-CABLAGE-1). Commande `pool` (CB-18d) : ouvre le journal du
+pool, y écrit `run_params` (commit, sha256 des octets de chaque fichier chargé, contenus, version de Python) à la
+première fenêtre admise, puis fait tourner la boucle. Le journal est fermé à la sortie, quelle qu'elle soit ; une
+OSError ou un refus de l'écrivain (JOURNAL/casse compris) arrête la boucle et le processus, que systemd relance
+(SHOGEN-S2BIS-ECRIVAIN-USAGE-1). Sortie : 0 après les fenêtres demandées (`--fenetres`, essais), 1 arrêt sur le
+journal, 2 refus avant l'ouverture du journal."""
+import argparse
 import ipaddress
 import os
 import re
+import sys
 
 from shogen_s2bis.collecte import boucle, config, dns, http, journal, sante
-from shogen_s2bis.collecte.lecture import S
+from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
 FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "chemin": (str, 1, 2048),
@@ -81,3 +88,30 @@ def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
     jl = journal.Journal(dossier, "pool", w=f["w"], fsync=fsync)
     return jl, boucle.Boucle(jl, {x["nom"]: _lecteur(x, f["delai"], tls) for x in f["formes"]}, _plan(f), f["places"],
                              w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes)
+
+
+def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
+    p = argparse.ArgumentParser(prog="python3 -m shogen_s2bis.collecte", description="collecteur de S2-bis")
+    pool = p.add_subparsers(dest="commande", required=True).add_parser("pool", help="processus du pool")
+    for option in ("--formes", "--sante", "--descripteur", "--journal", "--commit"):
+        pool.add_argument(option, required=True)
+    pool.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
+    a = p.parse_args(argv)
+    try:
+        lus = configurer({n: getattr(a, n) for n in SCHEMAS}, a.commit)
+        f = lus["formes"][0]
+        jl, b = construire(f, lus["sante"][0], lus["descripteur"][0], a.journal, tls, fsync)
+    except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
+        print(f"collecte : refus : {e}", file=sys.stderr)
+        return 2
+    try:
+        jl.ouvrir(horloge() // (S * f["w"]) * f["w"])
+        jl.ecrire("run_params", jl.suivante, commit=a.commit, sha256={n: lus[n][1] for n in lus}, python=sys.version,
+                  **{n: lus[n][0] for n in lus})
+        b.tourner(a.fenetres)
+    except (OSError, journal.ErreurJournal) as e:
+        print(f"collecte : arrêt : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)
+        return 1
+    finally:
+        jl.fermer()
+    return 0

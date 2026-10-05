@@ -15,7 +15,8 @@
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12) ; le diff CB-18b ferme SHOGEN-S2BIS-SOMMEIL-MURAL-1
   (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle, SHOGEN-S2BIS-PLAN-CABLAGE-1
-  (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14).
+  (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14) ; le diff CB-18d achève
+  SHOGEN-S2BIS-ECRIVAIN-USAGE-1 (fermeture au point d'entrée, §14).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -334,7 +335,7 @@ résolution et sans envoi (ADR-0029 l.109).
    utilisateur ordinaire) ; ou `{erreur}` (nom de l'exception). `resolveur` : sha256 des octets de la configuration
    du résolveur de l'observateur (`/etc/resolv.conf` par défaut), null si elle ne se lit pas.
 
-## 14. Configurations, descripteur et câblage (CB-18c ; E-C-02, E-C-23)
+## 14. Configurations, descripteur, câblage et point d'entrée (CB-18c, CB-18d ; E-C-02, E-C-16, E-C-23)
 
 1. **Fichiers chargés** : chacun est lu en octets, son sha256 calculé sur ces octets, puis contrôlé (champs exacts,
    types, bornes, puis règles de cohérence nommées) :
@@ -356,3 +357,15 @@ résolution et sans envoi (ADR-0029 l.109).
 2. **Câblage** (SHOGEN-S2BIS-PLAN-CABLAGE-1) : une lecture par forme ; plan par hôte (§11.1) ; sondes construites
    depuis `sante.json`, dirigées vers le résolveur du descripteur, disque relevé sur le dossier du journal ; la boucle
    tourne toujours avec ses sondes (§13.1 : une `sante` sans sondes n'existe que dans les tests de la boucle seule).
+3. **Commande** (CB-18d) : `python3 -m shogen_s2bis.collecte pool --formes F --sante S --descripteur D --journal
+   DOSSIER --commit SHA` (code de référence : `s2bis/shogen_s2bis/collecte/entree.py`). `--fenetres N` arrête après N
+   fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. Un refus de configuration donne la sortie 2
+   et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
+4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
+   `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes`, `sante` et
+   `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte `run_params` puis n'a pas de marqueur
+   est déclarée par le `trou` suivant (§8).
+5. **Fermeture** (CB-18d, SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : le journal est fermé à la sortie du point d'entrée, quelle
+   qu'elle soit. Une OSError ou un refus de l'écrivain (`JOURNAL/casse` compris, et toute ouverture refusée) arrête la
+   boucle : sortie 1, refus nommé (`collecte : arrêt : <code> : …`) ; systemd relance le service, et l'instance
+   suivante reprend le journal (§7). Sortie 0 : les N fenêtres demandées sont écrites.

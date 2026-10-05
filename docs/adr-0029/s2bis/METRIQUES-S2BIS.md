@@ -621,3 +621,22 @@ le point d'entrée sans `--fenetres` : une configuration non refusée faisait to
 borne de 300 s ; non compté tué), puis 17 tués sur 18 (M-18c-16 vivant : `run_params` une fenêtre plus tard ; test
 renforcé), puis 18 sur 18 ; les deux jeux ont été rejoués après la scission. Suite : 166 tests ; plancher du job : 166,
 égalité exigée (`--egal`).
+
+## CB-18d (2026-10-05) : point d'entrée `pool`, `run_params`, fermeture (E-C-16, E-C-23 ; ECRIVAIN-USAGE-1)
+
+Objet : `python3 -m shogen_s2bis.collecte pool` ; refus de configuration en sortie 2, sans rien écrire ; journal ouvert
+à la fenêtre courante, `run_params` (commit, sha256 des trois fichiers, contenus, version de Python) à la première
+fenêtre admise ; une OSError ou un refus de l'écrivain (JOURNAL/casse compris) arrête la boucle en sortie 1, et le
+journal est fermé à la sortie, quelle qu'elle soit (SHOGEN-S2BIS-ECRIVAIN-USAGE-1, volet point d'entrée). FORMAT §14.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 117 | — |
+| `shogen_s2bis/collecte/__main__.py` | 7 | — |
+| `tests/test_entree.py` | 171 | 4 (2 de plus : refus au point d'entrée, sortie 2, aussi par `python3 -m` ; `run_params` et fermeture sur une erreur du journal, puis reprise) |
+
+Mutants (commande du job, `--plancher 168`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par leur test
+visé (0 vivant, 0 FATAL), dont « `--fenetres` ignoré » (la boucle ne s'arrête pas) : le point d'entrée tourne, dans
+les tests, dans le fil borné du test (10 s), et le test échoue sans pendre la suite. Dernier passage sur l'état
+corrigé : les fichiers du journal y sont lus par `pathlib` (un `open` sans `with` levait un ResourceWarning sous
+`-X dev`), campagne entière rejouée, même bilan. Suite : 168 tests ; plancher du job : 168, égalité exigée (`--egal`).
