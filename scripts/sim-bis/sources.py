@@ -170,13 +170,24 @@ def composantes(p: Fraction, part: Fraction, regime) -> dict:
     return {"longues": r_l, "base": r_e, "regime": r_e * (kappa - 1) / (1 - r_e)}
 
 
+def rang(prm: dict, hote: str) -> int:
+    """h des flux d'un hôte : son rang dans sources.indices_hotes, liste scellée et immuable des 10 hôtes D1-bis dans
+    l'ordre de l'ADR-0029 l.168, distincte des listes opérationnelles (C-6 de la G2 de la tranche 2, avis Q-T2-11) :
+    réordonner ou réduire un pool ne change le flux d'aucun autre hôte, un hôte retiré laisse son rang inemployé. Hôte
+    absent de la liste, ou liste à doublon : SOURCES/indice."""
+    liste = prm["sources"]["indices_hotes"]
+    if hote not in liste or len(set(liste)) != len(liste):
+        raise commun.Refus("SOURCES/indice", f"{hote!r} : hôte absent de sources.indices_hotes, ou liste à doublon")
+    return liste.index(hote)
+
+
 def indice(prm: dict, hote: str, strate: str, k: int = 0) -> int:
-    """Indice de flux (E-S-41) d'une série : (h·S + s)·10 + k, h rang de l'hôte dans calibration.unites (pool BTC
-    D1-bis), s rang de la strate, k emplacement de 0 à 9 (0 : l'hôte ; 1 + c : classe c), sinon SOURCES/indice."""
-    hotes, strates = [h for h, _f in prm["calibration"]["unites"]], prm["calibration"]["strates"]
-    if hote not in hotes or strate not in strates or type(k) is not int or not 0 <= k < 10:
+    """Indice de flux (E-S-41) d'une série : (h·S + s)·10 + k, h = rang(prm, hote), s rang de la strate, k emplacement
+    de 0 à 9 (0 : l'hôte ; 1 + c : classe c), sinon SOURCES/indice."""
+    strates = prm["calibration"]["strates"]
+    if strate not in strates or type(k) is not int or not 0 <= k < 10:
         raise commun.Refus("SOURCES/indice", f"{hote!r}, {strate!r}, {k!r}")
-    return (hotes.index(hote) * len(strates) + strates.index(strate)) * 10 + k
+    return (rang(prm, hote) * len(strates) + strates.index(strate)) * 10 + k
 
 
 def loi_longues(prm: dict) -> Empirique:
@@ -371,15 +382,15 @@ def chaine(p: Fraction, L: int) -> tuple:
 
 def faibles(prm: dict, cellule: str, i: int, spec, horizon: int) -> dict:
     """{hôte : masque} des unités faibles (E-S-16) ; spec : None ou {"hotes", "p" (p_w), "L" (L_w), "type"} ; chaîne de
-    chaine(p_w, L_w), départ stationnaire, un flux « faibles » par unité (indice : rang dans spec["hotes"]). Hôte hors
-    du pool : SOURCES/faible (C-3 de la G2 de la tranche 2), comme touches() pour un incident."""
+    chaine(p_w, L_w), départ stationnaire, un flux « faibles » par unité (indice : rang(prm, hôte), C-6 de la G2 de la
+    tranche 2). Hôte hors du pool : SOURCES/faible (C-3 de la même G2), comme touches() pour un incident."""
     if spec is None:
         return {}
     if any(h not in [x for x, _f in prm["calibration"]["unites"]] for h in spec["hotes"]):
         raise commun.Refus("SOURCES/faible", f"{spec['hotes']!r} : hôtes du pool attendus")
     a_, b = chaine(spec["p"], spec["L"])
-    return {h: masque(markov(flux(prm, cellule, i, "faibles", j), a_, b, prm["aleas"], horizon))
-            for j, h in enumerate(spec["hotes"])}
+    return {h: masque(markov(flux(prm, cellule, i, "faibles", rang(prm, h)), a_, b, prm["aleas"], horizon))
+            for h in spec["hotes"]}
 
 
 def touches(prm: dict, v, mode: tuple) -> list:

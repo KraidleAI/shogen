@@ -170,12 +170,13 @@ class TestSources(unittest.TestCase):
 
 class TestHotes(unittest.TestCase):
     def test_indice_et_longues(self):
-        """Indice (h·S + s)·10 + k : binance calme → 0 ; okx stress, k = 3 → (9·2 + 1)·10 + 3 = 193 ; bitfinex stress →
-        30 ; hôte inconnu, k = 10 : SOURCES/indice. Pannes longues (E-S-11) : 1 h, 1 jour, 3 jours, également probables,
-        moyenne (60 + 1 440 + 4 320)/3 = 1 940. Mutations M-3C-01 (strate omise de l'indice), M-3C-09 (durées pondérées
-        par leur longueur)."""
+        """Indice (h·S + s)·10 + k, h rang dans sources.indices_hotes (C-6) : binance calme → 0 ; okx (rang 3) stress,
+        k = 3 → (3·2 + 1)·10 + 3 = 73 ; bitfinex (rang 6) stress → 130 ; hôte inconnu, k = 10 : SOURCES/indice. Pannes
+        longues (E-S-11) : 1 h, 1 jour, 3 jours, également probables, moyenne (60 + 1 440 + 4 320)/3 = 1 940. Mutations
+        M-3C-01 (strate omise de l'indice), M-3C-09 (durées pondérées par leur longueur), M-C6-06 (rang pris dans la
+        liste triée)."""
         self.assertEqual([sources.indice(PRM, "binance", "calme"), sources.indice(PRM, "okx", "stress", 3),
-                          sources.indice(PRM, "bitfinex", "stress")], [0, 193, 30])
+                          sources.indice(PRM, "bitfinex", "stress")], [0, 73, 130])
         for h, k in (("bybit", 0), ("okx", 10)):
             with self.assertRaises(commun.Refus) as c:
                 sources.indice(PRM, h, "calme", k)
@@ -183,6 +184,53 @@ class TestHotes(unittest.TestCase):
         self.assertEqual(PRM["sources"]["longues"], [60, 1440, 4320])
         lg = sources.loi_longues(PRM)
         self.assertEqual((lg.hist, lg.moyenne), (((60, 1), (1440, 1), (4320, 1)), 1940))
+
+    def test_indices_hotes_stables(self):
+        """C-6 (avis Q-T2-11) : h pris dans sources.indices_hotes, liste scellée des 10 hôtes D1-bis dans
+        l'ordre où l'ADR-0029 l.168 les écrit (recopié ici à la main ; EP l.8 : aucun retrait), distincte de
+        calibration.unites (ordre alphabétique). Pool réordonné (à rebours) ou réduit (sans coinbase) : état vrai des
+        autres hôtes inchangé à l'octet, rang 1 de coinbase inemployé ; unité faible : indice = rang de l'hôte (kraken :
+        2), quelle que soit sa place dans spec["hotes"]. Mutations M-C6-01 (h pris dans calibration.unites), M-C6-02
+        (unité faible indexée par sa place dans la spécification), M-C6-04 (liste dans l'ordre alphabétique)."""
+        ordre = ["binance", "coinbase", "kraken", "okx", "bitstamp", "gemini", "bitfinex", "coingecko", "defillama",
+                 "chainlink"]
+        self.assertEqual(PRM["sources"]["indices_hotes"], ordre)
+        self.assertEqual(sorted(ordre), [h for h, _f in PRM["calibration"]["unites"]])
+        m = {"calme": (1 << 500) - 1, "stress": 0}
+
+        def etat(unites):
+            hotes = [h for h, _f in unites]
+            cl = {c: [h for h in hotes if h in p] for c, p in PRM["sources"]["classes"].items()}
+            prm = dict(PRM, calibration=dict(PRM["calibration"], unites=unites),
+                       sources=dict(PRM["sources"], classes=cl))
+            return sources.Replication(prm, EP, fond(hors="1/50"), "T-C6", 0, m, 500).etat(), prm
+        e = etat(PRM["calibration"]["unites"])[0]
+        self.assertEqual(etat(list(reversed(PRM["calibration"]["unites"])))[0], e)
+        e_red, prm = etat([u for u in PRM["calibration"]["unites"] if u[0] != "coinbase"])
+        self.assertEqual(e_red, {k: v for k, v in e.items() if k[0] != "coinbase"})
+        self.assertEqual(sorted(sources.indice(prm, h, "calme") // 20 for h, _f in prm["calibration"]["unites"]),
+                         [0, 2, 3, 4, 5, 6, 7, 8, 9])
+        a_, b = sources.chaine(Fraction(1, 2), 1)
+        k = sources.masque(sources.markov(aleas.flux(A, "T-C6", 0, "faibles", 2), a_, b, A, 500))
+        for hotes in (["kraken"], ["gemini", "kraken"], ["kraken", "gemini"]):
+            spec = {"hotes": hotes, "p": Fraction(1, 2), "L": 1, "type": "panne"}
+            self.assertEqual(sources.faibles(PRM, "T-C6", 0, spec, 500)["kraken"], k, hotes)
+
+    def test_indices_hotes_refus(self):
+        """C-6 : hôte d'un pool absent de sources.indices_hotes (okx retiré de la liste), par indice(), etat() et
+        faibles(), ou liste à doublon : SOURCES/indice. Mutations M-C6-03 (contrôle d'appartenance retiré), M-C6-05
+        (contrôle des doublons retiré)."""
+        ordre, m = PRM["sources"]["indices_hotes"], {"calme": (1 << 500) - 1, "stress": 0}
+        sans_okx = dict(PRM, sources=dict(PRM["sources"], indices_hotes=[h for h in ordre if h != "okx"]))
+        double = dict(PRM, sources=dict(PRM["sources"], indices_hotes=ordre + ["binance"]))
+        spec = {"hotes": ["okx"], "p": Fraction(1, 2), "L": 1, "type": "panne"}
+        for prm, appel in ((sans_okx, lambda p: sources.indice(p, "okx", "calme")),
+                           (sans_okx, lambda p: sources.Replication(p, EP, fond(), "T-C6", 0, m, 500).etat()),
+                           (sans_okx, lambda p: sources.faibles(p, "T-C6", 0, spec, 500)),
+                           (double, lambda p: sources.indice(p, "kraken", "calme"))):
+            with self.assertRaises(commun.Refus) as c:
+                appel(prm)
+            self.assertEqual(c.exception.code, "SOURCES/indice")
 
     def test_regime_part_phi(self):
         """Régime Z (E-S-12) : durée moyenne τ_D = 20 en régime dégradé, part φ = 1/5, d'où a = 19/20 et
