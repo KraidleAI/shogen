@@ -1,6 +1,6 @@
-"""Sources SB-3 (E-S-09 à E-S-13, E-S-39, E-S-41, E-S-43 ; T-GEN-1) : chaîne à deux états de taux stationnaire
-b/(1 − a + b) écrit à la main, moyenne simulée à 5 erreurs-types ; renouvellement alterné tiré pas à pas par des u
-écrits à la main ; poids et paramètres refaits à la main en rationnels. Chaque test nomme les mutations qui le
+"""Sources SB-3 et SB-4 (E-S-07 à E-S-16, E-S-39, E-S-41, E-S-43 ; T-GEN-1, T-GEN-2) : chaîne à deux états de taux
+stationnaire b/(1 − a + b) écrit à la main, moyenne simulée à 5 erreurs-types ; renouvellement alterné tiré pas à pas
+par des u écrits à la main ; poids et paramètres refaits à la main en rationnels. Chaque test nomme les mutations qui le
 rougissent. Les comparaisons « à 5 SE » se font en rationnels exacts, sans racine : (x̄ − r)² < 25·s²/R."""
 import unittest
 from fractions import Fraction
@@ -27,9 +27,11 @@ def dans_5_se(x: list, r: Fraction) -> bool:
     return (m - r) * (m - r) < 25 * s2 / len(x)
 
 
-def fond(f="1", regime=None, longues="0") -> dict:
-    """Fond d'essai : f, régime (φ, κ, τ_D) ou None dans les deux strates, part des pannes longues."""
-    return {"f": Fraction(f), "regime": {"calme": regime, "stress": regime}, "longues": Fraction(longues)}
+def fond(f="1", regime=None, longues="0", autres="1", hors="0") -> dict:
+    """Fond d'essai : f, régime (φ, κ, τ_D) ou None dans les deux strates, part des pannes longues, multiplicateur
+    d'écart des classes autres que BTC, taux hors-enveloppe τ."""
+    return {"f": Fraction(f), "regime": {"calme": regime, "stress": regime}, "longues": Fraction(longues),
+            "autres": Fraction(autres), "hors_enveloppe": Fraction(hors)}
 
 
 def part(m: int, debut: int, n: int) -> Fraction:
@@ -294,3 +296,59 @@ class TestDerives(unittest.TestCase):
         r = sources.Replication(PRM, EP, dict(fond(), derive={"genres": ["initiale"], "duree": n}), "T-N9", 0, m, 2 * n)
         hote = r.derives()["initiale"]
         self.assertEqual(r.pannes(hote) & ((1 << 4320) - 1), (1 << 4320) - 1)
+
+
+class TestClasses(unittest.TestCase):
+    TOUS = ["binance", "bitfinex", "bitstamp", "chainlink", "coinbase", "coingecko", "defillama", "gemini", "kraken",
+            "okx"]
+
+    def test_classes_e_s_07(self):
+        """Pools provisoires (E-S-07 ; ADR l.173, P6 C3, CALIB-ACTIFS-G0 §1) : BTC, ETH et USDT servis par les 10 hôtes,
+        USDC par 8 (ni coinbase, ni okx) ; pool BTC autre que le pool D1-bis, ou hôte hors du pool : SOURCES/classes.
+        Mutation M-4A-01 : contrôle des pools retiré."""
+        usdc = [h for h in self.TOUS if h not in ("coinbase", "okx")]
+        self.assertEqual(sources.classes(PRM), [("BTC", self.TOUS), ("ETH", self.TOUS), ("USDC", usdc),
+                                                ("USDT", self.TOUS)])
+        for c, pool in (("BTC", self.TOUS[1:]), ("ETH", self.TOUS + ["bybit"])):
+            prm = dict(PRM, sources=dict(PRM["sources"], classes=dict(PRM["sources"]["classes"], **{c: pool})))
+            with self.assertRaises(commun.Refus) as e:
+                sources.classes(prm)
+            self.assertEqual(e.exception.code, "SOURCES/classes")
+
+    def test_jointe_t_gen_2(self):
+        """T-GEN-2 : fond nul (f = 0, τ = 0), panne d'hôte écrite à la main sur kraken (fenêtres 3, 4, 5) : elle frappe
+        les 4 classes de kraken, typée panne, et aucune autre des 38 séries (10 + 10 + 8 + 10). Fond f = 1, τ = 1/10 :
+        la panne de binance (372/24 585 en calme, EP l.13) est la même dans ses 4 classes et non vide, ses écarts
+        diffèrent d'une classe à l'autre, et aucun écart ne recouvre une panne. Mutations M-GEN-3 (H tirée par classe),
+        M-4A-02 (surcharge sur la seule première classe), M-4A-03 (écart non disjoint de la panne)."""
+        m, n = {"calme": (1 << 2000) - 1, "stress": 0}, 2000
+        e = sources.Replication(PRM, EP, fond("0"), "T-GEN-2", 0, m, n).etat({"kraken": 0b111000})
+        self.assertEqual(len(e), 38)
+        self.assertEqual({k: v for k, v in e.items() if v != (0, 0)},
+                         {("kraken", c): (0b111000, 0) for c in ("BTC", "ETH", "USDC", "USDT")})
+        e = sources.Replication(PRM, EP, fond("1", hors="1/10"), "T-GEN-2", 0, m, n).etat()
+        pannes = {e["binance", c][0] for c in ("BTC", "ETH", "USDC", "USDT")}
+        ecarts = [e["binance", c][1] for c in ("BTC", "ETH", "USDC", "USDT")]
+        self.assertEqual((len(pannes), len(set(ecarts)), any(x & y for x, y in e.values())), (1, 4, False))
+        self.assertNotEqual(pannes, {0})
+
+    def test_ecarts_e_s_09(self):
+        """F (E-S-09, Q-S-21) sur un EP d'essai où binance calme compte 2 830 cellules d'écart pour 372 de panne (écart
+        propre 2 458/24 585) : f = 1/2, autres = 2, τ = 1/20 ; 100 réplications de 10 080 fenêtres : part de F à moins
+        de 5 SE de 1 − (1 − 1 229/24 585)(19/20) pour BTC et de 1 − (1 − 2 458/24 585)(19/20) pour ETH (F d'ETH = F de
+        BTC × autres) ; f = 0, τ = 1/10 : épisodes d'une fenêtre seulement, part à moins de 5 SE de 1/10. Mutations
+        M-4A-04 (autres non appliqué), M-4A-05 (τ multiplié par f), M-4A-06 (f non appliqué à F), M-4A-07 (taux de panne
+        au lieu de l'écart propre), M-4A-08 (épisodes hors-enveloppe de deux fenêtres)."""
+        ep = dict(EP)
+        ep["calme", "binance", "ecart"] = dict(EP["calme", "binance", "ecart"], cellules=2830)
+        n, m, x = 10080, {"calme": (1 << 10080) - 1, "stress": 0}, {0: [], 1: []}
+        for i in range(100):
+            r = sources.Replication(PRM, ep, fond("1/2", autres="2", hors="1/20"), "T-F", i, m, n)
+            for c in (0, 1):
+                x[c].append(part(r.ecarts("binance", c), 0, n))
+        self.assertTrue(dans_5_se(x[0], 1 - (1 - Fraction(1229, 24585)) * Fraction(19, 20)))
+        self.assertTrue(dans_5_se(x[1], 1 - (1 - Fraction(2458, 24585)) * Fraction(19, 20)))
+        f = [sources.Replication(PRM, ep, fond("0", hors="1/10"), "T-F", i, m, n).ecarts("kraken", 2)
+             for i in range(50)]
+        self.assertEqual([y & (y >> 1) for y in f], [0] * 50)
+        self.assertTrue(dans_5_se([part(y, 0, n) for y in f], Fraction(1, 10)))

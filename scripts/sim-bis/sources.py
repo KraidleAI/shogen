@@ -6,8 +6,10 @@ Q-3 ; E-S-09) ; loi des longueurs « tous épisodes » d'EP (Q-2), regroupée en
 composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal conservé. SB-3c : indices des flux,
 réplication (fond de la cellule, masques de strate), régime par hôte et par strate, union des composantes, pannes d'hôte
 H(u) vues dans les fenêtres de chaque strate (E-S-08). SB-3d : dérives (E-S-13), par amincissement des épisodes d'une
-série tirée au taux maximal, et panne initiale hors équilibre. Chaque tirage compare random() à un seuil exact
-(aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
+série tirée au taux maximal, et panne initiale hors équilibre. SB-4a : classes jointes par hôte (E-S-07, E-S-08) : pools
+par classe, écarts propres F(u, c) par classe (E-S-09, composante hors-enveloppe de Q-S-21), état vrai typé. Chaque
+tirage compare random() à un seuil exact (aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante,
+aucune puissance."""
 import functools
 from fractions import Fraction
 
@@ -16,6 +18,7 @@ import calendrier
 import commun
 
 GENRES = ("commune", "tendances", "sauts", "transitoire", "initiale")
+CLASSES = ("BTC", "ETH", "USDC", "USDT")
 
 
 def flux(prm: dict, cellule: str, i: int, composant: str, indice: int):
@@ -182,9 +185,9 @@ def loi_longues(prm: dict) -> Empirique:
 
 class Replication:
     """Une réplication d'une cellule : paramètres, EP (calibration.charger(…)["episodes"]), fond (f ; régime par strate,
-    (φ, κ, τ_D) ou None ; part des pannes longues ; derive, None ou {genres, duree}), nom de cellule et indice i ≥ 0
-    (Q-4), masques de strate (calendrier.masques) et horizon T_max en fenêtres ; chaque série tire sur ses propres flux
-    (composant, indice)."""
+    (φ, κ, τ_D) ou None ; part des pannes longues ; derive, None ou {genres, duree} ; autres, multiplicateur d'écart
+    hors de BTC ; hors_enveloppe, τ), nom de cellule et indice i ≥ 0 (Q-4), masques de strate (calendrier.masques) et
+    horizon T_max en fenêtres ; chaque série tire sur ses propres flux (composant, indice)."""
 
     def __init__(self, prm, ep, fond, cellule, i, masques, horizon):
         self.prm, self.ep, self.fond, self.cellule, self.i = prm, ep, fond, cellule, i
@@ -235,16 +238,45 @@ class Replication:
             m = masque(amincir(self.u("derive-episodes", hote, strate, k), calendrier.segments(m), d))
         return m
 
-    def pannes(self, hote) -> int:
+    def pannes(self, hote, k=0) -> int:
         """H(hôte) (E-S-08) : dans chaque strate, union de taux f·p_panne(hôte, strate) (EP, Q-3), de loi « panne »
-        (loi_longueurs) et de part longue du fond, vue dans les fenêtres de la strate (masque de calendrier)."""
+        (loi_longueurs) et de part longue du fond, vue dans les fenêtres de la strate (masque de calendrier) ; flux
+        d'emplacement k = 0, celui de l'hôte."""
         h = 0
         for s in self.prm["calibration"]["strates"]:
             p, loi = self.fond["f"] * taux(self.ep, s, hote)[0], loi_longueurs(self.prm, self.ep, s, hote, "panne")
-            h |= self.masques[s] & self.union(hote, s, 0, p, loi, ("panne", "panne-regime", "longues"))
+            h |= self.masques[s] & self.union(hote, s, k, p, loi, ("panne", "panne-regime", "longues"))
         if hote == self.derives()["initiale"]:
             h |= (1 << min(self.prm["sources"]["derive"]["initiale"], self.horizon)) - 1
         return h
+
+    def ecarts(self, hote, c) -> int:
+        """F(hôte, classe de rang c) (E-S-08, E-S-09) : dans chaque strate, union de taux f·p_écart_propre(hôte,
+        strate), × fond["autres"] hors de BTC (F des autres classes = F de BTC du même hôte, déclaré ; sensibilité × 2),
+        de loi « ecart » et de régime Z partagé avec H ; plus la composante hors-enveloppe, épisodes d'une fenêtre de
+        part τ = fond["hors_enveloppe"], non multipliée par f (Q-S-21, côté source) ; flux d'emplacement 1 + c ; vue
+        dans les fenêtres de la strate."""
+        f, une = 0, Empirique([(1, 1)])
+        for s in self.prm["calibration"]["strates"]:
+            p = self.fond["f"] * taux(self.ep, s, hote)[1] * (1 if c == 0 else self.fond["autres"])
+            m = self.union(hote, s, 1 + c, p, loi_longueurs(self.prm, self.ep, s, hote, "ecart"),
+                           ("ecart", "ecart-regime", None))
+            m |= masque(alterner(self.u("hors-enveloppe", hote, s, 1 + c), une, pause(self.fond["hors_enveloppe"], 1),
+                                 self.prm["aleas"], self.horizon))
+            f |= self.masques[s] & m
+        return f
+
+    def etat(self, surcharges=None) -> dict:
+        """État vrai (E-S-08) : {(hôte, classe) : (panne, écart)} pour chaque hôte du pool et chaque classe qu'il sert
+        (classes) ; panne = H(hôte) | surcharges[hôte] (pannes de transport ajoutées), commune à toutes les classes de
+        l'hôte ; écart = F(hôte, classe) hors panne (deux types, Q-S-22)."""
+        out, cl = {}, classes(self.prm)
+        for hote, _f in self.prm["calibration"]["unites"]:
+            h = self.pannes(hote) | (surcharges or {}).get(hote, 0)
+            for c, (classe, pool) in enumerate(cl):
+                if hote in pool:
+                    out[hote, classe] = (h, self.ecarts(hote, c) & ~h)
+        return out
 
 
 @functools.lru_cache(maxsize=None)
@@ -299,4 +331,14 @@ def derives(prm: dict, derive, u) -> dict:
         out["specs"] = {h: ("saut", Fraction(p["transitoire"][0]), Fraction(1), p["transitoire"][1]) for h in hotes}
     if "initiale" in g:
         out["initiale"] = hotes[1 + _uniforme(len(hotes) - 1).tirer(u)]
+    return out
+
+
+def classes(prm: dict) -> list:
+    """[(classe, hôtes)] dans l'ordre CLASSES (sources.classes, E-S-07) : BTC servi par les hôtes du pool D1-bis
+    (calibration.unites), les autres classes par des hôtes pris parmi eux (ADR l.173) ; sinon SOURCES/classes."""
+    hotes = [h for h, _f in prm["calibration"]["unites"]]
+    out = [(c, prm["sources"]["classes"][c]) for c in CLASSES]
+    if out[0][1] != hotes or any(h not in hotes for _c, pool in out for h in pool):
+        raise commun.Refus("SOURCES/classes", f"{prm['sources']['classes']!r} : BTC = pool D1-bis, autres parmi lui")
     return out
