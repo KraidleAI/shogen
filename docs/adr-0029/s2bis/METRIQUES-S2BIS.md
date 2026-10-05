@@ -420,3 +420,19 @@ chaîne (jour, segment en entier) ; aucun fichier : refus nommé `LECTEUR/absent
 
 Mutants (commande du job, runner puis `--plancher 134`, borne de 300 s, réseau isolé) : 20 tués sur 20 par leur test
 visé (0 vivant, 0 FATAL). Suite : 134 tests ; plancher du job : 134, égalité exigée (`--egal`).
+
+## RB-1b (2026-10-05) : lecture en flux, genèse, lien entre fichiers, ruptures, queue finale
+
+Objet : itération du lecteur, ligne à ligne (LIMITE octets au plus), sans jamais tenir un fichier en mémoire ; genèse
+(`seq` 0, `prec` nul, `ouverture`) et lien de chaque fichier au précédent contrôlés (FORMAT §7.7) ; toute rupture
+(`LECTEUR/lien`, `LECTEUR/queue-non-declaree`) rendue à sa place dans le flux, sans arrêt ni réparation, le premier
+enregistrement qui la suit devenant l'ancre ; queue d'un fichier relevée (position, octets, sha256, cause), tolérée en
+fin de journal (`queue_finale`) ; état remis à zéro à chaque lecture.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 136 | 11 (`tests/test_lecteur.py`, 203 lignes ; 7 de plus, journaux écrits par l'écrivain de `collecte/journal.py`) |
+
+Mutants (commande du job, runner puis `--plancher 141`, borne de 300 s, réseau isolé) : 16 tués sur 16 par leur test
+visé (0 vivant, 0 FATAL), dont « contrôle de lien sauté » et « lien contrôlé sur seq seul ». Suite : 141 tests ;
+plancher du job : 141, égalité exigée (`--egal`).

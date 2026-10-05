@@ -1,14 +1,22 @@
 """Lecteur en flux des journaux d'observateur de S2-bis (RB-1 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION E-R-01,
-E-R-02 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §1 à §8). Ligne intègre au sens de l'écrivain de
-référence (FORMAT §7.1, `collecte/journal.py` `_lire`) : terminée par 0x0A, JSON canonique, chaînée à la précédente du
-fichier, première ligne `ouverture` ou `reprise`, champs typés comme l'écrivain les relit ; sinon cause nommée
-(`LECTEUR/entier-long` pour un entier de plus de CHIFFRES chiffres, quel que soit le réglage `int_max_str_digits` de
-l'interpréteur). Fichiers d'un préfixe dans l'ordre de la chaîne (FORMAT §6.1, §7.2)."""
+E-R-02 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §1 à §8). Fichiers d'un préfixe lus dans l'ordre de la
+chaîne (jour, segment), ligne à ligne (LIMITE octets au plus), jamais un fichier en mémoire : mémoire bornée quelle que
+soit la longueur du journal. Ligne intègre au sens de l'écrivain de référence (FORMAT §7.1, `collecte/journal.py`
+`_lire`) : terminée par 0x0A, JSON canonique, chaînée à la précédente du fichier, première ligne `ouverture` ou
+`reprise`, champs typés comme l'écrivain les relit ; la première ligne non intègre d'un fichier et la suite forment sa
+queue, cause nommée (`LECTEUR/entier-long` pour un entier de plus de CHIFFRES chiffres, quel que soit le réglage
+`int_max_str_digits` de l'interpréteur). Le lecteur contrôle en plus ce que l'écrivain ne contrôle pas (FORMAT §7.7) :
+genèse (`seq` 0, `prec` nul, `ouverture`) et lien de chaque fichier au précédent. Tout autre cas est une rupture :
+rendue à sa place dans le flux, sans arrêt ni réparation ; l'enregistrement qui la suit devient l'ancre de la chaîne
+(portée en fenêtres : Q-R-03, sous-lot RB-3). Toute queue suivie d'un enregistrement est une rupture ; en fin de
+journal, elle est tolérée (`queue_finale`)."""
 import hashlib
 import json
 import os
 import re
 
+GENESE = "0" * 64
+LIMITE = 1 << 22                       # octets d'une ligne au plus, saut de ligne compris (FORMAT §7.1)
 RESERVES = {"ouverture", "marqueur", "point", "cloture", "reprise", "trou"}
 CHIFFRES = 640                         # entier JSON : 640 chiffres au plus, plus petit int_max_str_digits non nul
 
@@ -67,9 +75,20 @@ def _integre(ligne, etat):
     return e, (e["seq"] + 1, hashlib.sha256(ligne).hexdigest(), attendu, derniere)
 
 
+def _empreinte(chemin, debut):
+    h = hashlib.sha256()
+    with open(chemin, "rb") as f:
+        f.seek(debut)
+        for bloc in iter(lambda: f.read(1 << 20), b""):
+            h.update(bloc)
+    return h.hexdigest()
+
+
 class Lecteur:
-    """Journal d'un préfixe dans un dossier : `fichiers()` rend ses fichiers quotidiens dans l'ordre de la chaîne
-    (jour, puis numéro de segment en entier) ; aucun fichier : refus nommé `LECTEUR/absent`."""
+    """`iter(Lecteur(dossier, préfixe))` rend ("enr", fichier, enregistrement) pour chaque enregistrement intègre, dans
+    l'ordre de la chaîne, et ("rupture", {code, fichier, seq, apres, queues}) juste avant l'ancre qui suit une rupture.
+    Après la lecture : `tete` (seq et sha256 de la dernière ligne intègre, ou None), `ruptures`, `queue_finale`
+    (queues en fin de journal, tolérées) ; chaque queue porte sa cause."""
 
     def __init__(self, dossier, prefixe):
         self.dossier, self.prefixe = dossier, prefixe
@@ -80,3 +99,38 @@ class Lecteur:
         if not noms:
             raise RefusLecteur("LECTEUR/absent", f"aucun fichier {self.prefixe}-*.jsonl dans {self.dossier}")
         return [n for _j, _k, n in noms]
+
+    def __iter__(self):
+        self.tete, self.ruptures, self.queue_finale = None, [], []         # état d'une lecture
+        chaine, attente = (0, GENESE), []                   # (seq attendu, prec attendu) ; queues en attente
+        for nom in self.fichiers():
+            chemin, pos, etat, cause = os.path.join(self.dossier, nom), 0, None, "LECTEUR/fin"
+            with open(chemin, "rb") as f:
+                while ligne := f.readline(LIMITE):
+                    try:
+                        e, etat_suivant = _integre(ligne, etat)
+                    except _NonIntegre as x:
+                        cause = x.args[0]
+                        break
+                    code = self._controle(e, etat is None, chaine, attente)
+                    if code:
+                        self.ruptures.append({"code": code, "fichier": nom, "seq": e["seq"], "apres": self.tete,
+                                              "queues": attente})
+                        yield "rupture", self.ruptures[-1]
+                    attente = []
+                    etat, pos = etat_suivant, pos + len(ligne)
+                    chaine, self.tete = etat[:2], (e["seq"], etat[1])
+                    yield "enr", nom, e
+            taille = os.path.getsize(chemin) - pos
+            if taille:
+                attente = attente + [{"fichier": nom, "position": pos, "octets": taille,
+                                      "sha256": _empreinte(chemin, pos), "cause": cause}]
+        self.queue_finale = attente
+
+    @staticmethod
+    def _controle(e, premier, chaine, attente):
+        """Code de rupture, ou None. Au premier enregistrement d'un fichier : genèse ou lien au précédent ; puis aucune
+        queue en attente."""
+        if premier and ((e["seq"], e.get("prec")) != chaine or e["seq"] == 0 and e["type"] != "ouverture"):
+            return "LECTEUR/lien"
+        return "LECTEUR/queue-non-declaree" if attente else None
