@@ -2,10 +2,11 @@
 E-R-16, E-R-17, E-R-20, E-R-25). Fichier `s2bis/config/analyse.json` lu en octets ; leur sha256 entre au paquet et à
 `run_params` (E-R-04). JSON strict : clé double, nombre à virgule, constante non finie, entier de plus de 30 chiffres
 refusés (lecture reprise de collecte/config.py l.20-46, par copie : la frontière interdit à `recalc` d'importer
-`collecte.config`, PROPOSITION §1 pt 2). Un bloc à fixer par un lot amont (null au premier niveau) refuse le fichier,
-puis le schéma (champs exacts, types, bornes ; τ, σ et noms d'unité), puis la cohérence (COHERENCE). Tout écart lève
-RefusAnalyse (`code` nomme le refus), sans défaut ni écrêtage. τ, P_j : fraction décimale en chaîne (« 0.005 » =
-0,5 %, τ de S2, `run_campaign.py` l.120-129) ; σ, D-2 à D-5 : secondes entières."""
+`collecte.config`, PROPOSITION §1 pt 2 ; texte égal à l'original aux préfixes près, contrôlé par `test_fitness`). Un
+bloc à fixer par un lot amont (null au premier niveau) refuse le fichier, puis le schéma (champs exacts, types,
+bornes ; τ, σ et noms d'unité), puis la cohérence (COHERENCE). Tout écart lève RefusAnalyse (`code` nomme le refus),
+sans défaut ni écrêtage. τ, P_j : fraction décimale en chaîne (« 0.005 » = 0,5 %, τ de S2, `run_campaign.py`
+l.120-129) ; σ, D-2 à D-5 : secondes entières."""
 import functools
 import hashlib
 import json
@@ -48,6 +49,7 @@ def _objet(paires):
 
 
 def _entier(t):
+    """Au-delà de 30 caractères, refus nommé plutôt que l'erreur générique de conversion (Python ≥ 3.11)."""
     return int(t) if len(t) <= 30 else _refus("ANALYSE/borne", f"entier de {len(t)} chiffres")
 
 
@@ -125,18 +127,18 @@ def charger(chemin):
     with open(chemin, "rb") as f:
         octets = f.read()
     try:
-        d = json.loads(octets.decode("utf-8"), object_pairs_hook=_objet, parse_int=_entier,
-                       parse_float=lambda t: _refus("ANALYSE/flottant", t),
-                       parse_constant=lambda t: _refus("ANALYSE/non-fini", t))
+        donnees = json.loads(octets.decode("utf-8"), object_pairs_hook=_objet, parse_int=_entier,
+                             parse_float=lambda t: _refus("ANALYSE/flottant", t),
+                             parse_constant=lambda t: _refus("ANALYSE/non-fini", t))
     except (ValueError, RecursionError) as e:                      # RecursionError : imbrication excessive
         raise RefusAnalyse("ANALYSE/json", e) from None
-    if vides := sorted(k for k in SCHEMA if type(d) is dict and k in d and d[k] is None):
+    if vides := sorted(k for k in SCHEMA if type(donnees) is dict and k in donnees and donnees[k] is None):
         _refus("ANALYSE/a-fixer", ", ".join(vides))
-    controler(d, SCHEMA)
+    controler(donnees, SCHEMA)
     for nom, regle in COHERENCE:
-        if not regle(d):
+        if not regle(donnees):
             _refus("ANALYSE/incoherent", nom)
-    return d, hashlib.sha256(octets).hexdigest()
+    return donnees, hashlib.sha256(octets).hexdigest()
 
 
 def controler(v, schema, ou="$"):

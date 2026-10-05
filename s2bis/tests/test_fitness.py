@@ -12,6 +12,9 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # de la table est refusé ; les imports dynamiques aussi : la frontière ne se lirait plus. RB-0a : `recalc` seul admis.
 REGLES = {"": (), "collecte": ("shogen_s2bis.collecte",), "recalc": ("shogen_s2bis.recalc",)}
 DYNAMIQUES = {"importlib", "imp", "runpy", "pkgutil", "zipimport", "__import__"}
+# Lecture JSON stricte de collecte/config.py (l.20-46) recopiée dans recalc/config_analyse.py, la frontière interdisant
+# l'import (Q-RB-1 de la G2 de RB-T1) ; seuls le préfixe des refus et le nom de l'exception diffèrent.
+COPIE = ("shogen_s2bis/collecte/config.py", "shogen_s2bis/recalc/config_analyse.py")
 
 
 def violations(paquet, source):
@@ -30,6 +33,18 @@ def violations(paquet, source):
             cibles.append("__import__")
     return [f"{paquet} : {t}" for t in cibles if t.split(".")[0] in DYNAMIQUES or not (
         t.split(".")[0] in sys.stdlib_module_names or any(t == a or t.startswith(a + ".") for a in admis))]
+
+
+def lecture_stricte(chemin):
+    """Texte, lu en octets sans import, des pièces de la lecture JSON stricte d'un module : `_objet`, `_entier`, et
+    dans `charger` la lecture des octets, l'appel de json.loads avec ses crochets et son except, le retour (données,
+    sha256)."""
+    with open(os.path.join(RACINE, chemin), "rb") as f:
+        source = f.read().decode("utf-8")
+    defs = {n.name: n for n in ast.parse(source).body if isinstance(n, ast.FunctionDef)}
+    pieces = [defs["_objet"], defs["_entier"]] + [n for n in defs["charger"].body if isinstance(n, (ast.With, ast.Try,
+                                                                                                    ast.Return))]
+    return [ast.get_source_segment(source, n) for n in pieces]
 
 
 def modules():
@@ -54,11 +69,18 @@ class Fitness(unittest.TestCase):
                                 ("import json\nfrom . import x\nfrom .y import z", [])):
             self.assertEqual(violations(c, source), [f"{c} : {t}" for t in attendu], source)
         self.assertEqual(violations("shogen_s2bis.autre", ""), ["shogen_s2bis.autre : sous-paquet sans règle"])
-        r = "shogen_s2bis.recalc"                               # recalc : ni collecte (hors décodeurs), ni S2
+        r = "shogen_s2bis.recalc"               # recalc : bibliothèque standard et recalc seuls (règle codée, plus
+        # serrée que PROPOSITION §1 pt 2) : ni collecte, décodeurs compris, ni S2
         for source, cible in (("from ..collecte import config", "shogen_s2bis.collecte"),
+                              ("from ..collecte.decodeurs import decoder", "shogen_s2bis.collecte.decodeurs"),
                               ("from shogen_s2.r1 import classify_ecart", "shogen_s2.r1")):
             self.assertEqual(violations(r, source), [f"{r} : {cible}"], source)
         self.assertEqual(violations(r, "from . import rotation\nfrom .lecteur import Lecteur\nimport hashlib"), [])
+
+    def test_copie_de_la_lecture_json_stricte(self):       # Q-RB-1 : égalité du texte, l'une ne bouge pas sans l'autre
+        source, copie = (lecture_stricte(c) for c in COPIE)
+        self.assertEqual((len(copie), [p.replace("CONFIG/", "ANALYSE/").replace("RefusConfig", "RefusAnalyse")
+                                       for p in source]), (5, copie))
 
     def test_memes_octets_sous_cinq_graines(self):
         code = ("from shogen_s2bis.collecte import config as c\ntry: c.controler({'a': 1, 'zz': 2, 'yy': 3, 'xx': 4},"

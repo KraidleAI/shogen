@@ -11,10 +11,11 @@
 
 | fonction | test | ce qu'elle refuse |
 |---|---|---|
-| frontière d'imports | `test_fitness.Fitness.test_frontiere_du_paquet`, `test_frontiere_refuse` | import hors bibliothèque standard et hors sous-paquet, import relatif sortant, import dynamique, sous-paquet sans règle ; `recalc` : ni `collecte` ni `shogen_s2` (RB-0a) |
+| frontière d'imports | `test_fitness.Fitness.test_frontiere_du_paquet`, `test_frontiere_refuse` | import hors bibliothèque standard et hors sous-paquet, import relatif sortant, import dynamique, sous-paquet sans règle ; `recalc` : ni `collecte` (décodeurs compris, RB-1g) ni `shogen_s2` (RB-0a) |
 | absence de réseau | `test_garde.Garde` (garde posée par `tests/__init__.py`) | connexion, envoi, résolution hors boucle locale, même sous un attrape-tout |
 | déterminisme | `test_fitness.Fitness.test_memes_octets_sous_cinq_graines`, `test_rotation.Lois.test_memes_octets_sous_cinq_graines_de_hachage` (RB-6b) | sortie qui dépend de la graine de hachage (`PYTHONHASHSEED` de 0 à 4) |
 | compilation | `test_fitness.Fitness.test_compilation_avertissements_en_erreur` | avertissement de compilation (séquence d'échappement invalide, par exemple) |
+| copie de la lecture JSON stricte | `test_fitness.Fitness.test_copie_de_la_lecture_json_stricte` (RB-1g) | une des deux copies (`collecte/config.py` l.20-46, `recalc/config_analyse.py`) modifiée sans l'autre (Q-RB-1) |
 
 ## CB-0a (2026-10-04) : paquet, configuration scellée, garde réseau
 
@@ -517,3 +518,38 @@ visé (0 vivant, 0 FATAL), dont « espace admise » (G-02 du réviseur transpos�
 contrôlé » ; M-1f-07 (nom vide admis), tué au premier passage par `test_refus_nommes` sous un test visé mal déclaré,
 a été rejoué avec ce test visé. Mutant dû au sous-lot RB-7 : « modulo n_s au lieu de n′_s ». Suite : 155 tests,
 tests des noms récrits ; plancher du job : 155, égalité exigée (`--egal`).
+
+## RB-1g (2026-10-05) : décision Q-RB-1 et observation O-6 de la relecture G2 de la tranche 1 de P3 (fitness)
+
+Objet : fonction de fitness `test_copie_de_la_lecture_json_stricte` (Q-RB-1) : le texte de la lecture JSON stricte
+recopiée dans `recalc/config_analyse.py` (`_objet`, `_entier`, lecture des octets, appel de `json.loads` avec ses
+crochets et son except, retour des données et du sha256) est égal à celui de `collecte/config.py` l.20-46, les deux
+fichiers lus en octets sans import, aux seuls préfixes des refus (`CONFIG/`, `ANALYSE/`) et nom d'exception près ; la
+copie est alignée sur l'original (docstring de `_entier`, nom `donnees`). Commentaire de la règle de `recalc` récrit
+pour dire la règle codée, plus serrée que la PROPOSITION (O-6 : ni `collecte`, décodeurs compris, ni S2), avec un cas de
+refus des décodeurs.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/config_analyse.py` | 168 | — |
+| `tests/test_fitness.py` | 96 | 5 (1 de plus) |
+
+Mutants (commande du job, runner puis `--plancher 156`, borne de 300 s, réseau isolé) : 6 tués sur 6 par leur test
+visé (0 vivant, 0 FATAL), dont chaque copie modifiée sans l'autre, un commentaire seul changé dans la copie, et
+« décodeurs admis dans `recalc` ». Suite : 156 tests ; plancher du job : 156, égalité exigée (`--egal`).
+
+### Mutants du réviseur G2 et du worker rejoués sur l'état final, par la commande du job (corrections de la tranche 1)
+
+Lanceur du réviseur (`campagne_g2.py` et `job.py` : runner, puis ligne `--egal --plancher 156` de `gates.yml`, suite
+entière, borne de 300 s, dépassement FATAL ; témoins verts ; copie fraîche par mutant ; réseau isolé) :
+
+| jeu | mutants | tués par leur test visé | vivants | FATAL |
+|---|---|---|---|---|
+| réviseur, G-01 à G-20 sauf G-02, texte inchangé | 19 | 19 | 0 | 0 |
+| G-02 transposé sur la règle `HOTE` (espace admise dans un nom d'unité) | 1 | 1 | 0 | 0 |
+| G-02 tel qu'écrit, sur l'état RB-1e (son texte, `_nom` d'avant Q-RB-13, n'existe plus) | 1 | 1 | 0 | 0 |
+| échantillon de 23 mutants du worker (RB-0a à RB-1c) | 23 | 23 | 0 | 0 |
+| mutants neufs de RB-1d à RB-1g | 37 | 37 | 0 | 0 |
+
+Les six vivants de C-2 (G-13 à G-16, G-19, G-20) sont tués, chacun par son cas nommé. Durée d'un passage : de 18,9 à
+22,9 s.
