@@ -15,7 +15,7 @@
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12) ; le diff CB-18b ferme SHOGEN-S2BIS-SOMMEIL-MURAL-1
   (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle, SHOGEN-S2BIS-PLAN-CABLAGE-1
-  (§11.9).
+  (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -333,3 +333,26 @@ résolution et sans envoi (ADR-0029 l.109).
 5. `disque` : `{total, libre}` du système de fichiers du journal, en octets (`libre` : blocs disponibles pour un
    utilisateur ordinaire) ; ou `{erreur}` (nom de l'exception). `resolveur` : sha256 des octets de la configuration
    du résolveur de l'observateur (`/etc/resolv.conf` par défaut), null si elle ne se lit pas.
+
+## 14. Configurations, descripteur et câblage (CB-18c ; E-C-02, E-C-23)
+
+1. **Fichiers chargés** : chacun est lu en octets, son sha256 calculé sur ces octets, puis contrôlé (champs exacts,
+   types, bornes, puis règles de cohérence nommées) :
+   - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `delai`, `marge` (µs ;
+     `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port, chemin, methode,
+     corps, espace}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai : la limite de l'hôte impose
+     l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte). Le plus grand décalage du
+     plan, plus `delai` et `marge`, tient dans `delta` (budget de l'ADR-0029 l.233-234) ;
+   - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
+     littérales canoniques), `noms` (D-5, noms DNS valides), `delai` (µs ; `delai` + `marge` ≤ `delta` : les sondes
+     sont jointes avant l'échéance) ;
+   - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur`, `fournisseur`,
+     `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
+     configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256
+     de la configuration déployée, 64 chiffres hexadécimaux minuscules).
+
+   Le commit est celui, scellé, de l'archive déployée : 40 chiffres hexadécimaux minuscules (aucune opération git sur
+   l'observateur). Tout écart est un refus nommé (`CONFIG/…` ou `BOUCLE/…`), levé avant l'ouverture du journal.
+2. **Câblage** (SHOGEN-S2BIS-PLAN-CABLAGE-1) : une lecture par forme ; plan par hôte (§11.1) ; sondes construites
+   depuis `sante.json`, dirigées vers le résolveur du descripteur, disque relevé sur le dossier du journal ; la boucle
+   tourne toujours avec ses sondes (§13.1 : une `sante` sans sondes n'existe que dans les tests de la boucle seule).

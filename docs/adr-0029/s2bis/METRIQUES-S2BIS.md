@@ -599,3 +599,25 @@ visé au dernier passage (0 vivant, 0 FATAL). Premier passage : 12 tués, 1 viva
 futurs) : à la boucle, l'instant du relevé lu d'abord et la règle `fin` > E rendent cet ordre sans effet ; le test est
 devenu un test de `joindre` sans échéance, où seul l'ordre décide, et la campagne entière a été relancée. Suite : 164
 tests ; plancher du job : 164, égalité exigée (`--egal`).
+
+## CB-18c (2026-10-05) : configurations scellées, descripteur, câblage (E-C-02, E-C-23 ; PLAN-CABLAGE-1)
+
+Objet : `configurer` charge `formes.json`, `sante.json` et le descripteur d'observateur (sha256 des octets lus),
+contrôle champs, types, bornes, puis treize règles nommées (grille, marge, budget de δ, noms uniques, méthode et
+corps, espacement par hôte, témoins IPv4 canoniques, noms DNS, résolveur IPv4, empreinte, délai des sondes, commit,
+cinq lectures par hôte) ; `construire` câble lectures, plan, sondes (commande, témoins, noms et délai de `sante.json`,
+résolveur et sa configuration du descripteur, disque du dossier du journal) et boucle (SHOGEN-S2BIS-PLAN-CABLAGE-1,
+volet sondes). FORMAT §14.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 83 | — |
+| `tests/test_entree.py` | 93 | 2 (refus nommés de configuration, une règle par cas ; câblage des sondes et de la boucle) |
+
+Mutants (commande du job, `--plancher 166`, borne de 300 s ; python3.12 ; réseau isolé) : 15 tués sur 15 par leur test
+visé (0 vivant, 0 FATAL). Historique : avant sa scission en CB-18c et CB-18d (259 lignes de code, au-delà du plafond
+de 200), le diff unique a connu trois passages : le premier, arrêté au FATAL de M-18c-11 (le test des refus appelait
+le point d'entrée sans `--fenetres` : une configuration non refusée faisait tourner la boucle sans fin, au-delà de la
+borne de 300 s ; non compté tué), puis 17 tués sur 18 (M-18c-16 vivant : `run_params` une fenêtre plus tard ; test
+renforcé), puis 18 sur 18 ; les deux jeux ont été rejoués après la scission. Suite : 166 tests ; plancher du job : 166,
+égalité exigée (`--egal`).
