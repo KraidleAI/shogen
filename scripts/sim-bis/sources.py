@@ -313,7 +313,8 @@ def multiplicateur(d: tuple, t: int) -> Fraction:
 
 def amincir(u, segs: list, d: tuple) -> list:
     """Épisodes gardés chacun avec la probabilité m(début)/M, M = max(m0, m1) : une série tirée au taux M·p prend le
-    taux local m(t)·p, longueurs inchangées (E-S-13)."""
+    taux local ≈ m(t)·p, le multiplicateur étant pris au début de chaque épisode (O-2 de la G2 de la tranche 2),
+    longueurs inchangées (E-S-13)."""
     grand = max(d[1], d[2])
     return [(a, b) for a, b in segs if aleas.bernoulli(u, aleas.seuil(multiplicateur(d, a) / grand))]
 

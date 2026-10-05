@@ -50,6 +50,21 @@ class TestSocle(unittest.TestCase):
         with open(commun.PARAMETRES, "rb") as f:
             self.assertEqual(lus["scripts/sim-bis/parametres.json"], hashlib.sha256(f.read()).hexdigest())
 
+    def test_provenance_c_5(self):
+        """C-5 de la G2 de la tranche 2 (E-S-03) : le rattachement porte l'empreinte actuelle du G0 (sha256sum à la tête
+        784ebd2, ajout daté du 2026-10-05 01:45:03 UTC compris) et cite celle d'avant cet ajout comme telle ;
+        sources.source cite cet ajout daté (points 2 et 3), et non plus l'adjudication provisoire du brief. Mutation
+        M-C5-01 : ancienne empreinte remise."""
+        prm = commun.charger_parametres(environ={})
+        g0 = ("G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md (sha256 "
+              "d9cffc0aec3634138f58ba33b9a9679484f2532460b3e5177c0c5ae194648034")
+        self.assertTrue(prm["rattachement"].startswith(g0), prm["rattachement"][:100])
+        self.assertIn("avant cet ajout : eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39",
+                      prm["rattachement"])
+        s = prm["sources"]["source"]
+        self.assertEqual([x in s for x in ("ajout daté du G0 du 2026-10-05 01:45:03 UTC, point 3",
+                                           "même ajout daté, point 2", "adjudication provisoire")], [True, True, False])
+
     def test_schema_ferme(self):
         """Clé en trop (racine, section), clé manquante, texte vide, empreinte en majuscules, entier pour un texte :
         PARAMETRES/schema. Mutations M-0-03 (clés incluses au lieu d'égales), M-0-04 (texte vide admis), M-0-05
