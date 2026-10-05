@@ -9,7 +9,8 @@
   par le collecteur entier (E-C-24) est celui du sous-lot CB-18.
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
-  de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2).
+  de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
+  l'observation O-7 (§11.6, §13.1, §13.2).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -225,7 +226,8 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
      résultat est arrivé entre E et le relevé), plus celles des fenêtres précédentes dont le résultat n'était pas
      arrivé au relevé ;
      `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
-     est arrivé depuis le relevé de la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15).
+     est arrivé depuis le relevé de la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15) ;
+     `fils.sondes` : instances de sonde encore en cours au relevé (§13.2), au plus une par sonde ; 0 sans sondes.
 7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter. D'où des futurs
    `concurrent.futures` sans `ThreadPoolExecutor`, qui joint ses fils à la sortie de l'interpréteur, même après
    `shutdown(wait=False, cancel_futures=True)` (essais du worker et de la G2 de la tranche B, Python 3.10 à 3.13).
@@ -253,10 +255,14 @@ aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-002
 1. Un enregistrement `sante` par fenêtre lue, avant le marqueur. Ses clés forment une **liste blanche fermée** :
    `type`, `ws`, `seq`, `prec`, `d2`, `fils` (§11.6), `d3`, `d4`, `d5`, `disque`, `resolveur`. Aucune clé n'est tirée
    d'une lecture de source ; aucun champ ne porte de jugement (« dégradé » se juge au recalcul et dans `status`, avec
-   les seuils scellés, E-C-26).
+   les seuils scellés, E-C-26). Une boucle construite sans sondes (tests de la boucle seule) écrit la même liste :
+   `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
 2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
    hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
-   cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null.
+   cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null. Une sonde dont l'instance précédente n'a pas
+   rendu **n'est pas relancée** (C-5) : elle vaut null dans la fenêtre, et repart à la première fenêtre où l'instance
+   précédente a rendu ; une sonde qui lève vaut null et repart de même. Le nombre d'instances encore en cours est
+   journalisé (`fils.sondes`, §11.6) : les fils de sonde restent bornés, au plus un par sonde.
 3. `d3` : sortie brute de la commande d'horloge scellée (configuration de l'observateur ; relevé chrony, ADR-0029
    l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard lue en UTF-8 (octet invalide
    remplacé par U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur`

@@ -2,8 +2,9 @@
 lectures (ws + w − δ, Q-C-03), chacune sur son fil démon, hors du pool des lectures ; la boucle les joint avant
 l'échéance. D-3 : sortie brute de la commande d'horloge scellée, sans analyse ici (son format n'est pas supposé : le
 recalcul l'analyse, sur pièce) ; D-4 : SOA de « . » vers chaque témoin, adresse IPv4 littérale, sans récursion ; D-5 :
-A de chaque nom témoin, par le résolveur de l'observateur ; délai de 2 s (l.109-110). S'y ajoutent, à l'écriture, le
-disque du journal et l'empreinte de la configuration du résolveur. Valeurs brutes, aucun jugement (E-C-26)."""
+A de chaque nom témoin, par le résolveur de l'observateur ; délai de 2 s (l.109-110). S'y ajoutent, au relevé, le
+disque du journal et l'empreinte de la configuration du résolveur. Valeurs brutes, aucun jugement (E-C-26). Une sonde
+dont l'instance précédente n'a pas rendu n'est pas relancée : au plus un fil par sonde (C-5 de la G2 de P1-B)."""
 import concurrent.futures
 import hashlib
 import os
@@ -54,27 +55,49 @@ class Sondes:
                  interroger=dns.interroger, lancer=subprocess.run):
         self.commande, self.temoins, self.noms, self.resolveur = commande, temoins, noms, resolveur
         self.dossier, self.resolv, self.delai = dossier, resolv, delai
-        self.interroger, self.lanceur = interroger, lancer
+        self.interroger, self.lanceur, self.encours = interroger, lancer, {}           # rang → dernier futur (C-5)
 
     def lancer(self):
-        """Lance chaque sonde sur un fil démon ; rend [(clé, futur)] dans l'ordre : d3, témoins, noms."""
+        """Lance chaque sonde sur un fil démon ; rend [(clé, futur)] dans l'ordre : d3, témoins, noms. Une sonde dont
+        l'instance précédente n'a pas rendu n'est pas relancée : futur None, elle vaut null (C-5)."""
         taches = [("d3", lambda: horloge_systeme(self.commande, self.delai, self.lanceur))]
         taches += [("d4", lambda a=a: {"adresse": a, **self.interroger(a, ".", "SOA", recursion=False,
                                                                        delai=self.delai)}) for a in self.temoins]
         taches += [("d5", lambda n=n: {"nom": n, **self.interroger(self.resolveur, n, "A", recursion=True,
                                                                    delai=self.delai)}) for n in self.noms]
-        lancees = [(cle, concurrent.futures.Future()) for cle, _t in taches]
-        for (_c, tache), (_k, futur) in zip(taches, lancees):
-            threading.Thread(target=lambda t=tache, f=futur: f.set_result(t()), daemon=True).start()
+        lancees = []
+        for rang, (cle, tache) in enumerate(taches):
+            if rang in self.encours and not self.encours[rang].done():
+                lancees.append((cle, None))
+                continue
+            futur = self.encours[rang] = concurrent.futures.Future()
+            threading.Thread(target=_sonder, args=(tache, futur), daemon=True).start()
+            lancees.append((cle, futur))
         return lancees
 
+    def vivantes(self):
+        """Instances de sonde encore en cours (C-5) : au plus une par sonde."""
+        return sum(not f.done() for f in self.encours.values())
+
     def joindre(self, lancees):
-        """Champs de santé des sondes, plus disque et résolveur ; une sonde inachevée vaut None."""
+        """Champs de santé des sondes, plus disque et résolveur ; une sonde inachevée ou non relancée vaut None."""
         r = {"d3": None, "d4": [], "d5": [], "disque": disque(self.dossier), "resolveur": empreinte(self.resolv)}
         for cle, futur in lancees:
-            v = futur.result() if futur.done() else None
+            v = futur.result() if futur is not None and futur.done() else None
             if cle == "d3":
                 r["d3"] = v
             else:
                 r[cle].append(v)
         return r
+
+
+def _sonder(tache, futur):
+    """Fil d'une sonde. Le futur rend toujours : une sonde qui lève vaut None et repart à la fenêtre suivante (C-5) ;
+    une BaseException suit son cours."""
+    v = None
+    try:
+        v = tache()
+    except Exception:                                               # attrape-tout : une sonde ne lève jamais
+        pass
+    finally:
+        futur.set_result(v)

@@ -243,3 +243,20 @@ Mutants, classés par la commande du job (SHOGEN-S2BIS-MUT-COMMANDE-1 : ligne `v
 --egal --plancher 97` de `gates.yml`, suite entière, borne de 300 s, dépassement FATAL) : 14 tués sur 14 par leur test
 visé (0 vivant, 0 FATAL), dont MG-11, MG-13, MG-29 du réviseur et M-LP-3 du worker, qui sort désormais en 1 en 76 s
 (la suite pendait). Suite : 97 tests ; plancher du job : 97, égalité exigée (`--egal`).
+
+## CB-11d (2026-10-05) : correction C-5, observation O-7 et mutant MG-26 (C-7) de la relecture G2 de la tranche B
+
+Objet : une sonde dont l'instance précédente n'a pas rendu n'est pas relancée (null), une sonde qui lève rend null et
+repart, au plus un fil par sonde ; nombre de sondes vivantes journalisé (`fils.sondes`) (C-5) ; `sante` complète sans
+sondes (O-7) ; test nommé du mutant vivant MG-26 (C-7).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/sante.py` | 103 | — |
+| `shogen_s2bis/collecte/boucle.py` | 95 | — |
+| `tests/test_sante.py` | 191 | 10 (4 de plus : sonde pendue jamais relancée, sonde qui lève, disque du dossier du journal, sondes pendues sur trois fenêtres) |
+| `tests/test_boucle.py` | 228 | 10 (santé complète sans sondes, `fils.sondes`) |
+
+Mutants (commande du job, `--plancher 101`, borne de 300 s) : 11 tués sur 11 par leur test visé (0 vivant, 0 FATAL),
+dont MG-26 et deux mutants du réviseur réécrits sur le texte de CB-11d avec la même mutation (MG-12, sondes non
+attendues ; MG-27, sonde inachevée non nulle). Suite : 101 tests ; plancher du job : 101, égalité exigée (`--egal`).

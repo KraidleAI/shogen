@@ -6,7 +6,7 @@ partage pas) : une `lecture` par lecture partie (non finie au relevé, ou finie 
 la résolution n'avait pas rendu à E, sinon `delai`, `fin` = E ; son fil est abandonné), la `sante`, le marqueur (C-1
 de la G2 de P1-B). Un résultat tardif est compté avec sa latence dans la santé suivante, jamais écrit (Q-C-15). Fils
 démons et futurs de concurrent.futures, pas de ThreadPoolExecutor : il joint ses fils à la sortie, un fil pendu
-bloquerait le processus (essai, 3.10 à 3.13)."""
+bloquerait le processus (essai, 3.10 à 3.13). Sans sondes, la `sante` reste complète, champs des sondes nuls (O-7)."""
 import concurrent.futures
 import threading
 import time
@@ -14,6 +14,7 @@ import time
 from shogen_s2bis.collecte.lecture import S, Lecture, horloge
 
 DELTA, MARGE, PAR_HOTE = 20 * S, S, 5                     # δ, marge de l'échéance, lectures par hôte (ADR l.233-234)
+NULS = {"d3": None, "d4": [], "d5": [], "disque": None, "resolveur": None}           # santé sans sondes (O-7)
 
 
 def planifier(formes, espaces=()):
@@ -63,10 +64,10 @@ class Boucle:
             retards.append(suivi["depart"] - depart - decalage)
             threading.Thread(target=self._lire, args=(nom, suivi, futur), daemon=True).start()
             lancees.append((nom, depart + decalage, suivi, futur))
-        self.attendre([f for *_x, f in lancees] + [f for _c, f in sondes], echeance)
+        self.attendre([f for *_x, f in lancees] + [f for _c, f in sondes if f is not None], echeance)
         releve = [(nom, prevu, suivi["depart"], futur, futur.result() if futur.done() else None,  # relevé unique, C-1
                    dict(suivi.get("phases", {})), suivi.get("adresse")) for nom, prevu, suivi, futur in lancees]
-        champs = self.sondes.joindre(sondes) if self.sondes else {}
+        champs, vivantes = (self.sondes.joindre(sondes), self.sondes.vivantes()) if self.sondes else (dict(NULS), 0)
         finis, vivants = concurrent.futures.wait(self.abandons, timeout=0)
         tardives, self.abandons = sorted(f.result().fin - f.result().depart for f in finis), list(vivants)
         for nom, prevu, dep, futur, lu, phases, adresse in releve:
@@ -77,7 +78,7 @@ class Boucle:
                 self.abandons.append(futur)
             self.journal.ecrire("lecture", ws, forme=nom, prevu=prevu, **lu.enregistrement())
         self.journal.ecrire("sante", ws, d2={"retard_max": max(retards, default=None), "non_parties": non_parties},
-                            fils={"abandonnes": len(self.abandons), "tardives": tardives}, **champs)
+                            fils={"abandonnes": len(self.abandons), "tardives": tardives, "sondes": vivantes}, **champs)
         self.journal.marqueur(ws)
 
     def _lire(self, nom, suivi, futur):

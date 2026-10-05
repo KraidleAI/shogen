@@ -1,7 +1,8 @@
 """CB-4, E-C-09, E-C-11 à E-C-15 : boucle du pool, horloge et attentes injectées, journal relu par `chaine`. Valeurs
 écrites à la main : instants par date -u -d ; base64 et sha256 de b"x" par printf, base64 et sha256sum. Corrections de
 la G2 de P1-B (CB-11c) : boucle dans un fil joint en temps borné (C-6) ; échéance exacte sous écrivain ralenti (C-1) ;
-mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5)."""
+mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5). CB-11d : santé complète sans sondes (O-7),
+sondes vivantes comptées (C-5)."""
 import concurrent.futures
 import queue
 import threading
@@ -111,7 +112,8 @@ class Boucle(Base):
         self.assertEqual(enrs, [{"type": "lecture", "ws": m(3), "forme": n, "prevu": p, "depart": p, "fin": p + 7,
                                  "phases": {"dns": p + 1}, **X} for n, p in (("a", D), ("b", D + S))] +
                          [{"type": "sante", "ws": m(3), "d2": {"retard_max": 0, "non_parties": 0},
-                           "fils": {"abandonnes": 0, "tardives": []}}, {"type": "marqueur", "ws": m(3)}])
+                           "fils": {"abandonnes": 0, "tardives": [], "sondes": 0}, "d3": None, "d4": [], "d5": [],
+                           "disque": None, "resolveur": None}, {"type": "marqueur", "ws": m(3)}])
 
     def test_echeance_lectures_non_finies_classees_fils_abandonnes(self):
         porte = threading.Event()
@@ -147,7 +149,8 @@ class Boucle(Base):
                                                                        ("marqueur", None), ("lecture", "ok"),
                                                                        ("sante", None), ("marqueur", None)])
         self.assertEqual([e["fils"] for e in enrs if e["type"] == "sante"],
-                         [{"abandonnes": 1, "tardives": []}, {"abandonnes": 0, "tardives": [7]}])
+                         [{"abandonnes": 1, "tardives": [], "sondes": 0},
+                          {"abandonnes": 0, "tardives": [7], "sondes": 0}])
 
     def test_attrape_tout_et_fenetre_dont_l_echeance_est_passee_sautee(self):
         def casse(suivi):
@@ -183,8 +186,8 @@ class Boucle(Base):
                           ("c", "panne_transport", "delai", E, v, a), ("d", "panne_transport", "dns", E, {}, None),
                           ("e", "ok", None, E, {"dns": D + 1, "corps": E}, a)])
         self.assertEqual([e["fils"] for e in enrs if e["type"] == "sante"],
-                         [{"abandonnes": 3, "tardives": []},
-                          {"abandonnes": 2, "tardives": [7, 19 * S + 1, 19 * S + 2]}])
+                         [{"abandonnes": 3, "tardives": [], "sondes": 0},
+                          {"abandonnes": 2, "tardives": [7, 19 * S + 1, 19 * S + 2], "sondes": 0}])
 
     def test_place_rendue_apres_une_lecture_qui_leve(self):
         """MG-11 : la place d'une lecture qui lève est rendue ; avec un pool d'une place, la fenêtre suivante part."""

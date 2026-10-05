@@ -1,6 +1,7 @@
 """CB-11, E-C-25 à E-C-29 : sondes de santé, commande d'horloge, requêtes DNS et lancement injectés ; branchement à la
 boucle (liste blanche des clés de `sante`). sha256 de la configuration du résolveur par printf et sha256sum. CB-11c
-(G2 de P1-B) : boucle dans un fil joint en temps borné (C-6) ; sondes relevées à l'échéance (C-1)."""
+(G2 de P1-B) : boucle dans un fil joint en temps borné (C-6) ; sondes relevées à l'échéance (C-1). CB-11d : sonde
+pendue jamais relancée, sondes vivantes comptées (C-5) ; disque du dossier du journal (MG-26)."""
 import concurrent.futures
 import os
 import subprocess
@@ -92,6 +93,41 @@ class Sondes(unittest.TestCase):
         r = s.joindre(lancees)
         self.assertEqual((r["d3"]["code"], r["d4"], r["d5"]), (0, [None], [None]))
 
+    def test_sonde_pendue_jamais_relancee(self):
+        """C-5 : une sonde dont l'instance précédente n'a pas rendu n'est pas relancée (futur None, valeur null) ;
+        `vivantes` compte les instances en cours ; elle repart dès que l'instance précédente a rendu."""
+        porte = threading.Event()
+        self.addCleanup(porte.set)
+        f = Faux(porte=porte)
+        s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", ".", interroger=f.interroger,
+                         lancer=f.lancer)
+        l1 = s.lancer()
+        concurrent.futures.wait([l1[0][1]], 5)                              # la sonde d'horloge finit seule
+        l2 = s.lancer()
+        concurrent.futures.wait([l2[0][1]], 5)
+        r = s.joindre(l2)
+        self.assertEqual(([x is None for _c, x in l2], r["d3"]["code"], r["d4"], r["d5"], s.vivantes()),
+                         ([False, True, True], 0, [None], [None], 2))
+        porte.set()
+        concurrent.futures.wait([x for _c, x in l1], 5)
+        self.assertEqual(sorted(a[0] for a in f.appels), ["interroger", "interroger", "lancer", "lancer"])
+        self.assertEqual([x is None for _c, x in s.lancer()], [False] * 3)
+
+    def test_sonde_qui_leve_vaut_null_et_repart(self):
+        """C-5 : une sonde qui lève vaut null ; son futur rend quand même, et elle repart à la fenêtre suivante."""
+        def casse(*a, **k):
+            raise RuntimeError("défaut imprévu")
+        s = sante.Sondes(["horloge"], TEMOINS[:1], [], "192.0.2.53", ".", interroger=casse, lancer=Faux().lancer)
+        l1 = s.lancer()
+        concurrent.futures.wait([x for _c, x in l1], 5)
+        self.assertEqual((s.joindre(l1)["d4"], [x is None for _c, x in s.lancer()]), ([None], [False, False]))
+
+    def test_disque_du_dossier_du_journal(self):
+        """MG-26 : `disque` se relève sur le dossier donné aux sondes (ici absent), jamais sur un autre."""
+        with tempfile.TemporaryDirectory() as d:
+            s = sante.Sondes(["horloge"], [], [], "192.0.2.53", os.path.join(d, "absent"), lancer=Faux().lancer)
+            self.assertEqual(s.joindre([])["disque"], {"erreur": "FileNotFoundError"})
+
 
 class Branchement(Base):
     def test_sante_liste_blanche_sondes_au_depart_jointes_avant_l_echeance(self):
@@ -108,7 +144,7 @@ class Branchement(Base):
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((sorted(enr), sorted(enr["d2"]), sorted(enr["fils"])),
                          (["d2", "d3", "d4", "d5", "disque", "fils", "resolveur", "type", "ws"],
-                          ["non_parties", "retard_max"], ["abandonnes", "tardives"]))
+                          ["non_parties", "retard_max"], ["abandonnes", "sondes", "tardives"]))
         self.assertEqual((enr["d3"]["code"], enr["d4"], enr["d5"], enr["resolveur"], instants),
                          (0, [{"adresse": TEMOINS[0], "statut": "reponse"}], [{"nom": NOMS[0], "statut": "reponse"}],
                           None, [D, D]))
@@ -130,3 +166,26 @@ class Branchement(Base):
         borne(self, b.tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((enr["type"], enr["d3"]["code"], enr["d4"]), ("sante", 0, [None]))
+
+    def test_sondes_pendues_trois_fenetres_fils_constants(self):
+        """C-5 : sondes pendues sur trois fenêtres : jamais relancées (trois fils de sonde en tout, toujours vivants),
+        null à chaque fenêtre ; `fils.sondes` journalise les sondes vivantes."""
+        temps, porte, fils = Temps(m(2) * S + 5 * S), threading.Event(), []
+        self.addCleanup(porte.set)
+
+        def pendre(*a, **k):
+            fils.append(threading.current_thread())
+            porte.wait(5)
+            return {"statut": "reponse"}
+        s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", self.d, interroger=pendre,
+                         lancer=lambda *a, **k: pendre() and types.SimpleNamespace(stdout=b"", returncode=0))
+        b = boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(0, "a")], 8, horloge=temps, dormir=temps.dormir,
+                          attendre=temps.attendre, sondes=s)
+        comptes = []
+        for _ in range(3):
+            borne(self, b.tourner, 1)
+            comptes.append((len(fils), sum(f.is_alive() for f in fils)))
+        enrs = [e for e in sans_chaine(chaine(self.etat()[FICHIER])[2]) if e["type"] == "sante"]
+        self.assertEqual([(e["d3"], e["d4"], e["d5"], e["fils"]["sondes"]) for e in enrs],
+                         [(None, [None], [None], 3)] * 3)
+        self.assertEqual(comptes, [(3, 3)] * 3)
