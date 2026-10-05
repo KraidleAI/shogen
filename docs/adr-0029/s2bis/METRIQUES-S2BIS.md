@@ -1050,3 +1050,40 @@ trois textes attendus manquent.
 Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (incise retirée,
 phrase de l'avis non mot pour mot, ordre de lecture retiré, plancher non relevé). Suite : 184 tests ; plancher du job :
 184, égalité exigée (`--egal`).
+
+## CB-18u (2026-10-05) : valeurs libres du gabarit en scalaire simple (CC2-1 du contre-contrôle bref de CB-18r à t)
+
+Objet : une chaîne entre guillemets écrite sur plusieurs lignes, dans une valeur libre du gabarit (`name` du job ou
+d'une étape), avalait des lignes du gabarit que celui-ci lisait une à une :
+- LC-03 : le nom de l'étape du runner, ouvert par un guillemet et fermé au nom de l'étape suivante ; le runner ne
+  s'exécute plus ;
+- LC-01 : le nom du job avale `runs-on`.
+
+Remède du réviseur, adjugé par l'orchestrateur : les trois `name` suivent `[0-9A-Za-z].*` (scalaire simple : ni
+guillemet, ni bloc, ni ancre, ni flux) et `timeout-minutes` suit `[1-9][0-9]*`. Cas : L-35 (LC-03), L-36 (LC-01) ;
+pour le gabarit seul, G-02 (`timeout-minutes` entre guillemets), G-03 et G-04 (le nom du job, le nom de l'étape 3,
+ouverts par un guillemet fermé à la dernière ligne du bloc). Rouge : sous le gabarit de CB-18t, les cinq sont admis.
+
+Leurres rejoués avec les outils du réviseur. Seuls passent :
+- N-12 et N-14 (résidu) ;
+- LC-02 (YAML invalide) ;
+- LC-09 et LC-10 (échec à l'exécution) ;
+- LC-08 (`timeout-minutes: 600`, sans effet), que `[1-9][0-9]*` admet.
+
+LC-13 (ancre et alias) est refusé.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 289 | 77 cas (5 de plus : L-35, L-36, G-02 à G-04) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 6 mutants, 6 tués. Ils
+rendent quelconques les valeurs libres, l'entier de `timeout-minutes`, le nom du job, le nom de l'étape du runner ou
+celui de l'étape 3, ou admettent un guillemet en tête d'une valeur libre.
+
+Rejoués sur la base recalée :
+- les mutants de CB-18r (8), de CB-18s (3) et de CB-18t (4) : tous tués ;
+- CA-01 à CA-12 du réviseur : 12 tués sur 12 ;
+- les leurres N-01 à N-20, LN-01 à LN-11 et LC-01 à LC-13, classés par l'étape du runner : 38 tués, 6 vivants (ceux
+  listés plus haut).
+
+Suite : 184 tests ; plancher du job : 184, égalité exigée (`--egal`).

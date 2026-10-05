@@ -18,7 +18,10 @@ refusée. Contre-contrôle de CB-18 (CC-1, remède (a)) : `cable` exige `gabarit
 exacte, et `analyseur` ; L-01 à L-21 sont refusés par l'analyseur seul ; L-23 à L-32, leurres qu'il admet (ligne cachée
 dans un nom plié ou dans un `with:`, checkout ou `runs-on` réels autres), par le gabarit ; G-01, le gabarit seul. CC-2 :
 L-33 (`env:` de premier niveau), L-34 (clé de job répétée) et A-03 (étapes imitées hors de `steps`) figent trois refus
-de l'analyseur. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+de l'analyseur. CC2-1 : les valeurs libres du gabarit sont des scalaires simples ; L-35 et L-36, un nom entre guillemets
+écrit sur plusieurs lignes qui avalerait des lignes du gabarit ; G-02, `timeout-minutes` entier ; G-03 et G-04, le
+nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du bloc, le gabarit seul. Sortie : 0 tout passe,
+1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -146,10 +149,11 @@ def job(texte, nom):
 RUNNER = "python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"
 ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1",
           "run: " + RUNNER)
-GABARIT = ("    name: .*", "    " + re.escape(ETAPES[0]), "    timeout-minutes: .*", "    steps:",
-           "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false", "      - name: .*",
-           "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: .*", "        shell: bash",
-           "        run: [|]")
+LIBRE = "[0-9A-Za-z].*"      # CC2-1 : valeur libre en scalaire simple, jamais un guillemet qui avalerait des lignes
+GABARIT = ("    name: " + LIBRE, "    " + re.escape(ETAPES[0]), "    timeout-minutes: [1-9][0-9]*", "    steps:",
+           "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false",
+           "      - name: " + LIBRE, "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: " + LIBRE,
+           "        shell: bash", "        run: [|]")
 
 
 def gabarit(texte, nom):
@@ -158,7 +162,9 @@ def gabarit(texte, nom):
     étape. Soit, sur ces lignes et dans cet ordre : `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, puis
     trois étapes et rien d'autre : le checkout épinglé, son `with:` réduit à `persist-credentials: false` ; le runner
     (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
-    plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite."""
+    plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite. CC2-1 : les trois `name` sont des scalaires
+    simples (premier caractère alphanumérique : ni guillemet, ni bloc, ni ancre, ni flux), `timeout-minutes` un entier ;
+    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit."""
     b = job(texte, nom)
     return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
         re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
@@ -174,11 +180,12 @@ def analyseur(texte, nom, appel):
 
 def cable(texte, nom, appel):
     """Câblage du job `nom`, contrôlé exactement ainsi, et rien d'autre : (1) `gabarit` : ses lignes brutes, à
-    indentation exacte, sont dans l'ordre `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, le checkout
-    épinglé et son `with:` réduit à `persist-credentials: false`, le runner (`name`, `shell: bash`, `run:` du runner),
-    une étape `name`, `shell: bash`, `run: |`, puis seulement des lignes d'indentation 10 ; (2) `analyseur`, lecture de
-    l'enregistreur de rôle : trois étapes, la première non admise, la deuxième le runner seul, et la ligne `appel` une
-    fois, dans un bloc `run:` admis sans autre ligne que v.LIBRES."""
+    indentation exacte, sont dans l'ordre `name` (scalaire simple), `runs-on: ubuntu-24.04`, `timeout-minutes`
+    (entier), `steps`, le checkout épinglé et son `with:` réduit à `persist-credentials: false`, le runner (`name` en
+    scalaire simple, `shell: bash`, `run:` du runner), une étape `name` (scalaire simple), `shell: bash`, `run: |`, puis
+    seulement des lignes d'indentation 10 ; (2) `analyseur`, lecture de l'enregistreur de rôle : trois étapes, la
+    première non admise, la deuxième le runner seul, et la ligne `appel` une fois, dans un bloc `run:` admis sans autre
+    ligne que v.LIBRES."""
     return gabarit(texte, nom) and analyseur(texte, nom, appel)
 
 
@@ -253,10 +260,21 @@ for nom, lignes in (
         ("L-31 runs-on qui prolonge l'étiquette (ubuntu-24.04-arm)", DEBUT[:3] + ["    runs-on: ubuntu-24.04-arm"]
          + DEBUT[4:] + SUITE),
         ("L-32 checkout épinglé à un autre commit", DEBUT[:6] + ["      " + ETAPES[1].replace("@3d3c", "@0d3c")]
-         + DEBUT[7:] + SUITE)):
+         + DEBUT[7:] + SUITE),
+        ("L-35 nom d'étape entre guillemets sur trois lignes : le runner avalé (CC2-1, LC-03)", DEBUT[:9]
+         + ['      - name: "cas'] + DEBUT[10:] + ['      - name: suite"'] + SUITE[1:]),
+        ("L-36 nom du job entre guillemets : runs-on avalé (CC2-1, LC-01)", DEBUT[:2]
+         + ['    name: "s2bis-unittest', DEBUT[3], '    timeout-minutes: 10"'] + DEBUT[5:] + SUITE)):
     cas(nom + " : refusé", ["admis"] if cable(chr(10).join(lignes), "s2bis-unittest", APPEL) else [], None)
 cas("G-01 ligne du bloc à l'indentation 12 : refusée par le gabarit (indentation exacte)", ["admis"] if gabarit(
     chr(10).join(DEBUT + SUITE[:4] + ["  " + SUITE[4]]), "s2bis-unittest") else [], None)
+cas("G-02 timeout-minutes entre guillemets : refusé par le gabarit (entier, CC2-1)", ["admis"] if gabarit(
+    chr(10).join(DEBUT[:4] + ['    timeout-minutes: "10"'] + DEBUT[5:] + SUITE), "s2bis-unittest") else [], None)
+for nom, lignes in (                                    # CC2-1 : guillemet fermé à la dernière ligne, le gabarit seul
+        ("G-03 nom du job", DEBUT[:2] + ['    name: "s2bis-unittest'] + DEBUT[3:] + SUITE[:4] + [L + LIGNE + '"']),
+        ("G-04 nom de l'étape 3", DEBUT + ['      - name: "suite'] + SUITE[1:4] + [L + LIGNE + '"'])):
+    cas(nom + " entre guillemets, fermé à la dernière ligne du bloc : refusé par le gabarit (scalaire simple, CC2-1)",
+        ["admis"] if gabarit(chr(10).join(lignes), "s2bis-unittest") else [], None)
 EXCLUES = DEBUT + SUITE[:1] + ["        if: false"] + SUITE[1:] + SUITE[:1] + ["        continue-on-error: true"]
 EXCLUES += SUITE[1:]
 for nom, texte, attendu in (                            # analyseur seul : ce que les contrôles d'avant voyaient déjà
