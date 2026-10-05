@@ -1,7 +1,6 @@
 """Calibration du lot SIM-BIS (G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md ; sous-lot SB-2 ; E-S-37, E-S-02) : lecture d'EP
 (`episodes.txt` versé par PLAN-S2BIS, forme de scripts/plan-s2bis/episodes.py l.92-120) sous ses deux épingles. Forme
-exigée ligne à ligne, dans l'ordre de parametres.json (strates, unités, types) : sinon CALIB/forme ; section FIV :
-en-tête et nombre de lignes seuls à ce sous-lot.
+exigée ligne à ligne, dans l'ordre de parametres.json (strates, unités, types ; pools, strates, ℓ) : sinon CALIB/forme.
 Nombres pris en rationnels exacts depuis leur écriture décimale. Contrôles de cohérence, sinon CALIB/coherence : chaque
 quotient imprimé est refait sous le contexte décimal de r1 de f35a70c (précision 50, ROUND_HALF_EVEN, le reste du
 DefaultContext) et comparé chaîne pour chaîne. L'histogramme d'EP compte tous les épisodes, censurés compris."""
@@ -54,9 +53,21 @@ def _episode(i: int, m, h, k: dict, ctx) -> dict:
             "moyenne_complets": Fraction(m.group(9 + nq)), "histogramme": hist}
 
 
+def _point(i: int, ell: int, m, k: dict, ctx) -> dict:
+    """Point (ℓ) d'une courbe FIV_série, après contrôle de cohérence."""
+    n, kk, fiv, s2, g0, cv = int(m.group(1)), int(m.group(2)), *m.group(3, 4, 5, 6)
+    garde = m.group(7) == "tenue"
+    _egal(i, "FIV_série = σ̂²_bloc/γ̂₀", fiv, str(ctx.divide(Decimal(s2), Decimal(g0))))
+    _egal(i, "γ̂₀ = (nK − K²)/n", g0, str(ctx.divide(Decimal(n * kk - kk * kk), Decimal(n))))
+    _egal(i, "garde = (n ≥ garde_blocs·ℓ)", garde, n >= k["garde_blocs"] * ell)
+    _egal(i, "cv = √(4ℓ/3n)", cv, str(ctx.sqrt(ctx.divide(Decimal(4 * ell), Decimal(3 * n)))))
+    return {"ell": ell, "n": n, "K": kk, "fiv": Fraction(fiv), "sigma2": Fraction(s2), "gamma0": Fraction(g0),
+            "cv": Fraction(cv), "garde": garde}
+
+
 def analyser(texte: str, k: dict) -> dict:
-    """{"episodes": {(strate, hôte, type): enregistrement}} d'EP ; `k` : section
-    « calibration » de parametres.json. Refus nommé sur tout écart de forme ou de cohérence, quotient par zéro
+    """{"episodes": {(strate, hôte, type): enregistrement}, "fiv": {(pool, strate): [point par ℓ]}} d'EP ; `k` :
+    section « calibration » de parametres.json. Refus nommé sur tout écart de forme ou de cohérence, quotient par zéro
     compris."""
     try:
         return _analyser(texte, k)
@@ -70,8 +81,10 @@ def _analyser(texte: str, k: dict) -> dict:
                       " ; taux = " + NB + " ; moyenne = " + NB + " ; max = " + EN + " ; " +
                       " ; ".join(f"P{q} = " + EN for q in k["quantiles"]) + " ; complets : " + EN + ", moyenne " + NB)
     l_hi = re.compile("    histogramme [(]longueur×nombre[)] : ([0-9]+×[0-9]+(?: [0-9]+×[0-9]+)*)")
+    l_fv = re.compile(" : n = " + EN + " ; K = " + EN + " ; FIV_série = " + NB + " ; σ̂²_bloc = " + NB + " ; γ̂₀ = " +
+                      NB + " ; cv théorique = " + NB + " ; garde : (tenue|non tenue)")
     s, u, t = len(k["strates"]), len(k["unites"]), len(k["types"])
-    lignes, out = texte.split(commun.NL), {"episodes": {}}
+    lignes, out = texte.split(commun.NL), {"episodes": {}, "fiv": {}}
     n = 14 + 2 * s * u * t + len(k["pools"]) * s * len(k["ell"])
     if (len(lignes), lignes[0], lignes[11], lignes[12 + 2 * s * u * t], lignes[-1]) != (
             n, ETIQUETTE_EP, TETE_EPISODES, TETE_FIV, ""):
@@ -86,6 +99,16 @@ def _analyser(texte: str, k: dict) -> dict:
                     _forme(i, lignes[i], tete)
                 out["episodes"][st, hote, ty] = _episode(i, m, h, k, ctx)
                 i += 2
+    for pool in k["pools"]:
+        for st in k["strates"]:
+            out["fiv"][pool, st] = []
+            for ell in k["ell"]:
+                i += 1
+                tete = f"  {pool} « {st} » ℓ = {ell}"
+                m = l_fv.fullmatch(lignes[i][len(tete):])
+                if not (lignes[i].startswith(tete) and m):
+                    _forme(i, lignes[i], tete)
+                out["fiv"][pool, st].append(_point(i, ell, m, k, ctx))
     return out
 
 

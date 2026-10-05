@@ -75,3 +75,28 @@ class TestCalibration(unittest.TestCase):
                   retouche(13, "P99 = 3", "P99 = 2"),
                   retouche(13, "n_s = 24585 ;", "n_s = 0 ;")):
             self.refus("CALIB/coherence", t)
+
+    def test_lecture_fiv_t_cal_1(self):
+        """EP l.140 (D1-bis, calme, ℓ = 240, garde tenue) et l.144 (ℓ = 1440, garde non tenue) ; 4 courbes de 17 points.
+        Mutation M-CAL-2 : garde ignorée (lue tenue partout)."""
+        d = calibration.charger(PRM, environ={})["fiv"]
+        self.assertEqual(d["D1-bis", "calme"][12], {
+            "ell": 240, "n": 24585, "K": 148, "fiv": Fraction("22.875107619499139688158815002722346438402490494255"),
+            "sigma2": Fraction("3365.1353559023660984670112023097760840941942530323"),
+            "gamma0": Fraction("147.10905023388244864754931869025828757372381533455"),
+            "cv": Fraction("0.11408797792643129814123654880491384644099142081780"), "garde": True})
+        self.assertEqual((d["D1-bis", "calme"][16]["ell"], d["D1-bis", "calme"][16]["garde"]), (1440, False))
+        self.assertEqual([(cle, len(v)) for cle, v in d.items()],
+                         [(("S2 (D1)", "calme"), 17), (("S2 (D1)", "stress"), 17), (("D1-bis", "calme"), 17),
+                          (("D1-bis", "stress"), 17)])
+
+    def test_refus_fiv(self):
+        """ℓ hors grille : CALIB/forme ; FIV ≠ σ̂²/γ̂₀, γ̂₀ ≠ (nK − K²)/n (σ̂² et γ̂₀ retouchés ensemble à ℓ = 1,
+        FIV = 1 tenu), garde ≠ (n ≥ 30ℓ), cv ≠ √(4ℓ/3n) : CALIB/coherence. Mutations M-2-17 à M-2-20, un contrôle
+        retiré chacune."""
+        self.refus("CALIB/forme", retouche(161, "ℓ = 1440", "ℓ = 1441"))
+        g = "147.10905023388244864754931869025828757372381533455"
+        for t in (retouche(140, "494255 ;", "494256 ;"),
+                  retouche(128, f"σ̂²_bloc = {g} ; γ̂₀ = {g}", "σ̂²_bloc = 2 ; γ̂₀ = 2"),
+                  retouche(140, "garde : tenue", "garde : non tenue"), retouche(140, "4099142081780", "4099142081781")):
+            self.refus("CALIB/coherence", t)
