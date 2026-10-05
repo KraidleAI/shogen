@@ -1,8 +1,9 @@
 """Adaptateur d'oracle r1 SB-14 (E-S-01, E-S-39 ; T-FIV-1, T-CAL-2 ; SHOGEN-SIM-BIS-WINDOW-EPINGLE-1) : épingles des
 cinq modules du harnais de f35a70c égales à celles de PLAN-S2BIS (scripts/plan-s2bis/parametres.json) et, pour
 window.py, à `git show f35a70c:s2-harness/shogen_s2/window.py | sha256sum` ; refus nommés d'une épingle fausse et d'un
-commit absent. T-CAL-2 contre window extrait : tests/test_calendrier.py. Chaque test nomme les mutations qui le
-rougissent."""
+commit absent ; FIV_série de r1 extrait égal à calib_fiv sur la même entrée (série de la fixture de PLAN-S2BIS, série
+à lacune, 10 réplications d'E1) ; l'écart mesuré est le nombre de valeurs différentes, déclaré nul. T-CAL-2 contre
+window extrait : tests/test_calendrier.py. Chaque test nomme les mutations qui le rougissent."""
 import json
 import os
 import subprocess
@@ -10,14 +11,29 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from fractions import Fraction
 
+import calib_fiv
+import calibration
 import commun
 import oracle_r1
 
 PRM = commun.charger_parametres(environ={})
+K_ = PRM["calibration"]
 H = oracle_r1.charger(PRM)
 COMMIT = "f35a70c19ba8269f1f7e2bcd31775e4fc513da20"
 WINDOW = "f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94"
+CHAMPS = ("n", "K", "numerateur", "gamma0", "sigma2_bloc", "FIV_serie")
+
+
+def bits(*positions):
+    return sum(1 << p for p in positions)
+
+
+def ecarts(pres, val, ells):
+    """Valeurs (champ, ℓ) où calib_fiv et r1 extrait diffèrent sur la même entrée, chaînes décimales comparées."""
+    a, b = calib_fiv.courbe(pres, val, ells, K_), oracle_r1.courbe(H, pres, val, ells, PRM["calendrier"]["w"])
+    return [(c, x["ell"]) for x, y in zip(a, b) for c in CHAMPS if str(x[c]) != str(y[c])]
 
 
 class TestOracleR1(unittest.TestCase):
@@ -61,6 +77,32 @@ class TestOracleR1(unittest.TestCase):
             with tempfile.TemporaryDirectory() as d, self.assertRaises(commun.Refus) as c:
                 oracle_r1.extraire(dict(PRM, oracle_r1=o), d, depot)
             self.assertEqual(c.exception.code, code)
+
+    def test_t_fiv_1_r1(self):
+        """T-FIV-1 : r1 extrait sur 1, 1, 0, 0 : FIV(2) = 1.25 (écrit à la main), et toutes les valeurs égales à
+        calib_fiv à ℓ = 1 à 3 ; série à lacune 1, 1, ·, 0, 0 : FIV(2) = 1.5 et aucun écart ; série nulle : FIV
+        indéfini (None). Mutations M-14-04 (ℓ − 1 passé à r1), M-14-15 (γ̂₀ = 0 divisé)."""
+        r = oracle_r1.courbe(H, bits(0, 1, 2, 3), bits(0, 1), [1, 2, 3], 60)
+        self.assertEqual([str(x["FIV_serie"]) for x in r], ["1", "1.25", "1"])
+        self.assertEqual(str(oracle_r1.courbe(H, bits(0, 1, 3, 4), bits(0, 1), [2], 60)[0]["FIV_serie"]), "1.5")
+        self.assertIsNone(oracle_r1.courbe(H, bits(0, 1, 2), 0, [2], 60)[0]["FIV_serie"])           # γ̂₀ = 0
+        self.assertEqual(ecarts(bits(0, 1, 2, 3), bits(0, 1), [1, 2, 3]) + ecarts(bits(0, 1, 3, 4), bits(0, 1), [2, 3]),
+                         [])
+
+    def test_oracle_e_s_39(self):
+        """E-S-39 : 10 réplications d'E1 (5 sous C0, 5 au point (1/10, 50, 1 440)), deux strates, les 17 ℓ d'EP :
+        n, K, numérateur, γ̂₀, σ̂²_bloc et FIV_série de calib_fiv égaux, chaîne pour chaîne, à r1 extrait de f35a70c
+        (forme d'episodes.courbe) ; écart mesuré : 0 valeur sur 2 040. Mutation M-14-05 (FIV_série en une seule
+        division, sans passer par les valeurs publiées)."""
+        texte = commun.lire_entree(PRM, "episodes", environ={}).decode("utf-8")
+        ep = calibration.analyser(texte, K_)["episodes"]
+        cal = calib_fiv.calendrier_j28(calib_fiv.portee(texte, PRM["calendrier"]), PRM["calendrier"])
+        vus = []
+        for point in [None] * 5 + [(Fraction(1, 10), Fraction(50), 1440)] * 5:
+            r = calib_fiv.replication(PRM, ep, cal, point, "E1-oracle", len(vus) // 2)
+            for s in ("calme", "stress"):
+                vus.append(ecarts(*r["strates"][s], K_["ell"]))
+        self.assertEqual((len(vus), sum(len(x) for x in vus)), (20, 0))
 
 
 if __name__ == "__main__":

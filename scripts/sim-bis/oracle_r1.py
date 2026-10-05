@@ -4,8 +4,9 @@ T-FIV-1, T-CAL-2 ; SHOGEN-SIM-BIS-WINDOW-EPINGLE-1) : les cinq modules épinglé
 `git archive` (lecture seule, aucun verrou), extraits dans un dossier temporaire sous TMPDIR, contrôlés par sha256 avant
 tout chargement (forme de scripts/plan-s2bis/commun.py, importer_harnais), puis chargés sous le nom shogen_s2 sans
 toucher sys.path ; seuls ces fichiers peuvent être chargés. Rend r1 et window (calendrier de S2). SB-14a :
-extraction et chargement. Adaptateur : jamais importé par le moteur (E-S-01, tests/test_fitness.py) ; ni puissance,
-ni hasard, ni libm (tests/test_fitness_tirages.py)."""
+extraction et chargement. SB-14b : FIV_série de r1 (block_long_run_variance, forme d'episodes.courbe de PLAN-S2BIS)
+sur la même entrée que calib_fiv.courbe. Adaptateur : jamais importé par le moteur (E-S-01, tests/test_fitness.py) ;
+ni puissance, ni hasard, ni libm (tests/test_fitness_tirages.py)."""
 import atexit
 import hashlib
 import importlib
@@ -17,6 +18,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+from decimal import localcontext
 
 import commun
 
@@ -72,3 +74,20 @@ def charger(prm: dict) -> dict:
             raise commun.Refus("ORACLE/modules", f"modules hors des fichiers épinglés : {sorted(charges - epingles)}")
         _CHARGE.update(mods)
     return dict(_CHARGE)
+
+
+def courbe(h: dict, pres: int, val: int, ells: list, w: int) -> list:
+    """FIV_série de r1 extrait sur la même entrée que calib_fiv.courbe : série [(w·j, I_j)] des positions j présentes
+    (masque pres ; I_j = bit j de val), puis, par ℓ, r1.block_long_run_variance et FIV_serie = +(σ̂²_bloc/γ̂₀) sous
+    r1.contexte_decimal() (forme d'episodes.courbe de PLAN-S2BIS) ; None si n = 0 ou γ̂₀ = 0."""
+    r1, bp = h["r1"], format(pres, "b")[::-1]
+    bv = format(val, "b")[::-1].ljust(len(bp), "0")
+    serie = [(w * j, int(bv[j])) for j in range(len(bp)) if bp[j] == "1"]
+    out = []
+    for ell in ells:
+        v = r1.block_long_run_variance(serie, w, ell)
+        with localcontext(r1.contexte_decimal()):
+            fs = None if not v["n"] or v["gamma0"] == 0 else +(v["sigma2_bloc"] / v["gamma0"])
+        out.append({"ell": ell, "n": v["n"], "K": v["K"], "numerateur": v["numerateur"], "gamma0": v["gamma0"],
+                    "sigma2_bloc": v["sigma2_bloc"], "FIV_serie": fs})
+    return out
