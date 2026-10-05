@@ -103,7 +103,8 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     (plancher committé compris) : « python3 -B enforcement/verdict-suite-s2.py <suite> --aucun-saut --egal --plancher
     N », une seule fois dans les blocs `run:` des étapes admises du job, lue par `lignes_du_job` de VERIF (étapes
     `if:` et `continue-on-error` exclues, `name: >` jamais lu). Job absent, ligne absente ou répétée, analyseur
-    illisible : ValueError (refus)."""
+    illisible, plancher 0 ou à zéro de tête (N suit `[1-9][0-9]*`, comme K-02 du runner : C-5 (a) de la relecture
+    d'intégration de P1) : ValueError (refus)."""
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
             texte = f.read()
@@ -113,7 +114,7 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     except (OSError, SyntaxError) as e:
         raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e}) — refus") from e
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
-             + " --aucun-saut --egal --plancher [0-9]+")
+             + " --aucun-saut --egal --plancher [1-9][0-9]*")      # C-5 (a) : plancher 0 refusé, comme K-02
     trouves = analyseur.lignes_du_job(texte, job, motif)
     if trouves is None:
         raise ValueError(f"job {job} absent ou répété dans {GATES}, ou {GATES} illisible — refus")

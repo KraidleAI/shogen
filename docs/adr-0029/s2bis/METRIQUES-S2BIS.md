@@ -1425,3 +1425,48 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
 - plancher non relevé.
 
 Suite : 203 tests ; plancher du job : 203, égalité exigée (`--egal`).
+
+## CB-19h (2026-10-05) : outillage de la CI, plancher 0 et chargement du vérificateur (C-5 de la relecture)
+
+Objet : C-5 (a) : l'enregistreur de rôle (`s2-harness/tools/oracle_record.py`) lit la ligne du vérificateur du job
+avec `--plancher [1-9][0-9]*`, comme K-02 du runner ; un commit dont la ligne porte `--plancher 0` (s2bis) ou
+`--plancher 07` (sim-bis) est refusé avant toute écriture (sous-tests ajoutés au test des suites par la ligne du job).
+C-5 (b) : le runner échoue fermé, sortie 3, sur toute exception au chargement du vérificateur, `SystemExit` compris ;
+R-01 et R-02 lancent une copie du runner, avec le `gates.yml` réel, à côté d'un vérificateur qui sort en 0 ou lève à
+son chargement. Aucun cas existant retiré ni affaibli ; les leurres du réviseur de CB-18 (`leurres_cc.py`,
+`leurres_cc2.py`, `leurres_fetch.py`, du contre-contrôle cc5) donnent les mêmes verdicts sur la base et sur CB-19h
+(sorties comparées après normalisation du chemin de l'arbre et du plancher affiché).
+
+Rouge : runner de CB-19h avant le correctif du chargement, R-01 sortie 0 sans aucun cas, R-02 sortie 1 par trace
+(85 ok, 2 échecs) ; test de l'enregistreur sur l'outil de la base, « ValueError not raised » pour les deux commits.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 338 | 87 cas (2 de plus : R-01, R-02) |
+| `s2-harness/tools/oracle_record.py` | 310 | — |
+| `s2-harness/tests/test_oracle_record.py` | 436 | 12 (deux sous-tests de plus ; plancher de S2 inchangé, 406) |
+
+Mutants (borne de 300 s ; python3.12, `-X dev -W error` ; réseau isolé ; témoins VIVANTS) : 11 mutants neufs, 11
+tués (0 vivant, 0 FATAL) :
+- runner, classés par la commande du job s2bis-unittest (le runner en est la première étape ; sortie 1 du runner :
+  tué) : chargement réduit à deux exceptions (avant C-5), `SystemExit` non attrapé, chargement en échec en sortie 0 ou
+  1, message du refus altéré, runner qui continue après l'échec du chargement : R-01 et R-02 ;
+- enregistreur, classés par la commande du job s2-harness-unittest (runner, puis `verdict-suite-s2.py --egal`) :
+  plancher 0 admis (trois écritures), zéro de tête admis : test des suites par la ligne du job (sous-tests des
+  planchers 0 et 07).
+
+Runner : 87 cas. Suite s2bis : 203 tests, plancher 203 inchangé. Suite S2 : 406 tests, plancher 406 inchangé.
+
+### Mutants de la relecture d'intégration de P1 rejoués sur l'état final, par la commande du job
+
+Les 30 mutants du réviseur (`outils/mutants.py`, sha256 `59b4fd2c…`, liste lue sans modification) rejoués sur l'état
+de CB-19h par la commande du job s2bis-unittest (runner, puis ligne de `gates.yml` à `--plancher 203` ; borne de
+300 s ; python3.12, `-X dev -W error` ; réseau isolé ; témoin VIVANT) : 30 tués, 0 vivant, 0 FATAL. MI-10, dont le
+texte visé a changé avec C-3 (b), est rejoué réécrit avec la même mutation (MI-10r). Les cinq vivants de la relecture
+sont tués par les tests neufs qui les visent : MI-09 et MI-10 par le client réel dans la boucle (et le suivi espion),
+MI-12 par le point d'entrée à w = 60, MI-13 et MI-14 par le délai et les places jusqu'à la boucle.
+
+| série | mutants | tués | vivants | FATAL |
+|---|---|---|---|---|
+| neufs, CB-19a à CB-19h (13, 15, 12, 13, 11, 10, 11, 11) | 96 | 96 | 0 | 0 |
+| du réviseur, rejoués sur l'état final | 30 | 30 | 0 | 0 |

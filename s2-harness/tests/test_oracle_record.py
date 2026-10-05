@@ -377,7 +377,8 @@ class TestOracleRecord(unittest.TestCase):
         plancher du commit faux : exit 1 consigné ; ligne répétée, job absent, ligne d'une autre suite ou ligne du
         vérificateur de s2bis présente dans le seul job suivant (C-2 de la G2 de la tranche C), leurres C1 (ligne dans
         un bloc `name: >`) et C4 (ligne dans une étape `if: false`), la vraie ligne étant affaiblie
-        (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1) : refus avant toute écriture ; la CLI admet les deux noms. Rougit si : noms
+        (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1), plancher 0 ou à zéro de tête (C-5 (a) de la relecture d'intégration de P1,
+        comme K-02 du runner) : refus avant toute écriture ; la CLI admet les deux noms. Rougit si : noms
         hors liste fermée, ligne recopiée dans l'outil, autre job (MR-24 : lecture au-delà du job) ou autre suite lus,
         ligne lue hors d'un bloc `run:` ou dans une étape `if:`, ligne répétée admise, refus après écriture."""
         self.assertLessEqual({"suite-s2bis", "suite-sim-bis"}, set(orc.COMMANDES))      # liste fermée, étendue
@@ -400,11 +401,11 @@ class TestOracleRecord(unittest.TestCase):
                               "      - name: suite", *etape, faible])
         complaisant = chr(10).join(["import re", "lignes_du_job = lambda t, j, m: [x.strip() for x in t.split(chr(10))"
                                     " if re.fullmatch(m, x.strip())]", ""]).encode()   # analyseur complaisant du commit
-        ok, ko, double, sans, mauvaise, suivant, leurre1, leurre4 = depot(dep, [
+        ok, ko, double, sans, mauvaise, suivant, zero, zero7, leurre1, leurre4 = depot(dep, [
             {**base, ".github/workflows/gates.yml": g} for g in (gates(1, 1), gates(2, 1), gates(1, 1, 2), gates(
-                1, 1).split(b"  sim-bis")[0], autre, loin)] + [{**base, ".github/workflows/gates.yml": c1,
-                                                                "enforcement/verdict-suite-s2.py": complaisant},
-                                                               {**base, ".github/workflows/gates.yml": c4}])
+                1, 1).split(b"  sim-bis")[0], autre, loin, gates(0, 1), gates(1, "07"))] + [
+                {**base, ".github/workflows/gates.yml": c1, "enforcement/verdict-suite-s2.py": complaisant},
+                {**base, ".github/workflows/gates.yml": c4}])
         chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
         rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
         ligne = [sys.executable, "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut", "--egal", "--plancher",
@@ -420,7 +421,8 @@ class TestOracleRecord(unittest.TestCase):
                          (1, [1, 0]))                               # Ran 1 < plancher 2 du commit
         avant = sorted(os.listdir(d))
         for commit, c in ((double, "suite-s2bis"), (sans, "suite-sim-bis"), (mauvaise, "suite-s2bis"),
-                          (suivant, "suite-s2bis"), (leurre1, "suite-s2bis"), (leurre4, "suite-s2bis")):
+                          (suivant, "suite-s2bis"), (leurre1, "suite-s2bis"), (leurre4, "suite-s2bis"),
+                          (zero, "suite-s2bis"), (zero7, "suite-sim-bis")):
             with self.subTest(commande=c), self.assertRaisesRegex(ValueError, "— refus$"):
                 orc.enregistrer(d, "cp-2", "claude-opus-5-5", dep, commit, ("suite", c))
         self.assertEqual(sorted(os.listdir(d)), avant)

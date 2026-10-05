@@ -24,13 +24,16 @@ nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du blo
 job sim-bis admet `fetch-depth: 0` sous le `with:` du checkout, après `persist-credentials: false`, valeur exacte, lui
 seul ; L-37 à L-41. CB-18w (O-2 de la relecture de SIM-T4) : la ligne y est exigée ; L-42. CB-18x (CC4-1 du
 contre-contrôle cc4) : L-43 (indentation 8) et L-44 (après le nom de l'étape du runner) fixent l'égalité exacte et la
-place de la ligne. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+place de la ligne. CB-19h (C-5 (b) de la relecture d'intégration de P1) : toute exception au chargement du
+vérificateur, SystemExit compris, donne la sortie 3 ; R-01 et R-02, copie du runner avec un vérificateur qui sort
+en 0 ou lève à son chargement. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -43,8 +46,8 @@ try:
     _S = importlib.util.spec_from_file_location("verdict", os.path.join(ICI, "..", "verdict-suite-s2.py"))
     v = importlib.util.module_from_spec(_S)
     _S.loader.exec_module(v)
-except (OSError, SyntaxError) as e:
-    print(f"ERREUR : vérificateur illisible ({e})", file=sys.stderr)
+except BaseException as e:                  # C-5 (b) : toute exception au chargement, SystemExit compris, échoue fermé
+    print(f"ERREUR : vérificateur illisible ({e!r})", file=sys.stderr)
     sys.exit(3)
 VAR, TIRETS = "SHOGEN_S2_CAMPAGNE_CONTROL", "-" * 70
 NOMME = f"'{VAR} absente : copie du control.jsonl scellé non fournie'"
@@ -132,6 +135,20 @@ try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             r = v.main([d, *opt])
         cas(nom, [] if r == rc else [f"code {r}, attendu {rc}"], None)
+    for nom, *corps in (("R-01 vérificateur qui sort en 0 à son chargement : runner en sortie 3", "import sys",
+                        "sys.exit(0)"),
+                       ("R-02 vérificateur qui lève à son chargement : runner en sortie 3", "raise RuntimeError()")):
+        d = os.path.join(W, nom[:4], "enforcement", "tests")         # copie du runner, gates.yml réel (C-5 (b))
+        os.makedirs(d)
+        os.makedirs(os.path.join(W, nom[:4], ".github", "workflows"))
+        shutil.copy(GY, os.path.join(W, nom[:4], ".github", "workflows"))
+        shutil.copy(os.path.abspath(__file__), d)
+        with open(os.path.join(d, "..", "verdict-suite-s2.py"), "w", encoding="utf-8") as f:
+            f.write(chr(10).join(corps) + chr(10))
+        p = subprocess.run([sys.executable, "-B", os.path.join(d, os.path.basename(__file__))], capture_output=True,
+                           text=True, timeout=120)
+        cas(nom, [] if (p.returncode, "vérificateur illisible" in p.stderr) == (3, True) else [
+            f"sortie {p.returncode} : {p.stderr[-160:]!r}"], None)
 finally:
     shutil.rmtree(W)
 
