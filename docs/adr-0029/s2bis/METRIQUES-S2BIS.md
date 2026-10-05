@@ -1505,3 +1505,28 @@ types réservés ; types jugés après la chaîne ; première ligne quelconque ;
 décalée d'un octet dans les deux sens ; forme canonique en séquences d'échappement. Première passe, 16 mutants sur
 l'état d'avant les deux tests des points (a) et (b) : 16 tués, versée sans être comptée. Suite : 209 tests ; plancher du
 job : 209, égalité exigée (`--egal`).
+
+## RB-1i (2026-10-05) : déclaration des queues comparée sous forme canonique (lettre C-3 ; C-15)
+
+Objet (lettre C-3 du FORMAT, adjugée par l'orchestrateur le 2026-10-05 ; correction C-15 de la relecture G2 de RB-18,
+premier point) : la déclaration d'une `reprise` est comparée sous forme canonique (`_canonique`, FORMAT §1.2, qui sert
+aussi au contrôle de canonicité de la ligne), non par l'égalité de Python, qui tient `true` pour `1` et `false` pour
+`0` : une déclaration à booléens pour des entiers était lue comme exacte. Déjà tenus, désormais fixés par un test : une
+liste exacte, dans l'ordre croissant (jour, k) des fichiers, déclare les queues ; un autre ordre, un champ de plus, une
+liste vide ou null devant des queues en attente, une liste vide sans queue en attente (null exigé) font une
+déclaration fausse ; à toute rupture (déclaration fausse, lien faux sous une déclaration exacte, `ouverture` au lieu
+d'une reprise), toutes les queues en attente sont rendues avec elle et aucune n'est réputée déclarée ; une ligne aux
+clés non triées n'est pas canonique. FORMAT §7.4.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 172 | — |
+| `tests/test_lecteur.py` | 451 | 28 (2 de plus : déclaration exacte à deux queues en attente, huit cas ; liste vide sans queue en attente, null exigé ; 1 complété : clés non triées) |
+
+Rouge : sur le code de RB-1h, 1 échec d'assertion (la déclaration à booléens, lue comme exacte) ; les autres cas passent
+déjà (preuves de conformité). Mutants (commande du job, runner puis `--plancher 211`, borne de 300 s ; python3.12 ;
+réseau isolé) : 12 tués sur 12 par leur test visé (0 vivant, 0 FATAL) : égalité de Python au lieu de la forme
+canonique ; forme canonique sans tri des clés, ou en séquences d'échappement ; ordre décroissant attendu ; liste vide
+attendue sans queue, ou prise pour null ; `cause` exigée dans la déclaration ; comparaison sans ordre ; queues non
+rendues avec la rupture, ou réputées déclarées malgré elle ; lien jugé sur `seq` seul ; queue non déclarée tolérée
+devant une `ouverture`. Suite : 211 tests ; plancher du job : 211, égalité exigée (`--egal`).

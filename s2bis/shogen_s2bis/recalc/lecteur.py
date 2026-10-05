@@ -9,9 +9,10 @@ première ligne `ouverture` ou `reprise` ; la première ligne non intègre d'un 
 nommée (`LECTEUR/entier-long` pour un entier de plus de CHIFFRES chiffres, quel que soit le réglage
 `int_max_str_digits` de l'interpréteur). Le lecteur contrôle en plus ce que l'écrivain ne contrôle pas (FORMAT §7.7) :
 genèse (`seq` 0, `prec` nul, `ouverture`), lien de chaque fichier au précédent, déclaration exacte des queues par la
-`reprise` qui les suit. Tout autre cas est une rupture : rendue à sa place dans le flux, sans arrêt ni réparation ;
-l'enregistrement qui la suit devient l'ancre de la chaîne (portée en fenêtres : Q-R-03, sous-lot RB-3). Une queue non
-déclarée en fin de journal est tolérée (`queue_finale`)."""
+`reprise` qui les suit, dans l'ordre (jour, k) de leurs fichiers, comparée sous forme canonique (FORMAT §7.4, lettre
+C-3 ; C-15). Tout autre cas est une rupture : rendue à sa place dans le flux avec toutes les queues en attente, sans
+arrêt ni réparation ; l'enregistrement qui la suit devient l'ancre de la chaîne (portée en fenêtres : Q-R-03,
+sous-lot RB-3). Une queue non déclarée en fin de journal est tolérée (`queue_finale`)."""
 import hashlib
 import json
 import os
@@ -61,6 +62,12 @@ def _types(e):
     return all(k in e and type(e[k]) in t for k, t in exiges.items()) and HEX.fullmatch(e["prec"]) is not None
 
 
+def _canonique(v):
+    """Texte JSON canonique de `v` (FORMAT §1.2 : clés triées, séparateurs sans espace, UTF-8 en clair). Deux valeurs
+    s'y égalent si et seulement si elles s'écrivent de même : `true` n'y égale jamais `1`, ce que `==` admet (C-15)."""
+    return json.dumps(v, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 def _integre(ligne, etat):
     """(enregistrement, état) d'une ligne intègre, sinon _NonIntegre(cause) ; définition unique du FORMAT §7.1 : (a)
     ligne close par 0x0A (`LECTEUR/fin`), d'au plus LIMITE octets (borne de sa lecture, `readline(LIMITE)`) ; (b) objet
@@ -77,7 +84,7 @@ def _integre(ligne, etat):
     try:
         e = json.loads(ligne, parse_int=_entier, parse_float=_cause("LECTEUR/flottant"),
                        parse_constant=_cause("LECTEUR/flottant"))
-        canon = json.dumps(e, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
+        canon = _canonique(e).encode() + b"\n"
     except (ValueError, RecursionError):
         raise _NonIntegre("LECTEUR/json") from None
     if canon != ligne:
@@ -155,10 +162,11 @@ class Lecteur:
     @staticmethod
     def _controle(e, premier, chaine, attente):
         """Code de rupture, ou None. Au premier enregistrement d'un fichier : genèse ou lien au précédent ; à toute
-        `reprise` : déclaration exacte des queues en attente (null sans queue) ; sinon, aucune queue en attente."""
+        `reprise` : déclaration exacte des queues en attente, dans l'ordre (jour, k) de leurs fichiers, comparée sous
+        forme canonique (null sans queue ; FORMAT §7.4, lettre C-3 ; C-15) ; sinon, aucune queue en attente."""
         if premier and ((e["seq"], e.get("prec")) != chaine or e["seq"] == 0 and e["type"] != "ouverture"):
             return "LECTEUR/lien"
         if e["type"] == "reprise":
             declare = [{k: q[k] for k in QUEUE} for q in attente] or None
-            return None if e.get("queue") == declare else "LECTEUR/declaration"
+            return None if _canonique(e["queue"]) == _canonique(declare) else "LECTEUR/declaration"
         return "LECTEUR/queue-non-declaree" if attente else None

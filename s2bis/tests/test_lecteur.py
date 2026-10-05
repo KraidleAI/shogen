@@ -55,6 +55,8 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
         for cause, octets, avant in (("LECTEUR/fin", OUVERTURE[:-1], None), ("LECTEUR/json", bytes(9) + b"\n", etat),
                                      ("LECTEUR/json", b"[" * 100000 + b"]" * 100000 + b"\n", etat),
                                      ("LECTEUR/canonique", ligne(1, P, (", ", ": "), **lect), etat),
+                                     ("LECTEUR/canonique", b'{"seq":1,' + ligne(1, P, **lect)[1:].replace(
+                                         b'"seq":1,', b""), etat),                              # clés non triées
                                      ("LECTEUR/chaine", ligne(1, "0" * 64, **lect), etat),
                                      ("LECTEUR/chaine", ligne(2, P, **lect), etat),
                                      ("LECTEUR/chaine", ligne(0, "0" * 64, **lect), None),       # première ligne
@@ -406,3 +408,44 @@ class Pannes(AvecQueues):              # C-2 de la G2 de RB-T1 : un cas par muta
                 lecteur, _flux = lire(self.d)
                 self.assertEqual((prec != prec.upper(), lecteur.ruptures, lecteur.queues, lecteur.queue_finale),
                                  (True, [], [], [q, queue(SEG1, 0, tete, "LECTEUR/champ")]))
+
+    def test_declaration_exacte_sous_forme_canonique(self):            # C-15, C-3 (FORMAT §7.4)
+        """Deux queues en attente (ligne coupée du jour, segment sans ligne intègre) : seule leur liste exacte, dans
+        l'ordre croissant (jour, k) des fichiers, les déclare. Autre ordre, booléens pour des entiers (False == 0 et
+        True == 1 en Python), champ de plus, liste vide ou null : rupture `LECTEUR/declaration` ; lien faux sous une
+        déclaration exacte, ou une `ouverture` au lieu d'une reprise : `LECTEUR/lien`, `LECTEUR/queue-non-declaree`.
+        Toute rupture rend les deux queues, et aucune n'est réputée déclarée."""
+        intact = self.preparer()
+        seq, prec, _e = chaine(intact)
+        self.ajouter(FICHIER, b"{")
+        self.ajouter(SEG1, b"x")
+        q1, q2 = queue(FICHIER, len(intact), b"{", "LECTEUR/fin"), queue(SEG1, 0, b"x", "LECTEUR/fin")
+        d1, d2 = declaree(q1), declaree(q2)
+        for nom, tete, code in (
+                ("exacte", self.reprise(seq, prec, [d1, d2]), None),
+                ("ordre décroissant", self.reprise(seq, prec, [d2, d1]), "LECTEUR/declaration"),
+                ("booléens", self.reprise(seq, prec, [d1, {**d2, "position": False, "octets": True}]),
+                 "LECTEUR/declaration"),
+                ("champ de plus", self.reprise(seq, prec, [d1, {**d2, "cause": "LECTEUR/fin"}]), "LECTEUR/declaration"),
+                ("liste vide", self.reprise(seq, prec, []), "LECTEUR/declaration"),
+                ("null", self.reprise(seq, prec, None), "LECTEUR/declaration"),
+                ("lien faux", self.reprise(seq, "f" * 64, [d1, d2]), "LECTEUR/lien"),
+                ("ouverture", ligne(seq, prec, type="ouverture", jour=JOUR, suivante=m(9)),
+                 "LECTEUR/queue-non-declaree")):
+            with self.subTest(nom):
+                with open(os.path.join(self.d, SEG2), "wb") as f:
+                    f.write(tete)
+                lecteur, _flux = lire(self.d)
+                self.assertEqual((lecteur.ruptures, lecteur.queues), ([], [q1, q2]) if code is None else (
+                    self.rupture(code, SEG2, seq, prec, [q1, q2]), []))
+
+    def test_liste_vide_sans_queue_en_attente(self):                   # C-3 (FORMAT §7.4) : null exigé
+        """Reprise écrite à la suite du fichier repris, aucune queue en attente : `queue` null est exacte ; une liste
+        vide est une déclaration fausse, rupture `LECTEUR/declaration` sans queue rendue."""
+        intact = self.preparer()
+        seq, prec, _e = chaine(intact)
+        for liste, ruptures in ((None, []), ([], self.rupture("LECTEUR/declaration", FICHIER, seq, prec, []))):
+            with self.subTest(liste=liste):
+                with open(os.path.join(self.d, FICHIER), "wb") as f:
+                    f.write(intact + self.reprise(seq, prec, liste))
+                self.assertEqual(lire(self.d)[0].ruptures, ruptures)
