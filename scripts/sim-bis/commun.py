@@ -40,7 +40,7 @@ def positif(v) -> bool:
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
-          "aleas": {"prefixe": texte, "graine": positif, "source": texte}}
+          "aleas": {"prefixe": texte, "graine": positif, "rangs": positif, "garde": positif, "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

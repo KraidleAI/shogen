@@ -10,6 +10,8 @@
  "aleas": {
   "prefixe": "SHOGEN-SIM-BIS",
   "graine": 20261004,
-  "source": "E-S-41 : GRAINE = 20261004 fixée par le G0, aucune autre essayée ; flux = 8 premiers octets de SHA-256 de « SHOGEN-SIM-BIS|20261004|<cellule>|<i>|<composant>|<indice> », graine de règle = SHA-256 hexadécimal de « SHOGEN-SIM-BIS|20261004|<cellule>|<i> » ; E-S-42 (random() seule)"
+  "rangs": 4096,
+  "garde": 128,
+  "source": "E-S-41 : GRAINE = 20261004 fixée par le G0, aucune autre essayée ; flux = 8 premiers octets de SHA-256 de « SHOGEN-SIM-BIS|20261004|<cellule>|<i>|<composant>|<indice> », graine de règle = SHA-256 hexadécimal de « SHOGEN-SIM-BIS|20261004|<cellule>|<i> » ; E-S-42 (random() seule) ; E-S-43 (tables de seuils exactes) ; rangs (taille des tables géométriques, qui fixe l'ordre des tirages) et garde (bits d'encadrement de (1 − p)^k) : choix du sous-lot SB-1"
  }
 }
