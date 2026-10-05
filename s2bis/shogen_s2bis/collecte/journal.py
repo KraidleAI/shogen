@@ -1,5 +1,6 @@
 """Journal chaîné du collecteur (CB-1 ; E-C-18, E-C-19 ; ADR-0029 §2.9 l.238). Chaque enregistrement est une ligne
-JSON canonique (clés triées, séparateurs « , » et « : », UTF-8 sans échappement, saut de ligne final, aucun flottant)
+JSON canonique (clés triées, séparateurs « , » et « : », UTF-8 sans échappement, saut de ligne final, aucun flottant,
+entiers de 640 chiffres au plus : SHOGEN-S2BIS-ENTIER-ECRIVAIN-1, I-1 de la G2 du recalcul)
 qui porte `seq` (rang depuis 0) et `prec` (sha256 des octets de la ligne précédente, saut de ligne compris ; GENESE
 pour la première). Écriture sans tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt
 une heure est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
@@ -33,6 +34,8 @@ GENESE = "0" * 64
 HEURE = 3600
 LIMITE = 1 << 22                                                   # octets d'une ligne au plus, saut de ligne compris
 RESERVES = {"ouverture", "marqueur", "point", "cloture", "reprise", "trou"}
+CHIFFRES = 640                     # I-1 : plus petite limite non nulle de conversion des entiers (sys.int_info)
+BORNE = 10 ** CHIFFRES
 
 
 class ErreurJournal(Exception):
@@ -45,9 +48,25 @@ class JournalOccupe(ErreurJournal):
     pass
 
 
+def _entier_long(enr):
+    """Vrai si `enr` porte un entier de plus de CHIFFRES chiffres ; chaque conteneur n'est vu qu'une fois (cycle)."""
+    pile, vus = [enr], set()
+    while pile:
+        v = pile.pop()
+        if isinstance(v, int) and not -BORNE < v < BORNE:
+            return True
+        if isinstance(v, (dict, list, tuple)) and id(v) not in vus:
+            vus.add(id(v))
+            pile += v.values() if isinstance(v, dict) else v
+    return False
+
+
 def canonique(enr):
     """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Le
-    contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3)."""
+    contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3). Un entier de plus de CHIFFRES chiffres
+    est refusé avant le sérialiseur, quel que soit le réglage de l'interpréteur : JOURNAL/entier (I-1)."""
+    if _entier_long(enr):
+        raise ErreurJournal("JOURNAL/entier", f"entier de plus de {CHIFFRES} chiffres")
     try:
         octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication

@@ -79,6 +79,9 @@ class Reprise(AvecJournal):
     def test_queue_fenetre_non_entiere(self):                   # C-1 : jamais prise pour la dernière fenêtre écrite
         self.queue(lambda s, p: ligne(s, p, type="lecture", ws="23:02", k=4))
 
+    def test_queue_entier_de_641_chiffres(self):                       # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
+        self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x=10 ** 640))
+
     def test_queue_ligne_chainee_trop_longue_et_refus_a_l_ecriture(self):
         self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x="a" * j.LIMITE))
         with self.assertRaises(j.ErreurJournal) as e:

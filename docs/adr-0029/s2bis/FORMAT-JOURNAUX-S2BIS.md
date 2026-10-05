@@ -14,7 +14,8 @@
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
-  le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3).
+  le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3) ; le diff ENTIER-ECRIVAIN,
+  I-1 (§1.2, §2).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -32,8 +33,12 @@
    chaîne.
 2. Chaque ligne est un objet JSON **canonique** : clés triées par point de code, séparateurs `,` et `:` sans espace,
    caractères hors ASCII écrits en UTF-8 (jamais en séquence `\u`), aucun nombre à virgule ni NaN (valeurs exactes :
-   entiers JSON, décimaux en chaîne). Réécrire l'objet lu sous cette forme redonne les octets de la ligne : c'est le
-   contrôle de canonicité.
+   entiers JSON, décimaux en chaîne). Un entier a au plus 640 chiffres, signe non compté : 640 est la plus petite
+   limite non nulle de conversion des entiers de Python (`sys.int_info.str_digits_check_threshold`), si bien que tout
+   lecteur Python relit la ligne quel que soit son réglage. L'écrivain refuse un entier plus long avant toute écriture
+   (`JOURNAL/entier` ; SHOGEN-S2BIS-ENTIER-ECRIVAIN-1, I-1 de la G2 du recalcul : un entier de 641 à 4 300 chiffres
+   était écrit, puis lu comme une queue par le lecteur du recalcul) ; une ligne qui en porte un n'est pas intègre
+   (§7.1). Réécrire l'objet lu sous cette forme redonne les octets de la ligne : c'est le contrôle de canonicité.
 3. Champs communs à tout enregistrement :
    - `type` : chaîne ;
    - `seq` : entier ; 0 pour le premier enregistrement du journal, puis plus un à chaque enregistrement, d'un fichier
@@ -58,7 +63,8 @@ Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont 
 `seq` ou `prec` est refusé.
 
 Tout refus est nommé (`JOURNAL/…`) et n'écrit rien (CB-2d, C-6 de la G2 de P1) : l'enregistrement demandé est contrôlé
-(type des valeurs, borne LIMITE du §7) avant la bascule de jour (§6) ou le `trou` (§8) qu'il appellerait.
+(type des valeurs, entiers de 640 chiffres au plus du §1.2, borne LIMITE du §7) avant la bascule de jour (§6) ou le
+`trou` (§8) qu'il appellerait.
 
 ## 3. Fenêtres
 

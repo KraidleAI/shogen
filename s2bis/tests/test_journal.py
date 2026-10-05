@@ -2,12 +2,14 @@
 journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits.
 CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une OSError ; cycle refusé en temps borné.
 CB-18a (SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : garde d'un seul fil, refus nommés de l'écrivain neuf, fermé ou déjà ouvert,
-garde `_terminal` sur toute méthode publique d'écriture (contrôle mécanique)."""
+garde `_terminal` sur toute méthode publique d'écriture (contrôle mécanique). SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1 de
+la G2 du recalcul) : entiers de 640 chiffres au plus."""
 import errno
 import fcntl
 import hashlib
 import json
 import os
+import sys
 import tempfile
 import threading
 import unittest
@@ -186,6 +188,30 @@ class Ecrivain(Base):
         t.join(5)
         self.assertEqual((res, [self.etat()]), (["JOURNAL/type"], avant))
         self.assertEqual(j.canonique({"a": partage, "b": partage}), b'{"a":[1],"b":[1]}\n')   # partage sans cycle
+
+    def test_entiers_de_640_chiffres_au_plus(self):                    # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
+        """640 chiffres, signe non compté, plus petite limite non nulle de conversion des entiers de l'interpréteur :
+        admis, et relus intègres ; 641 : refus JOURNAL/entier sans rien écrire, à toute profondeur, quel que soit le
+        réglage de l'interpréteur (limite abaissée à 640, ou levée) et au-delà de sa limite par défaut (FORMAT §1.2)."""
+        self.assertEqual(sys.int_info.str_digits_check_threshold, 640)
+        jl, grand, refus = self.journal(), 10 ** 640, []                # grand : 641 chiffres
+        for x in (grand - 1, -(grand - 1), [grand - 1], {"y": {"z": 1 - grand}}):
+            jl.ecrire("lecture", WS + 60, x=x)
+        avant, ancien = self.etat(), sys.get_int_max_str_digits()
+        for x in (grand, -grand, [1, [grand]], {"y": {"z": grand}}, 10 ** 5000):
+            refus.append(code(lambda: jl.ecrire("lecture", WS + 60, x=x)))
+        for limite in (640, 0):
+            sys.set_int_max_str_digits(limite)
+            try:
+                refus.append(code(lambda: jl.ecrire("lecture", WS + 60, x=grand)))
+            finally:
+                sys.set_int_max_str_digits(ancien)
+        self.assertEqual((refus, self.etat()), (["JOURNAL/entier"] * 7, avant))
+        jl.marqueur(WS + 60)
+        jl.fermer()
+        self.journal(WS + 120).fermer()                                 # lignes de 640 chiffres relues intègres
+        dernier = chaine(self.etat()[FICHIER])[2][-1]
+        self.assertEqual((dernier["type"], dernier["queue"]), ("reprise", None))
 
     def test_garde_d_un_seul_fil(self):                                 # CB-18a, ECRIVAIN-USAGE-1
         """Le fil qui ouvre l'écrivain est le seul qui écrive : `ecrire` et `marqueur` appelés d'un autre fil sont

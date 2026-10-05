@@ -705,3 +705,23 @@ la tranche A), qui se servait d'un fichier du lendemain présent, provoque déso
 Mutants (commande du job, `--plancher 173`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par leur test
 visé (0 vivant, 0 FATAL), dont le défaut N-1 rétabli, la bascule au segment 0 et le descripteur gardé à la bascule
 (C-2). Suite : 173 tests ; plancher du job : 173, égalité exigée (`--egal`).
+
+## ENTIER-ECRIVAIN (2026-10-05) : entiers de 640 chiffres au plus (SHOGEN-S2BIS-ENTIER-ECRIVAIN-1)
+
+Objet (I-1 de la G2 du recalcul, tranche 1 ; adjugé par l'orchestrateur à P1) : `canonique` refuse avant le
+sérialiseur tout entier de plus de 640 chiffres (`JOURNAL/entier`), à toute profondeur, par un parcours qui ne voit
+chaque conteneur qu'une fois (il se termine sur un cycle, que le sérialiseur refuse ensuite, C-3) ; le refus ne dépend
+plus de la limite de conversion de l'interpréteur (4 300 chiffres par défaut, réglable). 640 est
+`sys.int_info.str_digits_check_threshold` sous Python 3.10 à 3.13. `_lire` passant par `canonique`, une ligne qui
+porte un tel entier est une queue, comme pour le lecteur du recalcul. FORMAT §1.2, §2.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 343 | — |
+| `tests/test_journal.py` | 255 | 13 (1 de plus : 640 chiffres écrits et relus intègres ; 641 refusés à toute profondeur, sous tout réglage) |
+| `tests/test_reprise.py` | 235 | 20 (1 de plus : queue d'une ligne chaînée qui porte un entier de 641 chiffres) |
+
+Mutants (commande du job, `--plancher 175`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par leur test
+visé (0 vivant, 0 FATAL), dont la borne décalée d'une unité, le parcours sans garde de cycle (fil d'essai pendu, test
+du cycle en échec ; 41 s, puis 53 s au passage sur l'état final) et le sérialiseur appelé d'abord. Suite : 175 tests ;
+plancher du job : 175, égalité exigée (`--egal`).
