@@ -148,3 +148,13 @@ l'état final (CB-2c, CB-2d, CB-2e) par le lanceur des corrections, même contra
 | `shogen_s2bis/collecte/http.py` (partie sans réseau) | 68 | 6 (`tests/test_http.py`, classes `Requete` et `Analyse` ; 97 lignes en tout) |
 
 Mutants : 14 tués sur 14 (0 vivant, 0 FATAL). Suite : 58 tests ; plancher du job : 58, égalité exigée (`--egal`).
+
+## CB-3b (2026-10-04) : lecture par phases (IPv4, TLS, délai global, attrape-tout)
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/http.py` | 125 | 9 (`tests/test_http_reseau.py`, 140 lignes : serveurs factices de boucle locale) |
+
+Mutants : 15 tués sur 15 au dernier passage (0 vivant, 0 FATAL). Premier passage : 14 tués, 1 vivant (M-3b-15, seconde
+adresse prise au lieu de la première : le résolveur injecté n'en rendait qu'une) ; résolveur injecté porté à deux
+adresses, campagne relancée. Suite : 67 tests ; plancher du job : 67, égalité exigée (`--egal`).

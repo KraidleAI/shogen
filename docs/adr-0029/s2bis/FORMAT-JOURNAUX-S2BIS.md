@@ -169,3 +169,25 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    `Connection: close` ; pour une requête avec corps, `Content-Length` et `Content-Type: application/json`.
 4. La réponse est lue au plus juste (`Content-Length`, blocs `chunked`, sinon jusqu'à la fermeture). Au plus
    1 048 576 octets sont reçus, en-têtes compris : au-delà, la lecture est `panne_transport` de sous-type `autre`.
+
+## 10. Phases de la lecture et sous-types de panne (CB-3b ; E-C-03 à E-C-05)
+
+1. Une lecture HTTPS passe par cinq phases, dans l'ordre ; `phases` porte l'instant de fin de chacune de celles qui
+   ont abouti :
+
+   | phase | ce qui la termine | défaut pendant la phase |
+   |---|---|---|
+   | `dns` | la résolution du nom en IPv4 seule (`getaddrinfo` en `AF_INET`) rend une adresse ; la première est contactée | `dns` (échec, aucune adresse, ou délai épuisé pendant la résolution) |
+   | `connexion` | la connexion TCP est établie | `connexion` |
+   | `tls` | la poignée TLS aboutit (certificat vérifié, nom d'hôte contrôlé) | `tls` |
+   | `requete` | les octets de la requête sont envoyés | `coupure` |
+   | `corps` | la réponse est lue entière | `coupure` (fin du flux ou connexion rompue avant la fin annoncée) ; `autre` (réponse illisible, ou plus de 1 048 576 octets) |
+
+2. Délai global : la lecture entière dispose de 10 s depuis son départ (ADR-0029 l.233). Chaque attente reçoit le temps
+   qui reste, jamais un délai par opération ; un délai épuisé pendant une phase autre que `dns` donne le sous-type
+   `delai`. La résolution est un appel bloquant que le client ne peut pas interrompre : l'échéance de la boucle (§11)
+   la borne.
+3. Réponse lue entière : code 200, statut `ok` ; tout autre code, `panne_http` avec ce code et le corps reçu. Aucune
+   redirection n'est suivie (S2 suivait celles d'urllib) : un code 3xx est un `panne_http`.
+4. Toute autre anomalie (défaut imprévu, requête dont l'hôte, le chemin ou la méthode sort de l'ASCII imprimable sans
+   espace) donne `panne_transport` de sous-type `autre`. Une lecture ne lève jamais.
