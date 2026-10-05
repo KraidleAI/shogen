@@ -1,0 +1,16 @@
+py3.12 {'concordants': 10102, 'discordants': 0, 'journaux': 10102} python 3.12.3 3.12.3
+ modules rb1 w/s2bis/shogen_s2bis/recalc/lecteur.py 94894d782c46 | rb18 w/s2bis/shogen_s2bis/recalc/oracle_indep.py 316e6593f654
+ modules shogen charges rb1 ['shogen_s2bis', 'shogen_s2bis.recalc', 'shogen_s2bis.recalc.lecteur'] | rb18 ['shogen_s2bis', 'shogen_s2bis.recalc', 'shogen_s2bis.recalc.oracle_indep']
+  a {'concordants': 24, 'discordants': 0, 'journaux': 24, 'paires_de_refus': {'LECTEUR/absent / ORACLE/vide': 1}, 'refus_communs': 1}
+  b {'concordants': 7016, 'discordants': 0, 'journaux': 7016, 'refus_communs': 0}
+  c {'concordants': 3000, 'discordants': 0, 'journaux': 3000, 'paires_de_refus': {'LECTEUR/absent / ORACLE/vide': 16, 'LECTEUR/nom / ORACLE/nom': 23}, 'refus_communs': 39}
+  d {'concordants': 62, 'discordants': 0, 'journaux': 62, 'refus_communs': 0}
+ classes {}
+py3.10 {'concordants': 10102, 'discordants': 0, 'journaux': 10102} python 3.10.20 3.10.20
+ modules rb1 w/s2bis/shogen_s2bis/recalc/lecteur.py 94894d782c46 | rb18 w/s2bis/shogen_s2bis/recalc/oracle_indep.py 316e6593f654
+ modules shogen charges rb1 ['shogen_s2bis', 'shogen_s2bis.recalc', 'shogen_s2bis.recalc.lecteur'] | rb18 ['shogen_s2bis', 'shogen_s2bis.recalc', 'shogen_s2bis.recalc.oracle_indep']
+  a {'concordants': 24, 'discordants': 0, 'journaux': 24, 'paires_de_refus': {'LECTEUR/absent / ORACLE/vide': 1}, 'refus_communs': 1}
+  b {'concordants': 7016, 'discordants': 0, 'journaux': 7016, 'refus_communs': 0}
+  c {'concordants': 3000, 'discordants': 0, 'journaux': 3000, 'paires_de_refus': {'LECTEUR/absent / ORACLE/vide': 16, 'LECTEUR/nom / ORACLE/nom': 23}, 'refus_communs': 39}
+  d {'concordants': 62, 'discordants': 0, 'journaux': 62, 'refus_communs': 0}
+ classes {}

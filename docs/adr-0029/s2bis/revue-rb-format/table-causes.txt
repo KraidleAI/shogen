@@ -1,0 +1,20 @@
+== py3.12
+    37  LECTEUR/declaration          <-> declaration
+   174  LECTEUR/declaration          <-> declaration+queue-non-declaree
+   177  LECTEUR/lien                 <-> genese
+   137  LECTEUR/lien                 <-> genese+queue-non-declaree
+   317  LECTEUR/lien                 <-> lien
+  2180  LECTEUR/lien                 <-> lien+queue-non-declaree
+    43  LECTEUR/queue-non-declaree   <-> queue-non-declaree
+    17  refus LECTEUR/absent <-> ORACLE/vide
+    23  refus LECTEUR/nom <-> ORACLE/nom
+== py3.10
+    37  LECTEUR/declaration          <-> declaration
+   174  LECTEUR/declaration          <-> declaration+queue-non-declaree
+   177  LECTEUR/lien                 <-> genese
+   137  LECTEUR/lien                 <-> genese+queue-non-declaree
+   317  LECTEUR/lien                 <-> lien
+  2180  LECTEUR/lien                 <-> lien+queue-non-declaree
+    43  LECTEUR/queue-non-declaree   <-> queue-non-declaree
+    17  refus LECTEUR/absent <-> ORACLE/vide
+    23  refus LECTEUR/nom <-> ORACLE/nom
