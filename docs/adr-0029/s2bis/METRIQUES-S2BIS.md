@@ -371,3 +371,18 @@ tant qu'ils ne sont pas fixés.
 Mutants (commande du job, runner puis `--plancher 122`, borne de 300 s, réseau isolé) : 20 tués sur 20 par leur test
 visé (0 vivant, 0 FATAL), dont « R = 9 998 au gabarit ». Suite : 122 tests ; plancher du job : 122, égalité exigée
 (`--egal`).
+
+## RB-6a (2026-10-05) : décalages o(r, u) de la loi de rotation, sens du décalage
+
+Objet : `rotation.py`, entrée de SHA-256 scellée (AVIS Q-R-02 : chaîne ASCII « graine:strate:r:u », graine en 64
+hexadécimaux minuscules, strate `calme` ou `stress`, r de 1 à 9 999 sans zéro de tête, unité en ASCII imprimable sans
+« : »), entier big-endian des 32 octets modulo n, refus nommés avant tout calcul ; décalage d'un masque de n bits, la
+valeur de la position t allant en (t + o) mod n. Contrat et vecteurs : `docs/adr-0029/s2bis/ROTATION-S2BIS.md`.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/rotation.py` | 55 | 3 (`tests/test_rotation.py`, 46 lignes : six vecteurs calculés hors du code par `sha256sum` et `bc`, dont o = 0 et o = n − 1 ; refus nommés ; masques décalés écrits à la main) |
+
+Mutants (commande du job, runner puis `--plancher 125`, borne de 300 s, réseau isolé) : 18 tués sur 18 par leur test
+visé (0 vivant, 0 FATAL), dont « sens du décalage inversé » et « modulo autre que la longueur de la suite retenue ».
+Suite : 125 tests ; plancher du job : 125, égalité exigée (`--egal`).
