@@ -19,3 +19,5 @@ Adjugé par l'orchestrateur le 2026-10-04 17:03:38 UTC (heure produite par le sc
    inchangé (les serveurs ne se louent qu'au déploiement). Information de l'investisseur et choix « carte réduite » : question de valeur,
    posée par l'orchestrateur.
 5. Chaque partie (P1 à P5) reçoit une relecture G2 neuve et un accord de l'investisseur ; chaque sous-lot ≤ 200 lignes ajoutées.
+
+*Ajout daté du 2026-10-05 04:38:22 UTC (heure produite par le script d'écriture), point 5* : par décision de l'investisseur (message en session, heure lue 2026-10-05 04:09:04 UTC : « demande aux advisors. tout en gardant le but de tout ton travail »), l'accord de chaque partie est rendu par un advisor (`claude-fable-5-1`, effort `medium`, R-26), sur la pièce de clôture de la partie (relecture G2 neuve, contre-contrôle, items ouverts) et au regard du but du projet : faire de Shōgen un standard institutionnel vendable, sans baisse de qualité. Restent à l'investisseur les questions de valeur : dépense, calendrier annoncé, déclaration publique, et tout ce qui touche Pocket.
