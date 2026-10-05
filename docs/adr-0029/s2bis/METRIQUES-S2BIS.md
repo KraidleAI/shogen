@@ -1119,3 +1119,28 @@ par un seul cas :
 
 Runner : 82 ok sur la tête, comme sur la tête suivie de la série SIM-T4. Suite s2bis : 184 tests, plancher 184
 inchangé.
+
+## CB-18w (2026-10-05) : `fetch-depth: 0` exigé dans le job sim-bis (O-2 de la relecture de SIM-T4)
+
+Objet : la relecture de la tranche 4 de SIM-BIS demande (O-2) que K-03 exige la ligne `fetch-depth: 0` dans le job
+sim-bis-unittest ; sans elle, l'adaptateur oracle_r1 échoue fermé (ORACLE/extraction). CB-18w suit la série SIM-T4,
+qui pose la ligne (SB-14A) ; avant elle, K-03 échouerait sur la tête.
+
+Le gabarit du job sim-bis exige désormais la ligne, à sa place (après `persist-credentials: false`), valeur exacte.
+Les jobs s2bis et S2 restent tels quels. Cas : L-42, le job sim-bis sans la ligne, refusé. Rouge : sous le gabarit
+de CB-18v, sur la tête suivie de CB-18v et de la série SIM-T4, L-42 échoue.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 316 | 83 cas (1 de plus : L-42) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 6 mutants, 6 tués :
+- ligne seulement admise : L-42 ;
+- ligne exigée dans tous les jobs : K-01, K-02, L-00 et L-39 ;
+- ligne quelconque à sa place : L-38 ;
+- valeur quelconque : L-38 ;
+- lignes suivantes du `with:` admises : L-40 ;
+- ligne exigée à toute place du job : L-41.
+
+Runner : 83 ok sur la tête suivie de CB-18v, de la série SIM-T4 et de CB-18w. Suite s2bis : 184 tests, plancher 184
+inchangé.

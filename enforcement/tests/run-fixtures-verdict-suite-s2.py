@@ -22,7 +22,8 @@ de l'analyseur. CC2-1 : les valeurs libres du gabarit sont des scalaires simples
 écrit sur plusieurs lignes qui avalerait des lignes du gabarit ; G-02, `timeout-minutes` entier ; G-03 et G-04, le
 nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du bloc, le gabarit seul. CB-18v (Q-T4-11) : le
 job sim-bis admet `fetch-depth: 0` sous le `with:` du checkout, après `persist-credentials: false`, valeur exacte, lui
-seul ; L-37 à L-41. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+seul ; L-37 à L-41. CB-18w (O-2 de la relecture de SIM-T4) : la ligne y est exigée ; L-42. Sortie : 0 tout passe, 1 un
+cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -166,11 +167,13 @@ def gabarit(texte, nom):
     (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
     plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite. CC2-1 : les trois `name` sont des scalaires
     simples (premier caractère alphanumérique : ni guillemet, ni bloc, ni ancre, ni flux), `timeout-minutes` un entier ;
-    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit. CB-18v (Q-T4-11) :
-    dans le seul job sim-bis-unittest, la ligne FETCH (`fetch-depth: 0`, valeur exacte) peut suivre
-    `persist-credentials: false` ; l'adaptateur oracle_r1 y extrait f35a70c par git archive."""
+    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit. CB-18v (Q-T4-11) et
+    CB-18w (O-2) : dans le seul job sim-bis-unittest, la ligne FETCH (`fetch-depth: 0`, valeur exacte) suit
+    `persist-credentials: false`, exigée ; l'adaptateur oracle_r1 y extrait f35a70c par git archive."""
     b = job(texte, nom)
-    if nom == "sim-bis-unittest" and b[7:8] == [FETCH]:
+    if nom == "sim-bis-unittest":
+        if b[7:8] != [FETCH]:
+            return False
         del b[7]
     return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
         re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
@@ -187,9 +190,9 @@ def analyseur(texte, nom, appel):
 def cable(texte, nom, appel):
     """Câblage du job `nom`, contrôlé exactement ainsi, et rien d'autre : (1) `gabarit` : ses lignes brutes, à
     indentation exacte, sont dans l'ordre `name` (scalaire simple), `runs-on: ubuntu-24.04`, `timeout-minutes`
-    (entier), `steps`, le checkout épinglé et son `with:` réduit à `persist-credentials: false` (et `fetch-depth: 0`
-    dans le seul job sim-bis, CB-18v), le runner (`name` en scalaire simple, `shell: bash`, `run:` du runner), une
-    étape `name` (scalaire simple), `shell: bash`, `run: |`, puis seulement des lignes d'indentation 10 ;
+    (entier), `steps`, le checkout épinglé et son `with:` réduit à `persist-credentials: false` (et `fetch-depth: 0`,
+    exigé dans le seul job sim-bis, CB-18v et CB-18w), le runner (`name` en scalaire simple, `shell: bash`, `run:` du
+    runner), une étape `name` (scalaire simple), `shell: bash`, `run: |`, puis seulement des lignes d'indentation 10 ;
     (2) `analyseur`, lecture de l'enregistreur de rôle : trois étapes, la première non admise, la deuxième le runner
     seul, et la ligne `appel` une fois, dans un bloc `run:` admis sans autre ligne que v.LIBRES."""
     return gabarit(texte, nom) and analyseur(texte, nom, appel)
@@ -294,7 +297,8 @@ for nom, lignes, attendu in (
         ("L-40 job sim-bis, autre clé du with: après fetch-depth: 0 (CB-18v)", SIM[:9] + [FD + "0", L + "ref: main"]
          + SIM[9:] + SIM_SUITE, False),
         ("L-41 job sim-bis, fetch-depth: 0 avant persist-credentials (ordre du gabarit, CB-18v)", SIM[:8]
-         + [FD + "0"] + SIM[8:] + SIM_SUITE, False)):
+         + [FD + "0"] + SIM[8:] + SIM_SUITE, False),
+        ("L-42 job sim-bis sans fetch-depth: 0 (ligne exigée, CB-18w, O-2)", SIM + SIM_SUITE, False)):
     nom_job = lignes[1].strip(" :")                     # s2bis-unittest ou sim-bis-unittest
     admis = cable(chr(10).join(lignes), nom_job, APPEL_SIM if nom_job == "sim-bis-unittest" else APPEL)
     cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
