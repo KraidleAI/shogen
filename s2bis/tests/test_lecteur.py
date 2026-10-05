@@ -7,12 +7,13 @@ import json
 import os
 import sys
 import tempfile
+import tracemalloc
 import unittest
 
 from shogen_s2bis.recalc import lecteur as lec
 from tests.test_fichiers import J1, J2, J3, NOMS
 from tests.test_journal import FICHIER, Base, chaine
-from tests.test_reprise import ligne, m
+from tests.test_reprise import SEG1, ligne, m
 
 OUVERTURE = ligne(0, "0" * 64, type="ouverture", jour="2026-10-04", suivante=m(1))
 P = hashlib.sha256(OUVERTURE).hexdigest()
@@ -200,3 +201,48 @@ class Queues(AvecQueues):
         _lecteur, flux = lire(self.d)
         self.assertEqual(flux, [("enr", NOMS[0], x) for x in enrs] + [("rupture", rupture)] + [
             ("enr", NOMS[1], x) for x in chaine(self.etat()[NOMS[1]], seq, prec)[2]])
+
+
+class Declarations(AvecQueues):
+    def test_reprise_dans_le_meme_fichier_puis_queue_declaree(self):
+        self.preparer()
+        self.journal(m(7)).fermer()                             # reprise dans le même fichier : queue null
+        avant, coupee = self.etat()[FICHIER], b'{"k":4,"prec":"5e3'
+        self.ajouter(FICHIER, coupee)
+        self.journal(m(9)).fermer()                             # segment 1 : sa reprise déclare la queue
+        seq, prec, enrs = chaine(avant)
+        suite = chaine(self.etat()[SEG1], seq, prec)[2]
+        lecteur, flux = lire(self.d)
+        self.assertEqual((flux, lecteur.ruptures, lecteur.queues, lecteur.queue_finale),
+                         ([("enr", FICHIER, x) for x in enrs] + [("enr", SEG1, x) for x in suite], [],
+                          [queue(FICHIER, len(avant), coupee, "LECTEUR/fin")], []))
+
+    def test_declaration_alteree_rupture(self):              # un octet de la queue change après sa déclaration
+        intact = self.preparer()
+        seq, prec, _e = chaine(intact)
+        self.ajouter(FICHIER, b'{"k":4,"prec":"5e3')
+        self.journal(m(7)).fermer()
+        with open(os.path.join(self.d, FICHIER), "r+b") as f:
+            f.seek(len(intact) + 2)
+            f.write(b"K")
+        lecteur, _flux = lire(self.d)
+        observee = queue(FICHIER, len(intact), b'{"K":4,"prec":"5e3', "LECTEUR/fin")
+        self.assertEqual((lecteur.ruptures, lecteur.queues), ([{"code": "LECTEUR/declaration", "fichier": SEG1,
+                                                                "seq": seq, "apres": (seq - 1, prec),
+                                                                "queues": [observee]}], []))
+
+    def test_memoire_bornee_independante_de_la_longueur(self):   # pic de tracemalloc, tailles 1 et 4
+        pics = []
+        for n in (500, 2000):
+            self.setUp()
+            jl = self.journal()
+            for i in range(n):
+                jl.ecrire("lecture", m(1 + i // 50), k=i, x="a" * 200)
+            jl.fermer()
+            tracemalloc.start()
+            for _x in lec.Lecteur(self.d, "pool"):
+                pass
+            pics.append((tracemalloc.get_traced_memory()[1], os.path.getsize(os.path.join(self.d, FICHIER))))
+            tracemalloc.stop()
+        (p1, _t1), (p4, t4) = pics
+        self.assertTrue(p4 < p1 + 32768 and p4 < t4 // 4, pics)

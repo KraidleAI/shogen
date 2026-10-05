@@ -11,9 +11,9 @@
 
 | fonction | test | ce qu'elle refuse |
 |---|---|---|
-| frontière d'imports | `test_fitness.Fitness.test_frontiere_du_paquet`, `test_frontiere_refuse` | import hors bibliothèque standard et hors sous-paquet, import relatif sortant, import dynamique, sous-paquet sans règle |
+| frontière d'imports | `test_fitness.Fitness.test_frontiere_du_paquet`, `test_frontiere_refuse` | import hors bibliothèque standard et hors sous-paquet, import relatif sortant, import dynamique, sous-paquet sans règle ; `recalc` : ni `collecte` ni `shogen_s2` (RB-0a) |
 | absence de réseau | `test_garde.Garde` (garde posée par `tests/__init__.py`) | connexion, envoi, résolution hors boucle locale, même sous un attrape-tout |
-| déterminisme | `test_fitness.Fitness.test_memes_octets_sous_cinq_graines` | sortie qui dépend de la graine de hachage (`PYTHONHASHSEED` de 0 à 4) |
+| déterminisme | `test_fitness.Fitness.test_memes_octets_sous_cinq_graines`, `test_rotation.Lois.test_memes_octets_sous_cinq_graines_de_hachage` (RB-6b) | sortie qui dépend de la graine de hachage (`PYTHONHASHSEED` de 0 à 4) |
 | compilation | `test_fitness.Fitness.test_compilation_avertissements_en_erreur` | avertissement de compilation (séquence d'échappement invalide, par exemple) |
 
 ## CB-0a (2026-10-04) : paquet, configuration scellée, garde réseau
@@ -436,3 +436,19 @@ fin de journal (`queue_finale`) ; état remis à zéro à chaque lecture.
 Mutants (commande du job, runner puis `--plancher 141`, borne de 300 s, réseau isolé) : 16 tués sur 16 par leur test
 visé (0 vivant, 0 FATAL), dont « contrôle de lien sauté » et « lien contrôlé sur seq seul ». Suite : 141 tests ;
 plancher du job : 141, égalité exigée (`--egal`).
+
+## RB-1c (2026-10-05) : déclaration des queues par la reprise, mémoire bornée
+
+Objet : une queue relevée doit être déclarée, champ pour champ (fichier, position, octets, sha256), par la `reprise` qui
+la suit (FORMAT §7.4) ; null sans queue en attente ; déclaration différente : rupture `LECTEUR/declaration` ; queues
+déclarées relevées (`queues`). Mémoire : pic de `tracemalloc` d'une lecture complète, journaux synthétiques de tailles 1
+et 4 (500 et 2 000 enregistrements, environ 167 et 670 Ko) : environ 24 Ko puis 11 à 14 Ko sous Python 3.10 et 3.13,
+le pic ne croît pas avec la taille.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 142 | 14 (`tests/test_lecteur.py`, 248 lignes ; 3 de plus) |
+
+Mutants (commande du job, runner puis `--plancher 144`, borne de 300 s, réseau isolé) : 10 tués sur 10 par leur test
+visé (0 vivant, 0 FATAL), dont « fichier lu en entier » (test de mémoire). Suite : 144 tests ; plancher du job : 144,
+égalité exigée (`--egal`).
