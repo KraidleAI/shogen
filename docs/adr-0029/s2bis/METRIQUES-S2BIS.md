@@ -725,3 +725,21 @@ Mutants (commande du job, `--plancher 175`, borne de 300 s ; python3.12 ; résea
 visé (0 vivant, 0 FATAL), dont la borne décalée d'une unité, le parcours sans garde de cycle (fil d'essai pendu, test
 du cycle en échec ; 41 s, puis 53 s au passage sur l'état final) et le sérialiseur appelé d'abord. Suite : 175 tests ;
 plancher du job : 175, égalité exigée (`--egal`).
+
+## CB-18g (2026-10-05) : tolérance de départ scellée, budget de l'ADR (C-1 de la G2 de la tranche C)
+
+Objet : `formes.json` scelle `tolerance` (µs) : la tolérance de départ de D-2, 5 s en production (ADR-0029 l.107,
+reformulée par l'ajout daté du 2026-10-04 17:03:38 UTC) ; `run_params` la porte avec le contenu de `formes.json`. La
+règle `budget` devient celle de l'ADR-0029 l.233-234 : tolérance + plus grand décalage + délai + marge ≤ δ, égalité
+admise. Avant, elle omettait la tolérance : la sonde du réviseur admettait des délais de 14 et 15 s (24 et 25 s au
+budget de l'ADR, au-delà de 20 s). Rejouée, sa copie avec `tolerance` = 5 s admet 10 s et refuse 14, 15 et 16 s ;
+la sonde telle quelle est refusée en `CONFIG/champ-absent`. FORMAT §14.1, §14.4.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 119 | — |
+| `tests/test_entree.py` | 190 | 5 (1 de plus : budget de l'ADR à la borne, 5 + 4 + 10 + 1 = 20 ≤ 20 s admis, 1 µs de plus sur un terme ou de moins sur δ refusé, délai de 14 s refusé ; refus d'une tolérance nulle) |
+
+Mutants (commande du job, `--plancher 176`, borne de 300 s ; python3.12 ; réseau isolé) : 6 tués sur 6 (0 vivant,
+0 FATAL), dont la règle d'avant C-1 rétablie. MR-17 du réviseur (égalité refusée) est tué par le test à la borne,
+rejoué sur l'état final. Suite : 176 tests ; plancher du job : 176, égalité exigée (`--egal`).

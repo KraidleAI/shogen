@@ -2,7 +2,8 @@
 CABLAGE-1 pour les sondes). CB-18d : point d'entrée `pool`, `run_params`, fermeture du journal à la sortie (E-C-16 ;
 SHOGEN-S2BIS-ECRIVAIN-USAGE-1). Configurations de test écrites ici, sha256 attendus calculés par hashlib sur les
 octets écrits ; temps réel, w = 1 s ; lectures vers un port local fermé ; sondes vers des adresses de boucle locale
-où rien n'écoute (délai de 0,1 s)."""
+où rien n'écoute (délai de 0,1 s). CB-18g (C-1 de la G2 de la tranche C) : tolérance de départ scellée (`tolerance`),
+budget de l'ADR-0029 l.233-234 à la borne, valeurs prises au texte de l'ADR."""
 import contextlib
 import errno
 import fcntl
@@ -42,9 +43,9 @@ def port_ferme():
 
 
 def configurations(port):
-    """(formes, sante, descripteur) de test ; w = 1 s, δ = 0,6 s, délai 0,3 s, marge 0,2 s."""
+    """(formes, sante, descripteur) de test ; w = 1 s, δ = 0,6 s, tolérance 0,05 s, délai 0,3 s, marge 0,2 s."""
     forme = {"hote": "127.0.0.1", "port": port, "methode": "GET", "corps": "", "espace": False}
-    return ({"w": 1, "delta": 6 * S // 10, "delai": 3 * S // 10, "marge": S // 5, "places": 4,
+    return ({"w": 1, "delta": 6 * S // 10, "tolerance": S // 20, "delai": 3 * S // 10, "marge": S // 5, "places": 4,
              "formes": [{**forme, "nom": "a", "chemin": "/a"}, {**forme, "nom": "b", "chemin": "/b"}]},
             {"commande": [sys.executable, "-c", "print('suivi')"], "temoins": ["127.0.9.1", "127.0.9.2", "127.0.9.3"],
              "noms": ["a.example.", "b.example."], "delai": S // 10},
@@ -75,7 +76,7 @@ class Entree(unittest.TestCase):
         RefusConfig ou RefusBoucle, au chargement ; fichier absent : OSError."""
         f, s, d = configurations(1)
         x, y = f["formes"]
-        cas = [("CONFIG/champ-absent", {**f, "places": None}, s, d),
+        cas = [("CONFIG/champ-absent", {**f, "places": None}, s, d), ("CONFIG/borne", {**f, "tolerance": 0}, s, d),
                ("CONFIG/incoherent : w-divise", {**f, "w": 7}, s, d),
                ("CONFIG/incoherent : marge-delta", {**f, "marge": 6 * S // 10}, s, d),
                ("CONFIG/incoherent : budget", {**f, "delai": S}, s, d),
@@ -97,6 +98,24 @@ class Entree(unittest.TestCase):
         self.assertEqual((refus(lambda: entree.configurer(chemins, "abc")), refus(lambda: entree.configurer(
             {**chemins, "formes": "absent.json"}, COMMIT))[:9]), ("CONFIG/commit : abc", "[Errno 2]"))
         self.assertEqual(sorted(entree.configurer(chemins, COMMIT)), ["descripteur", "formes", "sante"])
+
+    def test_budget_de_l_adr_a_la_borne(self):                          # CB-18g, C-1 de la G2 de la tranche C
+        """Budget de l'ADR-0029 l.233-234 : tolérance de départ de D-2 (5 s) + plus grand décalage (4 s : cinq
+        lectures espacées sur un hôte) + délai (10 s) + marge (1 s) = 20 s ≤ δ = 20 s : admis à l'égalité ; 1 µs de
+        plus sur un terme, ou de moins sur δ : refus nommé. Délai de 14 s (sonde du réviseur : admis avant C-1, car
+        4 + 14 + 1 ≤ 20) : 24 s > 20 s, refusé."""
+        f, s, d = configurations(1)
+        cinq = [{**f["formes"][0], "hote": "api.example", "espace": True, "nom": f"f{k}", "chemin": f"/{k}"}
+                for k in range(5)]
+        adr = {**f, "w": 60, "delta": 20 * S, "tolerance": 5 * S, "delai": 10 * S, "marge": S, "places": 5,
+               "formes": cinq}
+        budget = "CONFIG/incoherent : budget"
+        cas = [(adr, None), ({**adr, "delta": 20 * S - 1}, budget), ({**adr, "delai": 14 * S}, budget)]
+        cas += [({**adr, k: adr[k] + 1}, budget) for k in ("tolerance", "delai", "marge")]
+        for formes, attendu in cas:
+            with self.subTest(formes={k: formes[k] for k in ("delta", "tolerance", "delai", "marge")}):
+                r = refus(lambda: entree.configurer(self.ecrire(formes, {**s, "delai": 2 * S}, d)[1], COMMIT))
+                self.assertEqual(r and r[:len(budget)], attendu)
 
     def test_cablage_des_sondes_et_de_la_boucle(self):                  # SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Les sondes reçoivent la commande, les témoins, les noms et le délai de `sante.json`, le résolveur et sa

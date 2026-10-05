@@ -15,7 +15,7 @@
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
   le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3) ; le diff ENTIER-ECRIVAIN,
-  I-1 (§1.2, §2).
+  I-1 (§1.2, §2). Relecture G2 de la tranche C de P1 (2026-10-05) : le diff CB-18g applique C-1 (§14.1, §14.4).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -368,11 +368,15 @@ résolution et sans envoi (ADR-0029 l.109).
 
 1. **Fichiers chargés** : chacun est lu en octets, son sha256 calculé sur ces octets, puis contrôlé (champs exacts,
    types, bornes, puis règles de cohérence nommées) :
-   - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `delai`, `marge` (µs ;
-     `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port, chemin, methode,
-     corps, espace}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai : la limite de l'hôte impose
-     l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte). Le plus grand décalage du
-     plan, plus `delai` et `marge`, tient dans `delta` (budget de l'ADR-0029 l.233-234) ;
+   - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `tolerance`, `delai`,
+     `marge` (µs ; `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port,
+     chemin, methode, corps, espace}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai : la limite
+     de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte).
+     `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
+     du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
+     l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +
+     `delai` + `marge` ≤ `delta`, égalité admise (en production, 5 + 4 + 10 + 1 = 20 ≤ 20 s) ; une lecture partie
+     dans la tolérance finit ainsi avant l'échéance (§11.1). Avant C-1, la règle omettait la tolérance ;
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
      littérales canoniques), `noms` (D-5, noms DNS valides), `delai` (µs ; `delai` + `marge` ≤ `delta` : les sondes
      sont jointes avant l'échéance) ;
@@ -391,9 +395,9 @@ résolution et sans envoi (ADR-0029 l.109).
    fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. Un refus de configuration donne la sortie 2
    et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
-   `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes`, `sante` et
-   `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte `run_params` puis n'a pas de marqueur
-   est déclarée par le `trou` suivant (§8).
+   `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
+   `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
+   `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8).
 5. **Fermeture** (CB-18d, SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : le journal est fermé à la sortie du point d'entrée, quelle
    qu'elle soit. Une OSError ou un refus de l'écrivain (`JOURNAL/casse` compris, et toute ouverture refusée) arrête la
    boucle : sortie 1, refus nommé (`collecte : arrêt : <code> : …`) ; systemd relance le service, et l'instance
