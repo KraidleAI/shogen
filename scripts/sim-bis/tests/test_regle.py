@@ -73,3 +73,96 @@ class TestRotation(unittest.TestCase):
             regle.paires([1] * 16)
         self.assertEqual(e.exception.code, "REGLE/plans")
         self.assertEqual(regle.paires([1] * 15), 105)
+
+
+def ks(*listes) -> list:
+    """K^(r) injectés, r = 1, 2, … (S non suivie)."""
+    return [(k, None) for liste in listes for k in liste]
+
+
+class TestDecision(unittest.TestCase):
+    def test_parametres_et_seuil(self):
+        """Section regle recopiée à la main (ADR-0029 l.139, l.200-203 ; AVIS Q-S-06 complément 1) : R = 9 999, R = 999
+        pour la grille et l'absorption, α = 1/100, garde (deux unités en écart, K_crit ≥ 2, deux runs). Seuil entier
+        α·(R + 1) − 1 : 99 à R = 9 999, 9 à R = 999 ; R = 9 998 : REGLE/seuil. Mutation M-REG-4 (R + 1 → R)."""
+        r = PRM["regle"]
+        self.assertEqual((r["R"], r["R_approche"], r["alpha"], r["garde"]),
+                         (9999, 999, [1, 100], {"unites": 2, "k_crit": 2, "runs": 2}))
+        self.assertEqual([regle.seuil(9999, [1, 100]), regle.seuil(999, [1, 100])], [99, 9])
+        with self.assertRaises(commun.Refus) as c:
+            regle.seuil(9998, [1, 100])
+        self.assertEqual(c.exception.code, "REGLE/seuil")
+
+    def test_retraits_e_s_24(self):
+        """D1-bis et flux presque mort par classe, avant K (E-S-24 ; ADR-0029 l.170), à la main, n = 10 en calme et 6 en
+        stress : u1 (10, 6) reste ; u2 (0, 0) : D1-bis (a) dans les deux strates ; u3 (0, 3) : D1-bis (b) en calme,
+        reste en stress (2·3 = 6) ; u4 (4, 2) : presque mort dans les deux (8 < 10, 4 < 6) ; u5 (5, 3) reste (2·ok = n).
+        Mutations M-7B-01 (« ≤ » au lieu de « < »), M-7B-02 (D1-bis (a) non distinguée), M-7B-03 (seuil de flux
+        presque mort omis)."""
+        ok = {("u1", "calme"): 10, ("u1", "stress"): 6, ("u2", "calme"): 0, ("u2", "stress"): 0, ("u3", "calme"): 0,
+              ("u3", "stress"): 3, ("u4", "calme"): 4, ("u4", "stress"): 2, ("u5", "calme"): 5, ("u5", "stress"): 3}
+        self.assertEqual(regle.retraits(ok, {"calme": 10, "stress": 6}),
+                         {("u2", "calme"): "D1-bis (a)", ("u2", "stress"): "D1-bis (a)", ("u3", "calme"): "D1-bis (b)",
+                          ("u4", "calme"): "presque mort", ("u4", "stress"): "presque mort"})
+
+    def test_decision_t_reg_1(self):
+        """T-REG-1, listes de K^(r) injectées (R = 9 999, seuil 99), K = 3, deux runs, deux unités, n′ suffisant : 99
+        valeurs ≥ 3 → C = 99, REJETTE ; 100 → C = 100 (arrêt à r = 100), NE REJETTE PAS. K = 1 : C1 = 99 → NON
+        ÉVALUABLE (k_crit) ; K = 2, C1 = 100 et C = 0 → REJETTE. Un run → NON ÉVALUABLE (runs) ; une unité (unites) ;
+        n′ < n_s/2 (n_prime). Arrêt : 100 fois K = 1, puis 99 fois K = 3 (C = 99 à r = 199), 0, 3 : pas d'arrêt avant
+        C = 100, en r = 201. K = 0 : C1 n'atteint 100 qu'à r = 299, garde tenue (seule cause : runs). R = 999
+        (seuil 9, garde C1 ≥ 10) : 9 valeurs ≥ 3 puis 990 fois 1 → REJETTE ; 10 → NE REJETTE PAS. Liste trop courte :
+        REGLE/rotations. S suivie (S = 5) : 100 fois (3, 5) → C_S = 100, arrêt à r = 100 ; (3, 4) → C_S = 0, pas
+        d'arrêt (E-S-29 : et C_S > seuil quand S est suivie). Mutations M-REG-1 (C < seuil), M-REG-2 (garde C1 ≥ 1),
+        M-REG-3 (un run suffit), M-REG-5 (« > » au lieu de « ≥ » dans C), M-REG-6 (arrêt à C ≥ seuil), M-REG-7 (C1
+        non suivi), M-7B-04 (unités non comptées), M-7B-07 (« > » dans C_S)."""
+        def d(k, runs, unites, suffisant, liste, R=9999):
+            self.assertEqual(len(liste), R)
+            out = regle.decider(k, runs, unites, suffisant, liste, R, PRM)
+            return out["valeur"], out["causes"], out["C"], out["r"]
+        self.assertEqual(d(3, 2, 2, True, ks([3] * 99, [2] * 9900)), ("REJETTE", [], 99, 9999))
+        self.assertEqual(d(3, 2, 2, True, ks([3] * 100, [0] * 9899)), ("NE REJETTE PAS", [], 100, 100))
+        self.assertEqual(d(1, 2, 2, True, ks([1] * 99, [0] * 9900))[:2], ("NON ÉVALUABLE", ["k_crit"]))
+        self.assertEqual(d(2, 2, 2, True, ks([1] * 100, [0] * 9899)), ("REJETTE", [], 0, 9999))
+        self.assertEqual(d(3, 1, 2, True, ks([3] * 99, [2] * 9900))[:2], ("NON ÉVALUABLE", ["runs"]))
+        self.assertEqual(d(3, 2, 1, True, ks([3] * 99, [2] * 9900))[:2], ("NON ÉVALUABLE", ["unites"]))
+        self.assertEqual(d(3, 2, 2, False, ks([3] * 99, [2] * 9900))[:2], ("NON ÉVALUABLE", ["n_prime"]))
+        self.assertEqual(d(3, 2, 2, True, ks([1] * 100, [3] * 99, [0], [3], [0] * 9798)),
+                         ("NE REJETTE PAS", [], 100, 201))
+        self.assertEqual(d(0, 0, 2, True, ks([0] * 199, [1] * 9800))[:2], ("NON ÉVALUABLE", ["runs"]))
+        self.assertEqual(d(3, 2, 2, True, ks([3] * 9, [1] * 990), 999), ("REJETTE", [], 9, 999))
+        self.assertEqual(d(3, 2, 2, True, ks([3] * 10, [1] * 989), 999), ("NE REJETTE PAS", [], 10, 10))
+        s = regle.decider(3, 2, 2, True, [(3, 5)] * 100 + [(0, 0)] * 9899, 9999, PRM, 5)
+        self.assertEqual((s["valeur"], s["C_S"], s["r"]), ("NE REJETTE PAS", 100, 100))
+        s = regle.decider(3, 2, 2, True, [(3, 4)] * 100 + [(0, 0)] * 9899, 9999, PRM, 5)
+        self.assertEqual((s["valeur"], s["C"], s["C_S"], s["r"]), ("NE REJETTE PAS", 100, 0, 9999))
+        with self.assertRaises(commun.Refus) as c:
+            regle.decider(3, 2, 2, True, ks([3] * 99, [2] * 9899), 9999, PRM)
+        self.assertEqual(c.exception.code, "REGLE/rotations")
+
+    def test_tester_rotation_r_1(self):
+        """Chemin complet à R = 1 (α = 1/2 en paramètre d'essai : seuil 0), n = 8, n_s = 10, binance (non décalée),
+        coinbase et kraken ; décalages de r = 1 en calme par sha256sum et bc : coinbase 1, kraken 4 (modulo 8 ; modulo
+        10 : 1 et 2). A : {0}, {7}, {2} → tournées {0}, {0}, {6} : K^(1) = 1, C1 = 1, garde tenue, seule cause runs
+        (K = 0) ; toutes décalées (unité non décalée absente de la classe, binance de 1) : K^(1) = 0, causes k_crit et
+        runs. B : {0}, {5}, {2} → {0}, {6}, {6} : K^(1) = 1. C : {0, 3}, {0, 3, 7}, {} → K = 2 en deux runs ; coinbase
+        {1, 4, 0} : K^(1) = 1, C = 0, C1 = 1 → REJETTE ; n_s = 16 (2·8 = 16) : REJETTE ; n_s = 17 : NON ÉVALUABLE
+        (n_prime). S suivie en C : S = 2 (fenêtres 0 et 3), S^(1) = 1, C_S = 0. Mutations M-ROT-2 (unité non décalée
+        décalée), M-ROT-3 (modulo n_s au lieu de n′_s), M-7B-05 (« > » dans n′_s ≥ n_s/2), M-7B-06 (dernier hôte non
+        décalé), M-7B-08 (S non suivie)."""
+        prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2]))
+
+        def t(b, c, k, premier="binance", n_s=10):
+            out = regle.tester({"binance": b, "coinbase": c, "kraken": k}, premier, G, "calme", 8, n_s, prm, 1)
+            return out["valeur"], out["causes"], out["C1"]
+        self.assertEqual(t(bits(0), bits(7), bits(2)), ("NON ÉVALUABLE", ["runs"], 1))
+        self.assertEqual(t(bits(0), bits(7), bits(2), None), ("NON ÉVALUABLE", ["k_crit", "runs"], 0))
+        self.assertEqual(t(bits(0), bits(5), bits(2)), ("NON ÉVALUABLE", ["runs"], 1))
+        self.assertEqual(t(bits(0, 3), bits(0, 3, 7), 0), ("REJETTE", [], 1))
+        self.assertEqual([t(bits(0, 3), bits(0, 3, 7), 0, n_s=16), t(bits(0, 3), bits(0, 3, 7), 0, n_s=17)],
+                         [("REJETTE", [], 1), ("NON ÉVALUABLE", ["n_prime"], 1)])
+        out = regle.tester({"binance": bits(0, 3), "coinbase": bits(0, 3, 7)}, "binance", G, "calme", 8, 10, prm, 1,
+                           True)
+        self.assertEqual((out["S"], out["C_S"], out["K"], out["runs"], out["unites"]), (2, 0, 2, 2, 2))
+        self.assertEqual(regle.premiere(["kraken", "binance", "okx"]), "binance")
+        self.assertIsNone(regle.premiere([]))
