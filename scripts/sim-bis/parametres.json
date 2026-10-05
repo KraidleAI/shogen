@@ -6,5 +6,10 @@
   "sommes": {"chemin": "docs/adr-0029/plan-s2bis/SHA256SUMS", "sha256": "f21f929329f11e9baf00057e3a7b250e5fb3a05a31fd5bcc64bb9860218f601f"},
   "episodes": {"chemin": "docs/adr-0029/plan-s2bis/episodes.txt", "sha256": "c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6"},
   "source": "E-S-02 : sorties versées de PLAN-S2BIS (episodes.txt, « EP », seule entrée de calibration ; sa ligne de SHA256SUMS) ; empreintes mesurées par sha256sum le 2026-10-04 à la tête 435fa12"
+ },
+ "aleas": {
+  "prefixe": "SHOGEN-SIM-BIS",
+  "graine": 20261004,
+  "source": "E-S-41 : GRAINE = 20261004 fixée par le G0, aucune autre essayée ; flux = 8 premiers octets de SHA-256 de « SHOGEN-SIM-BIS|20261004|<cellule>|<i>|<composant>|<indice> », graine de règle = SHA-256 hexadécimal de « SHOGEN-SIM-BIS|20261004|<cellule>|<i> » ; E-S-42 (random() seule)"
  }
 }

@@ -33,9 +33,14 @@ def hex64(v) -> bool:
     return type(v) is str and len(v) == 64 and all(c in "0123456789abcdef" for c in v)
 
 
+def positif(v) -> bool:
+    return type(v) is int and v > 0
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
-          "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte}}
+          "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
+          "aleas": {"prefixe": texte, "graine": positif, "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
