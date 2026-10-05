@@ -24,5 +24,14 @@
   "garde_blocs": 30,
   "precision": 50,
   "source": "E-S-37 ; EP l.1-161 (forme de scripts/plan-s2bis/episodes.py l.92-120) ; parametres.json de PLAN-S2BIS (strates, pool_d1bis : unités = hôtes, okx par okx_ticker, E-S-07 ; episodes.types et quantiles ; fiv.ell et pools) ; r1 de f35a70c (DECIMAL_PREC = 50, ROUND_HALF_EVEN, GARDE_BLOCS = 30)"
+ },
+ "calendrier": {
+  "w": 60,
+  "jours_stress": [5, 6],
+  "lundi_reference": 1796601600,
+  "echelle_semaines": [12, 14, 16, 18, 20, 22, 24],
+  "n_par_semaine": {"calme": 6840, "stress": 2736},
+  "t_max": [3, 2],
+  "source": "E-S-14 : grille UTC w = 60 s, strates par le calendrier de S2 (window.WEEKEND_STRATE_SPEC de f35a70c : stress_weekdays [5, 6], lundi = 0), T_début = lundi 00:00 UTC + 0 à 6 jours tirés par réplication (Q-S-08) ; lundi de référence 2026-12-07 00:00 UTC (date -u -d), indicatif, seule la place dans la semaine comptant ; E-S-25 et proposition §3 pt 2 : échelle W de 12 à 24 semaines, n_calme = 6 840·W, n_stress = 2 736·W (16 × 5 × 1 440 × 0,95 et 16 × 2 × 1 440 × 0,95 à W = 16, ADR l.158), T_max = 3/2·W semaines"
  }
 }

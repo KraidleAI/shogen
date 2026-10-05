@@ -37,13 +37,20 @@ def positif(v) -> bool:
     return type(v) is int and v > 0
 
 
+def jour(v) -> bool:
+    return type(v) is int and 0 <= v <= 6
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
           "aleas": {"prefixe": texte, "graine": positif, "rangs": positif, "garde": positif, "source": texte},
           "calibration": {"strates": [texte], "unites": [(texte, texte)], "types": [texte], "quantiles": [positif],
                           "pools": [texte], "ell": [positif], "garde_blocs": positif, "precision": positif,
-                          "source": texte}}
+                          "source": texte},
+          "calendrier": {"w": positif, "jours_stress": [jour], "lundi_reference": positif,
+                         "echelle_semaines": [positif], "n_par_semaine": {"calme": positif, "stress": positif},
+                         "t_max": (positif, positif), "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

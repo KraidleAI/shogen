@@ -55,7 +55,8 @@ class TestSocle(unittest.TestCase):
         PARAMETRES/schema. Mutations M-0-03 (clés incluses au lieu d'égales), M-0-04 (texte vide admis), M-0-05
         (hexadécimal majuscule admis), M-0-06 (prédicat non appelé) ; SB-1 : booléen ou zéro pour un entier positif
         (M-1-16, M-1-17) ; SB-2 : liste vide, couple de trois éléments, élément refusé, texte pour une liste (M-2-21
-        liste vide admise, M-2-22 longueur du couple non contrôlée, M-2-23 éléments non contrôlés)."""
+        liste vide admise, M-2-22 longueur du couple non contrôlée, M-2-23 éléments non contrôlés) ; SB-5 : jour 7,
+        facteur T_max d'un seul terme (M-5-15 : jour 7 admis)."""
         prm = commun.charger_parametres(environ={})
         commun.controler(prm, commun.SCHEMA)
         for f in (lambda p: p.update(extra="x"), lambda p: p["entrees"]["sommes"].update(extra="x"),
@@ -63,7 +64,8 @@ class TestSocle(unittest.TestCase):
                   lambda p: p["entrees"]["episodes"].update(sha256=p["entrees"]["episodes"]["sha256"].upper()),
                   lambda p: p["aleas"].update(graine=True), lambda p: p["aleas"].update(graine=0),
                   lambda p: p["calibration"].update(strates=[]), lambda p: p["calibration"]["unites"][0].append("x"),
-                  lambda p: p["calibration"].update(ell=[1, 0]), lambda p: p["calibration"].update(types="panne")):
+                  lambda p: p["calibration"].update(ell=[1, 0]), lambda p: p["calibration"].update(types="panne"),
+                  lambda p: p["calendrier"].update(jours_stress=[5, 7]), lambda p: p["calendrier"].update(t_max=[3])):
             p = json.loads(json.dumps(prm))
             f(p)
             self.refus("PARAMETRES/schema", commun.controler, p, commun.SCHEMA)
