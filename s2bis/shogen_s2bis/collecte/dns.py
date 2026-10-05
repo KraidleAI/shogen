@@ -5,7 +5,8 @@ drapeau TC, réponses avec leur TTL). Le jugement (D-4, D-5) se fait au recalcul
 en UDP vers une adresse IPv4 littérale canonique, sans aucune résolution (autre adresse : `forme`, rien n'est envoyé),
 identifiant tiré au hasard ; un datagramme qui ne vient pas de cette adresse et de ce port ou qui ne répond pas à la
 requête est ignoré, l'attente continue ; `forme` est réservé à une réponse appariée mal formée (C-2 de la G2 de P1-B) ;
-ne lève jamais (instants en microsecondes)."""
+ne lève jamais (instants en microsecondes). CB-19a (C-1 (a) de la relecture d'intégration de P1) : une réponse appariée
+de plus de UDP = 512 octets est `forme` (RFC 1035 §2.3.4, §4.2.1) ; `analyser` ne porte pas cette borne de l'UDP."""
 import ipaddress
 import secrets
 import socket
@@ -14,6 +15,7 @@ import struct
 from shogen_s2bis.collecte.lecture import S, horloge, monotone
 
 TYPES = {"A": 1, "SOA": 6, "TXT": 16}
+UDP = 512                                                           # octets d'un message en UDP, au plus
 
 
 class Forme(ValueError):
@@ -95,7 +97,7 @@ def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horlog
                monotone=monotone):
     """Une requête vers `adresse`:`port`, réponse attendue `delai` au plus, compté sur l'horloge `monotone` (C-4) ;
     `debut`, `fin` sur l'horloge murale. Statut : reponse, delai, forme (adresse qui n'est pas une IPv4 littérale
-    canonique, requête impossible, ou réponse appariée mal formée) ou reseau (envoi refusé)."""
+    canonique, requête impossible, réponse appariée de plus de UDP octets ou mal formée) ou reseau (envoi refusé)."""
     r = {"statut": "delai", "rcode": None, "tc": None, "reponses": None, "debut": horloge()}
     fin = monotone() + delai
     try:
@@ -108,6 +110,8 @@ def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horlog
                 s.settimeout(reste / S)
                 m, source = s.recvfrom(65535)
                 if source == (adresse, port) and repond(m, q):
+                    if len(m) > UDP:                                # C-1 (a) : RFC 1035 §2.3.4, §4.2.1
+                        raise Forme(f"réponse de {len(m)} octets, {UDP} au plus en UDP")
                     r.update(statut="reponse", **analyser(m, q))
                     break
     except TimeoutError:

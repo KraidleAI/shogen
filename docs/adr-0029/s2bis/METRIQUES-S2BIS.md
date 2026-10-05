@@ -1169,3 +1169,28 @@ Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau i
 
 Runner : 85 ok sur la tête suivie de CB-18v, de la série SIM-T4, de CB-18w et de CB-18x. Suite s2bis : 184 tests,
 plancher 184 inchangé.
+
+## CB-19a (2026-10-05) : réponse DNS appariée de plus de 512 octets en `forme` (C-1 (a) de la relecture d'intégration)
+
+Objet : la relecture G2 d'intégration de P1 (C-1) mesure qu'une seule réponse DNS appariée de 65 502 octets (un nom
+de 255 octets de caractères de contrôle, puis 4 076 pointeurs vers lui) porte la `sante` à 6 209 510 octets, au-delà
+de LIMITE : refus `JOURNAL/taille` et arrêt du collecteur à chaque fenêtre. Correction (a), adjugée telle qu'écrite :
+une réponse appariée de plus de 512 octets est `forme` (RFC 1035 §2.3.4 et §4.2.1, citées mot pour mot au FORMAT §12,
+fichier du registre lu, sha256 `d14ae809…`). Le contrôle suit l'appariement, dans `interroger` : un datagramme non
+apparié reste ignoré quelle que soit sa taille ; `analyser` ne porte pas la borne de l'UDP.
+
+Rouge : les tests neufs sur le code et le FORMAT de la base 47b2177 échouent par assertion (513 octets et réponse
+hostile retenus en `reponse` ; trois textes du §12 absents).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/dns.py` | 123 | — |
+| `tests/test_dns.py` | 224 | 15 (2 de plus : 512 octets retenue, 513 en `forme`, non apparié de 600 octets ignoré, `analyser` sans la borne ; réponse hostile du réviseur en `forme`) |
+| `tests/test_format.py` | 129 | 5 (1 de plus : §12, statut, deux citations de la RFC 1035, puce « Corrections ») |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 13 mutants neufs, 13 tués par leur test visé (0 vivant, 0 FATAL) : borne
+retirée, à 512 octets compris, à 513, à 65 507 (ces deux réécrits sur une ancre unique, la première écriture étant
+inapplicable : texte présent aussi dans la docstring), avant l'appariement, réponse ignorée au lieu de `forme`, borne
+après la mise à jour du résultat, borne portée par `analyser`, quatre retouches du §12 défaites, plancher non relevé.
+Suite : 187 tests ; plancher du job : 187, égalité exigée (`--egal`).

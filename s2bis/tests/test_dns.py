@@ -1,8 +1,11 @@
 """CB-10, E-C-27, E-C-28 : client DNS filaire. Octets écrits à la main selon la RFC 1035 (§4.1, pointeur §4.1.4 ;
 libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui en tire les mêmes valeurs (journal G1).
 CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7). CB-11f : datagramme non apparié ignoré,
-adresse non littérale refusée sans envoi (C-2) ; MG-18, MG-19, MG-21, MG-24 (C-7)."""
+adresse non littérale refusée sans envoi (C-2) ; MG-18, MG-19, MG-21, MG-24 (C-7). CB-19a (C-1 (a) de la relecture
+d'intégration de P1) : réponse appariée de plus de 512 octets en `forme` (RFC 1035 §2.3.4, §4.2.1), tailles écrites à
+la main."""
 import socket
+import struct
 import threading
 import time
 import unittest
@@ -181,6 +184,36 @@ class Interroger(unittest.TestCase):
                     self.assertEqual((r["statut"], r["rcode"]), ("forme", None))
             srv.setblocking(False)
             self.assertRaises(BlockingIOError, srv.recvfrom, 4096)         # aucune requête n'est partie
+
+    def test_reponse_appariee_de_plus_de_512_octets_forme(self):
+        """C-1 (a) : 512 octets au plus en UDP (RFC 1035 §2.3.4, §4.2.1). R_A suivie d'une réponse de type 99 dont les
+        données font n octets : 65 + 12 + n octets. À 512 octets, retenue ; à 513, `forme`, rien de la réponse n'est
+        gardé. Un datagramme non apparié de 600 octets reçu avant reste ignoré. `analyser` ne porte pas la borne."""
+        def plus(n):
+            return R_A[:6] + bytes([0, 3]) + R_A[8:] + bytes.fromhex("c00c 0063 0001 0000003c") + struct.pack(
+                ">H", n) + bytes(n)
+        self.assertEqual((len(plus(435)), len(plus(436))), (512, 513))
+        resultats = []
+        for n in (435, 436):
+            port, _r, fil = udp(lambda srv, requete, client, n=n: [srv.sendto(m, client) for m in (
+                bytes([requete[0] ^ 1]) + requete[1:] + bytes(600 - len(requete)), requete[:2] + plus(n)[2:])])
+            resultats.append(dns.interroger("127.0.0.1", WE, "A", delai=S, port=port))
+            fil.join(5)
+        self.assertEqual([(r["statut"], r["rcode"], r["tc"], r["reponses"]) for r in resultats], [
+            ("reponse", 0, False, A2 + [[WE, 99, 60, None]]), ("forme", None, None, None)])
+        self.assertEqual(len(dns.analyser(plus(436), Q_A)["reponses"]), 3)
+
+    def test_reponse_hostile_de_65_502_octets_forme(self):
+        """C-1 (a) : la réponse hostile du réviseur, un nom de 255 octets de caractères de contrôle puis 4 076 réponses
+        dont le nom pointe vers lui (avant C-1 : `sante` de 6 209 510 octets, au-delà de LIMITE) : `forme`."""
+        nom = b"".join(bytes([n]) + bytes([1]) * n for n in (63, 63, 63, 61)) + bytes(1)
+        rr, suite = struct.pack(">HHIH", 1, 1, 0, 4) + bytes([1, 2, 3, 4]), bytes([0xC0, 17])
+        corps = struct.pack(">5H", 0x8180, 1, 4077, 0, 0) + Q_SOA[12:] + nom + rr + (suite + rr) * 4076
+        self.assertEqual(len(corps) + 2, 65502)
+        port, _r, fil = udp(lambda srv, requete, client: srv.sendto(requete[:2] + corps, client))
+        r = dns.interroger("127.0.0.1", ".", "SOA", recursion=False, delai=S, port=port)
+        fil.join(5)
+        self.assertEqual((r["statut"], r["rcode"], r["reponses"]), ("forme", None, None))
 
     def test_identifiant_tire_sur_16_bits(self):
         """MG-24 : l'identifiant est tiré par `secrets.randbelow(65536)` et porté tel quel par la requête."""

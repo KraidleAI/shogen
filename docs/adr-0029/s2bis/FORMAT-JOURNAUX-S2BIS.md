@@ -29,7 +29,8 @@
   (§2, §8.3) ; le diff CB-18o, C-1 et C-2 (§7.1 : définition unique d'« intègre », sans limite déclarée ; l'item
   proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
   §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
-  et écrit la limite d'O-2 (§5).
+  et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
+  (§12).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -385,8 +386,8 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
 Les sondes D-4 et D-5 de l'enregistrement `sante` (§13) portent chacune le résultat d'une requête DNS en UDP, objet de
 champs :
 - `statut` : `reponse` (une réponse retenue), `delai` (aucune réponse retenue avant le délai), `forme` (adresse qui
-  n'est pas une IPv4 littérale canonique, requête impossible, ou réponse appariée mal formée) ou `reseau` (envoi
-  refusé par le système) ;
+  n'est pas une IPv4 littérale canonique, requête impossible, réponse appariée de plus de 512 octets ou mal formée) ou
+  `reseau` (envoi refusé par le système) ;
 - `rcode` : code de réponse (entier de 0 à 15 ; 0 NOERROR, 3 NXDOMAIN) ; `tc` : drapeau de troncature ; null tous deux
   sans réponse retenue ;
 - `reponses` : liste de la section réponse, chaque élément `[nom, type, ttl, données]` : `nom` en texte terminé par
@@ -402,6 +403,13 @@ seule question et la même, casse ignorée (RFC 1035 §4.1.1-4.1.2, §7.3 ; cass
 **choix du lot**, non une règle de la RFC 1035, dont le §7.3 note que des serveurs répondent depuis une autre adresse
 que celle qui a reçu la requête. Une telle réponse est ignorée, et la sonde finit en `delai` : un échec D-4 ou D-5 que
 le rodage mesure (contre-contrôle de CB-11h).
+**Taille** (C-1 (a) de la relecture d'intégration de P1, diff CB-19a) : une réponse appariée de plus de 512 octets est
+`forme`, rien n'en est gardé. RFC 1035 §2.3.4 : « UDP messages 512 octets or less » ; §4.2.1 : « Messages carried by
+UDP are restricted to 512 bytes (not counting the IP or UDP headers). Longer messages are truncated and the TC bit is
+set in the header. » Le datagramme est reçu entier (65 535 octets au plus) avant ce contrôle, qui suit l'appariement :
+un datagramme non apparié reste ignoré, quelle que soit sa taille. La borne est celle de l'UDP : `analyser` ne la porte
+pas. Avant C-1, une seule réponse appariée de 65 502 octets (un nom de 255 octets, puis 4 076 pointeurs vers lui)
+donnait une `sante` de 6 209 510 octets, au-delà de LIMITE (§7.1) : refus `JOURNAL/taille`, arrêt à chaque fenêtre.
 Tout autre datagramme (écho de la requête, réponse à une autre question, datagramme trop
 court) est ignoré, et l'attente continue jusqu'au délai (C-2). La requête ne passe par aucune résolution : l'adresse
 est une IPv4 littérale **canonique** (quatre entiers décimaux pointés, sans zéro de tête : forme rendue par

@@ -6,7 +6,9 @@ dernière fenêtre) ». CB-18j (G2 de la tranche C) : convention des citations �
 (SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1 : « elles suivent l'ADR au commit e16956b, convention du G0 ») ; `run_params`
 placé dans l'ordre de la première fenêtre d'une exécution (§11.5, observation de la G2). CB-18o (lettres C-1 et C-2 du
 FORMAT, avis sur le banc de concordance) : une seule définition d'« intègre » au §7.1, points (a) à (e), sans limite
-déclarée, et `_lire` la fait."""
+déclarée, et `_lire` la fait. CB-19a (C-1 (a) de la relecture d'intégration de P1) : §12, réponse appariée de plus
+de 512 octets en `forme`, deux citations de la RFC 1035 mot pour mot (texte lu au fichier du registre, sha256
+d14ae809…)."""
 import hashlib
 import json
 import os
@@ -56,6 +58,19 @@ class Format(unittest.TestCase):
                          [(True, True, True)])
         corrections = [p for p in puces if p.startswith("**Corrections** :")]
         self.assertEqual([("CB-11h" in p) for p in corrections], [True])
+
+    def test_paragraphe_12_reponse_de_plus_de_512_octets(self):     # CB-19a, C-1 (a) de la relecture d'intégration
+        """§12 : le statut `forme` nomme la réponse appariée de plus de 512 octets ; la règle cite la RFC 1035 §2.3.4 et
+        §4.2.1 mot pour mot ; la puce « Corrections » nomme CB-19a. Citations prises au fichier de la RFC (l.529,
+        l.1756-1758), blancs ramenés à un seul."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        douze = sections["12"]
+        attendus = ("réponse appariée de plus de 512 octets ou mal formée",
+                    "RFC 1035 §2.3.4 : « UDP messages 512 octets or less »",
+                    "§4.2.1 : « Messages carried by UDP are restricted to 512 bytes (not counting the IP or UDP "
+                    "headers). Longer messages are truncated and the TC bit is set in the header. »")
+        self.assertEqual([x in douze for x in attendus], [True] * 3)
+        self.assertEqual([("CB-19a" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
