@@ -334,3 +334,21 @@ suite entière, borne de 300 s, dépassement FATAL ; témoins verts ; réseau is
   lieu de pendre (C-6).
 - Réécrits sur le nouveau texte : MG-12, MG-27, M-LP-1a (CB-11d), MG-23, M-LP-8 (CB-11e), MG-17, MG-21 (CB-11f),
   M-LP-6 (CB-11c). Aucune équivalence invoquée hors MG-22.
+
+## RB-0a (2026-10-05) : paramètres d'analyse, lecture stricte et schéma (RECALC-BIS, partie P3)
+
+Objet : sous-paquet `recalc` et sa règle de frontière (bibliothèque standard et `recalc` seuls, PROPOSITION §1 pt 2) ;
+`config_analyse.py` : fichier des paramètres d'analyse scellés lu en octets, sha256 des octets, JSON strict (clé
+double, nombre à virgule, constante non finie, entier de plus de 30 chiffres), blocs à fixer par un lot amont (null au
+premier niveau) refusés d'abord, puis schéma : seuils de D-2 à D-5, gardes, n_s, T_max, R et seuil, tolérance des
+événements, P_j, τ et σ par (actif, classe de source), unités par classe.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/__init__.py` | 1 | — |
+| `shogen_s2bis/recalc/config_analyse.py` | 111 | 3 (`tests/test_config_analyse.py`, 77 lignes) |
+| `tests/test_fitness.py` | 76 | 4 (règle de `recalc`, cas de refus de `recalc`) |
+
+Mutants, classés par la commande du job (runner, puis ligne `verdict-suite-s2.py s2bis --aucun-saut --egal
+--plancher 117` de `gates.yml`, suite entière, borne de 300 s, réseau isolé) : 21 tués sur 21 par leur test visé
+(0 vivant, 0 FATAL). Suite : 117 tests ; plancher du job : 117, égalité exigée (`--egal`).

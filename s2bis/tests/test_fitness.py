@@ -9,8 +9,8 @@ import warnings
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Sous-paquet de shogen_s2bis → préfixes admis hors bibliothèque standard (PROPOSITION §1 pt 2). Un sous-paquet absent
-# de la table est refusé ; les imports dynamiques aussi : la frontière ne se lirait plus.
-REGLES = {"": (), "collecte": ("shogen_s2bis.collecte",)}
+# de la table est refusé ; les imports dynamiques aussi : la frontière ne se lirait plus. RB-0a : `recalc` seul admis.
+REGLES = {"": (), "collecte": ("shogen_s2bis.collecte",), "recalc": ("shogen_s2bis.recalc",)}
 DYNAMIQUES = {"importlib", "imp", "runpy", "pkgutil", "zipimport", "__import__"}
 
 
@@ -42,7 +42,8 @@ def modules():
 
 class Fitness(unittest.TestCase):
     def test_frontiere_du_paquet(self):
-        self.assertIn(("shogen_s2bis.collecte", "config.py"), [(p, n) for p, n, _o in modules()])
+        for module in (("shogen_s2bis.collecte", "config.py"), ("shogen_s2bis.recalc", "config_analyse.py")):
+            self.assertIn(module, [(p, n) for p, n, _o in modules()])
         self.assertEqual([x for p, _n, o in modules() for x in violations(p, o)], [])
 
     def test_frontiere_refuse(self):
@@ -53,6 +54,11 @@ class Fitness(unittest.TestCase):
                                 ("import json\nfrom . import x\nfrom .y import z", [])):
             self.assertEqual(violations(c, source), [f"{c} : {t}" for t in attendu], source)
         self.assertEqual(violations("shogen_s2bis.autre", ""), ["shogen_s2bis.autre : sous-paquet sans règle"])
+        r = "shogen_s2bis.recalc"                               # recalc : ni collecte (hors décodeurs), ni S2
+        for source, cible in (("from ..collecte import config", "shogen_s2bis.collecte"),
+                              ("from shogen_s2.r1 import classify_ecart", "shogen_s2.r1")):
+            self.assertEqual(violations(r, source), [f"{r} : {cible}"], source)
+        self.assertEqual(violations(r, "from . import rotation\nfrom .lecteur import Lecteur\nimport hashlib"), [])
 
     def test_memes_octets_sous_cinq_graines(self):
         code = ("from shogen_s2bis.collecte import config as c\ntry: c.controler({'a': 1, 'zz': 2, 'yy': 3, 'xx': 4},"
