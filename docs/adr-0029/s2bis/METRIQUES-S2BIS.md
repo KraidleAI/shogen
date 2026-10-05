@@ -760,3 +760,24 @@ plus refusé ; tue MR-18) et du commit (majuscules refusées ; tue MR-22). FORMA
 Mutants (commande du job, `--plancher 177`, borne de 300 s ; python3.12 ; réseau isolé) : 10 tués sur 10 (0 vivant,
 0 FATAL). MR-18 et MR-22 du réviseur sont tués, rejoués sur l'état final. Suite : 177 tests ; plancher du job : 177,
 égalité exigée (`--egal`).
+
+## CB-18i (2026-10-05) : disque injecté, onze segments d'un jour, tuple (tests seuls)
+
+Objet : SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 : `test_disque_et_empreinte_du_resolveur` injecte `os.statvfs` (valeurs
+écrites à la main ; `f_bsize` et `f_bfree` distincts de `f_frsize` et `f_bavail`) et devient déterministe. Sous un
+statvfs « mouvant », qui perd un bloc à chaque appel comme sous un écrivain concurrent, l'ancien test échoue et le
+neuf passe. SHOGEN-S2BIS-SEGMENTS-10-1 : onze redémarrages d'un même jour, chacun sur une ligne coupée, donnent les
+segments 1 à 11 ; chaque segment déclare la queue du précédent par numéro et se chaîne à sa `reprise`, et les sommes
+suivent le même ordre (tue MR-26 et un tri des noms en texte). MR-09 : tuple admis (écrit en liste JSON) puis refusé
+à 641 chiffres dans le test des 640 chiffres. Aucun code de production. FORMAT §6.1 : le numéro se compare en entier ;
+au-delà de 9 segments, l'ordre de `ls` n'est plus celui de la chaîne (le nom sur trois chiffres reste un item).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_sante.py` | 248 | 12 (1 réécrit : statvfs injecté) |
+| `tests/test_reprise.py` | 257 | 21 (1 de plus : onze redémarrages d'un même jour) |
+| `tests/test_journal.py` | 256 | 13 (1 complété : tuples) |
+
+Mutants (commande du job, `--plancher 178`, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
+0 FATAL). MR-09 et MR-26 du réviseur sont tués, rejoués sur l'état final. Suite : 178 tests ; plancher du job : 178,
+égalité exigée (`--egal`).

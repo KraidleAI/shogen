@@ -8,7 +8,7 @@ from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
 from tests.test_fichiers import J1, J2, J3
-from tests.test_journal import FICHIER, WS, Base, chaine
+from tests.test_journal import FICHIER, WS, Base, chaine, code
 
 SEG1, SEG2 = "pool-2026-10-04-1.jsonl", "pool-2026-10-04-2.jsonl"
 
@@ -222,6 +222,28 @@ class Reprise(AvecJournal):
                                   [x.split("  ")[1] for x in e[p + ".sha256"].decode().split(chr(10))[:-1]]), (
                     [{"type": "reprise", "ws": J1 - 120, "suivante": J2, "queue": q if taille else None}], "ouverture",
                     noms[:3]))
+
+    def test_onze_redemarrages_d_un_jour_segments_a_deux_chiffres(self):    # SHOGEN-S2BIS-SEGMENTS-10-1 (MR-26)
+        """Onze redémarrages d'un même jour, chacun sur une ligne coupée du dernier segment : segments 1 à 11 du jour.
+        Le numéro se lit en entier, jamais dans l'ordre des noms en texte (« -10 » y trie avant « -2 ») : chaque
+        segment déclare la queue du précédent par numéro, se chaîne à sa `reprise`, et les sommes suivent ce même
+        ordre (FORMAT §6.1, §7.2). Avant : aucun test au-delà de 9 segments (MR-26, segments à deux chiffres
+        invisibles, survivait à la G2 de la tranche C)."""
+        self.preparer()
+        noms = [FICHIER] + [f"pool-2026-10-04-{k}.jsonl" for k in range(1, 12)]
+        for k in range(1, 12):
+            with open(os.path.join(self.d, noms[k - 1]), "ab") as f:
+                f.write(b'{"k":')                                    # coupure : queue du dernier segment
+            self.assertEqual(code(lambda: self.journal(m(6 + k)).fermer()), None)
+        e = self.etat()
+        lignes = {n: e[n].split(bytes([10]))[0] for n in noms[1:]}          # première ligne de chaque segment
+        tetes = {n: json.loads(x) for n, x in lignes.items()}
+        self.assertEqual(sorted(n for n in e if n.endswith(".jsonl")), sorted(noms))
+        self.assertEqual([(tetes[n]["type"], tetes[n]["queue"][0]["fichier"]) for n in noms[1:]],
+                         [("reprise", n) for n in noms[:-1]])
+        self.assertEqual([tetes[n]["prec"] for n in noms[2:]],
+                         [hashlib.sha256(lignes[n] + bytes([10])).hexdigest() for n in noms[1:-1]])
+        self.assertEqual([x.split("  ")[1] for x in e["pool.sha256"].decode().split(chr(10))[:-1]], noms[:-1])
 
     def test_sommes_rattrapees_et_ligne_coupee_close(self):
         jl = self.journal(J1 - 60)

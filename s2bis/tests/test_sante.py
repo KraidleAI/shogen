@@ -61,11 +61,20 @@ class Sondes(unittest.TestCase):
         self.assertEqual((len(long["sortie"]), long["code"]), (4096, 1))
 
     def test_disque_et_empreinte_du_resolveur(self):
+        """`disque` lit le statvfs du dossier donné, injecté ici (SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 : deux lectures du
+        vrai statvfs différaient de 4 096 octets libres sous écritures concurrentes) : total = f_blocks × f_frsize,
+        libre = f_bavail × f_frsize (f_bsize et f_bfree, distincts, ne comptent pas) ; valeurs écrites à la main."""
+        vus = []
+
+        def statvfs(chemin):
+            vus.append(chemin)
+            return types.SimpleNamespace(f_bsize=8192, f_frsize=4096, f_blocks=1000, f_bfree=300, f_bavail=200)
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "resolv.conf"), "wb") as f:
                 f.write(RESOLV)
-            disque, v = sante.disque(d), os.statvfs(d)
-            self.assertEqual(disque, {"total": v.f_blocks * v.f_frsize, "libre": v.f_bavail * v.f_frsize})
+            with mock.patch.object(os, "statvfs", statvfs):
+                disque = sante.disque(d)
+            self.assertEqual((disque, vus), ({"total": 4096000, "libre": 819200}, [d]))
             self.assertEqual(sante.empreinte(os.path.join(d, "resolv.conf")), EMPREINTE)
             self.assertEqual((sante.disque(os.path.join(d, "absent")), sante.empreinte(os.path.join(d, "absent"))),
                              ({"erreur": "FileNotFoundError"}, None))

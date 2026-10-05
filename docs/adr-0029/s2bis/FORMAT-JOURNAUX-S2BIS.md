@@ -16,7 +16,8 @@
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
   le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3) ; le diff ENTIER-ECRIVAIN,
   I-1 (§1.2, §2). Relecture G2 de la tranche C de P1 (2026-10-05) : le diff CB-18g applique C-1 (§14.1, §14.4) ; le
-  diff CB-18h ferme l'item SHOGEN-S2BIS-CONFIG-REGLES-1 (§14.1).
+  diff CB-18h ferme l'item SHOGEN-S2BIS-CONFIG-REGLES-1 (§14.1) ; le diff CB-18i, par des tests seuls,
+  SHOGEN-S2BIS-SEGMENTS-10-1 (§6.1) et SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 (§13.5), et couvre le tuple au §1.2.
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -117,11 +118,13 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 
 1. Un fichier porte le nom `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` : jour UTC des fenêtres qu'il contient, puis numéro de
    segment `k`, 1 + le plus grand numéro de ce jour présent au dossier, 0 pour le premier fichier du jour (bascule :
-   point 2 ; segments de reprise : §7.2). L'ordre des noms, jour puis numéro, est l'ordre de la chaîne. Une seule
-   exception au jour des fenêtres : après un redémarrage dont l'horloge est en arrière du jour d'un fichier présent,
-   le segment de reprise porte ce jour, et les fenêtres antérieures s'y écrivent jusqu'à ce que l'horloge le
-   rejoigne (§7.2). La grille divise l'heure (w divise 3 600), donc la journée : une fenêtre n'est jamais à cheval
-   sur deux jours.
+   point 2 ; segments de reprise : §7.2). L'ordre des noms, jour puis numéro, est l'ordre de la chaîne. Le numéro
+   s'écrit en décimal et se compare en entier : au-delà de 9 segments d'un jour, l'ordre des noms en texte (celui de
+   `ls`) n'est plus celui de la chaîne (« -10 » y précède « -2 ») ; un test couvre onze segments d'un même jour
+   (SHOGEN-S2BIS-SEGMENTS-10-1). Une seule exception au jour des fenêtres : après un redémarrage dont l'horloge est
+   en arrière du jour d'un fichier présent, le segment de reprise porte ce jour, et les fenêtres antérieures s'y
+   écrivent jusqu'à ce que l'horloge le rejoigne (§7.2). La grille divise l'heure (w divise 3 600), donc la journée :
+   une fenêtre n'est jamais à cheval sur deux jours.
 2. Le premier enregistrement de fenêtre d'un jour nouveau déclenche la bascule : l'écrivain ajoute `cloture` au fichier
    courant, appelle `fsync`, le ferme, inscrit sa ligne au fichier de sommes, puis crée le fichier du nouveau jour au
    numéro suivant de ce jour (point 1 : un fichier du jour déjà présent, vide par exemple, n'est jamais heurté ;

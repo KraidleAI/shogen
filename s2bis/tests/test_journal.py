@@ -191,14 +191,15 @@ class Ecrivain(Base):
 
     def test_entiers_de_640_chiffres_au_plus(self):                    # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
         """640 chiffres, signe non compté, plus petite limite non nulle de conversion des entiers de l'interpréteur :
-        admis, et relus intègres ; 641 : refus JOURNAL/entier sans rien écrire, à toute profondeur, quel que soit le
-        réglage de l'interpréteur (limite abaissée à 640, ou levée) et au-delà de sa limite par défaut (FORMAT §1.2)."""
+        admis, et relus intègres ; 641 : refus JOURNAL/entier sans rien écrire, à toute profondeur et dans tout
+        conteneur (tuple compris, écrit en liste JSON : MR-09 de la G2 de la tranche C), quel que soit le réglage de
+        l'interpréteur (limite abaissée à 640, ou levée) et au-delà de sa limite par défaut (FORMAT §1.2)."""
         self.assertEqual(sys.int_info.str_digits_check_threshold, 640)
         jl, grand, refus = self.journal(), 10 ** 640, []                # grand : 641 chiffres
-        for x in (grand - 1, -(grand - 1), [grand - 1], {"y": {"z": 1 - grand}}):
+        for x in (grand - 1, -(grand - 1), [grand - 1], {"y": {"z": 1 - grand}}, (0, grand - 1)):
             jl.ecrire("lecture", WS + 60, x=x)
         avant, ancien = self.etat(), sys.get_int_max_str_digits()
-        for x in (grand, -grand, [1, [grand]], {"y": {"z": grand}}, 10 ** 5000):
+        for x in (grand, -grand, [1, [grand]], {"y": {"z": grand}}, 10 ** 5000, (0, grand), [(grand,)]):
             refus.append(code(lambda: jl.ecrire("lecture", WS + 60, x=x)))
         for limite in (640, 0):
             sys.set_int_max_str_digits(limite)
@@ -206,7 +207,7 @@ class Ecrivain(Base):
                 refus.append(code(lambda: jl.ecrire("lecture", WS + 60, x=grand)))
             finally:
                 sys.set_int_max_str_digits(ancien)
-        self.assertEqual((refus, self.etat()), (["JOURNAL/entier"] * 7, avant))
+        self.assertEqual((refus, self.etat()), (["JOURNAL/entier"] * 9, avant))
         jl.marqueur(WS + 60)
         jl.fermer()
         self.journal(WS + 120).fermer()                                 # lignes de 640 chiffres relues intègres
