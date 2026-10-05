@@ -154,6 +154,32 @@ class Reprise(AvecJournal):
         self.journal(m(7)).fermer()
         self.assertEqual([x["fichier"] for x in chaine(self.etat()[SEG2], seq, prec)[2][0]["queue"]], [FICHIER, SEG1])
 
+    def test_deux_pannes_deux_queues_dans_l_ordre_jour_k(self):        # CB-18p, lettre C-3 du FORMAT (risque R-1)
+        """Deux pannes réelles de l'écrivain, disque plein sur une ligne du journal : une `lecture` du 4 coupée, puis,
+        au redémarrage du 5, la `reprise` du segment neuf coupée. Le redémarrage suivant déclare les deux queues dans
+        l'ordre croissant (jour, k) des fichiers, non dans l'ordre de relecture (FORMAT §7.4)."""
+        vrai, d5 = j._tout, ["pool-2026-10-05-0.jsonl", "pool-2026-10-05-1.jsonl"]
+
+        def coupe(fd, octets):                                  # ligne du journal : 40 octets, puis ENOSPC
+            if not octets.startswith(b"{"):
+                return vrai(fd, octets)                         # ligne du fichier de sommes : écrite
+            os.write(fd, octets[:40])
+            raise OSError(errno.ENOSPC, "disque plein (simulé)")
+        jl, suivant = self.journal(), j.Journal(self.d, "pool", fsync=self.espion)
+        jl.marqueur(m(1))
+        intact = self.etat()[FICHIER]
+        with mock.patch.object(j, "_tout", coupe):
+            self.assertRaises(OSError, jl.ecrire, "lecture", m(2), k=2)
+            jl.fermer()
+            self.assertRaises(OSError, suivant.ouvrir, J2)
+        suivant.fermer()
+        self.journal(J2 + 60).fermer()
+        e, (seq, prec, _e) = self.etat(), chaine(intact)
+        q = [e[FICHIER][len(intact):], e[d5[0]]]
+        self.assertEqual(chaine(e[d5[1]], seq, prec)[2][0]["queue"], [
+            {"fichier": FICHIER, "position": len(intact), "octets": 40, "sha256": hashlib.sha256(q[0]).hexdigest()},
+            {"fichier": d5[0], "position": 0, "octets": 40, "sha256": hashlib.sha256(q[1]).hexdigest()}])
+
     def test_reprise_sur_fichier_clos_fichier_neuf(self):              # C-5 (G-02)
         seq, prec, _e = chaine(self.preparer())
         with open(os.path.join(self.d, FICHIER), "ab") as f:

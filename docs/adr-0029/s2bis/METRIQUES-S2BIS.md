@@ -919,3 +919,21 @@ décodeur ; `point` retiré des types réservés ; sonde R-2 (`ws` de `run_param
 échoue). Passage précédent, non compté : 19 tués et 1 vivant (`point` retiré des types réservés, le test des
 refus ne couvrant que `marqueur`) ; le test a été complété. Suite : 181 tests ; plancher du job : 181, égalité exigée
 (`--egal`).
+
+## CB-18p (2026-10-05) : ordre de la liste `queue` (lettre C-3 du FORMAT)
+
+Objet : le §7.4 porte la lettre C-3 : `queue` est une liste non vide dans l'ordre croissant (jour, k) des fichiers, ou
+null sans queue ; une liste vide, un objet nu, un autre ordre ou un booléen pour un entier font une déclaration
+fausse ; à toute rupture, toutes les queues en attente sont rendues avec elle ; seules comptent comme déclarées les
+`reprise` intègres, au lien juste, à déclaration exacte. Le §7.4 dit que l'écrivain écrit la liste dans cet ordre :
+il relit du plus récent au plus ancien et range chaque queue devant les précédentes ; aucun code ne change. Risque
+R-1 : un test de deux pannes réelles (disque plein sur une `lecture` du 4, puis sur la `reprise` du segment neuf du 5)
+fixe l'ordre ; il échoue sous le mutant qui ajoute en fin de liste. FORMAT §7.4.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_reprise.py` | 286 | 23 (1 de plus : deux pannes réelles, deux queues dans l'ordre (jour, k)) |
+
+Mutants (commande du job, `--plancher 182`, borne de 300 s ; python3.12 ; réseau isolé) : 2 tués sur 2 (0 vivant,
+0 FATAL) : queues rangées dans l'ordre de relecture, plancher non relevé. Suite : 182 tests ; plancher du job : 182,
+égalité exigée (`--egal`).
