@@ -34,8 +34,10 @@ def chaine(a: dict, cellule: str, i: int, composant=None, indice=None) -> str:
 
 
 def graine_flux(a: dict, cellule: str, i: int, composant: str, indice: int) -> int:
-    """Entier big-endian des 8 premiers octets de SHA-256 de la chaîne ASCII du flux (E-S-41)."""
-    return int.from_bytes(hashlib.sha256(chaine(a, cellule, i, composant, indice).encode("ascii")).digest()[:8], "big")
+    """Entier big-endian des 8 premiers octets de SHA-256 de la chaîne ASCII du flux (E-S-41) ; composant et indice
+    exigés tous deux (sinon ALEAS/champ : sans eux, la chaîne serait celle de la graine de règle ; C-4 de la G2)."""
+    c = chaine(a, cellule, i, _texte(composant, "composant"), indice)
+    return int.from_bytes(hashlib.sha256(c.encode("ascii")).digest()[:8], "big")
 
 
 def flux(a: dict, cellule: str, i: int, composant: str, indice: int):

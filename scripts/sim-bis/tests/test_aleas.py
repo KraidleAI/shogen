@@ -110,3 +110,26 @@ class TestAleas(unittest.TestCase):
         """Sans bits de garde, l'encadrement de (2/3)^1 sur 2^-53 laisse deux seuils : refus nommé, jamais un seuil
         deviné. Mutation M-1-15 : borne haute arrondie par défaut (encadrement nul)."""
         self.refus("ALEAS/seuil-ambigu", aleas.Geometrique, Fraction(1, 3), 4, 0)
+
+    def test_flux_a_moitie_renseigne(self):
+        """C-4 (a) de la G2 (E-S-41) : composant sans indice, ou indice sans composant : ALEAS/champ, jamais une chaîne
+        de quatre champs. Mutation R-03 : « and » au lieu de « or »."""
+        for composant, indice in (("sources", None), (None, 0)):
+            self.refus("ALEAS/champ", aleas.chaine, A, "N1", 0, composant, indice)
+
+    def test_flux_exige_composant_et_indice(self):
+        """C-4 (b) de la G2 (E-S-41) : un flux exige composant et indice ; sans eux, sa chaîne serait celle de la
+        graine de règle, et graine_flux(A, "N1", 0, None, None) les 64 premiers bits de graine_regle(A, "N1", 0)
+        (12389947756047311666 = 0xabf1efd6e0d92332, par `sha256sum` et `bc`) : ALEAS/champ, pour graine_flux et flux."""
+        for composant, indice in ((None, None), ("sources", None), (None, 0)):
+            self.refus("ALEAS/champ", aleas.graine_flux, A, "N1", 0, composant, indice)
+        self.refus("ALEAS/champ", aleas.flux, A, "N1", 0, None, None)
+
+    def test_geometrique_un_appel_par_tranche(self):
+        """C-5 de la G2 (R-02) : p = 1/4, deux rangs, borne 2 (fin de la première tranche) : u() = 0,5 ≥ 7/16 rend
+        None après un seul appel de u() (suite(0.5) à une valeur). Mutation R-02 : « base <= borne », tirage de trop."""
+        g = aleas.Geometrique(Fraction(1, 4), 2, 64)
+        try:
+            self.assertIsNone(g.tirer(suite(0.5), 2))
+        except StopIteration:
+            self.fail("second appel de u() au-delà de la borne")

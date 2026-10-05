@@ -156,3 +156,43 @@ class TestSocle(unittest.TestCase):
         self.assertEqual((t[0], t[1:] == sorted(t[1:])), (commun.ETIQUETTE, True))
         self.assertTrue({moi, "sha256 docs/x.txt ab"} <= set(t))
         self.assertEqual([x for x in t[1:] if not x.startswith("sha256 scripts/sim-bis/")], ["sha256 docs/x.txt ab"])
+
+    def test_garde_chemin_par_defaut(self):
+        """C-1 de la G2 (E-S-02, annexe D.4 a) : sans argument `environ`, la garde lit os.environ, remplacé le temps du
+        cas par un mapping (mock.patch.object : ni putenv, ni sous-processus) ; vide, charger_parametres() et
+        lire_entree(prm, "episodes") lisent ; fictif, ils rendent CAMPAGNE/variable. Mutation R-28 : chemin par défaut
+        neutralisé."""
+        with mock.patch.object(commun.os, "environ", {}):
+            prm = commun.charger_parametres()
+            self.assertEqual(len(commun.lire_entree(prm, "episodes")), 40337)
+        with mock.patch.object(commun.os, "environ", FICTIF):
+            self.refus("CAMPAGNE/variable", commun.charger_parametres)
+            self.refus("CAMPAGNE/variable", commun.lire_entree, prm, "episodes")
+
+    def test_schema_controle_au_chargement(self):
+        """C-2 de la G2 (E-S-03) : JSON valide hors schéma ({"lot": "SIM-BIS"}) refusé par charger_parametres :
+        PARAMETRES/schema. Mutation R-26 : schéma non contrôlé au chargement."""
+        self.refus("PARAMETRES/schema", commun.charger_parametres, self.poser("p.json", b'{"lot": "SIM-BIS"}'),
+                   environ={})
+
+    def test_jsonl_en_majuscules(self):
+        """C-5 de la G2 (R-07) : « .JSONL » refusé en entrée (ENTREE/jsonl) et en sortie (SORTIE/jsonl), rien
+        d'écrit. Mutation R-07 : extension d'entrée comparée sans passage en minuscules."""
+        self.refus("ENTREE/jsonl", commun.charger_parametres, self.poser("p.JSONL", b"{}"), environ={})
+        self.refus("SORTIE/jsonl", commun.ecrire, os.path.join(self.r, "u.JSONL"), b"x")
+        self.assertEqual(os.listdir(self.r), ["p.JSONL"])
+
+    def test_epingle_de_64_caracteres(self):
+        """C-5 de la G2 (R-08) : une épingle compte exactement 64 caractères hexadécimaux ; 65 (et 63) refusés au
+        schéma : PARAMETRES/schema. Mutation R-08 : « len(v) >= 64 »."""
+        prm = commun.charger_parametres(environ={})
+        sha = prm["entrees"]["episodes"]["sha256"]
+        for s in (sha + "0", sha[:-1]):
+            prm["entrees"]["episodes"]["sha256"] = s
+            self.refus("PARAMETRES/schema", commun.controler, prm, commun.SCHEMA)
+
+    def test_cle_flottante(self):
+        """O-2 de la G2 (E-S-43) : clé flottante d'un dict, même imbriqué, refusée (SORTIE/flottant) ; json.dumps
+        l'écrirait en chaîne (« 0.5 »). Mutation : clés non parcourues par _sans_flottant."""
+        for x in ({0.5: 1}, {"a": [{1.0: "b"}]}):
+            self.refus("SORTIE/flottant", commun.json_canonique, x)

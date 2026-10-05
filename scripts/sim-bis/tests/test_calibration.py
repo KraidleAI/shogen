@@ -23,10 +23,14 @@ def retouche(numero: int, avant: str, apres: str) -> str:
 
 
 class TestCalibration(unittest.TestCase):
-    def refus(self, code, texte):
-        with self.assertRaises(commun.Refus) as c:
-            calibration.analyser(texte, PRM["calibration"])
-        self.assertEqual(c.exception.code, code)
+    def refus(self, code, texte, k=None):
+        """Refus nommé `code` exigé ; toute autre exception échoue en la nommant par son type (O-1, R-12 de la G2)."""
+        try:
+            calibration.analyser(texte, k or PRM["calibration"])
+        except Exception as e:
+            self.assertEqual(getattr(e, "code", type(e).__name__), code)
+        else:
+            self.fail(f"{code} attendu, aucun refus")
 
     def test_lecture_t_cal_1(self):
         """EP l.13 et l.14 ; 40 lignes d'épisodes (2 strates × 10 unités × 2 types). Mutations M-CAL-1 (censurés
@@ -100,3 +104,20 @@ class TestCalibration(unittest.TestCase):
                   retouche(128, f"σ̂²_bloc = {g} ; γ̂₀ = {g}", "σ̂²_bloc = 2 ; γ̂₀ = 2"),
                   retouche(140, "garde : tenue", "garde : non tenue"), retouche(140, "4099142081780", "4099142081781")):
             self.refus("CALIB/coherence", t)
+
+    def test_quotient_indefini_nomme(self):
+        """C-5 de la G2 (R-12) : EP l.13 « n_s = 0 ; cellules = 0 » : 0/0 lève InvalidOperation, qui n'est pas une
+        ZeroDivisionError ; rendu CALIB/coherence. Mutation R-12 : seules les divisions par zéro nommées."""
+        self.refus("CALIB/coherence", retouche(13, "n_s = 24585 ; cellules = 372 ;", "n_s = 0 ; cellules = 0 ;"))
+
+    def test_longueur_repetee_refusee(self):
+        """C-5 de la G2 (R-13) : EP l.14 « 1×301 » écrit « 1×300 1×1 » (332 épisodes, 372 cellules, maximum et
+        quantiles inchangés, `bc`) : longueurs non strictement croissantes, CALIB/coherence. Mutation R-13 :
+        « sorted(lg) » au lieu de « sorted(set(lg)) »."""
+        self.refus("CALIB/coherence", retouche(14, "1×301", "1×300 1×1"))
+
+    def test_quantile_au_dela_de_100(self):
+        """O-1 de la G2 : un quantile au-delà de 100 n'a pas de rang (P101 : rang 336 > 332 épisodes, `bc`) : refus
+        nommé CALIB/coherence, et non StopIteration. Mutation : next sans valeur par défaut."""
+        k = dict(PRM["calibration"], quantiles=[50, 90, 101])
+        self.refus("CALIB/coherence", EP.replace("P99 = ", "P101 = "), k)

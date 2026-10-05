@@ -1,7 +1,7 @@
 """Fitness du lot (SB-0 ; E-S-01, E-S-06 ; T-FRO-1, analyse des imports) : frontière lue par `ast` sur chaque module du
-moteur (tout `*.py` du dossier du lot, hors tests et hors les deux adaptateurs d'oracle d'E-S-01) ; aucun octet de barre
-oblique inverse dans les fichiers du lot (consigne de gabarit, ADR-0028 annexe B.16) ; SB-1 : aucune fonction
-transcendante de libm dans le moteur (E-S-43), lue par `ast`."""
+moteur (tout `*.py` du dossier du lot, hors tests et hors les deux adaptateurs d'oracle d'E-S-01, que le moteur
+n'importe pas) ; aucun octet de barre oblique inverse dans les fichiers du lot (consigne de gabarit, ADR-0028 annexe
+B.16) ; SB-1 : aucune fonction transcendante de libm dans le moteur (E-S-43), lue par `ast`."""
 import ast
 import os
 import sys
@@ -16,7 +16,8 @@ MATH_ADMIS = {"nextafter", "isqrt", "gcd", "floor", "ceil", "isfinite"}
 
 def refus_imports(source: str, lot: set) -> list:
     """Motifs de refus d'un module du moteur : import relatif ; module ni de la bibliothèque standard ni du lot
-    (`shogen_s2`, `shogen_s2bis` compris) ; module interdit (import dynamique, réseau) ; appel de `__import__`."""
+    (`shogen_s2`, `shogen_s2bis` compris) ; adaptateur d'oracle, même présent dans le lot (E-S-01, C-3 de la G2) ;
+    module interdit (import dynamique, réseau) ; appel de `__import__`."""
     out = []
     for n in ast.walk(ast.parse(source)):
         if isinstance(n, ast.ImportFrom) and n.level:
@@ -25,7 +26,7 @@ def refus_imports(source: str, lot: set) -> list:
             [n.module] if isinstance(n, ast.ImportFrom) and n.module else [])
         for m in noms:
             t = m.split(".")[0]
-            if t in INTERDITS or not (t in sys.stdlib_module_names or t in lot):
+            if t in INTERDITS or not (t in sys.stdlib_module_names or t in lot) or t + ".py" in ORACLES:
                 out.append(f"{m} l.{n.lineno}")
         if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "__import__":
             out.append(f"__import__ l.{n.lineno}")
@@ -65,6 +66,15 @@ class TestFitness(unittest.TestCase):
                   "from socket import socket"):
             self.assertNotEqual(refus_imports(s, {"commun"}), [], s)
         self.assertEqual(refus_imports("import json, os.path" + chr(10) + "from commun import Refus", {"commun"}), [])
+
+    def test_frontiere_refuse_les_adaptateurs(self):
+        """C-3 de la G2 (E-S-01) : un module du moteur n'importe aucun des deux adaptateurs d'oracle, même présents
+        dans le dossier du lot (noms admis au moteur : bibliothèque standard et modules du moteur). Mutation R-34 :
+        `import oracle_r1` dans un module du moteur, oracle_r1.py présent."""
+        lot = {"commun", "oracle_r1", "oracle_recalc"}
+        for s in ("import oracle_r1", "from oracle_recalc import croiser", "import oracle_r1.sous as o"):
+            self.assertNotEqual(refus_imports(s, lot), [], s)
+        self.assertEqual(refus_imports("import commun", lot), [])
 
     def test_aucune_barre_oblique_inverse(self):
         """Aucun octet 92 dans les fichiers du lot (E-S-06 ; un texte qui en porte un s'écrit par chr(92)). Mutation

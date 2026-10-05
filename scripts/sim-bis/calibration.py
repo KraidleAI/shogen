@@ -29,7 +29,8 @@ def _egal(i: int, quoi: str, lu, attendu) -> None:
 
 
 def _episode(i: int, m, h, k: dict, ctx) -> dict:
-    """Enregistrement d'une ligne d'épisodes et de son histogramme, après contrôle de cohérence."""
+    """Enregistrement d'une ligne d'épisodes et de son histogramme, après contrôle de cohérence ; un quantile sans
+    rang (au-delà de 100) vaut None, d'où un refus nommé (O-1 de la G2)."""
     nq = len(k["quantiles"])
     n_s, cel, ep, cens, mx, *e = (int(m.group(j)) for j in (1, 2, 3, 4, 7, *range(8, 9 + nq)))
     hist = [tuple(int(y) for y in x.split("×")) for x in h.group(1).split(" ")]
@@ -47,7 +48,7 @@ def _episode(i: int, m, h, k: dict, ctx) -> dict:
         cumul += n
         rang_val.append((cumul, x))
     _egal(i, "quantiles au rang le plus proche", e[:-1],
-          [next(x for c, x in rang_val if c >= -(-q * ep // 100)) for q in k["quantiles"]])
+          [next((x for c, x in rang_val if c >= -(-q * ep // 100)), None) for q in k["quantiles"]])
     return {"n_s": n_s, "cellules": cel, "episodes": ep, "censures": cens, "complets": e[-1], "max": mx,
             "taux": Fraction(m.group(5)), "moyenne": Fraction(m.group(6)), "quantiles": e[:-1],
             "moyenne_complets": Fraction(m.group(9 + nq)), "histogramme": hist}

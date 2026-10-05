@@ -161,13 +161,13 @@ def ecrire(chemin: str, octets: bytes) -> None:
 def _sans_flottant(x) -> None:
     if type(x) is float:
         raise Refus("SORTIE/flottant", f"{x!r} (E-S-43)")
-    for y in x.values() if type(x) is dict else x if type(x) in (list, tuple) else ():
+    for y in [*x, *x.values()] if type(x) is dict else x if type(x) in (list, tuple) else ():
         _sans_flottant(y)
 
 
 def json_canonique(obj) -> bytes:
-    """UTF-8 du JSON à clés triées, séparateurs fixes, sans échappement, saut de ligne final ; aucun flottant ;
-    aucune heure, aucun hôte, aucune version (E-S-43)."""
+    """UTF-8 du JSON à clés triées, séparateurs fixes, sans échappement, saut de ligne final ; aucun flottant, ni en
+    valeur ni en clé (O-2 de la G2) ; aucune heure, aucun hôte, aucune version (E-S-43)."""
     _sans_flottant(obj)
     try:
         t = json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
