@@ -41,6 +41,14 @@ def part(m: int, debut: int, n: int) -> Fraction:
     return Fraction((m >> debut & ((1 << n) - 1)).bit_count(), n)
 
 
+def prm_pool(unites) -> dict:
+    """Paramètres d'essai au pool `unites` (liste de calibration.unites, réordonnée ou réduite), classes réduites de
+    même."""
+    hotes = [h for h, _f in unites]
+    cl = {c: [h for h in hotes if h in p] for c, p in PRM["sources"]["classes"].items()}
+    return dict(PRM, calibration=dict(PRM["calibration"], unites=unites), sources=dict(PRM["sources"], classes=cl))
+
+
 class TestSources(unittest.TestCase):
     def refus(self, code, f, *a):
         with self.assertRaises(commun.Refus) as c:
@@ -171,16 +179,20 @@ class TestSources(unittest.TestCase):
 class TestHotes(unittest.TestCase):
     def test_indice_et_longues(self):
         """Indice (h·S + s)·10 + k, h rang dans sources.indices_hotes (C-6) : binance calme → 0 ; okx (rang 3) stress,
-        k = 3 → (3·2 + 1)·10 + 3 = 73 ; bitfinex (rang 6) stress → 130 ; hôte inconnu, k = 10 : SOURCES/indice. Pannes
-        longues (E-S-11) : 1 h, 1 jour, 3 jours, également probables, moyenne (60 + 1 440 + 4 320)/3 = 1 940. Mutations
-        M-3C-01 (strate omise de l'indice), M-3C-09 (durées pondérées par leur longueur), M-C6-06 (rang pris dans la
-        liste triée)."""
+        k = 3 → (3·2 + 1)·10 + 3 = 73 ; bitfinex (rang 6) stress → 130 ; hôte inconnu, k = 10, strate inconnue (O-B du
+        contre-contrôle de la tranche 2) : SOURCES/indice. Pannes longues (E-S-11) : 1 h, 1 jour, 3 jours, également
+        probables, moyenne (60 + 1 440 + 4 320)/3 = 1 940. Mutations M-3C-01 (strate omise de l'indice), M-3C-09 (durées
+        pondérées par leur longueur), M-C6-06 (rang pris dans la liste triée), K-05 du réviseur (contrôle de la strate
+        retiré : ValueError non nommée)."""
         self.assertEqual([sources.indice(PRM, "binance", "calme"), sources.indice(PRM, "okx", "stress", 3),
                           sources.indice(PRM, "bitfinex", "stress")], [0, 73, 130])
-        for h, k in (("bybit", 0), ("okx", 10)):
-            with self.assertRaises(commun.Refus) as c:
-                sources.indice(PRM, h, "calme", k)
-            self.assertEqual(c.exception.code, "SOURCES/indice")
+        for h, s, k in (("bybit", "calme", 0), ("okx", "calme", 10), ("binance", "inconnue", 0)):
+            try:                    # O-B du contre-contrôle : strate inconnue ; un refus non nommé rougit par assertion
+                sources.indice(PRM, h, s, k)
+                code = None
+            except Exception as e:  # noqa: BLE001 (le code du refus est l'attendu, quel que soit le type levé)
+                code = getattr(e, "code", type(e).__name__)
+            self.assertEqual(code, "SOURCES/indice", (h, s, k))
         self.assertEqual(PRM["sources"]["longues"], [60, 1440, 4320])
         lg = sources.loi_longues(PRM)
         self.assertEqual((lg.hist, lg.moyenne), (((60, 1), (1440, 1), (4320, 1)), 1940))
@@ -332,20 +344,59 @@ class TestDerives(unittest.TestCase):
         self.assertEqual(sources.amincir(suite(0.06, 0.5), [(0, 3), (50, 51)], d), [(50, 51)])
 
     def test_derives_tirees(self):
-        """Sauts et panne initiale (N9), L = 2 880 (deux jours) : hôte parmi 10 (u = 0,05 → binance), sens (0,7 → de
-        19/10 à 1/10), jour (0,6 → 1), minute (0 → 0) : saut en 1 440 ; parmi les 9 restants (0,95 → okx), sens (0,2 →
-        de 1/10 à 19/10), jour (0,1 → 0), minute (0,5 → 720) ; parmi 8 (0,3 → chainlink), sens (0,4), jour (0,99 → 1),
-        minute (0,99999 → 1 439) : 2 879 ; panne initiale parmi les 9 hôtes décalés (0,05 → rang 0 → bitfinex ; binance,
-        non décalé, est exclu). Genre inconnu, deux multiplicateurs, L non multiple d'un jour : SOURCES/derive.
-        Mutations M-3D-04 (tirage avec remise), M-3D-05 (hôte non décalé admis pour la panne initiale), M-3D-06
-        (contrôle des genres retiré)."""
-        u = suite(0.05, 0.7, 0.6, 0.0, 0.95, 0.2, 0.1, 0.5, 0.3, 0.4, 0.99, 0.99999, 0.05)
+        """Sauts et panne initiale (N9), L = 2 880 (deux jours), tirages sur les rangs de sources.indices_hotes
+        (binance, coinbase, kraken, okx, bitstamp, gemini, bitfinex, coingecko, defillama, chainlink ; O-A) : rang
+        parmi 10 (u = 0,05 → 0, binance), sens (0,7 → de 19/10 à 1/10), jour (0,6 → 1), minute (0 → 0) : saut en
+        1 440 ; parmi les 9 restants (0,95 → 8, chainlink), sens (0,2 → de 1/10 à 19/10), jour (0,1 → 0), minute
+        (0,5 → 720) ; parmi 8 (0,26 → 2, okx ; avec remise, 0,26 parmi 10 donnerait kraken), sens (0,4), jour
+        (0,99 → 1), minute (0,99999 → 1 439) : 2 879 ; panne initiale parmi les 9 rangs hors de l'unité non décalée,
+        binance, premier hôte du pool par ordre alphabétique (ADR-0029 l.200) : 0,05 → coinbase ; pool à rebours,
+        même tirage : coinbase ; pool sans coinbase : rang tiré inemployé, aucune panne initiale ; pool sans binance :
+        bitfinex devient l'unité non décalée, 0,05 → binance, absent : aucune panne initiale. Genre inconnu, deux
+        multiplicateurs, L non multiple d'un jour : SOURCES/derive. Mutations M-3D-04 (tirage avec remise), M-3D-05b
+        (unité non décalée admise pour la panne initiale), M-3D-06 (contrôle des genres retiré), M-4I-02 (sauts dans
+        l'ordre du pool), M-4I-03 (unité non décalée = premier hôte du pool dans l'ordre écrit), M-4I-07 (panne
+        initiale tirée hors du pool gardée), M-4I-10 (unité non décalée = dernier hôte par ordre alphabétique), M-4I-11
+        (unité non décalée prise au rang 0 de la liste scellée)."""
+        u = suite(0.05, 0.7, 0.6, 0.0, 0.95, 0.2, 0.1, 0.5, 0.26, 0.4, 0.99, 0.99999, 0.05)
         lo, hi = Fraction(1, 10), Fraction(19, 10)
         self.assertEqual(sources.derives(PRM, {"genres": ["sauts", "initiale"], "duree": 2880}, u),
-                         {"specs": {"binance": ("saut", hi, lo, 1440), "okx": ("saut", lo, hi, 720),
-                                    "chainlink": ("saut", lo, hi, 2879)}, "initiale": "bitfinex"})
+                         {"specs": {"binance": ("saut", hi, lo, 1440), "chainlink": ("saut", lo, hi, 720),
+                                    "okx": ("saut", lo, hi, 2879)}, "initiale": "coinbase"})
+        rebours = prm_pool(list(reversed(PRM["calibration"]["unites"])))
+        self.assertEqual(sources.derives(rebours, {"genres": ["initiale"], "duree": 1440}, suite(0.05))["initiale"],
+                         "coinbase")
+        for retire in ("coinbase", "binance"):
+            reduit = prm_pool([x for x in PRM["calibration"]["unites"] if x[0] != retire])
+            self.assertIsNone(sources.derives(reduit, {"genres": ["initiale"], "duree": 1440}, suite(0.05))["initiale"])
         for g, n in ((["inconnu"], 2880), (["tendances", "commune"], 2880), (["sauts"], 1000)):
             self.refus("SOURCES/derive", sources.derives, PRM, {"genres": g, "duree": n}, suite(0.1, 0.1, 0.1, 0.1))
+
+    def test_derives_ancrees_o_a(self):
+        """O-A du contre-contrôle de la tranche 2 (adjugé le 2026-10-05, avant E0, comme C-6 pour les flux) : sens des
+        tendances, rangs à saut et panne initiale tirés sur sources.indices_hotes ; un tirage tombé hors du pool reste
+        inemployé. Pool à rebours, ou sans coinbase, sous « tendances » ou « sauts + initiale » (horizon 3 000, f = 1) :
+        dérives et état vrai des autres hôtes identiques à l'octet ; dérives effectives (dix tendances ; trois sauts au
+        plus, une panne initiale ou aucune ; aucune dérive hors du pool). Hôte du pool absent de la liste :
+        SOURCES/indice. Mutations M-4I-01 (tendances dans l'ordre du pool), M-4I-02 (sauts dans l'ordre du pool),
+        M-4I-04 (contrôle d'appartenance retiré), M-4I-06 (saut tiré hors du pool gardé), M-4I-08 (sens tirés pour
+        les seuls hôtes du pool), M-4I-09 (instant d'un saut tiré pour les seuls hôtes du pool)."""
+        u, m = PRM["calibration"]["unites"], {"calme": (1 << 3000) - 1, "stress": 0}
+        for derive in ({"genres": ["tendances"], "duree": 3000}, {"genres": ["sauts", "initiale"], "duree": 2880}):
+            vu = {}
+            reduit = [x for x in u if x[0] != "coinbase"]
+            for nom, unites in (("tous", u), ("rebours", list(reversed(u))), ("sans", reduit)):
+                r = sources.Replication(prm_pool(unites), EP, dict(fond(), derive=derive), "T-4I", 0, m, 3000)
+                vu[nom] = (r.derives(), r.etat())
+            (d, e), sans = vu["tous"], lambda x: {k: v for k, v in x.items() if "coinbase" not in k}
+            self.assertEqual(vu["rebours"], (d, e), derive)
+            self.assertEqual((sans(vu["sans"][0]["specs"]), sans(vu["sans"][1])), (sans(d["specs"]), sans(e)), derive)
+            self.assertEqual(vu["sans"][0]["initiale"], None if d["initiale"] == "coinbase" else d["initiale"])
+            self.assertLessEqual(set(vu["sans"][0]["specs"]), {h for h, _f in reduit}, derive)
+            self.assertTrue(len(d["specs"]) == 10 if "tendances" in derive["genres"] else 0 < len(d["specs"]) <= 3)
+        sans_okx = dict(PRM, sources=dict(PRM["sources"], indices_hotes=[h for h in PRM["sources"]["indices_hotes"]
+                                                                         if h != "okx"]))
+        self.refus("SOURCES/indice", sources.derives, sans_okx, {"genres": ["tendances"], "duree": 100}, suite(0.1))
 
     def test_transitoire_et_initiale(self):
         """Transitoire commun (X2) : binance calme, f = 1, taux × 3 sur les 10 080 premières fenêtres, puis × 1 ; 100
@@ -596,12 +647,15 @@ class TestCasG2(unittest.TestCase):
         self.assertTrue(dans_5_se(x, Fraction(2458, 24585) * Fraction(2458, 24585)))
 
     def test_sens_des_tendances_et_de_la_commune(self):
-        """(c) Sens tirés à la main, croissant si u < 1/2. « tendances » : un tirage par hôte dans l'ordre du pool (0,2
-        et 0,7 alternés) ; « commune » : un seul tirage (0,7 : décroissant) pour les dix hôtes, les douze valeurs
-        suivantes restant inemployées. Mutations R-03 (commune : un sens par hôte), R-04 (tendances : un seul sens)."""
+        """(c) Sens tirés à la main, croissant si u < 1/2. « tendances » : un tirage par rang de sources.indices_hotes,
+        dans l'ordre de cette liste (O-A du contre-contrôle de la tranche 2 ; 0,2 et 0,7 alternés) ; « commune » : un
+        seul tirage (0,7 : décroissant) pour les dix hôtes, les douze valeurs suivantes restant inemployées. Mutations
+        R-03 (commune : un sens par hôte), R-04a (tendances : un seul sens), M-4I-01 (tendances dans l'ordre du
+        pool)."""
         lo, hi, tous = Fraction(1, 10), Fraction(19, 10), [h for h, _f in PRM["calibration"]["unites"]]
         d = sources.derives(PRM, {"genres": ["tendances"], "duree": 100}, suite(*[0.2, 0.7] * 5))["specs"]
-        self.assertEqual([d[h] for h in tous], [("lineaire", lo, hi, 100), ("lineaire", hi, lo, 100)] * 5)
+        self.assertEqual([d[h] for h in PRM["sources"]["indices_hotes"]],
+                         [("lineaire", lo, hi, 100), ("lineaire", hi, lo, 100)] * 5)
         reste = iter([0.7] + [0.2] * 12)
         d = sources.derives(PRM, {"genres": ["commune"], "duree": 100}, reste.__next__)["specs"]
         self.assertEqual(([d[h] for h in tous], len(list(reste))), ([("lineaire", hi, lo, 100)] * 10, 12))

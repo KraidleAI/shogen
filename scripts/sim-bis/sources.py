@@ -337,18 +337,24 @@ def amincir(u, segs: list, d: tuple) -> list:
 
 def derives(prm: dict, derive, u) -> dict:
     """Dérives d'une réplication (E-S-13 ; derive : None ou {"genres", "duree" : durée nominale L en fenêtres}) :
-    {"specs" : {hôte : multiplicateur}, "initiale" : hôte ou None}. Tirages sur u, dans l'ordre : commune (d : un sens
-    pour tous) ; tendances (a : un sens par hôte, ordre du pool) ; sauts (b : unites_saut hôtes sans remise, chacun
-    suivi de son sens et de son instant, jour puis fenêtre du jour) ; transitoire (d : × facteur sur les premières
-    fenêtres, sans tirage) ; initiale (c : un hôte décalé, en panne dès 0). Sens croissant si u < 1/2. SOURCES/derive :
-    genre inconnu, plus d'un multiplicateur, ou sauts sur une durée non multiple d'un jour."""
+    {"specs" : {hôte : multiplicateur}, "initiale" : hôte ou None}. Tirages sur u, ancrés sur les rangs de la liste
+    scellée sources.indices_hotes (O-A du contre-contrôle de la tranche 2, comme C-6 pour les flux), dans l'ordre :
+    commune (d : un sens pour tous) ; tendances (a : un sens par rang de la liste) ; sauts (b : unites_saut rangs sans
+    remise, chacun suivi de son sens et de son instant, jour puis fenêtre du jour) ; transitoire (d : × facteur sur les
+    premières fenêtres, sans tirage) ; initiale (c : un rang hors de l'unité non décalée, premier hôte du pool par ordre
+    alphabétique, ADR-0029 l.200 ; en panne dès 0). Un tirage tombé hors du pool reste inemployé : réordonner ou
+    réduire le pool ne change la dérive d'aucun autre hôte. Sens croissant si u < 1/2. Hôte du pool absent de la liste
+    (ou liste à doublon) : SOURCES/indice ; SOURCES/derive : genre inconnu, plus d'un multiplicateur, ou sauts sur une
+    durée non multiple d'un jour."""
     out, hotes = {"specs": {}, "initiale": None}, [h for h, _f in prm["calibration"]["unites"]]
     if derive is None:
         return out
     g, n, p, fpj = derive["genres"], derive["duree"], prm["sources"]["derive"], 86400 // prm["calendrier"]["w"]
     if any(x not in GENRES for x in g) or sum(x in g for x in GENRES[:4]) > 1 or ("sauts" in g and n % fpj):
         raise commun.Refus("SOURCES/derive", f"genres {g!r}, durée {n!r}")
-    bas, haut = Fraction(*p["bornes"][0]), Fraction(*p["bornes"][1])
+    bas, haut, liste = Fraction(*p["bornes"][0]), Fraction(*p["bornes"][1]), prm["sources"]["indices_hotes"]
+    for h in hotes:
+        rang(prm, h)
 
     def sens():
         return (bas, haut) if aleas.bernoulli(u, aleas.seuil(Fraction(1, 2))) else (haut, bas)
@@ -356,16 +362,21 @@ def derives(prm: dict, derive, u) -> dict:
         s = sens()
         out["specs"] = {h: ("lineaire", *s, n) for h in hotes}
     if "tendances" in g:
-        out["specs"] = {h: ("lineaire", *sens(), n) for h in hotes}
-    reste = list(hotes)
+        tires = [("lineaire", *sens(), n) for _h in liste]
+        out["specs"] = {h: d for h, d in zip(liste, tires) if h in hotes}
+    reste = list(liste)
     for _j in range(p["unites_saut"] if "sauts" in g else 0):
         h = reste.pop(_uniforme(len(reste)).tirer(u))
         s = sens()
-        out["specs"][h] = ("saut", *s, fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u))
+        d = ("saut", *s, fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u))
+        if h in hotes:
+            out["specs"][h] = d
     if "transitoire" in g:
         out["specs"] = {h: ("saut", Fraction(p["transitoire"][0]), Fraction(1), p["transitoire"][1]) for h in hotes}
     if "initiale" in g:
-        out["initiale"] = hotes[1 + _uniforme(len(hotes) - 1).tirer(u)]
+        rangs = [h for h in liste if h != min(hotes)]
+        h = rangs[_uniforme(len(rangs)).tirer(u)]
+        out["initiale"] = h if h in hotes else None
     return out
 
 
