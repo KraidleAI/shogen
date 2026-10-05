@@ -41,6 +41,10 @@ def jour(v) -> bool:
     return type(v) is int and 0 <= v <= 6
 
 
+def naturel(v) -> bool:
+    return type(v) is int and v >= 0
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
@@ -59,7 +63,10 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                       "classes": {"BTC": [texte], "ETH": [texte], "USDC": [texte], "USDT": [texte]}, "as13335": [texte],
                       "absorption": {"population": texte, "k_faibles": [positif], "k_bascule": positif,
                                      "source": texte},
-                      "source": texte}}
+                      "source": texte},
+          "observateurs": {"M": positif, "ue": [naturel], "repli": naturel, "duree_paire": positif,
+                           "duree_artefact": positif, "duree_locale": positif, "absences": [(positif, positif)],
+                           "composants": [texte], "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
