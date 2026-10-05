@@ -139,3 +139,12 @@ l'état final (CB-2c, CB-2d, CB-2e) par le lanceur des corrections, même contra
 - Sept fragments ne s'appliquaient plus au texte changé par CB-2d et CB-2e. Ils sont réécrits sur le nouveau texte,
   avec la même mutation : M-12, M-20, M-31, M-33, M-47, G-18 et G-26.
 - Aucune équivalence n'a été invoquée.
+
+## CB-3a (2026-10-04) : lecture typée, octets de la requête, analyse de la réponse
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/lecture.py` | 34 | 3 (`tests/test_http.py`, classe `LectureTypee`) |
+| `shogen_s2bis/collecte/http.py` (partie sans réseau) | 68 | 6 (`tests/test_http.py`, classes `Requete` et `Analyse` ; 97 lignes en tout) |
+
+Mutants : 14 tués sur 14 (0 vivant, 0 FATAL). Suite : 58 tests ; plancher du job : 58, égalité exigée (`--egal`).

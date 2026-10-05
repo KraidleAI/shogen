@@ -146,3 +146,26 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
 4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
    le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
    partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure.
+
+## 9. Enregistrement `lecture` (CB-3a ; E-C-03, E-C-04, E-C-17)
+
+1. Une lecture donne un seul enregistrement, de type `lecture`, écrit dans sa fenêtre `ws`. Ses champs propres :
+   - `statut` : `ok`, `panne_http`, `panne_transport` ou `panne_decode` (statuts lisibles par `r1.classify_ecart` de
+     S2) ;
+   - `sous_type` : pour `panne_transport` seulement, l'un de `dns`, `connexion`, `tls`, `delai`, `coupure`, `autre` ;
+     null pour tout autre statut ;
+   - `code` : code HTTP de la réponse (entier) ; null si aucune réponse n'a été lue ;
+   - `depart`, `fin` : instants de départ et de fin de la lecture ;
+   - `phases` : objet qui donne l'instant de fin de chaque phase atteinte (§10) ;
+   - `adresse` : adresse IPv4 et port contactés, `a.b.c.d:port` ; null si la résolution n'a pas rendu ;
+   - `brut` : octets du corps de la réponse, en base64 (alphabet standard, avec remplissage) ; `sha256` : leur
+     empreinte, en 64 chiffres hexadécimaux minuscules ;
+   - `valeurs` : valeurs décodées par le décodeur de la forme (sous-lots CB-6 et suivants) ; null avant décodage.
+2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
+   restent sous 2^53 : tout lecteur JSON les lit exactement.
+3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un
+   serveur de boucle locale) : `Accept-Encoding: identity` (sans lui, tout codage serait admis : RFC 9110
+   §12.5.3), `Host` (avec le port s'il n'est pas 443), `User-Agent` de S2, `Accept: application/json`,
+   `Connection: close` ; pour une requête avec corps, `Content-Length` et `Content-Type: application/json`.
+4. La réponse est lue au plus juste (`Content-Length`, blocs `chunked`, sinon jusqu'à la fermeture). Au plus
+   1 048 576 octets sont reçus, en-têtes compris : au-delà, la lecture est `panne_transport` de sous-type `autre`.
