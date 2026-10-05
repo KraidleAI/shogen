@@ -220,6 +220,13 @@ class Client(unittest.TestCase):
         lu = http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(port), tls=None, delai=S)
         self.assertEqual((vues, lu.sous_type, lu.adresse), ([("dns", True)], "connexion", f"127.0.0.1:{port}"))
 
+    def test_dns_tardive_adresse_resolue_non_contactee(self):      # CB-19g, C-4 (d) de la relecture d'intégration
+        """FORMAT §9.1 et §10.1 : une résolution qui rend après le délai donne `dns`, avec `phases.dns` et l'adresse
+        résolue (127.0.0.1:1), jamais contactée (aucune phase `connexion`)."""
+        lu = http.lire(http.Requete("api.example", "/"), resoudre=Resolveur(1, pause=0.3), tls=None, delai=S // 5)
+        self.assertEqual((lu.statut, lu.sous_type, sorted(lu.phases), lu.adresse),
+                         ("panne_transport", "dns", ["dns"], "127.0.0.1:1"))
+
     def test_delai_sur_l_horloge_monotone_malgre_un_recul(self):
         """C-4 (S-C1 de la G2) : l'horloge murale recule de 3 s, 0,1 s après le départ d'une lecture servie octet par
         octet ; le délai global de 0,3 s, compté sur l'horloge monotone, tient ; les instants restent ceux de l'horloge

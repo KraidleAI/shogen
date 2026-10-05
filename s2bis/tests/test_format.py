@@ -117,6 +117,24 @@ class Format(unittest.TestCase):
                                                 "relève les phases avant l'adresse")], [True] * 2)
         self.assertEqual([("CB-19e" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
+    def test_corrections_c4_tardives_run_params_adresse(self):       # CB-19g, C-4 (a), (b), (d) de la relecture
+        """C-4, FORMAT seul (valeurs prises au texte de l'adjudication) : (a) §11.6, une lecture finie entre E et le
+        relevé compte en `tardives` à la fenêtre suivante ; (b) §11.5, `run_params` suit l'`ouverture` de la bascule
+        qu'il déclenche, dans la phrase unique de `run_params` ; (d) §9.1, l'adresse est l'adresse résolue, contactée
+        seulement si `phases` porte la connexion ; §10.1, une `dns` rendue après une résolution tardive porte
+        `phases.dns` et une adresse non contactée. (c), au §4, est portée par CB-19d. Puce « Corrections » : CB-19g."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        cinq = sections["11"].split(" 5. ", 1)[1].split(" 6. ", 1)[0]
+        attendus = [(sections["11"], "une lecture finie entre E et le relevé compte en `tardives` à la fenêtre "
+                                     "suivante"),
+                    (cinq, "`run_params` suit l'`ouverture` de la bascule qu'il déclenche"),
+                    (sections["9"], "l'adresse résolue"),
+                    (sections["9"], "contactée que si `phases` porte la connexion"),
+                    (sections["10"], "une `dns` rendue après une résolution tardive porte `phases.dns` et une adresse "
+                                     "non contactée")]
+        self.assertEqual([x in s for s, x in attendus], [True] * 5)
+        self.assertEqual([("CB-19g" in p) for p in puces if p.startswith("**Corrections** :")], [True])
+
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
         et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite

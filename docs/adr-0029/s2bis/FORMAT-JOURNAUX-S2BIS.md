@@ -32,7 +32,7 @@
   et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
   (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1) ; le diff CB-19c, C-2 (a) (§6.4) ; le diff CB-19d, C-2 (b)
   et C-4 (c) (§4) ; le diff CB-19e, C-3 (a) et (b) (§11.4) ; le diff CB-19f, par des tests seuls, C-3 (c) et (d)
-  (§14.2, §14.3).
+  (§14.2, §14.3) ; le diff CB-19g, C-4 (a), (b) et (d) (§9.1, §10.1, §11.5, §11.6).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -302,7 +302,9 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    - `code` : code HTTP de la réponse (entier) ; null si aucune réponse n'a été lue ;
    - `depart`, `fin` : instants de départ et de fin de la lecture ;
    - `phases` : objet qui donne l'instant de fin de chaque phase atteinte (§10) ;
-   - `adresse` : adresse IPv4 et port contactés, `a.b.c.d:port` ; null si la résolution n'a pas rendu ;
+   - `adresse` : `a.b.c.d:port`, l'adresse résolue (la première que rend la résolution, et son port) ; null si la
+     résolution n'a pas rendu. Elle n'a été contactée que si `phases` porte la connexion (C-4 (d) de la relecture
+     d'intégration de P1, diff CB-19g ; §10.1) ;
    - `brut` : octets du corps de la réponse, en base64 (alphabet standard, avec remplissage) ; `sha256` : leur
      empreinte, en 64 chiffres hexadécimaux minuscules ;
    - `valeurs` : valeurs décodées par le décodeur de la forme (sous-lots CB-6 et suivants) ; null avant décodage.
@@ -322,7 +324,7 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
 
    | phase | ce qui la termine | défaut pendant la phase |
    |---|---|---|
-   | `dns` | la résolution du nom en IPv4 seule (`getaddrinfo` en `AF_INET`) rend une adresse ; la première est contactée | `dns` (échec, aucune adresse, ou délai épuisé pendant la résolution) |
+   | `dns` | la résolution du nom en IPv4 seule (`getaddrinfo` en `AF_INET`) rend une adresse ; la première est retenue, puis contactée (phase `connexion`) | `dns` (échec, aucune adresse, ou délai épuisé pendant la résolution : une `dns` rendue après une résolution tardive porte `phases.dns` et une adresse non contactée, C-4 (d)) |
    | `connexion` | la connexion TCP est établie | `connexion` |
    | `tls` | la poignée TLS aboutit (certificat vérifié, nom d'hôte contrôlé) | `tls` |
    | `requete` | les octets de la requête sont envoyés | `coupure` |
@@ -373,10 +375,12 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    `autre`.
 5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
    puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Dans la première fenêtre admise d'une exécution,
-   `run_params` (§14.4) suit immédiatement l'`ouverture` ou la `reprise` du démarrage et précède toute `lecture` ; si
-   la boucle part d'une fenêtre plus tardive, celle de `run_params` reste sans marqueur, déclarée par le `trou`
-   suivant. Une fenêtre dont l'échéance est déjà passée quand la boucle l'atteint n'est pas lue : le trou est déclaré
-   au marqueur suivant (cause `saut`).
+   `run_params` (§14.4) suit immédiatement l'`ouverture` ou la `reprise` du démarrage, ou, si cette fenêtre ouvre un
+   jour nouveau, `run_params` suit l'`ouverture` de la bascule qu'il déclenche (C-4 (b) de la relecture d'intégration
+   de P1 : `reprise` et `cloture` au fichier repris, `ouverture` et `run_params` au fichier du jour), et précède
+   toute `lecture` ; si la boucle part d'une fenêtre plus tardive, celle de `run_params` reste sans marqueur,
+   déclarée par le `trou` suivant. Une fenêtre dont l'échéance est déjà passée quand la boucle l'atteint n'est pas
+   lue : le trou est déclaré au marqueur suivant (cause `saut`).
 6. **Enregistrement `sante` de la boucle** (valeurs brutes, aucun jugement) :
    - `d2.retard_max` : plus grand retard au départ (instant de lancement moins instant planifié, en microsecondes)
      parmi les lectures parties ; null si aucune n'est partie. `d2.non_parties` : nombre de lectures planifiées qui ne
@@ -385,8 +389,11 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    - `fils.abandonnes` : lectures abandonnées, à savoir celles de la fenêtre (non finies à E, §11.4, même si leur
      résultat est arrivé entre E et le relevé), plus celles des fenêtres précédentes dont le résultat n'était pas
      arrivé au relevé ;
-     `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
-     est arrivé depuis le relevé de la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15) ;
+     `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées aux relevés
+     précédents dont le résultat est rendu au relevé de cette fenêtre : arrivé depuis le relevé précédent, ou déjà
+     arrivé à ce relevé-là pour une lecture de la fenêtre précédente rendue entre son échéance et son relevé (non
+     finie, §11.4) ; une lecture finie entre E et le relevé compte en `tardives` à la fenêtre suivante (C-4 (a) de la
+     relecture d'intégration de P1). Un résultat tardif n'est jamais écrit comme lecture (Q-C-15) ;
      `fils.sondes` : instances de sonde encore en cours au relevé (§13.2), au plus une par sonde ; 0 sans sondes ;
    - `horloges` (C-4, ferme SHOGEN-S2BIS-HORLOGE-RECUL-JOURNAL-1) : `{murale, monotone}`, temps écoulé depuis le relevé
      de la fenêtre précédente de la même exécution, en microsecondes, lu sur l'horloge murale et sur l'horloge

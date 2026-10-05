@@ -318,3 +318,16 @@ class Reprise(AvecJournal):
         self.journal(J2 + 120).fermer()
         premiers = [inst for nom, inst in self.appels[n:] if nom == FICHIER][:1]
         self.assertEqual([(i[FICHIER], i["pool.sha256"]) for i in premiers], [(len(self.etat()[FICHIER]), 0)])
+
+    def test_run_params_apres_l_ouverture_de_la_bascule_qu_il_declenche(self):    # CB-19g, C-4 (b) de la relecture
+        """FORMAT §11.5 : redémarrage à 23:59, reprise écrite au fichier du 4 ; la première fenêtre admise (00:00) ouvre
+        le 5 : `run_params`, écrit à cette fenêtre comme par le point d'entrée, suit l'`ouverture` de la bascule qu'il
+        déclenche (`reprise`, `cloture` | `ouverture`, `run_params`)."""
+        jl = self.journal(J1 - 120)
+        jl.marqueur(J1 - 60)
+        jl.fermer()
+        self.journal(J1).ecrire("run_params", J2, commit="0" * 40)
+        e = self.etat()
+        self.assertEqual(([x["type"] for x in chaine(e[FICHIER])[2][-2:]],
+                          [x["type"] for x in chaine(e["pool-2026-10-05-0.jsonl"], *chaine(e[FICHIER])[:2])[2]]),
+                         (["reprise", "cloture"], ["ouverture", "run_params"]))

@@ -1395,3 +1395,33 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
 - plancher non relevé.
 
 Suite : 200 tests ; plancher du job : 200, égalité exigée (`--egal`).
+
+## CB-19g (2026-10-05) : quatre phrases du FORMAT rendues exactes (C-4 (a), (b) et (d) de la relecture, FORMAT seul)
+
+Objet : C-4, FORMAT seul, (c) étant portée par CB-19d (§4) : (a) §11.6, une lecture finie entre E et le relevé compte
+en `tardives` à la fenêtre suivante ; (b) §11.5, `run_params` suit l'`ouverture` de la bascule qu'il déclenche ;
+(d) §9.1 et §10.1, l'adresse d'une lecture est l'adresse résolue, contactée seulement si `phases` porte la connexion,
+et une `dns` rendue après une résolution tardive porte `phases.dns` et une adresse non contactée. Aucun code de
+production. Deux tests lient le texte au code existant : (d) résolution tardive (adresse résolue `127.0.0.1:1`, phase
+`dns` seule) ; (b) redémarrage à 23:59, `reprise` et `cloture` au fichier du 4, `ouverture` et `run_params` au fichier
+du 5. (a) l'est déjà par `test_boucle.Boucle.test_echeance_exacte_ecrivain_ralenti`.
+
+Rouge : sur l'état CB-19f, les cinq textes attendus manquent ; les deux tests de comportement passent sur le code (ils
+le décrivent) et rougissent sous les mutants qui le changent.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 188 | 10 (1 de plus : C-4 (a), (b), (d), puce « Corrections ») |
+| `tests/test_http_reseau.py` | 295 | 16 (1 de plus : résolution tardive) |
+| `tests/test_reprise.py` | 333 | 26 (1 de plus : `run_params` après l'`ouverture` de la bascule) |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 11 mutants neufs, 11 tués (0 vivant, 0 FATAL) :
+- cinq textes du FORMAT défaits ((a), (b), (d) au §9.1 et au §10.1, puce) : test nommé de C-4 ; l'ordre de
+  `run_params` perdu au §11.5 : test de la convention (CB-18j) ;
+- client : adresse retirée, phase `dns` retirée, résolution tardive classée `delai` : test de la résolution tardive
+  (et deux tests existants) ;
+- boucle : lecture rendue entre E et le relevé jamais tardive : tests de l'échéance (CB-11c) ;
+- plancher non relevé.
+
+Suite : 203 tests ; plancher du job : 203, égalité exigée (`--egal`).
