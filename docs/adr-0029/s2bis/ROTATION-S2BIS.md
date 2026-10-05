@@ -35,6 +35,12 @@
    (octets ASCII) des noms d'hôte de la configuration, celui que le chargeur exige de chaque liste d'unités
    (`unites-ordre`) ; ainsi un nom `api-x` précède un nom `api.y` (0x2D < 0x2E). La première unité effective de chaque
    strate dépend du pool D1-bis (sous-lot RB-7) : elle sera imprimée au rendu (item pour le sous-lot RB-15).
+   *Précision de l.200 (Q-T3-15 de l'avis AVIS-SIM-T3, modifiée, adjugée par l'orchestrateur le 2026-10-05, avant
+   E0)* : le pool BTC D1-bis de la strate est celui qui reste après les retraits D1-bis (a) et (b) et le seuil de flux
+   presque mort (l.170) ; la première unité y est prise avant le critère collectif d'absorption candidat (E-S-35 de
+   SIM-BIS, Q-S-15) et n'est pas recalculée après lui : si ce critère la retire d'une classe, elle manque à cette classe
+   et toutes les unités de la classe sont décalées ; pool vide : None, toutes les unités sont décalées. Le module ne fait
+   aucun retrait : il reçoit `premiere` ainsi prise (sous-lot RB-7).
 9. **R et seuil** : paramètres de `lois`, R de 1 à 9 999 et seuil entier ≥ 0 (tests, oracle croisé). Au paquet, ils
    viennent du bloc `rotations` de `s2bis/config/analyse.json`, où le chargeur exige R = 9 999 et seuil = 99
    exactement (Q-RB-6), la cohérence (99 + 1)/(9 999 + 1) = 0,01 (l.202) restant contrôlée en seconde garde.
