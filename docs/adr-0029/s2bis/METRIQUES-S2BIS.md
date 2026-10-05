@@ -866,3 +866,27 @@ MR-25 du réviseur (PLANCHER rendu à 405) est tué.
 Mutants (commande du job s2-harness-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
 0 FATAL), dont `--egal` retiré de la ligne du job et K-01 desserré (tué par L-22). MR-25 du réviseur est tué, rejoué
 sur l'état final. Suite S2 : 406 tests ; PLANCHER : 406, égalité exigée (`--egal`).
+
+## CB-18n (2026-10-05) : 64 niveaux d'imbrication au plus (lettre C-4 du FORMAT)
+
+Objet (avis de l'advisor sur le banc de concordance des lecteurs du recalcul, adjugé par l'orchestrateur le
+2026-10-05) : le niveau d'une valeur est 1 pour l'objet de la ligne, n + 1 dans un conteneur de niveau n.
+`canonique` refuse avant le sérialiseur un enregistrement dont un conteneur dépasse le niveau 64
+(`JOURNAL/imbrication`), dans le parcours des entiers d'I-1, devenu postfixe : chaque conteneur est développé une fois
+et sa hauteur retenue, si bien qu'un conteneur partagé compte à sa plus grande profondeur, sans parcours exponentiel ;
+un cycle reste refusé en `JOURNAL/type` par le sérialiseur. `_lire` passant par `canonique`, une ligne de 65 niveaux
+est une queue quel que soit l'interpréteur ; avant, le refus venait de RecursionError (de 988 à 9 996 niveaux selon la
+version et l'appelant). Profondeur réelle mesurée au test de bout en bout : M = 4 (`run_params`, `formes.formes[i]`),
+écrite au FORMAT et fixée par ce test. FORMAT §2, §8.3.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 359 | — |
+| `tests/test_journal.py` | 285 | 14 (1 de plus : conteneurs au niveau 64 écrits puis relus intègres, au niveau 65 refusés, liste partagée vue par les deux chemins ; 1 complété : cycle profond refusé en `JOURNAL/type`) |
+| `tests/test_reprise.py` | 260 | 22 (1 de plus : queue d'une ligne chaînée de 65 niveaux ; 1 complété : refus `JOURNAL/imbrication` à l'écriture) |
+| `tests/test_bout_en_bout.py` | 202 | 1 (complété : niveau ≤ 64 de tout enregistrement, M = 4) |
+
+Mutants (commande du job, `--plancher 181`, borne de 300 s ; python3.12 ; réseau isolé) : 7 tués sur 7 (0 vivant,
+0 FATAL), dont N décalé d'une unité dans les deux sens, la hauteur prise au premier enfant et le cycle non relevé.
+MR-08 et MR-09 du réviseur, dont les lignes visées ont changé, y sont portés et tués. Suite : 181 tests ; plancher du
+job : 181, égalité exigée (`--egal`).

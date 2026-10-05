@@ -24,7 +24,9 @@
   diff CB-18h ferme l'item SHOGEN-S2BIS-CONFIG-REGLES-1 (§14.1) ; le diff CB-18i, par des tests seuls,
   SHOGEN-S2BIS-SEGMENTS-10-1 (§6.1) et SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 (§13.5), et couvre le tuple au §1.2 ; le
   diff CB-18j écrit la convention des citations (en-tête, SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1) et place `run_params`
-  dans l'ordre de la fenêtre (§11.5, observation de la G2).
+  dans l'ordre de la fenêtre (§11.5, observation de la G2). Lettres C-1 à C-5 du FORMAT (avis de l'advisor sur le
+  banc de concordance des lecteurs du recalcul, adjugé par l'orchestrateur le 2026-10-05) : le diff CB-18n écrit C-4
+  (§2, §8.3).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -72,7 +74,8 @@ Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont 
 `seq` ou `prec` est refusé.
 
 Tout refus est nommé (`JOURNAL/…`) et n'écrit rien (CB-2d, C-6 de la G2 de P1) : l'enregistrement demandé est contrôlé
-(type des valeurs, entiers de 640 chiffres au plus du §1.2, borne LIMITE du §7) avant la bascule de jour (§6) ou le
+(type des valeurs, entiers de 640 chiffres au plus du §1.2, borne LIMITE du §7, 64 niveaux d'imbrication au plus du
+§8.3) avant la bascule de jour (§6) ou le
 `trou` (§8) qu'il appellerait.
 
 ## 3. Fenêtres
@@ -200,8 +203,18 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 2. À la reprise, chaque fichier achevé (clos, abandonné à une queue, ou laissé pour un segment neuf) reçoit sa ligne
    au fichier de sommes s'il n'y figure pas, sha256 pris sur ses octets ; une dernière ligne coupée du fichier de sommes
    est close par un saut de ligne, jamais réécrite.
-3. Une ligne d'imbrication excessive (le décodeur JSON lève RecursionError) est non intègre : elle et la suite forment
-   une queue (§7). L'écrivain refuse d'écrire un tel enregistrement (`JOURNAL/type`).
+3. **Imbrication** (lettre C-4) : le **niveau** d'une valeur est 1 pour l'objet de la ligne, et n + 1 pour une valeur
+   contenue dans un conteneur (objet ou liste) de niveau n. Un enregistrement a tous ses conteneurs au niveau N = 64
+   au plus. L'écrivain refuse d'écrire un enregistrement plus profond (`JOURNAL/imbrication`), avant le sérialiseur,
+   quel que soit le réglage de l'interpréteur ; sa relecture (`_lire`) et les lecteurs mesurent le niveau et tiennent
+   pour non intègre (§7.1) toute ligne qui dépasse N, qu'un décodeur la lise ou lève RecursionError : ils comptent
+   les niveaux eux-mêmes et ne se fient pas à l'exception. Un conteneur que l'enregistrement porte à plusieurs
+   endroits compte à sa plus grande profondeur, celle de la ligne écrite. Motif de N : le plus profond enregistrement
+   du collecteur mesure M = 4 niveaux au test de bout en bout (E-C-24 ; `run_params`, `formes.formes[i]`), et une
+   `sante` dont une sonde D-4 ou D-5 rend une réponse SOA ou TXT en atteint 6 (§12, §13.4) ; le plus petit seuil de
+   lecture mesuré sur les décodeurs Python du projet est 988 niveaux (Python 3.10, limite de récursion par défaut ;
+   seuils mesurés sous 3.10 et 3.12 seulement, banc de la G2 de RB-18) ; N est très au-dessus du premier et très
+   au-dessous du second.
 4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
    le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
    partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure.

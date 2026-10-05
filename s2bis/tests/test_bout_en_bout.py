@@ -41,6 +41,13 @@ DNS = {"statut", "rcode", "tc", "reponses", "debut", "fin"}                     
 HEX = re.compile("[0-9a-f]{64}")
 
 
+def niveau(v):
+    """Niveau d'imbrication (FORMAT §8.3) : 1 pour un objet ou une liste sans conteneur, 1 + celui de son plus profond
+    conteneur sinon ; 0 pour une valeur simple."""
+    return 1 + max([niveau(x) for x in (v.values() if isinstance(v, dict) else v)], default=0) if isinstance(
+        v, (dict, list)) else 0
+
+
 def entiers(*x):
     return all(type(v) is int for v in x)
 
@@ -69,6 +76,7 @@ def anomalies(enrs, f, s):
     for i, e in enumerate(enrs):
         t, suivant = e.get("type"), enrs[i + 1].get("type") if i + 1 < len(enrs) else None
         exige(set(e) == CHAMPS.get(t, set()) | {"type", "seq", "prec"}, f"champs {sorted(e)}")
+        exige(niveau(e) <= 64, "imbrication")                                                               # §8.3
         if t not in CHAMPS or set(e) != CHAMPS[t] | {"type", "seq", "prec"}:
             continue
         exige("ws" not in e or entiers(e["ws"]) and e["ws"] % w == 0, "ws hors grille")                    # §3.1
@@ -172,7 +180,7 @@ class BoutEnBout(unittest.TestCase):
         self.assertEqual((a.returncode, a.stderr, b.returncode, b.stderr), (0, b"", 0, b""))
         noms = sorted(n for n in os.listdir(journal) if n.endswith(".jsonl"))
         enrs = chaine(b"".join(pathlib.Path(journal, n).read_bytes() for n in noms))[2]
-        self.assertEqual(anomalies(enrs, f, s), [])
+        self.assertEqual((anomalies(enrs, f, s), max(map(niveau, enrs))), ([], 4))      # M = 4 (FORMAT §8.3)
         types = [e["type"] for e in enrs[1:] if e["type"] in ("run_params", "reprise", "trou", "marqueur")]
         self.assertIn((enrs[0]["type"], types), [("ouverture", ["run_params"] + ["marqueur"] * 3 + ["reprise",
                       "run_params"] + x + ["marqueur"] * 2) for x in ([], ["trou"])])      # trou : redémarrage

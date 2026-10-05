@@ -1,9 +1,10 @@
 """Journal chaîné du collecteur (CB-1 ; E-C-18, E-C-19 ; ADR-0029 §2.9 l.238). Chaque enregistrement est une ligne
 JSON canonique (clés triées, séparateurs « , » et « : », UTF-8 sans échappement, saut de ligne final, aucun flottant,
-entiers de 640 chiffres au plus : SHOGEN-S2BIS-ENTIER-ECRIVAIN-1, I-1 de la G2 du recalcul)
-qui porte `seq` (rang depuis 0) et `prec` (sha256 des octets de la ligne précédente, saut de ligne compris ; GENESE
-pour la première). Écriture sans tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt
-une heure est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
+entiers de 640 chiffres au plus : SHOGEN-S2BIS-ENTIER-ECRIVAIN-1, I-1 de la G2 du recalcul ; 64 niveaux
+d'imbrication au plus, la racine au niveau 1 : lettre C-4 du FORMAT, CB-18n) qui porte `seq` (rang depuis 0) et
+`prec` (sha256 des octets de la ligne précédente, saut de ligne compris ; GENESE pour la première). Écriture sans
+tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt une heure est suivie d'un point
+de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
 fenêtre n'est admis que sur la grille, pour une fenêtre non close (ws ≥ `suivante`) et jamais avant la dernière
 fenêtre écrite (C-1). Tout refus est nommé (ErreurJournal) et n'écrit rien : l'enregistrement est contrôlé avant
 toute bascule et tout trou (C-6). Après une OSError, tout appel est refusé (JOURNAL/casse, C-2). E-C-16 : un seul
@@ -36,6 +37,7 @@ LIMITE = 1 << 22                                                   # octets d'un
 RESERVES = {"ouverture", "marqueur", "point", "cloture", "reprise", "trou"}
 CHIFFRES = 640                     # I-1 : plus petite limite non nulle de conversion des entiers (sys.int_info)
 BORNE = 10 ** CHIFFRES
+NIVEAUX = 64                       # C-4 : niveaux d'imbrication au plus, la racine au niveau 1 (FORMAT §8.3)
 
 
 class ErreurJournal(Exception):
@@ -48,25 +50,39 @@ class JournalOccupe(ErreurJournal):
     pass
 
 
-def _entier_long(enr):
-    """Vrai si `enr` porte un entier de plus de CHIFFRES chiffres ; chaque conteneur n'est vu qu'une fois (cycle)."""
-    pile, vus = [enr], set()
+def _parcours(enr):
+    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr`, None sur un cycle), sans
+    récursion. Chaque conteneur n'est développé qu'une fois et sa hauteur est retenue : un conteneur partagé compte à
+    sa plus grande profondeur, sans parcours exponentiel ; un cycle n'arrête pas la recherche des entiers."""
+    long_, cycle, haut, chemin, pile = False, False, {}, set(), [(enr, False)]
     while pile:
-        v = pile.pop()
-        if isinstance(v, int) and not -BORNE < v < BORNE:
-            return True
-        if isinstance(v, (dict, list, tuple)) and id(v) not in vus:
-            vus.add(id(v))
-            pile += v.values() if isinstance(v, dict) else v
-    return False
+        v, fin = pile.pop()
+        long_ = long_ or isinstance(v, int) and not -BORNE < v < BORNE
+        if not isinstance(v, (dict, list, tuple)) or not fin and id(v) in haut:
+            continue
+        enfants = list(v.values()) if isinstance(v, dict) else list(v)
+        if fin:
+            chemin.discard(id(v))
+            haut[id(v)] = 1 + max([haut.get(id(x), 0) for x in enfants if isinstance(x, (dict, list, tuple))],
+                                  default=0)
+        elif id(v) in chemin:
+            cycle = True                                            # le sérialiseur le refusera (JOURNAL/type)
+        else:
+            chemin.add(id(v))
+            pile += [(v, True)] + [(x, False) for x in enfants]
+    return long_, None if cycle else haut[id(enr)]
 
 
 def canonique(enr):
     """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Le
     contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3). Un entier de plus de CHIFFRES chiffres
-    est refusé avant le sérialiseur, quel que soit le réglage de l'interpréteur : JOURNAL/entier (I-1)."""
-    if _entier_long(enr):
+    (JOURNAL/entier, I-1) et un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication, C-4) sont refusés avant le
+    sérialiseur, quel que soit le réglage de l'interpréteur."""
+    long_, niveaux = _parcours(enr)
+    if long_:
         raise ErreurJournal("JOURNAL/entier", f"entier de plus de {CHIFFRES} chiffres")
+    if niveaux is not None and niveaux > NIVEAUX:
+        raise ErreurJournal("JOURNAL/imbrication", f"{niveaux} niveaux, {NIVEAUX} au plus")
     try:
         octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication

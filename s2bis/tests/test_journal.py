@@ -3,7 +3,8 @@ journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendan
 CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une OSError ; cycle refusé en temps borné.
 CB-18a (SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : garde d'un seul fil, refus nommés de l'écrivain neuf, fermé ou déjà ouvert,
 garde `_terminal` sur toute méthode publique d'écriture (contrôle mécanique). SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1 de
-la G2 du recalcul) : entiers de 640 chiffres au plus."""
+la G2 du recalcul) : entiers de 640 chiffres au plus. CB-18n (lettre C-4 du FORMAT, avis sur le banc de concordance) :
+64 niveaux d'imbrication au plus, la racine au niveau 1 (`JOURNAL/imbrication`)."""
 import errno
 import fcntl
 import hashlib
@@ -40,6 +41,14 @@ def chaine(octets, seq=0, prec="0" * 64):
         seq, prec = seq + 1, hashlib.sha256(ligne + b"\n").hexdigest()
         enrs.append(e)
     return seq, prec, enrs
+
+
+def imbrique(n, fond=None):
+    """n listes emboîtées ; la plus profonde est vide, ou contient `fond`."""
+    x = [] if fond is None else [fond]
+    for _i in range(n - 1):
+        x = [x]
+    return x
 
 
 def code(appel):
@@ -183,10 +192,11 @@ class Ecrivain(Base):
             jl = self.journal()
             avant.append(self.etat())
             res.append(code(lambda: jl.ecrire("lecture", WS + 60, c=boucle)))      # refus attendu : nommé
+            res.append(code(lambda: jl.ecrire("lecture", WS + 60, c=imbrique(70, boucle))))   # cycle avant C-4
         t = threading.Thread(target=essai, daemon=True)          # une boucle sans fin pendrait le fil, pas la suite
         t.start()
         t.join(5)
-        self.assertEqual((res, [self.etat()]), (["JOURNAL/type"], avant))
+        self.assertEqual((res, [self.etat()]), (["JOURNAL/type"] * 2, avant))
         self.assertEqual(j.canonique({"a": partage, "b": partage}), b'{"a":[1],"b":[1]}\n')   # partage sans cycle
 
     def test_entiers_de_640_chiffres_au_plus(self):                    # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
@@ -211,6 +221,25 @@ class Ecrivain(Base):
         jl.marqueur(WS + 60)
         jl.fermer()
         self.journal(WS + 120).fermer()                                 # lignes de 640 chiffres relues intègres
+        dernier = chaine(self.etat()[FICHIER])[2][-1]
+        self.assertEqual((dernier["type"], dernier["queue"]), ("reprise", None))
+
+    def test_imbrication_de_64_niveaux_au_plus(self):                  # CB-18n, lettre C-4 du FORMAT (§8.3)
+        """Niveau : 1 pour l'objet de la ligne, n + 1 dans un conteneur de niveau n. Tous les conteneurs au niveau 64
+        au plus : écrit, puis relu intègre ; un conteneur au niveau 65 : refus JOURNAL/imbrication sans rien écrire.
+        Une liste partagée compte à sa plus grande profondeur, qu'elle soit vue d'abord par le chemin court ou par le
+        long (64 et 65 niveaux par ce chemin)."""
+        s = imbrique(10)                                    # s au niveau L : sa liste la plus profonde au niveau L + 9
+        jl, refus = self.journal(), []
+        for x in (imbrique(63), imbrique(62, {}), {"a": s, "b": imbrique(52, s)}, {"b": imbrique(52, s), "a": s}):
+            jl.ecrire("lecture", WS + 60, x=x)
+        avant = self.etat()
+        for x in (imbrique(64), imbrique(63, {}), {"a": s, "b": imbrique(53, s)}, {"b": imbrique(53, s), "a": s}):
+            refus.append(code(lambda: jl.ecrire("lecture", WS + 60, x=x)))
+        self.assertEqual((refus, self.etat()), (["JOURNAL/imbrication"] * 4, avant))
+        jl.marqueur(WS + 60)
+        jl.fermer()
+        self.journal(WS + 120).fermer()                                 # lignes de 64 niveaux relues intègres
         dernier = chaine(self.etat()[FICHIER])[2][-1]
         self.assertEqual((dernier["type"], dernier["queue"]), ("reprise", None))
 

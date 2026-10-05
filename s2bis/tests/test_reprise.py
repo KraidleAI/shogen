@@ -8,7 +8,7 @@ from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
 from tests.test_fichiers import J1, J2, J3
-from tests.test_journal import FICHIER, WS, Base, chaine, code
+from tests.test_journal import FICHIER, WS, Base, chaine, code, imbrique
 
 SEG1, SEG2 = "pool-2026-10-04-1.jsonl", "pool-2026-10-04-2.jsonl"
 
@@ -82,6 +82,9 @@ class Reprise(AvecJournal):
     def test_queue_entier_de_641_chiffres(self):                       # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
         self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x=10 ** 640))
 
+    def test_queue_ligne_chainee_de_65_niveaux(self):                  # CB-18n, lettre C-4 du FORMAT (§8.3)
+        self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x=imbrique(64)))
+
     def test_queue_ligne_chainee_trop_longue_et_refus_a_l_ecriture(self):
         self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x="a" * j.LIMITE))
         with self.assertRaises(j.ErreurJournal) as e:
@@ -117,7 +120,7 @@ class Reprise(AvecJournal):
             x = [x]
         with self.assertRaises(j.ErreurJournal) as e:
             self.journal(m(9)).ecrire("lecture", m(10), x=x)
-        self.assertEqual(e.exception.code, "JOURNAL/type")
+        self.assertEqual(e.exception.code, "JOURNAL/imbrication")          # avant le sérialiseur (C-4)
 
     def segment(self, fabrique):
         """Segment 1 illisible dès sa première ligne : repli sur le segment 0, segment 1 déclaré, segment 2 ouvert."""
