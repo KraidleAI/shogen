@@ -1,7 +1,8 @@
 """Sources SB-3 et SB-4 (E-S-07 à E-S-16, E-S-39, E-S-41, E-S-43 ; T-GEN-1, T-GEN-2) : chaîne à deux états de taux
-stationnaire b/(1 − a + b) écrit à la main, moyenne simulée à 5 erreurs-types ; renouvellement alterné tiré pas à pas
-par des u écrits à la main ; poids et paramètres refaits à la main en rationnels. Chaque test nomme les mutations qui le
-rougissent. Les comparaisons « à 5 SE » se font en rationnels exacts, sans racine : (x̄ − r)² < 25·s²/R."""
+stationnaire b/(1 − a + b) écrit à la main, moyenne simulée à 5 erreurs-types ; renouvellement alterné et incidents
+tirés pas à pas par des u écrits à la main ; poids et paramètres refaits à la main en rationnels. Chaque test nomme les
+mutations qui le rougissent. Les comparaisons « à 5 SE » se font en rationnels exacts, sans racine :
+(x̄ − r)² < 25·s²/R."""
 import unittest
 from fractions import Fraction
 
@@ -352,3 +353,90 @@ class TestClasses(unittest.TestCase):
              for i in range(50)]
         self.assertEqual([y & (y >> 1) for y in f], [0] * 50)
         self.assertTrue(dans_5_se([part(y, 0, n) for y in f], Fraction(1, 10)))
+
+
+AS = ["bitfinex", "chainlink", "coinbase", "coingecko", "defillama", "kraken", "okx"]
+
+
+def inc(rho, duree, hotes, geometrique=False) -> dict:
+    return {"rho": Fraction(rho), "duree": duree, "geometrique": geometrique, "hotes": hotes}
+
+
+class TestAlternatives(unittest.TestCase):
+    def test_incidents_pas_a_pas(self):
+        """E-S-15 : ρ = 720 par jour, soit 720·60/86 400 = 1/2 par fenêtre (pauses géométriques de seuils 1/2, 3/4, 7/8,
+        …), horizon 8. D = 2 fixe, paire tirée parmi bitfinex, chainlink, coinbase : début 0 (u = 0,3), paire chainlink
+        (v = 0,5, seuils 1/3, 2/3), coinbase (0,9) ; début 3 (0,8), paire bitfinex (0,1), chainlink (0,1) ; pause 5
+        au-delà de l'horizon (0,95). D = 3, chacun à 1/2 : début 6 (0,99), coupé à 8, bitfinex et coinbase (v = 0,4,
+        0,6, 0,2) ; début 7 (0,3), aucun hôte. D géométrique de moyenne 2 : 0 à 2 (u = 0,3, 0,6), 5 coupé à 8 (pause 5 à
+        0,95 ; durée 7 à 0,99), pause 3 au-delà (0,8). Paramètre AS13335 : les 7 hôtes de la partition de S2. Mutations
+        M-4B-01 (premier début décalé d'une fenêtre), M-4B-02 (durée non coupée à l'horizon), M-4B-03 (paire tirée avec
+        remise), M-4B-04 (w ignoré dans ρ·w)."""
+        self.assertEqual(PRM["sources"]["as13335"], AS)
+        trois = ["bitfinex", "chainlink", "coinbase"]
+        self.assertEqual(sources.incidents(PRM, "T-I", 0, inc(720, 2, ("parmi", trois, 2, [])), 8,
+                                           suite(0.3, 0.8, 0.95), suite(0.5, 0.9, 0.1, 0.1)),
+                         {"chainlink": 0b11011, "coinbase": 0b11, "bitfinex": 0b11000})
+        self.assertEqual(sources.incidents(PRM, "T-I", 0, inc(720, 3, ("chacun", trois, Fraction(1, 2))), 8,
+                                           suite(0.99, 0.3), suite(0.4, 0.6, 0.2, 0.9, 0.9, 0.9)),
+                         {"bitfinex": 0b11000000, "coinbase": 0b11000000})
+        self.assertEqual(sources.incidents(PRM, "T-I", 0, inc(720, 2, ("chacun", ["bitfinex"], Fraction(1)), True), 8,
+                                           suite(0.3, 0.6, 0.95, 0.99, 0.8), suite(0.7, 0.1)),
+                         {"bitfinex": 0b11100011})
+
+    def test_incidents_hotes_q_s_05(self):
+        """D = 1, ρ = 144 par jour (1/10 par fenêtre), 100 réplications de 2 000 fenêtres. Cible, chacun des 7 hôtes
+        AS13335 à 7/10 : part de bitfinex à moins de 5 SE de 7/100, de bitfinex et kraken ensemble de 49/1 000. Paire
+        tirée par incident : 0 ou 2 hôtes AS13335 par fenêtre, part de bitfinex à moins de 5 SE de (1/10)(2/7). Paire
+        imposant okx : okx = bitfinex | chainlink. Hôte hors du pool : SOURCES/incident. Mutations M-4B-05 (un seul
+        tirage pour tous les hôtes), M-4B-06 (imposés ignorés), M-4B-07 (contrôle des hôtes retiré)."""
+        x, y, z = [], [], []
+        for i in range(100):
+            e = sources.incidents(PRM, "T-Q", i, inc(144, 1, ("chacun", AS, Fraction(7, 10))), 2000)
+            x.append(part(e.get("bitfinex", 0), 0, 2000))
+            y.append(part(e.get("bitfinex", 0) & e.get("kraken", 0), 0, 2000))
+            e = sources.incidents(PRM, "T-Q", i, inc(144, 1, ("parmi", AS, 2, [])), 2000)
+            self.assertEqual({sum(e.get(h, 0) >> t & 1 for h in AS) for t in range(2000)}, {0, 2})
+            z.append(part(e.get("bitfinex", 0), 0, 2000))
+        self.assertTrue(dans_5_se(x, Fraction(7, 100)))
+        self.assertTrue(dans_5_se(y, Fraction(49, 1000)))
+        self.assertTrue(dans_5_se(z, Fraction(1, 35)))
+        e = sources.incidents(PRM, "T-Q", 0, inc(144, 1, ("parmi", ["bitfinex", "chainlink"], 2, ["okx"])), 2000)
+        self.assertEqual(e["okx"], e["bitfinex"] | e["chainlink"])
+        with self.assertRaises(commun.Refus) as c:
+            sources.incidents(PRM, "T-Q", 0, inc(144, 1, ("chacun", ["bybit"], Fraction(1))), 2000)
+        self.assertEqual(c.exception.code, "SOURCES/incident")
+
+    def test_faibles_e_s_16(self):
+        """Chaîne (convention de S2, G0 SIM-NIVEAU l.54) : p = 2/5, L = 20 → a = 19/20, b = (2/5)/(20·3/5) = 1/30 ;
+        L = 1 : tirages indépendants, a = b = p (p = 3/5, point de bascule, possible). 100 réplications de 1 000
+        fenêtres : part à moins de 5 SE de 3/5 (L = 1) et de 2/5 (L = 20). Mutations M-4B-08 (L = 1 en épisodes d'une
+        fenêtre, a = 0), M-4B-09 (a et b inversés)."""
+        self.assertEqual([sources.chaine(Fraction(2, 5), 20), sources.chaine(Fraction(3, 5), 1)],
+                         [(Fraction(19, 20), Fraction(1, 30)), (Fraction(3, 5), Fraction(3, 5))])
+        for p, lw in ((Fraction(3, 5), 1), (Fraction(2, 5), 20)):
+            x = [part(sources.faibles(PRM, "T-W", i, {"hotes": ["gemini"], "p": p, "L": lw, "type": "panne"},
+                                      1000)["gemini"], 0, 1000) for i in range(100)]
+            self.assertTrue(dans_5_se(x, p), (p, lw))
+
+    def test_etat_alternatives(self):
+        """Fond nul ; incidents sur kraken seul (ρ = 144, D = 2) : la même panne dans les 4 classes de kraken (ADR
+        l.162) ; unité faible gemini (p = 1/2, L = 1) de type « ecart » : écart de gemini en BTC seulement ; de type
+        « panne » : panne de gemini dans ses 4 classes ; type inconnu : SOURCES/faible. Mutations M-4B-10 (incidents sur
+        la seule première classe), M-4B-11 (écart faible dans toutes les classes), M-4B-12 (type non contrôlé)."""
+        m, n = {"calme": (1 << 500) - 1, "stress": 0}, 500
+        f = dict(fond("0"), incidents=inc(144, 2, ("chacun", ["kraken"], Fraction(1))),
+                 faibles={"hotes": ["gemini"], "p": Fraction(1, 2), "L": 1, "type": "ecart"})
+        e = sources.Replication(PRM, EP, f, "T-E", 0, m, n).etat()
+        k = sources.incidents(PRM, "T-E", 0, f["incidents"], n)["kraken"]
+        g = sources.faibles(PRM, "T-E", 0, f["faibles"], n)["gemini"]
+        self.assertNotEqual((k, g), (0, 0))
+        self.assertEqual([e["kraken", c] for c in ("BTC", "ETH", "USDC", "USDT")], [(k, 0)] * 4)
+        self.assertEqual([e["gemini", c] for c in ("BTC", "ETH", "USDC", "USDT")], [(0, g)] + [(0, 0)] * 3)
+        f["faibles"] = dict(f["faibles"], type="panne")
+        e = sources.Replication(PRM, EP, f, "T-E", 0, m, n).etat()
+        self.assertEqual([e["gemini", c] for c in ("BTC", "ETH", "USDC", "USDT")], [(g, 0)] * 4)
+        f["faibles"] = dict(f["faibles"], type="autre")
+        with self.assertRaises(commun.Refus) as c:
+            sources.Replication(PRM, EP, f, "T-E", 0, m, n).etat()
+        self.assertEqual(c.exception.code, "SOURCES/faible")

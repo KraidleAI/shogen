@@ -7,9 +7,10 @@ composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal 
 réplication (fond de la cellule, masques de strate), régime par hôte et par strate, union des composantes, pannes d'hôte
 H(u) vues dans les fenêtres de chaque strate (E-S-08). SB-3d : dérives (E-S-13), par amincissement des épisodes d'une
 série tirée au taux maximal, et panne initiale hors équilibre. SB-4a : classes jointes par hôte (E-S-07, E-S-08) : pools
-par classe, écarts propres F(u, c) par classe (E-S-09, composante hors-enveloppe de Q-S-21), état vrai typé. Chaque
-tirage compare random() à un seuil exact (aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante,
-aucune puissance."""
+par classe, écarts propres F(u, c) par classe (E-S-09, composante hors-enveloppe de Q-S-21), état vrai typé. SB-4b :
+incidents communs (E-S-15 ; cible, grille, ETH : pannes de transport de l'hôte), unités faibles markoviennes, paires,
+triplets et co-défaillances qui impliquent une unité faible (E-S-16). Chaque tirage compare random() à un seuil exact
+(aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
 import functools
 from fractions import Fraction
 
@@ -186,8 +187,9 @@ def loi_longues(prm: dict) -> Empirique:
 class Replication:
     """Une réplication d'une cellule : paramètres, EP (calibration.charger(…)["episodes"]), fond (f ; régime par strate,
     (φ, κ, τ_D) ou None ; part des pannes longues ; derive, None ou {genres, duree} ; autres, multiplicateur d'écart
-    hors de BTC ; hors_enveloppe, τ), nom de cellule et indice i ≥ 0 (Q-4), masques de strate (calendrier.masques) et
-    horizon T_max en fenêtres ; chaque série tire sur ses propres flux (composant, indice)."""
+    hors de BTC ; hors_enveloppe, τ ; incidents et faibles, None ou leur spécification), nom de cellule et indice i ≥ 0
+    (Q-4), masques de strate (calendrier.masques) et horizon T_max en fenêtres ; chaque série tire sur ses propres flux
+    (composant, indice)."""
 
     def __init__(self, prm, ep, fond, cellule, i, masques, horizon):
         self.prm, self.ep, self.fond, self.cellule, self.i = prm, ep, fond, cellule, i
@@ -268,14 +270,23 @@ class Replication:
 
     def etat(self, surcharges=None) -> dict:
         """État vrai (E-S-08) : {(hôte, classe) : (panne, écart)} pour chaque hôte du pool et chaque classe qu'il sert
-        (classes) ; panne = H(hôte) | surcharges[hôte] (pannes de transport ajoutées), commune à toutes les classes de
-        l'hôte ; écart = F(hôte, classe) hors panne (deux types, Q-S-22)."""
+        (classes) ; panne = H(hôte) | surcharges[hôte] | incidents du fond (E-S-15) | unités faibles de type « panne »
+        (E-S-16), commune à toutes les classes de l'hôte ; écart = F(hôte, classe), plus l'unité faible de type
+        « ecart » en BTC seulement (flux déviant), hors panne (deux types, Q-S-22). Type d'unité faible inconnu :
+        SOURCES/faible."""
+        sur, fa = dict(surcharges or {}), self.fond.get("faibles")
+        if fa is not None and fa["type"] not in ("panne", "ecart"):
+            raise commun.Refus("SOURCES/faible", f"type {fa['type']!r} : « panne » ou « ecart »")
+        mf = faibles(self.prm, self.cellule, self.i, fa, self.horizon)
+        ajouts = incidents(self.prm, self.cellule, self.i, self.fond.get("incidents"), self.horizon)
+        for hote, m in list(ajouts.items()) + (list(mf.items()) if fa and fa["type"] == "panne" else []):
+            sur[hote] = sur.get(hote, 0) | m
         out, cl = {}, classes(self.prm)
         for hote, _f in self.prm["calibration"]["unites"]:
-            h = self.pannes(hote) | (surcharges or {}).get(hote, 0)
+            h, e0 = self.pannes(hote) | sur.get(hote, 0), mf.get(hote, 0) if fa and fa["type"] == "ecart" else 0
             for c, (classe, pool) in enumerate(cl):
                 if hote in pool:
-                    out[hote, classe] = (h, self.ecarts(hote, c) & ~h)
+                    out[hote, classe] = (h, (self.ecarts(hote, c) | (e0 if c == 0 else 0)) & ~h)
         return out
 
 
@@ -342,3 +353,62 @@ def classes(prm: dict) -> list:
     if out[0][1] != hotes or any(h not in hotes for _c, pool in out for h in pool):
         raise commun.Refus("SOURCES/classes", f"{prm['sources']['classes']!r} : BTC = pool D1-bis, autres parmi lui")
     return out
+
+
+def chaine(p: Fraction, L: int) -> tuple:
+    """(a, b) de la chaîne d'une unité faible de part stationnaire p et d'épisodes de longueur moyenne L (convention de
+    S2, G0 SIM-NIVEAU l.54) : L = 1, tirages indépendants, a = b = p ; sinon a = 1 − 1/L, b = p/(L(1 − p))."""
+    return (p, p) if L == 1 else (1 - Fraction(1, L), p / (L * (1 - p)))
+
+
+def faibles(prm: dict, cellule: str, i: int, spec, horizon: int) -> dict:
+    """{hôte : masque} des unités faibles (E-S-16) ; spec : None ou {"hotes", "p" (p_w), "L" (L_w), "type"} ; chaîne de
+    chaine(p_w, L_w), départ stationnaire, un flux « faibles » par unité (indice : rang dans spec["hotes"])."""
+    if spec is None:
+        return {}
+    a_, b = chaine(spec["p"], spec["L"])
+    return {h: masque(markov(flux(prm, cellule, i, "faibles", j), a_, b, prm["aleas"], horizon))
+            for j, h in enumerate(spec["hotes"])}
+
+
+def touches(prm: dict, v, mode: tuple) -> list:
+    """Hôtes d'un incident (Q-S-05) : ("chacun", hôtes, π) : chacun avec la probabilité π, un tirage par hôte dans
+    l'ordre (cible : les 7 hôtes AS13335, π = 7/10 ; « les 10 » : π = 1) ; ("parmi", hôtes, k, imposés) : un hôte
+    uniforme parmi les imposés s'il y en a (unité faible), puis des hôtes uniformes sans remise parmi les autres jusqu'à
+    k (paire tirée par incident, triplet). Hôte hors du pool : SOURCES/incident."""
+    tous = [h for h, _f in prm["calibration"]["unites"]]
+    if any(h not in tous for h in list(mode[1]) + (list(mode[3]) if mode[0] == "parmi" else [])):
+        raise commun.Refus("SOURCES/incident", f"{mode!r} : hôtes du pool attendus")
+    if mode[0] == "chacun":
+        s = aleas.seuil(mode[2])
+        return [h for h in mode[1] if aleas.bernoulli(v, s)]
+    out = [mode[3][_uniforme(len(mode[3])).tirer(v)]] if mode[3] else []
+    reste = [h for h in mode[1] if h not in out]
+    while len(out) < mode[2]:
+        out.append(reste.pop(_uniforme(len(reste)).tirer(v)))
+    return out
+
+
+def incidents(prm: dict, cellule: str, i: int, spec, horizon: int, u=None, v=None) -> dict:
+    """{hôte : masque} des incidents communs (E-S-15) ; spec : None ou {"rho" (par jour de strate), "duree" D,
+    "geometrique", "hotes" (touches)}. Débuts de Bernoulli de paramètre ρ·w/86 400 par fenêtre de grille (flux
+    « incidents », ou u) ; durée D fixe (Q-S-05 a) ou géométrique de moyenne D (sensibilité b), tirée sur le même flux
+    après le début, coupée à l'horizon ; hôtes tirés par incident (flux « incidents-hotes », ou v). Panne de transport :
+    elle s'ajoute à H, donc frappe toutes les classes de l'hôte (ADR l.162 ; cible d'ETH)."""
+    if spec is None:
+        return {}
+    u = u or flux(prm, cellule, i, "incidents", 0)
+    v = v or flux(prm, cellule, i, "incidents-hotes", 0)
+    debut, out, t = Geometrique(spec["rho"] * prm["calendrier"]["w"] / 86400, prm["aleas"]), {}, -1
+    while True:
+        g = debut.tirer(u, horizon - 1 - t)
+        if g is None:
+            return out
+        t += g
+        if spec["geometrique"]:
+            d = Geometrique(Fraction(1, spec["duree"]), prm["aleas"]).tirer(u, horizon - t)
+        else:
+            d = min(spec["duree"], horizon - t)
+        bits = ((1 << (horizon - t if d is None else d)) - 1) << t
+        for h in touches(prm, v, spec["hotes"]):
+            out[h] = out.get(h, 0) | bits

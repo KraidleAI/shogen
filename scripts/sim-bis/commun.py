@@ -54,7 +54,8 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "sources": {"composants": [texte], "regroupees": [texte], "longues": [positif],
                       "derive": {"bornes": ((positif, positif), (positif, positif)), "unites_saut": positif,
                                  "transitoire": (positif, positif), "initiale": positif},
-                      "classes": {"BTC": [texte], "ETH": [texte], "USDC": [texte], "USDT": [texte]}, "source": texte}}
+                      "classes": {"BTC": [texte], "ETH": [texte], "USDC": [texte], "USDT": [texte]}, "as13335": [texte],
+                      "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
