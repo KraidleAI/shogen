@@ -386,6 +386,32 @@ class TestDerives(unittest.TestCase):
                      ("absorption", {"k_bascule": 1})):
             self.refus("PARAMETRES/schema", commun.controler, dict(PRM, sources=dict(s, **{k: v})), commun.SCHEMA)
 
+    def oracle(self, derive, somme, tous):
+        """Écarts (part en panne − p·Σ_{t<T} m(t)/T) des hôtes à dérive (binance seul si tous est faux), calme, f = 1,
+        T = 8 640, 60 réplications ; p lu dans EP (cellules/n_s de la ligne « panne ») ; moyenne à 5 SE de 0 dans
+        chaque sens (croissant, décroissant), pour que des erreurs de signes opposés ne se compensent pas."""
+        n, m, x = 8640, {"calme": (1 << 8640) - 1, "stress": 0}, {True: [], False: []}
+        for i in range(60):
+            r = sources.Replication(PRM, EP, dict(fond(), derive=derive), "T-C8", i, m, n)
+            for h, d in r.derives()["specs"].items():
+                if tous or h == "binance":
+                    p = Fraction(EP["calme", h, "panne"]["cellules"], EP["calme", h, "panne"]["n_s"])
+                    x[d[1] < d[2]].append(part(r.pannes(h), 0, n) - p * somme(d) / n)
+        self.assertEqual([dans_5_se(x[s], Fraction(0)) for s in (True, False)], [True, True])
+
+    def test_oracle_tendance_c_8(self):
+        """C-8 de la G2 de la tranche 2 (avis Q-T2-6, oracle manquant) : taux moyen de la série amincie = moyenne de
+        m(t)·p, à 5 SE. Tendances sur L = 4 320, horizon T = 2L, binance (p = 372/24 585) : Σ m(t) = L·m0 +
+        (m1 − m0)(L − 1)/2 + L·m1, refaite à la main depuis le sens tiré (m0, m1). Mutations M-C8-01 (tendances non
+        amincies), M-C8-03 (multiplicateur non tenu après L), M-C8-04 (tendance tirée au taux p, non M·p)."""
+        self.oracle({"genres": ["tendances"], "duree": 4320},
+                    lambda d: 4320 * d[1] + (d[2] - d[1]) * 4319 / 2 + 4320 * d[2], False)
+
+    def test_oracle_saut_c_8(self):
+        """C-8 : même oracle pour les sauts (L = 4 320, trois hôtes tirés, chacun à son p d'EP), Σ m(t) = x·m0 +
+        (T − x)·m1, x instant tiré. Mutation M-C8-02 : sauts non amincis."""
+        self.oracle({"genres": ["sauts"], "duree": 4320}, lambda d: d[3] * d[1] + (8640 - d[3]) * d[2], True)
+
 
 class TestClasses(unittest.TestCase):
     TOUS = ["binance", "bitfinex", "bitstamp", "chainlink", "coinbase", "coingecko", "defillama", "gemini", "kraken",
