@@ -14,7 +14,10 @@ de P1 (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1) : K-01 à K-03 passent aussi par l'analy
 commentaire dans le bloc, runner dans un `name: >`, clé de premier niveau `env :`, entre guillemets ou répétée ;
 A-01 et A-02, l'analyseur seul (étapes exclues, U+2028), que les contrôles d'avant masquent. CB-18m : K-01 exige
 `--egal` à la ligne du job s2-harness-unittest (Ran = PLANCHER du vérificateur) ; L-22, la même ligne sans `--egal`,
-refusée. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+refusée. Contre-contrôle de CB-18 (CC-1, remède (a)) : `cable` exige `gabarit`, les lignes brutes du job à indentation
+exacte, et `analyseur` ; L-01 à L-21 sont refusés par l'analyseur seul ; L-23 à L-32, leurres qu'il admet (ligne cachée
+dans un nom plié ou dans un `with:`, checkout ou `runs-on` réels autres), par le gabarit ; G-01, le gabarit seul.
+Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -127,31 +130,55 @@ finally:
 
 
 def job(texte, nom):
-    """Lignes, sans indentation, du job `nom` du texte de gates.yml : de sa clé à la clé de job suivante ; [] s'il
-    manque."""
-    lignes = texte.splitlines()
-    if f"  {nom}:" not in lignes:
-        return []
-    i = lignes.index(f"  {nom}:") + 1
-    fin = next((k for k in range(i, len(lignes)) if re.fullmatch(r"  [\w-]+:", lignes[k])), len(lignes))
-    return [x.strip() for x in lignes[i:fin]]
+    """Lignes brutes du job `nom` du texte de gates.yml, indentation comprise : de sa clé (exclue) à la première ligne
+    d'indentation inférieure à 4 qui n'est ni vide ni un commentaire ; lignes vides et commentaires d'indentation 8 au
+    plus omis (aucun n'est une ligne d'un bloc `run:`, à l'indentation 10) ; [] s'il manque."""
+    lignes, sortie = texte.split(chr(10)), []
+    for x in lignes[lignes.index(f"  {nom}:") + 1:] if f"  {nom}:" in lignes else []:
+        n, t = len(x) - len(x.lstrip(" ")), x.strip()
+        if t and n < 4 and t[0] != "#":
+            break
+        sortie += [x] if t and (n > 8 or t[0] != "#") else []
+    return sortie
 
 
 RUNNER = "python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"
 ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1",
           "run: " + RUNNER)
+GABARIT = ("    name: .*", "    " + re.escape(ETAPES[0]), "    timeout-minutes: .*", "    steps:",
+           "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false", "      - name: .*",
+           "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: .*", "        shell: bash",
+           "        run: [|]")
+
+
+def gabarit(texte, nom):
+    """CC-1 du contre-contrôle de CB-18, remède (a) : les lignes brutes du job (`job`), à indentation exacte, suivent
+    GABARIT ligne à ligne, puis ne sont plus que des lignes d'indentation 10 exactement, celles du bloc de la troisième
+    étape. Soit, sur ces lignes et dans cet ordre : `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, puis
+    trois étapes et rien d'autre : le checkout épinglé, son `with:` réduit à `persist-credentials: false` ; le runner
+    (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
+    plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite."""
+    b = job(texte, nom)
+    return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
+        re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
+
+
+def analyseur(texte, nom, appel):
+    """Analyseur unique `v.etapes`, partagé avec l'enregistreur de rôle (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1) : trois
+    étapes, la première non admise, la deuxième le runner seul ; puis `v.lignes_du_job` : la ligne `appel` une fois,
+    dans un bloc `run:` admis sans autre ligne que v.LIBRES."""
+    pas = v.etapes(texte, nom) or []
+    return len(pas) == 3 and pas[:2] == [None, [RUNNER]] and len(v.lignes_du_job(texte, nom, appel) or []) == 1
 
 
 def cable(texte, nom, appel):
-    """Câblage du job `nom` : contrôles d'avant sur ses lignes (une ligne `appel`, les étapes de ETAPES avant elle,
-    ni `-m unittest`, ni `continue-on-error`, ni `if:`), puis ceux de l'analyseur unique `v.etapes`, partagé avec
-    l'enregistreur de rôle (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1) : trois étapes, le checkout, le runner seul, puis un bloc
-    `run:` admis où la ligne figure une fois, sans autre ligne que v.LIBRES."""
-    l, pas = job(texte, nom), v.etapes(texte, nom) or []
-    k = [i for i, x in enumerate(l) if re.fullmatch(appel, x)]
-    return (len(k) == 1 and all(e in l[:k[0]] for e in ETAPES) and not any(
-        "-m unittest" in x or "continue-on-error" in x or x.startswith(("if:", "- if:")) for x in l) and len(pas) == 3
-        and pas[:2] == [None, [RUNNER]] and len(v.lignes_du_job(texte, nom, appel) or []) == 1)
+    """Câblage du job `nom`, contrôlé exactement ainsi, et rien d'autre : (1) `gabarit` : ses lignes brutes, à
+    indentation exacte, sont dans l'ordre `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, le checkout
+    épinglé et son `with:` réduit à `persist-credentials: false`, le runner (`name`, `shell: bash`, `run:` du runner),
+    une étape `name`, `shell: bash`, `run: |`, puis seulement des lignes d'indentation 10 ; (2) `analyseur`, lecture de
+    l'enregistreur de rôle : trois étapes, la première non admise, la deuxième le runner seul, et la ligne `appel` une
+    fois, dans un bloc `run:` admis sans autre ligne que v.LIBRES."""
+    return gabarit(texte, nom) and analyseur(texte, nom, appel)
 
 
 with open(GY, encoding="utf-8") as f:
@@ -197,12 +224,36 @@ for nom, lignes in (                                    # leurres contre l'analy
         ("L-19 env du workflow, espace avant les deux-points", ["env : {PATH: leurre}"] + DEBUT + SUITE),
         ("L-20 defaults du workflow, clé entre guillemets", ['"defaults": {run: {shell: cat {0}}}'] + DEBUT + SUITE),
         ("L-21 clé jobs répétée", DEBUT + SUITE + ["jobs:", "  autre:"])):
-    attendu = nom.startswith("L-00")
-    admis = cable(chr(10).join(lignes), "s2bis-unittest", APPEL)
+    attendu = nom.startswith("L-00")                    # leurres de l'analyseur : refusés par l'analyseur seul (CC-1)
+    admis = (cable if attendu else analyseur)(chr(10).join(lignes), "s2bis-unittest", APPEL)
     cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
 S2 = [x.replace("s2bis-unittest", "s2-harness-unittest") for x in DEBUT] + SUITE[:3] + [L + V]
 cas("L-22 job S2 sans --egal : refusé (CB-18m)", ["admis"] if cable(chr(10).join(S2), "s2-harness-unittest", APPEL_S2)
     else [], None)
+RO, CO = DEBUT[3].strip(), DEBUT[6].strip()             # CC-1 : leurres que l'analyseur admet, refusés par le gabarit
+for nom, lignes in (
+        ("L-23 runs-on réel ubuntu-latest, ligne runs-on dans un nom plié (N-01)", DEBUT[:3]
+         + ["    runs-on: ubuntu-latest"] + DEBUT[4:9] + ["      - name: >", L + RO] + DEBUT[10:] + SUITE),
+        ("L-24 checkout @v4, ligne épinglée dans un nom plié (N-02)", DEBUT[:6] + ["      - uses: actions/checkout@v4"]
+         + DEBUT[7:9] + ["      - name: >", L + CO] + DEBUT[10:] + SUITE),
+        ("L-25 première étape run: en sh, checkout dans un nom plié (N-03)", DEBUT[:6] + ["      - shell: sh",
+         "        run: sed -i s/7/0/ " + V[11:]] + ["      - name: >", L + CO] + DEBUT[10:] + SUITE),
+        ("L-26 runs-on réel macos-15, ligne runs-on dans le with: du checkout (N-04)", DEBUT[:3] + [
+         "    runs-on: macos-15"] + DEBUT[4:9] + [L + RO] + DEBUT[9:] + SUITE),
+        ("L-27 runs-on dans le nom plié du job, réel windows-latest (N-17)", DEBUT[:2] + ["    name: >", L + RO,
+         "    runs-on: windows-latest"] + DEBUT[4:] + SUITE),
+        ("L-28 checkout dans le nom littéral du job, étape uses: tierce (N-18)", DEBUT[:2] + ["    name: |", L + CO]
+         + DEBUT[3:6] + ["      - uses: tiers/action@main"] + DEBUT[7:] + SUITE),
+        ("L-29 with: du checkout vers un dépôt tiers", DEBUT[:8] + ["          repository: tiers/r"] + DEBUT[9:]
+         + SUITE),
+        ("L-30 if: sur l'étape du checkout", DEBUT[:7] + ["        if: false"] + DEBUT[7:] + SUITE),
+        ("L-31 runs-on qui prolonge l'étiquette (ubuntu-24.04-arm)", DEBUT[:3] + ["    runs-on: ubuntu-24.04-arm"]
+         + DEBUT[4:] + SUITE),
+        ("L-32 checkout épinglé à un autre commit", DEBUT[:6] + ["      " + ETAPES[1].replace("@3d3c", "@0d3c")]
+         + DEBUT[7:] + SUITE)):
+    cas(nom + " : refusé", ["admis"] if cable(chr(10).join(lignes), "s2bis-unittest", APPEL) else [], None)
+cas("G-01 ligne du bloc à l'indentation 12 : refusée par le gabarit (indentation exacte)", ["admis"] if gabarit(
+    chr(10).join(DEBUT + SUITE[:4] + ["  " + SUITE[4]]), "s2bis-unittest") else [], None)
 EXCLUES = DEBUT + SUITE[:1] + ["        if: false"] + SUITE[1:] + SUITE[:1] + ["        continue-on-error: true"]
 EXCLUES += SUITE[1:]
 for nom, texte, attendu in (                            # analyseur seul : ce que les contrôles d'avant voyaient déjà

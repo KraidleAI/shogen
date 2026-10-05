@@ -959,3 +959,44 @@ Mutants (commande du job, `--plancher 183`, borne de 300 s ; python3.12 ; résea
 0 FATAL) : zéro de tête admis, segments à deux chiffres hors grammaire (MR-26 porté), refus jamais levé, ouverture
 sans refus, refus aussi à la bascule, préfixe sans tiret ou autre fin refusés, k comparé en texte, plancher non
 relevé. Suite : 183 tests ; plancher du job : 183, égalité exigée (`--egal`).
+
+## CB-18r (2026-10-05) : gabarit des lignes brutes des jobs unittest (CC-1 du contre-contrôle de CB-18, remède (a))
+
+Objet : `cable()`, qui juge les cas K-01 à K-03 du runner, contrôlait `runs-on`, le checkout épinglé et le runner par
+la présence de lignes dépouillées de leur indentation : une ligne cachée dans un nom plié (`name: >`) ou dans le
+`with:` du checkout suffisait (leurres N-01 à N-04 et N-17 à N-20 du contre-contrôle). `cable()` exige désormais
+`gabarit` et `analyseur`. `gabarit` lit les lignes brutes du job, à indentation exacte, contre un gabarit fixe :
+`name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps` ; le checkout épinglé, dont le `with:` se réduit à
+`persist-credentials: false` ; le runner ; une étape `run: |` ; puis seulement des lignes d'indentation 10.
+`analyseur` est la lecture de l'enregistreur de rôle, inchangée. `job()` rend les lignes brutes, sans les lignes vides
+ni les commentaires d'indentation 8 au plus. Le docstring de `cable()` dit exactement ces contrôles.
+
+Cas du runner :
+- L-01 à L-21 sont désormais jugés par l'analyseur seul ; jugés par `cable`, le gabarit masquerait ses mutants (sonde :
+  CA-03 survit alors).
+- L-23 à L-29 sont refusés par le gabarit : classes N-01, N-02, N-03, N-04, N-17, N-18, et un `with:` vers un dépôt
+  tiers.
+- L-30 (`if:` sur le checkout), L-31 (`runs-on: ubuntu-24.04-arm`) et L-32 (checkout épinglé à un autre commit)
+  gardent les refus d'avant.
+- G-01 fige l'indentation exacte du bloc.
+
+Rouge : sous le `cable` d'avant, L-23 à L-29 et G-01 sont admis. Les 20 leurres du réviseur, rejoués par son outil : les
+8 failles sont refusées, les 10 refus sont gardés, N-12 et N-14 restent admis (résidu SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1,
+sans code).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 265 | 69 cas (11 de plus : L-23 à L-32, G-01 ; L-01 à L-21 jugés par l'analyseur seul) |
+
+Mutants (commande du job s2bis-unittest, dont le runner est la première étape, borne de 300 s ; python3.12 ; réseau
+isolé) : 8 tués sur 8 (0 vivant, 0 FATAL) :
+- gabarit non appelé ;
+- `runs-on`, checkout et `with:` quelconques ;
+- lignes après le gabarit non contrôlées ;
+- fin du job non vue ;
+- commentaires gardés ;
+- préfixe seul (`re.match`).
+
+Passage précédent, non compté : le checkout quelconque survivait, parce que les leurres cachaient une ligne dans un nom
+plié, ce qui rompait déjà la suite. L-32 a été ajouté. Les CA-01 à CA-12 du réviseur et les leurres sont comptés à
+CB-18s. Suite : 183 tests ; plancher du job : 183.
