@@ -199,6 +199,20 @@ class TestHotes(unittest.TestCase):
                 sources.Replication(PRM, EP, fond(regime=reg), "T-Z", 0, m, 2000).regime("binance", "calme")
             self.assertEqual(c.exception.code, "SOURCES/regime")
 
+    def test_regime_garde_avant_usage(self):
+        """C-2 de la G2 de la tranche 2 (E-S-12) : régime invalide refusé SOURCES/regime par le chemin principal, avant
+        tout usage dans union(), par pannes() comme par etat() : κ = 1/2 (auparavant ALEAS/geometrique) ; à κ = 1
+        (r' = 0, Z jamais tiré), φ = 2 ou τ_D = 0 (auparavant admis en silence). Mutation M-C2-01 : contrôle retiré
+        d'union()."""
+        m = {"calme": (1 << 500) - 1, "stress": 0}
+        for reg in ((Fraction(1, 5), Fraction(1, 2), 20), (Fraction(2), Fraction(1), 20),
+                    (Fraction(1, 5), Fraction(1), 0)):
+            for chemin in ("pannes", "etat"):
+                r = sources.Replication(PRM, EP, fond(regime=reg), "T-C2", 0, m, 500)
+                with self.assertRaises(commun.Refus) as c:
+                    r.pannes("binance") if chemin == "pannes" else r.etat()
+                self.assertEqual(c.exception.code, "SOURCES/regime", (reg, chemin))
+
     def test_union_taux_marginal(self):
         """Taux marginal conservé (E-S-11, E-S-12) : p = 1/10, loi 1×1 3×1, part longue 1/2 (durées 2 et 4 dans un
         paramètre d'essai), régime φ = 1/5, κ = 10, τ_D = 20 ; 300 réplications de 2 000 fenêtres : part du temps dans E
@@ -419,6 +433,18 @@ class TestAlternatives(unittest.TestCase):
             x = [part(sources.faibles(PRM, "T-W", i, {"hotes": ["gemini"], "p": p, "L": lw, "type": "panne"},
                                       1000)["gemini"], 0, 1000) for i in range(100)]
             self.assertTrue(dans_5_se(x, p), (p, lw))
+
+    def test_faible_hors_du_pool(self):
+        """C-3 de la G2 de la tranche 2 (E-S-16) : unité faible hors du pool (bybit) : SOURCES/faible, par etat()
+        (auparavant ignorée en silence) et par faibles(), comme touches() rend SOURCES/incident pour un incident.
+        Mutation M-C3-01 : contrôle du pool retiré."""
+        spec = {"hotes": ["gemini", "bybit"], "p": Fraction(1, 2), "L": 1, "type": "panne"}
+        m = {"calme": (1 << 500) - 1, "stress": 0}
+        for appel in (lambda: sources.Replication(PRM, EP, dict(fond("0"), faibles=spec), "T-C3", 0, m, 500).etat(),
+                      lambda: sources.faibles(PRM, "T-C3", 0, spec, 500)):
+            with self.assertRaises(commun.Refus) as c:
+                appel()
+            self.assertEqual(c.exception.code, "SOURCES/faible")
 
     def test_etat_alternatives(self):
         """Fond nul ; incidents sur kraken seul (ρ = 144, D = 2) : la même panne dans les 4 classes de kraken (ADR

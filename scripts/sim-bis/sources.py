@@ -184,6 +184,14 @@ def loi_longues(prm: dict) -> Empirique:
     return Empirique([(d, 1) for d in prm["sources"]["longues"]])
 
 
+def regime_valide(reg):
+    """Régime d'une strate (E-S-12) : None (C0) ou (φ, κ, τ_D), φ de [0, 1[, κ ≥ 1, τ_D entier ≥ 1, sinon
+    SOURCES/regime ; contrôlé avant tout usage, par regime() et par union() (C-2 de la G2 de la tranche 2)."""
+    if reg is not None and not (0 <= reg[0] < 1 <= reg[1] and type(reg[2]) is int and reg[2] >= 1):
+        raise commun.Refus("SOURCES/regime", f"{reg!r} : φ de [0, 1[, κ ≥ 1, τ_D entier ≥ 1")
+    return reg
+
+
 class Replication:
     """Une réplication d'une cellule : paramètres, EP (calibration.charger(…)["episodes"]), fond (f ; régime par strate,
     (φ, κ, τ_D) ou None ; part des pannes longues ; derive, None ou {genres, duree} ; autres, multiplicateur d'écart
@@ -206,11 +214,9 @@ class Replication:
 
     def regime(self, hote, strate) -> int:
         """Z(hôte, strate) (E-S-12), commun aux séries de l'hôte dans la strate : chaîne à deux états de durée moyenne
-        τ_D en régime dégradé et de part φ (a = 1 − 1/τ_D, b = φ/(τ_D(1 − φ))) ; 0 sous C0."""
+        τ_D en régime dégradé et de part φ (a = 1 − 1/τ_D, b = φ/(τ_D(1 − φ))) ; 0 sous C0 ; regime_valide."""
         if (hote, strate) not in self._z:
-            reg = self.fond["regime"][strate]
-            if reg is not None and not (0 <= reg[0] < 1 <= reg[1] and type(reg[2]) is int and reg[2] >= 1):
-                raise commun.Refus("SOURCES/regime", f"{reg!r} : φ de [0, 1[, κ ≥ 1, τ_D entier ≥ 1")
+            reg = regime_valide(self.fond["regime"][strate])
             self._z[hote, strate] = 0 if reg is None else masque(markov(
                 self.u("regime", hote, strate), 1 - Fraction(1, reg[2]), reg[0] / (reg[2] * (1 - reg[0])),
                 self.prm["aleas"], self.horizon))
@@ -221,11 +227,12 @@ class Replication:
         flux noms = (E, E′, L) ; L (loi_longues, part du fond) seulement si noms[2]. E′ est tirée fenêtre à fenêtre,
         indépendamment, de part r' (convention L = 1 de S2, G0 SIM-NIVEAU l.54) : en régime dégradé, la part κ·r_E peut
         dépasser μ/(μ + 1), borne d'un renouvellement à pauses d'au moins une fenêtre (points de la grille E1 à f = 1) ;
-        r' ≥ 1 : SOURCES/taux. Sous une dérive de l'hôte de maximum M : union tirée au taux M·p, puis amincie (flux
-        « derive-episodes »)."""
+        r' ≥ 1 : SOURCES/taux ; régime contrôlé d'abord (regime_valide). Sous une dérive de l'hôte de maximum M : union
+        tirée au taux M·p, puis amincie (flux « derive-episodes »)."""
+        reg = regime_valide(self.fond["regime"][strate])
         d = self.derives()["specs"].get(hote)
         grand = max(d[1], d[2]) if d else 1
-        c = composantes(grand * p, self.fond["longues"] if noms[2] else 0 * p, self.fond["regime"][strate])
+        c = composantes(grand * p, self.fond["longues"] if noms[2] else 0 * p, reg)
         lois, m = (loi, None, loi_longues(self.prm)), 0
         for j, cle in enumerate(("base", "regime", "longues")):
             if c[cle] and cle == "regime":
@@ -363,9 +370,12 @@ def chaine(p: Fraction, L: int) -> tuple:
 
 def faibles(prm: dict, cellule: str, i: int, spec, horizon: int) -> dict:
     """{hôte : masque} des unités faibles (E-S-16) ; spec : None ou {"hotes", "p" (p_w), "L" (L_w), "type"} ; chaîne de
-    chaine(p_w, L_w), départ stationnaire, un flux « faibles » par unité (indice : rang dans spec["hotes"])."""
+    chaine(p_w, L_w), départ stationnaire, un flux « faibles » par unité (indice : rang dans spec["hotes"]). Hôte hors
+    du pool : SOURCES/faible (C-3 de la G2 de la tranche 2), comme touches() pour un incident."""
     if spec is None:
         return {}
+    if any(h not in [x for x, _f in prm["calibration"]["unites"]] for h in spec["hotes"]):
+        raise commun.Refus("SOURCES/faible", f"{spec['hotes']!r} : hôtes du pool attendus")
     a_, b = chaine(spec["p"], spec["L"])
     return {h: masque(markov(flux(prm, cellule, i, "faibles", j), a_, b, prm["aleas"], horizon))
             for j, h in enumerate(spec["hotes"])}
