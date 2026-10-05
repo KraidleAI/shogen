@@ -13,6 +13,8 @@ import commun
 
 PRM = commun.charger_parametres(environ={})
 K_ = PRM["calibration"]
+TEXTE = commun.lire_entree(PRM, "episodes", environ={}).decode("utf-8")
+EP = calibration.analyser(TEXTE, K_)["episodes"]
 
 
 def bits(*positions):
@@ -94,6 +96,101 @@ class TestEstimateur(unittest.TestCase):
                 calib_fiv.courbe(pres, val, ells, K_)
             self.assertEqual(c.exception.code, "FIV/entree", (pres, val, ells))
 
+
+
+class TestModeleE1(unittest.TestCase):
+    def test_portee_ep_l6(self):
+        """EP l.6 : segment [1 787 770 800 ; 1 790 558 880), n fixe 38 600, plage D5 [1 790 273 880, 1 790 435 280] ;
+        une retouche de forme, une borne hors du pas w, un segment vide : CALIB/forme. Mutation M-10-09 (ligne non
+        contrôlée)."""
+        self.assertEqual(calib_fiv.portee(TEXTE, PRM["calendrier"]), {
+            "t0": 1787770800, "t_fin": 1790558880, "n_fixe": 38600, "plages": [(1790273880, 1790435280)]})
+        lignes = TEXTE.split(chr(10))
+        for a, b in (("portée : segment", "portée : Segment"), ("1790435280)", "1790435290)"),
+                     ("[1787770800 ; 1790558880)", "[1787770800 ; 1787770800)")):
+            faux = chr(10).join(lignes[:5] + [lignes[5].replace(a, b, 1)] + lignes[6:])
+            with self.assertRaises(commun.Refus) as c:
+                calib_fiv.portee(faux, PRM["calendrier"])
+            self.assertEqual(c.exception.code, "CALIB/forme", b)
+
+    def test_calendrier_j28(self):
+        """Grille de 46 468 positions du mercredi 2026-08-26 19:00 au lundi 2026-09-28 01:28 UTC (date -u -d @…) :
+        calme 300 + 2 880 + 4 × 7 200 + 88 = 32 068, stress 5 × 2 880 = 14 400 ; plage D5 du jeudi 24 18:18 au
+        samedi 26 15:08 inclus : 342 + 1 440 = 1 782 positions de calme et 909 de stress retirées : 30 286 et 13 491.
+        Position 41 718 (1 790 273 880) retirée, 41 717 en calme ; 44 408 retirée, 44 409 en stress ; 0 en calme ; 3 180
+        (samedi 29 août 00:00) en stress ; une plage hors du segment (la veille d'un samedi) ne retire rien.
+        Mutations M-10-10 (plage à borne haute exclue), M-10-11 (plage ignorée), M-10-12 (premier jour partiel
+        ignoré), M-10-25 (plage hors du segment non écartée)."""
+        c = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        m = c["masques"]
+        self.assertEqual((c["horizon"], m["calme"].bit_count(), m["stress"].bit_count()), (46468, 30286, 13491))
+        lu = [("calme" if m["calme"] >> j & 1 else "stress" if m["stress"] >> j & 1 else "-")
+              for j in (41718, 41717, 44408, 44409, 0, 3180, 3179)]
+        self.assertEqual(lu, ["-", "calme", "-", "stress", "calme", "stress", "calme"])
+        seg = {"t0": 1796428800, "t_fin": 1796428800 + 3 * 86400, "plages": [(1796342400, 1796428680)]}
+        self.assertEqual(calib_fiv.calendrier_j28(seg, PRM["calendrier"]),     # samedi 2026-12-05, plage la veille
+                         {"masques": {"calme": ((1 << 1440) - 1) << 2880, "stress": (1 << 2880) - 1}, "horizon": 4320})
+
+    def test_replication(self):
+        """Une réplication d'E1 (C0, puis un point à régime) : I_t égal au comptage naïf « au moins deux hôtes en
+        écart », position par position, sur les positions de chaque strate ; même (cellule, i) : mêmes octets ; i
+        différent : autres octets. Mutations M-10-13 (I_t à « au moins un »), M-10-14 (strate ignorée : I_t pris sur
+        la grille)."""
+        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        for point in (None, (Fraction(1, 10), Fraction(20), 240)):
+            r = calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 0)
+            for s, (pres, val) in r["strates"].items():
+                self.assertEqual(pres, cal["masques"][s])
+                naif_ = sum(1 << j for j in range(cal["horizon"])
+                            if pres >> j & 1 and sum(x >> j & 1 for x in r["etats"].values()) >= 2)
+                self.assertEqual(val, naif_, (point, s))
+            self.assertEqual(r, calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 0))
+            self.assertNotEqual(r, calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 1))
+
+    def test_taux_c0_e_s_39(self):
+        """E-S-39 : sous C0, sans observateur, à f = 1, la part de fenêtres de calme où binance est en écart, sur 30
+        réplications, égale le taux d'EP l.15 (372/24 585, écart propre nul) à 5 erreurs-types près (variance binomiale
+        majorée par un facteur 2 ; dispersion des épisodes d'EP l.16 : 476/372) ; de même quand la ligne « panne » de
+        binance est vidée (EP retouché en mémoire : l'écart vient alors de F seul). Mutations M-10-15 (f = 1/2),
+        M-10-23 (état réduit à la panne H)."""
+        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        p, calme = Fraction(372, 24585), cal["masques"]["calme"]
+        e = EP["calme", "binance", "ecart"]
+        self.assertEqual(p, Fraction(e["cellules"], e["n_s"]))
+        sans_panne = dict(EP)
+        sans_panne["calme", "binance", "panne"] = dict(EP["calme", "binance", "panne"], cellules=0)
+        for ep in (EP, sans_panne):
+            x = sum((calib_fiv.replication(PRM, ep, cal, None, "E1-taux", i)["etats"]["binance"] & calme).bit_count()
+                    for i in range(30))
+            n = calme.bit_count() * 30
+            self.assertLessEqual((Fraction(x, n) - p) ** 2, 25 * 2 * p * (1 - p) / n)
+
+    def test_regime_groupe(self):
+        """Régime caché d'E-S-12 appliqué : série de binance seule, en calme, FIV(240) sur 5 réplications : sous C0,
+        au plus 1,41 (épisodes courts) ; au point (φ, κ, τ_D) = (1/10, 50, 1 440), au moins 12,05 (mesuré à la mise au
+        point de ce test) : le plus petit sous régime dépasse 4 fois le plus grand sous C0. Mutation M-10-21 (régime
+        ignoré : C0 partout)."""
+        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        c = cal["masques"]["calme"]
+
+        def fiv(point, i):
+            x = calib_fiv.replication(PRM, EP, cal, point, "E1-regime", i)["etats"]["binance"] & c
+            return calib_fiv.courbe(c, x, [240], K_)[0]["fiv"]
+        sous_c0 = [fiv(None, i) for i in range(5)]
+        sous_regime = [fiv((Fraction(1, 10), Fraction(50), 1440), i) for i in range(5)]
+        self.assertGreater(min(sous_regime), 4 * max(sous_c0))
+
+    def test_moyenne(self):
+        """Trois réplications : 1, 1, 0, 0 (FIV(2) = 5/4), série nulle (indéfinie), lacune 1, 1, ·, 0, 0 (FIV(2) =
+        3/2) : moyenne des définies (5/4 + 3/2)/2 = 11/8 ; une indéfinie ; aucune définie : None ; liste vide :
+        FIV/entree. Mutations M-10-16 (indéfinies comptées pour 0), M-10-26 (liste vide non refusée)."""
+        cs = [calib_fiv.courbe(bits(0, 1, 2, 3), bits(0, 1), [1, 2], K_),
+              calib_fiv.courbe(bits(0, 1), 0, [1, 2], K_), calib_fiv.courbe(bits(0, 1, 3, 4), bits(0, 1), [1, 2], K_)]
+        self.assertEqual(calib_fiv.moyenne(cs), {"fiv": [1, Fraction(11, 8)], "definies": 2, "indefinies": 1})
+        self.assertEqual(calib_fiv.moyenne(cs[1:2]), {"fiv": [None, None], "definies": 0, "indefinies": 1})
+        with self.assertRaises(commun.Refus) as c:
+            calib_fiv.moyenne([])
+        self.assertEqual(c.exception.code, "FIV/entree")
 
 if __name__ == "__main__":
     unittest.main()
