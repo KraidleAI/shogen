@@ -181,13 +181,19 @@ def _rang(item) -> tuple:
 def selection(prm: dict, cible: dict, moyennes: dict) -> dict:
     """C2 et C1 de chaque strate (E-S-38) : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la
     grille, ou None pour C0 : {strate : moyenne()}}. C2 = point de critère minimal ; C1 = point de la grille dont
-    ln FIV(ell_c1) est le plus proche de la moyenne des ln FIV(ell_c1) de C0 et de C2 ; égalités : _rang. Rend
-    {strate : {"C2", "C1", "criteres" : {point : critère}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés}}. Point
-    absent : E1/point ; aucun critère défini, ou FIV(ell_c1) de C0 ou de C2 indéfini : E1/indefini."""
+    ln FIV(ell_c1) est le plus proche de la moyenne des ln FIV(ell_c1) de C0 et de C2, C2 compris (lettre d'E-S-38) ;
+    égalités : _rang. Rend {strate : {"C2", "C1", "criteres" : {point : critère}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ)
+    aux ℓ gardés}}. ell_c1 absent de calibration.ell : E1/ell ; point absent, C0 compris : E1/point ; strate de la cible
+    sans courbe pour un point ou pour C0 : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, ou
+    FIV(ell_c1) de C0 ou de C2 indéfini : E1/indefini."""
     ctx, ells, pts = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm)
+    if prm["e1"]["ell_c1"] not in ells:
+        raise commun.Refus("E1/ell", f"ell_c1 = {prm['e1']['ell_c1']!r} absent de calibration.ell")
     j, out = ells.index(prm["e1"]["ell_c1"]), {}
     if any(p not in moyennes for p in [None] + pts):
         raise commun.Refus("E1/point", "point de la grille ou C0 sans courbe")
+    if any(s not in moyennes[p] for p in [None] + pts for s in cible):
+        raise commun.Refus("E1/strate", "strate de la cible sans courbe pour un point de la grille ou pour C0")
     for s, cs in cible.items():
         crit = {p: critere(moyennes[p][s]["fiv"], cs, ells, ctx) for p in pts}
         defs = [(v, p) for p, v in crit.items() if v is not None]

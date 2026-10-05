@@ -103,13 +103,15 @@ class TestEstimateur(unittest.TestCase):
 class TestModeleE1(unittest.TestCase):
     def test_portee_ep_l6(self):
         """EP l.6 : segment [1 787 770 800 ; 1 790 558 880), n fixe 38 600, plage D5 [1 790 273 880, 1 790 435 280] ;
-        une retouche de forme, une borne hors du pas w, un segment vide : CALIB/forme. Mutation M-10-09 (ligne non
-        contrôlée)."""
+        une retouche de forme, une borne hors du pas w, un segment vide, un t0 répété différent du début du segment
+        (1 787 770 860, multiple de w, ligne canonique : C-2 de la G2 de la tranche 4) : CALIB/forme. Mutations M-10-09
+        (ligne non contrôlée), R-06 du réviseur (t0 répété non contrôlé)."""
         self.assertEqual(calib_fiv.portee(TEXTE, PRM["calendrier"]), {
             "t0": 1787770800, "t_fin": 1790558880, "n_fixe": 38600, "plages": [(1790273880, 1790435280)]})
         lignes = TEXTE.split(chr(10))
         for a, b in (("portée : segment", "portée : Segment"), ("1790435280)", "1790435290)"),
-                     ("[1787770800 ; 1790558880)", "[1787770800 ; 1787770800)")):
+                     ("[1787770800 ; 1790558880)", "[1787770800 ; 1787770800)"),
+                     ("(t0 = 1787770800,", "(t0 = 1787770860,")):
             faux = chr(10).join(lignes[:5] + [lignes[5].replace(a, b, 1)] + lignes[6:])
             with self.assertRaises(commun.Refus) as c:
                 calib_fiv.portee(faux, PRM["calendrier"])
@@ -250,6 +252,11 @@ def m(*fiv):
     return {"fiv": [None if x is None else Fraction(x) for x in fiv], "definies": 1, "indefinies": 0}
 
 
+def cible3():
+    """Cible EP fictive : 1 et 2 à ℓ = 1 et 2 (gardés), 8 à ℓ = 240 (non gardé)."""
+    return [{"ell": e, "fiv": Fraction(x), "garde": g} for e, x, g in ((1, 1, True), (2, 2, True), (240, 8, False))]
+
+
 class TestCritereE1(unittest.TestCase):
     def test_parametres_e1(self):
         """Section « e1 » : grille φ × κ × τ_D de 64 points dans l'ordre déclaré, 200 réplications par point, pool
@@ -318,6 +325,56 @@ class TestCritereE1(unittest.TestCase):
             with self.assertRaises(commun.Refus) as c:
                 calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in faux.items()})
             self.assertEqual(c.exception.code, code)
+
+    def test_egalites_kappa_puis_tau_d(self):
+        """C-2 de la G2 de la tranche 4, lettre d'E-S-38 : égalités départagées par le plus petit κ, puis le plus petit
+        τ_D, φ en dernier (Q-T4-9). Grille φ ∈ {1/100, 1/10}, κ ∈ {5, 50}, τ_D ∈ {60, 240} ; cible 1, 2 (gardés), 8
+        (non gardé) ; points à 1, 4, 1 (critère (ln 2)²), sauf deux à 1, 2, 1 (critère 0) : (1/100, 5, 240) et
+        (1/10, 5, 60), à κ égal : C2 = (1/10, 5, 60), τ_D avant φ ; (1/100, 5, 240) et (1/100, 50, 60) : C2 =
+        (1/100, 5, 240), κ avant τ_D. Mutations R-04 du réviseur (φ avant τ_D), M-14D-04 (τ_D avant κ)."""
+        prm = dict(PRM, e1=dict(PRM["e1"], phi=[[1, 100], [1, 10]], kappa=[5, 50], tau_D=[60, 240]),
+                   calibration=dict(K_, ell=[1, 2, 240]))
+        cible = cible3()
+        f, t = Fraction, (Fraction(1, 100), Fraction(5), 240)
+        for autre, c2 in (((f(1, 10), f(5), 60), (f(1, 10), f(5), 60)), ((f(1, 100), f(50), 60), t)):
+            moy = {p: m(1, 2, 1) if p in (t, autre) else m(1, 4, 1) for p in calib_fiv.grille(prm)}
+            moy[None] = m(1, 1, 1)
+            s = calib_fiv.selection(prm, {"calme": cible}, {p: {"calme": x} for p, x in moy.items()})["calme"]
+            self.assertEqual((s["criteres"][t], s["criteres"][autre], s["C2"]), (0, 0, c2))
+
+    def test_c1_egal_c2(self):
+        """O-1 de la G2 de la tranche 4, lettre d'E-S-38 (C1 = point de la grille dont ln FIV(240) est le plus proche
+        de la moyenne des ln FIV(240) de C0 et de C2) : C2, point de la grille, est candidat. Grille réduite ; C0 à 1 en
+        ℓ = 240 ; P1 seul à critère 0 (1, 2 aux ℓ gardés) et à 4 en ℓ = 240 ; P2, P3 et P4 à 16 : milieu ln 2, P1 à
+        distance ln 2, les autres à 3 ln 2 : C1 = C2 = P1. Mutation R-05 du réviseur (C1 pris hors de C2)."""
+        cible = cible3()
+        moy = {None: m(1, 1, 1), P1: m(1, 2, 4), P2: m(1, 4, 16), P3: m(1, 4, 16), P4: m(1, 1, 16)}
+        s = calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in moy.items()})["calme"]
+        self.assertEqual((s["C2"], s["C1"]), (P1, P1))
+
+    def test_selection_refus_nommes(self):
+        """C-2 et O-7 de la G2 de la tranche 4 : C0 absent des moyennes : E1/point (promis par la docstring) ; ell_c1
+        absent de calibration.ell : E1/ell ; strate de la cible sans courbe, pour un point ou pour C0 : E1/strate ;
+        jamais une erreur non nommée (KeyError, ValueError) ; entrée complète à deux strates : aucun refus. Mutations
+        R-07 du réviseur (C0 non contrôlé), M-14D-01 à M-14D-03."""
+        def code_de(prm, cible, moy):
+            try:
+                calib_fiv.selection(prm, cible, moy)
+            except commun.Refus as e:
+                return e.code
+            except (KeyError, ValueError, IndexError) as e:
+                return type(e).__name__
+            return None
+        cible = cible3()
+        deux = {p: {"calme": x, "stress": x} for p, x in
+                {None: m(1, 1, 1), P1: m(1, 2, 4), P2: m(1, 2, 2), P3: m(1, 4, 3), P4: m(1, 1, 1)}.items()}
+        r = reduit()
+        cas = [(r, {p: x for p, x in deux.items() if p is not None}, "E1/point"),
+               (dict(r, e1=dict(r["e1"], ell_c1=120)), deux, "E1/ell"),
+               (r, {**deux, P3: {"calme": deux[P3]["calme"]}}, "E1/strate"),
+               (r, {**deux, None: {"stress": deux[None]["stress"]}}, "E1/strate"), (r, deux, None)]
+        self.assertEqual([code_de(p, {"calme": cible, "stress": cible}, x) for p, x, _c in cas],
+                         [c for _p, _x, c in cas])
 
 if __name__ == "__main__":
     unittest.main()
