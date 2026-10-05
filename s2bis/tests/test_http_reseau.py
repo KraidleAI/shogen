@@ -226,7 +226,7 @@ class Client(unittest.TestCase):
     def test_contexte_tls_d_urllib(self):
         """C-3 : CONTEXTE vérifie le certificat et le nom d'hôte, et annonce, comme le contexte d'urllib en S2, l'ALPN
         `http/1.1` (RFC 7301 §3.1 : liste de 9 octets, nom de 8) et l'authentification après poignée (RFC 8446
-        §4.2.6, extension 49, vide) ; le nom de la requête part en SNI."""
+        §4.2 (numéro 49), §4.2.6 (données vides)) ; le nom de la requête part en SNI."""
         ext = extensions(hello(http.CONTEXTE))
         self.assertEqual((http.CONTEXTE.verify_mode, http.CONTEXTE.check_hostname), (ssl.CERT_REQUIRED, True))
         self.assertEqual((ext.get(16), ext.get(49), ext[0][5:]), (bytes([0, 9, 8]) + b"http/1.1", b"", b"api.example"))

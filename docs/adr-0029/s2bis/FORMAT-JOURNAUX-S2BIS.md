@@ -264,11 +264,12 @@ champs :
 
 Une réponse est **appariée** si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête (tiré
 au hasard sur 16 bits), le bit QR, une seule question et la même (casse ignorée) ; elle est alors retenue, ou `forme`
-si la suite est mal formée. Tout autre datagramme (écho de la requête, réponse à une autre question, datagramme trop
+si la suite est mal formée (RFC 1035 §4.1.1-4.1.2).
+Tout autre datagramme (écho de la requête, réponse à une autre question, datagramme trop
 court) est ignoré, et l'attente continue jusqu'au délai (C-2). La requête ne passe par aucune résolution : l'adresse
 est une IPv4 littérale **canonique** (quatre entiers décimaux pointés, sans zéro de tête : forme rendue par
 `ipaddress`) ; toute autre valeur (nom, forme abrégée comme « 127.1 », null) donne `forme`, sans exception, sans
-résolution et sans envoi (RFC 1035 §4.1 ; ADR-0029 l.109).
+résolution et sans envoi (ADR-0029 l.109).
 
 ## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
 
