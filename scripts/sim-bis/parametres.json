@@ -37,6 +37,7 @@
  "sources": {
   "composants": ["regime", "panne", "panne-regime", "longues", "ecart", "ecart-regime", "hors-enveloppe", "derive", "derive-episodes", "incidents", "incidents-hotes", "faibles"],
   "regroupees": ["stress"],
-  "source": "E-S-41 et Q-4 (adjudication provisoire de l'orchestrateur, brief de la tranche 2, 2026-10-05) : composants des flux pré-déclarés, indice de réplication à partir de 0 ; E-S-10 et Q-S-04 (AVIS) : loi des longueurs regroupée sur les unités de la strate en stress ; Q-2 et I-1 (même adjudication) : loi « tous épisodes » d'EP, censurés compris, limite écrite (leurs longueurs sont des minorants ; SHOGEN-SIM-BIS-STRESS-EPISODES-1)"
+  "longues": [60, 1440, 4320],
+  "source": "E-S-11 (G0, proposition l.150 ; cellule N4, l.290) : pannes longues de 1 h, 1 jour et 3 jours (60, 1 440 et 4 320 fenêtres de w = 60 s), également probables (choix du sous-lot SB-3c ; le G0 ne fixe pas les poids), portant une part déclarée du taux de panne de l'hôte ; E-S-41 et Q-4 (adjudication provisoire de l'orchestrateur, brief de la tranche 2, 2026-10-05) : composants des flux pré-déclarés, indice de réplication à partir de 0 ; E-S-10 et Q-S-04 (AVIS) : loi des longueurs regroupée sur les unités de la strate en stress ; Q-2 et I-1 (même adjudication) : loi « tous épisodes » d'EP, censurés compris, limite écrite (leurs longueurs sont des minorants ; SHOGEN-SIM-BIS-STRESS-EPISODES-1)"
  }
 }

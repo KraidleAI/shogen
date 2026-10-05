@@ -3,8 +3,10 @@ par hôte sur la grille, en masques entiers (bit j = fenêtre T_début + j·w, c
 (empirique, géométrique) et leur loi résiduelle, renouvellement alterné stationnaire, chaîne à deux états (T-GEN-1),
 masques. SB-3b : flux des composants pré-déclarés (E-S-41, Q-4) ; taux exacts par hôte et par strate (cellules/n_s,
 Q-3 ; E-S-09) ; loi des longueurs « tous épisodes » d'EP (Q-2), regroupée en stress (E-S-10) ; taux exacts des
-composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal conservé. Chaque tirage compare random() à
-un seuil exact (aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
+composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal conservé. SB-3c : indices des flux,
+réplication (fond de la cellule, masques de strate), régime par hôte et par strate, union des composantes, pannes d'hôte
+H(u) vues dans les fenêtres de chaque strate (E-S-08). Chaque tirage compare random() à un seuil exact (aleas.seuil,
+E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
 import functools
 from fractions import Fraction
 
@@ -158,3 +160,70 @@ def composantes(p: Fraction, part: Fraction, regime) -> dict:
     phi, kappa, _tau = regime
     r_e = p_a / (1 - phi + phi * kappa)
     return {"longues": r_l, "base": r_e, "regime": r_e * (kappa - 1) / (1 - r_e)}
+
+
+def indice(prm: dict, hote: str, strate: str, k: int = 0) -> int:
+    """Indice de flux (E-S-41) d'une série : (h·S + s)·10 + k, h rang de l'hôte dans calibration.unites (pool BTC
+    D1-bis), s rang de la strate, k emplacement de 0 à 9 (0 : l'hôte ; 1 + c : classe c), sinon SOURCES/indice."""
+    hotes, strates = [h for h, _f in prm["calibration"]["unites"]], prm["calibration"]["strates"]
+    if hote not in hotes or strate not in strates or type(k) is not int or not 0 <= k < 10:
+        raise commun.Refus("SOURCES/indice", f"{hote!r}, {strate!r}, {k!r}")
+    return (hotes.index(hote) * len(strates) + strates.index(strate)) * 10 + k
+
+
+def loi_longues(prm: dict) -> Empirique:
+    """Durées des pannes longues de sources.longues (E-S-11 : 1 h, 1 jour, 3 jours), également probables."""
+    return Empirique([(d, 1) for d in prm["sources"]["longues"]])
+
+
+class Replication:
+    """Une réplication d'une cellule : paramètres, EP (calibration.charger(…)["episodes"]), fond (f ; régime par strate,
+    (φ, κ, τ_D) ou None ; part des pannes longues), nom de cellule et indice i ≥ 0 (Q-4), masques de strate
+    (calendrier.masques) et horizon T_max en fenêtres ; chaque série tire sur ses propres flux (composant, indice)."""
+
+    def __init__(self, prm, ep, fond, cellule, i, masques, horizon):
+        self.prm, self.ep, self.fond, self.cellule, self.i = prm, ep, fond, cellule, i
+        self.masques, self.horizon, self._z = masques, horizon, {}
+
+    def u(self, composant, hote, strate, k=0):
+        return flux(self.prm, self.cellule, self.i, composant, indice(self.prm, hote, strate, k))
+
+    def regime(self, hote, strate) -> int:
+        """Z(hôte, strate) (E-S-12), commun aux séries de l'hôte dans la strate : chaîne à deux états de durée moyenne
+        τ_D en régime dégradé et de part φ (a = 1 − 1/τ_D, b = φ/(τ_D(1 − φ))) ; 0 sous C0."""
+        if (hote, strate) not in self._z:
+            reg = self.fond["regime"][strate]
+            if reg is not None and not (0 <= reg[0] < 1 <= reg[1] and type(reg[2]) is int and reg[2] >= 1):
+                raise commun.Refus("SOURCES/regime", f"{reg!r} : φ de [0, 1[, κ ≥ 1, τ_D entier ≥ 1")
+            self._z[hote, strate] = 0 if reg is None else masque(markov(
+                self.u("regime", hote, strate), 1 - Fraction(1, reg[2]), reg[0] / (reg[2] * (1 - reg[0])),
+                self.prm["aleas"], self.horizon))
+        return self._z[hote, strate]
+
+    def union(self, hote, strate, k, p, loi, noms) -> int:
+        """Masque sur la grille de E ∪ (E′ ∩ Z) ∪ L, série de taux marginal p (composantes), de loi `loi` pour E, de
+        flux noms = (E, E′, L) ; L (loi_longues, part du fond) seulement si noms[2]. E′ est tirée fenêtre à fenêtre,
+        indépendamment, de part r' (convention L = 1 de S2, G0 SIM-NIVEAU l.54) : en régime dégradé, la part κ·r_E peut
+        dépasser μ/(μ + 1), borne d'un renouvellement à pauses d'au moins une fenêtre (points de la grille E1 à f = 1) ;
+        r' ≥ 1 : SOURCES/taux."""
+        c = composantes(p, self.fond["longues"] if noms[2] else 0 * p, self.fond["regime"][strate])
+        lois, m = (loi, None, loi_longues(self.prm)), 0
+        for j, cle in enumerate(("base", "regime", "longues")):
+            if c[cle] and cle == "regime":
+                if c[cle] >= 1:
+                    raise commun.Refus("SOURCES/taux", f"r' = {c[cle]} : part de [0, 1[ attendue (régime {strate})")
+                s = masque(markov(self.u(noms[j], hote, strate, k), c[cle], c[cle], self.prm["aleas"], self.horizon))
+                m |= s & self.regime(hote, strate)
+            elif c[cle]:
+                m |= masque(alterner(self.u(noms[j], hote, strate, k), lois[j], pause(c[cle], lois[j].moyenne),
+                                     self.prm["aleas"], self.horizon))
+        return m
+
+    def pannes(self, hote) -> int:
+        """H(hôte) (E-S-08) : dans chaque strate, union de taux f·p_panne(hôte, strate) (EP, Q-3), de loi « panne »
+        (loi_longueurs) et de part longue du fond, vue dans les fenêtres de la strate (masque de calendrier)."""
+        h = 0
+        for s in self.prm["calibration"]["strates"]:
+            p, loi = self.fond["f"] * taux(self.ep, s, hote)[0], loi_longueurs(self.prm, self.ep, s, hote, "panne")
+            h |= self.masques[s] & self.union(hote, s, 0, p, loi, ("panne", "panne-regime", "longues"))
+        return h

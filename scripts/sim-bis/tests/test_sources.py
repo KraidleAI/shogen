@@ -27,6 +27,16 @@ def dans_5_se(x: list, r: Fraction) -> bool:
     return (m - r) * (m - r) < 25 * s2 / len(x)
 
 
+def fond(f="1", regime=None, longues="0") -> dict:
+    """Fond d'essai : f, régime (φ, κ, τ_D) ou None dans les deux strates, part des pannes longues."""
+    return {"f": Fraction(f), "regime": {"calme": regime, "stress": regime}, "longues": Fraction(longues)}
+
+
+def part(m: int, debut: int, n: int) -> Fraction:
+    """Part des bits à 1 de m dans les fenêtres [debut, debut + n)."""
+    return Fraction((m >> debut & ((1 << n) - 1)).bit_count(), n)
+
+
 class TestSources(unittest.TestCase):
     def refus(self, code, f, *a):
         with self.assertRaises(commun.Refus) as c:
@@ -152,3 +162,74 @@ class TestSources(unittest.TestCase):
                          [Fraction(1, 2), Fraction(3, 7), 0, 1])
         for r in (Fraction(7, 10), Fraction(1), Fraction(-1, 10), 0.5):
             self.refus("SOURCES/taux", sources.pause, r, Fraction(2))
+
+
+class TestHotes(unittest.TestCase):
+    def test_indice_et_longues(self):
+        """Indice (h·S + s)·10 + k : binance calme → 0 ; okx stress, k = 3 → (9·2 + 1)·10 + 3 = 193 ; bitfinex stress →
+        30 ; hôte inconnu, k = 10 : SOURCES/indice. Pannes longues (E-S-11) : 1 h, 1 jour, 3 jours, également probables,
+        moyenne (60 + 1 440 + 4 320)/3 = 1 940. Mutations M-3C-01 (strate omise de l'indice), M-3C-09 (durées pondérées
+        par leur longueur)."""
+        self.assertEqual([sources.indice(PRM, "binance", "calme"), sources.indice(PRM, "okx", "stress", 3),
+                          sources.indice(PRM, "bitfinex", "stress")], [0, 193, 30])
+        for h, k in (("bybit", 0), ("okx", 10)):
+            with self.assertRaises(commun.Refus) as c:
+                sources.indice(PRM, h, "calme", k)
+            self.assertEqual(c.exception.code, "SOURCES/indice")
+        self.assertEqual(PRM["sources"]["longues"], [60, 1440, 4320])
+        lg = sources.loi_longues(PRM)
+        self.assertEqual((lg.hist, lg.moyenne), (((60, 1), (1440, 1), (4320, 1)), 1940))
+
+    def test_regime_part_phi(self):
+        """Régime Z (E-S-12) : durée moyenne τ_D = 20 en régime dégradé, part φ = 1/5, d'où a = 19/20 et
+        b = φ/(τ_D(1 − φ)) = 1/80 ; 300 réplications de 2 000 fenêtres : part de Z à moins de 5 SE de 1/5 ; C0 : Z = 0.
+        φ = 1, κ < 1 ou τ_D = 0 : SOURCES/regime. Mutation M-3C-02 : b = φ/τ_D (part φ/(1 + φ) = 1/6)."""
+        m = {"calme": (1 << 2000) - 1, "stress": 0}
+        x = [part(sources.Replication(PRM, EP, fond(regime=(Fraction(1, 5), Fraction(3), 20)), "T-Z", i, m, 2000)
+                  .regime("binance", "calme"), 0, 2000) for i in range(300)]
+        self.assertTrue(dans_5_se(x, Fraction(1, 5)))
+        self.assertEqual(sources.Replication(PRM, EP, fond(), "T-Z", 0, m, 2000).regime("binance", "calme"), 0)
+        for reg in ((Fraction(1), Fraction(3), 20), (Fraction(1, 5), Fraction(1, 2), 20),
+                    (Fraction(1, 5), Fraction(3), 0)):
+            with self.assertRaises(commun.Refus) as c:
+                sources.Replication(PRM, EP, fond(regime=reg), "T-Z", 0, m, 2000).regime("binance", "calme")
+            self.assertEqual(c.exception.code, "SOURCES/regime")
+
+    def test_union_taux_marginal(self):
+        """Taux marginal conservé (E-S-11, E-S-12) : p = 1/10, loi 1×1 3×1, part longue 1/2 (durées 2 et 4 dans un
+        paramètre d'essai), régime φ = 1/5, κ = 10, τ_D = 20 ; 300 réplications de 2 000 fenêtres : part du temps dans E
+        ∪ (E′ ∩ Z) ∪ L à moins de 5 SE de 1/10. Point de la grille E1 à f = 1 (defillama stress, p = 226/11 397, EP
+        l.77 ; φ = 1/100, κ = 50 ; loi regroupée, μ = 684/673) : r' = r_E·49/(1 − r_E), r_E = 100p/149, soit
+        1 107 400/1 675 553 ≈ 0,66, au-delà de μ/(μ + 1) = 684/1 357 : admis, E′ étant tirée indépendamment ; p = 1/10
+        donne r' > 1 : SOURCES/taux. Mutations M-3C-03 (E′ hors de Z), M-3C-04 (pannes longues omises), M-3C-15 (E′ en
+        épisodes de la loi d'EP), M-3C-16 (contrôle r' < 1 retiré)."""
+        prm = dict(PRM, sources=dict(PRM["sources"], longues=[2, 4]))
+        loi, m = sources.Empirique([(1, 1), (3, 1)]), {"calme": (1 << 2000) - 1, "stress": 0}
+        x = []
+        for i in range(300):
+            r = sources.Replication(prm, EP, fond(longues="1/2", regime=(Fraction(1, 5), Fraction(10), 20)), "T-U", i,
+                                    m, 2000)
+            x.append(part(r.union("binance", "calme", 0, Fraction(1, 10), loi, ("panne", "panne-regime", "longues")),
+                          0, 2000))
+        self.assertTrue(dans_5_se(x, Fraction(1, 10)))
+        r = sources.Replication(PRM, EP, fond(regime=(Fraction(1, 100), Fraction(50), 60)), "T-U", 0, m, 6000)
+        loi = sources.loi_longueurs(PRM, EP, "stress", "defillama", "panne")
+        noms = ("panne", "panne-regime", None)
+        self.assertNotEqual(r.union("defillama", "stress", 0, Fraction(226, 11397), loi, noms), 0)
+        with self.assertRaises(commun.Refus) as c:
+            r.union("defillama", "stress", 0, Fraction(1, 10), loi, noms)
+        self.assertEqual(c.exception.code, "SOURCES/taux")
+
+    def test_pannes_par_strate(self):
+        """H(hôte) (E-S-08, E-S-09) : coingecko, f = 1/2, sans régime ni panne longue ; grille de 2 × 10 080 fenêtres,
+        calme la première moitié, stress la seconde ; 100 réplications : part en panne de chaque moitié à moins de 5 SE
+        de f·56/24 585 (EP l.33) et de f·127/11 397 (EP l.73) ; strates vides : aucune panne. Mutations M-3C-05 (masque
+        de strate non appliqué), M-3C-06 (écart propre au lieu de la panne), M-3C-07 (f ignoré), M-3C-08 (taux du calme
+        dans les deux strates)."""
+        n = 10080
+        m = {"calme": (1 << n) - 1, "stress": ((1 << n) - 1) << n}
+        h = [sources.Replication(PRM, EP, fond("1/2"), "T-H", i, m, 2 * n).pannes("coingecko") for i in range(100)]
+        self.assertTrue(dans_5_se([part(x, 0, n) for x in h], Fraction(28, 24585)))
+        self.assertTrue(dans_5_se([part(x, n, n) for x in h], Fraction(127, 22794)))
+        vide = {"calme": 0, "stress": 0}
+        self.assertEqual(sources.Replication(PRM, EP, fond(), "T-H", 0, vide, n).pannes("kraken"), 0)
