@@ -10,6 +10,9 @@ de D8a-3 : plancher, et non manifeste des modules ; journal G1 du lot DETTES-B1)
 Lot COLLECTE-BIS, CB-0 (G0 docs/adr-0029/g0-collecte/, PROPOSITION §1 pt 6) : `--aucun-saut` refuse tout saut, même
 nommant la variable (suite s2bis) ; `--plancher N` remplace PLANCHER ; sans option, verdict de S2 inchangé. CB-2e
 (Q-2 de la G2 de P1, job s2bis seul) : `--egal` exige Ran = plancher (SHOGEN-CI-PLANCHER-SUIVI-1 mécanisé).
+SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : `etapes` et `lignes_du_job`, analyseur unique de la
+ligne d'un job de gates.yml, partagé par les cas K du runner et par l'enregistreur de rôle
+(s2-harness/tools/oracle_record.py).
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
 import os
@@ -51,6 +54,62 @@ def lancer(harnais: str, environ=None) -> tuple:
     env = {k: x for k, x in (os.environ if environ is None else environ).items() if k != VARIABLE}
     p = subprocess.run([sys.executable, *SUITE], cwd=harnais, capture_output=True, env=env)
     return p.stderr.decode("utf-8", "replace"), p.stdout.decode("utf-8", "replace"), p.returncode
+
+
+CLE = re.compile("([a-z-]+):(?: (.*))?")
+PREMIER = re.compile("(name|on|permissions|jobs):(?: .*)?")       # seules clés de premier niveau admises
+SEPARATEURS = "".join(map(chr, (11, 12, 13, 28, 29, 30, 133, 8232, 8233)))      # fins de ligne autres que LF
+JOB, ETAPE = {"name", "runs-on", "timeout-minutes", "steps"}, {"name", "shell", "run"}  # clés admises
+LIBRES = ("python3 --version", f"unset {VARIABLE}")      # seules autres lignes admises dans le bloc de la ligne
+
+
+def etapes(texte: str, job: str):
+    """Étapes du job `job` du texte de gates.yml, dans l'ordre : les lignes du bloc `run:` (sans indentation, vides
+    omises) de chaque étape admise, None pour les autres. Admise : clés de ETAPE seules, `shell: bash`, `run` en ligne
+    ou en bloc littéral `|` ; seule la clé `run` est lue, jamais un `name: >` ; une étape `if:`, `continue-on-error`,
+    `env:` ou `working-directory` est exclue. Clé de job hors de JOB, clé répétée, ligne d'indentation inattendue,
+    commentaire entre une clé et sa suite : aucune étape admise ([]). Job absent ou répété, ligne de premier niveau
+    hors de PREMIER (`defaults`, `env`, clé entre guillemets ou suivie d'une espace…) ou clé répétée, fin de ligne
+    autre que LF : None."""
+    lignes = texte.split(chr(10))
+    hauts = [PREMIER.fullmatch(x) for x in lignes if x[:1] not in ("", " ", "#")]
+    noms = [m[1] for m in hauts if m]                       # clés de premier niveau reconnues
+    if (lignes.count(f"  {job}:") != 1 or any(c in texte for c in SEPARATEURS) or len(noms) != len(hauts)
+            or len(set(noms)) != len(noms)):
+        return None
+    pas, cles, suite, sain = [], [], [], True
+    for ligne in lignes[lignes.index(f"  {job}:") + 1:]:
+        n, t = len(ligne) - len(ligne.lstrip(" ")), ligne.strip()
+        m = CLE.fullmatch(t[2:] if n == 6 and t.startswith("- ") else t)
+        if not t:
+            continue
+        if n < 4 and t[0] != "#":
+            break                                           # clé du job suivant, ou du premier niveau
+        if n > 8:
+            suite.append(t)                                 # suite de la dernière clé : bloc, nom plié…
+        elif t[0] == "#":
+            suite = []                                      # un commentaire clôt la suite d'une clé
+        elif m and n == 4:
+            cles, suite = cles + [m[1]], []
+        elif m and n in (6, 8) and cles[-1:] == ["steps"] and (n == 6) == t.startswith("- ") and (pas or n == 6):
+            pas += [{}] if n == 6 else []
+            sain, suite = sain and m[1] not in pas[-1], []
+            pas[-1][m[1]] = (m[2], suite)
+        else:
+            sain = False
+    if not sain or set(cles) - JOB or len(cles) != len(set(cles)):
+        return []
+    return [(e["run"][1] if e["run"][0] == "|" else [e["run"][0]] if e["run"][0] and not e["run"][1] else None)
+            if set(e) <= ETAPE and "run" in e and e.get("shell") == ("bash", []) else None for e in pas]
+
+
+def lignes_du_job(texte: str, job: str, motif: str):
+    """Lignes du job qui satisfont `motif` (re.fullmatch), lues par `etapes` dans les blocs admis dont toute autre
+    ligne est dans LIBRES (un bloc où la ligne côtoie `set +e`, `exit 0` ou un heredoc ne compte pas). None : job
+    absent ou illisible (voir `etapes`)."""
+    pas = etapes(texte, job)
+    return None if pas is None else [x for b in pas if b for x in b if re.fullmatch(motif, x) and all(
+        y in LIBRES or re.fullmatch(motif, y) for y in b)]
 
 
 def main(argv: list) -> int:

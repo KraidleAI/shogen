@@ -814,3 +814,37 @@ réviseur (ligne cherchée jusqu'à la fin du fichier), qui survivait. Le dépô
 
 Mutants (commande du job s2-harness-unittest, borne de 300 s ; python3.12 ; réseau isolé ; état CB-18k) : MR-24 et
 une fin de job manquée sur un nom à tiret, 2 tués sur 2 (0 vivant, 0 FATAL). Suite S2 : 406 tests, inchangée.
+
+## CB-18l (2026-10-05) : analyseur unique de la ligne d'un job (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1)
+
+Objet : `enforcement/verdict-suite-s2.py` porte `etapes` et `lignes_du_job`, seul analyseur de la ligne d'un job de
+gates.yml. Il sert aux cas K-01 à K-03 du runner et à `ligne_du_job` de l'enregistreur de rôle, qui le charge depuis
+l'arbre de l'outil, jamais depuis le commit extrait. Il ne lit que les blocs `run:` des étapes admises : clés `name`,
+`shell: bash` et `run` seules, `run` en ligne ou en bloc littéral `|` ; les étapes `if:`, `continue-on-error`, `env:`
+et `working-directory` sont exclues. La ligne compte si son bloc ne porte, en dehors d'elle, que `python3 --version`
+ou `unset SHOGEN_S2_CAMPAGNE_CONTROL`. Un job aux clés hors de `name`, `runs-on`, `timeout-minutes` et `steps`, ou de
+forme illisible, n'a aucune étape admise. Un job absent ou répété, une ligne de premier niveau hors de `name`, `on`,
+`permissions` et `jobs` (un `defaults` ou un `env`, même écrit `env :` ou entre guillemets) ou répétée, une fin de
+ligne autre que LF donnent un refus. Les cas K gardent leurs contrôles d'avant et y ajoutent ceux de l'analyseur
+(trois étapes : checkout, runner, bloc du vérificateur) : aucun cas n'est affaibli, et le runner passe de 33 à 57
+cas. Les leurres C1 (`name: >`) et C4 (`if: false`) du réviseur sont refusés par les deux. Au runner : L-01 à L-21,
+A-01 et A-02 ; sous un squelette qui lit les lignes brutes comme K-02 d'avant, 19 de ces cas échouent. Au test de
+l'enregistreur : C1, C4 et un analyseur complaisant porté par le commit.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/verdict-suite-s2.py` | 148 | — |
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 209 | 57 cas (24 de plus : L-00 à L-21, A-01, A-02) |
+| `s2-harness/tools/oracle_record.py` | 309 | — |
+| `s2-harness/tests/test_oracle_record.py` | 434 | 12 (1 complété : leurres C1 et C4, analyseur complaisant du commit) |
+
+Mutants (commande du job s2-harness-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 25 tués sur 25 au
+dernier passage (0 vivant, 0 FATAL). Ce sont treize mutants de l'analyseur, un de l'enregistreur, deux des cas K,
+quatre mutants M-R du worker de CB-18 portés sur le code réécrit, et cinq leurres neufs portés sur le gates.yml réel
+(`name: >`, `set +e` et `exit 0`, `working-directory`, `defaults`, `env` du job). MR-24 y est porté en « fin du job
+ignorée ». Passages précédents, non comptés : le premier donnait 18 tués et 2 vivants (clés du job non contrôlées, clé
+`run` répétée), que L-12 et L-14 ne séparaient pas ; ces deux cas ont été réécrits (`env` du job en flux, première
+clé `run` en ligne avant le bloc), et la campagne a été relancée en entier (24 sur 24). Ensuite, une clé de premier
+niveau écrite `env :` ou entre guillemets échappait au contrôle de `defaults` et d'`env` (L-19 et L-20 rouges, comme
+L-21, clé `jobs` répétée) : les clés de premier niveau sont désormais fermées, et toute la campagne a été rejouée.
+Suite S2 : 406 tests, inchangée.

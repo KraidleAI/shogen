@@ -8,11 +8,15 @@ lecture contrôle aussi auteur et, avec un dépôt, tree.sha256. Partie 2, C3 : 
 (SHOGEN-ENREG-AUTEUR-ECRITURE-1) ; marqueur JOURNAUX des commandes remplacé par le dossier des journaux ; arrêt au
 premier échec sur demande (G0 §C, Q5 et Q8). SHOGEN-S2BIS-ENREG-ROLE-1 (lot COLLECTE-BIS, CB-18 ; G0
 docs/adr-0029/g0-collecte/) : suites `s2bis` et `scripts/sim-bis` au même enregistreur, par la ligne du vérificateur
-de leur job, lue dans le gates.yml du commit extrait (SHOGEN-S2BIS-G3-LIGNE-JOB-1), jamais recopiée ici."""
+de leur job, lue dans le gates.yml du commit extrait (SHOGEN-S2BIS-G3-LIGNE-JOB-1), jamais recopiée ici.
+SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : cette ligne est lue par l'analyseur unique des cas K du
+runner (`lignes_du_job` du vérificateur de l'arbre de l'outil, VERIF), dans les seuls blocs `run:` des étapes
+admises."""
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import io
 import json
 import math
@@ -43,6 +47,7 @@ CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tre
 RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
 LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "enforcement",
                     "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
+VERIF = os.path.join(os.path.dirname(LINT), "verdict-suite-s2.py")    # analyseur unique des lignes de job, non recopié
 DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
 EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
 
@@ -96,20 +101,25 @@ def auteur_admis(a) -> bool:
 def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     """Arguments de la ligne du vérificateur du job `job` de GATES dans l'extraction `arbre`, telle qu'écrite
     (plancher committé compris) : « python3 -B enforcement/verdict-suite-s2.py <suite> --aucun-saut --egal --plancher
-    N », une seule fois dans le job. Job absent, ligne absente ou répétée : ValueError (refus)."""
+    N », une seule fois dans les blocs `run:` des étapes admises du job, lue par `lignes_du_job` de VERIF (étapes
+    `if:` et `continue-on-error` exclues, `name: >` jamais lu). Job absent, ligne absente ou répétée, analyseur
+    illisible : ValueError (refus)."""
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
-            lignes = f.read().splitlines()
-        i = lignes.index(f"  {job}:") + 1
-    except (OSError, ValueError) as e:
-        raise ValueError(f"job {job} introuvable dans {GATES} ({e}) — refus") from e
-    fin = next((k for k in range(i, len(lignes)) if re.fullmatch("  [a-z0-9-]+:", lignes[k])), len(lignes))
-    motif = re.compile(" *python3 (-B enforcement/verdict-suite-s2[.]py " + re.escape(suite) +
-                       " --aucun-saut --egal --plancher [0-9]+)")
-    trouves = [m.group(1).split() for m in map(motif.fullmatch, lignes[i:fin]) if m]
+            texte = f.read()
+        spec = importlib.util.spec_from_file_location("verdict_suite_s2", VERIF)
+        analyseur = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(analyseur)
+    except (OSError, SyntaxError) as e:
+        raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e}) — refus") from e
+    motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
+             + " --aucun-saut --egal --plancher [0-9]+")
+    trouves = analyseur.lignes_du_job(texte, job, motif)
+    if trouves is None:
+        raise ValueError(f"job {job} absent ou répété dans {GATES}, ou {GATES} illisible — refus")
     if len(trouves) != 1:
         raise ValueError(f"job {job} : {len(trouves)} ligne(s) du vérificateur de {suite}, une exigée — refus")
-    return trouves[0]
+    return trouves[0].split()[1:]
 
 
 def extraire(depot: str, sha: str, arbre: str) -> dict:
