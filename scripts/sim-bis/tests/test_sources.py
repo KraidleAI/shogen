@@ -244,6 +244,30 @@ class TestHotes(unittest.TestCase):
                 appel(prm)
             self.assertEqual(c.exception.code, "SOURCES/indice")
 
+    def test_loi_regroupee_ancree_o_1(self):
+        """O-1 de la G2 de la tranche 3 (adjugé avant E0) : en stress, la loi regroupée somme les histogrammes d'EP sur
+        la liste scellée sources.indices_hotes (les 10 hôtes D1-bis d'EP l.8), non sur le pool opérationnel. Pool
+        sans coinbase : loi « panne » de stress d'okx = 1×662 2×11, celle du pool entier (sommes de
+        test_lois_regroupees_e_s_10) ; état vrai des autres hôtes identique à l'octet, calme et stress présents (500
+        fenêtres chacun, des pannes dans les deux), pool réduit ou à rebours. Hôte de la liste scellée absent d'EP :
+        SOURCES/loi. Mutations M-8E-08 (somme sur le pool opérationnel), M-8E-09 (contrôle d'EP retiré)."""
+        reduit = prm_pool([u for u in PRM["calibration"]["unites"] if u[0] != "coinbase"])
+        self.assertEqual(sources.loi_longueurs(reduit, EP, "stress", "okx", "panne").hist, ((1, 662), (2, 11)))
+        m = {"calme": (1 << 500) - 1, "stress": ((1 << 500) - 1) << 500}
+        e = sources.Replication(PRM, EP, fond(hors="1/50"), "T-O1", 0, m, 1000).etat()
+        self.assertTrue(all(any(p & m[s] for p, _x in e.values()) for s in m))
+        for nom, prm in (("réduit", reduit), ("rebours", prm_pool(list(reversed(PRM["calibration"]["unites"]))))):
+            e2 = sources.Replication(prm, EP, fond(hors="1/50"), "T-O1", 0, m, 1000).etat()
+            self.assertEqual(e2, {k: v for k, v in e.items() if k[0] in [h for h, _f in prm["calibration"]["unites"]]},
+                             nom)
+        avec = dict(PRM, sources=dict(PRM["sources"], indices_hotes=PRM["sources"]["indices_hotes"] + ["bybit"]))
+        try:
+            sources.loi_longueurs(avec, EP, "stress", "okx", "panne")
+            code = None
+        except Exception as x:  # noqa: BLE001 (le code du refus est l'attendu, quel que soit le type levé)
+            code = getattr(x, "code", type(x).__name__)
+        self.assertEqual(code, "SOURCES/loi")
+
     def test_regime_part_phi(self):
         """Régime Z (E-S-12) : durée moyenne τ_D = 20 en régime dégradé, part φ = 1/5, d'où a = 19/20 et
         b = φ/(τ_D(1 − φ)) = 1/80 ; 300 réplications de 2 000 fenêtres : part de Z à moins de 5 SE de 1/5 ; C0 : Z = 0.

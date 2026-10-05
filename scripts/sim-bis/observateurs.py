@@ -107,9 +107,13 @@ class Couche:
     """Couche d'observateurs d'une réplication (E-S-17 à E-S-21) : paramètres, spécification de la cellule (`couche` :
     absences et dégradations, parts stationnaires par observateur ; paires, pannes de paires par jour ; perte, None ou
     durée nominale en fenêtres sur laquelle l'instant de la perte est tiré ; repli, M = 3), nom de cellule, indice i ≥
-    0 et horizon T_max en fenêtres ; essais : {(composant, indice) : u} remplace les flux nommés (tests pas à pas)."""
+    0 et horizon T_max en fenêtres ; essais : {(composant, indice) : u} remplace les flux nommés (tests pas à pas).
+    Observateur de l'UE ou du repli hors de 0..M − 1 (O-4 de la G2 de la tranche 3) : OBSERVATEURS/indice."""
 
     def __init__(self, prm, couche, cellule, i, horizon, essais=None):
+        op = prm["observateurs"]
+        if any(o >= op["M"] for o in [*op["ue"], op["repli"]]):
+            raise commun.Refus("OBSERVATEURS/indice", f"ue {op['ue']!r}, repli {op['repli']!r} : de 0 à {op['M'] - 1}")
         self.prm, self.couche, self.cellule, self.i, self.horizon = prm, couche, cellule, i, horizon
         self.essais, self.grille = essais or {}, (1 << horizon) - 1
 

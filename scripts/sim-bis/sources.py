@@ -147,8 +147,12 @@ def taux(ep: dict, strate: str, hote: str) -> tuple:
 def loi_longueurs(prm: dict, ep: dict, strate: str, hote: str, type_: str) -> Empirique:
     """Loi « tous épisodes » d'EP (adjudication Q-2 : censurés compris, à leur longueur vue, qui minore la vraie) de
     l'hôte dans la strate, pour le type « panne » ou « ecart » ; dans une strate de sources.regroupees, histogrammes
-    sommés sur les hôtes du pool (E-S-10)."""
-    hotes = [h for h, _f in prm["calibration"]["unites"]] if strate in prm["sources"]["regroupees"] else [hote]
+    sommés sur les hôtes de la liste scellée sources.indices_hotes (E-S-10 ; O-1 de la G2 de la tranche 3 : ancrée
+    sur la liste de calibration, non sur le pool opérationnel, un retrait ne change l'état en stress d'aucun autre
+    hôte). Hôte sans ligne d'EP : SOURCES/loi."""
+    hotes = prm["sources"]["indices_hotes"] if strate in prm["sources"]["regroupees"] else [hote]
+    if any((strate, h, type_) not in ep for h in hotes):
+        raise commun.Refus("SOURCES/loi", f"« {strate} » {type_} : {hotes!r}, hôte sans ligne d'EP")
     c = {}
     for h in hotes:
         for lg, n in ep[strate, h, type_]["histogramme"]:

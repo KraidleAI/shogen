@@ -331,8 +331,9 @@ class TestContratRB6(unittest.TestCase):
     def test_refus_du_contrat_rb6(self):
         """Refus nommés du contrat RB-6 (§1 et §4), avant tout calcul. decalage : strate hors de calme et stress
         (REGLE/libelle) ; r au-delà de 9 999, booléen ou chaîne, n booléen (REGLE/entier) ; graine en octets ou de 65
-        caractères (REGLE/graine) ; unité vide, avec « : », DEL ou tabulation (REGLE/libelle) ; bornes ASCII imprimables
-        admises (« ! » précédé d'une espace, « ~ »). seuil : R au-delà de 9 999 (REGLE/seuil, α = 1/2). tester,
+        caractères (REGLE/graine) ; unité vide, avec « : », DEL ou tabulation (REGLE/libelle) ; « ! » précédé d'une
+        espace et « ~ », bornes ASCII imprimables admises jusqu'à P-7, refusés (REGLE/libelle ; test_noms_d_unite_p_7).
+        seuil : R au-delà de 9 999 (REGLE/seuil, α = 1/2). tester,
         loi_evenements et filtrer contrôlent toutes leurs entrées, même quand aucune rotation n'est calculée (une seule
         série non nulle, ou unité non décalée seule) : graine (REGLE/graine), n nul (REGLE/entier), nom d'unité ou unité
         non décalée hors du contrat (REGLE/libelle), masque négatif, booléen ou au-delà de n bits (REGLE/masque), R de
@@ -349,9 +350,10 @@ class TestContratRB6(unittest.TestCase):
                         ("REGLE/graine", (G6 + "0", "calme", 1, "a", 7)), ("REGLE/libelle", (G6, "calme", 1, "", 7)),
                         ("REGLE/libelle", (G6, "calme", 1, "a:4", 7)),
                         ("REGLE/libelle", (G6, "calme", 1, "a" + chr(127), 7)),
-                        ("REGLE/libelle", (G6, "calme", 1, "a" + chr(9) + "b", 7))):
+                        ("REGLE/libelle", (G6, "calme", 1, "a" + chr(9) + "b", 7)),
+                        ("REGLE/libelle", (G6, "calme", 9999, " !", 1)),
+                        ("REGLE/libelle", (G6, "calme", 9999, "~", 1))):
             refus(code, regle.decalage, *a)
-        self.assertEqual([regle.decalage(G6, "calme", 9999, u, 1) for u in (" !", "~")], [0, 0])
         refus("REGLE/seuil", regle.seuil, 10001, [1, 2])
         self.assertEqual(regle.seuil(9999, [1, 2]), 4999)
         for code, series, premier, g, n in (("REGLE/graine", {"a": 1, "b": 0}, "a", G6.upper(), 3),
@@ -368,3 +370,29 @@ class TestContratRB6(unittest.TestCase):
         for code, series in (("REGLE/masque", {"a": 8}), ("REGLE/masque", {"a": -1}), ("REGLE/masque", {"a": True})):
             refus(code, regle.filtrer, series, 3, PRM)
         refus("REGLE/entier", regle.filtrer, {"a": 1}, True, PRM)
+
+    def test_noms_d_unite_p_7(self):
+        """P-7 de l'avis de la tranche 3 (adjugé avant E0, comme Q-RB-13 adoptée pour RB-6) : noms d'unité aux seuls
+        caractères d'un nom d'hôte, en minuscules (lettres a à z, chiffres, « - », « . »), 1 à 253 caractères ; refus
+        REGLE/libelle par _cle et ses appelants : decalage, et tester, deux_modes, oracle et loi_evenements par
+        _controler, unité non décalée comprise. Admis : les dix noms courts du pool, les noms d'hôte du contrat RB-6
+        (api-pub.bitfinex.com, ethereum-rpc.publicnode.com), 253 caractères. Refusés : « ! » précédé d'une espace et
+        « ~ » (admis jusqu'ici), majuscule, « _ », espace, 254 caractères, octets. Mutations M-8E-01 (majuscules
+        admises), M-8E-02 (borne de 253 retirée), M-8E-03 (« _ » admis), M-8E-04 (unités non contrôlées par
+        _controler), M-8E-05 (unité non décalée non contrôlée)."""
+        def code(f, *a):
+            try:
+                f(*a)
+                return None
+            except commun.Refus as e:
+                return e.code
+        admis = [h for h, _f in PRM["calibration"]["unites"]] + ["api-pub.bitfinex.com", "ethereum-rpc.publicnode.com",
+                                                                  "a" * 253]
+        self.assertEqual([code(regle.decalage, G6, "calme", 1, u, 7) for u in admis], [None] * 13)
+        refuses = [" !", "~", "Binance", "okx_ticker", "a b", "a" * 254, b"okx"]
+        self.assertEqual([code(regle.decalage, G6, "calme", 1, u, 7) for u in refuses], ["REGLE/libelle"] * 7)
+        cas = (({"Binance": 1, "okx": 2}, "okx"), ({"binance": 1, "okx": 2}, "~"))
+        for f in (regle.tester, regle.deux_modes, regle.oracle):
+            self.assertEqual([code(f, s, p, G6, "calme", 3, 3, PRM, 99) for s, p in cas], ["REGLE/libelle"] * 2)
+        self.assertEqual([code(regle.loi_evenements, s, p, G6, "calme", 3, 9, PRM) for s, p in cas],
+                         ["REGLE/libelle"] * 2)

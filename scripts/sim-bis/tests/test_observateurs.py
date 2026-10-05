@@ -188,6 +188,21 @@ class TestValidite(unittest.TestCase):
                 lg |= {b - a for a, b in calendrier.segments(((1 << n) - 1) & ~v) if 0 < a and b < n}
         self.assertEqual(lg, {5, 180, 4320})
 
+    def test_indices_d_observateurs_o_4(self):
+        """O-4 de la G2 de la tranche 3 (avant E0) : observateurs.ue et observateurs.repli sont des indices
+        d'observateur, de 0 à M − 1 = 3 ; une valeur ≥ M (un cinquième observateur dans l'UE, ou repli = 4), ignorée
+        jusqu'ici sans refus, est refusée OBSERVATEURS/indice dès la construction de la couche ; les valeurs de
+        parametres.json (UE 0, 1, 2 ; repli 3) et une autre affectation valide (UE {3}, repli 0) passent. Mutations
+        M-8E-06 (contrôle de repli seul), M-8E-07 (borne M + 1)."""
+        def code(op):
+            try:
+                observateurs.Couche(dict(PRM, observateurs=dict(PRM["observateurs"], **op)), couche(), "T-O4", 0, 8)
+                return None
+            except commun.Refus as e:
+                return e.code
+        self.assertEqual([code({}), code({"ue": [0, 1, 4]}), code({"repli": 4}), code({"ue": [3], "repli": 0})],
+                         [None, "OBSERVATEURS/indice", "OBSERVATEURS/indice", None])
+
 
 class TestVotes(unittest.TestCase):
     def test_chemins_epsilon(self):

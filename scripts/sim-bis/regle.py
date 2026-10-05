@@ -10,6 +10,7 @@ SB-8c : alignement sur le contrat de rotation de RB-6 (docs/adr-0029/s2bis/ROTAT
 relecture G2 ; adjugé par l'orchestrateur, risque R-2) : libellés de strate calme et stress, r et R de 1 à 9 999, refus
 nommés de toutes les entrées avant tout calcul (graine, n, noms d'unité, unité non décalée, masques de [0, 2^n)).
 SB-8d (C-1 de la G2 de la tranche 3) : l'oracle d'équivalence compare aussi « C_S ≤ seuil » quand S est suivie.
+SB-8e (P-7 de l'avis de la tranche 3) : noms d'unité aux caractères d'un nom d'hôte en minuscules, refusés par _cle.
 Entiers et rationnels seuls : aucun flottant, aucune puissance."""
 import hashlib
 from fractions import Fraction
@@ -19,34 +20,42 @@ import commun
 
 SEP = ":"
 STRATES, R_MAX = ("calme", "stress"), 9999      # libellés et borne de r scellés (E-S-27 ; contrat RB-6 §1, pts 2 et 5)
+NOM_UNITE, LONG_UNITE = frozenset("abcdefghijklmnopqrstuvwxyz0123456789-."), 253    # P-7 ; comme Q-RB-13 pour RB-6
 
 
 def _libelle(v, nom: str) -> str:
-    if type(v) is str and v != "" and all(" " <= ch <= "~" for ch in v) and SEP not in v:
+    """Nom d'unité (P-7 de l'avis de la tranche 3, adjugé avant E0 comme Q-RB-13 adoptée pour RB-6) : caractères d'un
+    nom d'hôte en minuscules (NOM_UNITE : lettres a à z, chiffres, « - », « . »), 1 à LONG_UNITE caractères, sinon
+    REGLE/libelle ; les noms courts du pool et les noms d'hôte de configuration y passent."""
+    if type(v) is str and 0 < len(v) <= LONG_UNITE and set(v) <= NOM_UNITE:
         return v
-    raise commun.Refus("REGLE/libelle", f"{nom} = {v!r} : ASCII imprimable, sans « {SEP} »")
+    raise commun.Refus("REGLE/libelle", f"{nom} = {v!r} : nom d'hôte en minuscules (lettres, chiffres, « - », « . »), "
+                                        f"1 à {LONG_UNITE} caractères")
 
 
-def _cle(graine: str, strate: str, n: int) -> None:
-    """Graine (64 hexadécimaux minuscules, sinon REGLE/graine), strate parmi STRATES (sinon REGLE/libelle) et n entier
-    ≥ 1 (sinon REGLE/entier) de l'entrée des décalages, contrôlés avant tout calcul (contrat RB-6 §4)."""
+def _cle(graine: str, strate: str, n: int, unites=()) -> None:
+    """Graine (64 hexadécimaux minuscules, sinon REGLE/graine), strate parmi STRATES (sinon REGLE/libelle), n entier
+    ≥ 1 (sinon REGLE/entier) et noms d'unité (_libelle, sinon REGLE/libelle ; P-7) de l'entrée des décalages, contrôlés
+    avant tout calcul (contrat RB-6 §4)."""
     if not commun.hex64(graine):
         raise commun.Refus("REGLE/graine", f"{graine!r} : 64 hexadécimaux minuscules attendus")
     if strate not in STRATES:
         raise commun.Refus("REGLE/libelle", f"strate {strate!r} : {' ou '.join(STRATES)} attendu")
     if type(n) is not int or n < 1:
         raise commun.Refus("REGLE/entier", f"n = {n!r} : entier ≥ 1 attendu")
+    for u in unites:
+        _libelle(u, "unité")
 
 
 def decalage(graine: str, strate: str, r: int, u: str, n: int) -> int:
     """o(r, u) (E-S-27 ; ADR-0029 l.200 ; Q-R-02 adjugée, AVIS-C l.57-63 ; contrat RB-6 §2) : entier big-endian des 32
     octets de SHA-256 de la chaîne ASCII « <graine>:<strate>:<r>:<u> », modulo n (n_s, ou n′_s, de la strate). Graine,
-    strate et n : _cle ; r de 1 à 9 999, en décimal sans zéro de tête (sinon REGLE/entier) ; unité en ASCII
-    imprimable, sans « : » (sinon REGLE/libelle)."""
-    _cle(graine, strate, n)
+    strate, n et unité (nom d'hôte en minuscules, P-7) : _cle ; r de 1 à 9 999, en décimal sans zéro de tête (sinon
+    REGLE/entier)."""
+    _cle(graine, strate, n, [u])
     if type(r) is not int or not 1 <= r <= R_MAX:
         raise commun.Refus("REGLE/entier", f"r = {r!r} : entier de 1 à {R_MAX} attendu")
-    chaine = SEP.join([graine, _libelle(strate, "strate"), str(r), _libelle(u, "unité")])
+    chaine = SEP.join([graine, strate, str(r), u])
     return int.from_bytes(hashlib.sha256(chaine.encode("ascii")).digest(), "big") % n
 
 
@@ -169,13 +178,11 @@ def _masques(series: dict, n: int) -> None:
 
 def _controler(series: dict, premier, graine: str, strate: str, n: int, prm: dict) -> None:
     """Refus nommés de toutes les entrées, avant tout calcul, même sans rotation (contrat RB-6 §4) : strate parmi
-    calibration.strates (REGLE/libelle), graine, strate et n (_cle), noms des unités et de l'unité non décalée
-    (REGLE/libelle), masques (_masques)."""
+    calibration.strates (REGLE/libelle), puis par _cle graine, strate, n et noms des unités et de l'unité non décalée
+    (REGLE/libelle, P-7), masques (_masques)."""
     if strate not in prm["calibration"]["strates"]:
         raise commun.Refus("REGLE/libelle", f"strate {strate!r}")
-    _cle(graine, strate, n)
-    for u in [*series, *([] if premier is None else [premier])]:
-        _libelle(u, "unité")
+    _cle(graine, strate, n, [*series, *([] if premier is None else [premier])])
     _masques(series, n)
 
 
