@@ -1697,3 +1697,24 @@ Mutants (commande du job, `--plancher 248`, borne de 300 s ; python3.12 ; résea
 0 FATAL) : suivante d'ouverture, queue de reprise, cause de trou, jour de clôture, ws du marqueur, du point et d'un type
 non réservé non exigés, objet nu admis pour queue, booléen admis pour un entier, jour typé entier, cause entière admise,
 champ manquant lu comme null, seq non contrôlé. Suite : 248 tests ; plancher du job : 248, égalité exigée (`--egal`).
+
+## RB-18g (2026-10-05) : grammaire des noms, refus `ORACLE/nom` et `ORACLE/vide` (C-8 de la G2 de RB-18 ; lettre C-5)
+
+Objet : un nom qui commence par `<préfixe>-` et finit par `.jsonl` hors de la grammaire `<préfixe>-AAAA-MM-JJ-k.jsonl`
+(k suivant `0|[1-9][0-9]*`, chiffres ASCII, nom entier) est un refus `ORACLE/nom`, qui nomme le premier en ordre des
+points de code ; un dossier sans fichier du journal est un refus `ORACLE/vide` ; tout autre nom reste ignoré ; date non
+contrôlée au calendrier (validité, RB-3). La sortie échappe en séquence JSON un caractère qu'UTF-8 n'écrit pas (nom hors
+UTF-8 rendu par `os.listdir`), au lieu de lever. FORMAT §6.1, §7.7. Rouge : sur le code de RB-18f, noms fautifs ignorés
+et dossier vide lu sans refus.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 214 | — |
+| `tests/test_oracle_indep.py` | 472 | 35 (1 de plus : quatorze noms hors grammaire, dont zéro de tête, numéro sur trois chiffres, chiffre non ASCII, nom prolongé, nom hors UTF-8, et le premier de deux en ordre des points de code ; grammaire et ordre, dossier vide et sortie de la ligne de commande réécrits) |
+
+Mutants (commande du job, `--plancher 249`, borne de 300 s ; python3.12 ; réseau isolé) : 15 tués sur 15 (0 vivant,
+0 FATAL) : nom hors grammaire ignoré, préfixe sans tiret refusé, fin en .jsonl non reconnue, premier nom fautif pris
+dans l'ordre du listage, dossier sans fichier du journal admis, dossier rendu comme fichier du refus, octet hors UTF-8
+brut ou exception en sortie, zéro de tête admis, mois sur un chiffre, chiffres Unicode dans k, nom prolongé après .jsonl
+admis, nom en .jsonl.bak lu, k comparé en texte, préfixe non échappé. Suite : 249 tests ; plancher du job : 249, égalité
+exigée (`--egal`).

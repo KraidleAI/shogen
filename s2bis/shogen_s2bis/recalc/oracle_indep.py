@@ -7,10 +7,10 @@ niveau d'au plus NIVEAUX, l'objet de la ligne au niveau 1 ; les niveaux sont com
 décodeur, jamais par son exception (lettres C-1 et C-4 du FORMAT). Hors de ces bornes, la ligne n'est pas intègre :
 jamais un refus. Champs (§1.3, §2, §7.1 c et d ; lettre C-2) : `type` chaîne, `seq` entier, `prec` 64 chiffres
 hexadécimaux minuscules ; champs propres d'un type réservé, `ws` de tout autre type, présents et aux types du §2.
-Fichiers (§6.1, §7.2) : `<préfixe>-AAAA-MM-JJ-k.jsonl`, k décimal sans zéro de tête, en ordre (jour, k entier) ;
-autres noms ignorés (Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A,
-plus de LIMITE octets, non canonique, sans les champs communs, non chaînée ; la première est une `ouverture` ou une
-`reprise`), qui ouvre la queue du fichier.
+Fichiers (§6.1, §7.7 ; lettre C-5) : `<préfixe>-AAAA-MM-JJ-k.jsonl`, k suivant `0|[1-9][0-9]*`, en ordre (jour,
+k entier) ; un autre nom du préfixe en `.jsonl` est un refus ORACLE/nom, un dossier sans fichier du journal un refus
+ORACLE/vide ; tout autre nom est ignoré. Fichier (§7.1) : lignes intègres (points a à e) jusqu'à la première qui ne
+l'est pas, qui ouvre la queue du fichier ; la première ligne d'un fichier est une `ouverture` ou une `reprise`.
 Jonction au premier enregistrement de chaque fichier et à chaque `reprise` (§1.3, §7.4, §7.7) : lien au dernier intègre
 (genèse : `ouverture`, `seq` 0, `prec` nul) ; queues en attente déclarées par la `reprise` (quatre champs, comparés
 sous forme canonique) ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`, `declaration`), la
@@ -91,9 +91,18 @@ def champs(e):
 
 
 def fichiers(dossier, prefixe):
-    """Noms des fichiers du journal `prefixe` de `dossier`, dans l'ordre de la chaîne."""
+    """Noms des fichiers du journal `prefixe` de `dossier`, dans l'ordre (jour, k entier) de la chaîne. Le premier nom,
+    en ordre des points de code, qui commence par `<préfixe>-` et finit par `.jsonl` hors de la grammaire : refus
+    ORACLE/nom ; aucun fichier du journal : refus ORACLE/vide."""
     motif = re.compile(re.escape(prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl")
-    return [n for _j, _k, n in sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, os.listdir(dossier)) if m)]
+    noms = sorted(os.listdir(dossier))
+    for n in noms:
+        if n.startswith(prefixe + "-") and n.endswith(".jsonl") and not motif.fullmatch(n):
+            raise RefusOracle("ORACLE/nom", n, n)
+    lus = sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, noms) if m)
+    if not lus:
+        raise RefusOracle("ORACLE/vide", dossier)
+    return [n for _j, _k, n in lus]
 
 
 def cle(x):
@@ -182,8 +191,9 @@ def lire(dossier, prefixe):
 
 
 def sortie(r):
-    """Octets canoniques de `r` (clés triées, séparateurs sans espace, UTF-8), suivis de 0x0A."""
-    return cle(r).encode("utf-8") + NL
+    """Octets canoniques de `r` (clés triées, séparateurs sans espace, UTF-8), suivis de 0x0A ; un caractère qu'UTF-8
+    n'écrit pas (nom de fichier hors UTF-8, lu par os.listdir) y est échappé en séquence JSON."""
+    return cle(r).encode("utf-8", "backslashreplace") + NL
 
 
 def main(argv):

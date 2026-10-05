@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
 from shogen_s2bis.recalc import oracle_indep as o
@@ -17,6 +18,7 @@ BS, NL, PREC = chr(92), bytes((10,)), "ab" * 32
 T0 = 1791158280                     # 2026-10-04 23:58:00 UTC (date -u -d @1791158280) ; T0 + 120 : 00:00 du 5
 J1, J1S1 = "pool-2026-10-04-0.jsonl", "pool-2026-10-04-1.jsonl"
 J2, J3 = "pool-2026-10-05-0.jsonl", "pool-2026-10-06-0.jsonl"
+HORS_UTF8 = os.fsdecode(b"pool-" + bytes((255,)) + b".jsonl")              # octet 0xFF : nom hors UTF-8
 
 
 def ligne(texte):
@@ -111,17 +113,41 @@ class Champs(unittest.TestCase):
 
 
 class Noms(unittest.TestCase):
-    def test_grammaire_et_ordre(self):                                      # FORMAT §6.1, §7.2 ; Q-R18-5
-        with tempfile.TemporaryDirectory() as d:
-            for n in ("pool-2026-10-05-10.jsonl", "pool-2026-10-05-2.jsonl", "pool-2026-10-04-0.jsonl",
-                      "pool-2026-10-05-0.jsonl", "pool-2026-10-05-01.jsonl", "pool.sha256", "pool.verrou",
-                      "autre-2026-10-04-0.jsonl", "pool-2026-10-04-0.jsonl.bak", "pool-2026-1-04-0.jsonl",
-                      "xpool-2026-10-04-0.jsonl", "pool-2026-10-04-0.json", "p.l-2026-10-04-0.jsonl",
-                      "pxl-2026-10-04-0.jsonl"):
-                open(os.path.join(d, n), "wb").close()
-            self.assertEqual(o.fichiers(d, "pool"), ["pool-2026-10-04-0.jsonl", "pool-2026-10-05-0.jsonl",
-                                                       "pool-2026-10-05-2.jsonl", "pool-2026-10-05-10.jsonl"])
-            self.assertEqual(o.fichiers(d, "p.l"), ["p.l-2026-10-04-0.jsonl"])
+    def setUp(self):
+        t = tempfile.TemporaryDirectory()
+        self.addCleanup(t.cleanup)
+        self.d = t.name
+
+    def creer(self, *noms):
+        for n in noms:
+            open(os.path.join(self.d, n), "wb").close()
+
+    def test_grammaire_et_ordre(self):                                      # §6.1, §7.7 (lettre C-5)
+        self.creer("pool-2026-10-05-10.jsonl", "pool-2026-10-05-2.jsonl", "pool-2026-10-04-0.jsonl",
+                   "pool-2026-10-05-0.jsonl", "pool-9999-99-99-123.jsonl", "pool.sha256", "pool.verrou",
+                   "autre-2026-10-04-0.jsonl", "pool-2026-10-04-0.jsonl.bak", "xpool-2026-10-04-0.jsonl",
+                   "pool-2026-10-04-0.json", "pool-2026-10-04-0.JSONL", "pool2026-10-04-0.jsonl",
+                   "p.l-2026-10-04-0.jsonl", "pxl-2026-10-04-0.jsonl")
+        self.assertEqual(o.fichiers(self.d, "pool"), ["pool-2026-10-04-0.jsonl", "pool-2026-10-05-0.jsonl",
+                                                        "pool-2026-10-05-2.jsonl", "pool-2026-10-05-10.jsonl",
+                                                        "pool-9999-99-99-123.jsonl"])
+        self.assertEqual(o.fichiers(self.d, "p.l"), ["p.l-2026-10-04-0.jsonl"])
+
+    def test_nom_hors_grammaire(self):                                      # §6.1, §7.7 (lettre C-5) : refus nommé
+        self.creer(J1)
+        for n in ("pool-2026-10-05-01.jsonl", "pool-2026-10-04-000.jsonl", "pool-2026-1-04-0.jsonl", "pool-.jsonl",
+                  "pool-2026-10-04-.jsonl", "pool-2026-10-04-0-1.jsonl", "pool--2026-10-04-0.jsonl",
+                  "pool-2026-10-04-a.jsonl", "pool-2026-10-04-+1.jsonl", "pool-2026-10-04-1" + chr(0x663) + ".jsonl",
+                  "pool-2026-10-04-1 .jsonl", "pool-x-2026-10-04-0.jsonl", "pool-2026-10-04-0.jsonl.jsonl", HORS_UTF8):
+            self.creer(n)
+            with self.assertRaises(o.RefusOracle) as e:
+                o.fichiers(self.d, "pool")
+            self.assertEqual((e.exception.code, e.exception.fichier), ("ORACLE/nom", n))
+            os.remove(os.path.join(self.d, n))
+        with mock.patch.object(o.os, "listdir", return_value=["pool-2026-10-05-01.jsonl", "pool-2026-10-04-00.jsonl"]):
+            with self.assertRaises(o.RefusOracle) as e:                     # listage dans l'ordre inverse
+                o.fichiers(self.d, "pool")
+        self.assertEqual(e.exception.fichier, "pool-2026-10-04-00.jsonl")          # le premier en points de code
 
 
 class Frontiere(unittest.TestCase):
@@ -246,9 +272,13 @@ class Journaux(unittest.TestCase):
             r, flux = self.lire()
             self.assertEqual((len(flux), [x["causes"] for x in r["ruptures"]], len(r["queue_finale"])), attendu, t)
 
-    def test_dossier_vide_ou_absent(self):
-        r, flux = self.lire()
-        self.assertEqual((flux, r["fichiers"], r["tete"], r["ruptures"], r["queue_finale"]), ([], [], None, [], []))
+    def test_dossier_vide_ou_absent(self):                                # §7.7 (lettre C-5) : refus nommés
+        for noms in ((), ("pool.sha256", "pool.verrou", "autre-2026-10-04-0.jsonl", "pool-2026-10-04-0.json")):
+            for n in noms:                                                  # aucun fichier du journal
+                open(os.path.join(self.d, n), "wb").close()
+            with self.assertRaises(o.RefusOracle) as e:
+                self.lire()
+            self.assertEqual((e.exception.code, e.exception.fichier), ("ORACLE/vide", None), noms)
         with self.assertRaises(o.RefusOracle) as e:
             o.lire(os.path.join(self.d, "absent"), "pool")
         self.assertEqual(e.exception.code, "ORACLE/lecture")
@@ -432,6 +462,11 @@ class LigneDeCommande(unittest.TestCase):                                  # for
                        '"queue_finale":[],"queues_declarees":[],"ruptures":[],"tete":{"seq":0,"sha256":"'
                        + self.H + '"}}')
             self.assertEqual(self.lancer(d, "pool"), (0, ligne(attendu)))
-            refus = '{"fichier":null,"format":"shogen.s2bis.oracle-indep.v1","position":null,"refus":"ORACLE/lecture"}'
-            self.assertEqual(self.lancer(os.path.join(d, "absent"), "pool"), (1, ligne(refus)))
+            refus = '{"fichier":%s,"format":"shogen.s2bis.oracle-indep.v1","position":null,"refus":"ORACLE/%s"}'
+            self.assertEqual(self.lancer(os.path.join(d, "absent"), "pool"), (1, ligne(refus % ("null", "lecture"))))
+            open(os.path.join(d, HORS_UTF8), "wb").close()                  # nom hors UTF-8 : échappé en sortie
+            self.assertEqual(self.lancer(d, "pool"), (1, ligne(refus % ('"pool-' + BS + 'udcff.jsonl"', "nom"))))
+            for n in (J1, HORS_UTF8):
+                os.remove(os.path.join(d, n))
+            self.assertEqual(self.lancer(d, "pool"), (1, ligne(refus % ("null", "vide"))))
         self.assertEqual(self.lancer(), (2, b""))
