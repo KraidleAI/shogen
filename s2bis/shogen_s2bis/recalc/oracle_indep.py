@@ -6,18 +6,22 @@ de `json` (Q-R18-3). Champs communs (§1.3) : `type` chaîne, `seq` entier, `pre
 Entier de plus de CHIFFRES chiffres (signe exclu) dans un objet JSON par ailleurs lisible : refus nommé
 ORACLE/entier-long, la ligne n'est pas jugée (Q-R18-2 ; E-R-01 ; SHOGEN-JSON-ENTIER-LONG-1). Fichiers (§6.1, §7.2) :
 `<préfixe>-AAAA-MM-JJ-k.jsonl`, k décimal sans zéro de tête, dans l'ordre (jour, k entier) ; autres noms ignorés
-(Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A, non canonique, sans les
-champs communs, non chaînée ; la première est une `ouverture` ou une `reprise`), qui ouvre la queue du fichier.
+(Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A, plus de LIMITE octets,
+non canonique, sans les champs communs, non chaînée ; la première est une `ouverture` ou une `reprise`), qui ouvre la
+queue du fichier.
 Jonction au premier enregistrement de chaque fichier et à chaque `reprise` (§1.3, §7.4, §7.7) : lien au dernier intègre
 (genèse : `ouverture`, `seq` 0, `prec` nul) ; queues en attente déclarées par la `reprise` (quatre champs, comparés
 sous forme canonique) ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`, `declaration`), la
 lecture continue, rien n'est réparé (Q-R18-6, Q-R18-7). Queue finale : queues qu'aucun intègre ne suit (E-R-01 ;
-Q-R18-8). Tête : dernier intègre (§1.4)."""
+Q-R18-8). Tête : dernier intègre (§1.4). Sortie (`sortie`, `main`) : JSON canonique, clés triées, un objet suivi
+de 0x0A."""
 import hashlib
 import json
 import os
 import re
+import sys
 
+LIMITE = 1 << 22            # octets d'une ligne au plus, saut de ligne compris (§7.1)
 CHIFFRES = 640              # sys.int_info.str_digits_check_threshold (CPython 3.10 à 3.13) : lu sous tout réglage
 GENESE, NL = "0" * 64, bytes((10,))
 HEX = re.compile("[0-9a-f]{64}")
@@ -25,9 +29,9 @@ FORMAT = "shogen.s2bis.oracle-indep.v1"
 
 
 class RefusOracle(Exception):
-    def __init__(self, code, detail):
+    def __init__(self, code, detail, fichier=None, position=None):
         super().__init__(f"{code} : {detail}")
-        self.code = code
+        self.code, self.fichier, self.position = code, fichier, position
 
 
 def objet(ligne):
@@ -80,7 +84,7 @@ def cle(x):
 class Lecture:
     """Lecture en flux du journal `prefixe` de `dossier` : itérer rend chaque enregistrement intègre {fichier, position,
     sha256, enr}, dans l'ordre de la chaîne ; l'itération finie, `ruptures`, `queues_declarees`, `queue_finale` et
-    `tete` sont complets. Mémoire : une ligne et les queues en attente."""
+    `tete` sont complets. Mémoire : une ligne de LIMITE octets au plus, et les queues en attente."""
 
     def __init__(self, dossier, prefixe):
         self.dossier, self.prefixe = dossier, prefixe
@@ -93,8 +97,8 @@ class Lecture:
             for nom in self.noms:
                 with open(os.path.join(self.dossier, nom), "rb") as f:
                     pos, prec = 0, None
-                    while ligne := f.readline():
-                        e = self._integre(ligne, prec)
+                    while ligne := f.readline(LIMITE):
+                        e = self._integre(ligne, prec, nom, pos)
                         if e is None:
                             attente.append(self._queue(f, nom, pos))
                             break
@@ -109,9 +113,12 @@ class Lecture:
         self.queue_finale, self.tete = attente, base and {"seq": base[0], "sha256": base[1]}
 
     @staticmethod
-    def _integre(ligne, prec):
+    def _integre(ligne, prec, nom, pos):
         """Enregistrement intègre de `ligne`, ou None (§7.1) ; `prec` : (seq, sha256) de la ligne d'avant, ou None."""
-        e = objet(ligne)
+        try:
+            e = objet(ligne)
+        except RefusOracle as r:
+            raise RefusOracle(r.code, f"{nom} : {pos}", nom, pos) from None
         if e is None or not champs(e):
             return None
         if prec is None:
@@ -155,3 +162,26 @@ def lire(dossier, prefixe):
     enregistrements = list(lec)
     return {"enregistrements": enregistrements, "fichiers": lec.noms, "format": FORMAT, "tete": lec.tete,
             "queue_finale": lec.queue_finale, "queues_declarees": lec.queues_declarees, "ruptures": lec.ruptures}
+
+
+def sortie(r):
+    """Octets canoniques de `r` (clés triées, séparateurs sans espace, UTF-8), suivis de 0x0A."""
+    return cle(r).encode("utf-8") + NL
+
+
+def main(argv):
+    """`python3 -m shogen_s2bis.recalc.oracle_indep DOSSIER PREFIXE`, lancé depuis s2bis/ : `sortie(lire(…))`, code 0 ;
+    refus nommé : {fichier, format, position, refus}, code 1 ; usage : code 2, rien sur la sortie standard."""
+    if len(argv) != 2:
+        print("usage : python3 -m shogen_s2bis.recalc.oracle_indep DOSSIER PREFIXE", file=sys.stderr)
+        return 2
+    try:
+        octets, code = sortie(lire(*argv)), 0
+    except RefusOracle as r:
+        octets, code = sortie({"fichier": r.fichier, "format": FORMAT, "position": r.position, "refus": r.code}), 1
+    sys.stdout.buffer.write(octets)
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

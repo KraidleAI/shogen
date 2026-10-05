@@ -1641,3 +1641,20 @@ Mutants (commande du job, `--plancher 241`, borne de 300 s ; python3.12 ; résea
 rendue, déclaration sans queue non signalée, liste de la rupture vidée, appariement inversé, clés non triées dans la
 comparaison, champ mal nommé, liste lue comme une seule déclaration, queue non déclarée non signalée. Suite : 241 tests
 ; plancher du job : 241, égalité exigée (`--egal`).
+
+## RB-18d (2026-10-05) : LIMITE, lieu du refus, sortie canonique, ligne de commande (recalé sur 98c8537)
+
+Objet : lignes lues par `readline(LIMITE)` (une ligne de plus de 4 194 304 octets, saut compris, ouvre la queue) ;
+`sortie` (JSON trié, séparateurs sans espace, UTF-8, 0x0A final) et `main` (code 0, refus nommé en code 1, usage en code
+2) ; lieu du refus. FORMAT §7.1. Recalage : à la tête, l'écrivain refuse un entier de 641 chiffres (`JOURNAL/entier`,
+SHOGEN-S2BIS-ENTIER-ECRIVAIN-1) ; la ligne qui en porte un est écrite à la main dans le test.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 187 | — |
+| `tests/test_oracle_indep.py` | 394 | 32 (5 de plus : limite d'une ligne, entiers longs dans un journal, premier fichier manquant, queue finale sur deux fichiers, sortie dorée, refus et usage) |
+
+Mutants (commande du job, `--plancher 246`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 (0 vivant,
+0 FATAL) : bornes LIMITE + 1 et LIMITE - 1, ligne non bornée, position du refus perdue, refus sans lieu, sortie sans
+0x0A final, séparateurs avec espaces, codes de sortie du refus et de l'usage, nom du refus altéré, refus muet sur la
+sortie. Suite : 246 tests ; plancher du job : 246, égalité exigée (`--egal`).

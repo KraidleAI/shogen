@@ -320,3 +320,75 @@ class Journaux(unittest.TestCase):
         r, flux = self.lire()
         self.assertEqual((len(flux), r["ruptures"]), (4, [{"fichier": J1, "position": self.lignes(J1)[3][1], "seq": 3,
                                                             "causes": ["declaration"], "queues": []}]))
+
+    def test_limite_d_une_ligne(self):                                    # §7.1 : 4 194 304 octets, 0x0A compris
+        l0 = ligne(LigneDeCommande.L0)
+
+        def longue(seq, prec, n):                                          # ligne `lecture` de n octets exactement
+            fin = '","prec":"' + prec + '","seq":' + str(seq) + ',"type":"lecture","ws":' + str(T0) + "}"
+            return ligne('{"pad":"' + "x" * (n - len(fin) - 9) + fin)
+        l1 = longue(1, sha(l0), 4194304)
+        l2 = longue(2, sha(l1), 4194305)
+        with open(os.path.join(self.d, J1), "wb") as f:
+            f.write(l0 + l1 + l2)
+        r, flux = self.lire()
+        q = {"fichier": J1, "position": len(l0 + l1), "octets": len(l2), "sha256": sha(l2)}
+        self.assertEqual((len(l1), len(l2), [x[2] for x in flux], r["queue_finale"]),
+                         (4194304, 4194305, [sha(l0), sha(l1)], [q]))
+
+    def test_entiers_longs_dans_un_journal(self):                         # Q-R18-2 : 640 chiffres lus, 641 refusés
+        jl = j.Journal(self.d, "pool", fsync=lambda fd: None).ouvrir(T0 - 600)
+        self.addCleanup(jl.fermer)
+        jl.ecrire("lecture", T0 - 540, grand=int("9" * 640), petit=-int("9" * 640))
+        jl.marqueur(T0 - 540)
+        enr = self.lire()[0]["enregistrements"][1]["enr"]
+        self.assertEqual((enr["grand"], enr["petit"]), (10 ** 640 - 1, 1 - 10 ** 640))
+        with open(os.path.join(self.d, J1), "ab") as f:                     # l'écrivain refuse 641 chiffres (§1.2) :
+            f.write(ligne('{"prec":"' + self.lignes(J1)[-1][2] + '","seq":3,"trop":' + "9" * 641   # ligne à la main
+                          + ',"type":"lecture","ws":' + str(T0 - 480) + "}"))
+        with self.assertRaises(o.RefusOracle) as e:
+            self.lire()
+        self.assertEqual((e.exception.code, e.exception.fichier, e.exception.position),
+                         ("ORACLE/entier-long", J1, self.lignes(J1)[3][1]))
+
+    def test_premier_fichier_manquant(self):                              # §1.3 : la genèse manque
+        self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))
+        os.remove(os.path.join(self.d, J1))
+        r, flux = self.lire()
+        self.assertEqual((flux, r["ruptures"]), (self.lignes(J2), [{"fichier": J2, "position": 0, "seq": 5,
+                                                                   "causes": ["genese"], "queues": []}]))
+
+    def test_queue_finale_sur_deux_fichiers(self):                        # Q-R18-8 : la reprise déchirée à son tour
+        self.ecrivain(T0 - 600, (T0 - 540,), dernier=T0 - 480)
+        q1 = self.couper(J1, 3)
+        self.ecrivain(T0 - 300)
+        q2 = self.couper(J1S1, len(self.octets(J1S1)) - 10)
+        r, flux = self.lire()
+        self.assertEqual((flux, r["queue_finale"], r["queues_declarees"], r["ruptures"]),
+                         (self.lignes(J1), [q1, q2], [], []))
+
+
+class LigneDeCommande(unittest.TestCase):                                  # forme canonique documentée : JSON trié
+    H = "e256795529f7f3d0de68dee480a8f269e4e4cff9325a75d7d20ae02e90487409"   # printf '%s' L0 0x0A | sha256sum (G1)
+    L0 = '{"jour":"2026-10-04","prec":"' + "0" * 64 + '","seq":0,"suivante":1791158340,"type":"ouverture"}'
+
+    def lancer(self, *args):
+        p = subprocess.run([sys.executable, "-B", "-m", "shogen_s2bis.recalc.oracle_indep", *args], cwd=RACINE,
+                           capture_output=True, timeout=60)
+        return p.returncode, p.stdout
+
+    def test_sortie_doree_refus_et_usage(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, J1), "wb") as f:
+                f.write(ligne(self.L0))
+            attendu = ('{"enregistrements":[{"enr":' + self.L0 + ',"fichier":"' + J1 + '","position":0,"sha256":"'
+                       + self.H + '"}],"fichiers":["' + J1 + '"],"format":"shogen.s2bis.oracle-indep.v1",'
+                       '"queue_finale":[],"queues_declarees":[],"ruptures":[],"tete":{"seq":0,"sha256":"'
+                       + self.H + '"}}')
+            self.assertEqual(self.lancer(d, "pool"), (0, ligne(attendu)))
+            with open(os.path.join(d, J1), "ab") as f:
+                f.write(ligne('{"a":' + "1" * 641 + "}"))
+            refus = ('{"fichier":"' + J1 + '","format":"shogen.s2bis.oracle-indep.v1","position":145,'
+                     '"refus":"ORACLE/entier-long"}')
+            self.assertEqual(self.lancer(d, "pool"), (1, ligne(refus)))
+        self.assertEqual(self.lancer(), (2, b""))
