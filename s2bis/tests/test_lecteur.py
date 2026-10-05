@@ -13,7 +13,7 @@ import unittest
 from shogen_s2bis.recalc import lecteur as lec
 from tests.test_fichiers import J1, J2, J3, NOMS
 from tests.test_journal import FICHIER, Base, chaine
-from tests.test_reprise import SEG1, ligne, m
+from tests.test_reprise import SEG1, SEG2, ligne, m
 
 OUVERTURE = ligne(0, "0" * 64, type="ouverture", jour="2026-10-04", suivante=m(1))
 P = hashlib.sha256(OUVERTURE).hexdigest()
@@ -25,9 +25,11 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
         lecture = ligne(1, P, type="lecture", ws=m(1), k=1)
         e2, etat2 = lec._integre(lecture, etat)
         trou = ligne(2, etat2[1], type="trou", de=m(2), a=m(3), cause="saut")
-        self.assertEqual((e["type"], etat, e2["k"], etat2, lec._integre(trou, etat2)[1]), (
+        etat3 = lec._integre(trou, etat2)[1]
+        marqueur = ligne(3, etat3[1], type="marqueur", ws=m(4))  # C-4 : ws et a retenus (l'écrivain : ws + w, a + w)
+        self.assertEqual((e["type"], etat, e2["k"], etat2, etat3, lec._integre(marqueur, etat3)[1]), (
             "ouverture", (1, P, m(1), None), 1, (2, hashlib.sha256(lecture).hexdigest(), m(1), m(1)),
-            (3, hashlib.sha256(trou).hexdigest(), m(3), m(1))))
+            (3, hashlib.sha256(trou).hexdigest(), m(3), m(1)), (4, hashlib.sha256(marqueur).hexdigest(), m(4), m(4))))
 
     def test_causes_nommees(self):
         etat = lec._integre(OUVERTURE, None)[1]
@@ -246,3 +248,66 @@ class Declarations(AvecQueues):
             tracemalloc.stop()
         (p1, _t1), (p4, t4) = pics
         self.assertTrue(p4 < p1 + 32768 and p4 < t4 // 4, pics)
+
+
+def declaree(q):                                             # champs déclarés d'une queue (FORMAT §7.4)
+    return {k: q[k] for k in ("fichier", "position", "octets", "sha256")}
+
+
+class Pannes(AvecQueues):              # C-2 de la G2 de RB-T1 : un cas par mutant vivant (G-13 à G-16, G-19, G-20)
+    def coupe(self):
+        """Journal de `preparer` puis ligne coupée par une panne : (seq, prec) exigés ensuite, queue relevée."""
+        intact = self.preparer()
+        seq, prec, _e = chaine(intact)
+        self.ajouter(FICHIER, b'{"k":4,"prec":"5e3')
+        return seq, prec, queue(FICHIER, len(intact), b'{"k":4,"prec":"5e3', "LECTEUR/fin")
+
+    def reprise(self, seq, prec, queues):                     # reprise écrite par le test (FORMAT §7.4)
+        return ligne(seq, prec, type="reprise", ws=m(9), suivante=m(4), queue=queues)
+
+    def rupture(self, code, fichier, seq, prec, queues):
+        return [{"code": code, "fichier": fichier, "seq": seq, "apres": (seq - 1, prec), "queues": queues}]
+
+    def test_reprise_a_queue_nulle_derriere_une_queue(self):            # G-13
+        seq, prec, q = self.coupe()
+        self.ajouter(SEG1, self.reprise(seq, prec, None))
+        lecteur, _flux = lire(self.d)
+        self.assertEqual((lecteur.ruptures, lecteur.queues),
+                         (self.rupture("LECTEUR/declaration", SEG1, seq, prec, [q]), []))
+
+    def test_reprise_declarant_une_queue_quand_aucune_n_attend(self):    # G-14
+        intact = self.preparer()
+        seq, prec, _e = chaine(intact)
+        self.ajouter(FICHIER, self.reprise(seq, prec, [declaree(queue(FICHIER, len(intact), b"x", ""))]))
+        lecteur, _flux = lire(self.d)
+        self.assertEqual(lecteur.ruptures, self.rupture("LECTEUR/declaration", FICHIER, seq, prec, []))
+
+    def test_deux_queues_en_fin_de_journal(self):                       # G-15 : reprise coupée par une seconde panne
+        seq, prec, q = self.coupe()
+        coupee = self.reprise(seq, prec, [declaree(q)])[:40]
+        self.ajouter(SEG1, coupee)
+        lecteur, _flux = lire(self.d)
+        self.assertEqual((lecteur.ruptures, lecteur.queues, lecteur.queue_finale),
+                         ([], [], [q, queue(SEG1, 0, coupee, "LECTEUR/fin")]))
+
+    def test_deux_queues_declarees_ensemble_par_l_ecrivain(self):       # G-16 : deux pannes, puis l'écrivain réel
+        seq, prec, q = self.coupe()
+        coupee = self.reprise(seq, prec, [declaree(q)])[:40]
+        self.ajouter(SEG1, coupee)
+        self.journal(m(11)).fermer()                            # segment 2 : sa reprise déclare les deux queues
+        q1 = queue(SEG1, 0, coupee, "LECTEUR/fin")
+        lecteur, _flux = lire(self.d)
+        self.assertEqual((chaine(self.etat()[SEG2], seq, prec)[2][0]["queue"], lecteur.ruptures, lecteur.queues,
+                          lecteur.queue_finale), ([declaree(q), declaree(q1)], [], [q, q1], []))
+
+    def test_queue_d_un_octet_relevee(self):                            # G-19
+        intact = self.preparer()
+        self.ajouter(FICHIER, b"{")
+        lecteur, _flux = lire(self.d)
+        self.assertEqual(lecteur.queue_finale, [queue(FICHIER, len(intact), b"{", "LECTEUR/fin")])
+
+    def test_reprise_en_tete_de_segment_au_lien_faux(self):              # G-20 : déclaration exacte, prec faux
+        seq, prec, q = self.coupe()
+        self.ajouter(SEG1, self.reprise(seq, "f" * 64, [declaree(q)]))
+        lecteur, _flux = lire(self.d)
+        self.assertEqual((lecteur.ruptures, lecteur.queues), (self.rupture("LECTEUR/lien", SEG1, seq, prec, [q]), []))

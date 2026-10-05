@@ -45,8 +45,13 @@ def _entier(t):
 
 
 def _integre(ligne, etat):
-    """(enregistrement, état) d'une ligne intègre, état = (seq, sha256 de la ligne, attendu, dernière fenêtre) comme
-    l'écrivain le calcule ; sinon _NonIntegre(cause)."""
+    """(enregistrement, état) d'une ligne intègre, sinon _NonIntegre(cause) ; `etat` : celui de la ligne précédente du
+    fichier, None pour la première. État rendu : (seq + 1, sha256 de la ligne, attendu, dernière fenêtre) ; seq + 1 et
+    le sha256 sont le `seq` et le `prec` exigés de la ligne suivante ; attendu : `suivante` d'une `ouverture` ou d'une
+    `reprise`, `ws` d'un `marqueur`, `a` d'un `trou`, sinon celui de l'état précédent (l'écrivain retient `ws + w` et
+    `a + w` ; le lecteur n'en garde que le type, entier exigé, contrôlé comme chez l'écrivain) ; dernière fenêtre :
+    `ws` d'un `marqueur` ou d'un enregistrement hors RESERVES, sinon celle de l'état précédent (None à la première
+    ligne)."""
     if not ligne.endswith(b"\n"):
         raise _NonIntegre("LECTEUR/fin")
     try:

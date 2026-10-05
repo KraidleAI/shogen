@@ -347,7 +347,7 @@ premier niveau) refusés d'abord, puis schéma : seuils de D-2 à D-5, gardes, n
 |---|---|---|
 | `shogen_s2bis/recalc/__init__.py` | 1 | — |
 | `shogen_s2bis/recalc/config_analyse.py` | 111 | 3 (`tests/test_config_analyse.py`, 77 lignes) |
-| `tests/test_fitness.py` | 76 | 4 (règle de `recalc`, cas de refus de `recalc`) |
+| `tests/test_fitness.py` | 74 | 4 (règle de `recalc`, cas de refus de `recalc`) |
 
 Mutants, classés par la commande du job (runner, puis ligne `verdict-suite-s2.py s2bis --aucun-saut --egal
 --plancher 117` de `gates.yml`, suite entière, borne de 300 s, réseau isolé) : 21 tués sur 21 par leur test visé
@@ -416,7 +416,7 @@ chaîne (jour, segment en entier) ; aucun fichier : refus nommé `LECTEUR/absent
 
 | fichier | lignes | tests |
 |---|---|---|
-| `shogen_s2bis/recalc/lecteur.py` | 82 | 4 (`tests/test_lecteur.py`, 77 lignes) |
+| `shogen_s2bis/recalc/lecteur.py` | 82 | 4 (`tests/test_lecteur.py`, 76 lignes) |
 
 Mutants (commande du job, runner puis `--plancher 134`, borne de 300 s, réseau isolé) : 20 tués sur 20 par leur test
 visé (0 vivant, 0 FATAL). Suite : 134 tests ; plancher du job : 134, égalité exigée (`--egal`).
@@ -431,7 +431,7 @@ fin de journal (`queue_finale`) ; état remis à zéro à chaque lecture.
 
 | fichier | lignes | tests |
 |---|---|---|
-| `shogen_s2bis/recalc/lecteur.py` | 136 | 11 (`tests/test_lecteur.py`, 203 lignes ; 7 de plus, journaux écrits par l'écrivain de `collecte/journal.py`) |
+| `shogen_s2bis/recalc/lecteur.py` | 136 | 11 (`tests/test_lecteur.py`, 202 lignes ; 7 de plus, journaux écrits par l'écrivain de `collecte/journal.py`) |
 
 Mutants (commande du job, runner puis `--plancher 141`, borne de 300 s, réseau isolé) : 16 tués sur 16 par leur test
 visé (0 vivant, 0 FATAL), dont « contrôle de lien sauté » et « lien contrôlé sur seq seul ». Suite : 141 tests ;
@@ -452,3 +452,25 @@ le pic ne croît pas avec la taille.
 Mutants (commande du job, runner puis `--plancher 144`, borne de 300 s, réseau isolé) : 10 tués sur 10 par leur test
 visé (0 vivant, 0 FATAL), dont « fichier lu en entier » (test de mémoire). Suite : 144 tests ; plancher du job : 144,
 égalité exigée (`--egal`).
+
+## RB-1d (2026-10-05) : corrections C-2, C-3 et C-4 de la relecture G2 de la tranche 1 de P3 (lecteur, comptes)
+
+Objet : un cas nommé par mutant vivant de la relecture (C-2), sur des journaux de l'écrivain de `collecte/journal.py`
+complétés à la main : reprise à `queue` null derrière une queue en attente, et reprise déclarant une queue quand aucune
+n'attend (`LECTEUR/declaration`, G-13 et G-14) ; deux queues en fin de journal, toutes deux en `queue_finale` (G-15) ;
+deux queues déclarées ensemble par la reprise que l'écrivain réel écrit après deux pannes, sans rupture (G-16) ; queue
+d'un octet relevée (G-19) ; reprise en tête de segment au lien faux (`LECTEUR/lien`, G-20). Docstring de `_integre`
+récrite pour dire ce que le lecteur calcule (C-4 : `ws` d'un marqueur et `a` d'un trou, là où l'écrivain retient
+`ws + w` et `a + w` ; valeur inchangée) ; l'état rendu pour un marqueur est fixé par `test_lignes_integres_et_etat`.
+Comptes de lignes corrigés (C-3, `wc -l` sur les états de la série) : RB-0a, `tests/test_fitness.py`, 74 lignes et non
+76 ; RB-1a, `tests/test_lecteur.py`, 76 et non 77 ; RB-1b, 202 et non 203.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 147 | — |
+| `tests/test_lecteur.py` | 313 | 20 (6 de plus, un par mutant vivant de C-2) |
+
+Mutants (commande du job, runner puis `--plancher 150`, borne de 300 s, réseau isolé) : 9 tués sur 9 par leur test
+visé (0 vivant, 0 FATAL) : G-13 à G-16, G-19 et G-20 du réviseur, rejoués tels qu'écrits, et M-1d-01 à M-1d-03 (état
+rendu par `_integre`). Sur l'état RB-1c, les mêmes neuf mutants : 7 vivants (les six du réviseur et M-1d-01), 2 tués.
+Suite : 150 tests ; plancher du job : 150, égalité exigée (`--egal`).
