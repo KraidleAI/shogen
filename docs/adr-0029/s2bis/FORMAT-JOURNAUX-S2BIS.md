@@ -30,7 +30,7 @@
   proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
   §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
   et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
-  (§12).
+  (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -444,6 +444,24 @@ résolution et sans envoi (ADR-0029 l.109).
 5. `disque` : `{total, libre}` du système de fichiers du journal, en octets (`libre` : blocs disponibles pour un
    utilisateur ordinaire) ; ou `{erreur}` (nom de l'exception). `resolveur` : sha256 des octets de la configuration
    du résolveur de l'observateur (`/etc/resolv.conf` par défaut), null si elle ne se lit pas.
+6. **Taille** (C-1 (b) de la relecture d'intégration de P1, diff CB-19b) : sept témoins et sept noms au plus
+   (`sante.json`, §14.1) ; la plus grande `sante` possible fait au plus 3 823 224 octets, sous LIMITE (4 194 304
+   octets, §7.1), marge de 371 080 octets. Calcul (détail : METRIQUES, section CB-19b) :
+   - `reponses` d'une sonde : la réponse retenue fait 512 octets au plus (§12), dont 17 au moins d'en-tête et de
+     question. Un nom décodé y a au plus 2 × 512 = 1 024 caractères : chaque pointeur vise avant le début du segment
+     courant, si bien que les segments lus ne se chevauchent pas, hormis le dernier, qui ne chevauche que le
+     précédent. Le sérialiseur écrit un caractère en six octets au plus (caractère de contrôle). Une réponse donne
+     ainsi au plus (18 × 1 024 + 85) / 36 octets de JSON par octet du message qu'elle occupe, maximum atteint par une
+     SOA dont les trois noms sont des pointeurs (36 octets) : `reponses` fait au plus 1 + 495 × (18 × 1 024 + 85) / 36
+     octets, moins de 254 610 ;
+   - témoin du calcul (test `test_sante.Taille`) : chaque sonde porte 14 réponses SOA dont les trois noms ont 1 024
+     caractères de contrôle (259 239 octets, au-delà de la borne) ; tout autre champ est à sa borne : `sortie` de D-3
+     en 4 096 caractères de contrôle, noms de D-5 en 253, `tardives` de 2 × 4 096 latences, entiers à leur plus longue
+     écriture (instants de 17 caractères, écarts de 18, comptes de 19 chiffres, `seq` de 640) ;
+   - hypothèse : `tardives` compte au plus 2 × `places` latences. Les lectures abandonnées au relevé précédent tiennent
+     chacune une place, sauf celles de la fenêtre précédente finies entre son échéance et son relevé (au plus une par
+     forme, et `places` ≥ formes). Un fil saisi entre la remise de sa place et le rendu de son résultat n'est pas
+     compté ; la marge admet encore 19 530 latences.
 
 ## 14. Configurations, descripteur, câblage et point d'entrée (CB-18c, CB-18d ; E-C-02, E-C-16, E-C-23)
 
@@ -464,8 +482,8 @@ résolution et sans envoi (ADR-0029 l.109).
      de forme « / » suivi d'ASCII imprimable sans espace (`chemin-forme`, choix du lot : la lecture refuserait tout
      autre chemin à chaque fenêtre, §10.4) ;
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
-     littérales canoniques), `noms` (D-5, noms DNS valides), `delai` (µs ; `delai` + `marge` ≤ `delta`, égalité
-     admise : les sondes sont jointes avant l'échéance) ;
+     littérales canoniques, sept au plus), `noms` (D-5, noms DNS valides, sept au plus ; bornes du §13.6), `delai`
+     (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ;
    - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur`, `fournisseur`,
      `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
      configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256

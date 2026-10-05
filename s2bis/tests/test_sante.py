@@ -3,7 +3,7 @@ boucle (liste blanche des clés de `sante`). sha256 de la configuration du réso
 (G2 de P1-B) : boucle dans un fil joint en temps borné (C-6) ; sondes relevées à l'échéance (C-1). CB-11d : sonde
 pendue jamais relancée, sondes vivantes comptées (C-5) ; disque du dossier du journal (MG-26). CB-18b
 (SHOGEN-S2BIS-SONDES-ECHEANCE-1) : règle `fin` > E des sondes sur l'horloge monotone ; disque relevé après l'état
-des futurs."""
+des futurs. CB-19b (C-1 (b) de la relecture d'intégration de P1) : témoin de la plus grande `sante`, sous LIMITE."""
 import concurrent.futures
 import os
 import subprocess
@@ -14,10 +14,10 @@ import types
 import unittest
 from unittest import mock
 
-from shogen_s2bis.collecte import boucle, sante
+from shogen_s2bis.collecte import boucle, dns, entree, journal, sante
 from shogen_s2bis.collecte.lecture import S
 from tests.test_boucle import D, Lent, Temps, borne, rapide
-from tests.test_journal import FICHIER, Base, chaine
+from tests.test_journal import FICHIER, WS, Base, chaine
 from tests.test_reprise import m, sans_chaine
 
 GELEE = b"sortie gelee, une ligne : 0.000012,0.25\n" + bytes([0xFF])           # octet hors UTF-8 : remplacé
@@ -246,3 +246,29 @@ class Branchement(Base):
                                   attendre=attendre, sondes=s, monotone=temps.monotone).tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((enr["d3"]["code"], enr["d4"]), (0, [{"adresse": TEMOINS[0], "statut": "reponse"}, None]))
+
+
+class Taille(Base):
+    def test_plus_grande_sante_sous_la_borne_de_ligne(self):          # CB-19b, C-1 (b) de la relecture d'intégration
+        """Témoin du FORMAT §13.6 : chaque champ de `sante` à sa borne, lue au code (témoins et noms au plus, longueur
+        d'un nom, places du pool, sortie de D-3, taille d'une réponse UDP) ; `reponses` de chaque sonde : 14 réponses
+        SOA dont les trois noms ont 2 × 512 caractères de contrôle, au-delà de la borne 1 + 495 × (18 × 1 024 + 85) / 36
+        du FORMAT ; `tardives` : 2 × places ; entiers à leur plus longue écriture. Ligne canonique de 3 823 224 octets
+        (calcul du FORMAT, recompté), sous LIMITE ; l'écrivain écrit ces champs sans refus."""
+        sch, i17, i18 = entree.SCHEMAS, -(10 ** 16 - 1), -(10 ** 17 - 1)
+        t, n, long_nom = sch["sante"]["temoins"][-1], sch["sante"]["noms"][-1], sch["sante"]["noms"][0][2]
+        self.assertEqual((type(t), type(n)), (int, int))             # nombre de témoins et de noms borné au schéma
+        nom = chr(1) * 2 * dns.UDP
+        r = {"debut": i17, "fin": i17, "rcode": None, "statut": "reponse", "tc": False,
+             "reponses": [[nom, 65535, 2 ** 32 - 1, [nom, nom, *[2 ** 32 - 1] * 5]]] * 14}
+        champs = {"d2": {"non_parties": 10 ** 19 - 1, "retard_max": i18}, "horloges": {"monotone": i18, "murale": i18},
+                  "fils": {"abandonnes": 10 ** 19 - 1, "sondes": 10 ** 19 - 1,
+                           "tardives": [i18] * 2 * sch["formes"]["places"][2]},
+                  "d3": {"code": -2 ** 31, "debut": i17, "fin": i17, "sortie": chr(1) * sante.SORTIE},
+                  "d4": [{"adresse": "255.255.255.255", **r}] * t, "d5": [{"nom": chr(1) * long_nom, **r}] * n,
+                  "disque": {"libre": 2 ** 128 - 1, "total": 2 ** 128 - 1}, "resolveur": "f" * 64}
+        ligne = journal.canonique({**champs, "type": "sante", "ws": -(10 ** 10 - 1), "seq": 10 ** 640 - 1,
+                                   "prec": "f" * 64})
+        self.assertEqual((len(ligne), len(ligne) < journal.LIMITE), (3823224, True))
+        self.journal().ecrire("sante", WS + 60, **champs)
+        self.assertLess(len(self.etat()[FICHIER].split(bytes([10]))[-2]), 3823224)

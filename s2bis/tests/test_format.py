@@ -72,6 +72,19 @@ class Format(unittest.TestCase):
         self.assertEqual([x in douze for x in attendus], [True] * 3)
         self.assertEqual([("CB-19a" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
+    def test_paragraphe_13_6_taille_de_la_plus_grande_sante(self):    # CB-19b, C-1 (b) de la relecture d'intégration
+        """§13.6 : sept témoins et sept noms au plus, borne de `reponses`, ligne du témoin (3 823 224 octets, recomptée
+        par `test_sante.Taille`) sous LIMITE, hypothèse sur `tardives` écrite ; §14.1 : les deux bornes à `sante.json` ;
+        la puce « Corrections » nomme CB-19b."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        six = sections["13"].split(" 6. ", 1)[-1]
+        attendus = ("sept témoins et sept noms au plus", "1 + 495 × (18 × 1 024 + 85) / 36", "3 823 224 octets",
+                    "marge de 371 080 octets", "hypothèse : `tardives` compte au plus 2 × `places` latences")
+        self.assertEqual([x in six for x in attendus], [True] * 5)
+        self.assertEqual([x in sections["14"] for x in ("canoniques, sept au plus", "valides, sept au plus")],
+                         [True] * 2)
+        self.assertEqual([("CB-19b" in p) for p in puces if p.startswith("**Corrections** :")], [True])
+
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
         et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite

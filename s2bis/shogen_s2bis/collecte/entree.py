@@ -10,7 +10,8 @@ journal, 2 refus avant l'ouverture du journal. CB-18g (C-1 de la G2 de la tranch
 tolérance de départ de D-2 (`tolerance`, 5 s en production) ; la règle `budget` est celle de l'ADR-0029 l.233-234 :
 tolérance + plus grand décalage + délai + marge ≤ δ. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) : places du pool au moins
 égales au nombre de formes, hôte en minuscules (HOTE, règle de Q-RB-13 du recalcul), chemin en « / » puis ASCII
-imprimable sans espace."""
+imprimable sans espace. CB-19b (C-1 (b) de la relecture d'intégration de P1) : sept témoins et sept noms au plus,
+bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13.6)."""
 import argparse
 import ipaddress
 import os
@@ -26,8 +27,8 @@ FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "c
          "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None)}
 SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": (int, 1, MAX), "delai": (int, 1, MAX),
                       "marge": (int, 1, MAX), "places": (int, 1, 4096), "formes": [FORME]},
-           "sante": {"commande": [(str, 1, 4096)], "temoins": [(str, 7, 15)], "noms": [(str, 1, 253)],
-                     "delai": (int, 1, MAX)},
+           "sante": {"commande": [(str, 1, 4096)], "temoins": [(str, 7, 15), 7], "noms": [(str, 1, 253), 7],
+                     "delai": (int, 1, MAX)},           # 7 témoins, 7 noms au plus : `sante` sous LIMITE (§13.6)
            "descripteur": {"observateur": (str, 1, 16), "fournisseur": (str, 1, 64), "region": (str, 1, 64),
                            "asn": (int, 1, 4294967295), "resolveur": (str, 7, 15), "config_resolveur": (str, 1, 4096),
                            "versions": [(str, 1, 256)], "empreinte": (str, 64, 64)}}

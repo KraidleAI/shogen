@@ -145,6 +145,17 @@ class Entree(unittest.TestCase):
                 r = refus(lambda: entree.configurer(self.ecrire(formes, sante, d)[1], commit))
                 self.assertEqual(r and r.split(" : ")[:2], attendu)
 
+    def test_temoins_et_noms_bornes_au_schema(self):                    # CB-19b, C-1 (b) de la relecture d'intégration
+        """Sept témoins et sept noms au plus (FORMAT §13.6, §14.1 : la plus grande `sante` reste sous LIMITE) : sept
+        admis, huit refusés (CONFIG/borne), chaque liste à son tour ; valeurs prises au calcul du FORMAT."""
+        f, s, d = configurations(1)
+        listes = {"temoins": [f"127.0.9.{k}" for k in range(1, 9)], "noms": [f"n{k}.example." for k in range(8)]}
+        for champ, valeurs in listes.items():
+            for k, attendu in ((7, None), (8, "CONFIG/borne")):
+                with self.subTest(champ=champ, k=k):
+                    r = refus(lambda: entree.configurer(self.ecrire(f, {**s, champ: valeurs[:k]}, d)[1], COMMIT))
+                    self.assertEqual(r and r.split(" : ")[0], attendu)
+
     def test_cablage_des_sondes_et_de_la_boucle(self):                  # SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Les sondes reçoivent la commande, les témoins, les noms et le délai de `sante.json`, le résolveur et sa
         configuration du descripteur, le dossier du journal ; la boucle, ses paramètres de `formes.json` ; le plan, une

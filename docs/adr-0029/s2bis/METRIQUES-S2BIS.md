@@ -1194,3 +1194,72 @@ retirée, à 512 octets compris, à 513, à 65 507 (ces deux réécrits sur une 
 inapplicable : texte présent aussi dans la docstring), avant l'appariement, réponse ignorée au lieu de `forme`, borne
 après la mise à jour du résultat, borne portée par `analyser`, quatre retouches du §12 défaites, plancher non relevé.
 Suite : 187 tests ; plancher du job : 187, égalité exigée (`--egal`).
+
+## CB-19b (2026-10-05) : sept témoins et sept noms au plus, plus grande `sante` sous LIMITE (C-1 (b) de la relecture)
+
+Objet : C-1 (b), adjugée telle qu'écrite : borner au schéma de `sante.json` le nombre de témoins et de noms, calculé
+pour que la plus grande `sante` possible reste sous LIMITE (4 194 304 octets), calcul écrit au FORMAT (§13.6) et ici.
+Le schéma admet désormais `[s, n]` (n éléments au plus, refus `CONFIG/borne`) ; `temoins` et `noms` : sept au plus
+(production : trois témoins, deux noms, ADR-0029 l.109-110).
+
+Calcul. Borne de `reponses` d'une sonde, réponse retenue de U = 512 octets au plus (CB-19a), question de 17 octets au
+moins (« . » : en-tête de 12, nom de 1, type et classe de 4) :
+- un nom décodé a au plus 2U = 1 024 caractères. Lemme : `_nom` lit des segments ; chacun couvre, depuis son début, des
+  octets d'étiquette (longueur < 0x40, contenu ASCII, < 0x80) jusqu'à un pointeur (premier octet ≥ 0xC0) ou à un
+  octet nul ; un pointeur vise avant le début du segment courant. Un octet de pointeur n'est donc jamais couvert par
+  un segment : deux segments terminés par un pointeur sont disjoints (sinon l'un couvrirait le pointeur de l'autre, ou
+  ils auraient le même pointeur, donc la même cible) ; le dernier segment finit avant le dernier pointeur et ne
+  chevauche que le segment qui précède. Les caractères du nom sont les octets couverts (une longueur devient un point) ;
+- le sérialiseur écrit un caractère en six octets au plus (caractère de contrôle) ; un nom fait au plus 6 × 1 024 + 2
+  octets, un entier de type 5 caractères, un TTL 10 ;
+- octets de JSON par octet du message, élément de `reponses` virgule comprise :
+
+| réponse (nom en pointeur, 2 octets) | octets du message | JSON au plus | par octet |
+|---|---|---|---|
+| SOA, `mname` et `rname` en pointeurs | 2 + 10 + 2 + 2 + 20 = 36 | 18 × 1 024 + 85 = 18 517 | 514,36 |
+| type inconnu, données vides | 12 | 6 × 1 024 + 27 = 6 171 | 514,25 |
+| TXT vide | 12 | 6 × 1 024 + 25 = 6 169 | 514,08 |
+| A | 16 | 6 × 1 024 + 40 = 6 184 | 386,5 |
+
+  un nom en étiquettes sur place ou à la racine coûte plus d'octets pour un nom au plus aussi long ; une chaîne TXT
+  donne au plus six octets par octet. D'où `reponses` ≤ 1 + 495 × 18 517 / 36 = 254 609,75 octets.
+
+Témoin (`test_sante.Taille`, bornes lues au code) : 14 réponses SOA par sonde, trois noms de 1 024 caractères de
+contrôle chacun (259 239 octets, au-delà de la borne) ; tout autre champ à sa borne. Ligne canonique, recomptée par le
+test et par un calcul indépendant du code (`json.dumps`, brouillon du worker) :
+
+| champ | octets |
+|---|---|
+| `d4` : 7 × 259 373 (`adresse` de 15 caractères) | 1 815 619 |
+| `d5` : 7 × 260 872 (`nom` de 253 caractères de contrôle) | 1 826 112 |
+| `fils` : `tardives` de 2 × 4 096 écarts de 18 caractères, comptes de 19 chiffres | 155 724 |
+| `d3` : `sortie` de 4 096 caractères de contrôle, `code` de 11, instants de 17 | 24 658 |
+| `disque` (2 × 39 chiffres), `d2`, `horloges`, `resolveur` | 97 + 67 + 59 + 66 |
+| clés, `type`, `ws` de 11 caractères, `seq` de 640 chiffres, `prec`, ponctuation, saut de ligne | 822 |
+| **ligne** | **3 823 224** (marge 371 080 sous LIMITE) |
+
+Bornes voisines, même témoin : huit témoins et sept noms, 4 082 598 octets (marge 111 706) ; sept et huit,
+4 084 097 ; huit et huit, 4 343 471, au-delà de LIMITE. Sept et sept laisse une marge qui couvre l'hypothèse sur
+`tardives` (FORMAT §13.6 : 2 × `places` latences, un fil saisi entre la remise de sa place et le rendu de son
+résultat non compté) pour 19 530 latences de plus.
+
+Rouge : sur l'état CB-19a, huit témoins et huit noms admis, aucune borne au schéma (assertion du témoin), §13.6 et
+§14.1 absents.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/config.py` | 73 | — |
+| `shogen_s2bis/collecte/entree.py` | 126 | — |
+| `tests/test_entree.py` | 229 | 7 (1 de plus : sept admis, huit refusés, témoins puis noms) |
+| `tests/test_sante.py` | 274 | 13 (1 de plus : plus grande `sante`, 3 823 224 octets, écrite sans refus) |
+| `tests/test_format.py` | 141 | 6 (1 de plus : §13.6, §14.1, puce « Corrections ») |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 15 mutants neufs, 15 tués par leur test visé (0 vivant, 0 FATAL) :
+- contrôle du nombre d'éléments retiré, n éléments refusés, huit témoins, huit noms, témoins ou noms sans borne,
+  refus mal nommé, borne jamais lue : test des bornes au schéma ;
+- sortie de D-3 doublée, pool de 8 192 places, nom de 254 caractères : témoin de la plus grande `sante`, recompté à
+  l'octet (huit témoins, huit noms et bornes retirées aussi) ;
+- trois textes du FORMAT défaits (total, borne du §14.1, hypothèse) ; plancher non relevé.
+
+Suite : 190 tests ; plancher du job : 190, égalité exigée (`--egal`).
