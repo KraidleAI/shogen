@@ -1,6 +1,7 @@
 """Lecture typée (CB-3 ; E-C-03, E-C-04, E-C-17 ; ADR-0029 §2.9 l.233, l.236, l.238). Statut lisible par
 `r1.classify_ecart` de S2 ; `panne_transport`, et lui seul, porte un sous-type. Instants entiers en microsecondes depuis
-l'époque Unix (UTC ; moins de 2^53, exacts pour tout lecteur JSON) : départ, fin, fin de chaque phase atteinte.
+l'époque Unix (UTC ; moins de 2^53, exacts pour tout lecteur JSON) : départ, fin, fin de chaque phase atteinte. Les
+délais se comptent sur l'horloge monotone, jamais journalisée (C-4 de la G2 de P1-B).
 Adresse contactée ; octets du corps, au journal en base64 avec leur sha256 ; valeurs décodées (CB-6 et suivants)."""
 import base64
 import hashlib
@@ -14,6 +15,11 @@ SOUS_TYPES = ("dns", "connexion", "tls", "delai", "coupure", "autre")
 def horloge():
     """Instant présent, en microsecondes entières depuis l'époque Unix (UTC)."""
     return time.time_ns() // 1000
+
+
+def monotone():
+    """Instant de l'horloge monotone, en microsecondes entières : délais seulement, jamais journalisé (C-4)."""
+    return time.monotonic_ns() // 1000
 
 
 class Lecture:

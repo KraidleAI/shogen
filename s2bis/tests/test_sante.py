@@ -143,7 +143,7 @@ class Branchement(Base):
                                   attendre=temps.attendre, sondes=s).tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((sorted(enr), sorted(enr["d2"]), sorted(enr["fils"])),
-                         (["d2", "d3", "d4", "d5", "disque", "fils", "resolveur", "type", "ws"],
+                         (["d2", "d3", "d4", "d5", "disque", "fils", "horloges", "resolveur", "type", "ws"],
                           ["non_parties", "retard_max"], ["abandonnes", "sondes", "tardives"]))
         self.assertEqual((enr["d3"]["code"], enr["d4"], enr["d5"], enr["resolveur"], instants),
                          (0, [{"adresse": TEMOINS[0], "statut": "reponse"}], [{"nom": NOMS[0], "statut": "reponse"}],

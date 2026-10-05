@@ -8,7 +8,7 @@ import secrets
 import socket
 import struct
 
-from shogen_s2bis.collecte.lecture import S, horloge
+from shogen_s2bis.collecte.lecture import S, horloge, monotone
 
 TYPES = {"A": 1, "SOA": 6, "TXT": 16}
 
@@ -82,16 +82,18 @@ def analyser(m, q):
         raise Forme(str(e)) from None
 
 
-def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horloge=horloge, ident=None):
-    """Une requête vers `adresse`:`port`, réponse attendue `delai` au plus. Statut : reponse, delai, forme (requête
-    impossible ou réponse retenue mal formée) ou reseau (envoi refusé)."""
+def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horloge=horloge, ident=None,
+               monotone=monotone):
+    """Une requête vers `adresse`:`port`, réponse attendue `delai` au plus, compté sur l'horloge `monotone` (C-4) ;
+    `debut`, `fin` sur l'horloge murale. Statut : reponse, delai, forme (requête impossible ou réponse retenue mal
+    formée) ou reseau (envoi refusé)."""
     r = {"statut": "delai", "rcode": None, "tc": None, "reponses": None, "debut": horloge()}
-    fin = r["debut"] + delai
+    fin = monotone() + delai
     try:
         q = requete(secrets.randbelow(1 << 16) if ident is None else ident, nom, qtype, recursion)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(q, (adresse, port))
-            while (reste := fin - horloge()) > 0:
+            while (reste := fin - monotone()) > 0:
                 s.settimeout(reste / S)
                 m, source = s.recvfrom(65535)
                 if source == (adresse, port) and m[:2] == q[:2]:

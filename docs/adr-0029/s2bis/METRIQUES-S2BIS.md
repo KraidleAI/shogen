@@ -260,3 +260,26 @@ sondes (O-7) ; test nommé du mutant vivant MG-26 (C-7).
 Mutants (commande du job, `--plancher 101`, borne de 300 s) : 11 tués sur 11 par leur test visé (0 vivant, 0 FATAL),
 dont MG-26 et deux mutants du réviseur réécrits sur le texte de CB-11d avec la même mutation (MG-12, sondes non
 attendues ; MG-27, sonde inachevée non nulle). Suite : 101 tests ; plancher du job : 101, égalité exigée (`--egal`).
+
+## CB-11e (2026-10-05) : correction C-4 et mutant MG-23 (C-7) de la relecture G2 de la tranche B
+
+Objet : délais de `lire` et `interroger` comptés sur l'horloge monotone, instants journalisés sur l'horloge murale ;
+temps écoulé depuis `depart` retranché, jamais négatif ; `horloges` de la `sante` (temps écoulé depuis le relevé
+précédent, sur chaque horloge) : un recul de l'horloge murale entre deux fenêtres s'y lit (C-4, ferme
+SHOGEN-S2BIS-HORLOGE-RECUL-JOURNAL-1) ; test nommé du mutant vivant MG-23 (C-7).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/lecture.py` | 40 | — |
+| `shogen_s2bis/collecte/http.py` | 127 | — |
+| `shogen_s2bis/collecte/dns.py` | 108 | — |
+| `shogen_s2bis/collecte/boucle.py` | 103 | — |
+| `tests/test_boucle.py` | 248 | 11 (1 de plus : recul de l'horloge murale entre deux fenêtres) |
+| `tests/test_http.py` | 98 | 9 (horloge monotone entière, en microsecondes) |
+| `tests/test_http_reseau.py` | 181 | 11 (2 de plus : recul pendant une lecture, S-C1 ; `depart` posé après le début) |
+| `tests/test_dns.py` | 145 | 8 (2 de plus : recul pendant une requête, S-C2 ; MG-23) |
+
+Mutants (commande du job, `--plancher 106`, borne de 300 s) : 12 tués sur 12 (0 vivant, 0 FATAL), dont MG-23 et M-LP-8
+réécrits sur le texte de CB-11e avec la même mutation ; M-11e-06 (délai DNS doublé) est tué par
+`test_delai_reseau_forme_et_identifiant_aleatoire`, et non par le test qu'il visait. Suite : 106 tests ; plancher du
+job : 106, égalité exigée (`--egal`).

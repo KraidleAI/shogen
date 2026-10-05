@@ -2,7 +2,7 @@
 écrites à la main : instants par date -u -d ; base64 et sha256 de b"x" par printf, base64 et sha256sum. Corrections de
 la G2 de P1-B (CB-11c) : boucle dans un fil joint en temps borné (C-6) ; échéance exacte sous écrivain ralenti (C-1) ;
 mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5). CB-11d : santé complète sans sondes (O-7),
-sondes vivantes comptées (C-5)."""
+sondes vivantes comptées (C-5). CB-11e : horloges murale et monotone injectées, recul entre deux fenêtres (C-4)."""
 import concurrent.futures
 import queue
 import threading
@@ -37,25 +37,33 @@ def borne(test, fonction, *args, delai=5):
 
 
 class Temps:
-    """Horloge injectée, portée à t par `dormir(t)` et `attendre(futurs, t)` (plus `saut`), consignés avec l'instant
-    réel de l'appel ; les futurs attendus sont notés, 0,5 s réelle au plus."""
+    """Horloges injectées, murale `t` et monotone `m` (C-4), portées à t ensemble par `avancer`, `dormir(t)` et
+    `attendre(futurs, t)` (plus `saut`), consignés avec l'instant réel de l'appel ; les futurs attendus sont notés,
+    0,5 s réelle au plus. Un recul de l'horloge murale se pose sur `t` seul."""
     def __init__(self, t, saut=0):
-        self.t, self.saut, self.appels, self.reels, self.futurs = t, saut, [], [], []
+        self.t, self.m, self.saut, self.appels, self.reels, self.futurs = t, 0, saut, [], [], []
 
     def __call__(self):
         return self.t
 
+    def monotone(self):
+        return self.m
+
+    def avancer(self, t):
+        self.m += max(0, t - self.t)
+        self.t = max(self.t, t)
+
     def dormir(self, t):
         self.appels.append(("dormir", t))
         self.reels.append(time.monotonic())
-        self.t = max(self.t, t)
+        self.avancer(t)
 
     def attendre(self, futurs, t):
         self.appels.append(("attendre", t))
         self.reels.append(time.monotonic())
         self.futurs = futurs
         concurrent.futures.wait(futurs, 0.5)
-        self.t = max(self.t, t) + self.saut
+        self.avancer(max(self.t, t) + self.saut)
 
 
 class Lent:
@@ -69,7 +77,7 @@ class Lent:
 
     def ecrire(self, genre, ws, **champs):
         if genre == "lecture" and not self.porte.is_set():
-            self.temps.t += 50_000
+            self.temps.avancer(self.temps.t + 50_000)
             self.porte.set()
             concurrent.futures.wait(self.temps.futurs, 5)
         return self.jl.ecrire(genre, ws, **champs)
@@ -95,7 +103,7 @@ class Boucle(Base):
         self.temps = Temps(m(2) * S + 5 * S, saut)                  # journal ouvert à 23:00:05 ; 1re fenêtre, 23:01
         jl = self.journal(m(2))
         self.b = boucle.Boucle(ecrivain(jl) if ecrivain else jl, lectures, plan, places, horloge=self.temps,
-                               dormir=self.temps.dormir, attendre=self.temps.attendre)
+                               dormir=self.temps.dormir, attendre=self.temps.attendre, monotone=self.temps.monotone)
         borne(self, self.b.tourner, n)
         return sans_chaine(chaine(self.etat()[FICHIER])[2])[1:]
 
@@ -113,7 +121,7 @@ class Boucle(Base):
                                  "phases": {"dns": p + 1}, **X} for n, p in (("a", D), ("b", D + S))] +
                          [{"type": "sante", "ws": m(3), "d2": {"retard_max": 0, "non_parties": 0},
                            "fils": {"abandonnes": 0, "tardives": [], "sondes": 0}, "d3": None, "d4": [], "d5": [],
-                           "disque": None, "resolveur": None}, {"type": "marqueur", "ws": m(3)}])
+                           "disque": None, "resolveur": None, "horloges": None}, {"type": "marqueur", "ws": m(3)}])
 
     def test_echeance_lectures_non_finies_classees_fils_abandonnes(self):
         porte = threading.Event()
@@ -226,3 +234,15 @@ class Boucle(Base):
         self.assertEqual([(e["d2"]["non_parties"], e["fils"]["abandonnes"]) for e in enrs if e["type"] == "sante"],
                          [(0, 0), (0, 0)])
         self.assertEqual([vus.get(timeout=5) for _ in range(2)], [Arret, Arret])
+
+    def test_recul_de_l_horloge_murale_entre_deux_fenetres_journalise(self):
+        """C-4 : l'horloge murale recule de 180 s entre deux fenêtres ; la boucle passe à la fenêtre suivante, et chaque
+        `sante` journalise, brut, le temps écoulé depuis le relevé précédent sur les deux horloges : le recul se lit
+        `murale` < `monotone` (null à la première fenêtre de l'exécution)."""
+        self.tourner({"a": rapide}, [(0, "a")])
+        self.temps.t -= 180 * S
+        borne(self, self.b.tourner, 2)
+        enrs = sans_chaine(chaine(self.etat()[FICHIER])[2])[1:]
+        self.assertEqual([(e["ws"], e["horloges"]) for e in enrs if e["type"] == "sante"],
+                         [(m(3), None), (m(4), {"murale": 60 * S, "monotone": 240 * S}),
+                          (m(5), {"murale": 60 * S, "monotone": 60 * S})])

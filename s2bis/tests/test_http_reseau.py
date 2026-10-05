@@ -1,4 +1,5 @@
-"""CB-3, E-C-03 à E-C-05 : lecture par phases sur serveurs factices de boucle locale, résolveur injecté."""
+"""CB-3, E-C-03 à E-C-05 : lecture par phases sur serveurs factices de boucle locale, résolveur injecté. CB-11e (C-4 de
+la G2 de P1-B) : délais sur l'horloge monotone, horloge murale reculée pendant une lecture."""
 import socket
 import ssl
 import struct
@@ -56,6 +57,17 @@ class Resolveur:
             raise self.erreur
         a = (socket.AF_INET, socket.SOCK_STREAM, 6, "")
         return [] if self.port is None else [(*a, ("127.0.0.1", self.port)), (*a, ("127.0.0.2", 1))]
+
+
+class Recul:
+    """Horloge murale injectée (C-4) : l'heure réelle, reculée de `recul` µs passé `apres` µs après le premier appel."""
+    def __init__(self, recul, apres):
+        self.recul, self.apres, self.t0 = recul, apres, None
+
+    def __call__(self):
+        t = horloge()
+        self.t0 = t if self.t0 is None else self.t0
+        return t - self.recul if t - self.t0 > self.apres else t
 
 
 class Client(unittest.TestCase):
@@ -129,8 +141,8 @@ class Client(unittest.TestCase):
         self.assertEqual((lu.statut, lu.sous_type, lu.phases, res.appels), ("panne_transport", "autre", {}, []))
 
     def test_delai_epuise_entre_deux_phases(self):
-        instants = iter([0, 0, 0, 0, S])          # départ, dns, reste avant connexion, connexion, reste avant envoi
-        lu = self.lire(repondre(OK7), horloge=lambda: next(instants, S), delai=S)[0]
+        instants = iter([0, 0, 0, S])             # horloge monotone : début, dns, reste avant connexion, avant envoi
+        lu = self.lire(repondre(OK7), monotone=lambda: next(instants, S), delai=S)[0]
         self.assertEqual((lu.sous_type, sorted(lu.phases)), ("delai", ["connexion", "dns"]))   # statut contrôlé
 
     def test_depart_pose_par_la_boucle_et_suivi(self):
@@ -138,3 +150,32 @@ class Client(unittest.TestCase):
         lu = http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(1), tls=None, delai=S)
         self.assertEqual((lu.statut, lu.sous_type, lu.depart, sorted(suivi)),
                          ("panne_transport", "dns", suivi["depart"], ["adresse", "depart", "phases"]))
+
+    def test_delai_sur_l_horloge_monotone_malgre_un_recul(self):
+        """C-4 (S-C1 de la G2) : l'horloge murale recule de 3 s, 0,1 s après le départ d'une lecture servie octet par
+        octet ; le délai global de 0,3 s, compté sur l'horloge monotone, tient ; les instants restent ceux de l'horloge
+        murale (la fin, reculée, précède le départ)."""
+        port, _r, fil = servir(repondre(b"HTTP/1.1 200 OK\r\nX-Long: " + b"a" * 100, pas=0.02))
+        t = time.monotonic()
+        lu = http.lire(http.Requete("api.example", "/"), resoudre=Resolveur(port), tls=None, delai=3 * S // 10,
+                       horloge=Recul(3 * S, S // 10))
+        duree = time.monotonic() - t
+        fil.join(10)
+        self.assertEqual((lu.statut, lu.sous_type), ("panne_transport", "delai"))
+        self.assertTrue(0.3 <= duree < 1, duree)
+        self.assertLess(lu.fin, lu.depart)
+
+    def test_depart_pose_apres_le_debut_ne_prolonge_pas_le_delai(self):
+        """C-4 : `depart` posé 5 s après le début de la lecture (horloge murale reculée entre la boucle et le fil) : le
+        temps écoulé, négatif, compte pour zéro ; le délai de 0,2 s court depuis le début de la lecture."""
+        def muet(conn, recues):
+            conn.recv(4096)
+            conn.recv(4096)                                         # jusqu'à la fermeture par le client
+        port, _r, fil = servir(muet)
+        t = time.monotonic()
+        lu = http.lire(http.Requete("api.example", "/"), {"depart": horloge() + 5 * S}, resoudre=Resolveur(port),
+                       tls=None, delai=S // 5)
+        duree = time.monotonic() - t
+        fil.join(10)
+        self.assertEqual((lu.statut, lu.sous_type), ("panne_transport", "delai"))
+        self.assertLess(duree, 1)

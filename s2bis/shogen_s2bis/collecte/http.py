@@ -10,7 +10,7 @@ import socket
 import ssl
 import types
 
-from shogen_s2bis.collecte.lecture import S, Lecture, horloge
+from shogen_s2bis.collecte.lecture import S, Lecture, horloge, monotone
 
 DELAI = 10 * S                                                      # délai global d'une lecture (ADR-0029 l.233)
 CONTEXTE = ssl.create_default_context()                             # certificats vérifiés, nom d'hôte contrôlé
@@ -74,19 +74,21 @@ def analyser(recevoir, plafond=PLAFOND):
         r.close()                                                   # flux fermé aussi après un refus
 
 
-def lire(req, suivi=None, delai=DELAI, resoudre=None, tls=CONTEXTE, horloge=horloge, plafond=PLAFOND):
+def lire(req, suivi=None, delai=DELAI, resoudre=None, tls=CONTEXTE, horloge=horloge, plafond=PLAFOND,
+         monotone=monotone):
     """Lecture de `req`, sans jamais lever (E-C-03) ; code autre que 200 : `panne_http`, sans suivre de redirection.
     `suivi` (partagé avec la boucle) reçoit `depart` (gardé s'il est posé), `phases` et `adresse` au fil de l'eau.
     `resoudre` (getaddrinfo injectable, en AF_INET) ne se borne pas : délai épuisé pendant la résolution, `dns` ;
-    l'échéance de la boucle borne le tout (PROPOSITION §9, essai 2). `tls` None : TCP nu (serveurs des tests)."""
+    l'échéance de la boucle borne le tout (PROPOSITION §9, essai 2). `tls` None : TCP nu (serveurs des tests). Délai
+    sur l'horloge `monotone`, instants sur l'horloge murale (C-4) ; le temps écoulé depuis `depart` est retranché."""
     suivi = {} if suivi is None else suivi
     phases, depart, socks = suivi.setdefault("phases", {}), suivi.setdefault("depart", horloge()), []
-    fin = depart + delai
+    fin = monotone() + delai - max(0, horloge() - depart)
 
     def borner(s, defaut, operation, *args):
         """`operation(*args)` sous le temps qui reste avant `fin` (délai global) ; épuisé : delai ; OSError : defaut."""
         try:
-            reste = fin - horloge()
+            reste = fin - monotone()
             if reste <= 0:
                 raise TimeoutError
             s.settimeout(reste / S)
@@ -102,7 +104,7 @@ def lire(req, suivi=None, delai=DELAI, resoudre=None, tls=CONTEXTE, horloge=horl
         except Exception:
             raise Panne("dns") from None
         phases["dns"], suivi["adresse"] = horloge(), f"{ip}:{port}"
-        if phases["dns"] >= fin:
+        if monotone() >= fin:
             raise Panne("dns")                                      # délai épuisé pendant la résolution
         socks.append(s := socket.socket(socket.AF_INET, socket.SOCK_STREAM))
         borner(s, "connexion", s.connect, (ip, port))

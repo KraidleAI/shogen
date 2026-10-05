@@ -10,7 +10,7 @@
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
-  l'observation O-7 (§11.6, §13.1, §13.2).
+  l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -188,7 +188,11 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
 2. Délai global : la lecture entière dispose de 10 s depuis son départ (ADR-0029 l.233). Chaque attente reçoit le temps
    qui reste, jamais un délai par opération ; un délai épuisé pendant une phase autre que `dns` donne le sous-type
    `delai`. La résolution est un appel bloquant que le client ne peut pas interrompre : l'échéance de la boucle (§11)
-   la borne.
+   la borne. Le délai se compte sur l'horloge monotone du système, les instants journalisés sur l'horloge murale
+   (C-4) : un recul ou une avance de l'horloge murale pendant la lecture ne change pas son délai. Le temps écoulé
+   entre `depart`, posé par la boucle, et le début de la lecture se lit sur l'horloge murale, jamais négatif, et se
+   retranche du délai (limite : une avance de l'horloge murale dans cet intervalle, celui du lancement du fil, le
+   raccourcit d'autant).
 3. Réponse lue entière : code 200, statut `ok` ; tout autre code, `panne_http` avec ce code et le corps reçu. Aucune
    redirection n'est suivie (S2 suivait celles d'urllib) : un code 3xx est un `panne_http`.
 4. Toute autre anomalie (défaut imprévu, requête dont l'hôte, le chemin ou la méthode sort de l'ASCII imprimable sans
@@ -227,7 +231,12 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
      arrivé au relevé ;
      `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
      est arrivé depuis le relevé de la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15) ;
-     `fils.sondes` : instances de sonde encore en cours au relevé (§13.2), au plus une par sonde ; 0 sans sondes.
+     `fils.sondes` : instances de sonde encore en cours au relevé (§13.2), au plus une par sonde ; 0 sans sondes ;
+   - `horloges` (C-4, ferme SHOGEN-S2BIS-HORLOGE-RECUL-JOURNAL-1) : `{murale, monotone}`, temps écoulé depuis le relevé
+     de la fenêtre précédente de la même exécution, en microsecondes, lu sur l'horloge murale et sur l'horloge
+     monotone ; null à la première fenêtre d'une exécution. Valeurs brutes : un recul de l'horloge murale entre deux
+     fenêtres se lit `murale` < `monotone`, une avance `murale` > `monotone` ; la boucle, elle, ne recule jamais de
+     fenêtre (§3.2).
 7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter. D'où des futurs
    `concurrent.futures` sans `ThreadPoolExecutor`, qui joint ses fils à la sortie de l'interpréteur, même après
    `shutdown(wait=False, cancel_futures=True)` (essais du worker et de la G2 de la tranche B, Python 3.10 à 3.13).
@@ -244,7 +253,8 @@ champs :
   un point ; `type` entier (1 A, 6 SOA, 16 TXT) ; `ttl` entier en secondes ; `données` : pour A, l'adresse en
   notation pointée ; pour TXT, la liste des chaînes (octets lus en latin-1) ; pour SOA, `[mname, rname, serial,
   refresh, retry, expire, minimum]` ; pour tout autre type, null. Null sans réponse retenue ;
-- `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes.
+- `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes, sur l'horloge murale ; le délai se
+  compte sur l'horloge monotone (C-4).
 
 Une réponse n'est retenue que si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête
 (tiré au hasard sur 16 bits), le bit QR et la même question ; tout autre datagramme est ignoré. La requête ne passe par
@@ -253,10 +263,10 @@ aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-002
 ## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
 
 1. Un enregistrement `sante` par fenêtre lue, avant le marqueur. Ses clés forment une **liste blanche fermée** :
-   `type`, `ws`, `seq`, `prec`, `d2`, `fils` (§11.6), `d3`, `d4`, `d5`, `disque`, `resolveur`. Aucune clé n'est tirée
-   d'une lecture de source ; aucun champ ne porte de jugement (« dégradé » se juge au recalcul et dans `status`, avec
-   les seuils scellés, E-C-26). Une boucle construite sans sondes (tests de la boucle seule) écrit la même liste :
-   `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
+   `type`, `ws`, `seq`, `prec`, `d2`, `fils`, `horloges` (§11.6), `d3`, `d4`, `d5`, `disque`, `resolveur`. Aucune clé
+   n'est tirée d'une lecture de source ; aucun champ ne porte de jugement (« dégradé » se juge au recalcul et dans
+   `status`, avec les seuils scellés, E-C-26). Une boucle construite sans sondes (tests de la boucle seule) écrit la
+   même liste : `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
 2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
    hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
    cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null. Une sonde dont l'instance précédente n'a pas

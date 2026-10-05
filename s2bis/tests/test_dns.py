@@ -1,11 +1,14 @@
 """CB-10, E-C-27, E-C-28 : client DNS filaire. Octets écrits à la main selon la RFC 1035 (§4.1, pointeur §4.1.4 ;
-libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui en tire les mêmes valeurs (journal G1)."""
+libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui en tire les mêmes valeurs (journal G1).
+CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7)."""
 import socket
 import threading
+import time
 import unittest
 
 from shogen_s2bis.collecte import dns
 from shogen_s2bis.collecte.lecture import S
+from tests.test_http_reseau import Recul
 
 QA = "07 7769746e657373 07 6578616d706c65 00 0001 0001"                         # witness.example., A, IN
 Q_SOA = bytes.fromhex("1234 0000 0001 0000 0000 0000 00 0006 0001")              # « . », SOA, sans récursion
@@ -116,3 +119,27 @@ class Interroger(unittest.TestCase):
         self.assertEqual([m[2:] for m in recues], [Q_SOA[2:]] * 3)
         self.assertEqual(dns.interroger("127.0.0.1", ".", "SOA", port=0)["statut"], "reseau")
         self.assertEqual(dns.interroger("127.0.0.1", "a..b", "A", port=1)["statut"], "forme")
+
+    def test_delai_sur_l_horloge_monotone_malgre_un_recul(self):
+        """C-4 (S-C2 de la G2) : datagrammes d'un autre identifiant toutes les 0,05 s, horloge murale reculée de 3 s
+        après 0,1 s : le délai de 0,3 s, compté sur l'horloge monotone, tient."""
+        def bruit(srv, requete, client):
+            for _ in range(20):
+                srv.sendto(bytes([requete[0] ^ 1]) + requete[1:], client)
+                time.sleep(0.05)
+        port, _r, fil = udp(bruit)
+        t = time.monotonic()
+        r = dns.interroger("127.0.0.1", WE, "A", delai=3 * S // 10, port=port, horloge=Recul(3 * S, S // 10))
+        duree = time.monotonic() - t
+        fil.join(5)
+        self.assertEqual(r["statut"], "delai")
+        self.assertTrue(0.3 <= duree < 1, duree)
+
+    def test_attente_close_au_delai_apres_un_datagramme_etranger(self):
+        """MG-23 : un datagramme étranger reçu, puis le délai épuisé (horloge monotone injectée) : l'attente s'arrête
+        là, statut `delai`, sans un tour de plus."""
+        port, _r, fil = udp(lambda srv, requete, client: srv.sendto(bytes([requete[0] ^ 1]) + requete[1:], client))
+        instants = iter([0, 0])                                         # début, premier tour ; puis délai dépassé
+        r = dns.interroger("127.0.0.1", WE, "A", delai=S, port=port, monotone=lambda: next(instants, S + 1))
+        fil.join(5)
+        self.assertEqual(r["statut"], "delai")

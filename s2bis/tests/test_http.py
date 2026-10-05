@@ -3,7 +3,7 @@ d'urllib (forme de S2, serveur de boucle locale) ; base64 et sha256 du corps par
 import time
 import unittest
 
-from shogen_s2bis.collecte import http
+from shogen_s2bis.collecte import http, lecture
 from shogen_s2bis.collecte.lecture import S, Lecture, horloge
 
 UA = "User-Agent: Mozilla/5.0 (Shogen-S2-harness; +https://github.com/KraidleAI/shogen)\r\n"
@@ -93,5 +93,6 @@ class LectureTypee(unittest.TestCase):
                 self.assertRaises(ValueError, Lecture, statut, 0, 0, sous_type=sous_type)
 
     def test_horloge_entiere_en_microsecondes(self):
-        a = horloge()
+        a, m = horloge(), lecture.monotone()                        # m : horloge des délais (C-4), jamais journalisée
         self.assertTrue(type(a) is int and abs(a - time.time() * S) < S, a)
+        self.assertTrue(type(m) is int and abs(m - time.monotonic() * S) < S, m)
