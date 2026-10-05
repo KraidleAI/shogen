@@ -1144,3 +1144,28 @@ Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau i
 
 Runner : 83 ok sur la tête suivie de CB-18v, de la série SIM-T4 et de CB-18w. Suite s2bis : 184 tests, plancher 184
 inchangé.
+
+## CB-18x (2026-10-05) : égalité exacte et place de la ligne `fetch-depth: 0` (CC4-1 du contre-contrôle cc4)
+
+Objet : deux mutants du réviseur survivaient à CB-18w, faute de cas :
+- MV-01 admet aussi la ligne après le nom de l'étape du runner ;
+- MV-02 compare la ligne après `strip()`, ce qui rend l'indentation libre.
+
+Le gabarit exige la ligne à la lettre et à sa place, mais aucun cas ne le fixait. Adjudication de l'orchestrateur :
+ajouter les cas. Cas : L-43 (la ligne à l'indentation 8, refusée) et L-44 (la ligne après le nom de l'étape du runner,
+refusée). Le code du gabarit ne change pas.
+
+Rouge : sans ces cas, le runner de CB-18w sous MV-01 ou sous MV-02 donne 83 ok. Avec eux : 85 ok ; sous MV-02, seul
+L-43 échoue ; sous MV-01, seul L-44.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 321 | 85 cas (2 de plus : L-43, L-44) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) :
+- 2 mutants neufs, 2 tués : ligne cherchée de b[7] à b[9] (L-44) ; indentation quelconque (L-43) ;
+- MV-01 et MV-02 : tués ;
+- les 6 mutants de CB-18w, rejoués : tués.
+
+Runner : 85 ok sur la tête suivie de CB-18v, de la série SIM-T4, de CB-18w et de CB-18x. Suite s2bis : 184 tests,
+plancher 184 inchangé.

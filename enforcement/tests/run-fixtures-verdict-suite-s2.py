@@ -22,8 +22,9 @@ de l'analyseur. CC2-1 : les valeurs libres du gabarit sont des scalaires simples
 écrit sur plusieurs lignes qui avalerait des lignes du gabarit ; G-02, `timeout-minutes` entier ; G-03 et G-04, le
 nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du bloc, le gabarit seul. CB-18v (Q-T4-11) : le
 job sim-bis admet `fetch-depth: 0` sous le `with:` du checkout, après `persist-credentials: false`, valeur exacte, lui
-seul ; L-37 à L-41. CB-18w (O-2 de la relecture de SIM-T4) : la ligne y est exigée ; L-42. Sortie : 0 tout passe, 1 un
-cas échoue, 3 erreur."""
+seul ; L-37 à L-41. CB-18w (O-2 de la relecture de SIM-T4) : la ligne y est exigée ; L-42. CB-18x (CC4-1 du
+contre-contrôle cc4) : L-43 (indentation 8) et L-44 (après le nom de l'étape du runner) fixent l'égalité exacte et la
+place de la ligne. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -298,7 +299,11 @@ for nom, lignes, attendu in (
          + SIM[9:] + SIM_SUITE, False),
         ("L-41 job sim-bis, fetch-depth: 0 avant persist-credentials (ordre du gabarit, CB-18v)", SIM[:8]
          + [FD + "0"] + SIM[8:] + SIM_SUITE, False),
-        ("L-42 job sim-bis sans fetch-depth: 0 (ligne exigée, CB-18w, O-2)", SIM + SIM_SUITE, False)):
+        ("L-42 job sim-bis sans fetch-depth: 0 (ligne exigée, CB-18w, O-2)", SIM + SIM_SUITE, False),
+        ("L-43 job sim-bis, fetch-depth: 0 à l'indentation 8 (égalité exacte, CB-18x)", SIM[:9] + [FD[2:] + "0"]
+         + SIM[9:] + SIM_SUITE, False),
+        ("L-44 job sim-bis, fetch-depth: 0 après le nom de l'étape du runner (place exacte, CB-18x)", SIM[:10]
+         + [FD + "0"] + SIM[10:] + SIM_SUITE, False)):
     nom_job = lignes[1].strip(" :")                     # s2bis-unittest ou sim-bis-unittest
     admis = cable(chr(10).join(lignes), nom_job, APPEL_SIM if nom_job == "sim-bis-unittest" else APPEL)
     cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
