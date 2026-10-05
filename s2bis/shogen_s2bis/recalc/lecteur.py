@@ -1,8 +1,9 @@
 """Lecteur en flux des journaux d'observateur de S2-bis (RB-1 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION E-R-01,
-E-R-02 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §1 à §8). Fichiers d'un préfixe lus dans l'ordre de la
-chaîne (jour, segment), ligne à ligne (LIMITE octets au plus), jamais un fichier en mémoire : mémoire bornée quelle que
-soit la longueur du journal. Ligne intègre au sens de la définition unique du FORMAT §7.1, points (a) à (e), celle de
-l'écrivain de référence (`collecte/journal.py` `_lire` ; lettres C-1 et C-2 du FORMAT, C-14 de la G2 de RB-18) :
+E-R-02 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §1 à §8). Fichiers d'un préfixe, aux noms de la
+grammaire du FORMAT §6.1 (lettre C-5), lus dans l'ordre de la chaîne (jour, k entier), ligne à ligne (LIMITE octets
+au plus), jamais un fichier en mémoire : mémoire bornée quelle que soit la longueur du journal. Ligne intègre au sens
+de la définition unique du FORMAT §7.1, points (a) à (e), celle de l'écrivain de référence (`collecte/journal.py`
+`_lire` ; lettres C-1 et C-2 du FORMAT, C-14 de la G2 de RB-18) :
 terminée par 0x0A, objet JSON canonique aux conteneurs de 64 niveaux au plus, comptés par le lecteur (lettre C-4 ;
 C-15), `type` chaîne, `seq` entier, `prec` de 64 chiffres hexadécimaux minuscules, champs propres du §2 présents et
 typés (un booléen n'est jamais un entier), chaînée à la précédente du fichier, première ligne `ouverture` ou
@@ -145,11 +146,20 @@ class Lecteur:
         self.dossier, self.prefixe = dossier, prefixe
 
     def fichiers(self):
-        motif = re.compile(re.escape(self.prefixe) + r"-([0-9]{4}-[0-9]{2}-[0-9]{2})-([0-9]+)[.]jsonl")
-        noms = sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, os.listdir(self.dossier)) if m)
-        if not noms:
+        """Fichiers du journal dans l'ordre de la chaîne (jour, k entier) : noms `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl`, k
+        en décimal sans zéro de tête, `0|[1-9][0-9]*` (FORMAT §6.1, §7.7 ; lettre C-5). Un nom qui commence par
+        `<préfixe>-` et finit par `.jsonl` hors de cette grammaire : refus `LECTEUR/nom` ; aucun fichier du journal :
+        refus `LECTEUR/absent`."""
+        motif = re.compile(re.escape(self.prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl")
+        noms = os.listdir(self.dossier)
+        hors = sorted(n for n in noms if n.startswith(self.prefixe + "-") and n.endswith(".jsonl") and
+                      not motif.fullmatch(n))
+        if hors:
+            raise RefusLecteur("LECTEUR/nom", f"noms hors de la grammaire du FORMAT §6.1 dans {self.dossier} : {hors}")
+        trouves = sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, noms) if m)
+        if not trouves:
             raise RefusLecteur("LECTEUR/absent", f"aucun fichier {self.prefixe}-*.jsonl dans {self.dossier}")
-        return [n for _j, _k, n in noms]
+        return [n for _j, _k, n in trouves]
 
     def __iter__(self):
         self.tete, self.ruptures, self.queues, self.queue_finale = None, [], [], []   # d'une lecture

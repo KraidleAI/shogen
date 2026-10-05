@@ -179,6 +179,36 @@ class Fichiers(unittest.TestCase):
                 lec.Lecteur(d, "carte").fichiers()
             self.assertEqual(e.exception.code, "LECTEUR/absent")
 
+    def test_grammaire_des_noms_refus_nommes(self):                   # C-5 (FORMAT §6.1, §7.7 ; §5, limite O-2)
+        """k suit `0|[1-9][0-9]*` (100 compris : seul le zéro de tête est exclu) et l'ordre est (jour, k entier). Un
+        nom qui commence par « pool- » et finit par « .jsonl » hors de cette grammaire est un refus nommé
+        (`LECTEUR/nom`), préfixe prolongé et numéro complété de zéros compris ; un autre préfixe, une autre fin ou le
+        préfixe sans tiret sont ignorés ; un dossier vide, ou sans fichier du journal, est un refus nommé
+        (`LECTEUR/absent`)."""
+        codes = []
+        with tempfile.TemporaryDirectory() as d:
+            for n in (None, "pool.verrou", "pool.sha256", "pool-2026-10-04-0.jsonl.bak", "pool-2026-10-04-01.JSONL",
+                      "autre-2026-10-04-01.jsonl", "pool2026-10-04-01.jsonl"):
+                if n:
+                    open(os.path.join(d, n), "wb").close()
+                with self.assertRaises(lec.RefusLecteur) as e:
+                    lec.Lecteur(d, "pool").fichiers()
+                codes.append(e.exception.code)
+            for n in ("pool-2026-10-04-10.jsonl", "pool-2026-10-05-0.jsonl", "pool-2026-10-04-2.jsonl",
+                      "pool-2026-10-04-0.jsonl", "pool-2026-10-04-100.jsonl", "pool-2026-10-04-1.jsonl"):
+                open(os.path.join(d, n), "wb").close()
+            ordre = lec.Lecteur(d, "pool").fichiers()
+            for n in ("pool-2026-10-04-01.jsonl", "pool-2026-10-04-00.jsonl", "pool-2026-10-04-007.jsonl",
+                      "pool-2026-1-04-0.jsonl", "pool-x.jsonl", "pool-2026-10-04-.jsonl", "pool-2026-10-04-1a.jsonl",
+                      "pool--2026-10-04-0.jsonl", "pool-b-2026-10-04-0.jsonl", "pool-2026-10-04-0.jsonl.jsonl"):
+                open(os.path.join(d, n), "wb").close()
+                with self.assertRaises(lec.RefusLecteur) as e:
+                    list(lec.Lecteur(d, "pool"))
+                codes.append(e.exception.code)
+                os.remove(os.path.join(d, n))
+        self.assertEqual((ordre, codes), ([f"pool-2026-10-04-{k}.jsonl" for k in (0, 1, 2, 10, 100)] + [
+            "pool-2026-10-05-0.jsonl"], ["LECTEUR/absent"] * 7 + ["LECTEUR/nom"] * 10))
+
 
 def lire(dossier, prefixe="pool"):
     lecteur = lec.Lecteur(dossier, prefixe)

@@ -1559,3 +1559,27 @@ admis) ; racine comptée deux fois ; barre doublée non retirée ; guillemet éc
 chaînes comptés, ou seuls comptés ; objets non comptés ; fermants ignorés (nombre d'ouvrants pris pour le niveau) ;
 octets effacés inversés ; niveaux non comptés (RecursionError seule) ; RecursionError prise pour un verdict. Suite : 213
 tests ; plancher du job : 213, égalité exigée (`--egal`).
+
+## RB-1k (2026-10-05) : grammaire des noms de fichiers au lecteur (lettre C-5)
+
+Objet (lettre C-5 du FORMAT, adjugée par l'orchestrateur le 2026-10-05 ; FORMAT §6.1 et §7.7) : k suit `0|[1-9][0-9]*`
+et l'ordre des fichiers est (jour, k entier) ; un nom qui commence par `<préfixe>-` et finit par `.jsonl` hors de cette
+grammaire est un refus nommé (`LECTEUR/nom`), y compris un numéro complété de zéros, une date mal formée, un nom
+prolongé après `.jsonl` et un préfixe prolongé (limite O-2, §5) ; « pas de numéro sur trois chiffres » s'entend d'un
+numéro complété de zéros (parenthèse du FORMAT §6.1) : `-100`, sans zéro de tête, est le segment 100 ; un autre préfixe,
+une autre fin ou le préfixe sans tiret sont ignorés ; un dossier sans fichier du journal, vide ou non, reste un refus
+nommé (`LECTEUR/absent`). Avant (sondes du worker sur la souche) : `-01`, `-00` et `-007` étaient lus comme segments 1,
+0 et 7 (`-00` à côté de `-0` : deux segments 0), les sept autres noms non conformes ignorés.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 203 | — |
+| `tests/test_lecteur.py` | 511 | 31 (1 de plus : dossier vide, six voisins ignorés, ordre de six fichiers dont le segment 100, dix noms refusés) |
+
+Rouge : sur le code de RB-1j, 1 échec d'assertion (premier nom non conforme lu sans refus). Mutants (commande du job,
+runner puis `--plancher 214`, borne de 300 s ; python3.12 ; réseau isolé) : 12 tués sur 12 par leur test visé (0 vivant,
+0 FATAL) : zéro de tête admis ; k = 0 refusé ; k de trois chiffres refusé ; date hors grammaire admise ; k comparé en
+texte ; nom hors grammaire ignoré, ou refusé seulement sans fichier du journal ; préfixe sans tiret, ou fin en
+majuscules, refusés ; nom prolongé après `.jsonl` ignoré (`match` au lieu de `fullmatch`) ; dossier sans fichier du
+journal admis ; refus mal nommé. Première passe, 11 mutants, avant l'ajout du segment 100 au test : 11 tués, versée sans
+être comptée. Suite : 214 tests ; plancher du job : 214, égalité exigée (`--egal`).
