@@ -52,9 +52,13 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                          "echelle_semaines": [positif], "n_par_semaine": {"calme": positif, "stress": positif},
                          "t_max": (positif, positif), "source": texte},
           "sources": {"composants": [texte], "indices_hotes": [texte], "regroupees": [texte], "longues": [positif],
+                      "poids_longues": [positif],
                       "derive": {"bornes": ((positif, positif), (positif, positif)), "unites_saut": positif,
-                                 "transitoire": (positif, positif), "initiale": positif},
+                                 "transitoire": (positif, positif), "initiale": positif,
+                                 "tendance_par_semaine": positif},
                       "classes": {"BTC": [texte], "ETH": [texte], "USDC": [texte], "USDT": [texte]}, "as13335": [texte],
+                      "absorption": {"population": texte, "k_faibles": [positif], "k_bascule": positif,
+                                     "source": texte},
                       "source": texte}}
 
 

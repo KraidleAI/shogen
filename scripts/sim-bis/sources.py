@@ -191,8 +191,13 @@ def indice(prm: dict, hote: str, strate: str, k: int = 0) -> int:
 
 
 def loi_longues(prm: dict) -> Empirique:
-    """Durées des pannes longues de sources.longues (E-S-11 : 1 h, 1 jour, 3 jours), également probables."""
-    return Empirique([(d, 1) for d in prm["sources"]["longues"]])
+    """Durées des pannes longues de sources.longues (E-S-11 : 1 h, 1 jour, 3 jours), de poids sources.poids_longues en
+    nombre d'épisodes (1:1:1, avis Q-T2-5 adopté ; C-7 de la G2 de la tranche 2) ; autant de poids que de durées, sinon
+    SOURCES/loi."""
+    durees, poids = prm["sources"]["longues"], prm["sources"]["poids_longues"]
+    if len(durees) != len(poids):
+        raise commun.Refus("SOURCES/loi", f"{durees!r}, poids {poids!r} : autant de poids que de durées")
+    return Empirique(list(zip(durees, poids)))
 
 
 def regime_valide(reg):

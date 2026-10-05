@@ -269,7 +269,7 @@ class TestHotes(unittest.TestCase):
         1 107 400/1 675 553 ≈ 0,66, au-delà de μ/(μ + 1) = 684/1 357 : admis, E′ étant tirée indépendamment ; p = 1/10
         donne r' > 1 : SOURCES/taux. Mutations M-3C-03 (E′ hors de Z), M-3C-04 (pannes longues omises), M-3C-15 (E′ en
         épisodes de la loi d'EP), M-3C-16 (contrôle r' < 1 retiré)."""
-        prm = dict(PRM, sources=dict(PRM["sources"], longues=[2, 4]))
+        prm = dict(PRM, sources=dict(PRM["sources"], longues=[2, 4], poids_longues=[1, 1]))
         loi, m = sources.Empirique([(1, 1), (3, 1)]), {"calme": (1 << 2000) - 1, "stress": 0}
         x = []
         for i in range(300):
@@ -309,11 +309,12 @@ class TestDerives(unittest.TestCase):
 
     def test_parametres_et_multiplicateur(self):
         """E-S-13 : bornes 0,1 et 1,9, trois unités à saut, transitoire × 3 la première semaine (10 080 fenêtres), panne
-        initiale de 3 jours (4 320). m(t) linéaire de 1/10 à 19/10 sur L = 100 : 1/10, 1 (t = 50), 19/10, puis tenu
-        (t = 150) ; saut de 19/10 à 1/10 en 30 : 19/10 à t = 29, 1/10 à t = 30. Mutations M-3D-01 (t non borné par L),
-        M-3D-02 (saut en t ≤ x)."""
+        initiale de 3 jours (4 320), tendance sur W × 10 080 fenêtres (C-7). m(t) linéaire de 1/10 à 19/10 sur L = 100 :
+        1/10, 1 (t = 50), 19/10, puis tenu (t = 150) ; saut de 19/10 à 1/10 en 30 : 19/10 à t = 29, 1/10 à t = 30.
+        Mutations M-3D-01 (t non borné par L), M-3D-02 (saut en t ≤ x)."""
         self.assertEqual(PRM["sources"]["derive"], {"bornes": [[1, 10], [19, 10]], "unites_saut": 3,
-                                                    "transitoire": [3, 10080], "initiale": 4320})
+                                                    "transitoire": [3, 10080], "initiale": 4320,
+                                                    "tendance_par_semaine": 10080})
         d = ("lineaire", Fraction(1, 10), Fraction(19, 10), 100)
         self.assertEqual([sources.multiplicateur(d, t) for t in (0, 50, 100, 150)],
                          [Fraction(1, 10), 1, Fraction(19, 10), Fraction(19, 10)])
@@ -360,6 +361,30 @@ class TestDerives(unittest.TestCase):
         r = sources.Replication(PRM, EP, dict(fond(), derive={"genres": ["initiale"], "duree": n}), "T-N9", 0, m, 2 * n)
         hote = r.derives()["initiale"]
         self.assertEqual(r.pannes(hote) & ((1 << 4320) - 1), (1 << 4320) - 1)
+
+    def test_valeurs_avis_c_7(self):
+        """C-7 de la G2 de la tranche 2 (avis Q-T2-5, Q-T2-6, Q-T2-10 adoptés ; DERIVE-AMPLITUDE-1 et ABS-POPULATIONS-1
+        clos avant E0) : valeurs recopiées ici à la main, forme tenue par le schéma. Pannes longues : poids 1:1:1 en
+        nombre d'épisodes, lus par loi_longues (poids d'essai 3:1:1 : 60×3 1 440×1 4 320×1, moyenne 5 940/5 = 1 188 ;
+        autant de poids que de durées, sinon SOURCES/loi). Tendance sur W × 10 080 fenêtres (7 × 86 400/w). Absorption :
+        population = la liste as13335 ; hôtes faibles = ses k premiers, k ∈ {1 ; 2 ; 4} (k = 4 : bitfinex, chainlink,
+        coinbase, coingecko) ; bascule : k = 1 ; partenaire par touches (« parmi », imposés = les unités faibles),
+        k = 2, v = 0,6 puis 0 : chainlink imposé, puis bitfinex parmi les six autres. Poids nul, liste des k vide,
+        absorption incomplète : PARAMETRES/schema. Mutations M-C7-01 à M-C7-06."""
+        s = PRM["sources"]
+        a = s.get("absorption", {})
+        self.assertEqual((s.get("poids_longues"), s["derive"].get("tendance_par_semaine"),
+                          7 * 86400 // PRM["calendrier"]["w"]), ([1, 1, 1], 10080, 10080))
+        self.assertEqual((a.get("population"), a.get("k_faibles"), a.get("k_bascule")), ("as13335", [1, 2, 4], 1))
+        pop = s[a["population"]]
+        self.assertEqual((pop, pop[:4]), (AS, ["bitfinex", "chainlink", "coinbase", "coingecko"]))
+        self.assertEqual(sources.touches(PRM, suite(0.6, 0.0), ("parmi", pop, 2, pop[:2])), ["chainlink", "bitfinex"])
+        lg = sources.loi_longues(dict(PRM, sources=dict(s, poids_longues=[3, 1, 1])))
+        self.assertEqual((lg.hist, lg.moyenne), (((60, 3), (1440, 1), (4320, 1)), 1188))
+        self.refus("SOURCES/loi", sources.loi_longues, dict(PRM, sources=dict(s, poids_longues=[1, 1])))
+        for k, v in (("poids_longues", [0, 1, 1]), ("absorption", dict(a, k_faibles=[])),
+                     ("absorption", {"k_bascule": 1})):
+            self.refus("PARAMETRES/schema", commun.controler, dict(PRM, sources=dict(s, **{k: v})), commun.SCHEMA)
 
 
 class TestClasses(unittest.TestCase):
