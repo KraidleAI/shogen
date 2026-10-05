@@ -81,8 +81,9 @@ def portee(texte: str, cal: dict) -> dict:
 def calendrier_j28(seg: dict, cal: dict) -> dict:
     """Grille de pas w sur [t0 ; t_fin) : position j = instant t0 + j·w ; strate de chaque journée UTC
     (calendrier.strate, réplique de window de f35a70c), jours partiels compris ; les positions des plages exclues,
-    bornes incluses (forme de records.filtre_horodatage de f35a70c), ne sont dans aucune strate. Rend {"masques" :
-    {strate : masque}, "horizon" : nombre de positions}."""
+    bornes incluses (forme de records.filtre_horodatage de f35a70c), ne sont dans aucune strate ; les fenêtres de S2
+    non évaluables, inconnues d'EP, restent des positions (Q-T4-5 : limite écrite). Rend {"masques" : {strate :
+    masque}, "horizon" : nombre de positions}."""
     w, t0, tf = cal["w"], seg["t0"], seg["t_fin"]
     out, t = {"calme": 0, "stress": 0}, t0
     while t < tf:
@@ -119,8 +120,8 @@ def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> 
 
 def moyenne(courbes: list) -> dict:
     """Courbe d'un point d'E1 sur ses réplications (courbes de courbe(), mêmes ℓ) : par ℓ, moyenne exacte des FIV
-    définis ; une réplication à FIV indéfini (K ∈ {0, n}, indéfini à tout ℓ) est comptée à part ; aucune définie :
-    None ; liste vide : FIV/entree."""
+    définis ; une réplication à FIV indéfini (K ∈ {0, n}, indéfini à tout ℓ) est comptée à part (Q-T4-6) ; aucune
+    définie : None ; liste vide : FIV/entree."""
     if not courbes:
         raise commun.Refus("FIV/entree", "aucune courbe")
     definies = [c for c in courbes if c[0]["fiv"] is not None]

@@ -102,6 +102,51 @@ class TestSocle(unittest.TestCase):
             with open(os.path.join(commun.ICI, module), encoding="utf-8") as g:
                 self.assertLessEqual(set(numeros), marques(g.read()), module)
 
+    def test_valeurs_avis_t4(self):
+        """Corrections G2 de la tranche 4 (forme P-2 de la tranche 3, adjugées avant E0) : les valeurs Q-T4-1 à Q-T4-13
+        de l'avis (douze adoptées, Q-T4-8 modifiée) sont écrites dans parametres.json, chacune avec sa source :
+        variante.questions (Q-T4-1 à Q-T4-4), e1.questions (Q-T4-5 à Q-T4-10, Q-T4-13), oracle_r1.questions
+        (Q-T4-11, Q-T4-12), textes qui citent les lignes de l'AVIS-SIM-T4 et de la PROPOSITION ; la source de chacune
+        de ces sections cite l'adjudication (brief des corrections et avis, par leurs empreintes) ; Q-T4-8 porte la
+        forme adjugée du nom de cellule. Forme tenue par le schéma : question manquante, en trop, dans une autre
+        section, texte vide ou sans ses deux citations : PARAMETRES/schema. Chaque numéro est marqué dans le module qui
+        emploie la valeur. Mutations M-14F-01 (citation de l'avis non exigée), M-14F-02 (citation de la PROPOSITION non
+        exigée), M-14F-03 (marque retirée d'un module), M-14F-04 (forme « / » remise dans Q-T4-8), M-14F-05
+        (adjudication retirée d'une source)."""
+        def marques(texte):
+            out, i = set(), texte.find("Q-T4-")
+            while i >= 0:
+                j = i + 5
+                while j < len(texte) and texte[j].isdigit():
+                    j += 1
+                out.add(texte[i:j])
+                i = texte.find("Q-T4-", j)
+            return out
+        prm = commun.charger_parametres(environ={})
+        sections = {"variante": (1, 2, 3, 4), "e1": (5, 6, 7, 8, 9, 10, 13), "oracle_r1": (11, 12)}
+        q = {s: prm[s].get("questions", {}) for s in sections}
+        self.assertEqual({s: sorted(v, key=lambda k: int(k[5:])) for s, v in q.items()},
+                         {s: [f"Q-T4-{n}" for n in ns] for s, ns in sections.items()})
+        self.assertEqual(len([1 for v in q.values() for x in v.values()
+                              if "AVIS-SIM-T4.md l." in x and "PROPOSITION l." in x]), 13)
+        self.assertIn("« E1-<num>_<den>-<κ>-<τ_D> »", q["e1"]["Q-T4-8"])
+        adj = ("adjugées par l'orchestrateur le 2026-10-05, avant E0 (brief des corrections G2 de la tranche 4, sha256 "
+               "5e4487bc17fafb1a881f760e7bce5c8f543072e2f6e84cacf52cdec9ab382eff", "AVIS-SIM-T4.md (sha256 "
+               "6dfc13e71633c29acd6446812dc0abdd2f4255d91bb8296c5811b2d9eed7ad8c)")
+        self.assertEqual([s for s in sections if not all(x in prm[s]["source"] for x in adj)], [])
+        for f in (lambda p: p["variante"]["questions"].pop("Q-T4-3"),
+                  lambda p: p["e1"]["questions"].update({"Q-T4-14": p["e1"]["questions"]["Q-T4-13"]}),
+                  lambda p: p["variante"]["questions"].update({"Q-T4-11": p["oracle_r1"]["questions"]["Q-T4-11"]}),
+                  lambda p: p["oracle_r1"]["questions"].update({"Q-T4-12": ""}),
+                  lambda p: p["e1"]["questions"].update({"Q-T4-9": "AVIS-SIM-T4.md l.61-63 seule"}),
+                  lambda p: p["e1"]["questions"].update({"Q-T4-6": "PROPOSITION l.197 seule"})):
+            p = json.loads(json.dumps(prm))
+            f(p)
+            self.refus("PARAMETRES/schema", commun.controler, p, commun.SCHEMA)
+        for module, s in (("variante.py", "variante"), ("calib_fiv.py", "e1"), ("oracle_r1.py", "oracle_r1")):
+            with open(os.path.join(commun.ICI, module), encoding="utf-8") as g:
+                self.assertLessEqual(set(q[s]), marques(g.read()), module)
+
     def test_schema_ferme(self):
         """Clé en trop (racine, section), clé manquante, texte vide, empreinte en majuscules, entier pour un texte :
         PARAMETRES/schema. Mutations M-0-03 (clés incluses au lieu d'égales), M-0-04 (texte vide admis), M-0-05

@@ -55,6 +55,12 @@ def question(v) -> bool:
     return texte(v) and "AVIS-SIM-T3.md l." in v and "PROPOSITION l." in v
 
 
+def question_t4(v) -> bool:
+    """Valeur adjugée d'une question de la tranche 4 (corrections G2 de la tranche 4, forme P-2 de la tranche 3) :
+    texte qui cite ses lignes de l'avis AVIS-SIM-T4.md et de la PROPOSITION."""
+    return texte(v) and "AVIS-SIM-T4.md l." in v and "PROPOSITION l." in v
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
@@ -82,14 +88,17 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                     "garde": {"unites": positif, "k_crit": positif, "runs": positif}, "c_etoile": (positif, positif),
                     "tolerances": [naturel], "source": texte,
                     "questions": {f"Q-T3-{n}": question for n in (13, 14, 15)}},
-          "variante": {"diviseur": positif, "sensibilite": positif, "source": texte},
+          "variante": {"diviseur": positif, "sensibilite": positif, "source": texte,
+                       "questions": {f"Q-T4-{n}": question_t4 for n in (1, 2, 3, 4)}},
           "e1": {"phi": [(positif, positif)], "kappa": [positif], "tau_D": [positif], "replications": positif,
                  "pool": texte, "ell_c1": positif, "cellule": texte, "source": texte,
                  "fond": {"f": (positif, positif), "longues": (naturel, positif), "autres": (positif, positif),
-                          "hors_enveloppe": (naturel, positif), "classe": texte, "source": texte}},
+                          "hors_enveloppe": (naturel, positif), "classe": texte, "source": texte},
+                 "questions": {f"Q-T4-{n}": question_t4 for n in (5, 6, 7, 8, 9, 10, 13)}},
           "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
                         "fichiers": {f"shogen_s2/{m}.py": hex64
-                                     for m in ("__init__", "model", "records", "window", "r1")}}}
+                                     for m in ("__init__", "model", "records", "window", "r1")},
+                        "questions": {f"Q-T4-{n}": question_t4 for n in (11, 12)}}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

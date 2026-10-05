@@ -31,8 +31,8 @@ def segment(n: int, N: int) -> int:
 
 def decalage(graine: str, strate: str, r: int, u: str, N: int) -> int:
     """s(r, u) (E-S-33) : (entier big-endian des 32 octets de SHA-256 de la chaîne ASCII
-    « <graine>:<strate>:minus:<r>:<u> ») modulo 2N + 1, moins N : un décalage de {−N, …, N}. Graine, strate et unité
-    contrôlées par regle._cle (refus nommés de la rotation enroulée) ; r de 1 à 9 999, sinon REGLE/entier."""
+    « <graine>:<strate>:minus:<r>:<u> ») modulo 2N + 1, moins N : un décalage de {−N, …, N} (Q-T4-2). Graine, strate et
+    unité contrôlées par regle._cle (refus nommés de la rotation enroulée) ; r de 1 à 9 999, sinon REGLE/entier."""
     regle._cle(graine, strate, 2 * N + 1, [u])
     if type(r) is not int or not 1 <= r <= regle.R_MAX:
         raise commun.Refus("REGLE/entier", f"r = {r!r} : entier de 1 à {regle.R_MAX} attendu")
@@ -42,15 +42,16 @@ def decalage(graine: str, strate: str, r: int, u: str, N: int) -> int:
 
 def decaler(x: int, s: int, n: int, N: int) -> int:
     """Série décalée de s, sans enroulement, vue sur le segment central : la valeur de la position t va en t + s (sens
-    de la rotation enroulée, Q-R-02) ; |s| ≤ N, donc chaque position du segment reçoit une position de [0, n)."""
+    de la rotation enroulée, Q-R-02 ; Q-T4-1) ; |s| ≤ N, donc chaque position du segment reçoit une position de
+    [0, n)."""
     return (x << s if s >= 0 else x >> -s) & segment(n, N)
 
 
 def _entrees(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, diviseur):
     """(base, arguments de regle.decider et regle.complet, générateur des (K_H^(r), None)) : entrées contrôlées par
     regle._controler, N = demi(n, diviseur) ; K_H^(0), runs de I et unités à au moins un écart, sur le segment central ;
-    n′ ≥ n_s/2 sur la suite (2·n ≥ n_s) ; l'unité `premier` n'est pas décalée. Une série nulle sur le segment peut y
-    entrer par décalage : seul « au plus une série non nulle sur toute la suite » donne K_H^(r) = 0 pour tout r,
+    n′ ≥ n_s/2 sur la suite (2·n ≥ n_s) (Q-T4-3) ; l'unité `premier` n'est pas décalée. Une série nulle sur le segment
+    peut y entrer par décalage : seul « au plus une série non nulle sur toute la suite » donne K_H^(r) = 0 pour tout r,
     exactement, sans hachage."""
     regle._controler(series, premier, graine, strate, n, prm)
     N = demi(n, prm["variante"]["diviseur"] if diviseur is None else diviseur, prm)
@@ -69,7 +70,7 @@ def _entrees(series: dict, premier, graine: str, strate: str, n: int, n_s: int, 
 def tester(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, diviseur=None) -> dict:
     """Variante pour une classe dans une strate, avec l'arrêt anticipé exact de regle.decider (mêmes compteurs C et C1,
     non décroissants en r) : rend regle.decider(), plus K (= K_H^(0)), runs et unités sur le segment, et N. diviseur :
-    None (N = ⌊n/4⌋) ou la sensibilité (N = ⌊n/8⌋)."""
+    None (N = ⌊n/4⌋) ou la sensibilité (N = ⌊n/8⌋) (Q-T4-4 : arrêt anticipé, sensibilité par argument)."""
     base, a, ks = _entrees(series, premier, graine, strate, n, n_s, prm, R, diviseur)
     return {**regle.decider(*a, ks, R, prm), **base}
 
