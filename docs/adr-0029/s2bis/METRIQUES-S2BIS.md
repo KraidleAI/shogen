@@ -937,3 +937,25 @@ fixe l'ordre ; il échoue sous le mutant qui ajoute en fin de liste. FORMAT §7.
 Mutants (commande du job, `--plancher 182`, borne de 300 s ; python3.12 ; réseau isolé) : 2 tués sur 2 (0 vivant,
 0 FATAL) : queues rangées dans l'ordre de relecture, plancher non relevé. Suite : 182 tests ; plancher du job : 182,
 égalité exigée (`--egal`).
+
+## CB-18q (2026-10-05) : grammaire des noms de fichiers (lettre C-5 du FORMAT)
+
+Objet : dans `_fichiers`, k suit `0|[1-9][0-9]*`, et l'ordre est (jour, k entier). À l'ouverture, un nom qui commence
+par `<préfixe>-` et finit par `.jsonl` hors de cette grammaire est refusé (`JOURNAL/nom`) : rien n'est écrit,
+l'écrivain est fermé et le verrou rendu. À la bascule, un tel nom est ignoré, parce que le refuser là écrirait la
+`cloture` avant le refus ; le redémarrage suivant le refuse. Il n'y a pas de numéro sur trois chiffres : la lettre
+écarte le nom sur trois chiffres que le diff CB-18i laissait en item. Le test des onze segments d'un jour (CB-18i)
+tient lieu du test à dix segments ou plus (MR-26, porté). Rouge : sur le code d'avant, un nom à zéro de tête était lu
+comme segment (`JOURNAL/illisible` sur un fichier vide) et les autres noms non conformes étaient ignorés. FORMAT §5,
+§6.1, §7.7 (lettre des lecteurs : grammaire, refus nommé d'un nom non conforme et d'un dossier sans fichier du
+journal).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 381 | — |
+| `tests/test_fichiers.py` | 83 | 4 (1 de plus : sept noms non conformes refusés à l'ouverture sans rien écrire, verrou rendu ; quatre noms voisins ignorés (autre préfixe, préfixe sans tiret, autre fin, fin en majuscules) ; nom non conforme ignoré à la bascule, refusé au redémarrage) |
+
+Mutants (commande du job, `--plancher 183`, borne de 300 s ; python3.12 ; réseau isolé) : 9 tués sur 9 (0 vivant,
+0 FATAL) : zéro de tête admis, segments à deux chiffres hors grammaire (MR-26 porté), refus jamais levé, ouverture
+sans refus, refus aussi à la bascule, préfixe sans tiret ou autre fin refusés, k comparé en texte, plancher non
+relevé. Suite : 183 tests ; plancher du job : 183, égalité exigée (`--egal`).

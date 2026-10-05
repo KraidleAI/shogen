@@ -19,10 +19,11 @@ ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21, E-C-22 (
 au dernier enregistrement intègre ; une queue non intègre (ligne coupée, octets NUL, ligne de plus de LIMITE octets)
 n'est jamais réécrite : un segment neuf s'ouvre par `reprise`, qui la déclare (fichier, position, octets, sha256). N-1
 (SHOGEN-S2BIS-SEGMENT-JOUR-1) : un fichier neuf, à la bascule comme à la reprise, prend le numéro suivant de son jour ;
-un segment de reprise prend le jour le plus tardif entre l'horloge et les fichiers présents ; l'ordre des noms reste
-celui de la chaîne. La
-fenêtre du redémarrage, toute fenêtre close et toute fenêtre jusqu'à la dernière écrite restent refusées (C-1) ; le
-marqueur qui suit des fenêtres sans marqueur est précédé d'un `trou` (cause `arret`, `horloge_reculee` ou `saut`)."""
+un segment de reprise prend le jour le plus tardif entre l'horloge et les fichiers présents ; l'ordre (jour, k entier)
+reste celui de la chaîne, k sans zéro de tête, et un nom du préfixe hors de cette grammaire est refusé à l'ouverture
+(JOURNAL/nom, lettre C-5 du FORMAT). La fenêtre du redémarrage, toute fenêtre close et toute fenêtre jusqu'à la
+dernière écrite restent refusées (C-1) ; le marqueur qui suit des fenêtres sans marqueur est précédé d'un `trou`
+(cause `arret`, `horloge_reculee` ou `saut`)."""
 import fcntl
 import hashlib
 import json
@@ -186,7 +187,7 @@ class Journal:
             raise JournalOccupe("JOURNAL/occupe", self.prefixe) from None
         if type(ws) is not int or ws % self.w:
             raise ErreurJournal("JOURNAL/fenetre", ws)
-        fichiers = self._fichiers()
+        fichiers = self._fichiers(refus=True)
         if fichiers:
             self._reprendre(ws, fichiers)
         else:
@@ -248,10 +249,17 @@ class Journal:
         self.suivante = ws                                          # C-1 : ws non décroissant dans l'exécution
         return self._ecrire(enr)
 
-    def _fichiers(self):
-        """(jour, k, nom) des fichiers du journal, dans l'ordre des noms : jour, puis numéro de segment."""
-        motif = re.compile(re.escape(self.prefixe) + r"-([0-9]{4}-[0-9]{2}-[0-9]{2})-([0-9]+)[.]jsonl")
-        return sorted((x[1], int(x[2]), x[0]) for x in map(motif.fullmatch, os.listdir(self.dossier)) if x)
+    def _fichiers(self, refus=False):
+        """(jour, k, nom) des fichiers du journal, dans l'ordre (jour, k entier) ; k en décimal sans zéro de tête (C-5,
+        FORMAT §6.1). `refus` (à l'ouverture) : un nom du préfixe en `.jsonl` hors de cette grammaire est refusé
+        (JOURNAL/nom) ; sinon (bascule) il est ignoré."""
+        motif = re.compile(re.escape(self.prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl")
+        noms = os.listdir(self.dossier)
+        autres = [n for n in noms if n.startswith(self.prefixe + "-") and n.endswith(".jsonl") and not
+                  motif.fullmatch(n)]
+        if refus and autres:
+            raise ErreurJournal("JOURNAL/nom", sorted(autres))
+        return sorted((x[1], int(x[2]), x[0]) for x in map(motif.fullmatch, noms) if x)
 
     def _numero(self, j):
         """Numéro du fichier neuf du jour `j` : 1 + le plus grand présent au dossier, 0 sans fichier du jour (N-1)."""

@@ -57,3 +57,27 @@ class Fichiers(Base):
         self.assertEqual(([n for n in e if n.endswith(".jsonl")], e[NOMS[1]], [x["type"] for x in enrs[-2:]],
                           [x["type"] for x in chaine(e[suivant], seq, prec)[2]]),
                          ([NOMS[0], NOMS[1], suivant], b"", ["reprise", "cloture"], ["ouverture", "marqueur"]))
+
+    def test_grammaire_des_noms_refus_a_l_ouverture_ignore_a_la_bascule(self):   # CB-18q, lettre C-5 (§6.1, §7.7)
+        """k suit `0|[1-9][0-9]*`. À l'ouverture, un nom qui commence par « pool- » et finit par « .jsonl » sans suivre
+        la grammaire est refusé (JOURNAL/nom) : rien n'est écrit, le verrou est rendu. Un nom d'un autre préfixe ou
+        d'une autre fin est ignoré. À la bascule, un nom non conforme apparu en cours d'exécution est ignoré : le
+        lendemain prend le numéro 0, chaîné ; le redémarrage suivant refuse."""
+        for n in ("pool.verrou", "pool.sha256", "pool-2026-10-04-0.jsonl.bak", "pool-2026-10-04-01.JSONL",
+                  "autre-2026-10-04-01.jsonl", "pool2026-10-04-01.jsonl"):
+            open(os.path.join(self.d, n), "wb").close()
+        avant = self.etat()
+        for n in ("pool-2026-10-04-01.jsonl", "pool-2026-10-04-00.jsonl", "pool-2026-1-04-0.jsonl", "pool-x.jsonl",
+                  "pool-2026-10-04-.jsonl", "pool-2026-10-04-1a.jsonl", "pool--2026-10-04-0.jsonl"):
+            open(os.path.join(self.d, n), "wb").close()
+            with self.subTest(nom=n):
+                self.assertEqual((code(lambda: self.journal(J1 - 60)), self.etat()), ("JOURNAL/nom", {**avant, n: b""}))
+            os.remove(os.path.join(self.d, n))
+        jl = self.journal(J1 - 60)
+        jl.marqueur(J1)
+        open(os.path.join(self.d, "pool-2026-10-05-01.jsonl"), "wb").close()
+        jl.marqueur(J2)
+        jl.fermer()
+        e = self.etat()
+        self.assertEqual((chaine(e[NOMS[1]], *chaine(e[NOMS[0]])[:2])[2][0]["type"], code(lambda: self.journal(J2))),
+                         ("ouverture", "JOURNAL/nom"))

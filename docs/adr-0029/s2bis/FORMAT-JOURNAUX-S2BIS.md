@@ -27,7 +27,8 @@
   dans l'ordre de la fenêtre (§11.5, observation de la G2). Lettres C-1 à C-5 du FORMAT (avis de l'advisor sur le
   banc de concordance des lecteurs du recalcul, adjugé par l'orchestrateur le 2026-10-05) : le diff CB-18n écrit C-4
   (§2, §8.3) ; le diff CB-18o, C-1 et C-2 (§7.1 : définition unique d'« intègre », sans limite déclarée ; l'item
-  proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4).
+  proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
+  §6.1, §7.7).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -119,7 +120,8 @@ mécanique :
 - un écrivain s'ouvre une seule fois : un second `ouvrir` est refusé (`JOURNAL/ouvert`), sans toucher au verrou ni au
   fichier ouvert ;
 - une écriture avant `ouvrir` ou après `fermer`, et l'ouverture d'un écrivain fermé, sont refusées (`JOURNAL/ferme`) ;
-- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/illisible`) ferme l'écrivain et rend le verrou ;
+- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/nom`, `JOURNAL/illisible`) ferme l'écrivain et
+  rend le verrou ;
 - `fermer` est le seul appel admis de tout fil (nettoyage) ; il reste admis après une casse (§4).
 
 Aucun de ces refus n'écrit. Les trois méthodes publiques d'écriture portent la même garde que la casse de C-2 (§4) ; un
@@ -128,14 +130,18 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 ## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
 
 1. Un fichier porte le nom `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` : jour UTC des fenêtres qu'il contient, puis numéro de
-   segment `k`, 1 + le plus grand numéro de ce jour présent au dossier, 0 pour le premier fichier du jour (bascule :
-   point 2 ; segments de reprise : §7.2). L'ordre des noms, jour puis numéro, est l'ordre de la chaîne. Le numéro
-   s'écrit en décimal et se compare en entier : au-delà de 9 segments d'un jour, l'ordre des noms en texte (celui de
-   `ls`) n'est plus celui de la chaîne (« -10 » y précède « -2 ») ; un test couvre onze segments d'un même jour
-   (SHOGEN-S2BIS-SEGMENTS-10-1). Une seule exception au jour des fenêtres : après un redémarrage dont l'horloge est
-   en arrière du jour d'un fichier présent, le segment de reprise porte ce jour, et les fenêtres antérieures s'y
-   écrivent jusqu'à ce que l'horloge le rejoigne (§7.2). La grille divise l'heure (w divise 3 600), donc la journée :
-   une fenêtre n'est jamais à cheval sur deux jours.
+   segment k, en décimal sans zéro de tête (`0|[1-9][0-9]*`). Le numéro vaut 1 + le plus grand numéro de ce jour présent
+   au dossier, 0 pour le premier fichier du jour (bascule : point 2 ; segments de reprise : §7.2). L'ordre de la chaîne
+   est l'ordre (jour, k entier), non l'ordre des noms affiché par un listage. Au-delà de 9 segments d'un jour, l'ordre
+   des noms en texte (celui de `ls`) n'est plus celui de la chaîne (« -10 » y précède « -2 ») ; un test couvre onze
+   segments d'un même jour (SHOGEN-S2BIS-SEGMENTS-10-1). Lettre C-5 du FORMAT (diff CB-18q) : le numéro n'est jamais
+   complété de zéros (pas de numéro sur trois chiffres) ; tout outil (rétention, sommes) trie en entier ou lit le
+   fichier de sommes. À l'ouverture, l'écrivain refuse un nom qui commence par `<préfixe>-` et finit par `.jsonl` sans
+   suivre cette grammaire (`JOURNAL/nom`, §5) ; à la bascule, un tel nom est ignoré, et le redémarrage suivant le
+   refuse. Une seule exception au jour des fenêtres : après un redémarrage dont l'horloge est en arrière du jour d'un
+   fichier présent, le segment de reprise porte ce jour, et les fenêtres antérieures s'y écrivent jusqu'à ce que
+   l'horloge le rejoigne (§7.2). La grille divise l'heure (w divise 3 600), donc la journée : une fenêtre n'est jamais à
+   cheval sur deux jours.
 2. Le premier enregistrement de fenêtre d'un jour nouveau déclenche la bascule : l'écrivain ajoute `cloture` au fichier
    courant, appelle `fsync`, le ferme, inscrit sa ligne au fichier de sommes, puis crée le fichier du nouveau jour au
    numéro suivant de ce jour (point 1 : un fichier du jour déjà présent, vide par exemple, n'est jamais heurté ;
@@ -214,8 +220,15 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
    `arret`.
 6. Aucun enregistrement intègre dans tout le journal : refus nommé `JOURNAL/illisible` ; l'écrivain ne démarre pas et
    ne crée jamais une seconde chaîne dans le même dossier.
-7. Limite déclarée : la reprise ne contrôle pas le lien entre la première ligne d'un fichier et la dernière du fichier
-   précédent ; ce contrôle revient au lecteur du recalcul (RB-1) et au lecteur indépendant (RB-18).
+7. **Lecteurs** (lettre C-5 du FORMAT, diff CB-18q). Les fichiers du journal sont les fichiers du dossier dont le nom
+   est `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` au sens du §6.1, lus dans l'ordre (jour, k entier). Un nom qui commence par
+   `<préfixe>-` et finit par `.jsonl` sans satisfaire cette grammaire est un refus nommé ; un dossier sans aucun
+   fichier du journal est un refus nommé. L'écrivain applique la même grammaire à la reprise (`_fichiers`) : il refuse
+   de démarrer devant un nom non conforme (`JOURNAL/nom`, §6.1). La validité de la date au calendrier et l'égalité du
+   `jour` d'une `ouverture` ou d'une `cloture` au nom de son fichier restent de la validité (RB-3). La reprise de
+   l'écrivain ne juge pas le lien entre la première ligne d'un fichier et la dernière ligne intègre qui la précède
+   dans la chaîne (§7.1) : ce lien se juge ici, par le lecteur du recalcul (RB-1) et le lecteur indépendant (RB-18)
+   seuls.
 
 ## 8. Trous et sommes rattrapées (CB-2c, E-C-22, E-C-20)
 
