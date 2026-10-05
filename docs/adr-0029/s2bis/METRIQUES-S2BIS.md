@@ -1087,3 +1087,35 @@ Rejoués sur la base recalée :
   listés plus haut).
 
 Suite : 184 tests ; plancher du job : 184, égalité exigée (`--egal`).
+
+## CB-18v (2026-10-05) : `fetch-depth: 0` admis dans le seul job sim-bis (Q-T4-11, tranche 4 de SIM-BIS)
+
+Objet : l'adaptateur oracle_r1 de la tranche 4 de SIM-BIS (SB-14A) lit le harnais de f35a70c par `git archive`. Le
+job sim-bis-unittest demande donc l'historique complet, `fetch-depth: 0` sous le `with:` du checkout (Q-T4-11,
+adjugée). Le gabarit de K-03 réduisait ce `with:` à `persist-credentials: false` : sur la tête 98c8537, la série
+SIM-T4 (SB-9A à SB-14H) donnait 76 ok et 1 échec (K-03).
+
+Adjudication de l'orchestrateur : pour le seul job sim-bis-unittest, la ligne `fetch-depth: 0` (valeur exacte) peut
+suivre `persist-credentials: false` ; les jobs s2bis et S2 restent tels quels. Cas :
+- L-37 : la ligne, admise ;
+- L-38 : `fetch-depth: 1`, refusé ;
+- L-39 : la ligne dans le job s2bis, refusée ;
+- L-40 : une autre clé du `with:` après la ligne (`ref: main`), refusée ;
+- L-41 : la ligne avant `persist-credentials: false`, refusée (ordre du gabarit).
+
+Rouge : sous le gabarit de la tête, L-37 échoue ; avec la série SIM-T4, K-03 aussi.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 312 | 82 cas (5 de plus : L-37 à L-41) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 5 mutants, 5 tués, chacun
+par un seul cas :
+- ligne admise dans tous les jobs : L-39 ;
+- valeur quelconque : L-38 ;
+- ligne jamais admise : L-37 ;
+- lignes suivantes du `with:` admises : L-40 ;
+- ligne admise à toute place du job : L-41.
+
+Runner : 82 ok sur la tête, comme sur la tête suivie de la série SIM-T4. Suite s2bis : 184 tests, plancher 184
+inchangé.

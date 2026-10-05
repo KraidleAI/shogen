@@ -20,8 +20,9 @@ dans un nom plié ou dans un `with:`, checkout ou `runs-on` réels autres), par 
 L-33 (`env:` de premier niveau), L-34 (clé de job répétée) et A-03 (étapes imitées hors de `steps`) figent trois refus
 de l'analyseur. CC2-1 : les valeurs libres du gabarit sont des scalaires simples ; L-35 et L-36, un nom entre guillemets
 écrit sur plusieurs lignes qui avalerait des lignes du gabarit ; G-02, `timeout-minutes` entier ; G-03 et G-04, le
-nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du bloc, le gabarit seul. Sortie : 0 tout passe,
-1 un cas échoue, 3 erreur."""
+nom du job et celui de l'étape 3, guillemet fermé à la dernière ligne du bloc, le gabarit seul. CB-18v (Q-T4-11) : le
+job sim-bis admet `fetch-depth: 0` sous le `with:` du checkout, après `persist-credentials: false`, valeur exacte, lui
+seul ; L-37 à L-41. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -154,6 +155,7 @@ GABARIT = ("    name: " + LIBRE, "    " + re.escape(ETAPES[0]), "    timeout-min
            "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false",
            "      - name: " + LIBRE, "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: " + LIBRE,
            "        shell: bash", "        run: [|]")
+FETCH = "          fetch-depth: 0"   # CB-18v (Q-T4-11) : historique complet du job sim-bis, git archive de f35a70c
 
 
 def gabarit(texte, nom):
@@ -164,8 +166,12 @@ def gabarit(texte, nom):
     (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
     plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite. CC2-1 : les trois `name` sont des scalaires
     simples (premier caractère alphanumérique : ni guillemet, ni bloc, ni ancre, ni flux), `timeout-minutes` un entier ;
-    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit."""
+    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit. CB-18v (Q-T4-11) :
+    dans le seul job sim-bis-unittest, la ligne FETCH (`fetch-depth: 0`, valeur exacte) peut suivre
+    `persist-credentials: false` ; l'adaptateur oracle_r1 y extrait f35a70c par git archive."""
     b = job(texte, nom)
+    if nom == "sim-bis-unittest" and b[7:8] == [FETCH]:
+        del b[7]
     return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
         re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
 
@@ -181,11 +187,11 @@ def analyseur(texte, nom, appel):
 def cable(texte, nom, appel):
     """Câblage du job `nom`, contrôlé exactement ainsi, et rien d'autre : (1) `gabarit` : ses lignes brutes, à
     indentation exacte, sont dans l'ordre `name` (scalaire simple), `runs-on: ubuntu-24.04`, `timeout-minutes`
-    (entier), `steps`, le checkout épinglé et son `with:` réduit à `persist-credentials: false`, le runner (`name` en
-    scalaire simple, `shell: bash`, `run:` du runner), une étape `name` (scalaire simple), `shell: bash`, `run: |`, puis
-    seulement des lignes d'indentation 10 ; (2) `analyseur`, lecture de l'enregistreur de rôle : trois étapes, la
-    première non admise, la deuxième le runner seul, et la ligne `appel` une fois, dans un bloc `run:` admis sans autre
-    ligne que v.LIBRES."""
+    (entier), `steps`, le checkout épinglé et son `with:` réduit à `persist-credentials: false` (et `fetch-depth: 0`
+    dans le seul job sim-bis, CB-18v), le runner (`name` en scalaire simple, `shell: bash`, `run:` du runner), une
+    étape `name` (scalaire simple), `shell: bash`, `run: |`, puis seulement des lignes d'indentation 10 ;
+    (2) `analyseur`, lecture de l'enregistreur de rôle : trois étapes, la première non admise, la deuxième le runner
+    seul, et la ligne `appel` une fois, dans un bloc `run:` admis sans autre ligne que v.LIBRES."""
     return gabarit(texte, nom) and analyseur(texte, nom, appel)
 
 
@@ -275,6 +281,23 @@ for nom, lignes in (                                    # CC2-1 : guillemet ferm
         ("G-04 nom de l'étape 3", DEBUT + ['      - name: "suite'] + SUITE[1:4] + [L + LIGNE + '"'])):
     cas(nom + " entre guillemets, fermé à la dernière ligne du bloc : refusé par le gabarit (scalaire simple, CC2-1)",
         ["admis"] if gabarit(chr(10).join(lignes), "s2bis-unittest") else [], None)
+SIM = [x.replace("s2bis-unittest", "sim-bis-unittest") for x in DEBUT]        # CB-18v : job sim-bis (Q-T4-11)
+SIM_SUITE, FD = SUITE[:4] + [L + LIGNE.replace(" s2bis ", " scripts/sim-bis ")], "          fetch-depth: "
+APPEL_SIM = APPEL.replace(" s2bis ", " scripts/sim-bis ")
+for nom, lignes, attendu in (
+        ("L-37 job sim-bis, fetch-depth: 0 sous le with: du checkout (CB-18v)", SIM[:9] + [FD + "0"] + SIM[9:]
+         + SIM_SUITE, True),
+        ("L-38 job sim-bis, fetch-depth: 1 (valeur exacte, CB-18v)", SIM[:9] + [FD + "1"] + SIM[9:] + SIM_SUITE,
+         False),
+        ("L-39 job s2bis, fetch-depth: 0 (job sim-bis seul, CB-18v)", DEBUT[:9] + [FD + "0"] + DEBUT[9:] + SUITE,
+         False),
+        ("L-40 job sim-bis, autre clé du with: après fetch-depth: 0 (CB-18v)", SIM[:9] + [FD + "0", L + "ref: main"]
+         + SIM[9:] + SIM_SUITE, False),
+        ("L-41 job sim-bis, fetch-depth: 0 avant persist-credentials (ordre du gabarit, CB-18v)", SIM[:8]
+         + [FD + "0"] + SIM[8:] + SIM_SUITE, False)):
+    nom_job = lignes[1].strip(" :")                     # s2bis-unittest ou sim-bis-unittest
+    admis = cable(chr(10).join(lignes), nom_job, APPEL_SIM if nom_job == "sim-bis-unittest" else APPEL)
+    cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
 EXCLUES = DEBUT + SUITE[:1] + ["        if: false"] + SUITE[1:] + SUITE[:1] + ["        continue-on-error: true"]
 EXCLUES += SUITE[1:]
 for nom, texte, attendu in (                            # analyseur seul : ce que les contrôles d'avant voyaient déjà
