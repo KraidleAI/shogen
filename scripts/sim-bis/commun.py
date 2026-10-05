@@ -77,7 +77,8 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "regle": {"R": positif, "R_approche": positif, "alpha": (positif, positif),
                     "garde": {"unites": positif, "k_crit": positif, "runs": positif}, "c_etoile": (positif, positif),
                     "tolerances": [naturel], "source": texte,
-                    "questions": {f"Q-T3-{n}": question for n in (13, 14, 15)}}}
+                    "questions": {f"Q-T3-{n}": question for n in (13, 14, 15)}},
+          "variante": {"diviseur": positif, "sensibilite": positif, "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
