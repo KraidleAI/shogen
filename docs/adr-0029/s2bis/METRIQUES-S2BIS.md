@@ -386,3 +386,21 @@ valeur de la position t allant en (t + o) mod n. Contrat et vecteurs : `docs/adr
 Mutants (commande du job, runner puis `--plancher 125`, borne de 300 s, réseau isolé) : 18 tués sur 18 par leur test
 visé (0 vivant, 0 FATAL), dont « sens du décalage inversé » et « modulo autre que la longueur de la suite retenue ».
 Suite : 125 tests ; plancher du job : 125, égalité exigée (`--egal`).
+
+## RB-6b (2026-10-05) : lois de K et de S sous les rotations jointes par hôte
+
+Objet : `compter` (K par le compteur « au moins deux » sur masques, S par les paires d'unités), `resume` (C = #{r :
+K^(r) >= K}, K_crit = plus petit k tel que #{r : K^(r) >= k} <= seuil, moyenne exacte en `Fraction`), `lois` (R
+rotations, décalage commun à toutes les classes pour un même hôte, première unité jamais décalée, classes triées,
+refus nommés de toutes les entrées) ; R et seuil passés par l'appelant depuis `analyse.json`.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/rotation.py` | 107 | 8 (`tests/test_rotation.py`, 133 lignes ; 5 de plus : comptage naïf position par position sur 24 tirages de deux classes jointes, R = 9 999 jusqu'à la dernière rotation, résumé fait à la main aux bornes du seuil 99, refus nommés, mêmes octets sous cinq graines de hachage) |
+
+Mutants (commande du job, runner puis `--plancher 130`, borne de 300 s, réseau isolé) : 17 tués sur 17 par leur test
+visé au second passage (0 vivant, 0 FATAL), dont « classe dans l'entrée du hachage », « première unité décalée »,
+« une rotation de moins » et « > au lieu de >= dans C ». Premier passage invalide, arrêté : M-6b-01 a atteint la
+borne de 300 s (FATAL), le diff de `unittest` sur deux listes de 9 999 valeurs ne se terminant pas ; l'assertion compare
+désormais des booléens, puis la campagne a été relancée en entier. Coût mesuré : `ROTATION-S2BIS.md` §6. Suite :
+130 tests ; plancher du job : 130, égalité exigée (`--egal`).

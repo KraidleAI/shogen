@@ -5,10 +5,11 @@
   (`docs/adr-0029/g0-collecte/`), exigences E-R-16 à E-R-18 de la PROPOSITION, réponse de l'AVIS à la question Q-R-02
   (encodage de l'entrée de SHA-256, sens du décalage, vecteurs au paquet) ; sous-lot RB-6.
 - **Usage** : code de référence `s2bis/shogen_s2bis/recalc/rotation.py`. Ce contrat est celui de l'oracle croisé du lot
-  SIM-BIS (G0 `docs/adr-0029/g0-sim/`, exigence E-S-51, sous-lot SB-13) : o(r, u) et K^(r) égaux sur les vecteurs du §4
+  SIM-BIS (G0 `docs/adr-0029/g0-sim/`, exigence E-S-51, sous-lot SB-13) : o(r, u) et K^(r) égaux sur les vecteurs du §5
   et sur des séries synthétiques.
 - **Statut** : texte tenu à jour avec le code ; scellé au paquet de S2-bis avec le commit du recalcul (les vecteurs y
-  entrent, AVIS Q-R-02).
+  entrent, AVIS Q-R-02). La règle elle-même (garde d'information, valeur par strate, séquence d'ETH) relève du sous-lot
+  RB-7 ; ce module ne rend aucune valeur de la règle.
 
 ## 1. Entrées
 
@@ -23,24 +24,52 @@
 5. **r** : entier de 1 à 9 999, écrit en décimal sans zéro de tête (AVIS Q-R-02, complément (2)).
 6. **Unité u** : nom d'hôte de configuration (E-R-15), chaîne non vide de caractères ASCII imprimables (0x20 à 0x7E),
    sans « : », le séparateur de l'entrée (AVIS Q-R-02, complément (3)).
+7. **Séries** : `classes` = {classe : {unité : masque}} ; le masque d'une unité est un entier, 0 ≤ masque < 2^n, dont le
+   bit t vaut D(u, t), l'indicatrice d'écart consolidé au quorum de la fenêtre de rang t (§2.2 de l'ADR ; construite aux
+   sous-lots RB-3 à RB-5).
+8. **Première unité** : `premiere`, le premier hôte du pool BTC D1-bis de la strate (ordre des points de code des noms,
+   « ordre alphabétique » de l.200), ou None. Elle n'est décalée dans aucune classe ; si elle manque à une classe, toutes
+   les unités de cette classe sont décalées (l.200).
+9. **R et seuil** : R de 1 à 9 999 et seuil entier ≥ 0, pris du bloc `rotations` de `s2bis/config/analyse.json` :
+   R = 9 999 et seuil = 99 au paquet ((99 + 1)/(9 999 + 1) = 0,01, l.202).
 
 ## 2. Décalages
 
 1. **o(r, u)** : entier big-endian des 32 octets de SHA-256 appliqué aux octets UTF-8 de la chaîne ASCII
    `<graine>:<strate>:<r>:<u>`, réduit modulo n en arithmétique exacte. La classe n'entre jamais dans l'entrée :
    toutes les séries d'un même hôte sont décalées du même pas (rotations jointes par hôte, l.200). Un décalage nul est
-   admis.
-2. **Sens** : la valeur de la position t va en (t + o) mod n, soit D′(t) = D((t − o) mod n). Sur un masque de n bits
-   (bit t = valeur de la position t), le masque décalé vaut ((m << o) | (m >> (n − o))) & (2^n − 1) : fonction
-   `tourner(m, o, n)`.
+   admis. Fonction `decalage(graine, strate, r, u, n)`.
+2. **Sens** : la valeur de la position t va en (t + o) mod n, soit D′(t) = D((t − o) mod n). Sur un masque de n bits,
+   le masque décalé vaut ((m << o) | (m >> (n − o))) & (2^n − 1) : fonction `tourner(m, o, n)`.
 
-## 3. Refus nommés de `decalage(graine, strate, r, u, n)`
+## 3. Lois de K et de S : `lois(graine, strate, n, classes, premiere, R, seuil)`
+
+Pour chaque classe, m_t = Σ_u D(u, t) sur les unités de la classe :
+
+1. **K** = #{t : m_t ≥ 2} (fenêtres à au moins deux écarts, l.120) ; **S** = Σ_t C(m_t, 2) (paires d'unités en écart dans
+   une même fenêtre, l.212), calculée comme la somme, sur les paires d'unités, des fenêtres où les deux sont en écart.
+2. Pour r = 1 … R, les séries décalées de o(r, u) (§2) donnent K^(r) et S^(r) ; `K_r[r − 1]` = K^(r), `S_r[r − 1]` =
+   S^(r).
+3. **C** = #{r : K^(r) ≥ K} ; **K_crit** = le plus petit entier k ≥ 0 tel que #{r : K^(r) ≥ k} ≤ seuil, soit la valeur
+   de rang seuil + 1 de la loi rangée en ordre décroissant, plus un (0 si seuil ≥ R) ; **K_moyen** = Σ_r K^(r)/R en
+   rationnel exact (`fractions.Fraction`), le K̄_rot de l.200.
+4. **C_S**, **S_crit** et **S_moyen** de même sur la loi de S, avec les mêmes r (l.212). S_crit suit la définition de
+   K_crit, l'ADR ne la donnant pas.
+5. Sortie : {classe : {"K", "C", "K_crit", "K_moyen", "K_r", "S", "C_S", "S_crit", "S_moyen", "S_r"}}, classes dans
+   l'ordre trié de leurs noms. La décision C ≤ seuil et ses gardes sont au sous-lot RB-7.
+
+Aides publiques : `compter(masques)` rend (K, S) d'une liste de masques ; `resume(x, loi, seuil)` rend (C, x_crit,
+moyenne).
+
+## 4. Refus nommés
 
 Toute entrée hors du §1 lève `RefusRotation`, avant tout calcul : `ROTATION/graine` (autre chose que 64 hexadécimaux
 minuscules en chaîne), `ROTATION/strate`, `ROTATION/n` (entier n ≥ 1, booléen refusé), `ROTATION/r` (entier de 1 à
-9 999, booléen et chaîne refusés), `ROTATION/unite`.
+9 999, booléen et chaîne refusés), `ROTATION/unite` (nom d'unité ou première unité), `ROTATION/R` (R de 1 à 9 999 ou
+seuil négatif), `ROTATION/classes` (pas un dictionnaire de dictionnaires, ou nom de classe non textuel),
+`ROTATION/masque` (masque négatif, booléen, ou au-delà de n bits).
 
-## 4. Vecteurs, calculés hors du code
+## 5. Vecteurs, calculés hors du code
 
 Graine de test : `6fce4df75bac7db6ff01817b407f6331e49ec2ebf31f02e6672d3ab8a3bc9688`, sha256 de la chaîne ASCII
 `SHOGEN-RB6-VECTEURS`. Pour chaque ligne : `printf '%s' "<graine>:<strate>:<r>:<u>" | sha256sum`, puis l'empreinte,
@@ -57,4 +86,27 @@ Python dans ce calcul (journal G1 du sous-lot RB-6a ; script `vecteurs_rb6.sh`).
 | calme | 1 | api.binance.com | 54 720 | `d7916cde6fb849bd1c4b44da609ecc6dc266f916228d974ec2d4c9354c235a07` | 52 807 |
 
 La quatrième ligne donne o = 0 et la cinquième o = n − 1 (AVIS Q-R-02) ; la sixième reprend l'entrée de la première
-avec n′ = n/2.
+avec n′ = n/2. Les lois K^(r) et S^(r) sont contrôlées contre un comptage position par position écrit dans les tests
+(`tests/test_rotation.py`, o recalculé par le test), sur des séries tirées au hasard et pour R = 9 999.
+
+## 6. Coût mesuré
+
+Masques synthétiques de densité 0,005 par fenêtre et par unité, R = 9 999, hôte de session partagé (charge moyenne
+d'environ 3 sur 4 cœurs), journal G1 du sous-lot RB-6b, script hors dépôt `cout_rb6.py` :
+
+| interpréteur | calme (n = 109 440), une classe de 10 unités | calme, quatre classes (10, 8, 6, 6) | stress (n = 43 776), une classe | stress, quatre classes |
+|---|---|---|---|---|
+| Python 3.12.3 | 7,5 s | 17,2 s | 2,5 s | 6,1 s |
+| Python 3.10.20 | 6,7 s | 15,7 s | 2,2 s | 5,7 s |
+
+Les deux interpréteurs rendent les mêmes K, C et K_crit ; la loi de BTC est la même, calculée seule ou jointe aux trois
+autres classes. Les deux strates et les quatre classes font environ 23 s ; les huit sensibilités de l.212, si chacune
+refait toutes les rotations, multiplient ce coût par au plus neuf : quelques minutes pour le rendu, bibliothèque
+standard seule.
+
+## 7. Limites
+
+1. Le module ne reçoit que la longueur n de la suite retenue : la confusion entre n_s et n′_s ne peut s'y écrire ; elle
+   se contrôle là où les deux valeurs coexistent (sous-lot RB-7).
+2. La construction des masques (suite comprimée, n_s premières fenêtres évaluables, écarts consolidés) relève des
+   sous-lots RB-3 à RB-5 ; ce contrat suppose des masques déjà construits.
