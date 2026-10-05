@@ -7,6 +7,7 @@ import unittest
 from fractions import Fraction
 
 import aleas
+import calendrier
 import calibration
 import commun
 import sources
@@ -440,3 +441,110 @@ class TestAlternatives(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             sources.Replication(PRM, EP, f, "T-E", 0, m, n).etat()
         self.assertEqual(c.exception.code, "SOURCES/faible")
+
+
+class TestCasG2(unittest.TestCase):
+    """C-1 de la G2 de la tranche 2, (a) à (j) : un cas écrit à la main par mutant resté vivant (R-01 à R-09, R-19,
+    R-22, R-25 du réviseur), vert sur le code et rouge sous son mutant ; repris des prototypes du réviseur."""
+
+    def test_faibles_independantes(self):
+        """(a) Deux unités faibles, p = 1/2, L = 1 : P(les deux) = 1/4 à 5 SE sur 60 réplications de 400 fenêtres (un
+        flux commun donnerait 1/2). Mutation R-01 : un seul flux pour toutes les unités faibles."""
+        spec, x = {"hotes": ["gemini", "kraken"], "p": Fraction(1, 2), "L": 1, "type": "panne"}, []
+        for i in range(60):
+            e = sources.faibles(PRM, "T-C1A", i, spec, 400)
+            x.append(part(e["gemini"] & e["kraken"], 0, 400))
+        self.assertTrue(dans_5_se(x, Fraction(1, 4)))
+
+    def test_ecarts_independants_par_classe(self):
+        """(b) EP d'essai (binance calme : 2 830 cellules d'écart pour 372 de panne, écart propre p = 2 458/24 585),
+        f = 1, τ = 0 : F(binance, BTC) ≠ F(binance, ETH) et P(les deux) = p² à 5 SE sur 60 réplications de 2 000
+        fenêtres. Mutation R-02 : composantes d'écart de toutes les classes sur l'emplacement 0."""
+        ep = dict(EP)
+        ep["calme", "binance", "ecart"] = dict(EP["calme", "binance", "ecart"], cellules=2830)
+        m, x = {"calme": (1 << 2000) - 1, "stress": 0}, []
+        for i in range(60):
+            r = sources.Replication(PRM, ep, fond(), "T-C1B", i, m, 2000)
+            a, b = r.ecarts("binance", 0), r.ecarts("binance", 1)
+            self.assertNotEqual(a, b)
+            x.append(part(a & b, 0, 2000))
+        self.assertTrue(dans_5_se(x, Fraction(2458, 24585) * Fraction(2458, 24585)))
+
+    def test_sens_des_tendances_et_de_la_commune(self):
+        """(c) Sens tirés à la main, croissant si u < 1/2. « tendances » : un tirage par hôte dans l'ordre du pool (0,2
+        et 0,7 alternés) ; « commune » : un seul tirage (0,7 : décroissant) pour les dix hôtes, les douze valeurs
+        suivantes restant inemployées. Mutations R-03 (commune : un sens par hôte), R-04 (tendances : un seul sens)."""
+        lo, hi, tous = Fraction(1, 10), Fraction(19, 10), [h for h, _f in PRM["calibration"]["unites"]]
+        d = sources.derives(PRM, {"genres": ["tendances"], "duree": 100}, suite(*[0.2, 0.7] * 5))["specs"]
+        self.assertEqual([d[h] for h in tous], [("lineaire", lo, hi, 100), ("lineaire", hi, lo, 100)] * 5)
+        reste = iter([0.7] + [0.2] * 12)
+        d = sources.derives(PRM, {"genres": ["commune"], "duree": 100}, reste.__next__)["specs"]
+        self.assertEqual(([d[h] for h in tous], len(list(reste))), ([("lineaire", hi, lo, 100)] * 10, 12))
+
+    def test_regime_par_strate(self):
+        """(d) Z(binance, calme) et Z(binance, stress) sur des flux distincts : φ = 1/5 en calme, 1/20 en stress (κ = 3,
+        τ_D = 20) ; 150 réplications de 2 000 fenêtres : parts à 5 SE de 1/5 et de 1/20 ; à φ égal, les deux masques
+        diffèrent. Mutation R-05 : régime partagé entre strates (clé de cache sans la strate)."""
+        m = {"calme": (1 << 2000) - 1, "stress": (1 << 2000) - 1}
+        reg = {"calme": (Fraction(1, 5), Fraction(3), 20), "stress": (Fraction(1, 20), Fraction(3), 20)}
+        z = [sources.Replication(PRM, EP, dict(fond(), regime=reg), "T-C1D", i, m, 2000) for i in range(150)]
+        self.assertTrue(dans_5_se([part(r.regime("binance", "calme"), 0, 2000) for r in z], Fraction(1, 5)))
+        self.assertTrue(dans_5_se([part(r.regime("binance", "stress"), 0, 2000) for r in z], Fraction(1, 20)))
+        r = sources.Replication(PRM, EP, fond(regime=reg["calme"]), "T-C1D", 0, m, 2000)
+        self.assertNotEqual(r.regime("binance", "calme"), r.regime("binance", "stress"))
+
+    def test_paire_imposant_un_candidat(self):
+        """(e) Paire parmi les 7 hôtes AS13335 imposant kraken, qui en est membre : kraken (v = 0), puis 0,84 parmi les
+        six autres (seuils j/6 : rang 5, okx) ; parmi les sept (seuils j/7), 0,84 redonnerait kraken. Mutation R-06 :
+        imposé non retiré des candidats."""
+        self.assertEqual(sources.touches(PRM, suite(0.0, 0.84), ("parmi", AS, 2, ["kraken"])), ["kraken", "okx"])
+
+    def test_depart_stationnaire_epingle(self):
+        """(f) Loi 1×1 3×1 (moyenne 2), q = 1/2 : départ en cours si u < μq/(μq + 1) = 1/2 ; u = 0,49 : en cours (reste
+        1 à u = 0,1, pause 1, durée 1) ; la moyenne 7/4 de la loi résiduelle donnerait le seuil 7/15 < 0,49 ; u = 0,5
+        hors épisode (test_alterner_pas_a_pas). Mutation R-07 : seuil calculé sur la moyenne de la loi résiduelle."""
+        loi = sources.Empirique([(1, 1), (3, 1)])
+        self.assertEqual(sources.alterner(suite(0.49, 0.1, 0.1, 0.1), loi, Fraction(1, 2), A, 3), [(0, 1), (2, 3)])
+
+    def test_panne_initiale_bornee_par_l_horizon(self):
+        """(g) Horizon de 1 000 fenêtres, sous les 4 320 de la panne initiale, f = 0 : les pannes de l'hôte tiré valent
+        exactement (1 << 1 000) − 1. Mutation R-08 : panne initiale non bornée par l'horizon."""
+        f = dict(fond("0"), derive={"genres": ["initiale"], "duree": 1440})
+        r = sources.Replication(PRM, EP, f, "T-C1G", 0, {"calme": (1 << 1000) - 1, "stress": 0}, 1000)
+        self.assertEqual(r.pannes(r.derives()["initiale"]), (1 << 1000) - 1)
+
+    def test_transitoire_exclusif(self):
+        """(h) Le transitoire est un multiplicateur : avec les tendances, la tendance commune ou les sauts,
+        SOURCES/derive. Mutation R-09 : exclusivité contrôlée sur les trois premiers genres seulement."""
+        for g in (["transitoire", "tendances"], ["commune", "transitoire"], ["sauts", "transitoire"]):
+            with self.assertRaises(commun.Refus) as c:
+                sources.derives(PRM, {"genres": g, "duree": 1440}, suite(*[0.1] * 20))
+            self.assertEqual(c.exception.code, "SOURCES/derive", g)
+
+    def test_lois_ecart_et_regroupee(self):
+        """(i) EP d'essai à histogrammes distinctifs, f = 1, τ = 0, 10 réplications de 4 000 fenêtres ; épisodes entiers
+        (ni à 0 ni à l'horizon). F suit la loi « ecart » : binance calme, 2 830 cellules d'écart, histogramme 4×100 :
+        longueur 4 seule. H en stress suit la loi regroupée (1×662 2×11) : histogramme « panne » de binance calme mis à
+        7×100, strate stress seule : longueurs 1 et 2 seules. Mutations R-19 (F tiré avec la loi « panne »), R-22 (H de
+        la strate tirée avec la loi du calme)."""
+        ep, n, f, h = dict(EP), 4000, set(), set()
+        ep["calme", "binance", "ecart"] = dict(EP["calme", "binance", "ecart"], cellules=2830, histogramme=((4, 100),))
+        ep["calme", "binance", "panne"] = dict(EP["calme", "binance", "panne"], histogramme=((7, 100),))
+        for i in range(10):
+            r = sources.Replication(PRM, ep, fond(), "T-C1I", i, {"calme": (1 << n) - 1, "stress": 0}, n)
+            f |= {b - a for a, b in calendrier.segments(r.ecarts("binance", 0)) if 0 < a and b < n}
+            r = sources.Replication(PRM, ep, fond(), "T-C1I", i, {"calme": 0, "stress": (1 << n) - 1}, n)
+            h |= {b - a for a, b in calendrier.segments(r.pannes("binance")) if 0 < a and b < n}
+        self.assertEqual(f, {4})
+        self.assertTrue(h and h <= {1, 2}, h)
+
+    def test_ecart_faible_hors_panne(self):
+        """(j) Fond f = 1, incidents sur gemini (ρ = 144 par jour, D = 5, π = 1), unité faible gemini de type « ecart »
+        (p = 1/2, L = 1) : le masque faible recouvre la panne, l'écart de gemini en BTC jamais. Mutation R-25 : écart
+        faible ajouté hors de la clause « hors panne »."""
+        f = dict(fond(), faibles={"hotes": ["gemini"], "p": Fraction(1, 2), "L": 1, "type": "ecart"},
+                 incidents=inc(144, 5, ("chacun", ["gemini"], Fraction(1))))
+        e = sources.Replication(PRM, EP, f, "T-C1J", 0, {"calme": (1 << 4000) - 1, "stress": 0}, 4000).etat()
+        g = sources.faibles(PRM, "T-C1J", 0, f["faibles"], 4000)["gemini"]
+        self.assertNotEqual(g & e["gemini", "BTC"][0], 0)
+        self.assertEqual(e["gemini", "BTC"][0] & e["gemini", "BTC"][1], 0)
