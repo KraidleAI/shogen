@@ -1030,3 +1030,23 @@ Sur l'état final (CB-18t) :
   ANALYSEUR-RESIDUS-1, sans code). La commande du job exécuterait les étapes du leurre lui-même.
 
 Suite : 183 tests ; plancher du job : 183.
+
+## CB-18t (2026-10-05) : incise O-1 au §7.4 et limite O-2 au §5 du FORMAT
+
+Objet (adjudication de l'orchestrateur sur les observations O-1 et O-2) :
+- au §7.4, l'incise « (un objet nu rend déjà la ligne non intègre, §7.1 d) » ;
+- la phrase de l'avis l.78, mot pour mot, qui remplace sa paraphrase de CB-18p ;
+- « Les lecteurs appliquent le §7.1 avant le §7.4. » ;
+- au §5, une ligne de limite : un dossier par journal ; un préfixe qui en prolonge un autre dans le même dossier fait
+  refuser le plus court (`JOURNAL/nom`). L'item SHOGEN-S2BIS-PREFIXE-NOM-1 est formé par l'orchestrateur.
+
+Aucune autre lettre ne change : la comparaison mot à mot ne donne que ces ajouts. Rouge : sur le FORMAT d'avant, les
+trois textes attendus manquent.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 116 | 4 (1 de plus : §7.4, incise, phrase de l'avis l.78 et ordre de lecture) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (incise retirée,
+phrase de l'avis non mot pour mot, ordre de lecture retiré, plancher non relevé). Suite : 184 tests ; plancher du job :
+184, égalité exigée (`--egal`).

@@ -87,6 +87,18 @@ class Format(unittest.TestCase):
         self.assertEqual([integres(o, {"type": "reprise", "ws": WS, "suivante": WS, "queue": [{"fichier": "f"}]}),
                           integres(o, ("[1]" + NL).encode())], [2, 1])                                     # (d), (b)
 
+    def test_paragraphe_7_4_objet_nu_et_reprises_declarees(self):    # contre-contrôle de CB-18, O-1 (CB-18t)
+        """§7.4 (point 4 du §7) : l'incise d'O-1 sur l'objet nu, la phrase de l'avis l.78 sur les reprises déclarées,
+        mot pour mot, et l'ordre de lecture, §7.1 avant §7.4. Valeurs prises au texte de l'adjudication et de l'avis."""
+        _puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        point4 = sections["7"].split(" 4. `reprise` porte")[1].split(" 5. ")[0]
+        attendus = ("un objet nu (un objet nu rend déjà la ligne non intègre, §7.1 d)",
+                    "Une `reprise` au lien rompu ou à déclaration fausse est une rupture **non déclarée** ; sa "
+                    "déclaration n'est pas lue ; toutes les queues en attente sont rendues avec elle. Ne comptent "
+                    "comme reprises déclarées que les `reprise` intègres, au lien juste, à déclaration exacte.",
+                    "Les lecteurs appliquent le §7.1 avant le §7.4.")
+        self.assertEqual([x in point4 for x in attendus], [True] * 3)
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

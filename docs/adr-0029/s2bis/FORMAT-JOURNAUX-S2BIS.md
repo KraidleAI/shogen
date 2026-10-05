@@ -28,7 +28,8 @@
   banc de concordance des lecteurs du recalcul, adjugé par l'orchestrateur le 2026-10-05) : le diff CB-18n écrit C-4
   (§2, §8.3) ; le diff CB-18o, C-1 et C-2 (§7.1 : définition unique d'« intègre », sans limite déclarée ; l'item
   proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
-  §6.1, §7.7).
+  §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
+  et écrit la limite d'O-2 (§5).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -127,6 +128,9 @@ mécanique :
 Aucun de ces refus n'écrit. Les trois méthodes publiques d'écriture portent la même garde que la casse de C-2 (§4) ; un
 test contrôle que toute méthode publique de l'écrivain la porte, `fermer` excepté.
 
+Limite (O-2 du contre-contrôle de CB-18, item SHOGEN-S2BIS-PREFIXE-NOM-1) : un dossier par journal ; un préfixe qui en
+prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom`, §6.1).
+
 ## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
 
 1. Un fichier porte le nom `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` : jour UTC des fenêtres qu'il contient, puis numéro de
@@ -196,18 +200,19 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 4. `reprise` porte `ws` (fenêtre de l'horloge au redémarrage), `suivante` (première fenêtre ni close ni déclarée en
    trou, lue dans l'état repris) et `queue` : liste de `{fichier, position, octets, sha256}` (octet de début de la
    queue, longueur, empreinte de ses octets), ou null. Un `fsync` suit son écriture. La chaîne reprend au dernier
-   enregistrement intègre : le `prec` de la `reprise` est l'empreinte de sa ligne. **Déclaration exacte** (lettre C-3
-   du FORMAT, diff CB-18p) : `queue` est une liste non vide, dans l'ordre croissant (jour, k) des fichiers (§6.1), ou
-   null sans queue ; elle est comparée sous forme canonique. L'écrivain l'écrit dans cet ordre : il relit les fichiers
-   du plus récent au plus ancien (point 1) et range chaque queue trouvée devant les précédentes ; un test de deux
-   pannes réelles, dont la seconde coupe la `reprise` d'un segment neuf, fixe cet ordre (risque R-1 de l'avis). Une
-   liste vide, un objet nu, un autre ordre ou un booléen pour un entier font une déclaration fausse. À toute rupture
-   (lien rompu, déclaration fausse, queue non déclarée), aucune queue en attente n'est réputée déclarée : toutes sont
-   rendues avec la rupture. Ne comptent comme reprises déclarées que les `reprise` intègres, au lien juste, à
-   déclaration exacte ; une `reprise` au lien rompu ou à déclaration fausse est une rupture non déclarée, et sa
-   déclaration n'est pas lue. Ce point classe les ruptures ; la portée d'une rupture (quelles fenêtres deviennent
-   D-1 « intégrité » autour d'elle) revient à la politique de rupture du paquet (RB-3,
-   SHOGEN-S2BIS-RUPTURE-PORTEE-1). Le lien que juge ce point est celui du §7.7 : seuls les lecteurs le jugent.
+   enregistrement intègre : le `prec` de la `reprise` est l'empreinte de sa ligne. **Déclaration exacte** (lettre C-3 du
+   FORMAT, diff CB-18p) : `queue` est une liste non vide, dans l'ordre croissant (jour, k) des fichiers (§6.1), ou null
+   sans queue ; elle est comparée sous forme canonique. L'écrivain l'écrit dans cet ordre : il relit les fichiers du
+   plus récent au plus ancien (point 1) et range chaque queue trouvée devant les précédentes ; un test de deux pannes
+   réelles, dont la seconde coupe la `reprise` d'un segment neuf, fixe cet ordre (risque R-1 de l'avis). Une liste vide,
+   un objet nu (un objet nu rend déjà la ligne non intègre, §7.1 d), un autre ordre ou un booléen pour un entier font
+   une déclaration fausse. À toute rupture (lien rompu, déclaration fausse, queue non déclarée), aucune queue en attente
+   n'est réputée déclarée : toutes sont rendues avec la rupture. Une `reprise` au lien rompu ou à déclaration fausse est
+   une rupture **non déclarée** ; sa déclaration n'est pas lue ; toutes les queues en attente sont rendues avec elle. Ne
+   comptent comme reprises déclarées que les `reprise` intègres, au lien juste, à déclaration exacte. Les lecteurs
+   appliquent le §7.1 avant le §7.4. Ce point classe les ruptures ; la portée d'une rupture (quelles fenêtres deviennent
+   D-1 « intégrité » autour d'elle) revient à la politique de rupture du paquet (RB-3, SHOGEN-S2BIS-RUPTURE-PORTEE-1).
+   Le lien que juge ce point est celui du §7.7 : seuls les lecteurs le jugent.
 5. Après une reprise, un enregistrement de fenêtre exige ws ≥ max(`suivante`, dernière fenêtre écrite + w, fenêtre
    du redémarrage + w) (CB-2d, C-1). La **dernière fenêtre écrite** est le `ws` du dernier enregistrement de fenêtre
    (§3.2) dans l'ordre de la chaîne ; si le fichier repris n'en contient aucun (coupure entre une `ouverture` ou une
