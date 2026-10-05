@@ -2,6 +2,8 @@
 calculés hors du code (`sha256sum`, puis `bc` en base 16, journal de la tranche 3 « vecteurs-t-rot-1.txt »), séries,
 listes de K^(r) et décisions écrites à la main ; chaque test nomme les mutations qui le rougissent."""
 import unittest
+from fractions import Fraction
+from unittest import mock
 
 import aleas
 import commun
@@ -166,3 +168,77 @@ class TestDecision(unittest.TestCase):
         self.assertEqual((out["S"], out["C_S"], out["K"], out["runs"], out["unites"]), (2, 0, 2, 2, 2))
         self.assertEqual(regle.premiere(["kraken", "binance", "okx"]), "binance")
         self.assertIsNone(regle.premiere([]))
+
+
+HOTES = ["binance", "bitfinex", "bitstamp", "chainlink", "coinbase", "coingecko"]
+
+
+def instance(i: int) -> tuple:
+    """Instance d'essai i de T-REG-2 (flux « essai » de la cellule T-REG-2) : 3 à 5 unités, 120 à 239 fenêtres, écarts
+    indépendants de part 1 à 11 %, et, une fois sur trois, deux incidents communs de 3 fenêtres sur 2 ou 3 unités."""
+    u = aleas.flux(A, "T-REG-2", i, "essai", 0)
+    n, nu, p = 120 + int(120 * u()), 3 + int(3 * u()), 0.01 + 0.1 * u()
+    series = {h: sum(1 << t for t in range(n) if u() < p) for h in HOTES[:nu]}
+    if u() < 1 / 3:
+        for _j in range(2):
+            t0, k = int((n - 3) * u()), 2 + int(2 * u())
+            for h in HOTES[:k]:
+                series[h] |= 7 << t0
+    return series, n, aleas.graine_regle(A, "T-REG-2", i)
+
+
+class TestModeComplet(unittest.TestCase):
+    def test_mode_complet(self):
+        """Mode à R complet (E-S-29), à la main : R = 9 (α = 1/2, seuil 4), K^(r) = 0, 1, 1, 2, 2, 3, 3, 3, 5 : #{≥ 1} =
+        8, #{≥ 2} = 7, #{≥ 3} = 4 ≤ 4 (à la borne) → K_crit = 3 ; moyenne 20/9 ; K = 3 : C = 4 = seuil, REJETTE ; K = 2
+        : C = 7, NE REJETTE PAS ; liste de 8 : REGLE/rotations. Mutations M-8A-01 (« ≥ » dans la recherche de K_crit),
+        M-8A-02 (moyenne sur R + 1)."""
+        prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2]))
+        liste = ks([0, 1, 1, 2, 2, 3, 3, 3, 5])
+        out = regle.complet(3, 2, 2, True, liste, 9, prm)
+        self.assertEqual((out["valeur"], out["C"], out["C1"], out["K_crit"], out["moyenne"]),
+                         ("REJETTE", 4, 8, 3, Fraction(20, 9)))
+        self.assertEqual(regle.complet(2, 2, 2, True, liste, 9, prm)["valeur"], "NE REJETTE PAS")
+        with self.assertRaises(commun.Refus) as c:
+            regle.complet(3, 2, 2, True, liste[:8], 9, prm)
+        self.assertEqual(c.exception.code, "REGLE/rotations")
+
+    def test_arret_anticipe_t_reg_2(self):
+        """T-REG-2, oracle exact (E-S-29) : 200 instances (R = 999, seuil 9), valeur et causes de l'arrêt anticipé
+        égales à celles du mode à R complet, et cause k_crit ⇔ K_crit < 2 ; les instances couvrent REJETTE, NE REJETTE
+        PAS et NON ÉVALUABLE, dont des arrêts avant R et la cause k_crit. oracle() rend le résultat anticipé et refuse
+        un écart (REGLE/oracle ; désaccord de causes seul forcé par mock.patch.object sur complet). Mutations M-REG-6
+        (arrêt à C ≥ seuil), M-REG-7 (C1 non suivi), M-8A-03 (oracle sans comparaison des causes)."""
+        vus = set()
+        for i in range(200):
+            series, n, graine = instance(i)
+            a, f = regle.deux_modes(series, "binance", graine, "calme", n, n, PRM, 999)
+            self.assertEqual((a["valeur"], a["causes"]), (f["valeur"], f["causes"]), i)
+            self.assertEqual("k_crit" in f["causes"], f["K_crit"] < 2, i)
+            self.assertEqual(regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999), a)
+            vus |= {a["valeur"], "arrêt" if a["r"] < 999 else "complet"} | set(a["causes"])
+        self.assertLessEqual({"REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE", "arrêt", "complet", "k_crit"}, vus)
+        series, n, graine = instance(0)
+        vrai = regle.complet
+        with mock.patch.object(regle, "complet", lambda *x: dict(vrai(*x), causes=["k_crit"])):
+            with self.assertRaises(commun.Refus) as c:
+                regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999)
+        self.assertEqual(c.exception.code, "REGLE/oracle")
+
+    def test_sequence_et_f3_t_reg_3(self):
+        """T-REG-3 (E-S-30, E-S-31 ; ADR-0029 l.204) : ETH (F2) testé seulement si BTC REJETTE dans la strate, sinon
+        « NON TESTÉ (séquence) », son test sans condition gardé en diagnostic ; rejet familial (au moins un rejet, BTC
+        puis ETH) ; USDC et USDT (F3) : valeur et causes du moteur, étiquette « exploratoire, hors décision », aucune
+        valeur de registre. Mutations M-REG-8 (ETH toujours testé), M-8A-04 (F3 porté en registre)."""
+        rj, nr = {"valeur": "REJETTE", "causes": []}, {"valeur": "NE REJETTE PAS", "causes": []}
+        ne = {"valeur": "NON ÉVALUABLE", "causes": ["runs"]}
+        s = regle.strate({"BTC": rj, "ETH": rj, "USDC": ne, "USDT": nr})
+        self.assertEqual((s["ETH"]["valeur"], s["ETH"]["sans_condition"], s["familial"]), ("REJETTE", "REJETTE", True))
+        self.assertEqual(s["USDC"], {"famille": "F3", "valeur": "NON ÉVALUABLE", "causes": ["runs"], "registre": None,
+                                     "etiquette": "exploratoire, hors décision"})
+        for btc in (nr, ne):
+            s = regle.strate({"BTC": btc, "ETH": rj})
+            e = s["ETH"]
+            self.assertEqual((s["BTC"]["famille"], e["famille"], e["valeur"], e["sans_condition"], s["familial"]),
+                             ("F1", "F2", "NON TESTÉ (séquence)", "REJETTE", False))
+        self.assertEqual(regle.strate({"BTC": rj, "ETH": nr})["familial"], True)

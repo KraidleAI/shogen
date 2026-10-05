@@ -125,9 +125,13 @@ def decider(K: int, runs: int, unites: int, suffisant: bool, ks, R: int, prm: di
             cs += sr >= S
         if c > s_ and c1 > s_ and (S is None or cs > s_):
             break
+    return dict(_valeur(unites, c1, runs, suffisant, c, g, s_), C=c, C1=c1, C_S=None if S is None else cs, r=r)
+
+
+def _valeur(unites: int, c1: int, runs: int, suffisant: bool, c: int, g: dict, s_: int) -> dict:
+    """Garde (causes de NON ÉVALUABLE, non exclusives, dans l'ordre de CAUSES) et valeur (ADR-0029 l.203)."""
     causes = [x for x, v in zip(CAUSES, (unites < g["unites"], c1 <= s_, runs < g["runs"], not suffisant)) if v]
-    valeur = "NON ÉVALUABLE" if causes else "REJETTE" if c <= s_ else "NE REJETTE PAS"
-    return {"valeur": valeur, "causes": causes, "C": c, "C1": c1, "C_S": None if S is None else cs, "r": r}
+    return {"valeur": "NON ÉVALUABLE" if causes else "REJETTE" if c <= s_ else "NE REJETTE PAS", "causes": causes}
 
 
 def rotation(series: dict, premier, graine: str, strate: str, r: int, n: int) -> list:
@@ -136,12 +140,10 @@ def rotation(series: dict, premier, graine: str, strate: str, r: int, n: int) ->
     return [x if u == premier else tourner(x, decalage(graine, strate, r, u, n), n) for u, x in series.items()]
 
 
-def tester(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S=False) -> dict:
-    """R1-2 pour une classe dans une strate : series = {u : D(u, ·) comprimée sur les n fenêtres retenues (n_s, ou
-    n′_s)} des unités restées après retraits ; premier : unité non décalée (premiere) ; graine de règle de la
-    réplication (aleas.graine_regle) ; strate parmi calibration.strates (sinon REGLE/libelle) ; rend decider(), plus K,
-    S, runs et unites. Avec au plus une série non nulle, K^(r) = S^(r) = 0 pour tout r, exactement : aucune rotation
-    calculée."""
+def _entrees(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S: bool):
+    """(base, arguments de decider et complet, générateur des (K^(r), S^(r)), S) d'une classe dans une strate : strate
+    parmi calibration.strates (sinon REGLE/libelle) ; avec au plus une série non nulle, K^(r) = S^(r) = 0 pour tout r,
+    exactement : aucune rotation calculée."""
     if strate not in prm["calibration"]["strates"]:
         raise commun.Refus("REGLE/libelle", f"strate {strate!r}")
     vals = list(series.values())
@@ -151,6 +153,72 @@ def tester(series: dict, premier, graine: str, strate: str, n: int, n_s: int, pr
         for r in range(1, R + 1):
             rot = rotation(series, premier, graine, strate, r, n) if unites >= 2 else []
             yield deux(rot).bit_count(), paires(rot) if avec_S else None
-    out = decider(i.bit_count(), calendrier.runs(i), unites, 2 * n >= n_s, ks(), R, prm, S)
-    out.update(K=i.bit_count(), S=S, runs=calendrier.runs(i), unites=unites)
+    base = {"K": i.bit_count(), "S": S, "runs": calendrier.runs(i), "unites": unites}
+    return base, (base["K"], base["runs"], unites, 2 * n >= n_s), ks(), S
+
+
+def tester(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S=False) -> dict:
+    """R1-2 pour une classe dans une strate, avec arrêt anticipé : series = {u : D(u, ·) comprimée sur les n fenêtres
+    retenues (n_s, ou n′_s)} des unités restées après retraits ; premier : unité non décalée (premiere) ; graine de
+    règle de la réplication (aleas.graine_regle) ; rend decider(), plus K, S, runs et unites."""
+    base, a, ks, S = _entrees(series, premier, graine, strate, n, n_s, prm, R, avec_S)
+    return {**decider(*a, ks, R, prm, S), **base}
+
+
+def complet(K: int, runs: int, unites: int, suffisant: bool, ks, R: int, prm: dict, S=None) -> dict:
+    """Mode à R complet (E-S-29 ; ADR-0029 l.199-200) : les R rotations, sans arrêt ; C, C1, C_S exacts, loi des K^(r),
+    K_crit,s = plus petit k tel que #{r : K^(r) ≥ k} ≤ seuil, moyenne K̄_rot,s exacte ; même garde, même valeur que
+    decider(). Autre nombre de rotations que R : REGLE/rotations."""
+    g, s_, vals = prm["regle"]["garde"], seuil(R, prm["regle"]["alpha"]), list(ks)
+    if len(vals) != R:
+        raise commun.Refus("REGLE/rotations", f"{len(vals)} rotations, R = {R}")
+    loi = {}
+    for k, _s in vals:
+        loi[k] = loi.get(k, 0) + 1
+
+    def au_moins(x):
+        return sum(v for k, v in loi.items() if k >= x)
+    c, c1, k_crit = au_moins(K), au_moins(g["k_crit"] - 1), 0
+    while au_moins(k_crit) > s_:
+        k_crit += 1
+    cs = None if S is None else sum(1 for _k, x in vals if x >= S)
+    return dict(_valeur(unites, c1, runs, suffisant, c, g, s_), C=c, C1=c1, C_S=cs, r=R, K_crit=k_crit,
+                moyenne=Fraction(sum(k * v for k, v in loi.items()), R), loi=sorted(loi.items()))
+
+
+def deux_modes(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S=False):
+    """(arrêt anticipé, R complet) sur les mêmes R rotations, calculées une fois (oracle d'équivalence, E-S-29)."""
+    base, a, ks, S = _entrees(series, premier, graine, strate, n, n_s, prm, R, avec_S)
+    vals = list(ks)
+    return {**decider(*a, vals, R, prm, S), **base}, {**complet(*a, vals, R, prm, S), **base}
+
+
+def oracle(series: dict, premier, graine: str, strate: str, n: int, n_s: int, prm: dict, R: int, avec_S=False) -> dict:
+    """Oracle d'équivalence de l'arrêt anticipé (E-S-29 : sous-ensemble pré-déclaré, les 200 premières réplications de
+    chaque cellule) : rend le résultat anticipé si sa valeur et ses causes égalent celles du mode à R complet, sinon
+    REGLE/oracle."""
+    a, f = deux_modes(series, premier, graine, strate, n, n_s, prm, R, avec_S)
+    if (a["valeur"], a["causes"]) != (f["valeur"], f["causes"]):
+        raise commun.Refus("REGLE/oracle", f"anticipé {a['valeur']} {a['causes']}, complet {f['valeur']} {f['causes']}")
+    return a
+
+
+F3, ETIQUETTE_F3 = ("USDC", "USDT"), "exploratoire, hors décision"
+
+
+def strate(resultats: dict) -> dict:
+    """Valeurs d'une strate par classe (E-S-30, E-S-31 ; ADR-0029 l.204, l.211) : BTC (F1) telle quelle ; ETH (F2) :
+    valeur de son test si BTC REJETTE dans la strate, sinon « NON TESTÉ (séquence) », le test sans condition gardé en
+    diagnostic ; USDC et USDT (F3) : valeur et causes du moteur, étiquette « exploratoire, hors décision », aucune
+    valeur de registre ; familial : au moins un rejet dans la séquence BTC puis ETH."""
+    btc = resultats["BTC"]
+    out = {"BTC": {"famille": "F1", "valeur": btc["valeur"], "causes": btc["causes"]}}
+    if "ETH" in resultats:
+        e = resultats["ETH"]
+        out["ETH"] = {"famille": "F2", "valeur": e["valeur"] if btc["valeur"] == "REJETTE" else "NON TESTÉ (séquence)",
+                      "causes": e["causes"], "sans_condition": e["valeur"]}
+    for c in (c for c in F3 if c in resultats):
+        out[c] = {"famille": "F3", "valeur": resultats[c]["valeur"], "causes": resultats[c]["causes"], "registre": None,
+                  "etiquette": ETIQUETTE_F3}
+    out["familial"] = "REJETTE" in (out["BTC"]["valeur"], out.get("ETH", {}).get("valeur"))
     return out
