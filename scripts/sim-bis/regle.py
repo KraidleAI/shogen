@@ -312,9 +312,9 @@ def loi_evenements(series: dict, premier, graine: str, strate: str, n: int, R: i
 
 def absorption(p: dict, c_etoile) -> tuple:
     """Critère collectif d'absorption candidat (E-S-35 ; Q-R-10 ; Q-S-15 : mesuré, adoption décidée par
-    l'orchestrateur) : p = {u : p̂_u} rationnels de [0, 1] ; retraits un à un par p̂ décroissant (égalité : nom
-    croissant) tant que Σ_u p̂_u/(1 − p̂_u) > c* (un p̂_u = 1 rend l'indice infini) ; rend (retirées dans l'ordre,
-    indice final). Il ne lit que des marges, invariantes par rotation."""
+    l'orchestrateur ; Q-T3-14) : p = {u : p̂_u} rationnels de [0, 1] ; retraits un à un par p̂ décroissant (égalité :
+    nom croissant) tant que Σ_u p̂_u/(1 − p̂_u) > c* (un p̂_u = 1 rend l'indice infini, retirée d'abord) ; rend
+    (retirées dans l'ordre, indice final). Il ne lit que des marges, invariantes par rotation."""
     reste, retirees = dict(p), []
 
     def indice():

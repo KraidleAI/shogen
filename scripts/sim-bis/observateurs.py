@@ -93,7 +93,8 @@ def _uniforme(n: int):
 
 def debuts(prm: dict, u, rho, horizon: int) -> list:
     """Débuts d'épisodes sur [0, horizon), dans l'ordre : tirages de Bernoulli de paramètre ρ·w/86 400 par fenêtre de
-    grille, ρ par jour (forme de sources.incidents, pauses géométriques par table exacte)."""
+    grille, ρ par jour (forme de sources.incidents, pauses géométriques par table exacte ; paires Q-T3-6, artefacts
+    Q-T3-9)."""
     g, t, out = sources.Geometrique(rho * prm["calendrier"]["w"] / 86400, prm["aleas"]), -1, []
     while True:
         d = g.tirer(u, horizon - 1 - t)
@@ -124,15 +125,16 @@ class Couche:
     def vues(self, etat: dict, masques: dict) -> dict:
         """Vues des observateurs (E-S-19 à E-S-21), clés de consolider(). chemin (o, u) : échecs de chemin seuls,
         tirages indépendants par fenêtre de part ε(u, s) dans les fenêtres de la strate s (couche « chemin » : {(hôte,
-        strate) : ε} ou None ; flux « obs-chemin » d'indice sources.indice(prm, u, s, o)). local (o) : défaut local,
-        renouvellement stationnaire de part λ (couche « local », part du temps), épisodes géométriques de moyenne
-        observateurs.duree_locale (flux « obs-local » d'indice o). artefact (o, u), o de l'UE, u du sous-ensemble
-        AS13335 : épisodes de observateurs.duree_artefact fenêtres, débuts à ρ_art par jour (couche « artefacts » ; flux
-        « obs-artefacts »). cache (o, u) : chaque épisode de panne de l'hôte est régional avec la probabilité π (couche
-        « regionale »), vu alors par un sous-ensemble propre non vide uniforme des M observateurs, rangés par masque ;
-        les autres ne le voient pas (flux « obs-regionale » d'indice rang(u)). manque (o, u), puis (o, u, c) : à chaque
-        fenêtre de panne de l'hôte, puis d'écart de la série, chaque observateur la manque avec la probabilité β (couche
-        « manque » ; flux « obs-manque » d'indices 10·rang(u) et 10·rang(u) + 1 + rang de la classe)."""
+        strate) : ε} ou None ; flux « obs-chemin » d'indice sources.indice(prm, u, s, o) ; Q-T3-8). local (o) : défaut
+        local, renouvellement stationnaire de part λ (couche « local », part du temps : Q-T3-5), épisodes géométriques
+        de moyenne observateurs.duree_locale (Q-T3-4 ; flux « obs-local » d'indice o). artefact (o, u), o de l'UE, u du
+        sous-ensemble AS13335 : épisodes de observateurs.duree_artefact fenêtres, débuts à ρ_art par jour (couche
+        « artefacts » ; flux « obs-artefacts » ; Q-T3-9). cache (o, u) : chaque épisode de panne de l'hôte est régional
+        avec la probabilité π (couche « regionale »), vu alors par un sous-ensemble propre non vide uniforme des M
+        observateurs, rangés par masque ; les autres ne le voient pas (flux « obs-regionale » d'indice rang(u) ;
+        Q-T3-10). manque (o, u), puis (o, u, c) : à chaque fenêtre de panne de l'hôte, puis d'écart de la série, chaque
+        observateur la manque avec la probabilité β (couche « manque » ; flux « obs-manque » d'indices 10·rang(u) et
+        10·rang(u) + 1 + rang de la classe ; Q-T3-11). Composants et indices des flux : Q-T3-12."""
         c, op, a, out = self.couche, self.prm["observateurs"], self.prm["aleas"], {}
         for o in range(op["M"]):
             for (h, s), e in sorted((c["chemin"] or {}).items()):
@@ -185,14 +187,15 @@ class Couche:
 
     def validites(self) -> list:
         """Masques de validité des M observateurs (E-S-17, E-S-18 ; grille de Q-S-11). Non valide : absence D-1
-        (renouvellement stationnaire de part `absences`, longueurs observateurs.absences, flux « obs-absences » d'indice
-        o) ; dégradation D-2 à D-5 (tirages indépendants par fenêtre de part `degradations`, flux « obs-degradations »
-        d'indice o) ; panne de paire (débuts à `paires` par jour, flux « obs-paires » 0 ; paire uniforme parmi celles
-        des observateurs présents, flux « obs-paires » 1 ; durée observateurs.duree_paire) ; perte définitive
-        (observateur uniforme parmi les présents, instant uniforme sur la durée nominale W × 7 jours, jour puis fenêtre
-        du jour, jamais sur T_max : Q-T3-7, avis modifié ; flux « obs-perte ») ; repli (observateur observateurs.repli
-        absent toute la campagne, E-S-18). W non entier ≥ 1, ou durée nominale au-delà de l'horizon :
-        OBSERVATEURS/perte."""
+        (renouvellement stationnaire de part `absences`, longueurs observateurs.absences : Q-T3-2 ; flux
+        « obs-absences » d'indice o) ; dégradation D-2 à D-5 (tirages indépendants par fenêtre de part
+        `degradations` : Q-T3-3 ; flux « obs-degradations » d'indice o) ; processus partis de leur état stationnaire à
+        T_début (Q-T3-16) ; panne de paire (débuts à `paires` par jour, flux « obs-paires » 0 ; paire uniforme parmi
+        celles des observateurs présents, flux « obs-paires » 1 ; durée observateurs.duree_paire ; Q-T3-6) ; perte
+        définitive (observateur uniforme parmi les présents, instant uniforme sur la durée nominale W × 7 jours, jour
+        puis fenêtre du jour, jamais sur T_max : Q-T3-7, avis modifié ; flux « obs-perte ») ; repli (observateur
+        observateurs.repli absent toute la campagne, E-S-18). W non entier ≥ 1, ou durée nominale au-delà de
+        l'horizon : OBSERVATEURS/perte."""
         op, c, a = self.prm["observateurs"], self.couche, self.prm["aleas"]
         presents = [o for o in range(op["M"]) if not (c["repli"] and o == op["repli"])]
         inv, loi = [0 if o in presents else self.grille for o in range(op["M"])], sources.Empirique(op["absences"])
@@ -220,7 +223,7 @@ class Couche:
 
 
 def chemin_reference(prm: dict, ep: dict, f) -> dict:
-    """ε de référence (E-S-19, Q-S-12 (a)) : ε(u, s) = (1 − f)·p̂(u, s), p̂ = cellules/n_s de la ligne « ecart » d'EP
-    (indicatrice de R1 de S2, panne comprise), pour chaque hôte du pool et chaque strate."""
+    """ε de référence (E-S-19, Q-S-12 (a) ; Q-T3-8) : ε(u, s) = (1 − f)·p̂(u, s), p̂ = cellules/n_s de la ligne
+    « ecart » d'EP (indicatrice de R1 de S2, panne comprise), pour chaque hôte du pool et chaque strate."""
     return {(h, s): (1 - f) * Fraction(ep[s, h, "ecart"]["cellules"], ep[s, h, "ecart"]["n_s"])
             for h, _f in prm["calibration"]["unites"] for s in prm["calibration"]["strates"]}

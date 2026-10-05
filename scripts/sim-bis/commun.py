@@ -45,6 +45,12 @@ def naturel(v) -> bool:
     return type(v) is int and v >= 0
 
 
+def question(v) -> bool:
+    """Valeur adjugée d'une question de la tranche 3 (P-2 de ses corrections G2) : texte qui cite ses lignes de
+    l'avis AVIS-SIM-T3.md et de la PROPOSITION."""
+    return texte(v) and "AVIS-SIM-T3.md l." in v and "PROPOSITION l." in v
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
@@ -66,10 +72,12 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                       "source": texte},
           "observateurs": {"M": positif, "ue": [naturel], "repli": naturel, "duree_paire": positif,
                            "duree_artefact": positif, "duree_locale": positif, "absences": [(positif, positif)],
-                           "composants": [texte], "source": texte},
+                           "composants": [texte], "source": texte,
+                           "questions": {f"Q-T3-{n}": question for n in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16)}},
           "regle": {"R": positif, "R_approche": positif, "alpha": (positif, positif),
                     "garde": {"unites": positif, "k_crit": positif, "runs": positif}, "c_etoile": (positif, positif),
-                    "tolerances": [naturel], "source": texte}}
+                    "tolerances": [naturel], "source": texte,
+                    "questions": {f"Q-T3-{n}": question for n in (13, 14, 15)}}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

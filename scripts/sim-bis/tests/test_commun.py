@@ -65,6 +65,43 @@ class TestSocle(unittest.TestCase):
         self.assertEqual([x in s for x in ("ajout daté du G0 du 2026-10-05 01:45:03 UTC, point 3",
                                            "même ajout daté, point 2", "adjudication provisoire")], [True, True, False])
 
+    def test_valeurs_avis_t3(self):
+        """P-2 des corrections G2 de la tranche 3 (adjugé avant E0, comme C-7 de la tranche 2) : les valeurs Q-T3-2 à
+        Q-T3-16 adoptées ou modifiées par l'avis sont écrites dans parametres.json, chacune avec sa source :
+        observateurs.questions (Q-T3-2 à Q-T3-12, Q-T3-16) et regle.questions (Q-T3-13 à Q-T3-15), textes qui citent
+        les lignes de l'AVIS-SIM-T3 et de la PROPOSITION. Forme tenue par le schéma : question manquante, en trop, dans
+        l'autre section, texte vide ou sans ses deux citations : PARAMETRES/schema. Chaque numéro est marqué dans le
+        module qui emploie la valeur. Mutations M-8G-01 (citation de l'avis non exigée), M-8G-02 (citation de la
+        PROPOSITION non exigée), M-8G-03 (marque retirée d'un module)."""
+        def marques(texte):
+            out, i = set(), texte.find("Q-T3-")
+            while i >= 0:
+                j = i + 5
+                while j < len(texte) and texte[j].isdigit():
+                    j += 1
+                out.add(texte[i:j])
+                i = texte.find("Q-T3-", j)
+            return out
+        prm = commun.charger_parametres(environ={})
+        o, r = prm["observateurs"].get("questions", {}), prm["regle"].get("questions", {})
+        self.assertEqual((sorted(o, key=lambda k: int(k[5:])), sorted(r)),
+                         ([f"Q-T3-{n}" for n in (2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 16)], ["Q-T3-13", "Q-T3-14",
+                                                                                              "Q-T3-15"]))
+        cite = [k for k, v in {**o, **r}.items() if "AVIS-SIM-T3.md l." in v and "PROPOSITION l." in v]
+        self.assertEqual(len(cite), 15)
+        for f in (lambda p: p["observateurs"]["questions"].pop("Q-T3-7"),
+                  lambda p: p["regle"]["questions"].update({"Q-T3-1": p["regle"]["questions"]["Q-T3-13"]}),
+                  lambda p: p["observateurs"]["questions"].update({"Q-T3-13": p["regle"]["questions"]["Q-T3-13"]}),
+                  lambda p: p["regle"]["questions"].update({"Q-T3-14": ""}),
+                  lambda p: p["regle"]["questions"].update({"Q-T3-15": "AVIS-SIM-T3.md l.101-106 seule"}),
+                  lambda p: p["observateurs"]["questions"].update({"Q-T3-16": "PROPOSITION l.161-164 seule"})):
+            p = json.loads(json.dumps(prm))
+            f(p)
+            self.refus("PARAMETRES/schema", commun.controler, p, commun.SCHEMA)
+        for module, numeros in (("observateurs.py", o), ("regle.py", r)):
+            with open(os.path.join(commun.ICI, module), encoding="utf-8") as g:
+                self.assertLessEqual(set(numeros), marques(g.read()), module)
+
     def test_schema_ferme(self):
         """Clé en trop (racine, section), clé manquante, texte vide, empreinte en majuscules, entier pour un texte :
         PARAMETRES/schema. Mutations M-0-03 (clés incluses au lieu d'égales), M-0-04 (texte vide admis), M-0-05
