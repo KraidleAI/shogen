@@ -1,21 +1,30 @@
 """RB-18, lecteur indépendant (E-R-33 ; PROPOSITION du G0 de RECALC-BIS l.396, l.486, l.539-540, l.551) : attendus
 construits depuis le FORMAT (docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md), jamais depuis un autre lecteur. Lignes,
 valeurs et noms écrits à la main ici ; barre oblique inverse et saut de ligne jamais tapés (chr(92), octet 10)."""
+import hashlib
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
 
+from shogen_s2bis.collecte import journal as j
 from shogen_s2bis.recalc import oracle_indep as o
 from tests.test_fitness import violations
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BS, NL, PREC = chr(92), bytes((10,)), "ab" * 32
+T0 = 1791158280                     # 2026-10-04 23:58:00 UTC (date -u -d @1791158280) ; T0 + 120 : 00:00 du 5
+J1, J1S1 = "pool-2026-10-04-0.jsonl", "pool-2026-10-04-1.jsonl"
+J2, J3 = "pool-2026-10-05-0.jsonl", "pool-2026-10-06-0.jsonl"
 
 
 def ligne(texte):
     return texte.encode("utf-8") + NL
+
+
+def sha(b):
+    return hashlib.sha256(b).hexdigest()
 
 
 class Ligne(unittest.TestCase):
@@ -94,3 +103,111 @@ class Frontiere(unittest.TestCase):
         code = "import sys, shogen_s2bis.recalc.oracle_indep; print(sorted(m for m in sys.modules if 'shogen' in m))"
         p = subprocess.run([sys.executable, "-B", "-c", code], cwd=RACINE, capture_output=True, timeout=60)
         self.assertEqual(p.stdout, b"['shogen_s2bis', 'shogen_s2bis.recalc', 'shogen_s2bis.recalc.oracle_indep']" + NL)
+
+
+class Journaux(unittest.TestCase):
+    """Journaux de l'écrivain réel (CB-1, CB-2), puis altérés à la main. Attendus : lignes complètes découpées sur
+    l'octet 10 (§1.1) ; queues prises sur les octets (§7.1, §7.4) ; types et rangs lus dans le FORMAT (§2, §6, §7)."""
+    def setUp(self):
+        t = tempfile.TemporaryDirectory()
+        self.addCleanup(t.cleanup)
+        self.d = t.name
+
+    def ecrivain(self, ws, fenetres=(), dernier=None):
+        """Ouvert à `ws` : lecture et marqueur par fenêtre de `fenetres`, puis lecture « é » de `dernier` ; fermé."""
+        jl = j.Journal(self.d, "pool", fsync=lambda fd: None).ouvrir(ws)
+        try:
+            for x in fenetres:
+                jl.ecrire("lecture", x, v=x % 7)
+                jl.marqueur(x)
+            if dernier:
+                jl.ecrire("lecture", dernier, note="é")
+        finally:
+            jl.fermer()
+
+    def octets(self, nom):
+        with open(os.path.join(self.d, nom), "rb") as f:
+            return f.read()
+
+    def lignes(self, nom):
+        """(fichier, position, sha256) de chaque ligne complète de `nom`."""
+        r, pos = [], 0
+        for x in self.octets(nom).split(NL)[:-1]:
+            r.append((nom, pos, sha(x + NL)))
+            pos += len(x) + 1
+        return r
+
+    def lire(self):
+        r = o.lire(self.d, "pool")
+        return r, [(x["fichier"], x["position"], x["sha256"]) for x in r["enregistrements"]]
+
+    def test_journal_intact_sur_deux_jours(self):                         # §1.3, §1.4, §6.2
+        self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))                    # 23:59 (point), 00:00 et 00:01 du 5
+        r, flux = self.lire()
+        attendu = self.lignes(J1) + self.lignes(J2)
+        self.assertEqual((flux, [x["enr"]["seq"] for x in r["enregistrements"]]), (attendu, list(range(10))))
+        self.assertEqual([x["enr"]["type"] for x in r["enregistrements"]][3:6], ["point", "cloture", "ouverture"])
+        self.assertEqual((r["fichiers"], r["ruptures"], r["queues_declarees"], r["queue_finale"], r["tete"]),
+                         ([J1, J2], [], [], [], {"seq": 9, "sha256": attendu[-1][2]}))
+
+    def test_queue_tronquee_en_fin_du_dernier_fichier(self):              # E-R-01 ; §4
+        self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))
+        taille = len(self.octets(J2))
+        with open(os.path.join(self.d, J2), "ab") as f:
+            f.write(b'{"prec":"')                                          # ligne coupée par un arrêt brutal
+        r, flux = self.lire()
+        q = {"fichier": J2, "position": taille, "octets": 9, "sha256": sha(b'{"prec":"')}
+        self.assertEqual((flux, r["ruptures"], r["queues_declarees"]), (self.lignes(J1) + self.lignes(J2), [], []))
+        self.assertEqual((r["queue_finale"], r["tete"]["seq"]), ([q], 9))
+
+    def test_rupture_sans_reprise(self):                                  # §7.1, §7.7 : chaîne rompue, aucune reprise
+        self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))
+        b, j2 = self.octets(J1), self.lignes(J2)
+        p2, p3 = self.lignes(J1)[2][1], self.lignes(J1)[3][1]               # le marqueur de 23:59, rang 2
+        for avant, apres, k in ((b'"seq":2,', b'"seq":7,', 2), (b'"type":"marqueur",', b'', 2),
+                                (b'"ws":1791158340', b'"ws":1791158400', 3)):
+            with open(os.path.join(self.d, J1), "wb") as f:                 # seq faux ; prec du suivant faux
+                f.write(b[:p2] + b[p2:p3].replace(avant, apres) + b[p3:])
+            r, flux = self.lire()
+            j1 = self.lignes(J1)
+            reste = self.octets(J1)[j1[k][1]:]
+            q = {"fichier": J1, "position": j1[k][1], "octets": len(reste), "sha256": sha(reste)}
+            self.assertEqual((flux, r["queue_finale"], r["tete"]["seq"]), (j1[:k] + j2, [], 9), k)
+            self.assertEqual(r["ruptures"], [{"fichier": J2, "position": 0, "seq": 5, "queues": [q],
+                                              "causes": ["lien", "queue-non-declaree"]}], k)
+
+    def test_lien_rompu_par_le_seul_prec(self):                           # §7.7 : seq juste, prec faux entre fichiers
+        self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))
+        b, p4 = self.octets(J1), self.lignes(J1)[4][1]                      # la clôture du 4, rang 4
+        with open(os.path.join(self.d, J1), "wb") as f:
+            f.write(b[:p4] + b[p4:].replace(b"2026-10-04", b"2026-10-03"))
+        r, flux = self.lire()
+        rupture = {"fichier": J2, "position": 0, "seq": 5, "causes": ["lien"], "queues": []}
+        self.assertEqual((flux, r["ruptures"]), (self.lignes(J1) + self.lignes(J2), [rupture]))
+
+    def test_fichiers_manquants(self):                                    # §1.3 : genèse ; §7.7 : lien entre fichiers
+        self.ecrivain(T0, (T0 + 60, T0 + 120, T0 + 86520))                 # 4, 5 et 6 octobre
+        j1, j3 = self.lignes(J1), self.lignes(J3)
+        self.assertEqual((len(j1), len(self.lignes(J2)), len(j3)), (5, 4, 4))   # §2, §6.2, §8 : rangs 0 à 12
+        os.remove(os.path.join(self.d, J2))
+        r, flux = self.lire()
+        self.assertEqual((r["fichiers"], flux, r["tete"]["seq"]), ([J1, J3], j1 + j3, 12))
+        rupture = {"fichier": J3, "position": 0, "seq": 9, "causes": ["lien"], "queues": []}
+        self.assertEqual(r["ruptures"], [rupture])
+
+    def test_genese_et_premiere_ligne(self):                              # §1.3, §2, §7.1 : lignes écrites ici
+        z = "0" * 64
+        for t, seq, prec, attendu in (("ouverture", 0, z, (1, [], 0)), ("reprise", 0, z, (1, [["genese"]], 0)),
+                                      ("ouverture", 0, "1" * 64, (1, [["genese"]], 0)),
+                                      ("ouverture", 1, z, (1, [["genese"]], 0)), ("lecture", 0, z, (0, [], 1))):
+            with open(os.path.join(self.d, J1), "wb") as f:
+                f.write(ligne('{"prec":"' + prec + '","seq":' + str(seq) + ',"type":"' + t + '"}'))
+            r, flux = self.lire()
+            self.assertEqual((len(flux), [x["causes"] for x in r["ruptures"]], len(r["queue_finale"])), attendu, t)
+
+    def test_dossier_vide_ou_absent(self):
+        r, flux = self.lire()
+        self.assertEqual((flux, r["fichiers"], r["tete"], r["ruptures"], r["queue_finale"]), ([], [], None, [], []))
+        with self.assertRaises(o.RefusOracle) as e:
+            o.lire(os.path.join(self.d, "absent"), "pool")
+        self.assertEqual(e.exception.code, "ORACLE/lecture")

@@ -6,14 +6,21 @@ de `json` (Q-R18-3). Champs communs (§1.3) : `type` chaîne, `seq` entier, `pre
 Entier de plus de CHIFFRES chiffres (signe exclu) dans un objet JSON par ailleurs lisible : refus nommé
 ORACLE/entier-long, la ligne n'est pas jugée (Q-R18-2 ; E-R-01 ; SHOGEN-JSON-ENTIER-LONG-1). Fichiers (§6.1, §7.2) :
 `<préfixe>-AAAA-MM-JJ-k.jsonl`, k décimal sans zéro de tête, dans l'ordre (jour, k entier) ; autres noms ignorés
-(Q-R18-5)."""
+(Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A, non canonique, sans les
+champs communs, non chaînée ; la première est une `ouverture` ou une `reprise`), qui ouvre la queue du fichier.
+Jonction au premier enregistrement de chaque fichier (§1.3, §7.7) : lien au dernier intègre (genèse : `ouverture`,
+`seq` 0, `prec` nul), queues en attente ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`), la
+lecture continue, rien n'est réparé (Q-R18-6). Queue finale : queues qu'aucun intègre ne suit (E-R-01 ; Q-R18-8).
+Tête : dernier intègre (§1.4)."""
+import hashlib
 import json
 import os
 import re
 
 CHIFFRES = 640              # sys.int_info.str_digits_check_threshold (CPython 3.10 à 3.13) : lu sous tout réglage
-NL = bytes((10,))
+GENESE, NL = "0" * 64, bytes((10,))
 HEX = re.compile("[0-9a-f]{64}")
+FORMAT = "shogen.s2bis.oracle-indep.v1"
 
 
 class RefusOracle(Exception):
@@ -62,3 +69,75 @@ def fichiers(dossier, prefixe):
     """Noms des fichiers du journal `prefixe` de `dossier`, dans l'ordre de la chaîne."""
     motif = re.compile(re.escape(prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl")
     return [n for _j, _k, n in sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, os.listdir(dossier)) if m)]
+
+
+class Lecture:
+    """Lecture en flux du journal `prefixe` de `dossier` : itérer rend chaque enregistrement intègre {fichier, position,
+    sha256, enr}, dans l'ordre de la chaîne ; l'itération finie, `ruptures`, `queues_declarees`, `queue_finale` et
+    `tete` sont complets. Mémoire : une ligne et les queues en attente."""
+
+    def __init__(self, dossier, prefixe):
+        self.dossier, self.prefixe = dossier, prefixe
+        self.noms, self.ruptures, self.queues_declarees, self.queue_finale, self.tete = [], [], [], [], None
+
+    def __iter__(self):
+        base, attente = None, []                            # (seq, sha256) du dernier intègre ; queues non soldées
+        try:
+            self.noms = fichiers(self.dossier, self.prefixe)
+            for nom in self.noms:
+                with open(os.path.join(self.dossier, nom), "rb") as f:
+                    pos, prec = 0, None
+                    while ligne := f.readline():
+                        e = self._integre(ligne, prec)
+                        if e is None:
+                            attente.append(self._queue(f, nom, pos))
+                            break
+                        h = hashlib.sha256(ligne).hexdigest()
+                        if prec is None:
+                            self._jonction(nom, pos, e, base, attente)
+                        yield {"fichier": nom, "position": pos, "sha256": h, "enr": e}
+                        prec = base = (e["seq"], h)
+                        pos += len(ligne)
+        except OSError as x:
+            raise RefusOracle("ORACLE/lecture", repr(x)) from None
+        self.queue_finale, self.tete = attente, base and {"seq": base[0], "sha256": base[1]}
+
+    @staticmethod
+    def _integre(ligne, prec):
+        """Enregistrement intègre de `ligne`, ou None (§7.1) ; `prec` : (seq, sha256) de la ligne d'avant, ou None."""
+        e = objet(ligne)
+        if e is None or not champs(e):
+            return None
+        if prec is None:
+            return e if e["type"] in ("ouverture", "reprise") else None
+        return e if (e["seq"], e["prec"]) == (prec[0] + 1, prec[1]) else None
+
+    @staticmethod
+    def _queue(f, nom, pos):
+        """Queue de `f` à partir de l'octet `pos` : {fichier, position, octets, sha256} (§7.4)."""
+        f.seek(pos)
+        h, n = hashlib.sha256(), 0
+        while bloc := f.read(1 << 20):
+            h.update(bloc)
+            n += len(bloc)
+        return {"fichier": nom, "position": pos, "octets": n, "sha256": h.hexdigest()}
+
+    def _jonction(self, nom, pos, e, base, attente):
+        causes = []
+        if base is None:
+            causes += ["genese"] * ((e["type"], e["seq"], e["prec"]) != ("ouverture", 0, GENESE))
+        else:
+            causes += ["lien"] * ((e["seq"], e["prec"]) != (base[0] + 1, base[1]))
+        causes += ["queue-non-declaree"] * bool(attente)
+        if causes:
+            self.ruptures.append({"fichier": nom, "position": pos, "seq": e["seq"], "causes": sorted(causes),
+                                  "queues": list(attente)})
+        attente.clear()
+
+
+def lire(dossier, prefixe):
+    """Sortie de l'oracle, tout le journal en mémoire (fixtures et bancs)."""
+    lec = Lecture(dossier, prefixe)
+    enregistrements = list(lec)
+    return {"enregistrements": enregistrements, "fichiers": lec.noms, "format": FORMAT, "tete": lec.tete,
+            "queue_finale": lec.queue_finale, "queues_declarees": lec.queues_declarees, "ruptures": lec.ruptures}

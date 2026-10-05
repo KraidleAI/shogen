@@ -1604,3 +1604,23 @@ Mutants (commande du job, `--plancher 224`, borne de 300 s ; python3.12 ; résea
 NaN, ligne non objet, refus avant le jugement, RecursionError non attrapée, nom du refus, booléen pour `seq`, majuscules
 dans `prec`, k comparé en texte, zéro de tête, préfixe non échappé, import de l'écrivain, décodage latin-1. Suite : 224
 tests ; plancher du job : 224, égalité exigée (`--egal`).
+
+## RB-18b (2026-10-05) : lecture en flux, genèse, lien entre fichiers, queues, ruptures (recalé sur 98c8537)
+
+Objet : `Lecture` lit chaque fichier jusqu'à la première ligne non intègre, qui ouvre la queue du fichier (octet de
+début, longueur, sha256) ; la première ligne d'un fichier est une `ouverture` ou une `reprise` ; au premier
+enregistrement de chaque fichier, lien au dernier intègre, ou genèse (`ouverture`, `seq` 0, `prec` nul) ; rupture à
+causes nommées (`genese`, `lien`, `queue-non-declaree`), la lecture continue ; queue finale, tête ; `lire`. FORMAT §1.3,
+§1.4, §7.1, §7.7. Journaux produits par l'écrivain réel, puis altérés à la main.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 143 | — |
+| `tests/test_oracle_indep.py` | 213 | 17 (7 de plus : journal intact sur deux jours, queue tronquée, rupture sans reprise, lien rompu par le seul `prec`, fichiers manquants, genèse et première ligne, dossier vide ou absent) |
+
+Mutants (commande du job, `--plancher 231`, borne de 300 s ; python3.12 ; réseau isolé) : 17 tués sur 17 (0 vivant,
+0 FATAL) : première ligne de type quelconque, `prec` ou `seq` non contrôlés, champs communs non contrôlés, `prec` et
+type de la genèse non contrôlés, lien sans `prec`, jonction au seul premier fichier, liste de la rupture vidée, queue
+soldée deux fois ou non signalée, queue prise depuis le début, ligne coupée finale ignorée, queue finale perdue, nom du
+refus de lecture, rupture sans cause, chaînage figé. Suite : 231 tests ; plancher du job : 231, égalité exigée
+(`--egal`).
