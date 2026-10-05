@@ -6,11 +6,13 @@ import unittest
 from fractions import Fraction
 
 import aleas
+import calibration
 import commun
 import sources
 
 PRM = commun.charger_parametres(environ={})
 A = PRM["aleas"]
+EP = calibration.charger(PRM, environ={})["episodes"]
 
 
 def suite(*u):
@@ -30,6 +32,76 @@ class TestSources(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             f(*a)
         self.assertEqual(c.exception.code, code)
+
+    def test_parametres_et_flux(self):
+        """Composants de flux pré-déclarés (Q-4) et strate à loi regroupée (E-S-10) ; flux = aleas.flux du composant ;
+        composant non déclaré : SOURCES/composant. Mutation M-3B-01 : contrôle du composant retiré."""
+        s = PRM["sources"]
+        self.assertEqual(s["composants"], ["regime", "panne", "panne-regime", "longues", "ecart", "ecart-regime",
+                                           "hors-enveloppe", "derive", "derive-episodes", "incidents",
+                                           "incidents-hotes", "faibles"])
+        self.assertEqual(s["regroupees"], ["stress"])
+        self.assertEqual(sources.flux(PRM, "N1", 0, "panne", 3)(), aleas.flux(A, "N1", 0, "panne", 3)())
+        self.refus("SOURCES/composant", sources.flux, PRM, "N1", 0, "inconnu", 0)
+
+    def test_taux_ep_q_3(self):
+        """p = cellules/n_s exact (Q-3) : EP l.13 et l.15 (binance calme : panne 372, écart 372, n_s 24 585), l.17 et
+        l.19 (bitfinex calme : 30 et 32), l.81 et l.83 (gemini stress : 19 et 21, n_s 11 397) ; écart
+        propre = (écart − panne)/n_s (E-S-09) ; écart moins nombreux que la panne, ou n_s différents : SOURCES/taux.
+        Mutations M-3B-02 (taux décimal imprimé au lieu de cellules/n_s), M-3B-03 (écart total au lieu de l'écart
+        propre), M-3B-04 (contrôle retiré)."""
+        self.assertEqual(sources.taux(EP, "calme", "binance"), (Fraction(372, 24585), 0))
+        self.assertEqual(sources.taux(EP, "calme", "bitfinex"), (Fraction(30, 24585), Fraction(2, 24585)))
+        self.assertEqual(sources.taux(EP, "stress", "gemini"), (Fraction(19, 11397), Fraction(2, 11397)))
+        for champ, v in (("cellules", 371), ("n_s", 24584)):
+            faux = dict(EP)
+            faux["calme", "binance", "ecart"] = dict(EP["calme", "binance", "ecart"], **{champ: v})
+            self.refus("SOURCES/taux", sources.taux, faux, "calme", "binance")
+
+    def test_composantes_e_s_11_e_s_12(self):
+        """p = 3/100, part longue λ = 1/5, régime φ = 1/10, κ = 5, à la main : r_L = λp = 3/500 ; reste p_A = (p − r_L)/
+        (1 − r_L) = (12/500)/(497/500) = 12/497 ; r_E = p_A/(1 − φ + φκ) = (12/497)/(7/5) = 60/3 479 ; r' = r_E(κ − 1)/
+        (1 − r_E) = 240/3 419 ; contrôle : 1 − (1 − r_E)(1 − φr')(1 − r_L) = 1 − (3 395/3 479)(497/500) = 3/100, car
+        3 479 = 7 × 497. C0 (régime None) et λ = 0 : tout le taux en r_E. Rapport des taux de A en régime dégradé et
+        normal : (r_E + (1 − r_E)r')/r_E = κ. Mutations M-3B-10 (r_E = p_A sans le facteur du régime), M-3B-11 (part
+        longue retranchée sans renormaliser : p_A = p − r_L), M-3B-12 (r' sans le facteur 1/(1 − r_E))."""
+        c = sources.composantes(Fraction(3, 100), Fraction(1, 5), (Fraction(1, 10), Fraction(5), 60))
+        self.assertEqual(c, {"longues": Fraction(3, 500), "base": Fraction(60, 3479), "regime": Fraction(240, 3419)})
+        self.assertEqual((c["base"] + (1 - c["base"]) * c["regime"]) / c["base"], 5)
+        self.assertEqual(sources.composantes(Fraction(3, 100), Fraction(0), None),
+                         {"longues": 0, "base": Fraction(3, 100), "regime": 0})
+
+    def test_lois_regroupees_e_s_10(self):
+        """Loi « tous épisodes » d'EP (adjudication Q-2) : calme, par hôte et par type (binance panne = EP l.14, gemini
+        écart = EP l.44) ; stress, regroupée sur les dix hôtes (E-S-10 ; sommes faites à la main sur EP l.54 à l.92) :
+        panne 1×662 2×11 (684 cellules), écart 1×662 2×12 (686). Mutations M-3B-05 (regroupement ignoré), M-3B-06
+        (regroupement en toute strate), M-3B-07 (type ignoré)."""
+        self.assertEqual(sources.loi_longueurs(PRM, EP, "calme", "binance", "panne").hist,
+                         ((1, 301), (2, 24), (3, 6), (5, 1)))
+        self.assertEqual(sources.loi_longueurs(PRM, EP, "calme", "gemini", "ecart").hist,
+                         ((1, 53), (2, 3), (4, 1), (5, 1)))
+        self.assertEqual(sources.loi_longueurs(PRM, EP, "stress", "okx", "panne").hist, ((1, 662), (2, 11)))
+        self.assertEqual(sources.loi_longueurs(PRM, EP, "stress", "binance", "ecart").hist, ((1, 662), (2, 12)))
+
+    def test_oracle_c0_e_s_39(self):
+        """E-S-39 (C0, sans observateurs) : binance calme panne à f = 1, r = 372/24 585, loi d'EP l.14 ; 200
+        réplications de 10 080 fenêtres : part du temps en épisode à moins de 5 SE de r ; parts des longueurs 1, 2, 3, 5
+        parmi les épisodes entiers (ni coupés à 0 ni à l'horizon) à moins de 5 SE de (301, 24, 6, 1)/332, aucune autre
+        longueur. Mutations M-3B-08 (durée de chaque épisode tirée dans la loi résiduelle), M-3B-09 (départ hors
+        épisode)."""
+        loi, r = sources.loi_longueurs(PRM, EP, "calme", "binance", "panne"), Fraction(372, 24585)
+        q, x, n = sources.pause(r, loi.moyenne), [], {}
+        for i in range(200):
+            segs = sources.alterner(sources.flux(PRM, "E-S-39", i, "panne", 0), loi, q, A, 10080)
+            x.append(Fraction(sum(f - d for d, f in segs), 10080))
+            for d, f in segs:
+                if 0 < d and f < 10080:
+                    n[f - d] = n.get(f - d, 0) + 1
+        self.assertTrue(dans_5_se(x, r))
+        self.assertEqual(sorted(n), [1, 2, 3, 5])
+        for lg, c in ((1, 301), (2, 24), (3, 6), (5, 1)):
+            p, tot = Fraction(c, 332), sum(n.values())
+            self.assertTrue((Fraction(n[lg], tot) - p) ** 2 < 25 * p * (1 - p) / tot, lg)
 
     def test_markov_t_gen_1(self):
         """a = 19/20, b = 1/30 : taux stationnaire b/(1 − a + b) = (1/30)/(1/20 + 1/30) = 2/5, à la main ; 2 000 chaînes

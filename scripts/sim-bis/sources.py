@@ -1,13 +1,23 @@
 """Sources du lot SIM-BIS (G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md ; sous-lots SB-3 et SB-4 ; E-S-07 à E-S-16) : état vrai
 par hôte sur la grille, en masques entiers (bit j = fenêtre T_début + j·w, comme calendrier.py). SB-3a : lois de durée
 (empirique, géométrique) et leur loi résiduelle, renouvellement alterné stationnaire, chaîne à deux états (T-GEN-1),
-masques. Chaque tirage compare random() à un seuil exact (aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction
-transcendante, aucune puissance."""
+masques. SB-3b : flux des composants pré-déclarés (E-S-41, Q-4) ; taux exacts par hôte et par strate (cellules/n_s,
+Q-3 ; E-S-09) ; loi des longueurs « tous épisodes » d'EP (Q-2), regroupée en stress (E-S-10) ; taux exacts des
+composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal conservé. Chaque tirage compare random() à
+un seuil exact (aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
 import functools
 from fractions import Fraction
 
 import aleas
 import commun
+
+
+def flux(prm: dict, cellule: str, i: int, composant: str, indice: int):
+    """aleas.flux d'un composant pré-déclaré dans sources.composants de parametres.json (Q-4), sinon
+    SOURCES/composant."""
+    if composant not in prm["sources"]["composants"]:
+        raise commun.Refus("SOURCES/composant", f"{composant!r} : non déclaré dans parametres.json")
+    return aleas.flux(prm["aleas"], cellule, i, composant, indice)
 
 
 @functools.lru_cache(maxsize=None, typed=True)
@@ -111,3 +121,40 @@ def masque(segs: list) -> int:
         morceaux += ["0" * (d - t), "1" * (f - d)]
         t = f
     return int("".join(morceaux)[::-1] or "0", 2)
+
+
+def taux(ep: dict, strate: str, hote: str) -> tuple:
+    """(p_panne, p_ecart_propre) exacts de l'hôte dans la strate (E-S-09 ; Q-3) : cellules/n_s de la ligne « panne »
+    d'EP, puis (cellules d'écart − cellules de panne)/n_s ; SOURCES/taux si les n_s diffèrent ou si l'écart compte moins
+    de cellules que la panne (l'écart d'EP comprend la panne)."""
+    p, e = ep[strate, hote, "panne"], ep[strate, hote, "ecart"]
+    if p["n_s"] != e["n_s"] or e["cellules"] < p["cellules"]:
+        raise commun.Refus("SOURCES/taux", f"« {strate} » {hote} : panne {p['cellules']}/{p['n_s']}, écart "
+                                           f"{e['cellules']}/{e['n_s']}")
+    return Fraction(p["cellules"], p["n_s"]), Fraction(e["cellules"] - p["cellules"], p["n_s"])
+
+
+def loi_longueurs(prm: dict, ep: dict, strate: str, hote: str, type_: str) -> Empirique:
+    """Loi « tous épisodes » d'EP (adjudication Q-2 : censurés compris, à leur longueur vue, qui minore la vraie) de
+    l'hôte dans la strate, pour le type « panne » ou « ecart » ; dans une strate de sources.regroupees, histogrammes
+    sommés sur les hôtes du pool (E-S-10)."""
+    hotes = [h for h, _f in prm["calibration"]["unites"]] if strate in prm["sources"]["regroupees"] else [hote]
+    c = {}
+    for h in hotes:
+        for lg, n in ep[strate, h, type_]["histogramme"]:
+            c[lg] = c.get(lg, 0) + n
+    return Empirique(sorted(c.items()))
+
+
+def composantes(p: Fraction, part: Fraction, regime) -> dict:
+    """Taux des composantes indépendantes et stationnaires d'une série de taux marginal p : pannes longues L,
+    r_L = part·p (E-S-11) ; reste A = E ∪ (E′ ∩ Z), p_A = (p − r_L)/(1 − r_L), d'où P(A ∪ L) = p ; régime caché Z de
+    part φ et de rapport de taux κ (E-S-12 ; None : C0, sans régime) : r_E = p_A/(1 − φ + φκ) en régime normal,
+    r_E + (1 − r_E)r' = κ·r_E en régime dégradé, d'où r' = r_E(κ − 1)/(1 − r_E) et P(A) = p_A exactement."""
+    r_l = part * p
+    p_a = (p - r_l) / (1 - r_l)
+    if regime is None:
+        return {"longues": r_l, "base": p_a, "regime": 0 * p}
+    phi, kappa, _tau = regime
+    r_e = p_a / (1 - phi + phi * kappa)
+    return {"longues": r_l, "base": r_e, "regime": r_e * (kappa - 1) / (1 - r_e)}

@@ -33,5 +33,10 @@
   "n_par_semaine": {"calme": 6840, "stress": 2736},
   "t_max": [3, 2],
   "source": "E-S-14 : grille UTC w = 60 s, strates par le calendrier de S2 (window.WEEKEND_STRATE_SPEC de f35a70c : stress_weekdays [5, 6], lundi = 0), T_début = lundi 00:00 UTC + 0 à 6 jours tirés par réplication (Q-S-08) ; lundi de référence 2026-12-07 00:00 UTC (date -u -d), indicatif, seule la place dans la semaine comptant ; E-S-25 et proposition §3 pt 2 : échelle W de 12 à 24 semaines, n_calme = 6 840·W, n_stress = 2 736·W (16 × 5 × 1 440 × 0,95 et 16 × 2 × 1 440 × 0,95 à W = 16, ADR l.158), T_max = 3/2·W semaines"
+ },
+ "sources": {
+  "composants": ["regime", "panne", "panne-regime", "longues", "ecart", "ecart-regime", "hors-enveloppe", "derive", "derive-episodes", "incidents", "incidents-hotes", "faibles"],
+  "regroupees": ["stress"],
+  "source": "E-S-41 et Q-4 (adjudication provisoire de l'orchestrateur, brief de la tranche 2, 2026-10-05) : composants des flux pré-déclarés, indice de réplication à partir de 0 ; E-S-10 et Q-S-04 (AVIS) : loi des longueurs regroupée sur les unités de la strate en stress ; Q-2 et I-1 (même adjudication) : loi « tous épisodes » d'EP, censurés compris, limite écrite (leurs longueurs sont des minorants ; SHOGEN-SIM-BIS-STRESS-EPISODES-1)"
  }
 }

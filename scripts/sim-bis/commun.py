@@ -50,7 +50,8 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                           "source": texte},
           "calendrier": {"w": positif, "jours_stress": [jour], "lundi_reference": positif,
                          "echelle_semaines": [positif], "n_par_semaine": {"calme": positif, "stress": positif},
-                         "t_max": (positif, positif), "source": texte}}
+                         "t_max": (positif, positif), "source": texte},
+          "sources": {"composants": [texte], "regroupees": [texte], "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
