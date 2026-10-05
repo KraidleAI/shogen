@@ -68,7 +68,8 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                            "duree_artefact": positif, "duree_locale": positif, "absences": [(positif, positif)],
                            "composants": [texte], "source": texte},
           "regle": {"R": positif, "R_approche": positif, "alpha": (positif, positif),
-                    "garde": {"unites": positif, "k_crit": positif, "runs": positif}, "source": texte}}
+                    "garde": {"unites": positif, "k_crit": positif, "runs": positif}, "c_etoile": (positif, positif),
+                    "tolerances": [naturel], "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

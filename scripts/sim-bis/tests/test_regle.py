@@ -242,3 +242,38 @@ class TestModeComplet(unittest.TestCase):
             self.assertEqual((s["BTC"]["famille"], e["famille"], e["valeur"], e["sans_condition"], s["familial"]),
                              ("F1", "F2", "NON TESTÉ (séquence)", "REJETTE", False))
         self.assertEqual(regle.strate({"BTC": rj, "ETH": nr})["familial"], True)
+
+
+class TestEvenementsEtAbsorption(unittest.TestCase):
+    def test_evenements_e_s_34(self):
+        """Compte d'événements (E-S-34 ; tolérances g de regle.tolerances, recopiées : 0, 5, 20, 60), à la main sur la
+        suite comprimée de 40 positions, I = {0, 1, 3, 10, 11, 30} : g = 0 → 4 runs ; g = 1 (un 0 entre 1 et 3) → 3 ;
+        g = 5 → 3 ; g = 6 (six 0 entre 3 et 10) → 2 ; g = 18 → 1 ; I = {0, 39}, g = 0 → 2 (suite linéaire, aucun
+        enroulement). Loi de rotation (R = 1, α = 1/2, mêmes décalages que test_tester_rotation_r_1) : binance {0, 3},
+        coinbase {0, 3, 7} : E = 2 à g = 0, 1 à g = 5 ; rotation r = 1 : I = {0}, E^(1) = 1 ; C = 0 à g = 0, 1 à g = 5.
+        Mutations M-8B-01 (tolérance g + 1), M-8B-02 (tolérance g − 1), M-8B-03 (tolérance ignorée)."""
+        self.assertEqual(PRM["regle"]["tolerances"], [0, 5, 20, 60])
+        i = bits(0, 1, 3, 10, 11, 30)
+        self.assertEqual([regle.evenements(i, g, 40) for g in (0, 1, 5, 6, 18)], [4, 3, 3, 2, 1])
+        self.assertEqual(regle.evenements(bits(0, 39), 0, 40), 2)
+        prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2], tolerances=[0, 5]))
+        loi = regle.loi_evenements({"binance": bits(0, 3), "coinbase": bits(0, 3, 7)}, "binance", G, "calme", 8, 1,
+                                   prm)
+        self.assertEqual(loi, {0: {"E": 2, "C": 0}, 5: {"E": 1, "C": 1}})
+
+    def test_absorption_t_abs_1(self):
+        """T-ABS-1 (E-S-35 ; c* = 1/2 recopié) : pool de 5 unités à p̂ écrits à la main, a 1/2, b 1/4, c 1/10, d 1/10, e
+        1/20 : Σ p̂/(1 − p̂) = 1 + 1/3 + 1/9 + 1/9 + 1/19 = 275/171 > 1/2 → a retirée ; 104/171 > 1/2 → b ; 47/171 ≤ 1/2
+        : arrêt, retirées a, b, indice 47/171. Égalité (x et y à 1/3, z à 1/10) : x puis y (nom croissant), indice 1/9.
+        Indice égal à c* (u à 1/3 : 1/2) : rien retiré. p̂ = 1 : indice infini, retirée d'abord. Séries (n = 20) : a 10
+        écarts, b 5, c 2, d 2, e 1 → restent c, d, e. Mutations M-ABS-1 (retrait par p̂ croissant), M-8B-04 (« ≥ c* »),
+        M-8B-05 (indice Σ p̂ sans 1 − p̂), M-8B-06 (égalité départagée par nom décroissant)."""
+        f = Fraction
+        self.assertEqual(PRM["regle"]["c_etoile"], [1, 2])
+        p = {"a": f(1, 2), "b": f(1, 4), "c": f(1, 10), "d": f(1, 10), "e": f(1, 20)}
+        self.assertEqual(regle.absorption(p, f(1, 2)), (["a", "b"], f(47, 171)))
+        self.assertEqual(regle.absorption({"y": f(1, 3), "x": f(1, 3), "z": f(1, 10)}, f(1, 2)), (["x", "y"], f(1, 9)))
+        self.assertEqual(regle.absorption({"u": f(1, 3)}, f(1, 2)), ([], f(1, 2)))
+        self.assertEqual(regle.absorption({"u": f(1), "v": f(1, 10)}, f(1, 2)), (["u"], f(1, 9)))
+        series = {"a": (1 << 10) - 1, "b": (1 << 5) - 1, "c": 3, "d": 3, "e": 1}
+        self.assertEqual(regle.filtrer(series, 20, PRM), ({"c": 3, "d": 3, "e": 1}, ["a", "b"], f(47, 171)))

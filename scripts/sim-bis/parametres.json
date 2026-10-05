@@ -55,6 +55,7 @@
  },
  "regle": {
   "R": 9999, "R_approche": 999, "alpha": [1, 100], "garde": {"unites": 2, "k_crit": 2, "runs": 2},
-  "source": "ADR-0029 §2.7 (l.200 : R = 9 999 rotations ; l.202 : C_s ≤ 99 ⇔ (C_s + 1)/(R + 1) ≤ 0,01, d'où alpha = 1/100 et le seuil entier α·(R + 1) − 1 ; l.203 : strate testable ⇔ au moins deux unités avec au moins un écart consolidé, K_crit,s ≥ 2 et au moins deux runs de I_t, seuils scellés) ; §2.4 (c) pt 4 (l.139) ; E-S-28 (PROPOSITION l.182 : K_crit,s ≥ 2 ⇔ C1 ≥ 100) ; R_approche = 999 pour la grille et l'absorption, seuil 9 et garde C1 ≥ 10 (AVIS Q-S-06, complément 1, AVIS.md l.39 : paramètre et non constante ; aucune fréquence de NON ÉVALUABLE d'une cellule à R = 999 au paquet)"
+  "c_etoile": [1, 2], "tolerances": [0, 5, 20, 60],
+  "source": "ADR-0029 §2.7 (l.200 : R = 9 999 rotations ; l.202 : C_s ≤ 99 ⇔ (C_s + 1)/(R + 1) ≤ 0,01, d'où alpha = 1/100 et le seuil entier α·(R + 1) − 1 ; l.203 : strate testable ⇔ au moins deux unités avec au moins un écart consolidé, K_crit,s ≥ 2 et au moins deux runs de I_t, seuils scellés) ; §2.4 (c) pt 4 (l.139) ; E-S-28 (PROPOSITION l.182 : K_crit,s ≥ 2 ⇔ C1 ≥ 100) ; R_approche = 999 pour la grille et l'absorption, seuil 9 et garde C1 ≥ 10 (AVIS Q-S-06, complément 1, AVIS.md l.39 : paramètre et non constante ; aucune fréquence de NON ÉVALUABLE d'une cellule à R = 999 au paquet) ; c_etoile = 1/2, seuil du critère collectif d'absorption candidat (E-S-35, PROPOSITION l.189 ; Q-S-15, Q-R-10 : mesuré, adoption décidée par l'orchestrateur) ; tolerances : g ∈ {0 ; 5 ; 20 ; 60} fenêtres de la suite comprimée pour le compte d'événements hors décision (E-S-34, PROPOSITION l.188 ; Q-S-18 : g de puissance maximale à la cible)"
  }
 }

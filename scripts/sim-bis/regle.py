@@ -4,7 +4,9 @@ croisé à SB-13). Séries consolidées comprimées en entiers (bit t = position
 retenues de la strate, calendrier.comprimer). SB-7a : décalages SHA-256 (Q-R-02 adjugée), rotation enroulée, K par le
 compteur « au moins deux » et S = Σ_j C(m_j, 2) par plans de bits (E-S-26). SB-7b : seuil entier, retraits D1-bis et
 flux presque mort (E-S-24), unité non décalée, décision par strate avec arrêt anticipé exact et garde d'information
-(E-S-28, E-S-29). Entiers et rationnels seuls : aucun flottant, aucune puissance."""
+(E-S-28, E-S-29). SB-8a : mode à R complet, oracle d'équivalence de l'arrêt anticipé, séquence d'ETH et F3 (E-S-29 à
+E-S-31). SB-8b : compte d'événements à tolérance g et critère collectif d'absorption candidat (E-S-34, E-S-35).
+Entiers et rationnels seuls : aucun flottant, aucune puissance."""
 import hashlib
 from fractions import Fraction
 
@@ -222,3 +224,52 @@ def strate(resultats: dict) -> dict:
                   "etiquette": ETIQUETTE_F3}
     out["familial"] = "REJETTE" in (out["BTC"]["valeur"], out.get("ETH", {}).get("valeur"))
     return out
+
+
+def evenements(i: int, g: int, n: int) -> int:
+    """Compte d'événements (E-S-34 ; ADR-0029 l.212, hors décision) : runs de I sur la suite comprimée de longueur n,
+    deux runs séparés par au plus g positions à 0 fusionnés (tolérance en positions de la suite comprimée, jamais de la
+    grille ; suite linéaire, sans enroulement) : chaque 1 étendu de g positions vers l'avant, par doublements."""
+    x, fait = i, 1
+    while fait < g + 1:
+        pas = min(fait, g + 1 - fait)
+        x, fait = x | (x << pas), fait + pas
+    return calendrier.runs(x & ((1 << n) - 1))
+
+
+def loi_evenements(series: dict, premier, graine: str, strate: str, n: int, R: int, prm: dict) -> dict:
+    """Loi de rotation du compte d'événements (E-S-34 : mêmes rotations r = 1..R que K, R complet, statistique hors
+    décision) pour chaque tolérance g de regle.tolerances : {g : {"E" : compte observé, "C" : #{r : E^(r) ≥ E}}}."""
+    if strate not in prm["calibration"]["strates"]:
+        raise commun.Refus("REGLE/libelle", f"strate {strate!r}")
+    gs, i = prm["regle"]["tolerances"], deux(list(series.values()))
+    obs, c = {g: evenements(i, g, n) for g in gs}, {g: 0 for g in gs}
+    for r in range(1, R + 1):
+        j = deux(rotation(series, premier, graine, strate, r, n))
+        for g in gs:
+            c[g] += evenements(j, g, n) >= obs[g]
+    return {g: {"E": obs[g], "C": c[g]} for g in gs}
+
+
+def absorption(p: dict, c_etoile) -> tuple:
+    """Critère collectif d'absorption candidat (E-S-35 ; Q-R-10 ; Q-S-15 : mesuré, adoption décidée par
+    l'orchestrateur) : p = {u : p̂_u} rationnels de [0, 1] ; retraits un à un par p̂ décroissant (égalité : nom
+    croissant) tant que Σ_u p̂_u/(1 − p̂_u) > c* (un p̂_u = 1 rend l'indice infini) ; rend (retirées dans l'ordre,
+    indice final). Il ne lit que des marges, invariantes par rotation."""
+    reste, retirees = dict(p), []
+
+    def indice():
+        return None if 1 in reste.values() else sum((x / (1 - x) for x in reste.values()), Fraction(0))
+    while reste and (indice() is None or indice() > c_etoile):
+        u = sorted(reste, key=lambda v: (-reste[v], v))[0]
+        retirees.append(u)
+        del reste[u]
+    return retirees, indice()
+
+
+def filtrer(series: dict, n: int, prm: dict) -> tuple:
+    """Séries restées après le critère collectif (valeurs « avec » ; les valeurs « sans » prennent toutes les séries) :
+    p̂_u = écarts consolidés de u sur la suite comprimée / n ; rend (séries restées, retirées, indice final)."""
+    p = {u: Fraction(x.bit_count(), n) for u, x in series.items()}
+    ret, ind = absorption(p, Fraction(*prm["regle"]["c_etoile"]))
+    return {u: x for u, x in series.items() if u not in ret}, ret, ind
