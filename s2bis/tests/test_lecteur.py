@@ -215,6 +215,16 @@ def lire(dossier, prefixe="pool"):
     return lecteur, list(lecteur)
 
 
+def lire_sans_exception(dossier):
+    """(flux, queue finale) de la lecture de `dossier`, ou le nom de l'exception levée (RecursionError comprise) :
+    l'assertion la montre au lieu d'une erreur."""
+    try:
+        lecteur, flux = lire(dossier)
+    except Exception as e:                                      # rendue comme valeur, comparée par l'assertion
+        return type(e).__name__
+    return flux, lecteur.queue_finale
+
+
 def queue(nom, position, octets, cause):
     return {"fichier": nom, "position": position, "octets": len(octets), "sha256": hashlib.sha256(octets).hexdigest(),
             "cause": cause}
@@ -335,6 +345,24 @@ class Queues(AvecQueues):
                 lecteur, flux = lire(self.d)
                 self.assertEqual((len(longue), len(flux), lecteur.queue_finale), (4194304 + de_plus, len(enrs) + 1 -
                                  de_plus, [queue(FICHIER, len(intact), longue, "LECTEUR/fin")] if de_plus else []))
+
+    def test_octets_lus_en_utf8_strict(self):                          # NC-1 du contre-contrôle de RB-1 (§7.1 b)
+        """Le compte des niveaux et le décodeur lisent le même texte : l'UTF-8 strict de la ligne. Lignes minimales de
+        NC-1 en UTF-16-LE, closes par 00 0A, K = 2 000 et 20 000 crochets (décodées en UTF-16 par `json.loads` sur les
+        octets bruts : RecursionError sans verdict sous 3.10, puis sous 3.12) ; octet 0xFF ; BOM UTF-8 gardé. Chacune
+        est la queue du fichier, en 145 derrière son `ouverture`."""
+        nom, o, fin = "pool-2026-10-05-0.jsonl", ligne(0, "0" * 64, type="ouverture", jour="2026-10-05",
+                                                       suivante=m(63)), bytes([10])
+        cas = [(("{" + '"a' + chr(92) + '"":' + "[" * k + chr(0x0A00)).encode("utf-16-le"), "LECTEUR/json")
+               for k in (2000, 20000)] + [(b'{"x":"' + bytes([255]) + b'"}' + fin, "LECTEUR/utf8"),
+                                          (bytes([239, 187, 191]) + o, "LECTEUR/json")]
+        for octets, cause in cas:
+            with self.subTest(cause=cause, debut=octets[:12]):
+                self.setUp()
+                with open(os.path.join(self.d, nom), "wb") as f:
+                    f.write(o + octets)
+                self.assertEqual(lire_sans_exception(self.d), ([("enr", nom, json.loads(o))],
+                                                               [queue(nom, 145, octets, cause)]))
 
     def test_queue_non_declaree_suivie_d_un_fichier(self):
         jours(self, (J1, J2, J2 + 60))

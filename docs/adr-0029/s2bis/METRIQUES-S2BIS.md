@@ -1759,3 +1759,24 @@ Mutants (commande du job, `--plancher 254`, borne de 300 s ; python3.12 ; résea
 0 FATAL) : sortie en séquences u, sortie en latin-1, forme canonique en séquences u, trois arguments admis, zéro ou un
 argument admis, un ou trois arguments admis, codes d'usage 1 et 0, usage sur la sortie standard, fichier lu en entier,
 tampon de 8 Mio. Suite : 254 tests ; plancher du job : 254, égalité exigée (`--egal`).
+
+## RB-1l (2026-10-05) : ligne en UTF-8 strict avant le compte des niveaux et le décodeur (NC-1 du contre-contrôle)
+
+Objet (NC-1 du contre-contrôle de RB-1, adjugé par l'orchestrateur) : `_integre` décode la ligne en UTF-8 strict avant
+le compte des niveaux et le décodeur JSON, qui lisent ainsi le même texte ; une erreur de décodage rend la ligne non
+intègre (`LECTEUR/utf8`). Avant : `json.loads` recevait les octets bruts et y reconnaissait l'UTF-16 ou l'UTF-32 par
+leurs octets nuls, alors que `_trop_profonde` comptait sur l'UTF-8 : une ligne en UTF-16-LE close par 00 0A, d'un niveau
+au compte, menait le décodeur dans K crochets, et RecursionError sortait sans verdict (K = 2 000 sous 3.10 ; K = 20 000
+sous 3.10 et 3.12). Un BOM UTF-8 n'est plus retiré en silence (ligne non intègre, `LECTEUR/json`). FORMAT §7.1 b.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 209 | — |
+| `tests/test_lecteur.py` | 539 | 32 (1 de plus : les deux lignes minimales de NC-1, K = 2 000 et 20 000, un octet 0xFF, un BOM ; chacune en queue à la position 145) |
+
+Rouge : sur le code d'avant, 4 échecs d'assertion sous 3.10 (les deux lignes de NC-1 : RecursionError ; 0xFF nommé
+`json` ; BOM nommé `canonique`), 3 sous 3.12 (K = 2 000 y passe). Mutants (commande du job, runner puis `--plancher
+255`, borne de 300 s ; python3.12 ; réseau isolé) : 6 tués sur 6 par leur test visé (0 vivant, 0 FATAL) : `json.loads`
+rétabli sur les octets bruts (NC-1) ; décodage non strict (remplacement), en latin-1, ou avec retrait du BOM ; erreur de
+décodage non rattrapée ; cause de l'octet invalide mal nommée. Suite : 255 tests ; plancher du job : 255, égalité exigée
+(`--egal`).

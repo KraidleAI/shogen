@@ -90,7 +90,9 @@ def _canonique(v):
 def _integre(ligne, etat):
     """(enregistrement, état) d'une ligne intègre, sinon _NonIntegre(cause) ; définition unique du FORMAT §7.1 : (a)
     ligne close par 0x0A (`LECTEUR/fin`), d'au plus LIMITE octets (borne de sa lecture, `readline(LIMITE)`) ; (b)
-    conteneurs au niveau NIVEAUX au plus, comptés avant tout décodeur (`LECTEUR/imbrication` ; une RecursionError du
+    texte UTF-8 strict (`LECTEUR/utf8`), seul texte que lisent le compte des niveaux et le décodeur (NC-1 du
+    contre-contrôle : `json.loads` sur les octets bruts y reconnaissait l'UTF-16 ou l'UTF-32) ; conteneurs au niveau
+    NIVEAUX au plus, comptés avant tout décodeur (`LECTEUR/imbrication` ; une RecursionError du
     décodeur n'est jamais un verdict : elle remonte, C-4), objet JSON canonique (`LECTEUR/json`, `canonique`,
     `flottant`), entiers de CHIFFRES chiffres au plus (`LECTEUR/entier-long`) ; (c), (d) types de `_types`
     (`LECTEUR/champ`) ; (e) chaînée à la ligne précédente du fichier, la première étant une `ouverture` ou une
@@ -101,10 +103,14 @@ def _integre(ligne, etat):
     `marqueur` ou d'un enregistrement hors RESERVES, sinon celle de l'état précédent (None à la première ligne)."""
     if not ligne.endswith(b"\n"):
         raise _NonIntegre("LECTEUR/fin")
+    try:
+        texte = ligne.decode("utf-8")                       # strict ; `ligne` en est l'UTF-8, que compte _trop_profonde
+    except UnicodeDecodeError:
+        raise _NonIntegre("LECTEUR/utf8") from None
     if _trop_profonde(ligne):
         raise _NonIntegre("LECTEUR/imbrication")
     try:
-        e = json.loads(ligne, parse_int=_entier, parse_float=_cause("LECTEUR/flottant"),
+        e = json.loads(texte, parse_int=_entier, parse_float=_cause("LECTEUR/flottant"),
                        parse_constant=_cause("LECTEUR/flottant"))
         canon = _canonique(e).encode() + b"\n"
     except ValueError:
