@@ -800,3 +800,17 @@ l'état final) ; les autres comptes des sections CB-18 sont recomptés égaux.
 Mutants (commande du job, `--plancher 179`, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
 0 FATAL), dont `run_params` écrit après la boucle. Suite : 179 tests ; plancher du job : 179, égalité exigée
 (`--egal`).
+
+## CB-18k (2026-10-05) : enregistreur de rôle, ligne du seul job suivant (C-2 de la G2 de la tranche C)
+
+Objet : `test_suites_s2bis_et_sim_bis_par_la_ligne_du_job` ajoute un commit où la ligne du vérificateur de s2bis ne
+figure que dans le job suivant (`sim-bis-unittest`) : refus avant toute écriture. Rouge montré avec MR-24 du
+réviseur (ligne cherchée jusqu'à la fin du fichier), qui survivait. Le dépôt jetable du test porte aussi
+`s2-harness/tests`, pour que ce rouge soit d'assertion. Aucun code de production.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `s2-harness/tests/test_oracle_record.py` | 423 | 12 (1 complété : ligne du seul job suivant) |
+
+Mutants (commande du job s2-harness-unittest, borne de 300 s ; python3.12 ; réseau isolé ; état CB-18k) : MR-24 et
+une fin de job manquée sur un nom à tiret, 2 tués sur 2 (0 vivant, 0 FATAL). Suite S2 : 406 tests, inchangée.
