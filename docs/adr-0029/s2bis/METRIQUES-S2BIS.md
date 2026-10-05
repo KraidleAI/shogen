@@ -474,3 +474,24 @@ Mutants (commande du job, runner puis `--plancher 150`, borne de 300 s, réseau 
 visé (0 vivant, 0 FATAL) : G-13 à G-16, G-19 et G-20 du réviseur, rejoués tels qu'écrits, et M-1d-01 à M-1d-03 (état
 rendu par `_integre`). Sur l'état RB-1c, les mêmes neuf mutants : 7 vivants (les six du réviseur et M-1d-01), 2 tués.
 Suite : 150 tests ; plancher du job : 150, égalité exigée (`--egal`).
+
+## RB-1e (2026-10-05) : corrections C-1, Q-RB-4 et Q-RB-6 de la relecture G2 de la tranche 1 de P3 (paramètres)
+
+Objet : planchers des oracles poussés hors BTC (ADR-0029 l.188) : σ au moins égal à 124 200 s pour USDC et à
+129 600 s pour USDT (C-1 ; ETH : 5 400 s, égal au plancher de la classe), refus `ANALYSE/sigma` ; τ au moins égal à
+0,75 % pour ETH et à 0,375 % pour les stables, refus `ANALYSE/tau-plancher` (Q-RB-4). τ de BTC sur la grille de
+0,05 % (l.181), refus `ANALYSE/tau-grille` ; la grille des autres actifs relève du G0 de CALIB-ACTIFS (l.186). σ des
+places et des agrégateurs d'un actif au moins égal à celui de BTC de la même classe (l.189), une classe absente de BTC
+étant refusée : `ANALYSE/incoherent : sigma-btc` ; les oracles des autres actifs en sont exclus (l.189 : « planchers
+seuls », aux valeurs de l.188, que le σ de BTC peut dépasser). R = 9 999 et seuil = 99 exacts au chargeur (Q-RB-6),
+refus `ANALYSE/borne` ; la cohérence alpha reste en seconde garde, contrôlée sur la règle elle-même. VALIDE : σ des
+places horodatées de BTC ramené à 30 s, sha256 recalculé hors du code (`sed`, `sha256sum`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/config_analyse.py` | 164 | 13 (`tests/test_config_analyse.py`, 201 lignes ; 5 de plus) |
+
+Mutants (commande du job, runner puis `--plancher 155`, borne de 300 s, réseau isolé) : 17 tués sur 17 par leur test
+visé (0 vivant, 0 FATAL), dont « σ des oracles comparé à celui de BTC » (l.188 contredit), « classe absente de BTC
+admise » et les bornes de R et du seuil d'avant Q-RB-6. Suite : 155 tests ; plancher du job : 155, égalité exigée
+(`--egal`).

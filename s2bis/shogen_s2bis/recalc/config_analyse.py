@@ -6,6 +6,7 @@ refusés (lecture reprise de collecte/config.py l.20-46, par copie : la frontiè
 puis le schéma (champs exacts, types, bornes ; τ, σ et noms d'unité), puis la cohérence (COHERENCE). Tout écart lève
 RefusAnalyse (`code` nomme le refus), sans défaut ni écrêtage. τ, P_j : fraction décimale en chaîne (« 0.005 » =
 0,5 %, τ de S2, `run_campaign.py` l.120-129) ; σ, D-2 à D-5 : secondes entières."""
+import functools
 import hashlib
 import json
 import re
@@ -17,6 +18,14 @@ ACTIFS = ("BTC", "ETH", "USDC", "USDT")
 PLANCHERS = {"place_horodatee": 30, "agregateur": 300, "oracle_chainlink": 5400, "sans_horodatage": None}
 TAU = (Decimal("0.0005"), Decimal("0.0285"))
 FRACTION = re.compile(r"0\.[0-9]{1,20}")
+# Oracles poussés hors BTC (l.188 ; C-1 et Q-RB-4 de la G2 de RB-T1) : τ >= 1,5 × seuil de déviation ; σ >= 1,5 ×
+# heartbeat (ETH : 5 400 s, égal au plancher d'ADR-0020 de la classe). τ de BTC sur la grille de 0,05 % (l.181 ; celle
+# des autres actifs relève du G0 de CALIB-ACTIFS, l.186). σ des places et des agrégateurs d'un actif au moins égal à
+# celui de BTC de la même classe (l.189 ; « planchers seuls » pour les oracles des autres actifs, valeurs de l.188).
+TAU_ORACLES = {"ETH": "0.0075", "USDC": "0.00375", "USDT": "0.00375"}
+SIGMA_ORACLES = {"USDC": 124200, "USDT": 129600}
+GRILLE_BTC = Decimal("0.0005")
+SIGMA_BTC = ("place_horodatee", "agregateur")
 
 
 class RefusAnalyse(Exception):
@@ -52,16 +61,24 @@ def _nom(v, ou):
         _refus("ANALYSE/unite", f"{ou} = {v!r}")
 
 
-def _table(v, ou):
+def _table(actif, v, ou):
     """τ et σ d'un actif par classe de source : sous-ensemble non vide des classes ; σ null pour les places sans
-    horodatage (staleness non évaluable, `r1.classify_ecart`), entier au moins égal au plancher ailleurs."""
+    horodatage (staleness non évaluable, `r1.classify_ecart`), entier au moins égal au plancher ailleurs (celui de la
+    classe, et celui de l'oracle de l'actif) ; τ au moins égal au plancher de l'oracle de l'actif, sur la grille pour
+    BTC."""
     if type(v) is not dict or not v or v.keys() - PLANCHERS.keys():
         _refus("ANALYSE/classe", f"{ou} : {sorted(v) if type(v) is dict else v!r}")
     for classe, x in v.items():
         controler(x, {"sigma": lambda s, o: None, "tau": _fraction}, f"{ou}.{classe}")
         if not TAU[0] <= Decimal(x["tau"]) < TAU[1]:
             _refus("ANALYSE/borne", f"{ou}.{classe}.tau = {x['tau']} hors [0.0005, 0.0285)")
+        if classe == "oracle_chainlink" and Decimal(x["tau"]) < Decimal(TAU_ORACLES.get(actif, "0")):
+            _refus("ANALYSE/tau-plancher", f"{ou}.{classe}.tau = {x['tau']} (plancher {TAU_ORACLES[actif]})")
+        if actif == "BTC" and Decimal(x["tau"]) % GRILLE_BTC:
+            _refus("ANALYSE/tau-grille", f"{ou}.{classe}.tau = {x['tau']} hors de la grille de {GRILLE_BTC}")
         plancher, s = PLANCHERS[classe], x["sigma"]
+        if classe == "oracle_chainlink":
+            plancher = max(plancher, SIGMA_ORACLES.get(actif, 0))
         if (s is not None) if plancher is None else (type(s) is not int or s < plancher):
             _refus("ANALYSE/sigma", f"{ou}.{classe}.sigma = {s!r} (plancher {plancher})")
 
@@ -73,9 +90,9 @@ SCHEMA = {
     "gardes": {"diviseur_n": ENTIER, "k_crit": ENTIER, "runs": ENTIER, "unites": ENTIER},
     "n_s": {"calme": ENTIER, "stress": ENTIER},
     "p_j": {"grille": [_fraction], "seuil": _fraction},
-    "rotations": {"R": (int, 1, 9999), "seuil": (int, 0, None)},
+    "rotations": {"R": (int, 9999, 9999), "seuil": (int, 99, 99)},        # Q-RB-6 : valeurs de l.139, l.200, l.202
     "t_max_s": (int, 60, None),
-    "tau_sigma": {a: _table for a in ACTIFS},
+    "tau_sigma": {a: functools.partial(_table, a) for a in ACTIFS},
     "tolerance_evenements": (int, 0, None),
     "unites": {a: [_nom] for a in ACTIFS},
 }
@@ -86,7 +103,9 @@ def _croissante(xs):
 
 
 # (nom du refus, prédicat). Unités : ordre strict des points de code (« ordre alphabétique », ADR-0029 l.200) ; pools
-# d'ETH, d'USDC et d'USDT pris parmi les hôtes de BTC (l.173) ; alpha : C <= seuil ⇔ (C + 1)/(R + 1) <= 0,01 (l.202).
+# d'ETH, d'USDC et d'USDT pris parmi les hôtes de BTC (l.173) ; alpha : C <= seuil ⇔ (C + 1)/(R + 1) <= 0,01 (l.202),
+# seconde garde de R et du seuil (Q-RB-6) ; sigma-btc (l.189) : σ_BTC de la classe exigé, une classe absente de BTC
+# est refusée (pools des autres actifs pris parmi les hôtes de BTC, l.173).
 COHERENCE = (
     ("alpha", lambda d: d["rotations"]["R"] + 1 == 100 * (d["rotations"]["seuil"] + 1)),
     ("t_max-grille", lambda d: d["t_max_s"] % 60 == 0),
@@ -94,6 +113,8 @@ COHERENCE = (
     ("p_j-seuil", lambda d: Decimal(d["p_j"]["seuil"]) in [Decimal(x) for x in d["p_j"]["grille"]]),
     ("unites-ordre", lambda d: all(_croissante(u) for u in d["unites"].values())),
     ("unites-btc", lambda d: all(set(u) <= set(d["unites"]["BTC"]) for u in d["unites"].values())),
+    ("sigma-btc", lambda d: all(c in d["tau_sigma"]["BTC"] and x["sigma"] >= d["tau_sigma"]["BTC"][c]["sigma"]
+                                for t in d["tau_sigma"].values() for c, x in t.items() if c in SIGMA_BTC)),
 )
 
 

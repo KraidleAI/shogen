@@ -11,13 +11,13 @@ VALIDE = (b'{"degradation": {"d2_retard_s": 5, "d3_borne_s": 1, "d3_age_s": 120,
           b'"n_s": {"calme": 109440, "stress": 43776}, "p_j": {"grille": ["0.0025", "0.005", "0.01", "0.02"], '
           b'"seuil": "0.005"}, "rotations": {"R": 9999, "seuil": 99}, "t_max_s": 14515200, "tau_sigma": {"BTC": '
           b'{"agregateur": {"sigma": 300, "tau": "0.0265"}, "oracle_chainlink": {"sigma": 5400, "tau": "0.027"}, '
-          b'"place_horodatee": {"sigma": 180, "tau": "0.005"}, "sans_horodatage": {"sigma": null, "tau": "0.013"}}, '
+          b'"place_horodatee": {"sigma": 30, "tau": "0.005"}, "sans_horodatage": {"sigma": null, "tau": "0.013"}}, '
           b'"ETH": {"place_horodatee": {"sigma": 30, "tau": "0.0075"}}, "USDC": {"oracle_chainlink": {"sigma": 124200, '
           b'"tau": "0.00375"}}, "USDT": {"oracle_chainlink": {"sigma": 129600, "tau": "0.00375"}}}, '
           b'"tolerance_evenements": 20, "unites": {"BTC": ["api.binance.com", "api.kraken.com", '
           b'"ethereum-rpc.publicnode.com"], "ETH": ["api.kraken.com"], "USDC": ["api.kraken.com"], "USDT": '
           b'["api.binance.com"]}}\n')
-SHA_VALIDE = "fcf18be56b5e16c965b39b9829210079d2ae602ba885cda1fdb60831d879cd14"
+SHA_VALIDE = "c75973684681536db5523b82e2d55d758fc5c62a1528611066b7430cebe7a15e"
 
 
 class Base(unittest.TestCase):
@@ -106,6 +106,52 @@ class TauSigma(Base):                                        # bornes écrites d
                                                       b'"ETH": {}'), "$.tau_sigma.ETH : []")))
 
 
+class Oracles(Base):                       # C-1 et Q-RB-4 de la G2 de RB-T1 ; ADR-0029 l.181, l.188 et l.189
+    def ajout(self, entree):                                     # une classe de plus à ETH
+        return VALIDE.replace(b'"ETH": {', b'"ETH": {' + entree + b", ")
+
+    def test_planchers_de_sigma_par_actif(self):                 # C-1 : USDC 124 200 s, USDT 129 600 s (l.188)
+        self.assertEqual([self.charger(VALIDE)[0]["tau_sigma"][a]["oracle_chainlink"]["sigma"] for a in (
+            "BTC", "USDC", "USDT")], [5400, 124200, 129600])                    # planchers admis
+        self.refus([("ANALYSE/sigma", VALIDE.replace(b'"sigma": ' + s, b'"sigma": ' + str(int(s) - 1).encode()),
+                     f"{a}.oracle_chainlink.sigma = {int(s) - 1} (plancher {int(s)})")
+                    for a, s in (("BTC", b"5400"), ("USDC", b"124200"), ("USDT", b"129600"))])
+
+    def test_planchers_de_tau_des_oracles(self):                 # Q-RB-4 : 0,75 % pour ETH, 0,375 % stables (l.188)
+        eth = self.ajout(b'"oracle_chainlink": {"sigma": 5400, "tau": "0.0075"}')
+        btc = VALIDE.replace(b'"tau": "0.027"', b'"tau": "0.0005"')         # BTC : aucun plancher en valeur (l.181)
+        self.assertEqual((self.charger(eth)[0]["tau_sigma"]["ETH"]["oracle_chainlink"]["tau"],
+                          self.charger(btc)[0]["tau_sigma"]["BTC"]["oracle_chainlink"]["tau"]), ("0.0075", "0.0005"))
+        r = VALIDE.replace
+        self.refus([("ANALYSE/tau-plancher", o, d) for o, d in (
+            (eth.replace(b'"0.0075"}, "place', b'"0.00749"}, "place'), "ETH.oracle_chainlink.tau = 0.00749 (plancher "
+             "0.0075)"), (r(b'124200, "tau": "0.00375"', b'124200, "tau": "0.003749"'), "USDC.oracle_chainlink.tau = "
+                          "0.003749 (plancher 0.00375)"),
+            (r(b'129600, "tau": "0.00375"', b'129600, "tau": "0.0037"'), "USDT.oracle_chainlink.tau = 0.0037"))])
+
+    def test_grille_de_tau_de_btc(self):                         # Q-RB-4 : grille de 0,05 % pour BTC seul (l.181)
+        r = VALIDE.replace
+        bords = r(b'"tau": "0.0265"', b'"tau": "0.028"').replace(b'"tau": "0.005"', b'"tau": "0.0005"')
+        hors = r(b'"tau": "0.0075"', b'"tau": "0.00751"')        # ETH : grille du G0 de CALIB-ACTIFS (l.186)
+        self.assertEqual((self.charger(bords)[0]["tau_sigma"]["BTC"]["agregateur"]["tau"],
+                          self.charger(hors)[0]["tau_sigma"]["ETH"]["place_horodatee"]["tau"]), ("0.028", "0.00751"))
+        self.refus([("ANALYSE/tau-grille", r(b'"tau": "' + a + b'"', b'"tau": "' + x + b'"'),
+                     f"BTC.{c}.tau = {x.decode()}") for a, x, c in (
+            (b"0.0265", b"0.02651", "agregateur"), (b"0.005", b"0.00525", "place_horodatee"),
+            (b"0.013", b"0.0131", "sans_horodatage"), (b"0.027", b"0.0279", "oracle_chainlink"))])
+
+    def test_sigma_au_moins_celui_de_btc(self):                  # Q-RB-4 : places et agrégateurs (l.189)
+        agr = self.ajout(b'"agregateur": {"sigma": 300, "tau": "0.01"}')
+        oracle = self.ajout(b'"oracle_chainlink": {"sigma": 5400, "tau": "0.0075"}').replace(
+            b'5400, "tau": "0.027"', b'10800, "tau": "0.027"')   # l.188 : σ d'ETH = 1,5 × heartbeat, sous σ_BTC admis
+        self.assertEqual((self.charger(agr)[0]["tau_sigma"]["ETH"]["agregateur"]["sigma"],
+                          self.charger(oracle)[0]["tau_sigma"]["ETH"]["oracle_chainlink"]["sigma"]), (300, 5400))
+        self.refus([("ANALYSE/incoherent", o, "incoherent : sigma-btc") for o in (
+            agr.replace(b'"sigma": 300, "tau": "0.0265"', b'"sigma": 301, "tau": "0.0265"'),
+            VALIDE.replace(b'"sigma": 30, "tau": "0.005"', b'"sigma": 31, "tau": "0.005"'),
+            agr.replace(b'"agregateur": {"sigma": 300, "tau": "0.0265"}, ', b""))])      # classe absente de BTC
+
+
 class Unites(Base):
     def test_noms_ascii_imprimable_sans_deux_points(self):  # Q-R-02 de l'AVIS du G0, complément (3)
         bords = VALIDE.replace(b'"BTC": ["api.binance.com", ', b'"BTC": [" !", "api.binance.com", ').replace(
@@ -119,18 +165,22 @@ class Unites(Base):
 
 class Coherence(Base):
     def test_regles(self):
-        r = VALIDE.replace
-        self.assertEqual(self.charger(r(b'"R": 9999, "seuil": 99', b'"R": 999, "seuil": 9'))[0]["rotations"],
-                         {"R": 999, "seuil": 9})                     # alpha = 0,01 exactement : (9 + 1)/(999 + 1)
+        r, alpha = VALIDE.replace, dict(ca.COHERENCE)["alpha"]           # alpha : seconde garde (Q-RB-6)
+        self.assertEqual([alpha({"rotations": {"R": R, "seuil": s}}) for R, s in ((9999, 99), (999, 9), (99, 0), (
+            9999, 98), (9999, 100), (9998, 99))], [True] * 3 + [False] * 3)     # (seuil + 1)/(R + 1) = 0,01 exactement
         self.assertEqual(self.charger(r(b'"seuil": "0.005"', b'"seuil": "0.0050"'))[0]["p_j"]["seuil"], "0.0050")
         self.refus([("ANALYSE/incoherent", o, "incoherent : " + nom) for nom, o in (
-            ("alpha", r(b'"seuil": 99', b'"seuil": 98')), ("alpha", r(b'"seuil": 99', b'"seuil": 100')),
             ("t_max-grille", r(b"14515200", b"14515230")), ("p_j-seuil", r(b'"seuil": "0.005"', b'"seuil": "0.004"')),
             ("p_j-grille", r(b'"0.0025", "0.005"', b'"0.005", "0.0025"')),
             ("p_j-grille", r(b'"0.0025", "0.005"', b'"0.005", "0.005"')),
             ("unites-ordre", r(b'"api.binance.com", "api.kraken.com"', b'"api.kraken.com", "api.binance.com"')),
             ("unites-ordre", r(b'"api.binance.com", "api.kraken.com"', b'"api.binance.com", "api.binance.com"')),
             ("unites-btc", r(b'"ETH": ["api.kraken.com"]', b'"ETH": ["api.okx.com"]')))])
+
+    def test_R_et_seuil_exacts(self):                         # Q-RB-6 : R = 9 999, seuil = 99 (l.139, l.200, l.202)
+        self.refus([("ANALYSE/borne", VALIDE.replace(b'"R": 9999, "seuil": 99', x), d) for x, d in (
+            (b'"R": 999, "seuil": 9', "R = 999"), (b'"R": 9998, "seuil": 99', "R = 9998"),
+            (b'"R": 9999, "seuil": 98', "rotations.seuil = 98"), (b'"R": 9999, "seuil": 100', "seuil = 100"))])
 
 
 class Gabarit(Base):                                         # s2bis/config/analyse.json, valeurs de l'ADR-0029
