@@ -50,25 +50,38 @@ class Ligne(unittest.TestCase):
                      ('{"a":"' + BS + 'ud800"}').encode(), bytes((0xEF, 0xBB, 0xBF)) + b'{"a":1}'):
             self.assertIsNone(o.objet(brut + NL), brut)
 
-    def test_imbrication_excessive(self):                                   # §8.3 : RecursionError, non intègre
-        self.assertIsNone(o.objet(ligne('{"a":' + "[" * 100000 + "]" * 100000 + "}")))
+    def test_imbrication_comptee_par_le_lecteur(self):                      # §8.3, §7.1 b (lettre C-4) : N = 64
+        def listes(n):                                                      # n niveaux : l'objet, n - 1 listes
+            return '{"a":' + "[" * (n - 1) + "]" * (n - 1) + "}"
 
-    def test_entiers_longs(self):                                           # Q-R18-2 ; E-R-01
+        def alternes(n):                                                    # n niveaux : listes et objets alternés
+            t = "7"
+            for k in range(n - 1):
+                t = "[" + t + "]" if k % 2 else '{"b":' + t + "}"
+            return '{"a":' + t + "}"
+        v = []
+        for _k in range(62):
+            v = [v]
+        self.assertEqual(o.objet(ligne(listes(64))), {"a": v})              # la racine au niveau 1
+        self.assertIsNotNone(o.objet(ligne(alternes(64))))
+        for t in (listes(65), alternes(65), listes(100000)):                # lisible par json, ou RecursionError
+            self.assertIsNone(o.objet(ligne(t)), len(t))
+        dans = '{"a":"' + "[" * 70 + '","b":"' + BS + '"' + "{" * 70 + '","c":"' + BS * 2 + '","d":"' + "[" * 70 + '"}'
+        self.assertEqual(o.objet(ligne(dans)), {"a": "[" * 70, "b": '"' + "{" * 70, "c": BS, "d": "[" * 70})
+
+    def test_entiers_longs(self):                                           # §1.2, §7.1 b (lettre C-1)
         t = '{"a":' + "9" * 640 + ',"b":-1' + "0" * 639 + "}"
         self.assertEqual(o.objet(ligne(t)), {"a": 10 ** 640 - 1, "b": -(10 ** 639)})
-        for t in ('{"a":' + "1" * 641 + "}", '{"a":-' + "1" * 641 + "}", '{"a":[' + "2" * 700 + "]}"):
-            with self.assertRaises(o.RefusOracle) as r:
-                o.objet(ligne(t))
-            self.assertEqual(r.exception.code, "ORACLE/entier-long")
-        for t in ('{"a":' + "1" * 641 + ',"b":1.5}', "[" + "1" * 641 + "]", '{"a":' + "1" * 641 + ",}"):
-            self.assertIsNone(o.objet(ligne(t)), t[-9:])                    # non intègre d'abord
+        for t in ('{"a":' + "1" * 641 + "}", '{"a":-' + "1" * 641 + "}", '{"a":[' + "2" * 700 + "]}",
+                  '{"a":' + "3" * 5000 + "}", '{"a":' + "1" * 641 + ',"b":1.5}', '{"a":' + "1" * 641 + ",}"):
+            self.assertIsNone(o.objet(ligne(t)), t[-9:])                    # non intègre, jamais un refus
 
     def test_independant_du_reglage_de_l_interpreteur(self):                # PYTHONINTMAXSTRDIGITS, -X int_max…
         self.addCleanup(sys.set_int_max_str_digits, sys.get_int_max_str_digits())
         for reglage in (640, 0, 4300):
             sys.set_int_max_str_digits(reglage)
             self.assertEqual(o.objet(ligne('{"a":-' + "7" * 640 + "}")), {"a": -int("7" * 640)})
-            self.assertRaises(o.RefusOracle, o.objet, ligne('{"a":' + "7" * 641 + "}"))
+            self.assertIsNone(o.objet(ligne('{"a":' + "7" * 641 + "}")), reglage)
 
 
 class Champs(unittest.TestCase):
@@ -336,20 +349,22 @@ class Journaux(unittest.TestCase):
         self.assertEqual((len(l1), len(l2), [x[2] for x in flux], r["queue_finale"]),
                          (4194304, 4194305, [sha(l0), sha(l1)], [q]))
 
-    def test_entiers_longs_dans_un_journal(self):                         # Q-R18-2 : 640 chiffres lus, 641 refusés
+    def test_entier_long_ou_imbrication_dans_un_journal(self):            # §1.2, §8.3 : la ligne ouvre la queue
         jl = j.Journal(self.d, "pool", fsync=lambda fd: None).ouvrir(T0 - 600)
         self.addCleanup(jl.fermer)
         jl.ecrire("lecture", T0 - 540, grand=int("9" * 640), petit=-int("9" * 640))
         jl.marqueur(T0 - 540)
         enr = self.lire()[0]["enregistrements"][1]["enr"]
         self.assertEqual((enr["grand"], enr["petit"]), (10 ** 640 - 1, 1 - 10 ** 640))
-        with open(os.path.join(self.d, J1), "ab") as f:                     # l'écrivain refuse 641 chiffres (§1.2) :
-            f.write(ligne('{"prec":"' + self.lignes(J1)[-1][2] + '","seq":3,"trop":' + "9" * 641   # ligne à la main
-                          + ',"type":"lecture","ws":' + str(T0 - 480) + "}"))
-        with self.assertRaises(o.RefusOracle) as e:
-            self.lire()
-        self.assertEqual((e.exception.code, e.exception.fichier, e.exception.position),
-                         ("ORACLE/entier-long", J1, self.lignes(J1)[3][1]))
+        j1, b = self.lignes(J1), self.octets(J1)
+        for valeur in ("9" * 641, "[" * 64 + "]" * 64, "[" * 100000 + "]" * 100000):   # l'écrivain les refuse :
+            l3 = ligne('{"prec":"' + j1[-1][2] + '","seq":3,"trop":' + valeur      # lignes écrites à la main
+                       + ',"type":"lecture","ws":' + str(T0 - 480) + "}")
+            with open(os.path.join(self.d, J1), "wb") as f:
+                f.write(b + l3)
+            r, flux = self.lire()
+            q = {"fichier": J1, "position": len(b), "octets": len(l3), "sha256": sha(l3)}
+            self.assertEqual((flux, r["queue_finale"], r["ruptures"]), (j1, [q], []), len(valeur))
 
     def test_premier_fichier_manquant(self):                              # §1.3 : la genèse manque
         self.ecrivain(T0, range(T0 + 60, T0 + 240, 60))
@@ -386,9 +401,6 @@ class LigneDeCommande(unittest.TestCase):                                  # for
                        '"queue_finale":[],"queues_declarees":[],"ruptures":[],"tete":{"seq":0,"sha256":"'
                        + self.H + '"}}')
             self.assertEqual(self.lancer(d, "pool"), (0, ligne(attendu)))
-            with open(os.path.join(d, J1), "ab") as f:
-                f.write(ligne('{"a":' + "1" * 641 + "}"))
-            refus = ('{"fichier":"' + J1 + '","format":"shogen.s2bis.oracle-indep.v1","position":145,'
-                     '"refus":"ORACLE/entier-long"}')
-            self.assertEqual(self.lancer(d, "pool"), (1, ligne(refus)))
+            refus = '{"fichier":null,"format":"shogen.s2bis.oracle-indep.v1","position":null,"refus":"ORACLE/lecture"}'
+            self.assertEqual(self.lancer(os.path.join(d, "absent"), "pool"), (1, ligne(refus)))
         self.assertEqual(self.lancer(), (2, b""))

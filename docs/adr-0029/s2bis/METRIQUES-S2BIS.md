@@ -1658,3 +1658,23 @@ Mutants (commande du job, `--plancher 246`, borne de 300 s ; python3.12 ; résea
 0 FATAL) : bornes LIMITE + 1 et LIMITE - 1, ligne non bornée, position du refus perdue, refus sans lieu, sortie sans
 0x0A final, séparateurs avec espaces, codes de sortie du refus et de l'usage, nom du refus altéré, refus muet sur la
 sortie. Suite : 246 tests ; plancher du job : 246, égalité exigée (`--egal`).
+
+## RB-18e (2026-10-05) : entier long et imbrication, ligne non intègre (C-7, C-11 de la G2 de RB-18 ; lettres C-1, C-4)
+
+Objet : un entier de plus de 640 chiffres, signe exclu, rend la ligne non intègre (§1.2, §7.1 b) : le refus
+`ORACLE/entier-long` disparaît. Les niveaux d'imbrication sont comptés par le lecteur sur le texte de la ligne, avant le
+décodeur (échappements, puis chaînes, puis tout sauf crochets et accolades sont retirés) : un conteneur au-delà du
+niveau N = 64, l'objet de la ligne au niveau 1, rend la ligne non intègre, que `json` la lise (65 niveaux) ou lève
+RecursionError (100 000 niveaux) ; l'exception n'est plus attrapée (§8.3). La forme canonique du contrôle est `cle`.
+Rouge : sur le code de RB-18d, 65 niveaux admis, et refus `ORACLE/entier-long` au lieu d'une queue.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 196 | — |
+| `tests/test_oracle_indep.py` | 406 | 32 (4 réécrits : imbrication comptée par le lecteur (64 et 65 niveaux, listes et objets alternés, crochets dans les chaînes, guillemet et barre échappés), entiers longs, réglage de l'interpréteur, entier long ou imbrication dans un journal ; refus de la ligne de commande sur un dossier absent) |
+
+Mutants (commande du job, `--plancher 246`, borne de 300 s ; python3.12 ; réseau isolé) : 15 tués sur 15 (0 vivant,
+0 FATAL) : bornes N + 1 et N - 1, niveau N refusé, niveaux non comptés (décodeur seul), seul le guillemet échappé
+retiré, échappements laissés dans les chaînes, crochets des chaînes comptés, fermetures non décomptées, racine au niveau
+0, borne 641, signe compté, entier long lu par int, flottant admis, ligne non objet admise, dossier absent en exception
+nue. Suite : 246 tests ; plancher du job : 246, égalité exigée (`--egal`).
