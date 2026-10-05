@@ -30,7 +30,7 @@
   proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
   §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
   et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
-  (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1).
+  (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1) ; le diff CB-19c, C-2 (a) (§6.4).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -155,8 +155,12 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
 3. Le fichier de sommes `<préfixe>.sha256` reçoit une ligne par fichier clos, `<sha256 en hexadécimal>  <nom>` (deux
    espaces, format de `sha256sum`), ajoutée puis suivie d'un `fsync`. `sha256sum -c <préfixe>.sha256`, lancé dans le
    dossier, la contrôle.
-4. Limite déclarée : la création d'un fichier n'est pas suivie d'un `fsync` du dossier ; la durabilité de l'entrée de
-   répertoire après une coupure de courant n'est pas établie ici (item proposé à l'orchestrateur).
+4. **Entrée de dossier** (C-2 (a) de la relecture d'intégration de P1, diff CB-19c ; remplace la limite déclarée
+   jusque-là) : après la création d'un fichier du journal (journal neuf, bascule, segment de reprise), sa première
+   ligne écrite, et après la création du fichier de sommes, sa première ligne écrite et synchronisée, l'écrivain
+   appelle `fsync` sur le dossier : l'entrée du fichier créé est durable. La première ligne précède ce `fsync`, dont
+   l'échec ne laisse donc pas un fichier vide. Ce que ce `fsync` garantit dépend du système de fichiers ; le banc à
+   coupures de la relecture, dont le modèle ne porte que sur la taille des fichiers, ne le prouve pas (§4).
 
 ## 7. Reprise et segments (CB-2b, E-C-21)
 

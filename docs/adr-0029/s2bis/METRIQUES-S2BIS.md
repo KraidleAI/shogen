@@ -1263,3 +1263,35 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
 - trois textes du FORMAT défaits (total, borne du §14.1, hypothèse) ; plancher non relevé.
 
 Suite : 190 tests ; plancher du job : 190, égalité exigée (`--egal`).
+
+## CB-19c (2026-10-05) : fsync du dossier après chaque création (C-2 (a) de la relecture d'intégration de P1)
+
+Objet : C-2 (a), adjugée telle qu'écrite : après la création d'un fichier du journal (journal neuf, bascule, segment
+de reprise), sa première ligne écrite, et après la création du fichier de sommes, sa première ligne écrite et
+synchronisée, l'écrivain appelle `fsync` sur le dossier (descripteur en lecture seule, `fsync` injecté). La première
+ligne précède ce `fsync`, dont l'échec ne laisse pas un fichier vide. FORMAT §6.4 réécrit (la limite déclarée d'avant
+est retirée ; celle du modèle du banc est écrite). L'espion de `test_journal.Base` relève à part les `fsync` du dossier
+(`appels` : nom, instantané du dossier) ; `fsyncs` et `tailles` restent ceux des fichiers, et les assertions d'avant
+sur eux tiennent sans changement. Le test du point d'entrée qui injecte une panne au « premier fsync » la vise
+désormais au premier `fsync` d'un fichier, celui du dossier passant : c'est le scénario qu'il énonce (premier
+marqueur), inchangé.
+
+Rouge : sur l'état CB-19b, aucun `fsync` du dossier (`[] != [[…], …]`) ; §6.4 d'avant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 397 | — |
+| `tests/test_journal.py` | 294 | 14 (espion : `fsync` du dossier relevés à part) |
+| `tests/test_fichiers.py` | 100 | 5 (1 de plus : un `fsync` du dossier après chaque création, fichier créé déjà écrit, aucun sans création) |
+| `tests/test_entree.py` | 232 | 7 (panne injectée au premier `fsync` d'un fichier) |
+| `tests/test_format.py` | 151 | 7 (1 de plus : §6.4, puce « Corrections ») |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 12 mutants neufs, 12 tués (0 vivant, 0 FATAL) :
+- création sans `fsync` du dossier, `fsync` du dossier avant la première ligne, avant la création ; sommes créées
+  sans lui, `fsync` à chaque somme sauf à la création, avant la première somme, création testée après l'ouverture :
+  test des créations ;
+- `fsync` du fichier courant au lieu du dossier, descripteur fermé avant le `fsync` : plusieurs tests de l'écrivain ;
+- deux textes du FORMAT ; plancher non relevé.
+
+Suite : 192 tests ; plancher du job : 192, égalité exigée (`--egal`).

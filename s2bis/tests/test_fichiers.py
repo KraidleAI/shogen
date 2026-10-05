@@ -1,5 +1,6 @@
 """CB-2, E-C-20 : fichiers quotidiens bornés à 00:00 UTC, clos par `cloture`, sommés ; la chaîne continue d'un fichier
-au suivant. Sommes recalculées ici sur les octets lus ; chaîne recalculée par `chaine` (tests/test_journal.py)."""
+au suivant. Sommes recalculées ici sur les octets lus ; chaîne recalculée par `chaine` (tests/test_journal.py). CB-19c
+(C-2 (a) de la relecture d'intégration de P1) : fsync du dossier après chaque création, relevé par l'espion."""
 import errno
 import hashlib
 import os
@@ -29,6 +30,22 @@ class Fichiers(Base):
         self.assertEqual(e["pool.sha256"], sommes.encode())
         ino = {n: os.stat(os.path.join(self.d, n)).st_ino for n in (NOMS[0], "pool.sha256")}
         self.assertEqual((self.fsyncs.count(ino[NOMS[0]]), self.fsyncs.count(ino["pool.sha256"])), (2, 2))
+
+    def test_fsync_du_dossier_apres_chaque_creation(self):        # CB-19c, C-2 (a) de la relecture d'intégration
+        """Après la création d'un fichier du journal (journal neuf, bascule, segment de reprise) et du fichier de
+        sommes, l'écrivain appelle fsync sur le dossier, une fois, le fichier créé déjà écrit (sa première ligne, ou la
+        première somme) : à chaque appel, les fichiers créés jusque-là, et eux seuls, sont présents et non vides. Un
+        marqueur sans création n'en appelle aucun."""
+        jl = self.journal(J1 - 60)
+        for ws in (J1, J2, J2 + 60):                            # J2 : bascule, sommes créées ; J2 + 60 : rien
+            jl.marqueur(ws)
+        jl.fermer()
+        with open(os.path.join(self.d, NOMS[1]), "ab") as f:
+            f.write(b'{"coupee"')                              # queue : la reprise ouvre un segment neuf
+        self.journal(J2 + 180).fermer()
+        crees = [NOMS[0], "pool.sha256", NOMS[1], "pool-2026-10-05-1.jsonl"]
+        self.assertEqual([[n for n in crees if inst.get(n)] for nom, inst in self.appels if nom == "."],
+                         [crees[:1], crees[:2], crees[:3], crees])
 
     def test_bascule_en_echec_puis_fermer(self):              # C-2 (O-3 de la G2) : création du lendemain refusée
         jl, vrai = self.journal(J1 - 60), os.open

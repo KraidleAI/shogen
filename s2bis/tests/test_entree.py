@@ -15,6 +15,7 @@ import json
 import os
 import pathlib
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -203,7 +204,9 @@ class Entree(unittest.TestCase):
         f, s, d = configurations(port_ferme())
         sha, chemins = self.ecrire(f, s, d)
         for i, erreur in enumerate((OSError(errno.EIO, "fsync (simulé)"), journal.ErreurJournal("JOURNAL/casse", "s"))):
-            def fsync(fd):                                          # journal neuf : premier fsync au premier marqueur
+            def fsync(fd):                                          # journal neuf : premier fsync d'un fichier au
+                if stat.S_ISDIR(os.fstat(fd).st_mode):              # premier marqueur ; celui du dossier, après la
+                    return os.fsync(fd)                             # création (CB-19c, C-2 (a)), passe
                 raise erreur
             os.mkdir(dossier := os.path.join(self.d, f"j{i}"))
             code, err = self.pool(chemins, dossier, "--fenetres", "3", fsync=fsync)

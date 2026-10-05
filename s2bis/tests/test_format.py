@@ -85,6 +85,17 @@ class Format(unittest.TestCase):
                          [True] * 2)
         self.assertEqual([("CB-19b" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
+    def test_paragraphe_6_4_fsync_du_dossier(self):                  # CB-19c, C-2 (a) de la relecture d'intégration
+        """§6.4 : fsync du dossier après la création d'un fichier du journal et du fichier de sommes (texte de la
+        correction), la limite déclarée d'avant retirée, celle du modèle du banc écrite ; puce « Corrections » :
+        CB-19c."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        quatre = sections["6"].split(" 4. ", 1)[-1]
+        self.assertEqual([x in quatre for x in ("l'écrivain appelle `fsync` sur le dossier", "fichier du journal",
+                                                "fichier de sommes", "ne le prouve pas",
+                                                "n'est pas suivie d'un `fsync` du dossier")], [True] * 4 + [False])
+        self.assertEqual([("CB-19c" in p) for p in puces if p.startswith("**Corrections** :")], [True])
+
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
         et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite

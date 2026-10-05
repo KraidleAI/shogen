@@ -10,6 +10,7 @@ import fcntl
 import hashlib
 import json
 import os
+import stat
 import sys
 import tempfile
 import threading
@@ -64,14 +65,21 @@ class Base(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
-        self.d, self.fsyncs, self.tailles, self.panne = d.name, [], [], None
+        self.d, self.fsyncs, self.tailles, self.panne, self.appels = d.name, [], [], None, []
 
     def espion(self, fd):
-        """fsync injecté : relève l'inode et la taille du fichier ; lève `panne` si elle est posée (C-2)."""
+        """fsync injecté : relève l'inode et la taille du fichier ; lève `panne` si elle est posée (C-2). CB-19c (C-2 de
+        la relecture d'intégration) : chaque appel, fichier ou dossier, est aussi relevé dans `appels`, (nom, instantané
+        du dossier {nom : taille}), « . » pour le dossier ; `fsyncs` et `tailles` restent ceux des fichiers."""
         if self.panne:
             raise self.panne
-        self.fsyncs.append(os.fstat(fd).st_ino)
-        self.tailles.append(os.fstat(fd).st_size)
+        st, noms = os.fstat(fd), os.listdir(self.d)
+        inst = {n: os.stat(os.path.join(self.d, n)).st_size for n in noms}
+        self.appels.append((next((n for n in noms if os.stat(os.path.join(self.d, n)).st_ino == st.st_ino), "."),
+                            inst))
+        if not stat.S_ISDIR(st.st_mode):
+            self.fsyncs.append(st.st_ino)
+            self.tailles.append(st.st_size)
 
     def journal(self, ws=WS, prefixe="pool"):
         jl = j.Journal(self.d, prefixe, fsync=self.espion)

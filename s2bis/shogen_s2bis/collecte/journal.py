@@ -266,19 +266,36 @@ class Journal:
         return 1 + max([k for jj, k, _n in self._fichiers() if jj == j], default=-1)
 
     def _sommer(self, n, h):
-        """Ligne « sha256  nom » du fichier clos `n` au fichier de sommes (format de sha256sum), puis fsync."""
-        fd = os.open(os.path.join(self.dossier, self.prefixe + ".sha256"), os.O_WRONLY | os.O_APPEND | os.O_CREAT,
-                     0o644)
+        """Ligne « sha256  nom » du fichier clos `n` au fichier de sommes (format de sha256sum), puis fsync ; fsync du
+        dossier si le fichier de sommes vient d'être créé (C-2 (a))."""
+        chemin = os.path.join(self.dossier, self.prefixe + ".sha256")
+        neuf = not os.path.exists(chemin)
+        fd = os.open(chemin, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
         _tout(fd, f"{h}  {n}\n".encode())
         self.fsync(fd)
         os.close(fd)
+        if neuf:
+            self._synchro()
 
     def _creer(self, j, k, premier):
-        """Fichier neuf du jour `j`, segment `k`, ouvert par l'enregistrement `premier`."""
+        """Fichier neuf du jour `j`, segment `k`, ouvert par l'enregistrement `premier`, puis fsync du dossier
+        (C-2 (a) : l'entrée du fichier est durable ; après la première ligne, qu'un échec du fsync ne laisse pas un
+        fichier vide)."""
         self.jour, self.k, self.h = j, k, hashlib.sha256()
         self.fd = os.open(os.path.join(self.dossier, nom(self.prefixe, j, k)), os.O_WRONLY | os.O_APPEND | os.O_CREAT |
                           os.O_EXCL, 0o644)
-        return self._ecrire(premier)
+        tete = self._ecrire(premier)
+        self._synchro()
+        return tete
+
+    def _synchro(self, n=None):
+        """fsync (injecté) du fichier `n` du dossier, ou du dossier lui-même, par un descripteur en lecture seule
+        (C-2 de la relecture d'intégration de P1)."""
+        fd = os.open(os.path.join(self.dossier, n) if n else self.dossier, os.O_RDONLY)
+        try:
+            self.fsync(fd)
+        finally:
+            os.close(fd)
 
     def _lire(self, n):
         """(position de la queue, état, empreinte du préfixe intègre) du fichier `n`. Intègre : définition unique du
