@@ -11,9 +11,10 @@ Fichiers (§6.1, §7.7 ; lettre C-5) : `<préfixe>-AAAA-MM-JJ-k.jsonl`, k suivan
 k entier) ; un autre nom du préfixe en `.jsonl` est un refus ORACLE/nom, un dossier sans fichier du journal un refus
 ORACLE/vide ; tout autre nom est ignoré. Fichier (§7.1) : lignes intègres (points a à e) jusqu'à la première qui ne
 l'est pas, qui ouvre la queue du fichier ; la première ligne d'un fichier est une `ouverture` ou une `reprise`.
-Jonction au premier enregistrement de chaque fichier et à chaque `reprise` (§1.3, §7.4, §7.7) : lien au dernier intègre
-(genèse : `ouverture`, `seq` 0, `prec` nul) ; queues en attente déclarées par la `reprise` (quatre champs, comparés
-sous forme canonique) ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`, `declaration`), la
+Jonction au premier enregistrement de chaque fichier et à chaque `reprise` (§1.3, §7.4, §7.7 ; lettre C-3) : lien au
+dernier intègre (genèse : `ouverture`, `seq` 0, `prec` nul) ; une `reprise` au lien juste déclare exactement les queues
+en attente (liste dans l'ordre (jour, k), null sans queue, forme canonique) ; sinon rupture à causes nommées (`genese`,
+`lien`, `declaration`, et `queue-non-declaree` quand des queues sont en attente : toutes sont rendues avec elle), la
 lecture continue, rien n'est réparé (Q-R18-6, Q-R18-7). Queue finale : queues qu'aucun intègre ne suit (E-R-01 ;
 Q-R18-8). Tête : dernier intègre (§1.4). Sortie (`sortie`, `main`) : JSON canonique, clés triées, un objet suivi
 de 0x0A."""
@@ -162,23 +163,22 @@ class Lecture:
         return {"fichier": nom, "position": pos, "octets": n, "sha256": h.hexdigest()}
 
     def _jonction(self, nom, pos, e, base, attente):
-        causes = []
+        """Lien au dernier intègre, genèse sans lui (§1.3, §7.7) ; une `reprise` au lien juste déclare exactement les
+        queues en attente, liste dans l'ordre (jour, k), ou null sans queue, comparée sous forme canonique (§7.4 ;
+        lettre C-3) ; sinon rupture, avec toutes les queues en attente, et la déclaration d'une `reprise` au lien rompu
+        n'est pas lue."""
         if base is None:
-            causes += ["genese"] * ((e["type"], e["seq"], e["prec"]) != ("ouverture", 0, GENESE))
+            causes = ["genese"] * ((e["type"], e["seq"], e["prec"]) != ("ouverture", 0, GENESE))
         else:
-            causes += ["lien"] * ((e["seq"], e["prec"]) != (base[0] + 1, base[1]))
-        d = e.get("queue") if e["type"] == "reprise" else None
-        declarees, non = [cle(x) for x in (d if type(d) is list else [] if d is None else [d])], []
-        for q in attente:
-            if cle(q) in declarees:
-                declarees.remove(cle(q))
-                self.queues_declarees.append(q)
-            else:
-                non.append(q)
-        causes += ["queue-non-declaree"] * bool(non) + ["declaration"] * bool(declarees)
-        if causes:
-            self.ruptures.append({"fichier": nom, "position": pos, "seq": e["seq"], "causes": sorted(causes),
-                                  "queues": non})
+            causes = ["lien"] * ((e["seq"], e["prec"]) != (base[0] + 1, base[1]))
+        lue = e["type"] == "reprise" and not causes                         # déclaration lue
+        if lue and cle(e["queue"]) == cle(attente or None):
+            self.queues_declarees += attente
+        else:
+            causes += ["declaration"] * lue + ["queue-non-declaree"] * bool(attente)
+            if causes:
+                self.ruptures.append({"fichier": nom, "position": pos, "seq": e["seq"], "causes": sorted(causes),
+                                      "queues": list(attente)})
         attente.clear()
 
 

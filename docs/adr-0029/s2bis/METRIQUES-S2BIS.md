@@ -1718,3 +1718,25 @@ dans l'ordre du listage, dossier sans fichier du journal admis, dossier rendu co
 brut ou exception en sortie, zéro de tête admis, mois sur un chiffre, chiffres Unicode dans k, nom prolongé après .jsonl
 admis, nom en .jsonl.bak lu, k comparé en texte, préfixe non échappé. Suite : 249 tests ; plancher du job : 249, égalité
 exigée (`--egal`).
+
+## RB-18h (2026-10-05) : déclaration exacte, queues rendues avec la rupture (C-10 de la G2 de RB-18 ; lettre C-3)
+
+Objet : une `reprise` au lien juste déclare exactement les queues en attente : liste dans l'ordre (jour, k) des
+fichiers, ou null sans queue, comparée sous forme canonique ; une liste vide, null avec une queue en attente, un autre
+ordre, une partie, un doublon ou un booléen pour un entier font une déclaration fausse ; à toute rupture, toutes les
+queues en attente sont rendues avec elle ; la déclaration d'une `reprise` au lien rompu n'est pas lue (G-07). Test de
+deux pannes de l'écrivain réel, la seconde coupant la `reprise` du segment neuf : le troisième démarrage déclare les
+deux queues (G-08). FORMAT §7.4, §7.7. Rouge : sur le code de RB-18g, appariement en multiensemble, déclaration lue
+malgré le lien rompu, liste vide et null admis.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 214 | — |
+| `tests/test_oracle_indep.py` | 510 | 37 (2 de plus : reprise au lien faux, par `prec` puis par `seq` ; reprise qui déclare deux queues, puis autre ordre, partie, doublon ; déclaration stricte et reprise au milieu réécrites) |
+
+Mutants (commande du job, `--plancher 251`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 (0 vivant,
+0 FATAL) : déclaration lue malgré le lien rompu, null refusé et liste vide admise, ordre (jour, k) non exigé,
+déclaration fausse sans cause nommée, queues d'une déclaration fausse non dites non déclarées, liste des queues vidée
+après la rupture, une seule queue retenue comme déclarée, genèse par une reprise admise, queues en attente jamais
+soldées, prec du lien non contrôlé, null sans queue refusé. Suite : 251 tests ; plancher du job : 251, égalité exigée
+(`--egal`).
