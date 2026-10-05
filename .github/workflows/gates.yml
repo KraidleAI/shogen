@@ -225,7 +225,9 @@ jobs:
     # synthétiques et sorties versées de PLAN-S2BIS). Verdict par le vérificateur des jobs unittest : résumé final exigé,
     # aucun saut admis, Ran = plancher committé ci-dessous (--egal), relevé au compte mesuré à chaque sous-lot ; étapes
     # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Tant que la forge ne lance pas les jobs, le G3 opérant
-    # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20).
+    # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20). Sous-lot SB-14
+    # (2026-10-05 ; E-S-01, E-S-39) : l'adaptateur oracle_r1 lit le harnais de f35a70c par git archive, d'où
+    # l'historique complet (fetch-depth: 0, Q-T4-11) ; une copie sans ce commit échoue fermé (ORACLE/extraction).
     name: sim-bis-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -234,6 +236,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: cas du vérificateur de la suite (câblage des jobs unittest compris)
         shell: bash
         run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
@@ -241,4 +244,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 156
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 160

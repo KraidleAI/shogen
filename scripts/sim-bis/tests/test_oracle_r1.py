@@ -1,0 +1,67 @@
+"""Adaptateur d'oracle r1 SB-14 (E-S-01, E-S-39 ; T-FIV-1, T-CAL-2 ; SHOGEN-SIM-BIS-WINDOW-EPINGLE-1) : épingles des
+cinq modules du harnais de f35a70c égales à celles de PLAN-S2BIS (scripts/plan-s2bis/parametres.json) et, pour
+window.py, à `git show f35a70c:s2-harness/shogen_s2/window.py | sha256sum` ; refus nommés d'une épingle fausse et d'un
+commit absent. T-CAL-2 contre window extrait : tests/test_calendrier.py. Chaque test nomme les mutations qui le
+rougissent."""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+import commun
+import oracle_r1
+
+PRM = commun.charger_parametres(environ={})
+H = oracle_r1.charger(PRM)
+COMMIT = "f35a70c19ba8269f1f7e2bcd31775e4fc513da20"
+WINDOW = "f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94"
+
+
+class TestOracleR1(unittest.TestCase):
+    def test_epingles(self):
+        """Section « oracle_r1 » : commit f35a70c (complet), dossier s2-harness, cinq empreintes égales à celles de
+        PLAN-S2BIS (commit_analyse et harnais_sha256), celle de window.py égale à la valeur de sha256sum ; modules
+        chargés : r1 et window de ces fichiers. Mutation M-14-01 (empreinte de r1 de la tête)."""
+        o = PRM["oracle_r1"]
+        with open(os.path.join(commun.RACINE, "scripts", "plan-s2bis", "parametres.json"), encoding="utf-8") as f:
+            plan = json.load(f)
+        self.assertEqual((o["commit"], o["dossier"], o["fichiers"]), (COMMIT, "s2-harness", plan["harnais_sha256"]))
+        self.assertEqual((plan["commit_analyse"], o["fichiers"]["shogen_s2/window.py"]), (COMMIT, WINDOW))
+        self.assertEqual(sorted(H), ["r1", "window"])
+
+    def test_modules_hors_epingles(self):
+        """Dans un processus neuf : un shogen_s2 déjà chargé d'ailleurs, ou un module shogen_s2.* hors des fichiers
+        épinglés : ORACLE/modules. Mutations M-14-08 (contrôle des modules chargés retiré), M-14-09 (shogen_s2 déjà
+        chargé admis)."""
+        for intrus in ("shogen_s2", "shogen_s2.intrus"):
+            code = chr(10).join(["import sys, types", f"m = types.ModuleType({intrus!r})", "m.__file__ = '/hors/x.py'",
+                                 f"sys.modules[{intrus!r}] = m", "import commun, oracle_r1", "try:",
+                                 "    oracle_r1.charger(commun.charger_parametres(environ={}))",
+                                 "except commun.Refus as e:", "    print(e.code)"])
+            env = {k: v for k, v in os.environ.items() if k != commun.VARIABLE}
+            p = subprocess.run([sys.executable, "-B", "-c", code], cwd=commun.ICI, env=env, capture_output=True,
+                               text=True, timeout=120)
+            self.assertEqual(p.stdout.strip(), "ORACLE/modules", (intrus, p.stderr[-300:]))
+
+    def test_refus(self):
+        """Épingle fausse : ORACLE/sha256, rien chargé ; commit absent du dépôt : ORACLE/extraction ; dépôt sans git :
+        ORACLE/extraction ; variable de la copie scellée posée : CAMPAGNE/variable (E-S-02). Mutations M-14-02
+        (empreintes non contrôlées), M-14-03 (sortie de git non contrôlée), M-14-12 (garde de campagne retirée)."""
+        with mock.patch.object(commun.os, "environ", {commun.VARIABLE: ""}), tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(commun.Refus) as c:
+                oracle_r1.extraire(PRM, d)
+            self.assertEqual(c.exception.code, "CAMPAGNE/variable")
+        faux = dict(PRM["oracle_r1"], fichiers=dict(PRM["oracle_r1"]["fichiers"], **{"shogen_s2/r1.py": "0" * 64}))
+        for o, depot, code in ((faux, commun.RACINE, "ORACLE/sha256"),
+                               (dict(PRM["oracle_r1"], commit="0" * 40), commun.RACINE, "ORACLE/extraction"),
+                               (PRM["oracle_r1"], os.path.join(commun.RACINE, "inexistant"), "ORACLE/extraction")):
+            with tempfile.TemporaryDirectory() as d, self.assertRaises(commun.Refus) as c:
+                oracle_r1.extraire(dict(PRM, oracle_r1=o), d, depot)
+            self.assertEqual(c.exception.code, code)
+
+
+if __name__ == "__main__":
+    unittest.main()

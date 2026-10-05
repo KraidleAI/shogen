@@ -8,6 +8,8 @@ import os
 import random
 import unittest
 
+from tests import test_fitness
+
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ORACLES = {"oracle_r1.py", "oracle_recalc.py"}
 METHODES = {n for n in dir(random.Random) if not n.startswith("_")} - {"random"}
@@ -86,3 +88,14 @@ class TestTirages(unittest.TestCase):
                   "from random import shuffle"):
             self.assertNotEqual(refus_hasard(s), [], s)
         self.assertEqual(refus_hasard("import random" + chr(10) + "random.Random(1).random()"), [])
+
+    def test_adaptateurs(self):
+        """Brief de la tranche 4 (garde `ast` des puissances et du hasard appliquée à ses modules, LIBM-POW-1) : les
+        adaptateurs d'oracle présents (hors du moteur pour la seule frontière d'imports, E-S-01) ne portent ni
+        puissance, ni hasard, ni fonction transcendante de libm. Mutation M-14-07 (`2 ** 3` ajouté à oracle_r1.py)."""
+        presents = sorted(f for f in ORACLES if os.path.exists(os.path.join(ICI, f)))
+        self.assertIn("oracle_r1.py", presents)
+        for f in presents:
+            with open(os.path.join(ICI, f), encoding="utf-8") as g:
+                s = g.read()
+            self.assertEqual((refus_puissance(s), refus_hasard(s), test_fitness.refus_libm(s)), ([], [], []), f)

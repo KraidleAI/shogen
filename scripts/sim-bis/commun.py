@@ -41,6 +41,10 @@ def jour(v) -> bool:
     return type(v) is int and 0 <= v <= 6
 
 
+def hex40(v) -> bool:
+    return type(v) is str and len(v) == 40 and all(c in "0123456789abcdef" for c in v)
+
+
 def naturel(v) -> bool:
     return type(v) is int and v >= 0
 
@@ -80,7 +84,10 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                     "questions": {f"Q-T3-{n}": question for n in (13, 14, 15)}},
           "variante": {"diviseur": positif, "sensibilite": positif, "source": texte},
           "e1": {"phi": [(positif, positif)], "kappa": [positif], "tau_D": [positif], "replications": positif,
-                 "pool": texte, "ell_c1": positif, "cellule": texte, "source": texte}}
+                 "pool": texte, "ell_c1": positif, "cellule": texte, "source": texte},
+          "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
+                        "fichiers": {f"shogen_s2/{m}.py": hex64
+                                     for m in ("__init__", "model", "records", "window", "r1")}}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:

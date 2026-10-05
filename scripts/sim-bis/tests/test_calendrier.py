@@ -1,9 +1,7 @@
 """Calendrier SB-5 (E-S-14, E-S-23, E-S-25 ; E-S-28 pour les runs ; T-CAL-2, T-SEQ-1, T-RUN-1) : instants epoch par
 `date -u -d … +%s`, suites de 12 fenêtres et leurs valeurs écrites à la main, et test croisé avec `window` de f35a70c
-(module chargé par chemin depuis s2-harness, après contrôle de son sha256, sans import de shogen_s2) ; chaque test nomme
-les mutations qui le rougissent."""
-import hashlib
-import importlib.util
+(extrait du dépôt par l'adaptateur oracle_r1 de SB-14, sous l'épingle de parametres.json, et non plus lu dans
+s2-harness de la tête : SHOGEN-SIM-BIS-WINDOW-EPINGLE-1) ; chaque test nomme les mutations qui le rougissent."""
 import math
 import os
 import time
@@ -13,9 +11,10 @@ from fractions import Fraction
 import aleas
 import calendrier
 import commun
+import oracle_r1
 
-CAL = commun.charger_parametres(environ={})["calendrier"]
-WINDOW = os.path.join(commun.RACINE, "s2-harness", "shogen_s2", "window.py")
+PRM = commun.charger_parametres(environ={})
+CAL = PRM["calendrier"]
 WINDOW_F35A70C = "f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94"   # git show f35a70c:… | sha256sum
 
 
@@ -52,14 +51,12 @@ class TestCalendrier(unittest.TestCase):
             time.tzset()
 
     def test_croise_window_f35a70c(self):
-        """Réplique contre window de f35a70c (sha256 épinglé) : jours de stress égaux à WEEKEND_STRATE_SPEC, jour et
-        strate de chaque fenêtre de trois semaines, pour chacun des 7 jours de départ, égaux à weekday_utc et
-        strate_from_spec. Mutation M-5-05 : blocs de journée décalés d'un jour."""
-        with open(WINDOW, "rb") as f:
-            self.assertEqual(hashlib.sha256(f.read()).hexdigest(), WINDOW_F35A70C)
-        spec = importlib.util.spec_from_file_location("window_f35a70c", WINDOW)
-        w = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(w)
+        """Réplique contre window de f35a70c, extrait par oracle_r1 sous l'épingle de parametres.json (égale à la valeur
+        de sha256sum) : jours de stress égaux à WEEKEND_STRATE_SPEC, jour et strate de chaque fenêtre de trois
+        semaines, pour chacun des 7 jours de départ, égaux à weekday_utc et strate_from_spec. Mutation M-5-05 : blocs
+        de journée décalés d'un jour."""
+        self.assertEqual(PRM["oracle_r1"]["fichiers"]["shogen_s2/window.py"], WINDOW_F35A70C)
+        w = oracle_r1.charger(PRM)["window"]
         self.assertEqual(CAL["jours_stress"], w.WEEKEND_STRATE_SPEC["stress_weekdays"])
         for d in range(7):
             debut, n = CAL["lundi_reference"] + 86400 * d, 3 * 10080
