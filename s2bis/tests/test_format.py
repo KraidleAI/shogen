@@ -108,6 +108,15 @@ class Format(unittest.TestCase):
         self.assertEqual([x in sections["4"] for x in attendus], [False] + [True] * 6)
         self.assertEqual([("CB-19d" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
+    def test_paragraphe_11_4_adresse_avant_la_phase_dns(self):       # CB-19e, C-3 (b) de la relecture d'intégration
+        """§11.4 : le client pose l'adresse au suivi avant la phase `dns`, la boucle relève les phases avant l'adresse ;
+        puce « Corrections » : CB-19e."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        quatre = sections["11"].split(" 4. ", 1)[1].split(" 5. ", 1)[0]
+        self.assertEqual([x in quatre for x in ("le client pose l'adresse au suivi avant la phase `dns`",
+                                                "relève les phases avant l'adresse")], [True] * 2)
+        self.assertEqual([("CB-19e" in p) for p in puces if p.startswith("**Corrections** :")], [True])
+
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
         et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite

@@ -3,7 +3,8 @@ reprend octet pour octet celle d'urllib en S2 (sources.py l.48-79, ordre des en-
 `Accept-Encoding: identity` (sans lui, tout codage est admis : RFC 9110 §12.5.3). Réponse lue par http.client au
 plus juste ; fin du flux avant la fin annoncée : `coupure`, jamais une exception qui sort (PROPOSITION §9, essai 1).
 Contexte TLS armé comme celui d'urllib en S2 (http.client sans contexte : ALPN `http/1.1`, authentification après
-poignée annoncée ; Python 3.10 l.1441-1448, 3.12 l.824-835) : même ClientHello qu'en S2 (C-3 de la G2 de P1-B)."""
+poignée annoncée ; Python 3.10 l.1441-1448, 3.12 l.824-835) : même ClientHello qu'en S2 (C-3 de la G2 de P1-B).
+CB-19e (C-3 (b) de la relecture d'intégration de P1) : l'adresse est posée au suivi avant la phase `dns`."""
 import collections
 import http.client
 import io
@@ -108,7 +109,8 @@ def lire(req, suivi=None, delai=DELAI, resoudre=None, tls=CONTEXTE, horloge=horl
             ip, port = adresses[0][4][:2]
         except Exception:
             raise Panne("dns") from None
-        phases["dns"], suivi["adresse"] = horloge(), f"{ip}:{port}"
+        suivi["adresse"] = f"{ip}:{port}"                           # C-3 (b) : l'adresse avant la phase, que la
+        phases["dns"] = horloge()                                   # boucle relève avant l'adresse
         if monotone() >= fin:
             raise Panne("dns")                                      # délai épuisé pendant la résolution
         socks.append(s := socket.socket(socket.AF_INET, socket.SOCK_STREAM))

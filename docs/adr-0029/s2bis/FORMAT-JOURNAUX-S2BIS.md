@@ -31,7 +31,7 @@
   §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
   et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
   (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1) ; le diff CB-19c, C-2 (a) (§6.4) ; le diff CB-19d, C-2 (b)
-  et C-4 (c) (§4).
+  et C-4 (c) (§4) ; le diff CB-19e, C-3 (a) et (b) (§11.4).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -365,8 +365,11 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    et le relevé). Elle est alors `panne_transport`, de sous-type `dns` si la résolution n'avait pas rendu à E (aucune
    phase `dns` d'instant au plus E), sinon `delai` ; `fin` vaut E ; `phases` et `adresse` sont celles atteintes à E
    (instants au plus E ; `adresse` null sans phase `dns`) ; son fil est abandonné, et son résultat suit le chemin des
-   résultats tardifs (§11.6). Une lecture dont la fonction lève, BaseException comprise (O-5 : l'exception suit son
-   cours, le résultat est rendu), ou ne rend pas une lecture, est `panne_transport` de sous-type `autre`.
+   résultats tardifs (§11.6). Le suivi est partagé (C-3 (b) de la relecture d'intégration de P1, diff CB-19e) : le
+   client pose l'adresse au suivi avant la phase `dns`, et la boucle relève les phases avant l'adresse ; une phase
+   `dns` relevée a donc toujours son adresse. Une lecture dont la fonction lève, BaseException comprise (O-5 :
+   l'exception suit son cours, le résultat est rendu), ou ne rend pas une lecture, est `panne_transport` de sous-type
+   `autre`.
 5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
    puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Dans la première fenêtre admise d'une exécution,
    `run_params` (§14.4) suit immédiatement l'`ouverture` ou la `reprise` du démarrage et précède toute `lecture` ; si

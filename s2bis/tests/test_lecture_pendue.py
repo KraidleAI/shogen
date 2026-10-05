@@ -1,7 +1,8 @@
 """CB-5 : tests « lecture pendue » (PROPOSITION §2.4, T-LP-1 à T-LP-6 ; ADR-0029 l.233), contre les mutants M-LP-1 à
 M-LP-8, et borne du corps (SHOGEN-S2BIS-CORPS-BORNE-1). Chaque test a son propre délai : en processus, la boucle tourne
 dans un fil joint en 5 s réelles au plus (un mutant qui pend fait échouer le test sans pendre la suite) ; T-LP-4 tourne
-en sous-processus, fils et horloge réels."""
+en sous-processus, fils et horloge réels. CB-19e (C-3 (a) de la relecture d'intégration de P1) : client réel dans la
+boucle, lecture pendante à l'échéance après la résolution et la connexion."""
 import base64
 import concurrent.futures
 import os
@@ -64,6 +65,34 @@ class LecturePendue(Base):
             return http.lire(http.Requete("api.example", "/"), suivi, resoudre=lambda *a: self.porte.wait(), tls=None)
         enrs = self.tourner({"p": lire}, [(0, "p")])
         self.assertEqual((enrs[0]["statut"], enrs[0]["sous_type"], enrs[0]["phases"]), ("panne_transport", "dns", {}))
+
+    def test_client_reel_pendant_a_l_echeance_apres_dns_et_connexion(self):   # CB-19e, C-3 (a) de la relecture
+        """Le client réel (`http.lire`) dans la boucle, horloge murale de la boucle partagée, horloge monotone réelle
+        (délai réel de 10 s : la lecture pend encore au relevé) : le serveur accepte, lit la requête et ne répond pas ;
+        l'échéance attend qu'il l'ait lue (5 s réelles au plus). À E : `panne_transport`, sous-type `delai`, `phases`
+        porte `dns` et `connexion`, posées par le client dans le suivi partagé, instants au plus E ; l'adresse est
+        posée. Tue MI-09 (phases copiées) et MI-10 (adresse posée à la fin)."""
+        recue = threading.Event()
+
+        def muet(conn, recues):
+            recues.append(conn.recv(4096))
+            recue.set()
+            self.porte.wait(10)                                     # jusqu'à la fin du test
+        port, _r, fil = servir(muet)
+        temps = Temps(m(2) * S + 5 * S)
+
+        def lire(suivi):
+            return http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(port), tls=None,
+                             horloge=temps)
+        self.b = boucle.Boucle(borne(self, self.journal, m(2)), {"p": lire}, [(0, "p")], 8, horloge=temps,
+                               dormir=temps.dormir, attendre=lambda futurs, t: (recue.wait(5), temps.avancer(t)))
+        borne(self, self.b.tourner, 1)
+        self.porte.set()
+        fil.join(10)
+        lu = sans_chaine(chaine(self.etat()[FICHIER])[2])[1]
+        self.assertEqual((lu["statut"], lu["sous_type"], lu["fin"], {"dns", "connexion"} <= set(lu["phases"]),
+                          all(t <= E for t in lu["phases"].values()), lu["adresse"]),
+                         ("panne_transport", "delai", E, True, True, f"127.0.0.1:{port}"))
 
     def test_tlp3_resultat_tardif_jamais_ecrit_compte_ensuite(self):
         port, _r, fil = servir(repondre(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}"))

@@ -1337,3 +1337,34 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
   relevé.
 
 Suite : 195 tests ; plancher du job : 195, égalité exigée (`--egal`).
+
+## CB-19e (2026-10-05) : client réel dans la boucle, adresse avant la phase `dns` (C-3 (a) et (b) de la relecture)
+
+Objet : C-3 (b) : le client pose l'adresse au suivi partagé avant la phase `dns`, que la boucle relève avant
+l'adresse ; un relevé entre les deux écritures lisait une phase `dns` sans adresse (espion du réviseur). Test par
+suivi espion. C-3 (a), tests seuls : le client réel (`http.lire`) dans la boucle, horloge murale de la boucle
+partagée, horloge monotone réelle (délai réel de 10 s : la lecture pend encore au relevé, sans course) ; serveur qui
+accepte, lit la requête et ne répond pas ; à E, `panne_transport`, `delai`, `phases` avec `dns` et `connexion`,
+adresse posée. FORMAT §11.4 : l'ordre est écrit.
+
+Rouge : sur l'état CB-19d, le suivi espion lit `[('dns', False)]` ; le test du client réel passe sur le code juste et
+rougit sous MI-09 et MI-10 (échec d'assertion : `dns`, phases vides, adresse nulle).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/http.py` | 134 | — |
+| `tests/test_http_reseau.py` | 288 | 15 (1 de plus : suivi espion) |
+| `tests/test_lecture_pendue.py` | 160 | 9 (1 de plus : client réel dans la boucle) |
+| `tests/test_format.py` | 172 | 9 (1 de plus : §11.4, puce « Corrections ») |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 13 mutants (11 neufs ; MI-09 et MI-10 du réviseur), 13 tués (0 vivant,
+0 FATAL) :
+- MI-09 du réviseur, tel quel, et MI-10, réécrit sur le nouveau texte avec la même mutation (MI-10r) : tués par le
+  test du client réel dans la boucle et par le suivi espion ;
+- ordre d'avant (suivi espion) ; adresse jamais posée au suivi ; boucle : adresse jamais relevée, phases atteintes à E
+  oubliées, sous-types échangés ; client : phases dans un dictionnaire neuf, phase `connexion` jamais posée, adresse
+  sans port ;
+- deux textes du FORMAT ; plancher non relevé.
+
+Suite : 198 tests ; plancher du job : 198, égalité exigée (`--egal`).

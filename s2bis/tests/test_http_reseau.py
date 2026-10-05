@@ -1,7 +1,8 @@
 """CB-3, E-C-03 à E-C-05 : lecture par phases sur serveurs factices de boucle locale, résolveur injecté. CB-11e (C-4 de
 la G2 de P1-B) : délais sur l'horloge monotone, horloge murale reculée pendant une lecture. CB-11g (C-3) : contexte TLS
 d'urllib (attributs et ClientHello écrit en mémoire, sans réseau), chemin TLS réussi par une couche injectée ; MG-31.
-CB-18b (limite E-4 levée) : le délai court depuis le départ monotone que la boucle porte dans le suivi."""
+CB-18b (limite E-4 levée) : le délai court depuis le départ monotone que la boucle porte dans le suivi. CB-19e (C-3 (b)
+de la relecture d'intégration de P1) : adresse posée au suivi avant la phase `dns` (suivi espion)."""
 import contextlib
 import socket
 import ssl
@@ -203,6 +204,21 @@ class Client(unittest.TestCase):
             with self.subTest(attendu=attendu):
                 self.assertEqual((lu.statut, lu.sous_type, lu.depart, sorted(suivi)),
                                  ("panne_transport", attendu, mural, ["adresse", "depart", "monotone", "phases"]))
+
+    def test_adresse_posee_au_suivi_avant_la_phase_dns(self):     # CB-19e, C-3 (b) de la relecture d'intégration
+        """La boucle relève `phases`, puis `adresse` ; le client pose donc l'adresse au suivi avant la phase `dns`
+        (sinon un relevé entre les deux lit une phase `dns` sans adresse). Suivi espion : à l'écriture de chaque
+        phase, l'adresse est-elle déjà au suivi ? Port fermé : une seule phase, `dns`."""
+        class Phases(dict):
+            def __setitem__(self, cle, valeur):
+                vues.append((cle, "adresse" in suivi))
+                super().__setitem__(cle, valeur)
+        vues, suivi = [], {"phases": Phases()}
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]                               # port rendu : rien n'y écoute
+        lu = http.lire(http.Requete("api.example", "/"), suivi, resoudre=Resolveur(port), tls=None, delai=S)
+        self.assertEqual((vues, lu.sous_type, lu.adresse), ([("dns", True)], "connexion", f"127.0.0.1:{port}"))
 
     def test_delai_sur_l_horloge_monotone_malgre_un_recul(self):
         """C-4 (S-C1 de la G2) : l'horloge murale recule de 3 s, 0,1 s après le départ d'une lecture servie octet par
