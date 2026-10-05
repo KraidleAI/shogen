@@ -1740,3 +1740,22 @@ déclaration fausse sans cause nommée, queues d'une déclaration fausse non dit
 après la rupture, une seule queue retenue comme déclarée, genèse par une reprise admise, queues en attente jamais
 soldées, prec du lien non contrôlé, null sans queue refusé. Suite : 251 tests ; plancher du job : 251, égalité exigée
 (`--egal`).
+
+## RB-18i (2026-10-05) : sortie hors ASCII, usage, mémoire de `Lecture` (C-12 de la G2 de RB-18, tests seuls)
+
+Objet : tests vivants fermés : G-13, un caractère hors ASCII (é, U+2028) sort en UTF-8, sans séquence d'échappement ;
+G-14, la ligne de commande exige deux arguments (zéro, un ou trois : code 2, sortie vide) ; mémoire de `Lecture` mesurée
+par tracemalloc sur des journaux de 1 et 4 Mio (pics mesurés de 35 360 à 47 762 octets sous Python 3.10 à 3.13) : moins
+de 256 Kio, et le pic ne croît pas avec le journal. Seule la docstring de `Lecture` change dans le code. Rouge : chaque
+test contre le mutant qu'il ferme (sortie en séquences `u`, trois arguments admis, fichier lu en entier : pic de
+4 300 762 octets) ; les deux premiers mutants survivaient aux tests de RB-18h.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 215 | — |
+| `tests/test_oracle_indep.py` | 547 | 40 (3 de plus : sortie hors ASCII, usage, mémoire bornée ; le test de la sortie dorée ne porte plus l'usage) |
+
+Mutants (commande du job, `--plancher 254`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 (0 vivant,
+0 FATAL) : sortie en séquences u, sortie en latin-1, forme canonique en séquences u, trois arguments admis, zéro ou un
+argument admis, un ou trois arguments admis, codes d'usage 1 et 0, usage sur la sortie standard, fichier lu en entier,
+tampon de 8 Mio. Suite : 254 tests ; plancher du job : 254, égalité exigée (`--egal`).

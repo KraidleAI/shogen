@@ -7,6 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import tracemalloc
 import unittest
 from unittest import mock
 
@@ -491,7 +492,7 @@ class LigneDeCommande(unittest.TestCase):                                  # for
                            capture_output=True, timeout=60)
         return p.returncode, p.stdout
 
-    def test_sortie_doree_refus_et_usage(self):
+    def test_sortie_doree_et_refus(self):
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, J1), "wb") as f:
                 f.write(ligne(self.L0))
@@ -507,4 +508,40 @@ class LigneDeCommande(unittest.TestCase):                                  # for
             for n in (J1, HORS_UTF8):
                 os.remove(os.path.join(d, n))
             self.assertEqual(self.lancer(d, "pool"), (1, ligne(refus % ("null", "vide"))))
-        self.assertEqual(self.lancer(), (2, b""))
+
+    def test_sortie_hors_ascii(self):                                       # G-13 : hors ASCII écrit en UTF-8
+        l1 = '{"note":"é' + chr(0x2028) + '","prec":"' + self.H + '","seq":1,"type":"lecture","ws":1791158340}'
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, J1), "wb") as f:
+                f.write(ligne(self.L0) + ligne(l1))
+            code, octets = self.lancer(d, "pool")
+        self.assertEqual(code, 0)
+        self.assertIn(b'"enr":' + l1.encode("utf-8") + b',"fichier"', octets)
+        self.assertNotIn(BS.encode(), octets)                               # aucune séquence d'échappement
+
+    def test_usage(self):                                                   # G-14 : deux arguments, sinon code 2
+        for args in ((), ("d",), ("d", "pool", "x")):
+            self.assertEqual(self.lancer(*args), (2, b""), args)
+
+
+class Memoire(unittest.TestCase):
+    def test_lecture_en_memoire_bornee(self):                              # C-12 : tracemalloc, journaux de 1 et 4 Mio
+        pics = []
+        for taille in (1, 4):
+            with tempfile.TemporaryDirectory() as d:
+                jl = j.Journal(d, "pool", fsync=lambda fd: None).ouvrir(T0 - 600)
+                try:
+                    for _k in range(256 * taille):                          # 256 lignes de 4 Kio environ par Mio
+                        jl.ecrire("lecture", T0 - 540, pad="x" * 4000)
+                    jl.marqueur(T0 - 540)
+                finally:
+                    jl.fermer()
+                tracemalloc.start()
+                try:
+                    n = sum(1 for _x in o.Lecture(d, "pool"))
+                    pics.append(tracemalloc.get_traced_memory()[1])
+                finally:
+                    tracemalloc.stop()
+            self.assertEqual(n, 256 * taille + 2, taille)
+        self.assertLess(max(pics), 1 << 18)                                 # 256 Kio, loin des 4 Mio du journal
+        self.assertLess(pics[1], pics[0] + (1 << 16))                       # le pic ne croît pas avec le journal

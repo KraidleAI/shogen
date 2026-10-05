@@ -114,7 +114,8 @@ def cle(x):
 class Lecture:
     """Lecture en flux du journal `prefixe` de `dossier` : itérer rend chaque enregistrement intègre {fichier, position,
     sha256, enr}, dans l'ordre de la chaîne ; l'itération finie, `ruptures`, `queues_declarees`, `queue_finale` et
-    `tete` sont complets. Mémoire : une ligne de LIMITE octets au plus, et les queues en attente."""
+    `tete` sont complets. Mémoire : la ligne lue (LIMITE octets au plus) et les queues en attente, quelle que soit la
+    longueur du journal (test tracemalloc sur 1 et 4 Mio)."""
 
     def __init__(self, dossier, prefixe):
         self.dossier, self.prefixe = dossier, prefixe
