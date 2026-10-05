@@ -4,10 +4,13 @@ simultanés, consolidation au quorum q_j = ⌊M_j/2⌋ + 1 (vote tout axe) et «
 fenêtre T_début + j·w, comme calendrier.py et sources.py). SB-6a : flux des composants pré-déclarés, comptage par plans
 de bits, quorum par fenêtre, statuts et votes d'un observateur, consolidation (D, ok) de chaque série. SB-6b : couche
 d'une réplication, validité des observateurs (absences D-1, dégradations D-2 à D-5, pannes de paires, perte, repli M =
-3). Aucun flottant hors des tirages, aucune fonction transcendante, aucune puissance."""
+3). SB-6c : vues des observateurs (échecs de chemin ε, défauts locaux, artefacts, pannes régionales, manques β) et
+consolidation de la réplication. Aucun flottant hors des tirages, aucune fonction transcendante, aucune puissance."""
 import functools
+from fractions import Fraction
 
 import aleas
+import calendrier
 import commun
 import sources
 
@@ -113,6 +116,68 @@ class Couche:
     def u(self, composant, indice):
         return self.essais.get((composant, indice)) or flux(self.prm, self.cellule, self.i, composant, indice)
 
+    def vues(self, etat: dict, masques: dict) -> dict:
+        """Vues des observateurs (E-S-19 à E-S-21), clés de consolider(). chemin (o, u) : échecs de chemin seuls,
+        tirages indépendants par fenêtre de part ε(u, s) dans les fenêtres de la strate s (couche « chemin » : {(hôte,
+        strate) : ε} ou None ; flux « obs-chemin » d'indice sources.indice(prm, u, s, o)). local (o) : défaut local,
+        renouvellement stationnaire de part λ (couche « local », part du temps), épisodes géométriques de moyenne
+        observateurs.duree_locale (flux « obs-local » d'indice o). artefact (o, u), o de l'UE, u du sous-ensemble
+        AS13335 : épisodes de observateurs.duree_artefact fenêtres, débuts à ρ_art par jour (couche « artefacts » ; flux
+        « obs-artefacts »). cache (o, u) : chaque épisode de panne de l'hôte est régional avec la probabilité π (couche
+        « regionale »), vu alors par un sous-ensemble propre non vide uniforme des M observateurs, rangés par masque ;
+        les autres ne le voient pas (flux « obs-regionale » d'indice rang(u)). manque (o, u), puis (o, u, c) : à chaque
+        fenêtre de panne de l'hôte, puis d'écart de la série, chaque observateur la manque avec la probabilité β (couche
+        « manque » ; flux « obs-manque » d'indices 10·rang(u) et 10·rang(u) + 1 + rang de la classe)."""
+        c, op, a, out = self.couche, self.prm["observateurs"], self.prm["aleas"], {}
+        for o in range(op["M"]):
+            for (h, s), e in sorted((c["chemin"] or {}).items()):
+                if e:
+                    m = sources.markov(self.u("obs-chemin", sources.indice(self.prm, h, s, o)), e, e, a, self.horizon)
+                    out["chemin", o, h] = out.get(("chemin", o, h), 0) | (sources.masque(m) & masques[s])
+            if c["local"]:
+                loi = sources.Geometrique(Fraction(1, op["duree_locale"]), a)
+                q = sources.pause(c["local"], loi.moyenne)
+                m = sources.alterner(self.u("obs-local", o), loi, q, a, self.horizon)
+                out["local", o] = sources.masque(m)
+        m = 0
+        for t in debuts(self.prm, self.u("obs-artefacts", 0), c["artefacts"], self.horizon) if c["artefacts"] else []:
+            m |= ((1 << op["duree_artefact"]) - 1) << t
+        out.update({("artefact", o, h): m & self.grille for o in op["ue"] for h in self.prm["sources"]["as13335"] if m})
+        sous = [[o for o in range(op["M"]) if x >> o & 1] for x in range(1, (1 << op["M"]) - 1)]
+        for (h, cl), (p, e) in etat.items():
+            r = sources.rang(self.prm, h)
+            if c["regionale"] and ("cache", 0, h) not in out:
+                v = self.u("obs-regionale", r)
+                out.update({("cache", o, h): 0 for o in range(op["M"])})
+                for d, f in calendrier.segments(p):
+                    if aleas.bernoulli(v, aleas.seuil(c["regionale"])):
+                        vus = sous[_uniforme(len(sous)).tirer(v)]
+                        for o in [o for o in range(op["M"]) if o not in vus]:
+                            out["cache", o, h] |= ((1 << (f - d)) - 1) << d
+            if c["manque"]:
+                if ("manque", 0, h) not in out:
+                    out.update(self._manques(p, self.u("obs-manque", 10 * r), ("manque", h)))
+                v = self.u("obs-manque", 10 * r + 1 + sources.CLASSES.index(cl))
+                out.update(self._manques(e, v, ("manque", h, cl)))
+        return out
+
+    def _manques(self, m: int, v, cle: tuple) -> dict:
+        """{(cle[0], o, *cle[1:]) : fenêtres de m manquées par o} : à chaque fenêtre de m, dans l'ordre, un tirage de
+        Bernoulli β par observateur, dans l'ordre."""
+        s, n = aleas.seuil(self.couche["manque"]), self.prm["observateurs"]["M"]
+        b = [bytearray((self.horizon >> 3) + 1) for _o in range(n)]
+        for d, f in calendrier.segments(m):
+            for t in range(d, f):
+                for o in range(n):
+                    if aleas.bernoulli(v, s):
+                        b[o][t >> 3] |= 1 << (t & 7)
+        return {(cle[0], o, *cle[1:]): int.from_bytes(b[o], "little") for o in range(n)}
+
+    def consolidation(self, etat: dict, masques: dict) -> tuple:
+        """(quorum, {(hôte, classe) : (D, ok)}) de la réplication : Quorum des validités, consolider() des vues."""
+        q = Quorum(self.validites(), self.grille)
+        return q, consolider(etat, q, self.vues(etat, masques))
+
     def validites(self) -> list:
         """Masques de validité des M observateurs (E-S-17, E-S-18 ; grille de Q-S-11). Non valide : absence D-1
         (renouvellement stationnaire de part `absences`, longueurs observateurs.absences, flux « obs-absences » d'indice
@@ -146,3 +211,10 @@ class Couche:
             t = fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u)
             inv[o] |= self.grille >> t << t
         return [self.grille & ~x for x in inv]
+
+
+def chemin_reference(prm: dict, ep: dict, f) -> dict:
+    """ε de référence (E-S-19, Q-S-12 (a)) : ε(u, s) = (1 − f)·p̂(u, s), p̂ = cellules/n_s de la ligne « ecart » d'EP
+    (indicatrice de R1 de S2, panne comprise), pour chaque hôte du pool et chaque strate."""
+    return {(h, s): (1 - f) * Fraction(ep[s, h, "ecart"]["cellules"], ep[s, h, "ecart"]["n_s"])
+            for h, _f in prm["calibration"]["unites"] for s in prm["calibration"]["strates"]}

@@ -5,11 +5,13 @@ from fractions import Fraction
 
 import aleas
 import calendrier
+import calibration
 import commun
 import observateurs
 import sources
 
 PRM = commun.charger_parametres(environ={})
+EP = calibration.charger(PRM, environ={})["episodes"]
 
 
 def dans_5_se(x: list, r: Fraction) -> bool:
@@ -109,7 +111,8 @@ def suite(*u):
 def couche(**k) -> dict:
     """Couche d'essai (E-S-17, E-S-18) : rien par défaut ; k remplace."""
     return dict({"absences": Fraction(0), "degradations": Fraction(0), "paires": Fraction(0), "perte": None,
-                 "repli": False}, **k)
+                 "repli": False, "chemin": None, "local": Fraction(0), "artefacts": Fraction(0),
+                 "regionale": Fraction(0), "manque": Fraction(0)}, **k)
 
 
 def part(m: int, n: int) -> Fraction:
@@ -173,3 +176,95 @@ class TestValidite(unittest.TestCase):
         self.assertTrue(dans_5_se(y, Fraction(29, 200) * Fraction(29, 200)))
         self.assertEqual(lg, {2, 5})
         self.assertIn(1, ld)
+
+
+class TestVotes(unittest.TestCase):
+    def test_chemins_epsilon(self):
+        """Échecs de chemin seuls (E-S-19, Q-S-12) : référence ε_u = (1 − f)·p̂_u, p̂_u = cellules d'écart/n_s d'EP :
+        binance calme à f = 3/10, (7/10)·372/24 585 = 434/40 975 (EP l.15), bitfinex calme (7/10)·32/24 585 =
+        112/122 925 (EP l.19 : 32 cellules d'écart pour 30 de panne). ε = 1/10 pour binance en calme, 0 en
+        stress (grille de 2 × 2 000 fenêtres) ; 60 réplications : part de O1 en calme à 5 SE de 1/10, aucune en
+        stress ; O1 et O2 ensemble à 5 SE de 1/100 (indépendance par observateur) ; pool à rebours : masques
+        identiques (indices ancrés sur sources.indices_hotes). Mutations M-6C-01 (masque de strate omis), M-6C-02
+        (flux commun aux observateurs), M-6C-03 (référence sur la ligne « panne »), M-6C-12 (f omis)."""
+        ref = observateurs.chemin_reference(PRM, EP, Fraction(3, 10))
+        self.assertEqual((ref["binance", "calme"], ref["bitfinex", "calme"], len(ref)),
+                         (Fraction(434, 40975), Fraction(112, 122925), 20))
+        n, m = 4000, {"calme": (1 << 2000) - 1, "stress": ((1 << 2000) - 1) << 2000}
+        eps, x, y = {("binance", "calme"): Fraction(1, 10), ("binance", "stress"): Fraction(0)}, [], []
+        rebours = dict(PRM, calibration=dict(PRM["calibration"], unites=list(reversed(PRM["calibration"]["unites"]))))
+        for i in range(60):
+            v = observateurs.Couche(PRM, couche(chemin=eps), "T-6C", i, n).vues({}, m)
+            self.assertEqual(v[("chemin", 0, "binance")] >> 2000, 0)
+            x.append(part(v[("chemin", 0, "binance")], 2000))
+            y.append(part(v[("chemin", 0, "binance")] & v[("chemin", 1, "binance")], 2000))
+            if i < 3:
+                self.assertEqual(observateurs.Couche(rebours, couche(chemin=eps), "T-6C", i, n).vues({}, m), v)
+        self.assertTrue(dans_5_se(x, Fraction(1, 10)))
+        self.assertTrue(dans_5_se(y, Fraction(1, 100)))
+
+    def test_defauts_locaux_et_artefacts(self):
+        """Défaut local (E-S-20) : part stationnaire λ = 1/20, épisodes géométriques de moyenne 2 ; 100 réplications de
+        4 000 fenêtres : part de O3 à 5 SE de 1/20, longueur moyenne des épisodes entiers à 5 SE de 2. Artefacts
+        (E-S-21) à la main : ρ = 720 par jour (1/2 par fenêtre), durée 2 au lieu de 20 (paramètre d'essai), horizon 8 :
+        débuts en 0 et 3 (u = 0,3 ; 0,8 ; 0,95), soit les fenêtres 0, 1, 3, 4, pour O1 à O3 (UE) sur les 7 hôtes
+        AS13335, rien pour O4 ni pour binance, bitstamp, gemini. Mutations M-6C-04 (λ pris comme taux de débuts),
+        M-6C-05 (épisodes de défaut local d'une fenêtre), M-6C-06 (artefacts pour les quatre observateurs), M-6C-07
+        (artefacts sur tous les hôtes)."""
+        x, lg, n = [], [], 4000
+        for i in range(100):
+            v = observateurs.Couche(PRM, couche(local=Fraction(1, 20)), "T-6C", i, n).vues({}, {})
+            x.append(part(v[("local", 2)], n))
+            lg += [Fraction(b - a) for a, b in calendrier.segments(v[("local", 2)]) if 0 < a and b < n]
+        self.assertTrue(dans_5_se(x, Fraction(1, 20)))
+        self.assertTrue(dans_5_se(lg, Fraction(2)))
+        prm = dict(PRM, observateurs=dict(PRM["observateurs"], duree_artefact=2))
+        v = observateurs.Couche(prm, couche(artefacts=Fraction(720)), "T-6C", 0, 8,
+                                {("obs-artefacts", 0): suite(0.3, 0.8, 0.95)}).vues({}, {})
+        attendu = {("artefact", o, h): bits(0, 1, 3, 4) for o in (0, 1, 2) for h in PRM["sources"]["as13335"]}
+        self.assertEqual({k: w for k, w in v.items() if w}, attendu)
+
+    def test_regionale_et_manques(self):
+        """À la main, panne vraie de kraken (BTC et ETH) en 1, 2, 5, 6, 7, écart d'ETH en 3. Panne régionale (π = 1/2,
+        flux « obs-regionale » d'indice 2, rang de kraken) : épisode [1, 3) régional (u = 0,3), vu par le sous-ensemble
+        d'indice 7 des 14 sous-ensembles propres non vides, rangés par masque (u = 0,5 → masque 8, O4 seul) : cache pour
+        O1 à O3 ; épisode [5, 8) régional (0,2), sous-ensemble d'indice 13 (0,95 → masque 14, O2 à O4) : cache pour O1.
+        Consolidation : D = {5, 6, 7} (la panne vue d'un seul point est censurée, celle de trois points comptée), ok =
+        {0, 1, 2, 3, 4} (O1 à O3, qui ne voient pas la première, ont un statut non panne). Manques β = 1/2, sur
+        une panne de kraken en 2 et 5 et un écart d'ETH en 3 : par hôte (flux « obs-manque » 20), fenêtre 2, u = 0,3,
+        0,7, 0,2, 0,9 → O1, O3 ; fenêtre 5, 0,6, 0,1, 0,8, 0,4 → O2, O4 ; par classe (flux 22 pour ETH, aucun tirage
+        pour BTC, sans écart) : fenêtre 3, 0,9, 0,9, 0,1, 0,9 → O3. Mutations M-6C-08 (cache donné aux observateurs du
+        sous-ensemble), M-6C-09 (manque d'écart sur le flux de l'hôte), M-6C-10 (sous-ensemble plein admis)."""
+        etat = {("kraken", "BTC"): (bits(1, 2, 5, 6, 7), 0), ("kraken", "ETH"): (bits(1, 2, 5, 6, 7), bits(3))}
+        reg = observateurs.Couche(PRM, couche(regionale=Fraction(1, 2)), "T-6C", 0, 8,
+                                  {("obs-regionale", 2): suite(0.3, 0.5, 0.2, 0.95)}).vues(etat, {})
+        self.assertEqual({k: w for k, w in reg.items() if w}, {("cache", 0, "kraken"): bits(1, 2, 5, 6, 7),
+                                                               ("cache", 1, "kraken"): bits(1, 2),
+                                                               ("cache", 2, "kraken"): bits(1, 2)})
+        self.assertEqual(observateurs.consolider(etat, observateurs.Quorum([255] * 4, 255), reg),
+                         {("kraken", "BTC"): (bits(5, 6, 7), bits(0, 1, 2, 3, 4)),
+                          ("kraken", "ETH"): (bits(3, 5, 6, 7), bits(0, 1, 2, 3, 4))})
+        etat = {("kraken", "BTC"): (bits(2, 5), 0), ("kraken", "ETH"): (bits(2, 5), bits(3))}
+        essais = {("obs-manque", 20): suite(0.3, 0.7, 0.2, 0.9, 0.6, 0.1, 0.8, 0.4),
+                  ("obs-manque", 22): suite(0.9, 0.9, 0.1, 0.9)}
+        man = observateurs.Couche(PRM, couche(manque=Fraction(1, 2)), "T-6C", 0, 8, essais).vues(etat, {})
+        self.assertEqual({k: w for k, w in man.items() if w},
+                         {("manque", 0, "kraken"): bits(2), ("manque", 2, "kraken"): bits(2),
+                          ("manque", 1, "kraken"): bits(5), ("manque", 3, "kraken"): bits(5),
+                          ("manque", 2, "kraken", "ETH"): bits(3)})
+
+    def test_observateurs_parfaits(self):
+        """Oracle exact (E-S-22) : sans bruit d'observateur (quatre valides, ni ε, ni défaut, ni artefact, ni manque),
+        la consolidation rend l'état vrai : D = panne | écart et ok = non panne, pour les 38 séries d'une réplication
+        (f = 1, τ = 1/50, 2 000 fenêtres) ; fenêtres toutes évaluables ; au repli M = 3, de même, toutes les fenêtres
+        à M_j = 3. Mutation M-6C-11 : validités ignorées par la consolidation."""
+        n, m = 2000, {"calme": (1 << 2000) - 1, "stress": 0}
+        fond = {"f": Fraction(1), "regime": {"calme": None, "stress": None}, "longues": Fraction(0),
+                "autres": Fraction(1), "hors_enveloppe": Fraction(1, 50)}
+        etat = sources.Replication(PRM, EP, fond, "T-6C", 0, m, n).etat()
+        q, series = observateurs.Couche(PRM, couche(), "T-6C", 0, n).consolidation(etat, m)
+        self.assertEqual(q.evaluables, (1 << n) - 1)
+        self.assertEqual(series, {k: (p | e, ((1 << n) - 1) & ~p) for k, (p, e) in etat.items()})
+        self.assertNotEqual({p for p, _e in etat.values()}, {0})
+        q, s3 = observateurs.Couche(PRM, couche(repli=True), "T-6C", 0, n).consolidation(etat, m)
+        self.assertEqual((q.nombre[3], s3), ((1 << n) - 1, series))
