@@ -4,8 +4,10 @@ scripts/plan-s2bis/episodes.py, courbe) sur masques entiers : bit j = position j
 ou non ; une position absente ne forme aucune paire. Numérateur entier exact, valeurs publiées en Decimal sous le
 contexte de r1 (précision calibration.precision, ROUND_HALF_EVEN, le reste du DefaultContext), FIV exact en Fraction.
 SB-10b : portée du segment J28 lue sur EP l.6, calendrier de la grille, réplication du modèle d'E1 (unités
-indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. Entiers et
-rationnels seuls : aucun flottant, aucune puissance."""
+indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. SB-10c :
+grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le contexte de r1 : aucune fonction de libm),
+choix de C2 et de C1. Entiers et rationnels seuls, sauf les logarithmes du critère : aucun flottant, aucune
+puissance."""
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
@@ -36,7 +38,7 @@ def courbe(pres: int, val: int, ells: list, k: dict) -> list:
     publiées, forme d'episodes.courbe) ; fiv = N/(ℓ·n·K(n − K)) exact ; garde = n ≥ garde_blocs·ℓ (k : section
     « calibration » de parametres.json). n = 0 : γ̂₀, σ̂² et FIV à None ; γ̂₀ = 0 (K ∈ {0, n}) : FIV à None."""
     _entree(pres, val, ells)
-    ctx = Context(prec=k["precision"], rounding=ROUND_HALF_EVEN)
+    ctx = contexte(k)
     n, K, voulus = pres.bit_count(), val.bit_count(), set(ells)
     sommes, a, b = {1: (0, 0)}, 0, 0
     for j in range(1, max(ells)):
@@ -119,3 +121,77 @@ def moyenne(courbes: list) -> dict:
     nb = len(definies)
     fiv = [sum((c[j]["fiv"] for c in definies), Fraction(0)) / nb if nb else None for j in range(len(courbes[0]))]
     return {"fiv": fiv, "definies": nb, "indefinies": len(courbes) - nb}
+
+
+def contexte(k: dict) -> Context:
+    """Contexte décimal de r1 de f35a70c : précision calibration.precision, ROUND_HALF_EVEN, le reste du
+    DefaultContext."""
+    return Context(prec=k["precision"], rounding=ROUND_HALF_EVEN)
+
+
+def grille(prm: dict) -> list:
+    """Points (φ, κ, τ_D) de la grille d'E1 (E-S-38, section « e1 »), dans l'ordre φ, puis κ, puis τ_D."""
+    e = prm["e1"]
+    return [(Fraction(*f), Fraction(k), t) for f in e["phi"] for k in e["kappa"] for t in e["tau_D"]]
+
+
+def cellule(prm: dict, point) -> str:
+    """Nom de cellule des flux d'une réplication d'E1 (Q-T4-8) : « <préfixe>-C0 », ou « <préfixe>-<φ>-<κ>-<τ_D> », φ
+    en fraction irréductible."""
+    if point is None:
+        return f"{prm['e1']['cellule']}-C0"
+    return f"{prm['e1']['cellule']}-{point[0].numerator}/{point[0].denominator}-{point[1]}-{point[2]}"
+
+
+def _ln(x, ctx) -> Decimal:
+    """ln x, x rationnel > 0 : quotient décimal puis Decimal.ln, tous deux sous le contexte (Q-T4-7)."""
+    x = Fraction(x)
+    return ctx.divide(Decimal(x.numerator), Decimal(x.denominator)).ln(ctx)
+
+
+def critere(modele: list, cible: list, ells: list, ctx):
+    """Critère d'E1 (E-S-38) : Σ (ln F_modèle(ℓ) − ln F_EP(ℓ))² aux ℓ dont la garde d'EP est tenue ; ℓ de la cible
+    (points d'EP) égaux à `ells` dans l'ordre et autant de valeurs du modèle, sinon E1/cible ; FIV du modèle
+    indéfini à un ℓ gardé : None (point écarté, Q-T4-10)."""
+    if [c["ell"] for c in cible] != ells or len(modele) != len(ells):
+        raise commun.Refus("E1/cible", f"ℓ de la cible {[c['ell'] for c in cible]}, attendus {ells}")
+    s = Decimal(0)
+    for x, c in zip(modele, cible):
+        if c["garde"] and x is None:
+            return None
+        if c["garde"]:
+            d = ctx.subtract(_ln(x, ctx), _ln(c["fiv"], ctx))
+            s = ctx.add(s, ctx.multiply(d, d))
+    return s
+
+
+def _rang(item) -> tuple:
+    """Ordre de choix : valeur, puis plus petit κ, puis plus petit τ_D (E-S-38), puis plus petit φ (Q-T4-9)."""
+    v, (phi, kappa, tau) = item
+    return v, kappa, tau, phi
+
+
+def selection(prm: dict, cible: dict, moyennes: dict) -> dict:
+    """C2 et C1 de chaque strate (E-S-38) : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la
+    grille, ou None pour C0 : {strate : moyenne()}}. C2 = point de critère minimal ; C1 = point de la grille dont
+    ln FIV(ell_c1) est le plus proche de la moyenne des ln FIV(ell_c1) de C0 et de C2 ; égalités : _rang. Rend
+    {strate : {"C2", "C1", "criteres" : {point : critère}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés}}. Point
+    absent : E1/point ; aucun critère défini, ou FIV(ell_c1) de C0 ou de C2 indéfini : E1/indefini."""
+    ctx, ells, pts = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm)
+    j, out = ells.index(prm["e1"]["ell_c1"]), {}
+    if any(p not in moyennes for p in [None] + pts):
+        raise commun.Refus("E1/point", "point de la grille ou C0 sans courbe")
+    for s, cs in cible.items():
+        crit = {p: critere(moyennes[p][s]["fiv"], cs, ells, ctx) for p in pts}
+        defs = [(v, p) for p, v in crit.items() if v is not None]
+        c2 = min(defs, key=_rang)[1] if defs else None
+        f0, f2 = moyennes[None][s]["fiv"][j], None if c2 is None else moyennes[c2][s]["fiv"][j]
+        if f0 is None or f2 is None:
+            raise commun.Refus("E1/indefini", f"strate {s} : critère ou FIV({ells[j]}) indéfini")
+        mil = ctx.divide(ctx.add(_ln(f0, ctx), _ln(f2, ctx)), 2)
+        dist = [(ctx.subtract(_ln(moyennes[p][s]["fiv"][j], ctx), mil).copy_abs(), p) for p in pts
+                if moyennes[p][s]["fiv"][j] is not None]
+        out[s] = {"C2": c2, "C1": min(dist, key=_rang)[1], "criteres": crit,
+                  "residus": [ctx.subtract(_ln(x, ctx), _ln(c["fiv"], ctx))
+                              for x, c in zip(moyennes[c2][s]["fiv"], cs) if c["garde"]]}
+    return out

@@ -5,6 +5,7 @@ la grille, écarts à Ī, en Fraction) sur des séries aléatoires à lacunes ; 
 rougissent."""
 import random
 import unittest
+from decimal import Decimal
 from fractions import Fraction
 
 import calib_fiv
@@ -191,6 +192,86 @@ class TestModeleE1(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             calib_fiv.moyenne([])
         self.assertEqual(c.exception.code, "FIV/entree")
+
+
+L22 = Decimal("0.480453013918201424667102526326664971730552951594545586866864")     # bc -l : l(2)^2, scale = 60
+EPS = Decimal("1E-45")
+P1, P2, P3, P4 = ((Fraction(1, 100), Fraction(5), 60), (Fraction(1, 100), Fraction(50), 60),
+                  (Fraction(1, 10), Fraction(5), 60), (Fraction(1, 10), Fraction(50), 60))
+
+
+def reduit():
+    """parametres.json à grille réduite (φ ∈ {1/100, 1/10}, κ ∈ {5, 50}, τ_D = 60) et ℓ ∈ {1, 2, 240}."""
+    e1 = dict(PRM["e1"], phi=[[1, 100], [1, 10]], kappa=[5, 50], tau_D=[60])
+    return dict(PRM, e1=e1, calibration=dict(K_, ell=[1, 2, 240]))
+
+
+def m(*fiv):
+    return {"fiv": [None if x is None else Fraction(x) for x in fiv], "definies": 1, "indefinies": 0}
+
+
+class TestCritereE1(unittest.TestCase):
+    def test_parametres_e1(self):
+        """Section « e1 » : grille φ × κ × τ_D de 64 points dans l'ordre déclaré, 200 réplications par point, pool
+        D1-bis (cible EP l.128-161), ℓ = 240 pour C1 ; source citée ; cellule E1-C0 et E1-<φ>-<κ>-<τ_D>. Mutations
+        M-10-28 (grille sans τ_D = 4 320), M-10-29 (cellule sans φ)."""
+        g = calib_fiv.grille(PRM)
+        self.assertEqual((len(g), g[0], g[1], g[-1]), (64, (Fraction(1, 100), 5, 60), (Fraction(1, 100), 5, 240),
+                                                        (Fraction(1, 10), 50, 4320)))
+        e = PRM["e1"]
+        self.assertEqual((e["replications"], e["pool"], e["ell_c1"]), (200, "D1-bis", 240))
+        self.assertTrue(all(x in e["source"] for x in ("E-S-38", "PROPOSITION l.197", "AVIS.md l.24")))
+        self.assertEqual([calib_fiv.cellule(PRM, x) for x in (None, P1, (Fraction(1, 20), Fraction(10), 4320))],
+                         ["E1-C0", "E1-1/100-5-60", "E1-1/20-10-4320"])
+
+    def test_critere(self):
+        """Somme des carrés des écarts de log aux ℓ dont la garde d'EP est tenue : modèle 2, 4, 1 contre cible 1, 2, 1
+        (troisième ℓ non gardé) : 2·(ln 2)² ; modèle 3, 5, 7 contre 2, 3, 100 : (ln 3 − ln 2)² + (ln 5 − ln 3)² (bc -l,
+        à 10^-45 près) ; FIV indéfini à un ℓ gardé : None, à un ℓ non gardé : sans effet ; ℓ ou longueurs
+        discordants : E1/cible. Mutations M-10-30 (ℓ non gardés comptés), M-10-31 (écarts sans le carré), M-10-32 (log
+        décimal), M-10-41 (alignement des ℓ non contrôlé)."""
+        ctx = calib_fiv.contexte(K_)
+        cible = [{"ell": e, "fiv": Fraction(x), "garde": g}
+                 for e, x, g in ((1, 1, True), (2, 2, True), (240, 1, False))]
+        ells = [1, 2, 240]
+        ref = Decimal("0.960906027836402849334205052653329943461105903189091173733728")      # bc -l : 2*l(2)^2
+        self.assertLess(abs(calib_fiv.critere([2, 4, 1], cible, ells, ctx) - ref), EPS)
+        cible2 = [dict(c, fiv=Fraction(x)) for c, x in zip(cible, (2, 3, 100))]
+        ref = Decimal("0.425344771789078895160682693819873579225181410410195394238949")
+        self.assertLess(abs(calib_fiv.critere([3, 5, 7], cible2, ells, ctx) - ref), EPS)
+        self.assertIsNone(calib_fiv.critere([2, None, 1], cible, ells, ctx))
+        self.assertEqual(calib_fiv.critere([1, 2, None], cible, ells, ctx), 0)
+        for modele, c, e in (([1, 2], cible, ells), ([1, 2, 1], cible[:2], ells), ([1, 2, 1], cible, [1, 2, 120])):
+            with self.assertRaises(commun.Refus) as r:
+                calib_fiv.critere(modele, c, e, ctx)
+            self.assertEqual(r.exception.code, "E1/cible")
+
+    def test_selection(self):
+        """Grille réduite, cible EP fictive 1, 2 (gardés), 8 (non gardé) ; C0 : 1, 1, 1. P1 (1/100, 5, 60) : 1, 2, 4,
+        critère 0 ; P2 (1/100, 50, 60) : 1, 2, 2, critère 0 ; P3 (1/10, 5, 60) : 1, 4, 3 ; P4 (1/10, 50, 60) : 1, 1, 1.
+        C2 : égalité P1, P2 départagée par le plus petit κ : P1 ; C1 : moyenne de ln 1 et ln 4 = ln 2, P2 à distance 0 ;
+        si P3 vaut aussi 2 à ℓ = 240, égalité P2, P3 : P3 (κ = 5). Critère de P3 : (ln 2)² (bc -l). Résidus de C2 :
+        0, 0. P1 à FIV indéfini à un ℓ gardé : écarté, C2 = P2 ; P3 à 3/2 en 240 : C1 = P3 (|ln 1,5 − ln 2/2| =
+        0,059, contre ln 2/2 pour P2 et P4) ; point manquant : E1/point ; FIV(240) de C0 indéfini : E1/indefini.
+        Mutations M-10-33 (C2 au plus grand critère), M-10-34 (égalités au plus grand κ), M-10-35 (C1 sur la moyenne
+        des FIV au lieu des log), M-10-36 (point indéfini compté pour 0)."""
+        cible = [{"ell": e, "fiv": Fraction(x), "garde": g}
+                 for e, x, g in ((1, 1, True), (2, 2, True), (240, 8, False))]
+        moy = {None: m(1, 1, 1), P1: m(1, 2, 4), P2: m(1, 2, 2), P3: m(1, 4, 3), P4: m(1, 1, 1)}
+        s = calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in moy.items()})["calme"]
+        self.assertEqual((s["C2"], s["C1"], s["residus"]), (P1, P2, [0, 0]))
+        self.assertLess(abs(s["criteres"][P3] - L22), EPS)
+        moy[P3] = m(1, 4, 2)
+        s = calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in moy.items()})["calme"]
+        self.assertEqual((s["C2"], s["C1"]), (P1, P3))
+        moy[P1], moy[P3] = m(1, None, 4), m(1, 4, Fraction(3, 2))     # P1 écarté de C2 ; C1 : ln 1,5 près de ln 2/2
+        s = calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in moy.items()})["calme"]
+        self.assertEqual((s["C2"], s["criteres"][P1], s["C1"]), (P2, None, P3))
+        for faux, code in (({p: x for p, x in moy.items() if p != P4}, "E1/point"),
+                           ({**moy, None: m(1, 1, None)}, "E1/indefini")):
+            with self.assertRaises(commun.Refus) as c:
+                calib_fiv.selection(reduit(), {"calme": cible}, {p: {"calme": x} for p, x in faux.items()})
+            self.assertEqual(c.exception.code, code)
 
 if __name__ == "__main__":
     unittest.main()
