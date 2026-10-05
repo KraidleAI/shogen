@@ -1,9 +1,14 @@
 """Client DNS filaire (CB-10 ; E-C-27, E-C-28 ; ADR-0029 §2.3, D-4 et D-5), format RFC 1035 (§4.1) : octets d'une
 requête (en-tête de 12 octets, une question A, SOA ou TXT de classe IN) ; analyse d'une réponse, retenue seulement si
 elle porte le même identifiant, le bit QR et la même question ; données prêtes pour le journal (rcode, drapeau TC,
-réponses avec leur TTL). Le jugement (D-4, D-5) se fait au recalcul."""
+réponses avec leur TTL). Le jugement (D-4, D-5) se fait au recalcul. `interroger` (CB-10b) : une requête en UDP vers une
+adresse IPv4 littérale, sans aucune résolution, identifiant tiré au hasard ; tout datagramme qui ne vient pas de cette
+adresse et de ce port, ou d'un autre identifiant, est ignoré ; ne lève jamais (instants en microsecondes)."""
+import secrets
 import socket
 import struct
+
+from shogen_s2bis.collecte.lecture import S, horloge
 
 TYPES = {"A": 1, "SOA": 6, "TXT": 16}
 
@@ -75,3 +80,27 @@ def analyser(m, q):
         return {"rcode": drapeaux & 0x0F, "tc": bool(drapeaux & 0x0200), "reponses": reponses}
     except (IndexError, ValueError, struct.error) as e:                # UnicodeDecodeError et Forme compris
         raise Forme(str(e)) from None
+
+
+def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horloge=horloge, ident=None):
+    """Une requête vers `adresse`:`port`, réponse attendue `delai` au plus. Statut : reponse, delai, forme (requête
+    impossible ou réponse retenue mal formée) ou reseau (envoi refusé)."""
+    r = {"statut": "delai", "rcode": None, "tc": None, "reponses": None, "debut": horloge()}
+    fin = r["debut"] + delai
+    try:
+        q = requete(secrets.randbelow(1 << 16) if ident is None else ident, nom, qtype, recursion)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.sendto(q, (adresse, port))
+            while (reste := fin - horloge()) > 0:
+                s.settimeout(reste / S)
+                m, source = s.recvfrom(65535)
+                if source == (adresse, port) and m[:2] == q[:2]:
+                    r.update(statut="reponse", **analyser(m, q))
+                    break
+    except TimeoutError:
+        pass
+    except ValueError:                                              # Forme comprise
+        r["statut"] = "forme"
+    except OSError:
+        r["statut"] = "reseau"
+    return {**r, "fin": horloge()}

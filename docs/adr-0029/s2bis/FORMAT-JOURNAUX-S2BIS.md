@@ -220,3 +220,21 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
      `fils.tardives` : latences (fin moins départ, en microsecondes, triées) des lectures abandonnées dont le résultat
      est arrivé depuis la fenêtre précédente. Un résultat tardif n'est jamais écrit comme lecture (Q-C-15).
 7. Les fils de lecture sont des fils démons : un fil pendu n'empêche jamais le processus de s'arrêter.
+
+## 12. Résultat d'une requête DNS (CB-10 ; E-C-27, E-C-28)
+
+Les sondes D-4 et D-5 de l'enregistrement `sante` (§13) portent chacune le résultat d'une requête DNS en UDP, objet de
+champs :
+- `statut` : `reponse` (une réponse retenue), `delai` (aucune réponse retenue avant le délai), `forme` (requête
+  impossible, ou réponse retenue mal formée) ou `reseau` (envoi refusé par le système) ;
+- `rcode` : code de réponse (entier de 0 à 15 ; 0 NOERROR, 3 NXDOMAIN) ; `tc` : drapeau de troncature ; null tous deux
+  sans réponse retenue ;
+- `reponses` : liste de la section réponse, chaque élément `[nom, type, ttl, données]` : `nom` en texte terminé par
+  un point ; `type` entier (1 A, 6 SOA, 16 TXT) ; `ttl` entier en secondes ; `données` : pour A, l'adresse en
+  notation pointée ; pour TXT, la liste des chaînes (octets lus en latin-1) ; pour SOA, `[mname, rname, serial,
+  refresh, retry, expire, minimum]` ; pour tout autre type, null. Null sans réponse retenue ;
+- `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes.
+
+Une réponse n'est retenue que si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête
+(tiré au hasard sur 16 bits), le bit QR et la même question ; tout autre datagramme est ignoré. La requête ne passe par
+aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-0029 l.109).

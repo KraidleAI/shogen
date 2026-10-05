@@ -1,9 +1,11 @@
 """CB-10, E-C-27, E-C-28 : client DNS filaire. Octets écrits à la main selon la RFC 1035 (§4.1, pointeur §4.1.4 ;
 libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui en tire les mêmes valeurs (journal G1)."""
+import socket
 import threading
 import unittest
 
 from shogen_s2bis.collecte import dns
+from shogen_s2bis.collecte.lecture import S
 
 QA = "07 7769746e657373 07 6578616d706c65 00 0001 0001"                         # witness.example., A, IN
 Q_SOA = bytes.fromhex("1234 0000 0001 0000 0000 0000 00 0006 0001")              # « . », SOA, sans récursion
@@ -20,6 +22,25 @@ Q_TXT = bytes.fromhex("abcd 0100 0001 0000 0000 0000" + QT)
 R_TXT = bytes.fromhex("abcd 8180 0001 0001 0000 0000" + QT + "c00c 0010 0001 0000003c 000c 05 68656c6c6f 05 776f726c64")
 WE = "witness.example."
 A2 = [[WE, 1, 60, "192.0.2.1"], [WE, 1, 300, "192.0.2.2"]]
+
+
+def udp(comportement):
+    """Serveur UDP sur 127.0.0.1 : reçoit une requête, la consigne, puis `comportement(srv, requete, client)`."""
+    srv, recues = socket.socket(socket.AF_INET, socket.SOCK_DGRAM), []
+    srv.bind(("127.0.0.1", 0))
+    srv.settimeout(5)
+
+    def fil():
+        with srv:
+            try:
+                m, client = srv.recvfrom(4096)
+                recues.append(m)
+                comportement(srv, m, client)
+            except OSError:
+                pass
+    t = threading.Thread(target=fil, daemon=True)
+    t.start()
+    return srv.getsockname()[1], recues, t
 
 
 class Messages(unittest.TestCase):
@@ -62,3 +83,36 @@ class Messages(unittest.TestCase):
             f.start()
             f.join(2)                                                   # une boucle de pointeurs pendrait ici
         self.assertEqual(([f.is_alive() for f in fils], sorted(refus)), ([False] * len(cas), list(range(len(cas)))))
+
+
+class Interroger(unittest.TestCase):
+    def test_intrus_ignores_reponse_retenue(self):
+        def comportement(srv, requete, client):
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as autre:
+                autre.sendto(requete[:2] + R_NX[2:], client)                # autre source : ignoré
+            srv.sendto(bytes([requete[0] ^ 1]) + R_NX[1:], client)           # autre identifiant : ignoré
+            srv.sendto(requete[:2] + R_A[2:], client)
+        port, recues, fil = udp(comportement)
+        r = dns.interroger("127.0.0.1", WE, "A", delai=S, port=port, ident=0xABCD)
+        fil.join(5)
+        self.assertEqual((recues, r["statut"], r["rcode"], r["reponses"]), ([Q_A], "reponse", 0, A2))
+        self.assertTrue(type(r["debut"]) is int and r["debut"] <= r["fin"] < r["debut"] + S // 2)
+
+    def test_delai_reseau_forme_et_identifiant_aleatoire(self):
+        resultats, recues = [], []
+
+        def muets():
+            for _ in range(3):
+                port, vues, fil = udp(lambda *a: None)                     # serveur muet
+                resultats.append(dns.interroger("127.0.0.1", ".", "SOA", recursion=False, delai=S // 5, port=port))
+                fil.join(5)
+                recues.extend(vues)
+        f = threading.Thread(target=muets, daemon=True)
+        f.start()
+        f.join(5)                                                       # une attente sans délai pendrait ici
+        self.assertEqual([(r["statut"], r["rcode"], r["reponses"]) for r in resultats], [("delai", None, None)] * 3)
+        self.assertTrue(all(S // 5 <= r["fin"] - r["debut"] < 3 * S // 10 for r in resultats), resultats)
+        self.assertGreater(len({m[:2] for m in recues}), 1)
+        self.assertEqual([m[2:] for m in recues], [Q_SOA[2:]] * 3)
+        self.assertEqual(dns.interroger("127.0.0.1", ".", "SOA", port=0)["statut"], "reseau")
+        self.assertEqual(dns.interroger("127.0.0.1", "a..b", "A", port=1)["statut"], "forme")
