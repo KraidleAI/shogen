@@ -1583,3 +1583,24 @@ texte ; nom hors grammaire ignoré, ou refusé seulement sans fichier du journal
 majuscules, refusés ; nom prolongé après `.jsonl` ignoré (`match` au lieu de `fullmatch`) ; dossier sans fichier du
 journal admis ; refus mal nommé. Première passe, 11 mutants, avant l'ajout du segment 100 au test : 11 tués, versée sans
 être comptée. Suite : 214 tests ; plancher du job : 214, égalité exigée (`--egal`).
+
+## RB-18a (2026-10-05) : lecteur indépendant, ligne canonique, champs communs, noms (recalé sur 98c8537)
+
+Objet : premier diff du lecteur indépendant `recalc/oracle_indep.py` (E-R-33 ; PROPOSITION du G0 de RECALC-BIS l.396,
+l.486, l.539-540), écrit d'après le seul FORMAT, sans lire le lecteur principal (RB-1) : `objet` (ligne terminée par
+0x0A, objet JSON canonique, sans flottant ni NaN), `champs` (champs communs du §1.3), `fichiers` (noms
+`<préfixe>-AAAA-MM-JJ-k.jsonl`, ordre (jour, k entier)) ; frontière : bibliothèque standard seule, ni lecteur principal
+ni écrivain. Recalage (C-13 de la G2 de RB-18) : `recalc/__init__.py` et la règle `recalc` de `REGLES` sont déjà en
+tête, ce diff n'y touche plus. Le refus d'un entier long et l'oubli des noms hors grammaire sont corrigés par RB-18e et
+RB-18g.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 64 | — |
+| `tests/test_oracle_indep.py` | 96 | 10 (ligne canonique, échappements, non canonique, UTF-8, imbrication, entiers longs, réglage de l'interpréteur, champs communs, noms, frontière) |
+
+Mutants (commande du job, `--plancher 224`, borne de 300 s ; python3.12 ; réseau isolé) : 19 tués sur 19 (0 vivant,
+0 FATAL) : canonicité sautée, clés non triées, hors ASCII en séquence `u`, bornes 639 et 641, signe compté, flottant,
+NaN, ligne non objet, refus avant le jugement, RecursionError non attrapée, nom du refus, booléen pour `seq`, majuscules
+dans `prec`, k comparé en texte, zéro de tête, préfixe non échappé, import de l'écrivain, décodage latin-1. Suite : 224
+tests ; plancher du job : 224, égalité exigée (`--egal`).
