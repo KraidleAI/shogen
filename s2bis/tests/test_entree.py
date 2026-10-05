@@ -5,7 +5,8 @@ octets écrits ; temps réel, w = 1 s ; lectures vers un port local fermé ; son
 où rien n'écoute (délai de 0,1 s). CB-18g (C-1 de la G2 de la tranche C) : tolérance de départ scellée (`tolerance`),
 budget de l'ADR-0029 l.233-234 à la borne, valeurs prises au texte de l'ADR. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) :
 places du pool, forme de l'hôte (règle `[a-z0-9.-]{1,253}` de Q-RB-13 du recalcul) et du chemin, commit en minuscules,
-délai des sondes à la borne."""
+délai des sondes à la borne. CB-19f (C-3 (c) et (d) de la relecture d'intégration de P1) : point d'entrée à w = 60,
+journal ouvert sur la grille ; délai et places de `formes.json` jusqu'à la boucle."""
 import contextlib
 import errno
 import fcntl
@@ -20,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import entree, journal
 from shogen_s2bis.collecte.lecture import S
@@ -156,6 +158,31 @@ class Entree(unittest.TestCase):
                 with self.subTest(champ=champ, k=k):
                     r = refus(lambda: entree.configurer(self.ecrire(f, {**s, champ: valeurs[:k]}, d)[1], COMMIT))
                     self.assertEqual(r and r.split(" : ")[0], attendu)
+
+    def test_point_d_entree_w_60_journal_ouvert_sur_la_grille(self):    # CB-19f, C-3 (c) de la relecture d'intégration
+        """w = 60 (production ; δ 20 s, tolérance 5 s, délai 10 s, marge 1 s : valeurs de l'ADR) et une horloge hors de
+        la grille, 2026-10-05 12:34:56,789012 UTC (12:34:00 = 1791203640 par date -u -d) : le journal s'ouvre à la
+        fenêtre de 12:34, `suivante` 12:35, et `run_params` y est écrit ; sortie 0 (`--fenetres 0` : aucune fenêtre
+        lue). Tue MI-12 (journal ouvert à la seconde de l'horloge : refus JOURNAL/fenetre)."""
+        f, s, d = configurations(port_ferme())
+        f = {**f, "w": 60, "delta": 20 * S, "tolerance": 5 * S, "delai": 10 * S, "marge": S}
+        with mock.patch.object(entree, "horloge", lambda: (1791203640 + 56) * S + 789012):
+            self.assertEqual(self.pool(self.ecrire(f, s, d)[1], self.journal, "--fenetres", "0"), (0, ""))
+        enrs = chaine(pathlib.Path(self.journal, "pool-2026-10-05-0.jsonl").read_bytes())[2]
+        self.assertEqual([(e["type"], e.get("suivante"), e.get("ws")) for e in enrs],
+                         [("ouverture", 1791203700, None), ("run_params", None, 1791203700)])
+
+    def test_delai_et_places_de_formes_json_jusqu_a_la_boucle(self):    # CB-19f, C-3 (d) de la relecture d'intégration
+        """`delai` et `places` lus de `formes.json` (0,3 s ; quatre places pour deux formes) arrivent à la boucle :
+        chaque lecture appelle le client avec ce délai, et le pool a quatre places, pas une de plus. Tue MI-13 (délai
+        non transmis) et MI-14 (places prises au nombre de formes)."""
+        f, s, d = configurations(1)
+        lus = entree.configurer(self.ecrire(f, s, d)[1], COMMIT)
+        _jl, b = entree.construire(lus["formes"][0], lus["sante"][0], lus["descripteur"][0], self.journal)
+        with mock.patch.object(entree.http, "lire") as lire:
+            b.lectures["a"]({})
+        places = [b.places.acquire(blocking=False) for _ in range(5)]
+        self.assertEqual((lire.call_args.kwargs.get("delai"), places), (3 * S // 10, [True] * 4 + [False]))
 
     def test_cablage_des_sondes_et_de_la_boucle(self):                  # SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Les sondes reçoivent la commande, les témoins, les noms et le délai de `sante.json`, le résolveur et sa

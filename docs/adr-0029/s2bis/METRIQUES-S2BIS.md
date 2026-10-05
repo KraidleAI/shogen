@@ -1368,3 +1368,30 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
 - deux textes du FORMAT ; plancher non relevé.
 
 Suite : 198 tests ; plancher du job : 198, égalité exigée (`--egal`).
+
+## CB-19f (2026-10-05) : point d'entrée à w = 60, délai et places câblés (C-3 (c) et (d) de la relecture, tests seuls)
+
+Objet : C-3 (c) : point d'entrée à w = 60 (valeurs de l'ADR : δ 20 s, tolérance 5 s, délai 10 s, marge 1 s) et une
+horloge hors de la grille (12:34:56,789012 UTC le 2026-10-05, instant calculé par `date -u -d`) : journal ouvert à la
+fenêtre de 12:34, `suivante` 12:35, `run_params` à 12:35, sortie 0 (`--fenetres 0`). C-3 (d) : `delai` (0,3 s) et
+`places` (4 pour 2 formes) lus de `formes.json` arrivent à la boucle (client appelé avec ce délai ; quatre places,
+pas une de plus). Aucun code de production ; puce « Corrections » du FORMAT.
+
+Rouge : les tests passent sur le code juste ; sous MI-12, sortie 1 `JOURNAL/fenetre` ; sous MI-13, délai absent ;
+sous MI-14, deux places : échecs d'assertion.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_entree.py` | 259 | 9 (2 de plus : w = 60 sur la grille ; délai et places jusqu'à la boucle) |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 13 mutants, 13 tués (0 vivant, 0 FATAL) :
+- MI-12, MI-13 et MI-14 du réviseur, tels quels : tués par le test w = 60 (MI-12) et par celui du délai et des places
+  (MI-13, MI-14) ;
+- journal ouvert une fenêtre plus tard, ouverture au rang de la fenêtre, journal sur une grille d'une seconde,
+  `run_params` une minute après la première fenêtre admise : test w = 60 (et d'autres) ;
+- `delta` au lieu du délai, une place de plus (entrée ou boucle), délai divisé, délai de l'ADR au lieu du délai
+  scellé : test du délai et des places ;
+- plancher non relevé.
+
+Suite : 200 tests ; plancher du job : 200, égalité exigée (`--egal`).
