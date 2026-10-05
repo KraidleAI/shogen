@@ -183,3 +183,14 @@ plafond du client porté à 4 Mio ; 0 vivant, 0 FATAL). Premier passage : 11 tu�
 à chaque opération, contrôle du temps restant gardé », que le goutte-à-goutte ne distingue pas ; M-LP-8 réécrit
 « délai par opération seulement » (aucun temps restant), et un test de plus tue la première forme (M-5-04). Suite : 81
 tests ; plancher du job : 81, égalité exigée (`--egal`).
+
+## CB-10a (2026-10-04) : DNS filaire, requête et analyse de la réponse
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/dns.py` (format filaire) | 77 | 4 (`tests/test_dns.py`, 64 lignes) |
+
+Valeurs de référence : octets écrits à la main selon la RFC 1035 ; les quatre réponses ont été analysées par c-ares
+(Node 22, en boucle locale) avec les mêmes valeurs. Mutants : 18 tués sur 18 au dernier passage (0 vivant, 0 FATAL).
+Premier passage : 16 tués, 1 vivant (M-10a-09, contrôle de la taille des données SOA : redondant avec `struct.unpack`,
+qui exige 20 octets) ; contrôle retiré, mutant remplacé. Suite : 85 tests ; plancher du job : 85, égalité exigée (`--egal`).
