@@ -1,5 +1,7 @@
 """CB-3, E-C-03 à E-C-05 : lecture par phases sur serveurs factices de boucle locale, résolveur injecté. CB-11e (C-4 de
-la G2 de P1-B) : délais sur l'horloge monotone, horloge murale reculée pendant une lecture."""
+la G2 de P1-B) : délais sur l'horloge monotone, horloge murale reculée pendant une lecture. CB-11g (C-3) : contexte TLS
+d'urllib (attributs et ClientHello écrit en mémoire, sans réseau), chemin TLS réussi par une couche injectée ; MG-31."""
+import contextlib
 import socket
 import ssl
 import struct
@@ -68,6 +70,47 @@ class Recul:
         t = horloge()
         self.t0 = t if self.t0 is None else self.t0
         return t - self.recul if t - self.t0 > self.apres else t
+
+
+def hello(contexte, nom="api.example"):
+    """ClientHello que `contexte` écrit en mémoire (MemoryBIO), sans socket ni réseau."""
+    sortie = ssl.MemoryBIO()
+    tls = contexte.wrap_bio(ssl.MemoryBIO(), sortie, server_hostname=nom)
+    with contextlib.suppress(ssl.SSLWantReadError):
+        tls.do_handshake()
+    return sortie.read()
+
+
+def extensions(h):
+    """{type : données} des extensions d'un ClientHello (RFC 8446 §4.1.2), lues à la main."""
+    i = 5 + 4 + 2 + 32                                              # enregistrement, poignée, version, aléa
+    i += 1 + h[i]                                                   # identifiant de session
+    i += 2 + int.from_bytes(h[i:i + 2], "big")                      # suites de chiffrement
+    i += 1 + h[i]                                                   # méthodes de compression
+    fin, i, ext = i + 2 + int.from_bytes(h[i:i + 2], "big"), i + 2, {}
+    while i < fin:
+        n = int.from_bytes(h[i + 2:i + 4], "big")
+        ext[int.from_bytes(h[i:i + 2], "big")] = h[i + 4:i + 4 + n]
+        i += 4 + n
+    return ext
+
+
+class TlsNote:
+    """Couche TLS injectée (C-3) : note `server_hostname` et chaque poignée, puis laisse passer le flux en clair."""
+    def __init__(self):
+        self.noms, self.poignees = [], 0
+
+    def wrap_socket(self, s, server_hostname=None, do_handshake_on_connect=True):
+        self.noms.append((server_hostname, do_handshake_on_connect))
+        note = self
+
+        class Couche:
+            def __getattr__(self, nom):
+                return getattr(s, nom)
+
+            def do_handshake(self):
+                note.poignees += 1
+        return Couche()
 
 
 class Client(unittest.TestCase):
@@ -179,3 +222,40 @@ class Client(unittest.TestCase):
         fil.join(10)
         self.assertEqual((lu.statut, lu.sous_type), ("panne_transport", "delai"))
         self.assertLess(duree, 1)
+
+    def test_contexte_tls_d_urllib(self):
+        """C-3 : CONTEXTE vérifie le certificat et le nom d'hôte, et annonce, comme le contexte d'urllib en S2, l'ALPN
+        `http/1.1` (RFC 7301 §3.1 : liste de 9 octets, nom de 8) et l'authentification après poignée (RFC 8446
+        §4.2.6, extension 49, vide) ; le nom de la requête part en SNI."""
+        ext = extensions(hello(http.CONTEXTE))
+        self.assertEqual((http.CONTEXTE.verify_mode, http.CONTEXTE.check_hostname), (ssl.CERT_REQUIRED, True))
+        self.assertEqual((ext.get(16), ext.get(49), ext[0][5:]), (bytes([0, 9, 8]) + b"http/1.1", b"", b"api.example"))
+
+    def test_poignee_tls_reussie_couche_injectee(self):
+        """C-3 : chemin réussi par une couche TLS injectée : nom d'hôte de la requête en `server_hostname`, jamais
+        l'adresse (MG-01) ; poignée faite à part, une fois ; phase `tls` entre `connexion` et `requete`."""
+        tls = TlsNote()
+        lu, recues, _p = self.lire(repondre(OK7), tls=tls)
+        self.assertEqual((lu.statut, lu.code, lu.octets, recues, tls.noms, tls.poignees),
+                         ("ok", 200, CORPS, [REQUETE], [("api.example", False)], 1))
+        self.assertTrue(lu.phases["connexion"] <= lu.phases["tls"] <= lu.phases["requete"], lu.phases)
+
+    def test_connexion_sans_reponse_close_au_delai(self):
+        """MG-31 : une connexion qui ne s'établit pas (file d'attente d'écoute pleine : les SYN restent sans réponse)
+        est close au délai, sous-type `delai` ; la lecture tourne dans un fil joint en 5 s."""
+        with socket.socket() as srv:
+            srv.bind(("127.0.0.1", 0))
+            srv.listen(0)
+            port, pleins, lus = srv.getsockname()[1], [socket.socket() for _ in range(3)], []
+            for c in pleins:
+                self.addCleanup(c.close)
+                c.setblocking(False)
+                c.connect_ex(("127.0.0.1", port))
+            time.sleep(0.2)                                         # la file d'attente se remplit
+            fil = threading.Thread(target=lambda: lus.append(http.lire(
+                http.Requete("api.example", "/"), resoudre=Resolveur(port), tls=None, delai=S // 5)), daemon=True)
+            fil.start()
+            fil.join(5)
+            self.assertFalse(fil.is_alive(), "la connexion pend")
+        self.assertEqual((lus[0].statut, lus[0].sous_type, sorted(lus[0].phases)),
+                         ("panne_transport", "delai", ["dns"]))

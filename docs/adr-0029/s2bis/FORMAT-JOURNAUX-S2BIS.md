@@ -10,7 +10,8 @@
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
-  l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12).
+  l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
+  (§10.5).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -197,6 +198,10 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
    redirection n'est suivie (S2 suivait celles d'urllib) : un code 3xx est un `panne_http`.
 4. Toute autre anomalie (défaut imprévu, requête dont l'hôte, le chemin ou la méthode sort de l'ASCII imprimable sans
    espace) donne `panne_transport` de sous-type `autre`. Une lecture ne lève jamais.
+5. **Contexte TLS** (C-3) : celui qu'urllib arme en S2 quand aucun contexte n'est donné (`http.client`, Python 3.10 à
+   3.13) : `ssl.create_default_context()` (certificat vérifié, nom d'hôte contrôlé), ALPN `http/1.1`, authentification
+   après poignée annoncée. Le nom de la requête part en SNI. La ClientHello porte les mêmes extensions que celle
+   d'urllib (mesure en boucle locale, Python 3.10 à 3.13, OpenSSL 3.0.13 : journal G1 des corrections de la tranche B).
 
 ## 11. Boucle du pool : lectures planifiées, échéance, santé de la boucle (CB-4 ; E-C-09, E-C-11 à E-C-15)
 

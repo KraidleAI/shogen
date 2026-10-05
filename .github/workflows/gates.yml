@@ -215,7 +215,7 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 111
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 114
 
   sim-bis-unittest:
     # Lot SIM-BIS, sous-lot SB-0 (2026-10-05 ; ADR-0029 §6 lot 4 ; G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md, PROPOSITION

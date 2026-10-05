@@ -1,7 +1,9 @@
 """Client HTTPS par phases (CB-3 ; E-C-03 à E-C-05 ; ADR-0029 §2.9 l.233, l.236) ; `lire` ne lève jamais. La requête
 reprend octet pour octet celle d'urllib en S2 (sources.py l.48-79, ordre des en-têtes mesuré), dont l'en-tête
 `Accept-Encoding: identity` (sans lui, tout codage est admis : RFC 9110 §12.5.3). Réponse lue par http.client au
-plus juste ; fin du flux avant la fin annoncée : `coupure`, jamais une exception qui sort (PROPOSITION §9, essai 1)."""
+plus juste ; fin du flux avant la fin annoncée : `coupure`, jamais une exception qui sort (PROPOSITION §9, essai 1).
+Contexte TLS armé comme celui d'urllib en S2 (http.client sans contexte : ALPN `http/1.1`, authentification après
+poignée annoncée ; Python 3.10 l.1441-1448, 3.12 l.824-835) : même ClientHello qu'en S2 (C-3 de la G2 de P1-B)."""
 import collections
 import http.client
 import io
@@ -14,6 +16,8 @@ from shogen_s2bis.collecte.lecture import S, Lecture, horloge, monotone
 
 DELAI = 10 * S                                                      # délai global d'une lecture (ADR-0029 l.233)
 CONTEXTE = ssl.create_default_context()                             # certificats vérifiés, nom d'hôte contrôlé
+CONTEXTE.set_alpn_protocols(["http/1.1"])                           # comme urllib en S2 (C-3) : ALPN http/1.1 et
+CONTEXTE.post_handshake_auth = True                                 # authentification après poignée (TLS 1.3)
 PLAFOND = 1 << 20                    # octets reçus au plus, en-têtes compris (l'enregistrement tient sous la borne)
 UA = "Mozilla/5.0 (Shogen-S2-harness; +https://github.com/KraidleAI/shogen)"    # S2, sources.py l.40 (continuité)
 Requete = collections.namedtuple("Requete", "hote chemin port methode corps", defaults=(443, "GET", None))

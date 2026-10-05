@@ -300,3 +300,37 @@ Mutants (commande du job, `--plancher 111`, borne de 300 s) : 12 tués sur 12 pa
 dont MG-18, MG-19, MG-24, et MG-17 et MG-21 réécrits sur le texte de CB-11f avec la même mutation. MG-22 (rcode sur
 3 bits) reste équivalent en pratique (relecture G2) : non rejoué ici. Suite : 111 tests ; plancher du job : 111,
 égalité exigée (`--egal`).
+
+## CB-11g (2026-10-05) : correction C-3 et mutant MG-31 (C-7) de la relecture G2 de la tranche B
+
+Objet : `CONTEXTE` armé comme le contexte d'urllib en S2 (ALPN `http/1.1`, authentification après poignée annoncée) ;
+ClientHello mesurée en boucle locale avant et après (outil du réviseur), mêmes extensions qu'urllib sous Python 3.10 à
+3.13 (C-3 (a)) ; tests sans réseau des attributs de `CONTEXTE` (ClientHello écrite en mémoire) et du chemin TLS réussi
+par une couche injectée (C-3 (b), tuent MG-01 à MG-03) ; test nommé du mutant vivant MG-31 (C-7).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/http.py` | 131 | — |
+| `tests/test_http_reseau.py` | 261 | 14 (3 de plus : contexte TLS d'urllib, poignée réussie par une couche injectée, connexion sans réponse) |
+
+Mutants (commande du job, `--plancher 114`, borne de 300 s) : 10 tués sur 10 par leur test visé (0 vivant, 0 FATAL),
+dont MG-01, MG-02, MG-03 et MG-31 du réviseur. Suite : 114 tests ; plancher du job : 114, égalité exigée (`--egal`).
+
+### Mutants du réviseur G2 et du worker rejoués sur l'état final, par la commande du job (C-6, C-7)
+
+Lanceur des corrections (SHOGEN-S2BIS-MUT-COMMANDE-1 : ligne du job `--egal --plancher 114` lue dans `gates.yml`,
+suite entière, borne de 300 s, dépassement FATAL ; témoins verts ; réseau isolé) :
+
+| jeu | mutants | tués | vivants | inapplicables (texte changé) |
+|---|---|---|---|---|
+| `mutants_g2.py` du réviseur (MG-01 à MG-30) | 30 | 24 | 1 (MG-22, équivalent en pratique selon la relecture) | 5 |
+| `mutants_g2_b.py` du réviseur (MG-31) | 1 | 1 | 0 | 0 |
+| M-LP du worker (`mutants-final-cb5.py`) | 14 | 11 | 0 | 3 |
+| formes réécrites des huit inapplicables, même mutation | 8 | 8 | 0 | 0 |
+
+- Les dix vivants non équivalents de C-7 sont tués : MG-11, MG-13, MG-18, MG-19, MG-21 (réécrit), MG-23 (réécrit),
+  MG-24, MG-26, MG-29, MG-31 ; MG-01 à MG-03 le sont aussi (C-3 (b)).
+- M-LP-3 (marqueur écrit seulement quand tous les fils ont fini) sort en 1 en 79 s : la suite échoue en temps borné au
+  lieu de pendre (C-6).
+- Réécrits sur le nouveau texte : MG-12, MG-27, M-LP-1a (CB-11d), MG-23, M-LP-8 (CB-11e), MG-17, MG-21 (CB-11f),
+  M-LP-6 (CB-11c). Aucune équivalence invoquée hors MG-22.
