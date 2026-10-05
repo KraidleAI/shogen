@@ -1470,3 +1470,38 @@ MI-12 par le point d'entrée à w = 60, MI-13 et MI-14 par le délai et les plac
 |---|---|---|---|---|
 | neufs, CB-19a à CB-19h (13, 15, 12, 13, 11, 10, 11, 11) | 96 | 96 | 0 | 0 |
 | du réviseur, rejoués sur l'état final | 30 | 30 | 0 | 0 |
+
+## RB-1h (2026-10-05) : définition unique d'« intègre » au lecteur du recalcul (lettres C-1 et C-2 ; C-14)
+
+Objet (lettres C-1 et C-2 du FORMAT, adjugées par l'orchestrateur le 2026-10-05 ; correction C-14 de la relecture G2
+de RB-18) : le lecteur fait la définition unique du FORMAT §7.1, points (c) et (d), comme l'écrivain de référence.
+`_types` exige un objet dont `type` est une chaîne, `seq` un entier et `prec` 64 chiffres hexadécimaux minuscules, en
+tête de fichier comme ailleurs, et dont les champs propres des types réservés (§2 : `jour`, `suivante`, `ws`, `de`,
+`a`, `queue`, `cause`) sont présents à leurs types exacts ; `ws` est un entier requis pour tout type non réservé
+(risque R-2, vérifié type par type : `ws` null rend non intègre toute ligne d'un type qui porte `ws`, et reste un champ
+ordinaire d'une `ouverture`, d'une `cloture` ou d'un `trou`). `type(v)` et non `isinstance` : un booléen n'est jamais
+un entier. Avant (sondes du worker sur la tête) : `type` non contrôlé ; `seq` booléen admis par l'égalité `True == 1`
+du lien ; `prec` de tête non contrôlé ; `a` d'un trou admis booléen (`+ 0`) ; `de`, `cause`, `jour`, `queue` et le `ws`
+d'un `point` ou d'une `reprise` non contrôlés ; `ws` null admis pour un type non réservé. Une `reprise` dont `queue`
+est un objet nu, ou dont `prec` est en majuscules, est une ligne non intègre (une queue), non une rupture : le §7.1
+s'applique avant le §7.4. Déjà tenus, désormais fixés par un test : C-1 (un entier de plus de 640 chiffres rend la
+ligne non intègre, quel que soit le réglage ; tests existants) ; point (a), ligne de 4 194 304 octets intègre et d'un
+octet de plus en queue ; point (b), caractères hors ASCII en clair (séquence d'échappement : non canonique) ; état
+après un `point` (type réservé : ni attendu ni dernière fenêtre). FORMAT §7.1.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 164 | — |
+| `tests/test_lecteur.py` | 408 | 26 (6 de plus : champs propres type par type, champs communs et objet, `ws` null type par type, tête de segment non intègre, caractères hors ASCII en clair, ligne de LIMITE octets ; 1 complété : état après un `point`) |
+
+Rouge : sur le code d'avant, 15 échecs d'assertion dans les 4 tests de C-14 et C-2 (11 sous-tests des champs propres,
+champs communs, `ws` null, et les deux têtes de segment, lues comme ruptures) ; les deux tests des points (a) et (b) et
+l'état après un `point` passent déjà (preuves de conformité). Mutants (commande du job, runner puis `--plancher 209`,
+borne de 300 s ; python3.12 ; réseau isolé) : 19 tués sur 19 par leur test visé (0 vivant, 0 FATAL) : booléen admis pour
+un entier, ou par `isinstance` ; `prec` en majuscules, de plus de 64 chiffres ou de forme libre ; `type` entier ou null
+admis ; `de` et `cause` d'un trou, `jour` d'une clôture non exigés ; objet nu admis pour `queue` ; champ manquant pris
+pour null ; `ws` d'un type non réservé non exigé et, en resserrement, exigé partout où il figure ; `point` retiré des
+types réservés ; types jugés après la chaîne ; première ligne quelconque ; attendu d'un trou pris à `de` ; borne LIMITE
+décalée d'un octet dans les deux sens ; forme canonique en séquences d'échappement. Première passe, 16 mutants sur
+l'état d'avant les deux tests des points (a) et (b) : 16 tués, versée sans être comptée. Suite : 209 tests ; plancher du
+job : 209, égalité exigée (`--egal`).

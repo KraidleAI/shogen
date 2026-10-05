@@ -1,7 +1,8 @@
 """RB-1 : lecteur en flux des journaux (E-R-01, E-R-02 ; FORMAT §1 à §8). Lignes fabriquées ici (`ligne`, de
 tests/test_reprise.py) et journaux synthétiques écrits par l'écrivain de collecte/journal.py, aucun journal de
 campagne ; attendus recalculés par `chaine` (tests/test_journal.py), code de test indépendant du lecteur ; empreintes
-par hashlib sur les octets du test."""
+par hashlib sur les octets du test. Lettres C-1 à C-5 du FORMAT, corrections C-14 et C-15 de la G2 de RB-18 : types,
+ordres et bornes pris au texte du FORMAT de la tête, non au code."""
 import hashlib
 import json
 import os
@@ -17,6 +18,20 @@ from tests.test_reprise import SEG1, SEG2, ligne, m
 
 OUVERTURE = ligne(0, "0" * 64, type="ouverture", jour="2026-10-04", suivante=m(1))
 P = hashlib.sha256(OUVERTURE).hexdigest()
+JOUR = "2026-10-04"
+TYPES = {"ouverture": {"jour": JOUR, "suivante": m(1)}, "marqueur": {"ws": m(1)}, "point": {"ws": m(1)},
+         "cloture": {"jour": JOUR}, "reprise": {"ws": m(1), "suivante": m(1), "queue": None},
+         "trou": {"de": m(1), "a": m(1), "cause": "saut"}, "lecture": {"ws": m(1)}, "sante": {"ws": m(1)},
+         "run_params": {"ws": m(1)}}        # champs propres et leurs types, pris à la lettre (FORMAT §2, §7.1 d)
+
+
+def verdict(octets, etat):
+    """Cause nommée du refus de `_integre`, ou « intègre »."""
+    try:
+        lec._integre(octets, etat)
+    except lec._NonIntegre as e:
+        return e.args[0]
+    return "intègre"
 
 
 class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; écrivain de référence : `_lire`
@@ -30,6 +45,9 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
         self.assertEqual((e["type"], etat, e2["k"], etat2, etat3, lec._integre(marqueur, etat3)[1]), (
             "ouverture", (1, P, m(1), None), 1, (2, hashlib.sha256(lecture).hexdigest(), m(1), m(1)),
             (3, hashlib.sha256(trou).hexdigest(), m(3), m(1)), (4, hashlib.sha256(marqueur).hexdigest(), m(4), m(4))))
+        etat4 = lec._integre(marqueur, etat3)[1]
+        point = ligne(4, etat4[1], type="point", ws=m(9))         # réservé (§2) : ni attendu ni dernière fenêtre
+        self.assertEqual(lec._integre(point, etat4)[1], (5, hashlib.sha256(point).hexdigest(), m(4), m(4)))
 
     def test_causes_nommees(self):
         etat = lec._integre(OUVERTURE, None)[1]
@@ -69,6 +87,54 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
             finally:
                 sys.set_int_max_str_digits(reglage)
             self.assertEqual((valeurs == [10 ** 639, -10 ** 639], causes), (True, ["LECTEUR/entier-long"] * 2), limite)
+
+    def test_champs_propres_aux_types_du_paragraphe_2(self):          # C-2 (FORMAT §7.1 d) ; C-14 : `a` booléen
+        """Chaque champ propre au type de la lettre laisse la ligne intègre ; à un autre type (un booléen n'est jamais
+        un entier ; null compris) ou absent, il la rend non intègre. `ws` d'un type non réservé : requis, entier."""
+        etat = lec._integre(OUVERTURE, None)[1]
+        for genre, champs in TYPES.items():
+            for champ, bon in champs.items():
+                mauvais = ([{}, "x", 5, True] if champ == "queue" else [5, True, None, []] if type(bon) is str else
+                           ["60", True, False, None, {}])
+                octets = [ligne(1, P, type=genre, **{**champs, champ: v}) for v in [bon, *mauvais]] + [
+                    ligne(1, P, type=genre, **{k: v for k, v in champs.items() if k != champ})]
+                with self.subTest(type=genre, champ=champ):
+                    self.assertEqual([verdict(x, etat) for x in octets],
+                                     ["intègre"] + ["LECTEUR/champ"] * (len(mauvais) + 1))
+        self.assertEqual([verdict(ligne(1, P, type="reprise", ws=m(1), suivante=m(1), queue=q), etat) for q in (
+            [], [{"fichier": "f"}])], ["intègre"] * 2)             # une liste : son contenu relève du §7.4
+
+    def test_champs_communs_et_objet(self):                          # C-2 (FORMAT §7.1 b, c) ; C-14 : seq, prec
+        """`type` chaîne ; `seq` entier, jamais booléen (True == 1 en Python) ; `prec` de 64 chiffres hexadécimaux
+        minuscules, en tête de fichier aussi ; une ligne JSON qui n'est pas un objet n'est pas intègre."""
+        etat, tete = lec._integre(OUVERTURE, None)[1], {"type": "ouverture", **TYPES["ouverture"]}
+        lect, sep = {"type": "lecture", "ws": m(1)}, (",", ":")
+        refus = [(ligne(1, P, **{**lect, "type": t}), etat) for t in (5, None, ["lecture"], {})] + [
+            (ligne(s, P, **lect), etat) for s in (True, "1", None)] + [(ligne(True, "0" * 64, **tete), None)] + [
+            (ligne(0, p, **tete), None) for p in ("0" * 63, "0" * 65, "A" * 64, "g" * 64, None, 0)] + [
+            (json.dumps({"seq": 0, **tete}, sort_keys=True, separators=sep).encode() + b"\n", None)] + [
+            (x + b"\n", etat) for x in (b"[1]", b'"x"', b"5", b"null")]
+        self.assertEqual([verdict(x, e) for x, e in refus], ["LECTEUR/champ"] * len(refus))
+        self.assertEqual([verdict(ligne(0, p, **tete), None) for p in ("0" * 64, "a" * 64, "0123456789abcdef" * 4)],
+                         ["intègre"] * 3)                        # en tête, le lien se juge à part (§7.7)
+
+    def test_caracteres_hors_ascii_en_clair(self):                    # C-2 (FORMAT §7.1 b, §1.2)
+        """Canonique : un caractère hors ASCII s'écrit en UTF-8, jamais en séquence d'échappement ; « é » en clair
+        laisse la ligne intègre, sa séquence d'échappement la rend non intègre (`LECTEUR/canonique`)."""
+        etat = lec._integre(OUVERTURE, None)[1]
+        clair = ligne(1, P, type="lecture", ws=m(1), note="X").replace(b'"X"', '"é"'.encode())
+        echappee = ligne(1, P, type="lecture", ws=m(1), note="é")      # json.dumps échappe par défaut
+        self.assertEqual((verdict(clair, etat), lec._integre(clair, etat)[0]["note"], verdict(echappee, etat)),
+                         ("intègre", "é", "LECTEUR/canonique"))
+
+    def test_ws_null_type_par_type(self):                            # C-2, risque R-2 de l'avis (FORMAT §7.1)
+        """`ws` null rend non intègre toute ligne d'un type qui porte `ws` (marqueur, point, reprise, type non
+        réservé) ; ouverture, cloture et trou n'ont pas `ws` parmi leurs champs propres : là, un `ws` null est un champ
+        ordinaire et la ligne reste intègre (définition ni relâchée ni resserrée)."""
+        etat = lec._integre(OUVERTURE, None)[1]
+        self.assertEqual({t: verdict(ligne(1, P, type=t, **{**c, "ws": None}), etat) for t, c in TYPES.items()},
+                         {**dict.fromkeys(TYPES, "LECTEUR/champ"), **dict.fromkeys(("ouverture", "cloture", "trou"),
+                                                                                    "intègre")})
 
 
 class Fichiers(unittest.TestCase):
@@ -193,6 +259,21 @@ class Queues(AvecQueues):
                                  ([("enr", FICHIER, x) for x in enrs], (seq - 1, prec), [],
                                   [queue(FICHIER, len(intact), fabrique(seq, prec), cause)]))
 
+    def test_ligne_de_limite_octets_integre_un_octet_de_plus_queue(self):   # C-2 (FORMAT §7.1 a)
+        """LIMITE = 4 194 304 octets (valeur de la lettre) : une ligne de LIMITE octets, saut compris, est intègre ;
+        d'un octet de plus, elle forme la queue du fichier (`LECTEUR/fin` : lue jusqu'à LIMITE octets, sans saut)."""
+        for de_plus in (0, 1):
+            with self.subTest(de_plus=de_plus):
+                self.setUp()
+                intact = self.preparer()
+                seq, prec, enrs = chaine(intact)
+                vide = ligne(seq, prec, type="lecture", ws=m(4), x="")
+                longue = ligne(seq, prec, type="lecture", ws=m(4), x="a" * (4194304 - len(vide) + de_plus))
+                self.ajouter(FICHIER, longue)
+                lecteur, flux = lire(self.d)
+                self.assertEqual((len(longue), len(flux), lecteur.queue_finale), (4194304 + de_plus, len(enrs) + 1 -
+                                 de_plus, [queue(FICHIER, len(intact), longue, "LECTEUR/fin")] if de_plus else []))
+
     def test_queue_non_declaree_suivie_d_un_fichier(self):
         jours(self, (J1, J2, J2 + 60))
         clos = self.etat()[NOMS[0]]
@@ -311,3 +392,17 @@ class Pannes(AvecQueues):              # C-2 de la G2 de RB-T1 : un cas par muta
         self.ajouter(SEG1, self.reprise(seq, "f" * 64, [declaree(q)]))
         lecteur, _flux = lire(self.d)
         self.assertEqual((lecteur.ruptures, lecteur.queues), (self.rupture("LECTEUR/lien", SEG1, seq, prec, [q]), []))
+
+    def test_tete_de_segment_non_integre_par_ses_types(self):          # C-2, C-14 : le §7.1 avant le §7.4
+        """Reprise en tête de segment dont `queue` est un objet nu (§7.1 d), ou dont `prec` est en majuscules (§7.1 c) :
+        la ligne n'est pas intègre, donc ni rupture ni déclaration ; les deux queues restent en fin de journal."""
+        for nom, fabrique in (("objet nu", lambda s, p, q: self.reprise(s, p, {})),
+                              ("prec en majuscules", lambda s, p, q: self.reprise(s, p.upper(), [declaree(q)]))):
+            with self.subTest(nom):
+                self.setUp()
+                seq, prec, q = self.coupe()
+                tete = fabrique(seq, prec, q)
+                self.ajouter(SEG1, tete)
+                lecteur, _flux = lire(self.d)
+                self.assertEqual((prec != prec.upper(), lecteur.ruptures, lecteur.queues, lecteur.queue_finale),
+                                 (True, [], [], [q, queue(SEG1, 0, tete, "LECTEUR/champ")]))

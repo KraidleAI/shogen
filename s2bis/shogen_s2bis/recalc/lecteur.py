@@ -1,10 +1,12 @@
 """Lecteur en flux des journaux d'observateur de S2-bis (RB-1 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION E-R-01,
 E-R-02 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §1 à §8). Fichiers d'un préfixe lus dans l'ordre de la
 chaîne (jour, segment), ligne à ligne (LIMITE octets au plus), jamais un fichier en mémoire : mémoire bornée quelle que
-soit la longueur du journal. Ligne intègre au sens de l'écrivain de référence (FORMAT §7.1, `collecte/journal.py`
-`_lire`) : terminée par 0x0A, JSON canonique, chaînée à la précédente du fichier, première ligne `ouverture` ou
-`reprise`, champs typés comme l'écrivain les relit ; la première ligne non intègre d'un fichier et la suite forment sa
-queue, cause nommée (`LECTEUR/entier-long` pour un entier de plus de CHIFFRES chiffres, quel que soit le réglage
+soit la longueur du journal. Ligne intègre au sens de la définition unique du FORMAT §7.1, points (a) à (e), celle de
+l'écrivain de référence (`collecte/journal.py` `_lire` ; lettres C-1 et C-2 du FORMAT, C-14 de la G2 de RB-18) :
+terminée par 0x0A, objet JSON canonique, `type` chaîne, `seq` entier, `prec` de 64 chiffres hexadécimaux minuscules,
+champs propres du §2 présents et typés (un booléen n'est jamais un entier), chaînée à la précédente du fichier,
+première ligne `ouverture` ou `reprise` ; la première ligne non intègre d'un fichier et la suite forment sa queue, cause
+nommée (`LECTEUR/entier-long` pour un entier de plus de CHIFFRES chiffres, quel que soit le réglage
 `int_max_str_digits` de l'interpréteur). Le lecteur contrôle en plus ce que l'écrivain ne contrôle pas (FORMAT §7.7) :
 genèse (`seq` 0, `prec` nul, `ouverture`), lien de chaque fichier au précédent, déclaration exacte des queues par la
 `reprise` qui les suit. Tout autre cas est une rupture : rendue à sa place dans le flux, sans arrêt ni réparation ;
@@ -17,8 +19,13 @@ import re
 
 GENESE = "0" * 64
 LIMITE = 1 << 22                       # octets d'une ligne au plus, saut de ligne compris (FORMAT §7.1)
-RESERVES = {"ouverture", "marqueur", "point", "cloture", "reprise", "trou"}
 CHIFFRES = 640                         # entier JSON : 640 chiffres au plus, plus petit int_max_str_digits non nul
+ENTIER, CHAINE = (int,), (str,)        # types exacts, comparés par type(v) : un booléen n'est jamais un entier (C-2)
+CHAMPS = {"ouverture": {"jour": CHAINE, "suivante": ENTIER}, "marqueur": {"ws": ENTIER}, "point": {"ws": ENTIER},
+          "cloture": {"jour": CHAINE}, "reprise": {"ws": ENTIER, "suivante": ENTIER, "queue": (list, type(None))},
+          "trou": {"de": ENTIER, "a": ENTIER, "cause": CHAINE}}      # champs propres des types réservés (§2, §7.1 d)
+RESERVES = set(CHAMPS)
+HEX = re.compile("[0-9a-f]{64}")       # `prec` : 64 chiffres hexadécimaux minuscules (FORMAT §1.3, §7.1 c)
 QUEUE = ("fichier", "position", "octets", "sha256")    # champs d'une queue déclarée (FORMAT §7.4)
 
 
@@ -44,14 +51,27 @@ def _entier(t):
     return int(t)
 
 
+def _types(e):
+    """Points (c) et (d) du FORMAT §7.1 (lettre C-2 ; C-14) : un objet ; `type` chaîne, `seq` entier, `prec` de 64
+    chiffres hexadécimaux minuscules ; champs propres du §2 présents, aux types exacts, `ws` entier pour un type non
+    réservé (risque R-2). `type(v)`, jamais `isinstance`, qui admettrait un booléen pour un entier."""
+    if type(e) is not dict or type(e.get("type")) is not str:
+        return False
+    exiges = {"seq": ENTIER, "prec": CHAINE, **CHAMPS.get(e["type"], {"ws": ENTIER})}
+    return all(k in e and type(e[k]) in t for k, t in exiges.items()) and HEX.fullmatch(e["prec"]) is not None
+
+
 def _integre(ligne, etat):
-    """(enregistrement, état) d'une ligne intègre, sinon _NonIntegre(cause) ; `etat` : celui de la ligne précédente du
-    fichier, None pour la première. État rendu : (seq + 1, sha256 de la ligne, attendu, dernière fenêtre) ; seq + 1 et
-    le sha256 sont le `seq` et le `prec` exigés de la ligne suivante ; attendu : `suivante` d'une `ouverture` ou d'une
-    `reprise`, `ws` d'un `marqueur`, `a` d'un `trou`, sinon celui de l'état précédent (l'écrivain retient `ws + w` et
-    `a + w` ; le lecteur n'en garde que le type, entier exigé, contrôlé comme chez l'écrivain) ; dernière fenêtre :
-    `ws` d'un `marqueur` ou d'un enregistrement hors RESERVES, sinon celle de l'état précédent (None à la première
-    ligne)."""
+    """(enregistrement, état) d'une ligne intègre, sinon _NonIntegre(cause) ; définition unique du FORMAT §7.1 : (a)
+    ligne close par 0x0A (`LECTEUR/fin`), d'au plus LIMITE octets (borne de sa lecture, `readline(LIMITE)`) ; (b) objet
+    JSON canonique (`LECTEUR/json`, `canonique`, `flottant`), entiers de CHIFFRES chiffres au plus
+    (`LECTEUR/entier-long`) ; (c), (d) types de `_types` (`LECTEUR/champ`) ; (e) chaînée à la ligne précédente du
+    fichier, la première étant une `ouverture` ou une `reprise` (`LECTEUR/chaine`). `etat` : celui de la ligne
+    précédente du fichier, None pour la première. État rendu : (seq + 1, sha256 de la ligne, attendu, dernière
+    fenêtre) ; seq + 1 et le sha256 sont le `seq` et le `prec` exigés de la ligne suivante ; attendu : `suivante` d'une
+    `ouverture` ou d'une `reprise`, `ws` d'un `marqueur`, `a` d'un `trou`, sinon celui de l'état précédent (l'écrivain
+    retient `ws + w` et `a + w`) ; dernière fenêtre : `ws` d'un `marqueur` ou d'un enregistrement hors RESERVES, sinon
+    celle de l'état précédent (None à la première ligne)."""
     if not ligne.endswith(b"\n"):
         raise _NonIntegre("LECTEUR/fin")
     try:
@@ -62,22 +82,19 @@ def _integre(ligne, etat):
         raise _NonIntegre("LECTEUR/json") from None
     if canon != ligne:
         raise _NonIntegre("LECTEUR/canonique")
-    try:
-        t = e["type"]
-        lien = (e["seq"], e["prec"]) == etat[:2] if etat else t in ("ouverture", "reprise") and type(e["seq"]) is int
-        if t in ("ouverture", "reprise"):
-            attendu = e["suivante"]
-        elif t in ("marqueur", "trou"):
-            attendu = e["ws" if t == "marqueur" else "a"] + 0          # type de « ws + w » chez l'écrivain
-        else:
-            attendu = etat[2] if etat else None                  # première ligne : seules ouverture et reprise
-        derniere = e["ws"] if t == "marqueur" or t not in RESERVES else etat and etat[3]
-    except (KeyError, TypeError):
-        raise _NonIntegre("LECTEUR/champ") from None
+    if not _types(e):
+        raise _NonIntegre("LECTEUR/champ")
+    t = e["type"]
+    lien = (e["seq"], e["prec"]) == etat[:2] if etat else t in ("ouverture", "reprise")
     if not lien:
         raise _NonIntegre("LECTEUR/chaine")
-    if type(attendu) is not int or not (derniere is None or type(derniere) is int):
-        raise _NonIntegre("LECTEUR/champ")
+    if t in ("ouverture", "reprise"):
+        attendu = e["suivante"]
+    elif t in ("marqueur", "trou"):
+        attendu = e["ws" if t == "marqueur" else "a"]
+    else:
+        attendu = etat[2]                                       # la première ligne est une ouverture ou une reprise
+    derniere = e["ws"] if t == "marqueur" or t not in RESERVES else etat and etat[3]
     return e, (e["seq"] + 1, hashlib.sha256(ligne).hexdigest(), attendu, derniere)
 
 
