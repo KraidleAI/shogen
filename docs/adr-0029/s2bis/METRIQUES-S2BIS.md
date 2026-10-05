@@ -352,3 +352,22 @@ premier niveau) refusés d'abord, puis schéma : seuils de D-2 à D-5, gardes, n
 Mutants, classés par la commande du job (runner, puis ligne `verdict-suite-s2.py s2bis --aucun-saut --egal
 --plancher 117` de `gates.yml`, suite entière, borne de 300 s, réseau isolé) : 21 tués sur 21 par leur test visé
 (0 vivant, 0 FATAL). Suite : 117 tests ; plancher du job : 117, égalité exigée (`--egal`).
+
+## RB-0b (2026-10-05) : règles de τ, de σ et des noms d'unité, cohérence, gabarit `analyse.json`
+
+Objet : τ en fraction décimale écrite en chaîne, 0,05 % <= τ < 2,85 % (refus nommé, jamais d'écrêtage) ; σ au moins
+égal au plancher de sa classe (30, 300, 5 400 s), null pour les places sans horodatage ; noms d'unité en ASCII
+imprimable sans « : » ; cohérence : alpha = 0,01 exactement ((seuil + 1) × 100 = R + 1), T_max sur la grille de 60 s,
+grille de P_j strictement croissante et seuil dans la grille, unités en ordre strict des points de code, pools
+d'ETH, d'USDC et d'USDT pris parmi les hôtes de BTC ; gabarit `s2bis/config/analyse.json` : valeurs fixées par
+l'ADR-0029 remplies, blocs des lots amont (n_s, T_max, τ et σ, tolérance des événements, unités) à null, donc refusé
+tant qu'ils ne sont pas fixés.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/config_analyse.py` | 143 | 8 (`tests/test_config_analyse.py`, 151 lignes ; 5 de plus) |
+| `config/analyse.json` | 12 | 1 (valeurs de l'ADR, blocs des lots amont, gabarit complété accepté) |
+
+Mutants (commande du job, runner puis `--plancher 122`, borne de 300 s, réseau isolé) : 20 tués sur 20 par leur test
+visé (0 vivant, 0 FATAL), dont « R = 9 998 au gabarit ». Suite : 122 tests ; plancher du job : 122, égalité exigée
+(`--egal`).

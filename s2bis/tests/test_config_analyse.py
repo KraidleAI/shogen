@@ -1,4 +1,5 @@
 """RB-0 : paramètres d'analyse scellés. Octets VALIDE écrits à la main, sha256 par `sha256sum` hors du code (G1)."""
+import json
 import os
 import tempfile
 import unittest
@@ -75,3 +76,76 @@ class Lecture(Base):
         d = self.charger(o)[0]
         self.assertEqual((d["degradation"]["d4_echecs"], d["degradation"]["d5_echecs"], d["n_s"]["calme"],
                           d["tolerance_evenements"], d["t_max_s"]), (3, 1, 1, 0, 60))
+
+
+class TauSigma(Base):                                        # bornes écrites d'après l'ADR-0029 l.181-183 et l.182
+    def eth(self, classe, sigma, tau):
+        return VALIDE.replace(b'"ETH": {"place_horodatee": {"sigma": 30, "tau": "0.0075"}}',
+                              b'"ETH": {"' + classe + b'": {"sigma": ' + sigma + b', "tau": "' + tau + b'"}}')
+
+    def test_bornes_de_tau(self):                            # 0,05 % <= τ < 2,85 % (E-R-09), fraction écrite
+        for tau in (b"0.0005", b"0.02849999"):
+            d = self.charger(self.eth(b"place_horodatee", b"30", tau))[0]
+            self.assertEqual(d["tau_sigma"]["ETH"]["place_horodatee"]["tau"], tau.decode())
+        self.refus([("ANALYSE/borne", self.eth(b"place_horodatee", b"30", t), "tau = " + t.decode())
+                    for t in (b"0.0004999", b"0.0285", b"0.5")] +
+                   [("ANALYSE/fraction", self.eth(b"place_horodatee", b"30", t), "tau = '" + t.decode())
+                    for t in (b"5%", b"0.5e-3", b"-0.001", b".005", b"0.", b"0.000", b"1.0005")])
+
+    def test_planchers_de_sigma(self):                       # 30, 300, 5 400 s ; aucun pour les places sans horodatage
+        for classe, plancher in ((b"place_horodatee", 30), (b"agregateur", 300), (b"oracle_chainlink", 5400)):
+            d = self.charger(self.eth(classe, str(plancher).encode(), b"0.01"))[0]
+            self.assertEqual(d["tau_sigma"]["ETH"][classe.decode()]["sigma"], plancher)
+            self.refus([("ANALYSE/sigma", self.eth(classe, s, b"0.01"), "sigma = " + d)
+                        for s, d in ((str(plancher - 1).encode(), f"{plancher - 1} (plancher {plancher})"),
+                                     (b"null", "None"), (b"true", "True"))])
+        d = self.charger(self.eth(b"sans_horodatage", b"null", b"0.01"))[0]
+        self.assertEqual(d["tau_sigma"]["ETH"], {"sans_horodatage": {"sigma": None, "tau": "0.01"}})
+        self.refus((("ANALYSE/sigma", self.eth(b"sans_horodatage", b"0", b"0.01"), "sigma = 0 (plancher None)"),
+                    ("ANALYSE/classe", VALIDE.replace(b'"ETH": {"place_horodatee": {"sigma": 30, "tau": "0.0075"}}',
+                                                      b'"ETH": {}'), "$.tau_sigma.ETH : []")))
+
+
+class Unites(Base):
+    def test_noms_ascii_imprimable_sans_deux_points(self):  # Q-R-02 de l'AVIS du G0, complément (3)
+        bords = VALIDE.replace(b'"BTC": ["api.binance.com", ', b'"BTC": [" !", "api.binance.com", ').replace(
+            b'"ethereum-rpc.publicnode.com"]', b'"ethereum-rpc.publicnode.com", "~"]')    # 0x20, 0x21, 0x7e admis
+        self.assertEqual(self.charger(bords)[0]["unites"]["BTC"], [" !", "api.binance.com", "api.kraken.com",
+                                                                  "ethereum-rpc.publicnode.com", "~"])
+        self.refus([("ANALYSE/unite", VALIDE.replace(b'"USDT": ["api.binance.com"]', b'"USDT": [' + n + b"]"), d)
+                    for n, d in ((b'"api:443"', "'api:443'"), (b'"\xc3\xa9"', "'\xe9'"), (b'"a\\tb"', "'a\\tb'"),
+                                 (b'"a\\u007f"', "'a\\x7f'"), (b'"a\\u001f"', "'a\\x1f'"), (b"7", "= 7"))])
+
+
+class Coherence(Base):
+    def test_regles(self):
+        r = VALIDE.replace
+        self.assertEqual(self.charger(r(b'"R": 9999, "seuil": 99', b'"R": 999, "seuil": 9'))[0]["rotations"],
+                         {"R": 999, "seuil": 9})                     # alpha = 0,01 exactement : (9 + 1)/(999 + 1)
+        self.assertEqual(self.charger(r(b'"seuil": "0.005"', b'"seuil": "0.0050"'))[0]["p_j"]["seuil"], "0.0050")
+        self.refus([("ANALYSE/incoherent", o, "incoherent : " + nom) for nom, o in (
+            ("alpha", r(b'"seuil": 99', b'"seuil": 98')), ("alpha", r(b'"seuil": 99', b'"seuil": 100')),
+            ("t_max-grille", r(b"14515200", b"14515230")), ("p_j-seuil", r(b'"seuil": "0.005"', b'"seuil": "0.004"')),
+            ("p_j-grille", r(b'"0.0025", "0.005"', b'"0.005", "0.0025"')),
+            ("p_j-grille", r(b'"0.0025", "0.005"', b'"0.005", "0.005"')),
+            ("unites-ordre", r(b'"api.binance.com", "api.kraken.com"', b'"api.kraken.com", "api.binance.com"')),
+            ("unites-ordre", r(b'"api.binance.com", "api.kraken.com"', b'"api.binance.com", "api.binance.com"')),
+            ("unites-btc", r(b'"ETH": ["api.kraken.com"]', b'"ETH": ["api.okx.com"]')))])
+
+
+class Gabarit(Base):                                         # s2bis/config/analyse.json, valeurs de l'ADR-0029
+    def test_valeurs_de_l_adr_et_blocs_des_lots_amont(self):
+        with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config",
+                               "analyse.json"), "rb") as f:
+            octets = f.read()
+        self.refus((("ANALYSE/a-fixer", octets, "a-fixer : n_s, t_max_s, tau_sigma, tolerance_evenements, unites"),))
+        g = json.loads(octets)
+        self.assertEqual({k: g[k] for k in ("degradation", "gardes", "p_j", "rotations")}, {
+            "degradation": {"d2_retard_s": 5, "d3_borne_s": 1, "d3_age_s": 120, "d4_echecs": 2, "d4_delai_s": 2,
+                            "d5_echecs": 2, "d5_delai_s": 2},                     # l.107-110 ; l.397 (3)
+            "gardes": {"unites": 2, "k_crit": 2, "runs": 2, "diviseur_n": 2},      # l.203 : n′_s >= n_s/2
+            "p_j": {"seuil": "0.005", "grille": ["0.0025", "0.005", "0.01", "0.02"]},          # l.212
+            "rotations": {"R": 9999, "seuil": 99}})                                # l.139, l.200, l.202
+        v = json.loads(VALIDE)                                  # complété par les blocs synthétiques : accepté
+        g.update({k: v[k] for k in ("n_s", "t_max_s", "tau_sigma", "tolerance_evenements", "unites")})
+        self.assertEqual(self.charger(json.dumps(g).encode())[0], g)

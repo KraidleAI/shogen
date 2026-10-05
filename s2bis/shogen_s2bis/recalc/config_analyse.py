@@ -3,15 +3,20 @@ E-R-16, E-R-17, E-R-20, E-R-25). Fichier `s2bis/config/analyse.json` lu en octet
 `run_params` (E-R-04). JSON strict : clé double, nombre à virgule, constante non finie, entier de plus de 30 chiffres
 refusés (lecture reprise de collecte/config.py l.20-46, par copie : la frontière interdit à `recalc` d'importer
 `collecte.config`, PROPOSITION §1 pt 2). Un bloc à fixer par un lot amont (null au premier niveau) refuse le fichier,
-puis le schéma (champs exacts, types, bornes). Tout écart lève RefusAnalyse (`code` nomme le refus), sans défaut ni
-écrêtage. τ, P_j : fraction décimale en chaîne (« 0.005 » = 0,5 %, τ de S2, `run_campaign.py` l.120-129) ; σ, D-2 à
-D-5 : secondes entières."""
+puis le schéma (champs exacts, types, bornes ; τ, σ et noms d'unité), puis la cohérence (COHERENCE). Tout écart lève
+RefusAnalyse (`code` nomme le refus), sans défaut ni écrêtage. τ, P_j : fraction décimale en chaîne (« 0.005 » =
+0,5 %, τ de S2, `run_campaign.py` l.120-129) ; σ, D-2 à D-5 : secondes entières."""
 import hashlib
 import json
+import re
+from decimal import Decimal
 
 ACTIFS = ("BTC", "ETH", "USDC", "USDT")
-# Planchers de σ en secondes, par classe de source (ADR-0029 l.182 : planchers d'ADR-0020).
+# Planchers de σ en secondes, par classe de source (ADR-0029 l.182 : planchers d'ADR-0020) ; 0,05 % <= τ < 2,85 %
+# (E-R-09 ; ADR-0029 l.181, l.183 : refus nommé, jamais d'écrêtage).
 PLANCHERS = {"place_horodatee": 30, "agregateur": 300, "oracle_chainlink": 5400, "sans_horodatage": None}
+TAU = (Decimal("0.0005"), Decimal("0.0285"))
+FRACTION = re.compile(r"0\.[0-9]{1,20}")
 
 
 class RefusAnalyse(Exception):
@@ -35,22 +40,30 @@ def _entier(t):
     return int(t) if len(t) <= 30 else _refus("ANALYSE/borne", f"entier de {len(t)} chiffres")
 
 
-def _fraction(v, ou):                                        # fraction décimale écrite en chaîne
-    if type(v) is not str:
+def _fraction(v, ou):                                        # fraction décimale écrite en chaîne, 0 < x < 1
+    if type(v) is not str or not FRACTION.fullmatch(v) or not Decimal(v):
         _refus("ANALYSE/fraction", f"{ou} = {v!r}")
 
 
-def _nom(v, ou):                                             # unité : nom d'hôte de configuration (E-R-15)
-    if type(v) is not str or not v:
+def _nom(v, ou):
+    """Unité : nom d'hôte de configuration (E-R-15), ASCII imprimable sans « : », séparateur de l'entrée de SHA-256
+    des décalages (Q-R-02 de l'AVIS du G0, complément (3))."""
+    if type(v) is not str or not v or ":" in v or not all(" " <= c <= "~" for c in v):
         _refus("ANALYSE/unite", f"{ou} = {v!r}")
 
 
 def _table(v, ou):
-    """τ et σ d'un actif par classe de source : sous-ensemble non vide des classes, champs `sigma` et `tau`."""
+    """τ et σ d'un actif par classe de source : sous-ensemble non vide des classes ; σ null pour les places sans
+    horodatage (staleness non évaluable, `r1.classify_ecart`), entier au moins égal au plancher ailleurs."""
     if type(v) is not dict or not v or v.keys() - PLANCHERS.keys():
         _refus("ANALYSE/classe", f"{ou} : {sorted(v) if type(v) is dict else v!r}")
     for classe, x in v.items():
         controler(x, {"sigma": lambda s, o: None, "tau": _fraction}, f"{ou}.{classe}")
+        if not TAU[0] <= Decimal(x["tau"]) < TAU[1]:
+            _refus("ANALYSE/borne", f"{ou}.{classe}.tau = {x['tau']} hors [0.0005, 0.0285)")
+        plancher, s = PLANCHERS[classe], x["sigma"]
+        if (s is not None) if plancher is None else (type(s) is not int or s < plancher):
+            _refus("ANALYSE/sigma", f"{ou}.{classe}.sigma = {s!r} (plancher {plancher})")
 
 
 SECONDES = ENTIER = (int, 1, None)
@@ -68,6 +81,22 @@ SCHEMA = {
 }
 
 
+def _croissante(xs):
+    return all(a < b for a, b in zip(xs, xs[1:]))
+
+
+# (nom du refus, prédicat). Unités : ordre strict des points de code (« ordre alphabétique », ADR-0029 l.200) ; pools
+# d'ETH, d'USDC et d'USDT pris parmi les hôtes de BTC (l.173) ; alpha : C <= seuil ⇔ (C + 1)/(R + 1) <= 0,01 (l.202).
+COHERENCE = (
+    ("alpha", lambda d: d["rotations"]["R"] + 1 == 100 * (d["rotations"]["seuil"] + 1)),
+    ("t_max-grille", lambda d: d["t_max_s"] % 60 == 0),
+    ("p_j-grille", lambda d: _croissante([Decimal(x) for x in d["p_j"]["grille"]])),
+    ("p_j-seuil", lambda d: Decimal(d["p_j"]["seuil"]) in [Decimal(x) for x in d["p_j"]["grille"]]),
+    ("unites-ordre", lambda d: all(_croissante(u) for u in d["unites"].values())),
+    ("unites-btc", lambda d: all(set(u) <= set(d["unites"]["BTC"]) for u in d["unites"].values())),
+)
+
+
 def charger(chemin):
     """(données, sha256 hexadécimal des octets lus)."""
     with open(chemin, "rb") as f:
@@ -81,6 +110,9 @@ def charger(chemin):
     if vides := sorted(k for k in SCHEMA if type(d) is dict and k in d and d[k] is None):
         _refus("ANALYSE/a-fixer", ", ".join(vides))
     controler(d, SCHEMA)
+    for nom, regle in COHERENCE:
+        if not regle(d):
+            _refus("ANALYSE/incoherent", nom)
     return d, hashlib.sha256(octets).hexdigest()
 
 
