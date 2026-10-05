@@ -663,3 +663,23 @@ de production : le rouge se lit sur les mutants (« champ obligatoire omis », P
 Mutants (commande du job, `--plancher 169`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par le test
 de bout en bout (0 vivant, 0 FATAL), dont trois « champ obligatoire omis » (`adresse`, `horloges`, `python` de
 `run_params`). Suite : 169 tests ; plancher du job : 169, égalité exigée (`--egal`).
+
+## CB-18f (2026-10-05) : tests nommés des retouches du FORMAT (SHOGEN-S2BIS-FORMAT-RETOUCHES-1, étendu par I-2)
+
+Objet : `tests/test_format.py` lit le FORMAT. Premier test : retouches de l'item (B.63 de l'annexe B d'ADR-0028),
+valeurs prises au texte de l'item : la citation du §12 garde RFC 1035 §4.1.1-4.1.2 et ajoute §7.3 ; la phrase de la
+règle de source (adresse et port interrogés) la marque « choix du lot », non règle de la RFC, et renvoie au §7.3 ; la
+puce « Corrections » de l'en-tête, une seule, nomme CB-11h. Second test (I-2 de la G2 du recalcul, adjugé en extension
+de l'item) : le §7.1 dit les contrôles de type de `_lire` (`suivante`, `ws`, `a`, dernière fenêtre), écrits à ce diff
+d'après une sonde sur `_lire` (limites déclarées : booléen admis dans `a` et, hors première ligne, dans `seq`), et
+`_lire` les fait (une valeur textuelle rend la ligne non intègre). Rouges : texte de la base 122c670 (les deux tests),
+texte de CB-18e (test du §7.1). Aucun code de production.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 74 | 2 (retouches du §12 et de l'en-tête ; contrôles de type du §7.1, dits et faits) |
+
+Mutants (commande du job, `--plancher 171`, borne de 300 s ; python3.12 ; réseau isolé) : 20 tués sur 20 par leur test
+visé (0 vivant, 0 FATAL) : onze défont une retouche du §12 ou de l'en-tête, six la phrase du §7.1, trois le contrôle
+correspondant de `_lire`. Premier passage, avant l'extension I-2 : 11 tués sur 11 (`--plancher 170`). Suite : 171
+tests ; plancher du job : 171, égalité exigée (`--egal`).

@@ -13,13 +13,17 @@
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
-  (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12).
+  (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
+  le diff CB-18f applique I-2 (§7.1).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
-  pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12) ; le diff CB-18b ferme SHOGEN-S2BIS-SOMMEIL-MURAL-1
-  (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle, SHOGEN-S2BIS-PLAN-CABLAGE-1
-  (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14) ; le diff CB-18d achève
-  SHOGEN-S2BIS-ECRIVAIN-USAGE-1 (fermeture au point d'entrée, §14) ; le diff CB-18e verse le test de conformité de
-  bout en bout (E-C-24).
+  pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
+  SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
+  SHOGEN-S2BIS-PLAN-CABLAGE-1 (§11.9) ; le diff CB-18c achève SHOGEN-S2BIS-PLAN-CABLAGE-1 (câblage des sondes, §14) ;
+  le diff CB-18d achève SHOGEN-S2BIS-ECRIVAIN-USAGE-1 (fermeture au point d'entrée, §14) ; le diff CB-18e verse le
+  test de conformité de bout en bout (E-C-24) ; le diff CB-18f ferme SHOGEN-S2BIS-FORMAT-RETOUCHES-1, étendu par
+  I-2, par ses tests nommés (`s2bis/tests/test_format.py` : la citation du §7.3, la marque « choix du lot » de la
+  règle de source, CB-11h dans la puce « Corrections », valeurs prises au texte de l'item ; puis les contrôles de
+  type de `_lire` dits au §7.1 et faits par `_lire`).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -123,8 +127,13 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
    à ligne (LIMITE = 4 194 304 octets au plus par ligne, saut compris ; l'écrivain refuse d'écrire une ligne plus
    longue), jusqu'au premier fichier qui contient un enregistrement intègre. Intègre : ligne terminée par 0x0A, objet
    JSON canonique, chaîné à la ligne précédente (`seq` + 1, `prec`) ; la première ligne d'un fichier est une
-   `ouverture` ou une `reprise`. La lecture d'un fichier s'arrête à la première ligne non intègre : elle et tout ce qui
-   suit forment la **queue** du fichier.
+   `ouverture` ou une `reprise`. Les champs dont la reprise se sert sont contrôlés en type (`Journal._lire`, code de
+   référence ; I-2 de la G2 du recalcul) : `seq` de la première ligne d'un fichier, entier ; `suivante` d'une
+   `ouverture` ou d'une `reprise`, entier ; `ws` d'un `marqueur` ou d'un enregistrement de fenêtre, entier (il donne la
+   **dernière fenêtre écrite**, §7.5) ; `a` d'un `trou`, tel que `a` + w soit un entier. Limites déclarées : un booléen
+   JSON passe dans `a` et, hors de la première ligne, dans `seq` (`true` y vaut 1) ; `de` d'un `trou`, `ws` d'un
+   `point` ou d'une `reprise` et `jour` ne sont pas contrôlés. La lecture d'un fichier s'arrête à la première ligne non
+   intègre : elle et tout ce qui suit forment la **queue** du fichier.
 2. Une queue n'est jamais réécrite ni tronquée. S'il en existe une (dans le fichier repris, ou un fichier plus récent
    sans enregistrement intègre), l'écrivain ouvre un **segment** neuf : numéro suivant du jour le plus tardif entre le
    jour repris et celui de l'horloge (l'ordre des noms reste l'ordre de la chaîne), premier enregistrement `reprise`.
