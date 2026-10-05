@@ -5,13 +5,17 @@ masques. SB-3b : flux des composants pré-déclarés (E-S-41, Q-4) ; taux exacts
 Q-3 ; E-S-09) ; loi des longueurs « tous épisodes » d'EP (Q-2), regroupée en stress (E-S-10) ; taux exacts des
 composantes (pannes longues, E-S-11 ; régime caché, E-S-12), de taux marginal conservé. SB-3c : indices des flux,
 réplication (fond de la cellule, masques de strate), régime par hôte et par strate, union des composantes, pannes d'hôte
-H(u) vues dans les fenêtres de chaque strate (E-S-08). Chaque tirage compare random() à un seuil exact (aleas.seuil,
-E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
+H(u) vues dans les fenêtres de chaque strate (E-S-08). SB-3d : dérives (E-S-13), par amincissement des épisodes d'une
+série tirée au taux maximal, et panne initiale hors équilibre. Chaque tirage compare random() à un seuil exact
+(aleas.seuil, E-S-43) ; aucun autre flottant, aucune fonction transcendante, aucune puissance."""
 import functools
 from fractions import Fraction
 
 import aleas
+import calendrier
 import commun
+
+GENRES = ("commune", "tendances", "sauts", "transitoire", "initiale")
 
 
 def flux(prm: dict, cellule: str, i: int, composant: str, indice: int):
@@ -178,15 +182,22 @@ def loi_longues(prm: dict) -> Empirique:
 
 class Replication:
     """Une réplication d'une cellule : paramètres, EP (calibration.charger(…)["episodes"]), fond (f ; régime par strate,
-    (φ, κ, τ_D) ou None ; part des pannes longues), nom de cellule et indice i ≥ 0 (Q-4), masques de strate
-    (calendrier.masques) et horizon T_max en fenêtres ; chaque série tire sur ses propres flux (composant, indice)."""
+    (φ, κ, τ_D) ou None ; part des pannes longues ; derive, None ou {genres, duree}), nom de cellule et indice i ≥ 0
+    (Q-4), masques de strate (calendrier.masques) et horizon T_max en fenêtres ; chaque série tire sur ses propres flux
+    (composant, indice)."""
 
     def __init__(self, prm, ep, fond, cellule, i, masques, horizon):
         self.prm, self.ep, self.fond, self.cellule, self.i = prm, ep, fond, cellule, i
-        self.masques, self.horizon, self._z = masques, horizon, {}
+        self.masques, self.horizon, self._z, self._d = masques, horizon, {}, None
 
     def u(self, composant, hote, strate, k=0):
         return flux(self.prm, self.cellule, self.i, composant, indice(self.prm, hote, strate, k))
+
+    def derives(self) -> dict:
+        """Dérives de la réplication (derives, flux « derive » d'indice 0), tirées une fois."""
+        if self._d is None:
+            self._d = derives(self.prm, self.fond.get("derive"), flux(self.prm, self.cellule, self.i, "derive", 0))
+        return self._d
 
     def regime(self, hote, strate) -> int:
         """Z(hôte, strate) (E-S-12), commun aux séries de l'hôte dans la strate : chaîne à deux états de durée moyenne
@@ -205,8 +216,11 @@ class Replication:
         flux noms = (E, E′, L) ; L (loi_longues, part du fond) seulement si noms[2]. E′ est tirée fenêtre à fenêtre,
         indépendamment, de part r' (convention L = 1 de S2, G0 SIM-NIVEAU l.54) : en régime dégradé, la part κ·r_E peut
         dépasser μ/(μ + 1), borne d'un renouvellement à pauses d'au moins une fenêtre (points de la grille E1 à f = 1) ;
-        r' ≥ 1 : SOURCES/taux."""
-        c = composantes(p, self.fond["longues"] if noms[2] else 0 * p, self.fond["regime"][strate])
+        r' ≥ 1 : SOURCES/taux. Sous une dérive de l'hôte de maximum M : union tirée au taux M·p, puis amincie (flux
+        « derive-episodes »)."""
+        d = self.derives()["specs"].get(hote)
+        grand = max(d[1], d[2]) if d else 1
+        c = composantes(grand * p, self.fond["longues"] if noms[2] else 0 * p, self.fond["regime"][strate])
         lois, m = (loi, None, loi_longues(self.prm)), 0
         for j, cle in enumerate(("base", "regime", "longues")):
             if c[cle] and cle == "regime":
@@ -217,6 +231,8 @@ class Replication:
             elif c[cle]:
                 m |= masque(alterner(self.u(noms[j], hote, strate, k), lois[j], pause(c[cle], lois[j].moyenne),
                                      self.prm["aleas"], self.horizon))
+        if d:
+            m = masque(amincir(self.u("derive-episodes", hote, strate, k), calendrier.segments(m), d))
         return m
 
     def pannes(self, hote) -> int:
@@ -226,4 +242,61 @@ class Replication:
         for s in self.prm["calibration"]["strates"]:
             p, loi = self.fond["f"] * taux(self.ep, s, hote)[0], loi_longueurs(self.prm, self.ep, s, hote, "panne")
             h |= self.masques[s] & self.union(hote, s, 0, p, loi, ("panne", "panne-regime", "longues"))
+        if hote == self.derives()["initiale"]:
+            h |= (1 << min(self.prm["sources"]["derive"]["initiale"], self.horizon)) - 1
         return h
+
+
+@functools.lru_cache(maxsize=None)
+def _uniforme(n: int):
+    return aleas.Empirique([(j, 1) for j in range(n)])        # j uniforme sur 0..n − 1 (seuils exacts j/n)
+
+
+def multiplicateur(d: tuple, t: int) -> Fraction:
+    """m(t) d'une dérive (E-S-13) : ("lineaire", m0, m1, L) : m0 + (m1 − m0)·min(t, L)/L, tenu au-delà de L ; ("saut",
+    m0, m1, x) : m0 avant x, m1 à partir de x."""
+    genre, m0, m1, x = d
+    if genre == "lineaire":
+        return m0 + (m1 - m0) * Fraction(min(t, x), x)
+    return m0 if t < x else m1
+
+
+def amincir(u, segs: list, d: tuple) -> list:
+    """Épisodes gardés chacun avec la probabilité m(début)/M, M = max(m0, m1) : une série tirée au taux M·p prend le
+    taux local m(t)·p, longueurs inchangées (E-S-13)."""
+    grand = max(d[1], d[2])
+    return [(a, b) for a, b in segs if aleas.bernoulli(u, aleas.seuil(multiplicateur(d, a) / grand))]
+
+
+def derives(prm: dict, derive, u) -> dict:
+    """Dérives d'une réplication (E-S-13 ; derive : None ou {"genres", "duree" : durée nominale L en fenêtres}) :
+    {"specs" : {hôte : multiplicateur}, "initiale" : hôte ou None}. Tirages sur u, dans l'ordre : commune (d : un sens
+    pour tous) ; tendances (a : un sens par hôte, ordre du pool) ; sauts (b : unites_saut hôtes sans remise, chacun
+    suivi de son sens et de son instant, jour puis fenêtre du jour) ; transitoire (d : × facteur sur les premières
+    fenêtres, sans tirage) ; initiale (c : un hôte décalé, en panne dès 0). Sens croissant si u < 1/2. SOURCES/derive :
+    genre inconnu, plus d'un multiplicateur, ou sauts sur une durée non multiple d'un jour."""
+    out, hotes = {"specs": {}, "initiale": None}, [h for h, _f in prm["calibration"]["unites"]]
+    if derive is None:
+        return out
+    g, n, p, fpj = derive["genres"], derive["duree"], prm["sources"]["derive"], 86400 // prm["calendrier"]["w"]
+    if any(x not in GENRES for x in g) or sum(x in g for x in GENRES[:4]) > 1 or ("sauts" in g and n % fpj):
+        raise commun.Refus("SOURCES/derive", f"genres {g!r}, durée {n!r}")
+    bas, haut = Fraction(*p["bornes"][0]), Fraction(*p["bornes"][1])
+
+    def sens():
+        return (bas, haut) if aleas.bernoulli(u, aleas.seuil(Fraction(1, 2))) else (haut, bas)
+    if "commune" in g:
+        s = sens()
+        out["specs"] = {h: ("lineaire", *s, n) for h in hotes}
+    if "tendances" in g:
+        out["specs"] = {h: ("lineaire", *sens(), n) for h in hotes}
+    reste = list(hotes)
+    for _j in range(p["unites_saut"] if "sauts" in g else 0):
+        h = reste.pop(_uniforme(len(reste)).tirer(u))
+        s = sens()
+        out["specs"][h] = ("saut", *s, fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u))
+    if "transitoire" in g:
+        out["specs"] = {h: ("saut", Fraction(p["transitoire"][0]), Fraction(1), p["transitoire"][1]) for h in hotes}
+    if "initiale" in g:
+        out["initiale"] = hotes[1 + _uniforme(len(hotes) - 1).tirer(u)]
+    return out

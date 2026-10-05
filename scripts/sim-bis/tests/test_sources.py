@@ -233,3 +233,64 @@ class TestHotes(unittest.TestCase):
         self.assertTrue(dans_5_se([part(x, n, n) for x in h], Fraction(127, 22794)))
         vide = {"calme": 0, "stress": 0}
         self.assertEqual(sources.Replication(PRM, EP, fond(), "T-H", 0, vide, n).pannes("kraken"), 0)
+
+
+class TestDerives(unittest.TestCase):
+    def refus(self, code, f, *a):
+        with self.assertRaises(commun.Refus) as c:
+            f(*a)
+        self.assertEqual(c.exception.code, code)
+
+    def test_parametres_et_multiplicateur(self):
+        """E-S-13 : bornes 0,1 et 1,9, trois unités à saut, transitoire × 3 la première semaine (10 080 fenêtres), panne
+        initiale de 3 jours (4 320). m(t) linéaire de 1/10 à 19/10 sur L = 100 : 1/10, 1 (t = 50), 19/10, puis tenu
+        (t = 150) ; saut de 19/10 à 1/10 en 30 : 19/10 à t = 29, 1/10 à t = 30. Mutations M-3D-01 (t non borné par L),
+        M-3D-02 (saut en t ≤ x)."""
+        self.assertEqual(PRM["sources"]["derive"], {"bornes": [[1, 10], [19, 10]], "unites_saut": 3,
+                                                    "transitoire": [3, 10080], "initiale": 4320})
+        d = ("lineaire", Fraction(1, 10), Fraction(19, 10), 100)
+        self.assertEqual([sources.multiplicateur(d, t) for t in (0, 50, 100, 150)],
+                         [Fraction(1, 10), 1, Fraction(19, 10), Fraction(19, 10)])
+        s = ("saut", Fraction(19, 10), Fraction(1, 10), 30)
+        self.assertEqual([sources.multiplicateur(s, t) for t in (29, 30)], [Fraction(19, 10), Fraction(1, 10)])
+
+    def test_amincir(self):
+        """Épisode gardé si u < m(début)/M : saut de 3 à 1 en 10 (M = 3) : débuts 0 et 5 gardés même à u = 0,9
+        (m/M = 1) ; débuts 12 et 20 à 1/3 : u = 0,3 garde, 0,4 retire. Linéaire de 1/10 à 19/10 sur 100 : m(0)/M = 1/19,
+        u = 0,06 retire ; m(50)/M = 10/19, u = 0,5 garde. Mutation M-3D-03 : M = m0 au lieu de max(m0, m1)."""
+        segs = [(0, 2), (5, 6), (12, 15), (20, 21)]
+        self.assertEqual(sources.amincir(suite(0.9, 0.9, 0.3, 0.4), segs, ("saut", Fraction(3), Fraction(1), 10)),
+                         [(0, 2), (5, 6), (12, 15)])
+        d = ("lineaire", Fraction(1, 10), Fraction(19, 10), 100)
+        self.assertEqual(sources.amincir(suite(0.06, 0.5), [(0, 3), (50, 51)], d), [(50, 51)])
+
+    def test_derives_tirees(self):
+        """Sauts et panne initiale (N9), L = 2 880 (deux jours) : hôte parmi 10 (u = 0,05 → binance), sens (0,7 → de
+        19/10 à 1/10), jour (0,6 → 1), minute (0 → 0) : saut en 1 440 ; parmi les 9 restants (0,95 → okx), sens (0,2 →
+        de 1/10 à 19/10), jour (0,1 → 0), minute (0,5 → 720) ; parmi 8 (0,3 → chainlink), sens (0,4), jour (0,99 → 1),
+        minute (0,99999 → 1 439) : 2 879 ; panne initiale parmi les 9 hôtes décalés (0,05 → rang 0 → bitfinex ; binance,
+        non décalé, est exclu). Genre inconnu, deux multiplicateurs, L non multiple d'un jour : SOURCES/derive.
+        Mutations M-3D-04 (tirage avec remise), M-3D-05 (hôte non décalé admis pour la panne initiale), M-3D-06
+        (contrôle des genres retiré)."""
+        u = suite(0.05, 0.7, 0.6, 0.0, 0.95, 0.2, 0.1, 0.5, 0.3, 0.4, 0.99, 0.99999, 0.05)
+        lo, hi = Fraction(1, 10), Fraction(19, 10)
+        self.assertEqual(sources.derives(PRM, {"genres": ["sauts", "initiale"], "duree": 2880}, u),
+                         {"specs": {"binance": ("saut", hi, lo, 1440), "okx": ("saut", lo, hi, 720),
+                                    "chainlink": ("saut", lo, hi, 2879)}, "initiale": "bitfinex"})
+        for g, n in ((["inconnu"], 2880), (["tendances", "commune"], 2880), (["sauts"], 1000)):
+            self.refus("SOURCES/derive", sources.derives, PRM, {"genres": g, "duree": n}, suite(0.1, 0.1, 0.1, 0.1))
+
+    def test_transitoire_et_initiale(self):
+        """Transitoire commun (X2) : binance calme, f = 1, taux × 3 sur les 10 080 premières fenêtres, puis × 1 ; 100
+        réplications de 20 160 fenêtres : part en panne à moins de 5 SE de 3·372/24 585 puis de 372/24 585. Panne
+        initiale (N9) : l'hôte tiré est en panne sur les 4 320 premières fenêtres. Mutations M-3D-07 (série non tirée au
+        taux M·p), M-3D-08 (amincissement omis), M-3D-09 (panne initiale omise)."""
+        n, p = 10080, Fraction(372, 24585)
+        m = {"calme": (1 << 2 * n) - 1, "stress": 0}
+        f = dict(fond(), derive={"genres": ["transitoire"], "duree": n})
+        h = [sources.Replication(PRM, EP, f, "T-X2", i, m, 2 * n).pannes("binance") for i in range(100)]
+        self.assertTrue(dans_5_se([part(x, 0, n) for x in h], 3 * p))
+        self.assertTrue(dans_5_se([part(x, n, n) for x in h], p))
+        r = sources.Replication(PRM, EP, dict(fond(), derive={"genres": ["initiale"], "duree": n}), "T-N9", 0, m, 2 * n)
+        hote = r.derives()["initiale"]
+        self.assertEqual(r.pannes(hote) & ((1 << 4320) - 1), (1 << 4320) - 1)
