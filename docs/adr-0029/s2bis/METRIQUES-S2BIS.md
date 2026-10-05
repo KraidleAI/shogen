@@ -587,7 +587,7 @@ monotone de la boucle, disque et empreinte relevés après l'état des futurs (S
 
 | fichier | lignes | tests |
 |---|---|---|
-| `shogen_s2bis/collecte/boucle.py` | 131 | — |
+| `shogen_s2bis/collecte/boucle.py` | 132 (131 auparavant : C-3 de la G2 de la tranche C, recompté au diff CB-18j) | — |
 | `shogen_s2bis/collecte/sante.py` | 109 | — |
 | `shogen_s2bis/collecte/http.py` | 132 | — |
 | `tests/test_boucle.py` | 312 | 14 (3 de plus : sommeil malgré un recul de 1 s ou une avance de 30 s ; départ monotone dans le suivi ; plan sans lecture refusé) |
@@ -781,3 +781,22 @@ au-delà de 9 segments, l'ordre de `ls` n'est plus celui de la chaîne (le nom s
 Mutants (commande du job, `--plancher 178`, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
 0 FATAL). MR-09 et MR-26 du réviseur sont tués, rejoués sur l'état final. Suite : 178 tests ; plancher du job : 178,
 égalité exigée (`--egal`).
+
+## CB-18j (2026-10-05) : convention des citations, `run_params` dans l'ordre de la fenêtre, recompte
+
+Objet (G2 de la tranche C de P1) : l'en-tête du FORMAT écrit que « ADR-0029 l.N » renvoie à l'ADR-0029 au commit
+`e16956b`, convention du G0 (SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1). Relevé : toutes les citations de l'ADR-0029 du
+FORMAT (l.83, 107, 108, 109, 233, 234, 238-240), du code et des tests du collecteur (l.109-110, 217, 233, 234, 236,
+237, 238, 239) suivent cette convention ; aucune n'est à corriger. §11.5 : `run_params` ouvre la première fenêtre
+admise d'une exécution (observation de la G2) ; le test de bout en bout le contrôle (`run_params` suit l'`ouverture`
+ou la `reprise`). C-3 : `boucle.py` recompté à 132 lignes à l'état CB-18b (8 873 octets, 132 sauts de ligne, égal à
+l'état final) ; les autres comptes des sections CB-18 sont recomptés égaux.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 88 | 3 (1 de plus : convention des citations, `run_params` au §11.5) |
+| `tests/test_bout_en_bout.py` | 194 | 1 (`run_params` en tête de sa fenêtre, contrôlé) |
+
+Mutants (commande du job, `--plancher 179`, borne de 300 s ; python3.12 ; réseau isolé) : 4 tués sur 4 (0 vivant,
+0 FATAL), dont `run_params` écrit après la boucle. Suite : 179 tests ; plancher du job : 179, égalité exigée
+(`--egal`).

@@ -4,6 +4,11 @@
   contrôle horaire, fichiers quotidiens clos et sommés ; format spécifié et scellé au paquet) ; PROPOSITION du G0
   (`docs/adr-0029/g0-collecte/`), exigences E-C-16 à E-C-24 ; principe de SHOGEN-FORMAT-JOURNAUX-1 (annexe B d'ADR-0028,
   l.55).
+- **Citations** (SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1) : « ADR-0029 l.N » renvoie à la ligne N de l'ADR-0029 au
+  commit `e16956b`, convention du G0 COLLECTE-RECALC-DEPLOI, dont les renvois suivent le même texte. Les ajouts datés
+  versés depuis décalent les numéros sans changer le texte cité (deux lignes insérées au §2.4 par `b9ba2b4` : le §2.9
+  commence l.229 à `e16956b`, l.231 ensuite) ; un ajout daté se cite par sa date. Relevé du diff CB-18j : toutes les
+  citations de l'ADR-0029 de ce texte, du code et des tests du collecteur suivent cette convention.
 - **Statut** : texte tenu à jour à chaque sous-lot du collecteur ; il est scellé au paquet de S2-bis avec le commit du
   collecteur. Code de référence : `s2bis/shogen_s2bis/collecte/journal.py`. Le test de conformité d'un journal produit
   par le collecteur entier (E-C-24) est `s2bis/tests/test_bout_en_bout.py` (sous-lot CB-18e) : le point d'entrée
@@ -17,7 +22,9 @@
   le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3) ; le diff ENTIER-ECRIVAIN,
   I-1 (§1.2, §2). Relecture G2 de la tranche C de P1 (2026-10-05) : le diff CB-18g applique C-1 (§14.1, §14.4) ; le
   diff CB-18h ferme l'item SHOGEN-S2BIS-CONFIG-REGLES-1 (§14.1) ; le diff CB-18i, par des tests seuls,
-  SHOGEN-S2BIS-SEGMENTS-10-1 (§6.1) et SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 (§13.5), et couvre le tuple au §1.2.
+  SHOGEN-S2BIS-SEGMENTS-10-1 (§6.1) et SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 (§13.5), et couvre le tuple au §1.2 ; le
+  diff CB-18j écrit la convention des citations (en-tête, SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1) et place `run_params`
+  dans l'ordre de la fenêtre (§11.5, observation de la G2).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -276,8 +283,11 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
    résultats tardifs (§11.6). Une lecture dont la fonction lève, BaseException comprise (O-5 : l'exception suit son
    cours, le résultat est rendu), ou ne rend pas une lecture, est `panne_transport` de sous-type `autre`.
 5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
-   puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Une fenêtre dont l'échéance est déjà passée quand la boucle
-   l'atteint n'est pas lue : le trou est déclaré au marqueur suivant (cause `saut`).
+   puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Dans la première fenêtre admise d'une exécution,
+   `run_params` (§14.4) suit immédiatement l'`ouverture` ou la `reprise` du démarrage et précède toute `lecture` ; si
+   la boucle part d'une fenêtre plus tardive, celle de `run_params` reste sans marqueur, déclarée par le `trou`
+   suivant. Une fenêtre dont l'échéance est déjà passée quand la boucle l'atteint n'est pas lue : le trou est déclaré
+   au marqueur suivant (cause `saut`).
 6. **Enregistrement `sante` de la boucle** (valeurs brutes, aucun jugement) :
    - `d2.retard_max` : plus grand retard au départ (instant de lancement moins instant planifié, en microsecondes)
      parmi les lectures parties ; null si aucune n'est partie. `d2.non_parties` : nombre de lectures planifiées qui ne

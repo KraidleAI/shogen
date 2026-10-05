@@ -2,7 +2,9 @@
 porte les retouches de l'item. Valeurs attendues tirées du texte de l'item, non du FORMAT : « FORMAT §12 : citer aussi
 RFC 1035 §7.3 et marquer la règle de source (adresse et port interrogés) comme choix du lot ; ajouter CB-11h à l'en-tête
 « Corrections » » ; I-2 : « FORMAT §7.1 doit dire les contrôles de type que fait `_lire` (`suivante`, `ws`, `a`,
-dernière fenêtre) »."""
+dernière fenêtre) ». CB-18j (G2 de la tranche C) : convention des citations « ADR-0029 l.N » écrite dans l'en-tête
+(SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1 : « elles suivent l'ADR au commit e16956b, convention du G0 ») ; `run_params`
+placé dans l'ordre de la première fenêtre d'une exécution (§11.5, observation de la G2)."""
 import hashlib
 import json
 import os
@@ -68,6 +70,18 @@ class Format(unittest.TestCase):
             with self.subTest(champ=champ, type=enr["type"]):
                 self.assertEqual((integres(*avant, enr), integres(*avant, {**enr, champ: "x"})),
                                  (len(avant) + 1, len(avant)))
+
+    def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
+        """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
+        nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant
+        toute `lecture`."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        citations = [" ".join(p.split()) for p in puces if p.startswith("**Citations**")]
+        self.assertEqual([("« ADR-0029 l.N » renvoie à la ligne N de l'ADR-0029 au commit `e16956b`" in p,
+                           "CITATIONS-ADR-DECALEES-1" in p) for p in citations], [(True, True)])
+        cinq = sections["11"].split(" 5. ", 1)[1].split(" 6. ", 1)[0]
+        self.assertEqual([("première fenêtre" in p, "précède toute `lecture`" in p) for p in cinq.split(". ") if
+                          "`run_params`" in p], [(True, True)])
 
 
 if __name__ == "__main__":

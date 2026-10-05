@@ -84,6 +84,7 @@ def anomalies(enrs, f, s):
         elif t == "run_params":
             exige(re.fullmatch("[0-9a-f]{40}", e["commit"]) and sorted(e["sha256"]) == ["descripteur", "formes",
                   "sante"] and all(HEX.fullmatch(h) for h in e["sha256"].values()), "run_params")           # §14.4
+            exige(i > 0 and enrs[i - 1]["type"] in ("ouverture", "reprise"), "run_params hors tête")       # §11.5
         elif t == "lecture":
             p, depart, fin = e["phases"], (e["ws"] + w) * S - f["delta"], (e["ws"] + w) * S - f["marge"]
             exige(e["statut"] in ("ok", "panne_http", "panne_transport", "panne_decode") and (
