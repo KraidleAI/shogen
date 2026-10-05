@@ -40,17 +40,27 @@ def positif(v) -> bool:
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
-          "aleas": {"prefixe": texte, "graine": positif, "rangs": positif, "garde": positif, "source": texte}}
+          "aleas": {"prefixe": texte, "graine": positif, "rangs": positif, "garde": positif, "source": texte},
+          "calibration": {"strates": [texte], "unites": [(texte, texte)], "types": [texte], "quantiles": [positif],
+                          "pools": [texte], "ell": [positif], "garde_blocs": positif, "precision": positif,
+                          "source": texte}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
-    """`v` contre le schéma `s` : dict = clés exactes, contrôle récursif ; sinon prédicat. Refus PARAMETRES/schema."""
+    """`v` contre le schéma `s` : dict = clés exactes ; [s0] = liste non vide d'éléments conformes à s0 ; (s1, …) =
+    liste d'autant d'éléments, un schéma chacun ; contrôle récursif ; sinon prédicat. Refus PARAMETRES/schema."""
     if isinstance(s, dict):
         if type(v) is not dict or sorted(v) != sorted(s):
             raise Refus("PARAMETRES/schema", f"{ou} : {sorted(v) if type(v) is dict else type(v).__name__}, "
                                              f"attendu {sorted(s)}")
         for k in sorted(s):
             controler(v[k], s[k], f"{ou}.{k}")
+    elif isinstance(s, (list, tuple)):
+        if type(v) is not list or not v or (type(s) is tuple and len(v) != len(s)):
+            raise Refus("PARAMETRES/schema", f"{ou} : liste non vide attendue"
+                                             + (f" de {len(s)} éléments" if type(s) is tuple else ""))
+        for j, x in enumerate(v):
+            controler(x, s[j] if type(s) is tuple else s[0], f"{ou}[{j}]")
     elif not s(v):
         raise Refus("PARAMETRES/schema", f"{ou} : {v!r} refusé ({s.__name__})")
 

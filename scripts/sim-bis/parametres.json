@@ -13,5 +13,16 @@
   "rangs": 4096,
   "garde": 128,
   "source": "E-S-41 : GRAINE = 20261004 fixée par le G0, aucune autre essayée ; flux = 8 premiers octets de SHA-256 de « SHOGEN-SIM-BIS|20261004|<cellule>|<i>|<composant>|<indice> », graine de règle = SHA-256 hexadécimal de « SHOGEN-SIM-BIS|20261004|<cellule>|<i> » ; E-S-42 (random() seule) ; E-S-43 (tables de seuils exactes) ; rangs (taille des tables géométriques, qui fixe l'ordre des tirages) et garde (bits d'encadrement de (1 − p)^k) : choix du sous-lot SB-1"
+ },
+ "calibration": {
+  "strates": ["calme", "stress"],
+  "unites": [["binance", "binance"], ["bitfinex", "bitfinex"], ["bitstamp", "bitstamp"], ["chainlink", "chainlink"], ["coinbase", "coinbase"], ["coingecko", "coingecko"], ["defillama", "defillama"], ["gemini", "gemini"], ["kraken", "kraken"], ["okx", "okx_ticker"]],
+  "types": ["panne", "ecart"],
+  "quantiles": [50, 90, 99],
+  "pools": ["S2 (D1)", "D1-bis"],
+  "ell": [1, 2, 3, 5, 10, 15, 20, 30, 60, 90, 120, 180, 240, 360, 480, 720, 1440],
+  "garde_blocs": 30,
+  "precision": 50,
+  "source": "E-S-37 ; EP l.1-161 (forme de scripts/plan-s2bis/episodes.py l.92-120) ; parametres.json de PLAN-S2BIS (strates, pool_d1bis : unités = hôtes, okx par okx_ticker, E-S-07 ; episodes.types et quantiles ; fiv.ell et pools) ; r1 de f35a70c (DECIMAL_PREC = 50, ROUND_HALF_EVEN, GARDE_BLOCS = 30)"
  }
 }
