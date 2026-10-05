@@ -18,8 +18,9 @@ import subprocess
 import sys
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
-PLANCHER = 405      # tests de la suite après le lot DETTES-B1 (2026-10-04) ; un lot qui ajoute des tests le
-                    # relève (SHOGEN-CI-PLANCHER-SUIVI-1) ; l'abaisser desserre la gate : décision datée seulement
+PLANCHER = 406      # tests de la suite après le diff ENREG-ROLE de CB-18 (2026-10-05 ; 405 après DETTES-B1) ; un lot
+                    # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1) ; l'abaisser desserre la gate :
+                    # décision datée seulement
 SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
 FIN = re.compile(r"\n-{70}\nRan (\d+) tests? in \d+\.\d+s\n\n(OK(?: \(skipped=(\d+)\))?)\n*\Z")
 SAUT = re.compile(r" \.\.\. skipped (['\"])(.*)\1$", re.M)

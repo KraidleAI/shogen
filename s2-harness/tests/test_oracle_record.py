@@ -370,5 +370,50 @@ class TestOracleRecord(unittest.TestCase):
                                      noms)
 
 
+    def test_suites_s2bis_et_sim_bis_par_la_ligne_du_job(self):
+        """SHOGEN-S2BIS-ENREG-ROLE-1 : `suite-s2bis` et `suite-sim-bis` lancent, depuis la racine de l'extraction, la
+        ligne du vérificateur de leur job telle qu'écrite dans le gates.yml du commit (plancher committé compris),
+        python3 remplacé par l'interpréteur ; vérificateur réel du dépôt. Conforme : exit 0 et enregistrement conforme ;
+        plancher du commit faux : exit 1 consigné ; ligne répétée, job absent ou ligne d'une autre suite : refus avant
+        toute écriture ; la CLI admet les deux noms. Rougit si : noms hors liste fermée, ligne recopiée dans l'outil,
+        autre job ou autre suite lus, ligne répétée admise, refus après écriture."""
+        self.assertLessEqual({"suite-s2bis", "suite-sim-bis"}, set(orc.COMMANDES))      # liste fermée, étendue
+        d, dep = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-s2bis")
+        verif = Path(os.path.dirname(HARNESS), "enforcement", "verdict-suite-s2.py").read_bytes()
+
+        def gates(p1, p2, n1=1):                                    # lignes du vérificateur des deux jobs
+            v = "          python3 -B enforcement/verdict-suite-s2.py {} --aucun-saut --egal --plancher {}"
+            return chr(10).join(["jobs:", "  s2bis-unittest:", "    steps:", "      - run: |", *[v.format(
+                "s2bis", p1)] * n1, "  sim-bis-unittest:", "      - run: |", v.format("scripts/sim-bis", p2),
+                                 ""]).encode()
+        base = {"enforcement/verdict-suite-s2.py": verif, **{f"{x}/tests/{n}": c for x in ("s2bis", "scripts/sim-bis")
+                                                               for n, c in (("__init__.py", b""), ("test_t.py", T))}}
+        autre = gates(1, 1).replace(b"verdict-suite-s2.py s2bis ", b"verdict-suite-s2.py s2-harness ")
+        ok, ko, double, sans, mauvaise = depot(dep, [{**base, ".github/workflows/gates.yml": g} for g in (
+            gates(1, 1), gates(2, 1), gates(1, 1, 2), gates(1, 1).split(b"  sim-bis")[0], autre)])
+        chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
+        rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+        ligne = [sys.executable, "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut", "--egal", "--plancher",
+                 "1"]
+        self.assertEqual((code, [(r["nom"], r["arbre"], r["commande"], r["exit"]) for r in rec["runs"]]), (0, [
+            ("suite-s2bis", ".", [x.format("s2bis") for x in ligne], 0),
+            ("suite-sim-bis", ".", [x.format("scripts/sim-bis") for x in ligne], 0)]))
+        for r in rec["runs"]:
+            self.assertIn(b"verdict-suite-s2 : conforme (code 0, r", Path(d, r["sortie"]["chemin"]).read_bytes())
+        self.assertEqual(orc.verifier(chemin, "G2", ok, dep)["tree"]["commit"], ok)
+        chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ko, ("suite-s2bis", "suite-sim-bis"))
+        self.assertEqual((code, [r["exit"] for r in json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"]]),
+                         (1, [1, 0]))                               # Ran 1 < plancher 2 du commit
+        avant = sorted(os.listdir(d))
+        for commit, c in ((double, "suite-s2bis"), (sans, "suite-sim-bis"), (mauvaise, "suite-s2bis")):
+            with self.subTest(commande=c), self.assertRaisesRegex(ValueError, "— refus$"):
+                orc.enregistrer(d, "cp-2", "claude-opus-5-5", dep, commit, ("suite", c))
+        self.assertEqual(sorted(os.listdir(d)), avant)
+        p = subprocess.run([sys.executable, "-B", OUTIL, "--role", "G1", "--auteur", "claude-opus-5-5", "--depot", dep,
+                            "--commit", ok, "--sortie", d, "--commande", "suite-sim-bis"], capture_output=True,
+                           text=True)
+        self.assertEqual((p.returncode, p.stderr), (0, ""))
+
+
 if __name__ == "__main__":
     unittest.main()

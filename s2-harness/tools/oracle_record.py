@@ -6,7 +6,9 @@ shogen-<sha court>-<rôle>-<date>-<pid>.json (sorties : chemins relatifs à ce r
 est consignée, posée ou non, jamais posée (annexe D.4 a). SHOGEN-ENREG-VERIF-1 : délai maximal par commande ; la
 lecture contrôle aussi auteur et, avec un dépôt, tree.sha256. Partie 2, C3 : auteur contrôlé dès l'écriture
 (SHOGEN-ENREG-AUTEUR-ECRITURE-1) ; marqueur JOURNAUX des commandes remplacé par le dossier des journaux ; arrêt au
-premier échec sur demande (G0 §C, Q5 et Q8)."""
+premier échec sur demande (G0 §C, Q5 et Q8). SHOGEN-S2BIS-ENREG-ROLE-1 (lot COLLECTE-BIS, CB-18 ; G0
+docs/adr-0029/g0-collecte/) : suites `s2bis` et `scripts/sim-bis` au même enregistreur, par la ligne du vérificateur
+de leur job, lue dans le gates.yml du commit extrait (SHOGEN-S2BIS-G3-LIGNE-JOB-1), jamais recopiée ici."""
 from __future__ import annotations
 
 import argparse
@@ -28,10 +30,13 @@ ROLES = ("G1", "G2", "cp-2", "rendu")
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
 JOURNAUX = "<journaux>"     # marqueur d'argument : dossier des journaux, chemin absolu substitué (jamais un shell)
+LIGNE = "<ligne du job>"    # marqueur : arguments de la ligne du vérificateur du job, lus dans le gates.yml extrait
 PRODUCTION = ("j14-principal", "j14-second", "j28", "recalcul-tiers", "raw")   # rendu unique (G0 §C, Q5 à Q7)
+JOBS = {"suite-s2bis": ("s2bis-unittest", "s2bis"), "suite-sim-bis": ("sim-bis-unittest", "scripts/sim-bis")}
 COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]),
              **{n: ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n, "--journaux", JOURNAUX])
-                for n in PRODUCTION}}                                       # liste fermée
+                for n in PRODUCTION}, **{n: (".", [LIGNE]) for n in JOBS}}  # liste fermée
+GATES = os.path.join(".github", "workflows", "gates.yml")
 HEX = re.compile(r"[0-9a-f]{64}")
 CHAMPS = ("schema", "role", "auteur", "base", "static_only", "served_from", "tree", "python", "env", "runs", "exit",
           "ecrit", "paquet", "sceau")
@@ -88,6 +93,25 @@ def auteur_admis(a) -> bool:
     return isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis)
 
 
+def ligne_du_job(arbre: str, job: str, suite: str) -> list:
+    """Arguments de la ligne du vérificateur du job `job` de GATES dans l'extraction `arbre`, telle qu'écrite
+    (plancher committé compris) : « python3 -B enforcement/verdict-suite-s2.py <suite> --aucun-saut --egal --plancher
+    N », une seule fois dans le job. Job absent, ligne absente ou répétée : ValueError (refus)."""
+    try:
+        with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
+            lignes = f.read().splitlines()
+        i = lignes.index(f"  {job}:") + 1
+    except (OSError, ValueError) as e:
+        raise ValueError(f"job {job} introuvable dans {GATES} ({e}) — refus") from e
+    fin = next((k for k in range(i, len(lignes)) if re.fullmatch("  [a-z0-9-]+:", lignes[k])), len(lignes))
+    motif = re.compile(" *python3 (-B enforcement/verdict-suite-s2[.]py " + re.escape(suite) +
+                       " --aucun-saut --egal --plancher [0-9]+)")
+    trouves = [m.group(1).split() for m in map(motif.fullmatch, lignes[i:fin]) if m]
+    if len(trouves) != 1:
+        raise ValueError(f"job {job} : {len(trouves)} ligne(s) du vérificateur de {suite}, une exigée — refus")
+    return trouves[0]
+
+
 def extraire(depot: str, sha: str, arbre: str) -> dict:
     """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend {chemin : sha256} par
     fichier."""
@@ -121,7 +145,7 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     maximal par commande (s ; None : DELAI_DEFAUT) : au dépassement, commande arrêtée, exit EXIT_DELAI consigné, ligne
     de dépassement en fin de sortie, enregistrement écrit quand même. auteur hors liste blanche : refus avant tout git.
     journaux : dossier substitué au marqueur JOURNAUX (exigé si une commande le porte). arret_premier_echec : aucun
-    run lancé après un run en échec."""
+    run lancé après un run en échec. Commandes de JOBS : ligne du job lue dans l'extraction, refus avant tout run."""
     delai = DELAI_DEFAUT if delai is None else delai
     if role not in ROLES or not commandes or any(c not in COMMANDES for c in commandes):
         raise ValueError(f"rôle {role!r} ou commande(s) {list(commandes)} hors des listes fermées {ROLES}, "
@@ -144,8 +168,9 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     arbre, runs = tempfile.mkdtemp(prefix="oracle_"), []
     try:
         hashes = extraire(depot, sha, arbre)
+        lignes = {c: ligne_du_job(arbre, *JOBS[c]) for c in commandes if c in JOBS}     # refus avant tout run
         for i, c in enumerate(commandes):
-            sous, args = COMMANDES[c]
+            sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
             cmd, sortie = [sys.executable, *(journaux if x == JOURNAUX else x for x in args)], f"{nom}.{i}-{c}.out"
             try:
                 p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
