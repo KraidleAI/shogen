@@ -106,7 +106,8 @@ def debuts(prm: dict, u, rho, horizon: int) -> list:
 class Couche:
     """Couche d'observateurs d'une réplication (E-S-17 à E-S-21) : paramètres, spécification de la cellule (`couche` :
     absences et dégradations, parts stationnaires par observateur ; paires, pannes de paires par jour ; perte, None ou
-    durée nominale en fenêtres sur laquelle l'instant de la perte est tiré ; repli, M = 3), nom de cellule, indice i ≥
+    W, durée nominale de la cellule en semaines, sur laquelle l'instant de la perte est tiré (Q-T3-7) ; repli, M = 3),
+    nom de cellule, indice i ≥
     0 et horizon T_max en fenêtres ; essais : {(composant, indice) : u} remplace les flux nommés (tests pas à pas).
     Observateur de l'UE ou du repli hors de 0..M − 1 (O-4 de la G2 de la tranche 3) : OBSERVATEURS/indice."""
 
@@ -188,9 +189,10 @@ class Couche:
         o) ; dégradation D-2 à D-5 (tirages indépendants par fenêtre de part `degradations`, flux « obs-degradations »
         d'indice o) ; panne de paire (débuts à `paires` par jour, flux « obs-paires » 0 ; paire uniforme parmi celles
         des observateurs présents, flux « obs-paires » 1 ; durée observateurs.duree_paire) ; perte définitive
-        (observateur uniforme parmi les présents, instant uniforme sur la durée `perte`, jour puis fenêtre du jour, flux
-        « obs-perte ») ; repli (observateur observateurs.repli absent toute la campagne, E-S-18). Durée de perte non
-        multiple d'un jour : OBSERVATEURS/perte."""
+        (observateur uniforme parmi les présents, instant uniforme sur la durée nominale W × 7 jours, jour puis fenêtre
+        du jour, jamais sur T_max : Q-T3-7, avis modifié ; flux « obs-perte ») ; repli (observateur observateurs.repli
+        absent toute la campagne, E-S-18). W non entier ≥ 1, ou durée nominale au-delà de l'horizon :
+        OBSERVATEURS/perte."""
         op, c, a = self.prm["observateurs"], self.couche, self.prm["aleas"]
         presents = [o for o in range(op["M"]) if not (c["repli"] and o == op["repli"])]
         inv, loi = [0 if o in presents else self.grille for o in range(op["M"])], sources.Empirique(op["absences"])
@@ -207,12 +209,12 @@ class Couche:
                 x, y = paires[_uniforme(len(paires)).tirer(v)]
                 inv[x] |= ((1 << op["duree_paire"]) - 1) << t
                 inv[y] |= ((1 << op["duree_paire"]) - 1) << t
-        if c["perte"] is not None:
-            fpj, n, u = 86400 // self.prm["calendrier"]["w"], c["perte"], self.u("obs-perte", 0)
-            if n % fpj or n < fpj:
-                raise commun.Refus("OBSERVATEURS/perte", f"{n} fenêtres : multiple entier d'un jour ({fpj}) attendu")
+        if c["perte"] is not None:          # Q-T3-7 : instant sur la durée nominale W (W × 7 jours), jamais sur T_max
+            fpj, w, u = 86400 // self.prm["calendrier"]["w"], c["perte"], self.u("obs-perte", 0)
+            if type(w) is not int or w < 1 or 7 * w * fpj > self.horizon:
+                raise commun.Refus("OBSERVATEURS/perte", f"W = {w!r} : semaines entières ≥ 1, au plus l'horizon")
             o = presents[_uniforme(len(presents)).tirer(u)]
-            t = fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u)
+            t = fpj * _uniforme(7 * w).tirer(u) + _uniforme(fpj).tirer(u)
             inv[o] |= self.grille >> t << t
         return [self.grille & ~x for x in inv]
 

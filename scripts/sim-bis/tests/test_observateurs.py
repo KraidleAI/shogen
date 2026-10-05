@@ -137,21 +137,26 @@ class TestValidite(unittest.TestCase):
         self.assertEqual(v, [g & ~bits(0, 1), g & ~bits(7), g & ~bits(0, 1, 7), 0])
 
     def test_perte_definitive(self):
-        """Perte d'un observateur à un instant tiré (E-S-17, N5), sur 2 880 fenêtres nominales (deux jours) :
-        observateur parmi les quatre (u = 0,6 → O3), jour (0,3 → 0), fenêtre du jour (0,25 → 360) : O3 non valide de la
-        fenêtre 360 à l'horizon (3 000), plus d'un jour ; au repli, parmi les trois présents (0,6 → O2). Durée non
-        multiple d'un jour : OBSERVATEURS/perte. Mutations M-6B-04 (instant : jour et fenêtre permutés), M-6B-05 (perte
-        bornée à un jour)."""
-        g = (1 << 3000) - 1
-        v = observateurs.Couche(PRM, couche(perte=2880), "T-6B", 0, 3000, {("obs-perte", 0): suite(0.6, 0.3, 0.25)})
-        v = v.validites()
-        self.assertEqual(v, [g, g, (1 << 360) - 1, g])
-        v = observateurs.Couche(PRM, couche(perte=2880, repli=True), "T-6B", 0, 3000,
-                                {("obs-perte", 0): suite(0.6, 0.3, 0.25)}).validites()
-        self.assertEqual(v, [g, (1 << 360) - 1, g, 0])
-        with self.assertRaises(commun.Refus) as c:
-            observateurs.Couche(PRM, couche(perte=1000), "T-6B", 0, 3000).validites()
-        self.assertEqual(c.exception.code, "OBSERVATEURS/perte")
+        """Perte d'un observateur à un instant tiré (E-S-17, N5 ; Q-T3-7, avis modifié : instant uniforme sur la durée
+        nominale W, jamais sur T_max), W = 1 semaine (10 080 fenêtres), horizon 15 120 (T_max = 3/2·W) : observateur
+        parmi les quatre (u = 0,6 → O3), jour parmi 7 (0,3 → 2 ; parmi les 10 jours entiers de l'horizon, 0,3 donnerait
+        3), fenêtre du jour (0,25 → 360) : O3 non valide de la fenêtre 2 × 1 440 + 360 = 3 240 à l'horizon, plus d'un
+        jour ; au repli, parmi les trois présents (0,6 → O2) ; dernier jour de W (0,99 → 6 ; fenêtre 0,99 → 1 425) :
+        10 065. W non entier ≥ 1 (booléen, 0, 3/2) ou durée nominale au-delà de l'horizon (W = 2) :
+        OBSERVATEURS/perte. Fenêtres non valides comparées en segments [début, fin). Mutations M-6B-04 (instant : jour
+        et fenêtre permutés), M-6B-05 (perte bornée à un jour), M-8F-01 (instant tiré sur l'horizon), M-8F-02 (borne de
+        l'horizon retirée)."""
+        def v(w, repli=False, u=(0.6, 0.3, 0.25)):
+            try:
+                m = observateurs.Couche(PRM, couche(perte=w, repli=repli), "T-6B", 0, 15120,
+                                        {("obs-perte", 0): suite(*u)}).validites()
+                return [calendrier.segments(((1 << 15120) - 1) & ~x) for x in m]
+            except commun.Refus as e:
+                return e.code
+        self.assertEqual([v(1), v(1, True), v(1, u=(0.6, 0.99, 0.99))],
+                         [[[], [], [(3240, 15120)], []], [[], [(3240, 15120)], [], [(0, 15120)]],
+                          [[], [], [(10065, 15120)], []]])
+        self.assertEqual([v(x) for x in (True, 0, Fraction(3, 2), 2)], ["OBSERVATEURS/perte"] * 4)
 
     def test_absences_et_degradations(self):
         """Absences D-1 (renouvellement stationnaire, longueurs d'essai 2 et 5 à poids égaux) de part 1/20 et

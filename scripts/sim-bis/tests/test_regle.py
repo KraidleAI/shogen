@@ -1,6 +1,7 @@
 """Règle R1-2 répliquée, SB-7 et SB-8 (E-S-24 à E-S-35 ; T-ROT-1, T-ROT-2, T-REG-1 à T-REG-3, T-ABS-1) : décalages
 calculés hors du code (`sha256sum`, puis `bc` en base 16, journal de la tranche 3 « vecteurs-t-rot-1.txt »), séries,
 listes de K^(r) et décisions écrites à la main ; chaque test nomme les mutations qui le rougissent."""
+import hashlib
 import unittest
 from fractions import Fraction
 from unittest import mock
@@ -169,6 +170,27 @@ class TestDecision(unittest.TestCase):
         self.assertEqual(regle.premiere(["kraken", "binance", "okx"]), "binance")
         self.assertIsNone(regle.premiere([]))
 
+    def test_premiere_avant_absorption_q_t3_15(self):
+        """Q-T3-15 (avis modifié, adjugé avant E0 ; ADR-0029 l.200) : l'unité non décalée est prise sur le pool BTC
+        D1-bis restant après les retraits, avant le critère collectif d'absorption, et n'est pas recalculée après lui.
+        À la main, n = 8 : binance {0, …, 5} (p̂ = 3/4), coinbase {0}, kraken {4} (1/8 chacun) ; premiere = binance ;
+        filtrer retire binance (Σ p̂/(1 − p̂) = 3 + 2/7 > 1/2, puis 2/7). Valeurs « avec », R = 1, α = 1/2 (seuil 0),
+        décalages de r = 1 en calme par sha256sum et bc (coinbase 1, kraken 4, modulo 8) : binance absente de la
+        classe, toutes les unités sont décalées, comme sans unité non décalée (coinbase {1}, kraken {0} : K^(1) = 0,
+        C1 = 0, causes k_crit et runs, K = 0) ; recalculée (coinbase non décalée : {0} et {0}, K^(1) = 1, C1 = 1), la
+        garde changerait (runs seule). Mutation M-8F-06 (rotation : première unité présente non décalée quand
+        `premier` manque)."""
+        prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2]))
+        btc = {"binance": bits(0, 1, 2, 3, 4, 5), "coinbase": bits(0), "kraken": bits(4)}
+        premier = regle.premiere(list(btc))
+        restees, retirees, indice = regle.filtrer(btc, 8, prm)
+        self.assertEqual((premier, retirees, indice, restees), ("binance", ["binance"], Fraction(2, 7),
+                                                                 {"coinbase": bits(0), "kraken": bits(4)}))
+        t = {p: regle.tester(restees, p, G, "calme", 8, 10, prm, 1) for p in ("binance", None, "coinbase")}
+        self.assertEqual(t["binance"], t[None])
+        self.assertEqual([(t[p]["C1"], t[p]["causes"]) for p in ("binance", "coinbase")],
+                         [(0, ["k_crit", "runs"]), (1, ["runs"])])
+
     def test_unites_series_nulles_e_s_28(self):
         """C-2 (b) de la G2 de la tranche 3 (E-S-28 ; ADR-0029 l.203 : au moins deux unités avec au moins un écart
         consolidé) : tester sur trois séries dont une seule non nulle (binance {0, 3} ; coinbase et kraken
@@ -276,8 +298,9 @@ class TestEvenementsEtAbsorption(unittest.TestCase):
         suite comprimée de 40 positions, I = {0, 1, 3, 10, 11, 30} : g = 0 → 4 runs ; g = 1 (un 0 entre 1 et 3) → 3 ;
         g = 5 → 3 ; g = 6 (six 0 entre 3 et 10) → 2 ; g = 18 → 1 ; I = {0, 39}, g = 0 → 2 (suite linéaire, aucun
         enroulement). Loi de rotation (R = 1, α = 1/2, mêmes décalages que test_tester_rotation_r_1) : binance {0, 3},
-        coinbase {0, 3, 7} : E = 2 à g = 0, 1 à g = 5 ; rotation r = 1 : I = {0}, E^(1) = 1 ; C = 0 à g = 0, 1 à g = 5.
-        Mutations M-8B-01 (tolérance g + 1), M-8B-02 (tolérance g − 1), M-8B-03 (tolérance ignorée)."""
+        coinbase {0, 3, 7} : E = 2 à g = 0, 1 à g = 5 ; rotation r = 1 : I = {0}, E^(1) = 1 ; C = 0 à g = 0, 1 à g = 5 ;
+        queue basse (Q-T3-13, avis modifié) : C_bas = #{r : E^(r) ≤ E} = 1 aux deux g. Mutations M-8B-01 (tolérance
+        g + 1), M-8B-02 (tolérance g − 1), M-8B-03 (tolérance ignorée), M-8F-03 (queue basse omise)."""
         self.assertEqual(PRM["regle"]["tolerances"], [0, 5, 20, 60])
         i = bits(0, 1, 3, 10, 11, 30)
         self.assertEqual([regle.evenements(i, g, 40) for g in (0, 1, 5, 6, 18)], [4, 3, 3, 2, 1])
@@ -285,7 +308,43 @@ class TestEvenementsEtAbsorption(unittest.TestCase):
         prm = dict(PRM, regle=dict(PRM["regle"], alpha=[1, 2], tolerances=[0, 5]))
         loi = regle.loi_evenements({"binance": bits(0, 3), "coinbase": bits(0, 3, 7)}, "binance", G, "calme", 8, 1,
                                    prm)
-        self.assertEqual(loi, {0: {"E": 2, "C": 0}, 5: {"E": 1, "C": 1}})
+        self.assertEqual(loi, {0: {"E": 2, "C": 0, "C_bas": 1}, 5: {"E": 1, "C": 1, "C_bas": 1}})
+
+    def test_loi_evenements_oracle_q_t3_13(self):
+        """Q-T3-13 (avis modifié, adjugé avant E0) : loi de rotation du compte d'événements, deux queues, contre un
+        oracle naïf écrit ici : décalages refaits par hashlib (SHA-256 de « <graine>:calme:<r>:<u> », big-endian, modulo
+        n ; binance non décalée), rotation position par position (la valeur de t va en (t + o) mod n), I_t = 1{m_t ≥ 2},
+        événements sur la suite linéaire (un 1 ouvre un événement si plus de g zéros le séparent du 1 précédent). 30
+        instances de T-REG-2, R = 40, g ∈ {0 ; 5 ; 20 ; 60} : E, C = #{r : E^(r) ≥ E} et C_bas = #{r : E^(r) ≤ E}
+        égaux ; les instances ont des C strictement entre 0 et R et égaux à R, des C_bas à 0, strictement entre 0 et
+        R et égaux à R. Mutations M-8F-03
+        (queue basse omise), M-8F-04 (« < » dans la queue basse), M-8F-05 (queue basse comptée sur E^(r) ≥ E)."""
+        def evts(i, g):
+            e, dernier = 0, None
+            for t, x in enumerate(i):
+                if x:
+                    e, dernier = e + (dernier is None or t - dernier - 1 > g), t
+            return e
+
+        def masque_i(series, graine, n, r):
+            m = [0] * n
+            for u, x in series.items():
+                h = hashlib.sha256(f"{graine}:calme:{r}:{u}".encode("ascii")).digest()
+                o = 0 if r == 0 or u == "binance" else int.from_bytes(h, "big") % n
+                for t in range(n):
+                    m[(t + o) % n] += x >> t & 1
+            return [int(v >= 2) for v in m]
+        vus, gs = set(), PRM["regle"]["tolerances"]
+        for k in range(30):
+            series, n, graine = instance(k)
+            obs = {g: evts(masque_i(series, graine, n, 0), g) for g in gs}
+            rot = [masque_i(series, graine, n, r) for r in range(1, 41)]
+            attendu = {g: {"E": obs[g], "C": sum(evts(i, g) >= obs[g] for i in rot),
+                           "C_bas": sum(evts(i, g) <= obs[g] for i in rot)} for g in gs}
+            self.assertEqual(regle.loi_evenements(series, "binance", graine, "calme", n, 40, PRM), attendu, k)
+            vus |= {(q, "0" if x[q] == 0 else "R" if x[q] == 40 else "entre") for x in attendu.values()
+                    for q in ("C", "C_bas")}
+        self.assertLessEqual({("C", "entre"), ("C", "R"), ("C_bas", "0"), ("C_bas", "entre"), ("C_bas", "R")}, vus)
 
     def test_absorption_t_abs_1(self):
         """T-ABS-1 (E-S-35 ; c* = 1/2 recopié) : pool de 5 unités à p̂ écrits à la main, a 1/2, b 1/4, c 1/10, d 1/10, e

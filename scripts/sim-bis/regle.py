@@ -11,6 +11,8 @@ relecture G2 ; adjugé par l'orchestrateur, risque R-2) : libellés de strate ca
 nommés de toutes les entrées avant tout calcul (graine, n, noms d'unité, unité non décalée, masques de [0, 2^n)).
 SB-8d (C-1 de la G2 de la tranche 3) : l'oracle d'équivalence compare aussi « C_S ≤ seuil » quand S est suivie.
 SB-8e (P-7 de l'avis de la tranche 3) : noms d'unité aux caractères d'un nom d'hôte en minuscules, refusés par _cle.
+SB-8f (Q-T3-13 et Q-T3-15 adjugées) : deux queues de la loi du compte d'événements ; unité non décalée prise avant
+le critère collectif d'absorption.
 Entiers et rationnels seuls : aucun flottant, aucune puissance."""
 import hashlib
 from fractions import Fraction
@@ -126,8 +128,11 @@ def retraits(ok: dict, n: dict) -> dict:
 
 
 def premiere(btc: list):
-    """Unité non décalée (ADR-0029 l.200) : premier hôte, par ordre alphabétique, du pool BTC D1-bis de la strate
-    (unités BTC restées après retraits) ; None si ce pool est vide."""
+    """Unité non décalée (ADR-0029 l.200 ; Q-T3-15, avis modifié, adjugé avant E0) : premier hôte, par ordre des points
+    de code (« alphabétique »), du pool BTC D1-bis de la strate, pris après les retraits D1-bis (a), (b) et « presque
+    mort » (retraits) et avant le critère collectif d'absorption (filtrer), sans être recalculé après lui : si le
+    critère la retire d'une classe, elle y manque et toutes les unités de la classe sont décalées (rotation) ; None si
+    ce pool est vide."""
     return min(btc) if btc else None
 
 
@@ -288,18 +293,21 @@ def evenements(i: int, g: int, n: int) -> int:
 
 def loi_evenements(series: dict, premier, graine: str, strate: str, n: int, R: int, prm: dict) -> dict:
     """Loi de rotation du compte d'événements (E-S-34 : mêmes rotations r = 1..R que K, R complet, statistique hors
-    décision) pour chaque tolérance g de regle.tolerances : {g : {"E" : compte observé, "C" : #{r : E^(r) ≥ E}}} ;
-    entrées contrôlées par _controler, R entier de 1 à 9 999 (sinon REGLE/entier), avant tout calcul."""
+    décision ; suite comprimée lue linéairement pour I comme pour I^(r)) pour chaque tolérance g de regle.tolerances :
+    {g : {"E" : compte observé, "C" : #{r : E^(r) ≥ E}, "C_bas" : #{r : E^(r) ≤ E}}}, les deux queues (Q-T3-13, avis
+    modifié : Q-S-18 se lit sur la queue pré-déclarée C, C_bas est imprimée hors décision) ; entrées contrôlées par
+    _controler, R entier de 1 à 9 999 (sinon REGLE/entier), avant tout calcul."""
     _controler(series, premier, graine, strate, n, prm)
     if type(R) is not int or not 1 <= R <= R_MAX:
         raise commun.Refus("REGLE/entier", f"R = {R!r} : entier de 1 à {R_MAX} attendu")
     gs, i = prm["regle"]["tolerances"], deux(list(series.values()))
-    obs, c = {g: evenements(i, g, n) for g in gs}, {g: 0 for g in gs}
+    obs, c, b = {g: evenements(i, g, n) for g in gs}, {g: 0 for g in gs}, {g: 0 for g in gs}
     for r in range(1, R + 1):
         j = deux(rotation(series, premier, graine, strate, r, n))
         for g in gs:
-            c[g] += evenements(j, g, n) >= obs[g]
-    return {g: {"E": obs[g], "C": c[g]} for g in gs}
+            e = evenements(j, g, n)
+            c[g], b[g] = c[g] + (e >= obs[g]), b[g] + (e <= obs[g])
+    return {g: {"E": obs[g], "C": c[g], "C_bas": b[g]} for g in gs}
 
 
 def absorption(p: dict, c_etoile) -> tuple:
@@ -320,8 +328,9 @@ def absorption(p: dict, c_etoile) -> tuple:
 
 def filtrer(series: dict, n: int, prm: dict) -> tuple:
     """Séries restées après le critère collectif (valeurs « avec » ; les valeurs « sans » prennent toutes les séries) :
-    p̂_u = écarts consolidés de u sur la suite comprimée / n ; rend (séries restées, retirées, indice final). Masques
-    et n contrôlés par _masques."""
+    p̂_u = écarts consolidés de u sur la suite comprimée / n, après les retraits ; rend (séries restées, retirées,
+    indice final). L'unité non décalée reste celle de premiere(), prise avant ce critère (Q-T3-15). Masques et n
+    contrôlés par _masques."""
     _masques(series, n)
     p = {u: Fraction(x.bit_count(), n) for u, x in series.items()}
     ret, ind = absorption(p, Fraction(*prm["regle"]["c_etoile"]))
