@@ -683,3 +683,25 @@ Mutants (commande du job, `--plancher 171`, borne de 300 s ; python3.12 ; résea
 visé (0 vivant, 0 FATAL) : onze défont une retouche du §12 ou de l'en-tête, six la phrase du §7.1, trois le contrôle
 correspondant de `_lire`. Premier passage, avant l'extension I-2 : 11 tués sur 11 (`--plancher 170`). Suite : 171
 tests ; plancher du job : 171, égalité exigée (`--egal`).
+
+## SEGMENT-JOUR (2026-10-05) : jour et numéro des fichiers neufs de l'écrivain (SHOGEN-S2BIS-SEGMENT-JOUR-1)
+
+Objet (N-1 de la G2 du recalcul, tranche 1 ; adjugé par l'orchestrateur à P1) : un segment de reprise prend le jour le
+plus tardif entre celui de l'horloge et celui des fichiers présents (fichier repris compris), au numéro suivant de ce
+jour ; à la bascule, le fichier du nouveau jour prend aussi le numéro suivant de son jour (`_numero`, sur la liste des
+fichiers du dossier, `_fichiers`). Défaut reproduit à la main, de façon déterministe : panne juste après la bascule
+(fichier du lendemain vide, ou ouverture coupée à 8 octets), horloge du redémarrage revenue à la veille ; avant, segment
+`2026-10-04-1` nommé avant le fichier `2026-10-05-0` qu'il déclare, puis FileExistsError à la bascule suivante ; après,
+segment `2026-10-05-1`, noms, chaîne et sommes dans le même ordre. Le test C-2 de la bascule en échec (O-3 de la G2 de
+la tranche A), qui se servait d'un fichier du lendemain présent, provoque désormais l'échec par une création refusée
+(ENOSPC simulé). FORMAT §6.1, §6.2, §7.2, §7.3.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 324 | — |
+| `tests/test_fichiers.py` | 59 | 3 (1 de plus : bascule vers un jour déjà présent, segment suivant ; 1 réécrit : bascule en échec par création refusée) |
+| `tests/test_reprise.py` | 232 | 19 (1 de plus : horloge avant le jour d'un fichier sans ligne intègre, vide ou coupé) |
+
+Mutants (commande du job, `--plancher 173`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 par leur test
+visé (0 vivant, 0 FATAL), dont le défaut N-1 rétabli, la bascule au segment 0 et le descripteur gardé à la bascule
+(C-2). Suite : 173 tests ; plancher du job : 173, égalité exigée (`--egal`).

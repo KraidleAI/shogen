@@ -14,7 +14,7 @@
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
   (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12). Relecture G2 du recalcul, tranche 1 (2026-10-05) :
-  le diff CB-18f applique I-2 (§7.1).
+  le diff CB-18f applique I-2 (§7.1) ; le diff SEGMENT-JOUR, N-1 (§6.1, §6.2, §7.2, §7.3).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -109,12 +109,17 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 ## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
 
 1. Un fichier porte le nom `<préfixe>-<AAAA-MM-JJ>-<k>.jsonl` : jour UTC des fenêtres qu'il contient, puis numéro de
-   segment `k` (0 pour le premier fichier du jour ; segments de reprise : §7). La grille divise l'heure (w divise
-   3 600), donc la journée : une fenêtre n'est jamais à cheval sur deux jours.
+   segment `k`, 1 + le plus grand numéro de ce jour présent au dossier, 0 pour le premier fichier du jour (bascule :
+   point 2 ; segments de reprise : §7.2). L'ordre des noms, jour puis numéro, est l'ordre de la chaîne. Une seule
+   exception au jour des fenêtres : après un redémarrage dont l'horloge est en arrière du jour d'un fichier présent,
+   le segment de reprise porte ce jour, et les fenêtres antérieures s'y écrivent jusqu'à ce que l'horloge le
+   rejoigne (§7.2). La grille divise l'heure (w divise 3 600), donc la journée : une fenêtre n'est jamais à cheval
+   sur deux jours.
 2. Le premier enregistrement de fenêtre d'un jour nouveau déclenche la bascule : l'écrivain ajoute `cloture` au fichier
-   courant, appelle `fsync`, le ferme, inscrit sa ligne au fichier de sommes, puis crée le fichier du nouveau jour
-   (création exclusive), ouvert par `ouverture` (`jour`, `suivante`). La chaîne continue : le `seq` et le `prec` de
-   cette ouverture suivent ceux de la clôture.
+   courant, appelle `fsync`, le ferme, inscrit sa ligne au fichier de sommes, puis crée le fichier du nouveau jour au
+   numéro suivant de ce jour (point 1 : un fichier du jour déjà présent, vide par exemple, n'est jamais heurté ;
+   SHOGEN-S2BIS-SEGMENT-JOUR-1), en création exclusive, ouvert par `ouverture` (`jour`, `suivante`). La chaîne
+   continue : le `seq` et le `prec` de cette ouverture suivent ceux de la clôture.
 3. Le fichier de sommes `<préfixe>.sha256` reçoit une ligne par fichier clos, `<sha256 en hexadécimal>  <nom>` (deux
    espaces, format de `sha256sum`), ajoutée puis suivie d'un `fsync`. `sha256sum -c <préfixe>.sha256`, lancé dans le
    dossier, la contrôle.
@@ -135,10 +140,16 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
    `point` ou d'une `reprise` et `jour` ne sont pas contrôlés. La lecture d'un fichier s'arrête à la première ligne non
    intègre : elle et tout ce qui suit forment la **queue** du fichier.
 2. Une queue n'est jamais réécrite ni tronquée. S'il en existe une (dans le fichier repris, ou un fichier plus récent
-   sans enregistrement intègre), l'écrivain ouvre un **segment** neuf : numéro suivant du jour le plus tardif entre le
-   jour repris et celui de l'horloge (l'ordre des noms reste l'ordre de la chaîne), premier enregistrement `reprise`.
-3. Sans queue : un fichier repris d'un jour passé reçoit sa `cloture`, puis le fichier du jour s'ouvre par `reprise` ;
-   un fichier repris déjà clos laisse place à un fichier neuf ouvert par `reprise` ; sinon `reprise` s'écrit à sa suite.
+   sans enregistrement intègre), l'écrivain ouvre un **segment** neuf, premier enregistrement `reprise` : son jour est
+   le plus tardif entre celui de l'horloge, celui du fichier repris et celui de tout fichier présent au dossier ; son
+   numéro, 1 + le plus grand de ce jour. L'ordre des noms reste ainsi l'ordre de la chaîne, même quand l'horloge du
+   redémarrage est en arrière du jour d'un fichier vide ou sans ligne intègre laissé par une panne
+   (SHOGEN-S2BIS-SEGMENT-JOUR-1, N-1 de la G2 du recalcul : le segment prenait le jour de l'horloge, nommé avant le
+   fichier qu'il déclarait, et la bascule suivante heurtait ce fichier). Les fenêtres d'un jour antérieur s'écrivent
+   alors dans ce segment (§6.1).
+3. Sans queue : un fichier repris d'un jour passé reçoit sa `cloture`, puis un fichier neuf s'ouvre par `reprise` ; un
+   fichier repris déjà clos laisse place à un fichier neuf ouvert par `reprise` (jour et numéro de ces fichiers neufs :
+   point 2) ; sinon `reprise` s'écrit à sa suite.
 4. `reprise` porte `ws` (fenêtre de l'horloge au redémarrage), `suivante` (première fenêtre ni close ni déclarée en
    trou, lue dans l'état repris) et `queue` : liste de `{fichier, position, octets, sha256}` (octet de début de la
    queue, longueur, empreinte de ses octets), ou null. Un `fsync` suit son écriture. La chaîne reprend au dernier

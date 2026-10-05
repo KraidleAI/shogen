@@ -15,7 +15,10 @@ E-C-20 (CB-2) : un fichier par jour UTC ; le premier enregistrement d'une fenêt
 (`cloture`, fsync), inscrit son sha256 au fichier de sommes `<préfixe>.sha256` (format de sha256sum, fsync), puis
 ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21, E-C-22 (CB-2) : un journal existant reprend
 au dernier enregistrement intègre ; une queue non intègre (ligne coupée, octets NUL, ligne de plus de LIMITE octets)
-n'est jamais réécrite : un segment neuf s'ouvre par `reprise`, qui la déclare (fichier, position, octets, sha256). La
+n'est jamais réécrite : un segment neuf s'ouvre par `reprise`, qui la déclare (fichier, position, octets, sha256). N-1
+(SHOGEN-S2BIS-SEGMENT-JOUR-1) : un fichier neuf, à la bascule comme à la reprise, prend le numéro suivant de son jour ;
+un segment de reprise prend le jour le plus tardif entre l'horloge et les fichiers présents ; l'ordre des noms reste
+celui de la chaîne. La
 fenêtre du redémarrage, toute fenêtre close et toute fenêtre jusqu'à la dernière écrite restent refusées (C-1) ; le
 marqueur qui suit des fenêtres sans marqueur est précédé d'un `trou` (cause `arret`, `horloge_reculee` ou `saut`)."""
 import fcntl
@@ -133,8 +136,7 @@ class Journal:
             raise JournalOccupe("JOURNAL/occupe", self.prefixe) from None
         if type(ws) is not int or ws % self.w:
             raise ErreurJournal("JOURNAL/fenetre", ws)
-        motif = re.compile(re.escape(self.prefixe) + r"-([0-9]{4}-[0-9]{2}-[0-9]{2})-([0-9]+)[.]jsonl")
-        fichiers = sorted((x[1], int(x[2]), x[0]) for x in map(motif.fullmatch, os.listdir(self.dossier)) if x)
+        fichiers = self._fichiers()
         if fichiers:
             self._reprendre(ws, fichiers)
         else:
@@ -189,11 +191,21 @@ class Journal:
             self.fsync(self.fd)
             self._clore()
             self._sommer(nom(self.prefixe, self.jour, self.k), self.h.hexdigest())
-            self._creer(jour(ws), 0, {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
+            self._creer(jour(ws), self._numero(jour(ws)),                     # N-1 : numéro suivant du jour
+                        {"type": "ouverture", "jour": jour(ws), "suivante": self.attendu})
         if trou:
             self._ecrire({"type": "trou", "de": self.attendu, "a": ws - self.w, "cause": self.cause})
         self.suivante = ws                                          # C-1 : ws non décroissant dans l'exécution
         return self._ecrire(enr)
+
+    def _fichiers(self):
+        """(jour, k, nom) des fichiers du journal, dans l'ordre des noms : jour, puis numéro de segment."""
+        motif = re.compile(re.escape(self.prefixe) + r"-([0-9]{4}-[0-9]{2}-[0-9]{2})-([0-9]+)[.]jsonl")
+        return sorted((x[1], int(x[2]), x[0]) for x in map(motif.fullmatch, os.listdir(self.dossier)) if x)
+
+    def _numero(self, j):
+        """Numéro du fichier neuf du jour `j` : 1 + le plus grand présent au dossier, 0 sans fichier du jour (N-1)."""
+        return 1 + max([k for jj, k, _n in self._fichiers() if jj == j], default=-1)
 
     def _sommer(self, n, h):
         """Ligne « sha256  nom » du fichier clos `n` au fichier de sommes (format de sha256sum), puis fsync."""
@@ -276,8 +288,8 @@ class Journal:
                 self.fsync(self.fd)
                 self._clore()
             self._sommes([x for _j, _k, x in fichiers])
-            jn = max(jour(ws), j)
-            self._creer(jn, 1 + max([kk for jj, kk, _x in fichiers if jj == jn], default=-1), reprise)
+            jn = max(jour(ws), fichiers[-1][0])                 # N-1 : jamais avant le jour d'un fichier présent
+            self._creer(jn, self._numero(jn), reprise)
         self.fsync(self.fd)
 
     def _sommes(self, noms):

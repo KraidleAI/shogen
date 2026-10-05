@@ -7,7 +7,7 @@ import os
 from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
-from tests.test_fichiers import J1, J2
+from tests.test_fichiers import J1, J2, J3
 from tests.test_journal import FICHIER, WS, Base, chaine
 
 SEG1, SEG2 = "pool-2026-10-04-1.jsonl", "pool-2026-10-04-2.jsonl"
@@ -192,6 +192,33 @@ class Reprise(AvecJournal):
         self.journal(J1 - 120)                                  # l'horloge dit la veille, 23:57
         self.assertEqual(sorted(n for n in self.etat() if n.endswith(".jsonl")), [
             FICHIER, "pool-2026-10-05-0.jsonl", "pool-2026-10-05-1.jsonl"])
+
+    def test_horloge_avant_le_jour_d_un_fichier_sans_ligne_integre(self):   # SHOGEN-S2BIS-SEGMENT-JOUR-1 (N-1)
+        """Panne juste après la bascule : le fichier du lendemain n'a aucune ligne intègre (vide, ou ouverture coupée à
+        8 octets) ; l'horloge du redémarrage dit la veille. Le segment neuf prend le jour le plus tardif des fichiers
+        présents, au numéro suivant : les noms gardent l'ordre de la chaîne et des sommes (FORMAT §7.2) ; la bascule
+        suivante ne heurte aucun fichier (avant : segment de la veille nommé avant le fichier qu'il déclare, puis
+        FileExistsError à la bascule)."""
+        for p, taille in (("vide", 0), ("coupe", 8)):
+            noms = [f"{p}-2026-10-0{x}.jsonl" for x in ("4-0", "5-0", "5-1", "6-0")]
+            jl = self.journal(J1 - 60, p)
+            jl.marqueur(J1)
+            jl.marqueur(J2)                                     # bascule : fichier du 10-05 ouvert
+            jl.fermer()
+            os.truncate(os.path.join(self.d, noms[1]), taille)  # panne : rien d'intègre au fichier du 10-05
+            queue = self.etat()[noms[1]]
+            jl = self.journal(J1 - 120, p)                      # l'horloge dit la veille, 23:57
+            with self.subTest(prefixe=p):
+                self.assertEqual(sorted(n for n in self.etat() if n.startswith(p + "-")), noms[:3])
+                jl.marqueur(J2)
+                jl.marqueur(J3)
+                e = self.etat()
+                seq, prec, enrs = chaine(e[noms[2]], *chaine(e[noms[0]])[:2])
+                q = [{"fichier": noms[1], "position": 0, "octets": taille, "sha256": hashlib.sha256(queue).hexdigest()}]
+                self.assertEqual((sans_chaine(enrs[:1]), chaine(e[noms[3]], seq, prec)[2][0]["type"],
+                                  [x.split("  ")[1] for x in e[p + ".sha256"].decode().split(chr(10))[:-1]]), (
+                    [{"type": "reprise", "ws": J1 - 120, "suivante": J2, "queue": q if taille else None}], "ouverture",
+                    noms[:3]))
 
     def test_sommes_rattrapees_et_ligne_coupee_close(self):
         jl = self.journal(J1 - 60)
