@@ -16,8 +16,9 @@ A-01 et A-02, l'analyseur seul (étapes exclues, U+2028), que les contrôles d'a
 `--egal` à la ligne du job s2-harness-unittest (Ran = PLANCHER du vérificateur) ; L-22, la même ligne sans `--egal`,
 refusée. Contre-contrôle de CB-18 (CC-1, remède (a)) : `cable` exige `gabarit`, les lignes brutes du job à indentation
 exacte, et `analyseur` ; L-01 à L-21 sont refusés par l'analyseur seul ; L-23 à L-32, leurres qu'il admet (ligne cachée
-dans un nom plié ou dans un `with:`, checkout ou `runs-on` réels autres), par le gabarit ; G-01, le gabarit seul.
-Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+dans un nom plié ou dans un `with:`, checkout ou `runs-on` réels autres), par le gabarit ; G-01, le gabarit seul. CC-2 :
+L-33 (`env:` de premier niveau), L-34 (clé de job répétée) et A-03 (étapes imitées hors de `steps`) figent trois refus
+de l'analyseur. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
 import contextlib
 import importlib.util
 import io
@@ -223,7 +224,9 @@ for nom, lignes in (                                    # leurres contre l'analy
         ("L-18 runner dans un bloc name: > seulement", DEBUT[:9] + ["      - name: >", L + ETAPES[2]] + SUITE),
         ("L-19 env du workflow, espace avant les deux-points", ["env : {PATH: leurre}"] + DEBUT + SUITE),
         ("L-20 defaults du workflow, clé entre guillemets", ['"defaults": {run: {shell: cat {0}}}'] + DEBUT + SUITE),
-        ("L-21 clé jobs répétée", DEBUT + SUITE + ["jobs:", "  autre:"])):
+        ("L-21 clé jobs répétée", DEBUT + SUITE + ["jobs:", "  autre:"]),
+        ("L-33 env du workflow, forme simple (CC-2, CA-01)", ["env: {PATH: leurre}"] + DEBUT + SUITE),
+        ("L-34 clé de job runs-on répétée (CC-2, CA-07)", DEBUT[:4] + ["    runs-on: macos-15"] + DEBUT[4:] + SUITE)):
     attendu = nom.startswith("L-00")                    # leurres de l'analyseur : refusés par l'analyseur seul (CC-1)
     admis = (cable if attendu else analyseur)(chr(10).join(lignes), "s2bis-unittest", APPEL)
     cas(nom + (" : admis" if attendu else " : refusé"), [] if admis == attendu else [f"admis : {admis}"], None)
@@ -258,7 +261,10 @@ EXCLUES = DEBUT + SUITE[:1] + ["        if: false"] + SUITE[1:] + SUITE[:1] + ["
 EXCLUES += SUITE[1:]
 for nom, texte, attendu in (                            # analyseur seul : ce que les contrôles d'avant voyaient déjà
         ("A-01 étapes if: et continue-on-error exclues", EXCLUES, [None, [RUNNER], None, None]),
-        ("A-02 séparateur U+2028 : job illisible", DEBUT + SUITE[:1] + [L + chr(8232)] + SUITE[1:], None)):
+        ("A-02 séparateur U+2028 : job illisible", DEBUT + SUITE[:1] + [L + chr(8232)] + SUITE[1:], None),
+        ("A-03 étapes imitées dans le nom plié du job, hors de steps (CC-2, CA-12)", DEBUT[:2] + ["    name: >",
+         "      - name: x", "        shell: bash", "        run: |", L + LIGNE] + DEBUT[3:] + SUITE[:3] + [L + FAIBLE],
+         [])):
     cas(f"{nom} (analyseur unique)", [] if v.etapes(chr(10).join(texte), "s2bis-unittest") == attendu else ["écart"],
         None)
 print(f"verdict-suite-s2 : {OK_} ok, {KO} échec")

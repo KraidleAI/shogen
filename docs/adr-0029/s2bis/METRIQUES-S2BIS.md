@@ -1000,3 +1000,33 @@ isolé) : 8 tués sur 8 (0 vivant, 0 FATAL) :
 Passage précédent, non compté : le checkout quelconque survivait, parce que les leurres cachaient une ligne dans un nom
 plié, ce qui rompait déjà la suite. L-32 a été ajouté. Les CA-01 à CA-12 du réviseur et les leurres sont comptés à
 CB-18s. Suite : 183 tests ; plancher du job : 183.
+
+## CB-18s (2026-10-05) : trois refus de l'analyseur figés (CC-2 du contre-contrôle de CB-18)
+
+Objet : trois mutants de l'analyseur survivaient à la commande du job : CA-01 (`env` admis au premier niveau), CA-07
+(clé de job répétée admise) et CA-12 (étapes lues hors de `steps`). Trois cas les figent :
+- L-33 : `env:` de premier niveau, forme simple ;
+- L-34 : `runs-on` répété ;
+- A-03 : étapes imitées dans le nom plié du job, où `etapes` doit rendre `[]`.
+
+Rouge : à l'état r, les trois mutants survivent (69 cas, 0 échec) ; à l'état s, chacun fait échouer son cas, et lui
+seul.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `enforcement/tests/run-fixtures-verdict-suite-s2.py` | 271 | 72 cas (3 de plus : L-33, L-34, A-03) |
+
+Mutants (commande du job s2bis-unittest, borne de 300 s ; python3.12 ; réseau isolé) : CA-01, CA-07 et CA-12 du
+réviseur sont tués sur l'état s (3 sur 3).
+
+Sur l'état final (CB-18t) :
+- CA-01 à CA-12 du réviseur : 12 tués sur 12.
+- Les 20 leurres du réviseur, régénérés par son outil sur le gates.yml final, et 11 leurres neufs :
+  - à LN-01 à LN-04 : `with:` complété d'un `ref:` ou d'un `repository:`, `runs-on` répété, `if:` du job ;
+  - à LN-05 à LN-08 : `container:`, `continue-on-error` du job, runner caché dans un nom plié, checkout dans le nom plié
+    du job ;
+  - à LN-09 à LN-11 : quatrième étape, `env:` du job en bloc, `runs-on: ubuntu-24.04-arm`.
+- Leurres classés par l'étape du runner, commune aux trois jobs : 29 tués, 2 vivants (N-12 et N-14, résidu
+  ANALYSEUR-RESIDUS-1, sans code). La commande du job exécuterait les étapes du leurre lui-même.
+
+Suite : 183 tests ; plancher du job : 183.
