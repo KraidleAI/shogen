@@ -553,3 +553,23 @@ entière, borne de 300 s, dépassement FATAL ; témoins verts ; copie fraîche p
 
 Les six vivants de C-2 (G-13 à G-16, G-19, G-20) sont tués, chacun par son cas nommé. Durée d'un passage : de 18,9 à
 22,9 s.
+
+## CB-18a (2026-10-05) : écrivain, garde d'un seul fil et refus nommés (SHOGEN-S2BIS-ECRIVAIN-USAGE-1)
+
+Objet : le fil qui ouvre l'écrivain est le seul qui écrive (`JOURNAL/fil`) ; un écrivain s'ouvre une fois
+(`JOURNAL/ouvert`) et n'écrit qu'ouvert (`JOURNAL/ferme`) ; une ouverture refusée le ferme et rend le verrou ; toute
+méthode publique d'écriture porte `_terminal`, sous un contrôle mécanique. Les tests qui font tourner la boucle ouvrent
+le journal dans le fil où elle tourne (`borne` : un fil par test). FORMAT §5 ; retouches du §12 et de l'en-tête
+(SHOGEN-S2BIS-FORMAT-RETOUCHES-1).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 312 | — |
+| `tests/test_journal.py` | 229 | 12 (3 de plus : garde d'un seul fil ; refus de l'écrivain neuf, fermé ou déjà ouvert ; garde `_terminal` sur toute méthode publique ; 1 réécrit : cycle refusé, écrivain ouvert dans le fil qui écrit) |
+| `tests/test_boucle.py` | 258 | 11 (`borne` : un fil par test, journal ouvert dans ce fil) |
+| `tests/test_sante.py` | 192 | 10 (journal ouvert dans le fil de la boucle) |
+| `tests/test_lecture_pendue.py` | 131 | 8 (journal ouvert dans le fil de la boucle) |
+
+Mutants (commande du job : runner, puis la ligne `verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 159` de
+`gates.yml`, suite entière, borne de 300 s, dépassement FATAL ; python3.12 ; réseau isolé, `lo` allumée) : 12 tués sur
+12 par leur test visé (0 vivant, 0 FATAL). Suite : 159 tests ; plancher du job : 159, égalité exigée (`--egal`).

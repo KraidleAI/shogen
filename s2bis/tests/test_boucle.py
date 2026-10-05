@@ -2,7 +2,8 @@
 écrites à la main : instants par date -u -d ; base64 et sha256 de b"x" par printf, base64 et sha256sum. Corrections de
 la G2 de P1-B (CB-11c) : boucle dans un fil joint en temps borné (C-6) ; échéance exacte sous écrivain ralenti (C-1) ;
 mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5). CB-11d : santé complète sans sondes (O-7),
-sondes vivantes comptées (C-5). CB-11e : horloges murale et monotone injectées, recul entre deux fenêtres (C-4)."""
+sondes vivantes comptées (C-5). CB-11e : horloges murale et monotone injectées, recul entre deux fenêtres (C-4).
+CB-18a : journal ouvert et boucle lancée dans le même fil du test (garde d'un seul fil de l'écrivain)."""
 import concurrent.futures
 import queue
 import threading
@@ -19,21 +20,30 @@ X = {"statut": "ok", "sous_type": None, "code": 200, "adresse": "127.0.0.1:443",
 
 
 def borne(test, fonction, *args, delai=5):
-    """`fonction(*args)` dans un fil démon joint en `delai` s réelles au plus (C-6) : un mutant qui pend fait échouer
-    le test sans pendre la suite ; une exception du fil est relevée dans le test."""
-    erreurs = []
+    """`fonction(*args)` dans le fil démon du test, le même à chaque appel (l'écrivain n'écrit que depuis le fil qui l'a
+    ouvert, SHOGEN-S2BIS-ECRIVAIN-USAGE-1), attendue `delai` s réelles au plus (C-6) : un mutant qui pend fait échouer
+    le test sans pendre la suite ; rend le résultat ; une exception du fil est relevée dans le test."""
+    if "_fil" not in vars(test):
+        test._fil = queue.Queue()
+        threading.Thread(target=_servir, args=(test._fil,), daemon=True).start()
+        test.addCleanup(test._fil.put, None)
+    fait, res = threading.Event(), []
+    test._fil.put((fonction, args, res, fait))
+    test.assertTrue(fait.wait(delai), "la boucle pend")
+    if not res[0][0]:
+        raise res[0][1]
+    return res[0][1]
 
-    def cible():
+
+def _servir(taches):
+    """Fil d'un test : lance les fonctions reçues, dans l'ordre, jusqu'à None."""
+    while (tache := taches.get()) is not None:
+        fonction, args, res, fait = tache
         try:
-            fonction(*args)
+            res.append((True, fonction(*args)))
         except BaseException as e:                                  # relevée dans le fil du test
-            erreurs.append(e)
-    fil = threading.Thread(target=cible, daemon=True)
-    fil.start()
-    fil.join(delai)
-    test.assertFalse(fil.is_alive(), "la boucle pend")
-    if erreurs:
-        raise erreurs[0]
+            res.append((False, e))
+        fait.set()
 
 
 class Temps:
@@ -101,7 +111,7 @@ def pendue(porte, dns):
 class Boucle(Base):
     def tourner(self, lectures, plan, n=1, places=8, saut=0, ecrivain=None):
         self.temps = Temps(m(2) * S + 5 * S, saut)                  # journal ouvert à 23:00:05 ; 1re fenêtre, 23:01
-        jl = self.journal(m(2))
+        jl = borne(self, self.journal, m(2))                        # ouvert dans le fil de la boucle
         self.b = boucle.Boucle(ecrivain(jl) if ecrivain else jl, lectures, plan, places, horloge=self.temps,
                                dormir=self.temps.dormir, attendre=self.temps.attendre, monotone=self.temps.monotone)
         borne(self, self.b.tourner, n)

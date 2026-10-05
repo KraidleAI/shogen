@@ -139,7 +139,8 @@ class Branchement(Base):
             return {"statut": "reponse"}
         s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", self.d, os.path.join(self.d, "absent"),
                          interroger=interroger, lancer=Faux().lancer)
-        borne(self, boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(S, "a")], 8, horloge=temps, dormir=temps.dormir,
+        jl = borne(self, self.journal, m(2))                        # ouvert dans le fil de la boucle (CB-18a)
+        borne(self, boucle.Boucle(jl, {"a": rapide}, [(S, "a")], 8, horloge=temps, dormir=temps.dormir,
                                   attendre=temps.attendre, sondes=s).tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((sorted(enr), sorted(enr["d2"]), sorted(enr["fils"])),
@@ -161,8 +162,8 @@ class Branchement(Base):
             return {"statut": "reponse"}
         s = sante.Sondes(["horloge"], TEMOINS[:1], [], "192.0.2.53", self.d, interroger=interroger,
                          lancer=Faux().lancer)
-        b = boucle.Boucle(Lent(self.journal(m(2)), temps, porte), {"a": rapide}, [(0, "a")], 8, horloge=temps,
-                          dormir=temps.dormir, attendre=temps.attendre, sondes=s)
+        b = boucle.Boucle(Lent(borne(self, self.journal, m(2)), temps, porte), {"a": rapide}, [(0, "a")], 8,
+                          horloge=temps, dormir=temps.dormir, attendre=temps.attendre, sondes=s)
         borne(self, b.tourner, 1)
         enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
         self.assertEqual((enr["type"], enr["d3"]["code"], enr["d4"]), ("sante", 0, [None]))
@@ -179,8 +180,8 @@ class Branchement(Base):
             return {"statut": "reponse"}
         s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", self.d, interroger=pendre,
                          lancer=lambda *a, **k: pendre() and types.SimpleNamespace(stdout=b"", returncode=0))
-        b = boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(0, "a")], 8, horloge=temps, dormir=temps.dormir,
-                          attendre=temps.attendre, sondes=s)
+        b = boucle.Boucle(borne(self, self.journal, m(2)), {"a": rapide}, [(0, "a")], 8, horloge=temps,
+                          dormir=temps.dormir, attendre=temps.attendre, sondes=s)
         comptes = []
         for _ in range(3):
             borne(self, b.tourner, 1)

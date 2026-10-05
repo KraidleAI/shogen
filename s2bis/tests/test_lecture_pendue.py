@@ -45,7 +45,7 @@ class LecturePendue(Base):
         """`n` fenêtres dans un fil joint en 5 s réelles au plus ; rend les enregistrements du journal."""
         if lectures is not None:
             self.temps = Temps(m(2) * S + 5 * S)
-            self.b = boucle.Boucle(self.journal(m(2)), lectures, plan, places, horloge=self.temps,
+            self.b = boucle.Boucle(borne(self, self.journal, m(2)), lectures, plan, places, horloge=self.temps,
                                    dormir=self.temps.dormir, attendre=self.temps.attendre)
         borne(self, self.b.tourner, n)
         return sans_chaine(chaine(self.etat()[FICHIER])[2])[1:]

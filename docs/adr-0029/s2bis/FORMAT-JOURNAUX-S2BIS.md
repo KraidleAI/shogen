@@ -11,7 +11,9 @@
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
   l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12) ; CB-11g, C-3
-  (§10.5).
+  (§10.5) ; puis le diff CB-11h, CC-1 du contre-contrôle (§12).
+- **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
+  pour l'écrivain (§5) et SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -81,7 +83,18 @@ lecture ou écriture du journal et tenu jusqu'à la fermeture. Une seconde insta
 sans rien lire ni écrire (JournalOccupe). Avec la chaîne, une écriture entrelacée de deux instances serait de toute
 façon visible (`seq` ou `prec` rompu). C'est le moyen de fermeture par construction de SHOGEN-ENTRELACEMENT-D5-1 pour
 S2-bis (Q-C-11 de la proposition, adoptée par l'avis) ; la fermeture de l'item reste un acte de l'orchestrateur.
-L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pour la boucle du pool, sous-lot CB-4).
+
+**Un seul fil** (CB-18a, SHOGEN-S2BIS-ECRIVAIN-USAGE-1). L'écrivain ne se partage pas entre fils, et la garde est
+mécanique :
+- le fil qui appelle `ouvrir` est noté ; `ecrire` ou `marqueur` appelés d'un autre fil sont refusés (`JOURNAL/fil`) ;
+- un écrivain s'ouvre une seule fois : un second `ouvrir` est refusé (`JOURNAL/ouvert`), sans toucher au verrou ni au
+  fichier ouvert ;
+- une écriture avant `ouvrir` ou après `fermer`, et l'ouverture d'un écrivain fermé, sont refusées (`JOURNAL/ferme`) ;
+- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/illisible`) ferme l'écrivain et rend le verrou ;
+- `fermer` est le seul appel admis de tout fil (nettoyage) ; il reste admis après une casse (§4).
+
+Aucun de ces refus n'écrit. Les trois méthodes publiques d'écriture portent la même garde que la casse de C-2 (§4) ; un
+test contrôle que toute méthode publique de l'écrivain la porte, `fermer` excepté.
 
 ## 6. Fichiers quotidiens et sommes (CB-2a, E-C-20)
 
@@ -262,9 +275,12 @@ champs :
 - `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes, sur l'horloge murale ; le délai se
   compte sur l'horloge monotone (C-4).
 
-Une réponse est **appariée** si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête (tiré
-au hasard sur 16 bits), le bit QR, une seule question et la même (casse ignorée) ; elle est alors retenue, ou `forme`
-si la suite est mal formée (RFC 1035 §4.1.1-4.1.2).
+Une réponse est **appariée** si elle porte l'identifiant de la requête (tiré au hasard sur 16 bits), le bit QR, une
+seule question et la même, casse ignorée (RFC 1035 §4.1.1-4.1.2, §7.3 ; casse : §2.3.3) ; elle est alors retenue, ou
+`forme` si la suite est mal formée. Le lot exige en outre qu'elle vienne de l'adresse et du port interrogés : c'est un
+**choix du lot**, non une règle de la RFC 1035, dont le §7.3 note que des serveurs répondent depuis une autre adresse
+que celle qui a reçu la requête. Une telle réponse est ignorée, et la sonde finit en `delai` : un échec D-4 ou D-5 que
+le rodage mesure (contre-contrôle de CB-11h).
 Tout autre datagramme (écho de la requête, réponse à une autre question, datagramme trop
 court) est ignoré, et l'attente continue jusqu'au délai (C-2). La requête ne passe par aucune résolution : l'adresse
 est une IPv4 littérale **canonique** (quatre entiers décimaux pointés, sans zéro de tête : forme rendue par

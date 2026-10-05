@@ -1,6 +1,8 @@
 """CB-1, E-C-16, E-C-18, E-C-19 : écrivain chaîné. Octets attendus et sha256 écrits à la main (printf et sha256sum,
 journal G1 de CB-1) ; chaîne recalculée par `chaine`, code de test indépendant de l'écrivain, sur les octets écrits.
-CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une OSError ; cycle refusé en temps borné."""
+CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une OSError ; cycle refusé en temps borné.
+CB-18a (SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : garde d'un seul fil, refus nommés de l'écrivain neuf, fermé ou déjà ouvert,
+garde `_terminal` sur toute méthode publique d'écriture (contrôle mécanique)."""
 import errno
 import fcntl
 import hashlib
@@ -36,6 +38,15 @@ def chaine(octets, seq=0, prec="0" * 64):
         seq, prec = seq + 1, hashlib.sha256(ligne + b"\n").hexdigest()
         enrs.append(e)
     return seq, prec, enrs
+
+
+def code(appel):
+    """Code du refus nommé que lève `appel`, nom du type de toute autre exception, None sans exception."""
+    try:
+        appel()
+    except Exception as e:                                          # refus nommé, ou défaut relevé par son type
+        return getattr(e, "code", type(e).__name__)
+    return None
 
 
 class Base(unittest.TestCase):
@@ -163,17 +174,56 @@ class Ecrivain(Base):
                 self.assertEqual(e.exception.code, code)
 
     def test_structure_cyclique_refusee_en_temps_borne(self):          # C-3 (sonde S-7 de la G2)
-        jl, boucle, partage, res = self.journal(), [], [1], []
+        boucle, partage, res, avant = [], [1], [], []
         boucle.append(boucle)
-        avant = self.etat()
 
-        def essai():
-            try:
-                jl.ecrire("lecture", WS + 60, c=boucle)
-            except Exception as e:                                # refus attendu : ErreurJournal nommée
-                res.append(getattr(e, "code", repr(e)))
+        def essai():                                              # ouvert dans le fil qui écrit (CB-18a)
+            jl = self.journal()
+            avant.append(self.etat())
+            res.append(code(lambda: jl.ecrire("lecture", WS + 60, c=boucle)))      # refus attendu : nommé
         t = threading.Thread(target=essai, daemon=True)          # une boucle sans fin pendrait le fil, pas la suite
         t.start()
         t.join(5)
-        self.assertEqual((res, self.etat()), (["JOURNAL/type"], avant))
+        self.assertEqual((res, [self.etat()]), (["JOURNAL/type"], avant))
         self.assertEqual(j.canonique({"a": partage, "b": partage}), b'{"a":[1],"b":[1]}\n')   # partage sans cycle
+
+    def test_garde_d_un_seul_fil(self):                                 # CB-18a, ECRIVAIN-USAGE-1
+        """Le fil qui ouvre l'écrivain est le seul qui écrive : `ecrire` et `marqueur` appelés d'un autre fil sont
+        refusés (JOURNAL/fil) sans rien écrire ; le fil propriétaire écrit ensuite."""
+        jl, codes = self.journal(), []
+        avant = self.etat()
+        t = threading.Thread(target=lambda: codes.extend(code(a) for a in (
+            lambda: jl.ecrire("lecture", WS + 60, k=1), lambda: jl.marqueur(WS + 60))), daemon=True)
+        t.start()
+        t.join(5)
+        self.assertEqual((codes, self.etat()), (["JOURNAL/fil", "JOURNAL/fil"], avant))
+        jl.marqueur(WS + 60)
+        self.assertEqual([e["type"] for e in chaine(self.etat()[FICHIER])[2]], ["ouverture", "marqueur", "point"])
+
+    def test_refus_nommes_ecrivain_neuf_ferme_ou_deja_ouvert(self):    # CB-18a, ECRIVAIN-USAGE-1 (I-C2)
+        """Écriture avant `ouvrir` ou après `fermer`, ouverture d'un écrivain fermé : JOURNAL/ferme ; second `ouvrir` :
+        JOURNAL/ouvert, et l'écrivain écrit encore (verrou et fichier intacts) ; une ouverture refusée ferme l'écrivain
+        et rend le verrou. Aucun refus n'écrit."""
+        neuf, jl = j.Journal(self.d, "pool"), self.journal()
+        avant = self.etat()
+        self.assertEqual([code(lambda: neuf.ecrire("lecture", WS + 60)), code(lambda: neuf.marqueur(WS + 60)),
+                          code(lambda: jl.ouvrir(WS))], ["JOURNAL/ferme", "JOURNAL/ferme", "JOURNAL/ouvert"])
+        self.assertEqual(self.etat(), avant)
+        jl.marqueur(WS + 60)                                    # écrivain intact après le second `ouvrir`
+        jl.fermer()
+        apres = self.etat()
+        self.assertEqual([code(lambda: jl.ecrire("lecture", WS + 120)), code(lambda: jl.marqueur(WS + 120)),
+                          code(lambda: jl.ouvrir(WS + 120))], ["JOURNAL/ferme"] * 3)
+        refuse = j.Journal(self.d, "pool")
+        self.assertEqual((code(lambda: refuse.ouvrir(WS + 1)), code(lambda: refuse.ouvrir(WS + 120)), self.etat()),
+                         ("JOURNAL/fenetre", "JOURNAL/ferme", apres))
+        with open(os.path.join(self.d, "pool.verrou"), "rb") as f:
+            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)        # verrou rendu par l'ouverture refusée
+
+    def test_terminal_sur_toute_methode_publique_d_ecriture(self):     # CB-18a, ECRIVAIN-USAGE-1 (I-C3)
+        """Contrôle mécanique : les méthodes publiques de `Journal` sont `ouvrir`, `ecrire`, `marqueur` et `fermer` ;
+        les trois premières portent la garde `_terminal` (C-2 et refus de CB-18a) ; `fermer`, nettoyage admis de tout
+        fil et après une casse, ne la porte pas. Une méthode publique ajoutée sans la garde fait échouer ce test."""
+        publiques = [n for n in dir(j.Journal) if not n.startswith("_") and callable(getattr(j.Journal, n))]
+        self.assertEqual({n: getattr(getattr(j.Journal, n), "terminal", False) for n in publiques},
+                         {"ouvrir": True, "ecrire": True, "marqueur": True, "fermer": False})

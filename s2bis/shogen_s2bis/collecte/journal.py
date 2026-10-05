@@ -8,6 +8,9 @@ fenêtre écrite (C-1). Tout refus est nommé (ErreurJournal) et n'écrit rien :
 toute bascule et tout trou (C-6). Après une OSError, tout appel est refusé (JOURNAL/casse, C-2). E-C-16 : un seul
 écrivain par journal, verrou
 exclusif sans attente (`fcntl.flock`) ; une seconde instance lève JournalOccupe avant toute lecture ou écriture.
+CB-18a (SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : un seul fil écrit, celui qui a ouvert l'écrivain (JOURNAL/fil sinon) ; un
+écrivain s'ouvre une fois (JOURNAL/ouvert) et n'écrit qu'ouvert (JOURNAL/ferme) ; ces gardes et celle de C-2 sont
+portées par `_terminal`, sur toute méthode publique d'écriture ; `fermer` s'appelle de tout fil.
 E-C-20 (CB-2) : un fichier par jour UTC ; le premier enregistrement d'une fenêtre d'un jour nouveau clôt le fichier
 (`cloture`, fsync), inscrit son sha256 au fichier de sommes `<préfixe>.sha256` (format de sha256sum, fsync), puis
 ouvre le fichier du jour par `ouverture` ; la chaîne continue. E-C-21, E-C-22 (CB-2) : un journal existant reprend
@@ -20,6 +23,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 import time
 
 GENESE = "0" * 64
@@ -82,16 +86,31 @@ def nom(prefixe, j, k=0):
 def _terminal(methode):
     """C-2 : une OSError (ouverture, écriture, fsync, fermeture de fichier) rend l'écrivain inutilisable ; tout
     appel suivant est refusé (JOURNAL/casse) sans rien écrire ; `fermer` rend le verrou ; l'instance suivante
-    déclare la queue (`reprise`)."""
+    déclare la queue (`reprise`). CB-18a : écriture d'un écrivain neuf ou fermé, JOURNAL/ferme ; second `ouvrir`,
+    JOURNAL/ouvert ; appel hors du fil qui a ouvert, JOURNAL/fil ; une ouverture refusée ferme l'écrivain."""
+    ouverture = methode.__name__ == "ouvrir"
+
     def appel(self, *a, **k):
         if self.casse:
             raise ErreurJournal("JOURNAL/casse", self.casse)
+        if self.etat == "ferme" or self.etat == "neuf" and not ouverture:
+            raise ErreurJournal("JOURNAL/ferme", f"{methode.__name__} : écrivain {self.etat}")
+        if ouverture and self.etat == "ouvert":
+            raise ErreurJournal("JOURNAL/ouvert", self.prefixe)
+        if self.etat == "ouvert" and self.fil is not threading.current_thread():
+            raise ErreurJournal("JOURNAL/fil", f"{methode.__name__} hors du fil qui a ouvert l'écrivain")
+        if ouverture:
+            self.etat, self.fil = "ouvert", threading.current_thread()
         try:
             return methode(self, *a, **k)
         except OSError as e:
             self.casse = f"{methode.__name__} : {e!r}"
             raise
-    appel.__doc__ = methode.__doc__
+        except ErreurJournal:
+            if ouverture:
+                self.fermer()
+            raise
+    appel.__doc__, appel.terminal = methode.__doc__, True
     return appel
 
 
@@ -100,7 +119,8 @@ class Journal:
         if type(w) is not int or w <= 0 or HEURE % w:
             raise ErreurJournal("JOURNAL/grille", w)
         self.dossier, self.prefixe, self.w, self.fsync = dossier, prefixe, w, fsync
-        self.fd = self.verrou = self.casse = None
+        self.fd = self.verrou = self.casse = self.fil = None
+        self.etat = "neuf"                                          # neuf, ouvert, puis ferme (CB-18a)
 
     @_terminal
     def ouvrir(self, ws):
@@ -141,12 +161,13 @@ class Journal:
 
     def fermer(self):
         """Ferme le fichier et libère le verrou, sans fsync : n'est durable que ce qui précède le dernier marqueur. Le
-        verrou est rendu même si la fermeture du fichier échoue (C-2)."""
+        verrou est rendu même si la fermeture du fichier échoue (C-2). Appel admis de tout fil ; l'écrivain reste
+        fermé (CB-18a)."""
         try:
             if self.fd is not None:
                 self._clore()
         finally:
-            verrou, self.verrou = self.verrou, None
+            verrou, self.verrou, self.etat = self.verrou, None, "ferme"
             if verrou is not None:
                 os.close(verrou)
 
