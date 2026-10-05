@@ -1,6 +1,7 @@
-"""Calendrier SB-5 (E-S-14, E-S-25 ; T-CAL-2) : instants epoch par `date -u -d … +%s` et valeurs écrites à la main,
-et test croisé avec `window` de f35a70c (module chargé par chemin depuis s2-harness, après contrôle de son sha256, sans
-import de shogen_s2) ; chaque test nomme les mutations qui le rougissent."""
+"""Calendrier SB-5 (E-S-14, E-S-23, E-S-25 ; E-S-28 pour les runs ; T-CAL-2, T-SEQ-1, T-RUN-1) : instants epoch par
+`date -u -d … +%s`, suites de 12 fenêtres et leurs valeurs écrites à la main, et test croisé avec `window` de f35a70c
+(module chargé par chemin depuis s2-harness, après contrôle de son sha256, sans import de shogen_s2) ; chaque test nomme
+les mutations qui le rougissent."""
 import hashlib
 import importlib.util
 import math
@@ -16,6 +17,10 @@ import commun
 CAL = commun.charger_parametres(environ={})["calendrier"]
 WINDOW = os.path.join(commun.RACINE, "s2-harness", "shogen_s2", "window.py")
 WINDOW_F35A70C = "f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94"   # git show f35a70c:… | sha256sum
+
+
+def bits(*positions):
+    return sum(1 << p for p in positions)
 
 
 class TestCalendrier(unittest.TestCase):
@@ -88,3 +93,34 @@ class TestCalendrier(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             calendrier.masques(CAL, 1796342400 + 60, 10)
         self.assertEqual(c.exception.code, "CALENDRIER/debut")
+
+    def test_retenues_t_seq_1(self):
+        """12 fenêtres de la strate, censurées en 2, 5 et 6 : évaluables 0 1 3 4 7 8 9 10 11. n_s = 6 : retenues 0 1 3 4
+        7 8, atteinte en 8 ; n_s = 9 : atteinte en 11 ; n_s = 12 : n′ = 9 présentes à T_max, pas d'atteinte, 2·9 ≥ 12 ;
+        n_s = 18 : 2·9 ≥ 18 (égalité, E-S-23) ; n_s = 19 : insuffisant ; une autre strate n'entre pas. Compression de
+        la série 1 2 3 6 7 11 sur les 6 retenues : 0 1 1 0 1 0, soit 22. Mutations M-SEQ-1 (série non comprimée),
+        M-SEQ-2 (n′_s > n_s/2), M-5-09 (atteinte décalée d'une fenêtre), M-5-10 (n_s atteint exactement à T_max pris
+        pour non atteint), M-5-11 (strate ignorée)."""
+        ev, strate = bits(0, 1, 3, 4, 7, 8, 9, 10, 11), (1 << 12) - 1
+        r = calendrier.retenues(ev, strate, 6)
+        self.assertEqual(r, {"masque": bits(0, 1, 3, 4, 7, 8), "n": 6, "atteinte": 8, "suffisant": True})
+        self.assertEqual(calendrier.segments(r["masque"]), [(0, 2), (3, 5), (7, 9)])
+        self.assertEqual(calendrier.comprimer(bits(1, 2, 3, 6, 7, 11), calendrier.segments(r["masque"])), 22)
+        self.assertEqual(calendrier.retenues(ev, strate, 9)["atteinte"], 11)
+        self.assertEqual(calendrier.retenues(ev, strate & ~1, 6),  # fenêtre 0 d'une autre strate
+                         {"masque": bits(1, 3, 4, 7, 8, 9), "n": 6, "atteinte": 9, "suffisant": True})
+        self.assertEqual(calendrier.retenues(ev, strate, 12),
+                         {"masque": ev, "n": 9, "atteinte": None, "suffisant": True})
+        self.assertEqual([calendrier.retenues(ev, strate, n)["suffisant"] for n in (18, 19)], [True, False])
+        with self.assertRaises(commun.Refus) as c:
+            calendrier.retenues(ev, strate, 0)
+        self.assertEqual(c.exception.code, "CALENDRIER/n_s")
+
+    def test_runs_t_run_1(self):
+        """Incident sur 3..8 coupé par la perte de quorum en 5 et 6 : I = 3 4 7 8 sur la grille ; 1 run sur la suite
+        comprimée, 2 sur la grille (AVIS-C l.51-53) ; 0 run pour une suite nulle. Mutations M-RUN-1 (runs comptés sur
+        la grille), M-5-12 (fenêtres comptées au lieu des runs)."""
+        r = calendrier.retenues(bits(0, 1, 2, 3, 4, 7, 8, 9, 10, 11), (1 << 12) - 1, 10)
+        segs = calendrier.segments(r["masque"])
+        self.assertEqual((calendrier.runs_suite(bits(3, 4, 7, 8), segs), calendrier.runs(bits(3, 4, 7, 8))), (1, 2))
+        self.assertEqual((calendrier.runs(0), calendrier.runs(bits(0, 2, 3, 9))), (0, 3))

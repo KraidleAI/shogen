@@ -1,7 +1,9 @@
-"""Calendrier du lot SIM-BIS (G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md ; sous-lot SB-5 ; E-S-14, E-S-25) : grille UTC
-de pas w depuis T_début (lundi de référence 00:00 UTC + d jours, d tiré, Q-S-08), strates calme et stress par le
-calendrier de S2 (jour UTC, réplique de window.weekday_utc et strate_from_spec de f35a70c), échelle des durées. Masques :
-entiers, bit j = fenêtre T_début + j·w."""
+"""Calendrier du lot SIM-BIS (G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md ; sous-lot SB-5 ; E-S-14, E-S-23, E-S-25 ; runs
+d'E-S-28) : grille UTC de pas w depuis T_début (lundi de référence 00:00 UTC + d jours, d tiré, Q-S-08), strates calme
+et stress par le calendrier de S2 (jour UTC, réplique de window.weekday_utc et strate_from_spec de f35a70c), échelle
+des durées, fenêtres retenues (les n_s premières évaluables de la strate, ou les n′_s présentes à T_max), suite
+comprimée et runs sur cette suite. Séries et masques : entiers, bit j = fenêtre T_début + j·w."""
+import re
 from fractions import Fraction
 
 import aleas
@@ -47,3 +49,43 @@ def masques(cal: dict, debut: int, t_max: int) -> dict:
     for k in range(-(-t_max // fpj)):
         out[strate(debut + 86400 * k, cal)] |= jour << (fpj * k)
     return {s: m & ((1 << t_max) - 1) for s, m in out.items()}
+
+
+def retenues(evaluables: int, masque: int, n_s: int) -> dict:
+    """Fenêtres retenues d'une strate (E-S-23) : les n_s premières évaluables de la strate dans l'ordre de la grille ;
+    si elles ne sont pas toutes là à T_max, les n′_s présentes. "atteinte" : indice de grille de la n_s-ième, ou None ;
+    "suffisant" : n′_s ≥ n_s/2, en entiers. n_s entier ≥ 1, sinon CALENDRIER/n_s."""
+    if type(n_s) is not int or n_s < 1:
+        raise commun.Refus("CALENDRIER/n_s", repr(n_s))
+    e = evaluables & masque
+    total = e.bit_count()
+    if total < n_s:
+        return {"masque": e, "n": total, "atteinte": None, "suffisant": 2 * total >= n_s}
+    bas, haut = 0, e.bit_length()
+    while haut - bas > 1:
+        mil = (bas + haut) // 2
+        bas, haut = (bas, mil) if (e & ((1 << mil) - 1)).bit_count() >= n_s else (mil, haut)
+    return {"masque": e & ((1 << haut) - 1), "n": n_s, "atteinte": haut - 1, "suffisant": True}
+
+
+def segments(masque: int) -> list:
+    """Suites maximales de fenêtres retenues [(a, b)] : bits a à b − 1, dans l'ordre."""
+    return [(m.start(), m.end()) for m in re.finditer("1+", format(masque, "b")[::-1])]
+
+
+def comprimer(serie: int, segs: list) -> int:
+    """Suite comprimée : bits de `serie` aux fenêtres retenues, dans l'ordre, en positions 0, 1, … (la rotation et les
+    runs se font sur elle, ADR l.200 ; AVIS-C l.51-53)."""
+    s = format(serie, "b")[::-1]
+    c = "".join(s[a:b] for a, b in segs)[::-1]
+    return int(c, 2) if c else 0
+
+
+def runs(c: int) -> int:
+    """Nombre de suites maximales de 1 : bits à 1 dont le bit précédent est à 0 (ou absent)."""
+    return (c & ~(c << 1)).bit_count()
+
+
+def runs_suite(serie: int, segs: list) -> int:
+    """Runs de `serie` sur la suite comprimée des fenêtres retenues (E-S-28), jamais sur la grille."""
+    return runs(comprimer(serie, segs))
