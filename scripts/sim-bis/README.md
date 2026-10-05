@@ -1,9 +1,12 @@
 # Lot SIM-BIS : SIM-NIVEAU-BIS ‖ SIM-PUISSANCE-BIS (préparation de S2-bis)
 
 Rattachement : G0 `docs/adr-0029/g0-sim/G0-SIM-BIS.md`, dont le contenu est la proposition (`PROPOSITION.md`) corrigée par
-l'avis de l'advisor (`AVIS.md`, qui prime) ; ADR-0029 révision 3, acceptée, avec ses ajouts datés (§2.4, §2.7, §6 lot 4,
-§8). Données synthétiques seules ; seule entrée lue : les sorties versées de PLAN-S2BIS (`docs/adr-0029/plan-s2bis/`), sous
-leurs empreintes. Aucun journal de campagne, aucun `*.jsonl`, aucune donnée de S2-bis.
+l'avis de l'advisor (`AVIS.md`, qui prime), avec ses ajouts datés, dont celui de PLAN-S2BIS-2 du 2026-10-05 15:05:43 UTC
+(C1 calibré sur les FIV_u par hôte : règle intégrée par le diff qui lira les sorties de PLAN-S2BIS-2, après son exécution ;
+d'ici là, `e1.ell_c1` et la convention du milieu des logs restent en place) ; ADR-0029 révision 3, acceptée, avec ses ajouts
+datés (§2.4, §2.7, §6 lot 4, §8). Données synthétiques seules ; seule entrée lue : les sorties versées de PLAN-S2BIS
+(`docs/adr-0029/plan-s2bis/`), sous leurs empreintes ; les tests mesurent en plus le sha256 du G0, épinglé par
+`rattachement` (fil d'alarme de SB-14H). Aucun journal de campagne, aucun `*.jsonl`, aucune donnée de S2-bis.
 
 | fichier | rôle | sous-lot |
 |---|---|---|

@@ -244,4 +244,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 171
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 172

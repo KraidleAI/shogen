@@ -31,3 +31,62 @@ chaque diff ≤ 200 lignes de code ; exécution provisoire sur le pool de l'ADR 
 finale épinglée après le gel des pools.
 
 *Ajout daté du 2026-10-05 01:45:03 UTC (relecture G2 de la tranche 1, `revue-t1/`)* : (1) **numérotation** : les sous-lots sont **SB-0 à SB-14** (proposition §6.1) ; « SB-1 à SB-15 » au § Suite ci-dessus est une erreur de compte de l'orchestrateur. (2) **E-S-10** n'est pas réalisable à la lettre : l'histogramme des épisodes d'EP compte tous les épisodes, censurés compris (`scripts/plan-s2bis/episodes.py` l.47-50 ; EP l.13-14 : 332 épisodes dont 51 censurés) ; SB-3 emploie la loi « tous épisodes » d'EP avec une limite écrite (écart des moyennes complets / tous : −0,035 à +0,134 fenêtre en calme, −0,023 à +0,015 en stress, mesuré par le réviseur) ; recours : PLAN-S2BIS-2, selon l'adjudication 2. (3) Questions de la tranche 1 adjugées : `Fraction(cellules, n_s)` ; indice de réplication à 0 ; composants des flux en liste fermée sous schéma avant E0 ; `math.nextafter` admis au sens d'E-S-43 (nextUp IEEE 754, vérifié par le réviseur) ; pas de garde réseau dans les tests ; lundi de référence, table géométrique de 4 096 rangs et garde de 128 bits scellés tels quels à E0.
+
+*Ajout daté du 2026-10-05 15:05:43 UTC (heure produite par le script d'écriture) (lot PLAN-S2BIS-2 : G0 `docs/adr-0029/g0-plan2/G0-PLAN-S2BIS-2.md`, proposition, avis de l'advisor,
+périmètre réduit et cp-1 de cet ajout dans le même dossier ; option B de l'avis de la tranche 4 ; motif : constat du point 9
+du rapport de la tranche 4, vu à la mesure de mise au point E-4 du 2026-10-05 et recompté par la relecture G2 de la tranche 4
+(`docs/adr-0029/g0-sim/revue-t4/`), et §3.2 de l'avis de la tranche 4)* :
+(1) **C1** : dans chaque strate, point p de la grille d'E1 qui minimise Q₁(p) = Σ_u Σ_ℓ (ln F̄_u,p(ℓ) − ln F_u(ℓ))², somme
+sur les hôtes u du pool d'E1 (D1-bis) dont F_u(ℓ) est défini, sans garde sur leur nombre de cellules d'écart, et sur les ℓ de
+la grille de calibration où la garde de `fiv_unites.txt` est tenue. Même type de série des deux côtés : série d'écart
+(`r1.ECARTS`) côté S2 ; D*(u) = H(u) ∪ F(u, BTC) côté modèle, sans hors-enveloppe (Q-T4-13). F_u(ℓ) = FIV_série de
+`fiv_unites.txt`, chaîne de r1 prise en rationnel exact depuis son écriture décimale, comme EP (E-S-37). F̄_u,p(ℓ) = moyenne
+exacte, sur les réplications définies parmi les 200 du point p (celles de C2), du FIV exact de la série D*(u) sur le masque
+mesuré. Logarithmes par `Decimal.ln` sous le contexte de r1 ; égalités au plus petit κ, puis τ_D, puis φ ; un point dont un
+F̄_u,p(ℓ) retenu est indéfini est écarté. La convention « milieu des logs de C0 et de C2 à ℓ = 240 » est retirée.
+(2) **C2** : critère sur ln FIV_série de I_t contre la courbe D1-bis d'EP (EP l.128-161), inchangé. **C0** : inchangé (aucun
+régime).
+(3) **Calendrier d'E1** : positions présentes = masque des fenêtres évaluables de J28 versé par PLAN-S2BIS-2
+(`masque_j28.txt`), empreinte contrôlée, au lieu des positions de la portée hors D5, pour C0, C1 et C2. Le masque s'applique
+après génération (à vérifier par la G2 du diff d'intégration) ; il ne touche qu'E1 : E2 et E3 gardent le calendrier de S2-bis.
+(4) **Nature** : C1 : groupement propre mesuré par hôte, déclaré borne haute du groupement propre, par hypothèse : les
+absences de l'observateur unique ajoutent de la dépendance sérielle aux séries d'écart (ADR l.38 ; §5 de l'avis du G0 de
+PLAN-S2BIS-2) ; la troncature par le masque joue en sens inverse aux grands ℓ ; la sensibilité au voisinage des lacunes
+(PLAN-S2BIS-2, Q-P2-10) en chiffre la part. Ce sens n'est pas démontré pour la durée, d'où les trois W* de (5) ; au bord de la
+grille, (8) s'applique. C2 : point de la grille le plus proche de la courbe de I_t ; garde-fou imprimé, plus « cas le plus
+défavorable plausible » depuis le constat de la tranche 4
+(relecture G2 de la tranche 4, `revue-t4/`, constat du point 9, pt 4).
+(5) **Durée** : la règle du §3 de la proposition de SIM-BIS se lit au niveau C1 pour l'acte A-2 : W retenue = max(16,
+W*(C1)). Le fond de référence de la cible (§3 pt 1 de la proposition de SIM-BIS ; ADR l.399 pt 2, « groupement au niveau C2 »)
+passe au niveau C1 : la confirmation à 10⁴ réplications à la durée retenue et le bloc `[VALEURS POUR LE PAQUET DE S2-BIS]` (§3
+pts 3 et 6) s'y calculent ; l'échelle des durées tourne toujours aux trois niveaux (AVIS-G0 Q-S-03, modification 1) et P-cible
+à C2 (N3) reste imprimée. A-2 est posé si, et seulement si, W*(C1) > 16 ou W*(C0) > 16, ou si aucune durée de l'échelle ne
+tient (a) à (c) à l'un de ces deux niveaux (§3 pt 4 de la proposition de SIM-BIS) ; jamais sur W*(C2) seul. Si
+W*(C0) > 16 ≥ W*(C1), A-2 est posé sans détour, comme le prévoyait l'avis du G0 (Q-S-03), W retenue reste 16 et la question
+dit que le seul niveau mesuré, C1, n'exige pas l'allongement. Si A-2 n'est pas posé, et en particulier si W*(C1) ≤ 16 < W*(C2)
+avec W*(C0) ≤ 16, aucune question n'est posée : la durée écrite au paquet reste 16 semaines, la puissance à la cible y est
+imprimée aux trois niveaux et une phrase de limite nomme C2. La question A-2, si elle est posée, porte W*(C0), W*(C1), W*(C2),
+la phrase de (4), le 20 % sous H0 (adjudication 5) et, le cas échéant, la phrase de (8). Ce point remplace « la durée déclarée
+est celle de C2 » (adjudication 2) ; l'ajout daté du même jour à l'ADR-0029 porte le même changement à l'ajout daté du
+2026-10-04 23:02:56 UTC (l.399, pts 2 et 5). Dans (8)(iii), « sans question » s'entend au titre de (8) seul ; si A-2 est posé
+par la règle ci-dessus, il porte la phrase de (8).
+(6) **Contrôles et impressions** : SHOGEN-SIM-BIS-REGIME-FAISABILITE-1 sur C1 dès son épinglage. SB-11 imprime, par strate et
+par hôte, les résidus ln F̄_u,C1(ℓ) − ln F_u(ℓ) aux ℓ retenus, le point qui minimiserait Q₁ pour cet hôte seul (diagnostic,
+jamais candidat), le nombre de réplications à FIV indéfini, et la loi des pauses du modèle à C1 sur le masque, à côté de
+`intervalles.txt` ; et, par point et par ℓ, l'écart-type exact (racine par `Decimal.sqrt` sous le contexte de r1, à
+l'impression seulement) des FIV définis parmi les 200 réplications, pour la série de I_t.
+(7) **Ordre** : cet ajout est inscrit au G0 de SIM-BIS avant l'exécution de PLAN-S2BIS-2 et avant l'inscription au JOURNAL du
+sha256 du code de PLAN-S2BIS-2 ; cette antériorité est consignée par deux heures `date -u`. Un cp-1 bref de cet ajout, par un
+validateur frais, passe avant cette inscription (Q-P2-13 ; rapport `docs/adr-0029/g0-plan2/CP1-AJOUT.md`). `e1.ell_c1` est
+retiré de `parametres.json` de SIM-BIS (sans objet). E0 attend le versement de PLAN-S2BIS-2 et le diff de SIM-BIS qui lit ses
+sorties ; aucune exécution provisoire avec la C1 de la lettre d'E-S-38. RB-7 attend aussi : l'exécution provisoire du § Suite
+de ce G0 (« pour clore la conception et débloquer RB-7 ») se fait avec la C1 de cet ajout, donc après E0. Le texte d'E-S-38
+reste tel quel.
+**(8) Bord de la grille.** Dans une strate, C1 est « au bord » si l'une de ses trois coordonnées est la valeur extrême de sa grille (φ = 0,1, κ = 50 ou τ_D = 4 320 ; E-S-38) **ou** si, aux ℓ retenus ≥ 60, le résidu ln F̄_u,C1(ℓ) − ln F_u(ℓ) est négatif pour au moins six des dix hôtes du format. Alors : (i) C1 reste le point retenu (aucun point hors grille, aucune seconde sélection) ; (ii) la limite de SHOGEN-SIM-BIS-FIV-IDENTIF-1 s'écrit « dans la strate s, la famille E1 n'atteint pas les FIV_u mesurés ; C1 y est une borne basse de la mesure, et « borne haute » ne s'applique pas » ; (iii) les trois W* sont imprimés et, si W*(C1) ≤ 16 et que C1-calme est au bord, le paquet dit que les 16 semaines reposent sur un niveau que la famille ne peut pas dépasser : information à l'investisseur à l'accord A-1 de S-2, sans question ; si W*(C1) > 16, A-2 porte la même phrase. (iv) Le bord est constaté par le script, par une ligne nommée, jamais par une lecture humaine.
+Précision d'adjudication à (8) : la seconde condition se lit « pour au moins six des dix hôtes du format, le résidu ln
+F̄_u,C1(ℓ) − ln F_u(ℓ) est négatif à chacun des ℓ retenus ≥ 60 » ; la ligne nommée de (8)(iv) imprime, par strate, le nombre
+d'hôtes qui satisfont cette condition et la liste des ℓ retenus ≥ 60.
+(9) **Filet** : le déclencheur « W* différente entre C0 et C2 » de SHOGEN-SIM-BIS-FIV-IDENTIF-1 est retiré ; PLAN-S2BIS-2
+précède E0 dans tous les cas, que W*(C0) et W*(C2) diffèrent ou non. Le cas où C1 n'atteint pas les FIV_u mesurés relève de
+(8), jamais d'un déclencheur nouveau ; l'item reste ouvert jusqu'à la sortie d'E1 épinglée, où sa limite s'écrit selon (4)
+et (8).

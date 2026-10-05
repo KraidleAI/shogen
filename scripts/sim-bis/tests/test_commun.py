@@ -51,19 +51,31 @@ class TestSocle(unittest.TestCase):
             self.assertEqual(lus["scripts/sim-bis/parametres.json"], hashlib.sha256(f.read()).hexdigest())
 
     def test_provenance_c_5(self):
-        """C-5 de la G2 de la tranche 2 (E-S-03) : le rattachement porte l'empreinte actuelle du G0 (sha256sum à la tête
-        784ebd2, ajout daté du 2026-10-05 01:45:03 UTC compris) et cite celle d'avant cet ajout comme telle ;
-        sources.source cite cet ajout daté (points 2 et 3), et non plus l'adjudication provisoire du brief. Mutation
-        M-C5-01 : ancienne empreinte remise."""
+        """C-5 de la G2 de la tranche 2 (E-S-03), mis à jour par SB-14H : rattachement à l'empreinte du G0 figé (ajout
+        daté PLAN-S2BIS-2 du 2026-10-05 15:05:43 UTC compris), qui cite les précédentes : d9cffc0a… avant cet ajout,
+        eeaceb6b… avant celui du 2026-10-05 01:45:03 UTC ; sources.source cite ce dernier (points 2 et 3), sans
+        l'adjudication provisoire. Mutations M-C5-01 (ancienne empreinte remise), M-14H-01, M-14H-02."""
         prm = commun.charger_parametres(environ={})
         g0 = ("G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md (sha256 "
-              "d9cffc0aec3634138f58ba33b9a9679484f2532460b3e5177c0c5ae194648034")
+              "a216a953ba2be088868967e8b11a89c17e3882cee9da581700f88d3b70d0e11e")
         self.assertTrue(prm["rattachement"].startswith(g0), prm["rattachement"][:100])
-        self.assertIn("avant cet ajout : eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39",
-                      prm["rattachement"])
+        self.assertEqual([x in prm["rattachement"] for x in (
+            "avant l'ajout daté PLAN-S2BIS-2 du 2026-10-05 15:05:43 UTC : "
+            "d9cffc0aec3634138f58ba33b9a9679484f2532460b3e5177c0c5ae194648034",
+            "avant cet ajout : eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39")], [True, True])
         s = prm["sources"]["source"]
         self.assertEqual([x in s for x in ("ajout daté du G0 du 2026-10-05 01:45:03 UTC, point 3",
                                            "même ajout daté, point 2", "adjudication provisoire")], [True, True, False])
+
+    def test_g0_mesure(self):
+        """Fil d'alarme de l'ajout daté PLAN-S2BIS-2 (SB-14H, décision de l'orchestrateur du 2026-10-05) : le sha256 du
+        G0 du dépôt (docs/adr-0029/g0-sim/G0-SIM-BIS.md), mesuré, est l'empreinte que le rattachement épingle ; un G0 et
+        une épingle commités séparément font échouer le job. Mutations M-14H-01 (épingle d'avant PLAN-S2BIS-2 remise),
+        M-14H-03 (G0 retouché d'un octet)."""
+        prm = commun.charger_parametres(environ={})
+        with open(os.path.join(commun.RACINE, "docs", "adr-0029", "g0-sim", "G0-SIM-BIS.md"), "rb") as f:
+            mesure = hashlib.sha256(f.read()).hexdigest()
+        self.assertEqual(prm["rattachement"].split("(sha256 ", 1)[1][:64], mesure)
 
     def test_valeurs_avis_t3(self):
         """P-2 des corrections G2 de la tranche 3 (adjugé avant E0, comme C-7 de la tranche 2) : les valeurs Q-T3-2 à
