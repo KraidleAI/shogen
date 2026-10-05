@@ -1,0 +1,3 @@
+# Note datée sur la pièce de clôture de P1 (réserve R-2 de l'accord)
+
+*Note de l'orchestrateur, datée du 2026-10-05 23:35:14 UTC.* La pièce `CLOTURE-P1.md` de ce dossier a été rédigée par le réviseur avant les corrections, et elle est versée telle que rendue. Son §3 (« Ce qui reste à faire avant l'accord », corrections C-1 à C-5) est **tenu** : les cinq corrections sont commises en `3576bef` à `991d608` (CB-20a à CB-20h), et le contre-contrôle du même réviseur est CONFORME, liste vide (`CONTRE-CONTROLE-P1-INTEG-transcrit.md`). L'accord de fin de partie est rendu par un advisor dans `ACCORD-P1.md` : ACCORD-AVEC-RÉSERVES R-1 à R-4 (annexe B, bloc B.72).
