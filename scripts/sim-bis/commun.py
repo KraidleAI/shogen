@@ -1,14 +1,19 @@
 """Socle du lot SIM-BIS (G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md : PROPOSITION corrigée par AVIS ; sous-lot SB-0 ;
-E-S-02, E-S-03, E-S-43) : parametres.json sous schéma fermé, garde de la variable de campagne. Bibliothèque standard
-seule ; aucune barre oblique inverse dans ce fichier (saut de ligne : chr(10))."""
+E-S-02, E-S-03, E-S-05, E-S-06, E-S-43, E-S-48) : parametres.json sous schéma fermé, entrées lues par chemin sous deux
+épingles, garde de la variable de campagne, écriture atomique sans écrasement, en-tête et étiquette, JSON canonique.
+Bibliothèque standard seule ; aucune barre oblique inverse dans ce fichier (saut de ligne : chr(10))."""
 import hashlib
 import json
 import os
+import posixpath
+import sys
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 RACINE = os.path.dirname(os.path.dirname(ICI))
 PARAMETRES = os.path.join(ICI, "parametres.json")
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
+ETIQUETTE = ("synthétique ; préparation de S2-bis ; ne lit aucune donnée de S2-bis ni aucun journal de S2 ; ne change "
+             "ni R, ni le seuil, ni la règle")
 NL = chr(10)
 
 
@@ -85,3 +90,77 @@ def charger_parametres(chemin: str = PARAMETRES, lus=None, environ=None) -> dict
     if lus is not None:
         lus[os.path.relpath(chemin, RACINE).replace(os.sep, "/")] = hashlib.sha256(octets).hexdigest()
     return prm
+
+
+def lire_entree(prm: dict, nom: str, lus=None, environ=None, racine: str = RACINE) -> bytes:
+    """Octets de l'entrée `nom` (chemin relatif à la racine) : sha256 égal à son épingle de parametres.json, puis,
+    sauf pour « sommes », égal à sa ligne « <sha256>  <chemin relatif au dossier des sommes> » du fichier de sommes,
+    lui-même lu sous son épingle (E-S-02). Inscrit chaque fichier lu dans `lus`."""
+    garde_campagne(environ)
+    e = prm["entrees"][nom]
+    octets = _lire(os.path.join(racine, e["chemin"]))
+    sha = hashlib.sha256(octets).hexdigest()
+    if sha != e["sha256"]:
+        raise Refus("ENTREE/sha256-parametres", f"{e['chemin']} : {sha}, épingle {e['sha256']}")
+    if nom != "sommes":
+        s = prm["entrees"]["sommes"]["chemin"]
+        ligne = f"{sha}  {posixpath.relpath(e['chemin'], posixpath.dirname(s))}"
+        if ligne not in lire_entree(prm, "sommes", lus, environ, racine).decode("utf-8").split(NL):
+            raise Refus("ENTREE/sha256-sommes", f"{e['chemin']} : « {ligne} » absente de {s}")
+    if lus is not None:
+        lus[e["chemin"]] = sha
+    return octets
+
+
+def ecrire(chemin: str, octets: bytes) -> None:
+    """Fichier écrit en entier ou pas du tout, jamais par-dessus un fichier existant (E-S-48) : partiel voisin
+    « .partiel » créé en exclusif, fsync, lien dur vers `chemin` (refusé si `chemin` existe), partiel retiré ;
+    `.jsonl` refusé (E-S-06)."""
+    if chemin.lower().endswith(".jsonl"):
+        raise Refus("SORTIE/jsonl", chemin)
+    partiel = chemin + ".partiel"
+    try:
+        fd = os.open(partiel, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:
+        raise Refus("SORTIE/partiel-present", partiel) from None
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(octets)
+            f.flush()
+            os.fsync(f.fileno())
+        try:
+            os.link(partiel, chemin)
+        except FileExistsError:
+            raise Refus("SORTIE/existe", chemin) from None
+    finally:
+        os.unlink(partiel)
+
+
+def _sans_flottant(x) -> None:
+    if type(x) is float:
+        raise Refus("SORTIE/flottant", f"{x!r} (E-S-43)")
+    for y in x.values() if type(x) is dict else x if type(x) in (list, tuple) else ():
+        _sans_flottant(y)
+
+
+def json_canonique(obj) -> bytes:
+    """UTF-8 du JSON à clés triées, séparateurs fixes, sans échappement, saut de ligne final ; aucun flottant ;
+    aucune heure, aucun hôte, aucune version (E-S-43)."""
+    _sans_flottant(obj)
+    try:
+        t = json.dumps(obj, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    except TypeError as e:
+        raise Refus("SORTIE/type", str(e)) from None
+    return (t + NL).encode("utf-8")
+
+
+def entete(lus: dict) -> list:
+    """L'étiquette (première ligne de toute sortie, E-S-05), puis « sha256 <chemin> <empreinte> », triées par chemin,
+    des modules du lot chargés (empreinte des octets sur disque) et des fichiers lus `lus` (E-S-03)."""
+    mods = {}
+    for m in list(sys.modules.values()):
+        f = getattr(m, "__file__", None)
+        if f and os.path.dirname(os.path.realpath(f)) == os.path.realpath(ICI):
+            with open(f, "rb") as g:
+                mods[os.path.relpath(f, RACINE).replace(os.sep, "/")] = hashlib.sha256(g.read()).hexdigest()
+    return [ETIQUETTE] + [f"sha256 {k} {v}" for k, v in sorted({**mods, **lus}.items())]

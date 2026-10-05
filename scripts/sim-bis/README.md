@@ -8,7 +8,7 @@ leurs empreintes. Aucun journal de campagne, aucun `*.jsonl`, aucune donnée de 
 | fichier | rôle | sous-lot |
 |---|---|---|
 | `parametres.json` | tous les paramètres, chacun avec sa source ; schéma fermé contrôlé par `commun.py` | SB-0 |
-| `commun.py` | chargement de `parametres.json` (aucun flottant, aucune clé double, clés exactes), garde de la variable de campagne | SB-0 |
+| `commun.py` | chargement de `parametres.json` (aucun flottant, aucune clé double, clés exactes), garde de la variable de campagne ; entrées lues sous deux épingles (`parametres.json`, puis le `SHA256SUMS` de PLAN-S2BIS) ; écriture atomique sans écrasement ; étiquette et en-tête des sorties ; JSON canonique | SB-0 |
 | `tests/` | tests unitaires, attendus écrits à la main ou produits par un outil distinct (`sha256sum`, `bc`) | chaque sous-lot |
 
 ## Tests
