@@ -1530,3 +1530,32 @@ canonique ; forme canonique sans tri des clés, ou en séquences d'échappement 
 attendue sans queue, ou prise pour null ; `cause` exigée dans la déclaration ; comparaison sans ordre ; queues non
 rendues avec la rupture, ou réputées déclarées malgré elle ; lien jugé sur `seq` seul ; queue non déclarée tolérée
 devant une `ouverture`. Suite : 211 tests ; plancher du job : 211, égalité exigée (`--egal`).
+
+## RB-1j (2026-10-05) : 64 niveaux d'imbrication au plus, comptés par le lecteur (lettre C-4 ; C-15)
+
+Objet (lettre C-4 du FORMAT, adjugée par l'orchestrateur le 2026-10-05 ; correction C-15 de la relecture G2 de RB-18,
+second point) : le niveau d'une valeur est 1 pour l'objet de la ligne, n + 1 dans un conteneur de niveau n ; une ligne
+dont un conteneur passe le niveau N = 64 n'est pas intègre (`LECTEUR/imbrication`). Le lecteur compte les niveaux
+lui-même, sur les octets et avant tout décodeur (`_trop_profonde`) : échappements retirés (barre doublée, puis barre et
+guillemet), guillemets restants pris pour bornes des chaînes, seuls les crochets hors des chaînes comptés, arrêt au
+premier conteneur au-delà de 64 ; la barre oblique inverse est écrite par sa valeur (`bytes([92])`), le code n'ajoute
+aucun octet 92. Une RecursionError du décodeur n'est plus prise pour un verdict : sur une ligne de 64 niveaux au plus,
+elle remonte au lieu de faire une queue d'une ligne intègre. Avant : une ligne de 65 niveaux et plus était intègre
+jusqu'au seuil de RecursionError du décodeur, puis nommée `LECTEUR/json` par l'exception ; ce seuil dépend de la
+version (mesure du worker par dichotomie, appel depuis un script : `json` dès le niveau 992 sous 3.10 et 3.11, 9 998
+sous 3.12, 9 999 sous 3.13), si bien que le verdict d'une même ligne changeait d'une version à l'autre. FORMAT §8.3,
+§7.1 b.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 193 | — |
+| `tests/test_lecteur.py` | 481 | 30 (2 de plus : niveaux 64 et 65 en listes, en objets et derrière une barre échappée, conteneurs larges, crochets d'une chaîne, guillemet échappé, 100 000 niveaux ; RecursionError non rattrapée ; 2 complétés : 100 000 niveaux nommés `LECTEUR/imbrication`, queue d'une ligne de 65 niveaux) |
+
+Rouge : sur le code de RB-1i, 4 échecs d'assertion (dix cas des niveaux, dont 65 lus intègres en listes et en objets, et
+100 000 nommés par RecursionError ; RecursionError rattrapée ; cause des 100 000 niveaux ; ligne de 65 niveaux lue
+intègre en fin de fichier). Mutants (commande du job, runner puis `--plancher 213`, borne de 300 s ; python3.12 ; réseau
+isolé) : 12 tués sur 12 par leur test visé (0 vivant, 0 FATAL) : N décalé d'une unité dans les deux sens (64 refusés, 65
+admis) ; racine comptée deux fois ; barre doublée non retirée ; guillemet échappé pris pour une borne ; crochets des
+chaînes comptés, ou seuls comptés ; objets non comptés ; fermants ignorés (nombre d'ouvrants pris pour le niveau) ;
+octets effacés inversés ; niveaux non comptés (RecursionError seule) ; RecursionError prise pour un verdict. Suite : 213
+tests ; plancher du job : 213, égalité exigée (`--egal`).

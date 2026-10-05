@@ -10,10 +10,11 @@ import sys
 import tempfile
 import tracemalloc
 import unittest
+from unittest import mock
 
 from shogen_s2bis.recalc import lecteur as lec
 from tests.test_fichiers import J1, J2, J3, NOMS
-from tests.test_journal import FICHIER, Base, chaine
+from tests.test_journal import FICHIER, Base, chaine, imbrique
 from tests.test_reprise import SEG1, SEG2, ligne, m
 
 OUVERTURE = ligne(0, "0" * 64, type="ouverture", jour="2026-10-04", suivante=m(1))
@@ -23,6 +24,11 @@ TYPES = {"ouverture": {"jour": JOUR, "suivante": m(1)}, "marqueur": {"ws": m(1)}
          "cloture": {"jour": JOUR}, "reprise": {"ws": m(1), "suivante": m(1), "queue": None},
          "trou": {"de": m(1), "a": m(1), "cause": "saut"}, "lecture": {"ws": m(1)}, "sante": {"ws": m(1)},
          "run_params": {"ws": m(1)}}        # champs propres et leurs types, pris à la lettre (FORMAT §2, §7.1 d)
+
+
+def lecture(**champs):
+    """Ligne `lecture` de rang 1, chaînée à OUVERTURE."""
+    return ligne(1, P, type="lecture", ws=m(1), **champs)
 
 
 def verdict(octets, etat):
@@ -53,7 +59,7 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
         etat = lec._integre(OUVERTURE, None)[1]
         lect = {"type": "lecture", "ws": m(1)}
         for cause, octets, avant in (("LECTEUR/fin", OUVERTURE[:-1], None), ("LECTEUR/json", bytes(9) + b"\n", etat),
-                                     ("LECTEUR/json", b"[" * 100000 + b"]" * 100000 + b"\n", etat),
+                                     ("LECTEUR/imbrication", b"[" * 100000 + b"]" * 100000 + b"\n", etat),
                                      ("LECTEUR/canonique", ligne(1, P, (", ", ": "), **lect), etat),
                                      ("LECTEUR/canonique", b'{"seq":1,' + ligne(1, P, **lect)[1:].replace(
                                          b'"seq":1,', b""), etat),                              # clés non triées
@@ -137,6 +143,28 @@ class LigneIntegre(unittest.TestCase):                      # FORMAT §7.1 ; éc
         self.assertEqual({t: verdict(ligne(1, P, type=t, **{**c, "ws": None}), etat) for t, c in TYPES.items()},
                          {**dict.fromkeys(TYPES, "LECTEUR/champ"), **dict.fromkeys(("ouverture", "cloture", "trou"),
                                                                                     "intègre")})
+
+    def test_imbrication_comptee_par_le_lecteur(self):                 # C-4, C-15 (FORMAT §8.3, §7.1 b)
+        """Niveau 1 pour l'objet de la ligne, n + 1 dans un conteneur de niveau n : 64 niveaux intègres, 65 non
+        (`LECTEUR/imbrication`), en listes comme en objets, et de même bien au-delà du seuil de RecursionError des
+        décodeurs ; les crochets d'une chaîne ne comptent pas, échappements de guillemet et de barre compris."""
+        etat, barre, objets = lec._integre(OUVERTURE, None)[1], chr(92), [{}]
+        for _i in range(64):
+            objets.append({"a": objets[-1]})                            # objets[n] : n + 1 objets emboîtés
+        profonde = lecture(x=0).replace(b'"x":0}', b'"x":' + b"[" * 100000 + b"]" * 100000 + b"}")
+        cas = [(lecture(x=imbrique(63)), "intègre"), (lecture(x=imbrique(64)), "LECTEUR/imbrication"),
+               (lecture(x=objets[62]), "intègre"), (lecture(x=objets[63]), "LECTEUR/imbrication"),
+               (lecture(a=barre, x=imbrique(63)), "intègre"), (lecture(a=barre, x=imbrique(64)), "LECTEUR/imbrication"),
+               (lecture(x=[{}] * 100), "intègre"), (lecture(x="[" * 200), "intègre"),
+               (lecture(x='"' + "[{" * 100), "intègre"), (profonde, "LECTEUR/imbrication")]
+        self.assertEqual([verdict(x, etat) for x, _v in cas], [v for _x, v in cas])
+
+    def test_recursion_error_jamais_un_verdict(self):                  # C-4 : niveaux comptés, exception non suivie
+        """Une RecursionError du décodeur sur une ligne de 64 niveaux au plus (pile de l'appelant déjà profonde,
+        simulée) n'est pas un verdict : elle remonte, au lieu de faire une queue d'une ligne intègre."""
+        etat = lec._integre(OUVERTURE, None)[1]
+        with mock.patch.object(lec.json, "loads", side_effect=RecursionError):
+            self.assertRaises(RecursionError, verdict, lecture(), etat)
 
 
 class Fichiers(unittest.TestCase):
@@ -250,6 +278,8 @@ class Queues(AvecQueues):
                                 ("LECTEUR/json", lambda s, p: bytes(9) + b"\n" + OUVERTURE),
                                 ("LECTEUR/entier-long", lambda s, p: ligne(s, p, type="lecture", ws=m(4),
                                                                            x=10 ** 640) + OUVERTURE),
+                                ("LECTEUR/imbrication", lambda s, p: ligne(s, p, type="lecture", ws=m(4),
+                                                                           x=imbrique(64)) + OUVERTURE),
                                 ("LECTEUR/fin", lambda s, p: ligne(s, p, type="lecture", ws=m(4), x="a" * lec.LIMITE))):
             with self.subTest(cause=cause):
                 self.setUp()
