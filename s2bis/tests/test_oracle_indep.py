@@ -129,6 +129,17 @@ class Journaux(unittest.TestCase):
         with open(os.path.join(self.d, nom), "rb") as f:
             return f.read()
 
+    def couper(self, nom, n):
+        """Arrêt brutal : retire les `n` derniers octets, pris dans la dernière ligne ; rend la queue attendue."""
+        b = self.octets(nom)
+        debut, fin = b.rfind(NL, 0, len(b) - 1) + 1, len(b) - n
+        with open(os.path.join(self.d, nom), "r+b") as f:
+            f.truncate(fin)
+        return {"fichier": nom, "position": debut, "octets": fin - debut, "sha256": sha(b[debut:fin])}
+
+    def types(self, r):
+        return [x["enr"]["type"] for x in r["enregistrements"]]
+
     def lignes(self, nom):
         """(fichier, position, sha256) de chaque ligne complète de `nom`."""
         r, pos = [], 0
@@ -211,3 +222,101 @@ class Journaux(unittest.TestCase):
         with self.assertRaises(o.RefusOracle) as e:
             o.lire(os.path.join(self.d, "absent"), "pool")
         self.assertEqual(e.exception.code, "ORACLE/lecture")
+
+    def test_ligne_coupee_dans_un_caractere(self):                        # SHOGEN-TORN-LINE-UTF8-1 ; §1.1
+        self.ecrivain(T0, (), dernier=T0 + 60)
+        b = self.octets(J1)
+        q = self.couper(J1, len(b) - b.index("é".encode()) - 1)            # entre les deux octets de « é »
+        r, flux = self.lire()
+        self.assertEqual(self.octets(J1)[-1:], "é".encode()[:1])
+        self.assertEqual((flux, r["queue_finale"], r["tete"]["seq"]), (self.lignes(J1), [q], 0))
+
+    def test_reprise_declare_la_queue(self):                              # §7.2, §7.4 : segment neuf
+        self.ecrivain(T0 - 600, (T0 - 540, T0 - 480), dernier=T0 - 420)
+        q = self.couper(J1, 5)
+        self.ecrivain(T0 - 300, (T0 - 240,))
+        r, flux = self.lire()
+        self.assertEqual((flux, r["fichiers"]), (self.lignes(J1) + self.lignes(J1S1), [J1, J1S1]))
+        self.assertEqual((r["queues_declarees"], r["ruptures"], r["queue_finale"]), ([q], [], []))
+        self.assertEqual(self.types(r)[5:], ["reprise", "lecture", "trou", "marqueur"])
+
+    def test_reprise_sans_queue_a_la_suite(self):                         # §7.3
+        self.ecrivain(T0 - 600, (T0 - 540,))
+        self.ecrivain(T0 - 420, (T0 - 360,))
+        r, flux = self.lire()
+        self.assertEqual((flux, r["ruptures"], r["queues_declarees"], r["queue_finale"]), (self.lignes(J1), [], [], []))
+        self.assertEqual(self.types(r), ["ouverture", "lecture", "marqueur", "reprise", "lecture", "trou", "marqueur"])
+
+    def test_reprise_un_autre_jour(self):                                 # §7.3 : clôture tardive, puis reprise
+        self.ecrivain(T0 - 600, (T0 - 540,))
+        self.ecrivain(T0 + 300, (T0 + 360,))
+        r, flux = self.lire()
+        self.assertEqual((r["fichiers"], flux, self.types(r)[3:5]), ([J1, J2], self.lignes(J1) + self.lignes(J2),
+                                                                      ["cloture", "reprise"]))
+        self.assertEqual((r["ruptures"], r["queues_declarees"], r["queue_finale"]), ([], [], []))
+
+    def test_segments_de_jour(self):                                      # §6.1, §7.2 : segment 1, puis bascule
+        self.ecrivain(T0 - 600, (T0 - 540,), dernier=T0 - 480)
+        q = self.couper(J1, 3)
+        self.ecrivain(T0 - 300, range(T0 - 240, T0 + 180, 60))
+        self.ecrivain(T0 + 300, (T0 + 360,))
+        r, flux = self.lire()
+        self.assertEqual((r["fichiers"], flux), ([J1, J1S1, J2], self.lignes(J1) + self.lignes(J1S1) + self.lignes(J2)))
+        self.assertEqual((r["queues_declarees"], r["ruptures"], r["queue_finale"]), ([q], [], []))
+
+    def test_declaration_fausse(self):                                    # §7.4 : queue changée après la reprise
+        self.ecrivain(T0 - 600, (T0 - 540,), dernier=T0 - 480)
+        q = self.couper(J1, 3)
+        self.ecrivain(T0 - 300, (T0 - 240,))
+        b = self.octets(J1)
+        with open(os.path.join(self.d, J1), "wb") as f:
+            f.write(b[:-1] + b"x")
+        r, flux = self.lire()
+        q = {**q, "sha256": sha(b[q["position"]:-1] + b"x")}
+        rupture = {"fichier": J1S1, "position": 0, "seq": 3, "causes": ["declaration", "queue-non-declaree"],
+                   "queues": [q]}
+        self.assertEqual((r["queues_declarees"], len(flux), r["ruptures"]), ([], 7, [rupture]))
+
+    def test_declaration_stricte(self):                                   # §7.4 : `true` n'est pas l'entier 1
+        self.ecrivain(T0 - 600, (T0 - 540,))
+        with open(os.path.join(self.d, J1), "ab") as f:
+            f.write(b"{")                                                   # queue d'un octet
+        p = len(self.octets(J1)) - 1
+        q = '{"fichier":"' + J1 + '","octets":%s,"position":' + str(p) + ',"sha256":"' + sha(b"{") + '"}'
+        for octets, causes in (("1", []), ("true", [["declaration", "queue-non-declaree"]])):
+            with open(os.path.join(self.d, J1S1), "wb") as f:              # reprise écrite à la main, chaînée
+                f.write(ligne('{"prec":"' + self.lignes(J1)[-1][2] + '","queue":[' + q % octets + '],"seq":3,'
+                              '"suivante":1791157800,"type":"reprise","ws":1791157800}'))
+            r, flux = self.lire()
+            self.assertEqual(([x["causes"] for x in r["ruptures"]], len(flux), len(r["queues_declarees"])),
+                             (causes, 4, 1 - len(causes)), octets)
+
+    def test_douze_segments_d_un_jour(self):                              # §6.1, §7.2 : k comparé en entier
+        noms = [f"pool-2026-10-04-{k}.jsonl" for k in range(12)]
+        for k, nom in enumerate(noms):
+            a = T0 - 6000 + 240 * k
+            self.ecrivain(a, (a + 60,), dernier=a + 120)
+            q = self.couper(nom, 2)
+        r, flux = self.lire()
+        self.assertEqual((r["fichiers"], r["ruptures"], len(r["queues_declarees"]), r["queue_finale"]),
+                         (noms, [], 11, [q]))
+        self.assertEqual(flux, [x for n in noms for x in self.lignes(n)])
+
+    def test_fichier_renomme(self):                                       # §7.2 : ordre des noms, ordre de la chaîne
+        self.ecrivain(T0, (T0 + 60, T0 + 120, T0 + 86520))
+        j1, j2, j3, j7 = self.lignes(J1), self.lignes(J2), self.lignes(J3), "pool-2026-10-07-0.jsonl"
+        os.rename(os.path.join(self.d, J2), os.path.join(self.d, j7))
+        r, flux = self.lire()
+        self.assertEqual((r["fichiers"], flux), ([J1, J3, j7], j1 + j3 + [(j7, p, h) for _n, p, h in j2]))
+        self.assertEqual(r["ruptures"], [{"fichier": J3, "position": 0, "seq": 9, "causes": ["lien"], "queues": []},
+                                         {"fichier": j7, "position": 0, "seq": 5, "causes": ["lien"], "queues": []}])
+
+    def test_reprise_au_milieu_ne_declare_rien(self):                     # §7.3 : à la suite, `queue` null
+        self.ecrivain(T0 - 600, (T0 - 540,))
+        q = '[{"fichier":"' + J1 + '","octets":1,"position":0,"sha256":"' + sha(b"{") + '"}]'
+        with open(os.path.join(self.d, J1), "ab") as f:                     # reprise écrite à la main, chaînée
+            f.write(ligne('{"prec":"' + self.lignes(J1)[-1][2] + '","queue":' + q + ',"seq":3,"suivante":1791157800,'
+                          '"type":"reprise","ws":1791157800}'))
+        r, flux = self.lire()
+        self.assertEqual((len(flux), r["ruptures"]), (4, [{"fichier": J1, "position": self.lignes(J1)[3][1], "seq": 3,
+                                                            "causes": ["declaration"], "queues": []}]))

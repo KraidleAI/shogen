@@ -1624,3 +1624,20 @@ type de la genèse non contrôlés, lien sans `prec`, jonction au seul premier f
 soldée deux fois ou non signalée, queue prise depuis le début, ligne coupée finale ignorée, queue finale perdue, nom du
 refus de lecture, rupture sans cause, chaînage figé. Suite : 231 tests ; plancher du job : 231, égalité exigée
 (`--egal`).
+
+## RB-18c (2026-10-05) : déclaration des queues par la `reprise` (recalé sur 98c8537)
+
+Objet : `cle` (forme canonique de comparaison : `true` n'égale pas 1) ; à chaque `reprise`, les queues en attente sont
+comparées à la liste `queue`, rupture `declaration` sinon ; une `reprise` au milieu d'un fichier ne déclare rien. FORMAT
+§7.2 à §7.4. L'appariement est encore un multiensemble : RB-18h le remplace par la déclaration exacte de la lettre C-3.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/oracle_indep.py` | 157 | — |
+| `tests/test_oracle_indep.py` | 322 | 27 (10 de plus : ligne coupée dans un caractère, reprise d'un segment neuf, reprise à la suite, reprise un autre jour, segments de jour, déclaration fausse, déclaration stricte, douze segments d'un jour, fichier renommé, reprise au milieu) |
+
+Mutants (commande du job, `--plancher 241`, borne de 300 s ; python3.12 ; réseau isolé) : 11 tués sur 11 (0 vivant,
+0 FATAL) : reprise au milieu non contrôlée, `true` égal à 1, déclaration soldée laissée en compte, queue déclarée non
+rendue, déclaration sans queue non signalée, liste de la rupture vidée, appariement inversé, clés non triées dans la
+comparaison, champ mal nommé, liste lue comme une seule déclaration, queue non déclarée non signalée. Suite : 241 tests
+; plancher du job : 241, égalité exigée (`--egal`).

@@ -8,10 +8,11 @@ ORACLE/entier-long, la ligne n'est pas jugée (Q-R18-2 ; E-R-01 ; SHOGEN-JSON-EN
 `<préfixe>-AAAA-MM-JJ-k.jsonl`, k décimal sans zéro de tête, dans l'ordre (jour, k entier) ; autres noms ignorés
 (Q-R18-5). Fichier (§7.1) : lignes intègres jusqu'à la première qui ne l'est pas (sans 0x0A, non canonique, sans les
 champs communs, non chaînée ; la première est une `ouverture` ou une `reprise`), qui ouvre la queue du fichier.
-Jonction au premier enregistrement de chaque fichier (§1.3, §7.7) : lien au dernier intègre (genèse : `ouverture`,
-`seq` 0, `prec` nul), queues en attente ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`), la
-lecture continue, rien n'est réparé (Q-R18-6). Queue finale : queues qu'aucun intègre ne suit (E-R-01 ; Q-R18-8).
-Tête : dernier intègre (§1.4)."""
+Jonction au premier enregistrement de chaque fichier et à chaque `reprise` (§1.3, §7.4, §7.7) : lien au dernier intègre
+(genèse : `ouverture`, `seq` 0, `prec` nul) ; queues en attente déclarées par la `reprise` (quatre champs, comparés
+sous forme canonique) ; sinon rupture à causes nommées (`genese`, `lien`, `queue-non-declaree`, `declaration`), la
+lecture continue, rien n'est réparé (Q-R18-6, Q-R18-7). Queue finale : queues qu'aucun intègre ne suit (E-R-01 ;
+Q-R18-8). Tête : dernier intègre (§1.4)."""
 import hashlib
 import json
 import os
@@ -71,6 +72,11 @@ def fichiers(dossier, prefixe):
     return [n for _j, _k, n in sorted((m[1], int(m[2]), m[0]) for m in map(motif.fullmatch, os.listdir(dossier)) if m)]
 
 
+def cle(x):
+    """Forme canonique de comparaison : `true` n'égale pas 1."""
+    return json.dumps(x, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 class Lecture:
     """Lecture en flux du journal `prefixe` de `dossier` : itérer rend chaque enregistrement intègre {fichier, position,
     sha256, enr}, dans l'ordre de la chaîne ; l'itération finie, `ruptures`, `queues_declarees`, `queue_finale` et
@@ -93,7 +99,7 @@ class Lecture:
                             attente.append(self._queue(f, nom, pos))
                             break
                         h = hashlib.sha256(ligne).hexdigest()
-                        if prec is None:
+                        if prec is None or e["type"] == "reprise":
                             self._jonction(nom, pos, e, base, attente)
                         yield {"fichier": nom, "position": pos, "sha256": h, "enr": e}
                         prec = base = (e["seq"], h)
@@ -128,10 +134,18 @@ class Lecture:
             causes += ["genese"] * ((e["type"], e["seq"], e["prec"]) != ("ouverture", 0, GENESE))
         else:
             causes += ["lien"] * ((e["seq"], e["prec"]) != (base[0] + 1, base[1]))
-        causes += ["queue-non-declaree"] * bool(attente)
+        d = e.get("queue") if e["type"] == "reprise" else None
+        declarees, non = [cle(x) for x in (d if type(d) is list else [] if d is None else [d])], []
+        for q in attente:
+            if cle(q) in declarees:
+                declarees.remove(cle(q))
+                self.queues_declarees.append(q)
+            else:
+                non.append(q)
+        causes += ["queue-non-declaree"] * bool(non) + ["declaration"] * bool(declarees)
         if causes:
             self.ruptures.append({"fichier": nom, "position": pos, "seq": e["seq"], "causes": sorted(causes),
-                                  "queues": list(attente)})
+                                  "queues": non})
         attente.clear()
 
 
