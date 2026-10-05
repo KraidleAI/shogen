@@ -2,10 +2,14 @@
 quatre observateurs par fenêtre, M_j, votes « écart » par (observateur, hôte, classe), défauts locaux, artefacts
 simultanés, consolidation au quorum q_j = ⌊M_j/2⌋ + 1 (vote tout axe) et « ok » consolidé, en masques entiers (bit j =
 fenêtre T_début + j·w, comme calendrier.py et sources.py). SB-6a : flux des composants pré-déclarés, comptage par plans
-de bits, quorum par fenêtre, statuts et votes d'un observateur, consolidation (D, ok) de chaque série. Aucun flottant
-hors des tirages, aucune fonction transcendante, aucune puissance."""
+de bits, quorum par fenêtre, statuts et votes d'un observateur, consolidation (D, ok) de chaque série. SB-6b : couche
+d'une réplication, validité des observateurs (absences D-1, dégradations D-2 à D-5, pannes de paires, perte, repli M =
+3). Aucun flottant hors des tirages, aucune fonction transcendante, aucune puissance."""
+import functools
+
 import aleas
 import commun
+import sources
 
 
 def flux(prm: dict, cellule: str, i: int, composant: str, indice: int):
@@ -77,3 +81,68 @@ def consolider(etat: dict, quorum: Quorum, vues: dict) -> dict:
             ok.append(quorum.grille & ~p)
         out[u, c] = (quorum.atteint(votes), quorum.atteint(ok))
     return out
+
+
+@functools.lru_cache(maxsize=None)
+def _uniforme(n: int):
+    return aleas.Empirique([(j, 1) for j in range(n)])        # j uniforme sur 0..n − 1 (seuils exacts j/n)
+
+
+def debuts(prm: dict, u, rho, horizon: int) -> list:
+    """Débuts d'épisodes sur [0, horizon), dans l'ordre : tirages de Bernoulli de paramètre ρ·w/86 400 par fenêtre de
+    grille, ρ par jour (forme de sources.incidents, pauses géométriques par table exacte)."""
+    g, t, out = sources.Geometrique(rho * prm["calendrier"]["w"] / 86400, prm["aleas"]), -1, []
+    while True:
+        d = g.tirer(u, horizon - 1 - t)
+        if d is None:
+            return out
+        t += d
+        out.append(t)
+
+
+class Couche:
+    """Couche d'observateurs d'une réplication (E-S-17 à E-S-21) : paramètres, spécification de la cellule (`couche` :
+    absences et dégradations, parts stationnaires par observateur ; paires, pannes de paires par jour ; perte, None ou
+    durée nominale en fenêtres sur laquelle l'instant de la perte est tiré ; repli, M = 3), nom de cellule, indice i ≥
+    0 et horizon T_max en fenêtres ; essais : {(composant, indice) : u} remplace les flux nommés (tests pas à pas)."""
+
+    def __init__(self, prm, couche, cellule, i, horizon, essais=None):
+        self.prm, self.couche, self.cellule, self.i, self.horizon = prm, couche, cellule, i, horizon
+        self.essais, self.grille = essais or {}, (1 << horizon) - 1
+
+    def u(self, composant, indice):
+        return self.essais.get((composant, indice)) or flux(self.prm, self.cellule, self.i, composant, indice)
+
+    def validites(self) -> list:
+        """Masques de validité des M observateurs (E-S-17, E-S-18 ; grille de Q-S-11). Non valide : absence D-1
+        (renouvellement stationnaire de part `absences`, longueurs observateurs.absences, flux « obs-absences » d'indice
+        o) ; dégradation D-2 à D-5 (tirages indépendants par fenêtre de part `degradations`, flux « obs-degradations »
+        d'indice o) ; panne de paire (débuts à `paires` par jour, flux « obs-paires » 0 ; paire uniforme parmi celles
+        des observateurs présents, flux « obs-paires » 1 ; durée observateurs.duree_paire) ; perte définitive
+        (observateur uniforme parmi les présents, instant uniforme sur la durée `perte`, jour puis fenêtre du jour, flux
+        « obs-perte ») ; repli (observateur observateurs.repli absent toute la campagne, E-S-18). Durée de perte non
+        multiple d'un jour : OBSERVATEURS/perte."""
+        op, c, a = self.prm["observateurs"], self.couche, self.prm["aleas"]
+        presents = [o for o in range(op["M"]) if not (c["repli"] and o == op["repli"])]
+        inv, loi = [0 if o in presents else self.grille for o in range(op["M"])], sources.Empirique(op["absences"])
+        for o in presents:
+            if c["absences"]:
+                q = sources.pause(c["absences"], loi.moyenne)
+                inv[o] |= sources.masque(sources.alterner(self.u("obs-absences", o), loi, q, a, self.horizon))
+            if c["degradations"]:
+                p = c["degradations"]
+                inv[o] |= sources.masque(sources.markov(self.u("obs-degradations", o), p, p, a, self.horizon))
+        if c["paires"]:
+            paires, v = [(x, y) for x in presents for y in presents if x < y], self.u("obs-paires", 1)
+            for t in debuts(self.prm, self.u("obs-paires", 0), c["paires"], self.horizon):
+                x, y = paires[_uniforme(len(paires)).tirer(v)]
+                inv[x] |= ((1 << op["duree_paire"]) - 1) << t
+                inv[y] |= ((1 << op["duree_paire"]) - 1) << t
+        if c["perte"] is not None:
+            fpj, n, u = 86400 // self.prm["calendrier"]["w"], c["perte"], self.u("obs-perte", 0)
+            if n % fpj or n < fpj:
+                raise commun.Refus("OBSERVATEURS/perte", f"{n} fenêtres : multiple entier d'un jour ({fpj}) attendu")
+            o = presents[_uniforme(len(presents)).tirer(u)]
+            t = fpj * _uniforme(n // fpj).tirer(u) + _uniforme(fpj).tirer(u)
+            inv[o] |= self.grille >> t << t
+        return [self.grille & ~x for x in inv]

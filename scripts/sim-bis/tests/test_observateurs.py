@@ -1,13 +1,22 @@
 """Observateurs SB-6 (E-S-17 à E-S-22 ; T-OBS-1, T-OBS-2) : tables de votes et de validité écrites à la main, fenêtre
 par fenêtre (bit j = fenêtre j) ; chaque test nomme les mutations qui le rougissent."""
 import unittest
+from fractions import Fraction
 
 import aleas
+import calendrier
 import commun
 import observateurs
 import sources
 
 PRM = commun.charger_parametres(environ={})
+
+
+def dans_5_se(x: list, r: Fraction) -> bool:
+    """Moyenne des rationnels x à moins de 5 erreurs-types de r : (x̄ − r)² < 25·s²/R, s² variance sans biais."""
+    m = sum(x, Fraction(0)) / len(x)
+    s2 = sum(((y - m) * (y - m) for y in x), Fraction(0)) / (len(x) - 1)
+    return (m - r) * (m - r) < 25 * s2 / len(x)
 
 
 def bits(*positions) -> int:
@@ -90,3 +99,77 @@ class TestQuorum(unittest.TestCase):
         self.assertEqual(observateurs.consolider(etat, q, {**vues, ("local", 0): bits(1, 2)}),
                          {k: (bits(1), bits(0, 3)) for k in etat})
         self.assertEqual(observateurs.consolider(etat, q, vues), {k: (0, bits(0, 2, 3)) for k in etat})
+
+
+def suite(*u):
+    """u() qui rend les valeurs données, dans l'ordre (StopIteration au-delà)."""
+    return iter(u).__next__
+
+
+def couche(**k) -> dict:
+    """Couche d'essai (E-S-17, E-S-18) : rien par défaut ; k remplace."""
+    return dict({"absences": Fraction(0), "degradations": Fraction(0), "paires": Fraction(0), "perte": None,
+                 "repli": False}, **k)
+
+
+def part(m: int, n: int) -> Fraction:
+    return Fraction(m.bit_count(), n)
+
+
+class TestValidite(unittest.TestCase):
+    def test_paires_pas_a_pas(self):
+        """Pannes de paires (Q-S-11) à la main : ρ = 720 par jour, soit 1/2 par fenêtre (seuils 1/2, 3/4, 7/8, …), durée
+        2 au lieu de 60 (paramètre d'essai), horizon 8 : débuts en 0 (u = 0,3) et 3 (0,8), pause 5 au-delà (0,95) ;
+        paires parmi les six de {O1..O4} dans l'ordre (01, 02, 03, 12, 13, 23) : v = 0,5 → 12, v = 0,1 → 01. O1 non
+        valide en 3 et 4, O2 en 0, 1, 3, 4, O3 en 0 et 1, O4 toujours valide. Repli M = 3 (E-S-18) : O4 jamais valide ;
+        débuts en 0 et 7 (0,3 ; 0,99), paires parmi les trois de {O1..O3} (01, 02, 12) : v = 0,5 → 02, v = 0,9 → 12.
+        Mutations M-6B-01 (durée de paire constante, 60, au lieu du paramètre), M-6B-02 (paire tirée parmi les quatre
+        au repli), M-6B-03 (repli ignoré)."""
+        prm = dict(PRM, observateurs=dict(PRM["observateurs"], duree_paire=2))
+        g, essais = (1 << 8) - 1, {("obs-paires", 0): suite(0.3, 0.8, 0.95), ("obs-paires", 1): suite(0.5, 0.1)}
+        v = observateurs.Couche(prm, couche(paires=Fraction(720)), "T-6B", 0, 8, essais).validites()
+        self.assertEqual(v, [g & ~bits(3, 4), g & ~bits(0, 1, 3, 4), g & ~bits(0, 1), g])
+        essais = {("obs-paires", 0): suite(0.3, 0.99), ("obs-paires", 1): suite(0.5, 0.9)}
+        v = observateurs.Couche(prm, couche(paires=Fraction(720), repli=True), "T-6B", 0, 8, essais).validites()
+        self.assertEqual(v, [g & ~bits(0, 1), g & ~bits(7), g & ~bits(0, 1, 7), 0])
+
+    def test_perte_definitive(self):
+        """Perte d'un observateur à un instant tiré (E-S-17, N5), sur 2 880 fenêtres nominales (deux jours) :
+        observateur parmi les quatre (u = 0,6 → O3), jour (0,3 → 0), fenêtre du jour (0,25 → 360) : O3 non valide de la
+        fenêtre 360 à l'horizon (3 000), plus d'un jour ; au repli, parmi les trois présents (0,6 → O2). Durée non
+        multiple d'un jour : OBSERVATEURS/perte. Mutations M-6B-04 (instant : jour et fenêtre permutés), M-6B-05 (perte
+        bornée à un jour)."""
+        g = (1 << 3000) - 1
+        v = observateurs.Couche(PRM, couche(perte=2880), "T-6B", 0, 3000, {("obs-perte", 0): suite(0.6, 0.3, 0.25)})
+        v = v.validites()
+        self.assertEqual(v, [g, g, (1 << 360) - 1, g])
+        v = observateurs.Couche(PRM, couche(perte=2880, repli=True), "T-6B", 0, 3000,
+                                {("obs-perte", 0): suite(0.6, 0.3, 0.25)}).validites()
+        self.assertEqual(v, [g, (1 << 360) - 1, g, 0])
+        with self.assertRaises(commun.Refus) as c:
+            observateurs.Couche(PRM, couche(perte=1000), "T-6B", 0, 3000).validites()
+        self.assertEqual(c.exception.code, "OBSERVATEURS/perte")
+
+    def test_absences_et_degradations(self):
+        """Absences D-1 (renouvellement stationnaire, longueurs d'essai 2 et 5 à poids égaux) de part 1/20 et
+        dégradations D-2 à D-5 (tirages indépendants par fenêtre) de part 1/10 ; 100 réplications de 4 000 fenêtres :
+        part non valide de O1 à 5 SE de 1 − (19/20)(9/10) = 29/200 ; O1 et O2 non valides ensemble à 5 SE de
+        (29/200)², flux propres à chaque observateur ; absences seules : épisodes entiers de longueur 2 ou 5 seulement ;
+        dégradations seules : des épisodes d'une fenêtre.
+        Mutations M-6B-06 (absences omises), M-6B-07 (flux commun aux observateurs), M-6B-08 (dégradations en
+        épisodes de la loi des absences)."""
+        prm = dict(PRM, observateurs=dict(PRM["observateurs"], absences=[[2, 1], [5, 1]]))
+        x, y, lg, ld, n = [], [], set(), set(), 4000
+        for i in range(100):
+            v = observateurs.Couche(prm, couche(absences=Fraction(1, 20), degradations=Fraction(1, 10)), "T-6B", i,
+                                    n).validites()
+            x.append(1 - part(v[0], n))
+            y.append(part(((1 << n) - 1) & ~(v[0] | v[1]), n))
+            a = observateurs.Couche(prm, couche(absences=Fraction(1, 20)), "T-6B", i, n).validites()[2]
+            lg |= {b - d for d, b in calendrier.segments(((1 << n) - 1) & ~a) if 0 < d and b < n}
+            a = observateurs.Couche(prm, couche(degradations=Fraction(1, 10)), "T-6B", i, n).validites()[2]
+            ld |= {b - d for d, b in calendrier.segments(((1 << n) - 1) & ~a) if 0 < d and b < n}
+        self.assertTrue(dans_5_se(x, Fraction(29, 200)))
+        self.assertTrue(dans_5_se(y, Fraction(29, 200) * Fraction(29, 200)))
+        self.assertEqual(lg, {2, 5})
+        self.assertIn(1, ld)
