@@ -30,7 +30,8 @@
   proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet) ; le diff CB-18p, C-3 (§7.4) ; le diff CB-18q, C-5 (§5,
   §6.1, §7.7). Contre-contrôle de CB-18 (2026-10-05), adjugé par l'orchestrateur : le diff CB-18t applique O-1 (§7.4)
   et écrit la limite d'O-2 (§5). Relecture G2 d'intégration de P1 (2026-10-05) : le diff CB-19a applique C-1 (a)
-  (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1) ; le diff CB-19c, C-2 (a) (§6.4).
+  (§12) ; le diff CB-19b, C-1 (b) (§13.6, §14.1) ; le diff CB-19c, C-2 (a) (§6.4) ; le diff CB-19d, C-2 (b)
+  et C-4 (c) (§4).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -97,9 +98,29 @@ Tout refus est nommé (`JOURNAL/…`) et n'écrit rien (CB-2d, C-6 de la G2 de P
 
 ## 4. Durabilité
 
-L'écriture se fait sans tampon. `fsync` est appelé à chaque marqueur (après le point de contrôle s'il y en a un), et
-seulement là. Un arrêt brutal peut donc perdre les enregistrements postérieurs au dernier marqueur, ou laisser une
-dernière ligne tronquée.
+L'écriture se fait sans tampon. `fsync` est appelé (C-2 de la relecture d'intégration de P1, diffs CB-19c et CB-19d ;
+C-4 (c) : la phrase d'avant le disait appelé au marqueur seul, ce que contredisaient les §6.2, §6.3 et §7.4) :
+- à chaque marqueur, après le point de contrôle s'il y en a un ;
+- à la bascule, après la `cloture` (§6.2) ; après chaque ligne du fichier de sommes (§6.3) ; après chaque `reprise`
+  (§7.4) ;
+- sur le dossier, après la création d'un fichier (§6.4) ;
+- à la reprise (C-2 (b)) : avant d'écrire une `reprise` en segment neuf, sur le fichier dont elle chaîne la dernière
+  ligne intègre et sur ceux dont elle déclare la queue, même déjà sommés ; avant d'écrire la somme d'un fichier, sur
+  ce fichier.
+
+Entre deux marqueurs, rien n'est synchronisé : un arrêt brutal peut donc perdre les enregistrements postérieurs au
+dernier marqueur, ou laisser une dernière ligne tronquée.
+
+**Coupure de courant** (preuve de C-2) : banc à coupures de la relecture d'intégration (outil du réviseur, sha256
+`edca2fa8…`, rejoué sans modification ; graines 0 à 299, comme la relecture, sur des trajectoires qui diffèrent, le
+banc tirant ses pannes au sort à chaque `fsync`). Modèle : chaque fichier revient, au pire, à sa taille au dernier
+`fsync` de son inode, la part gardée au-delà pouvant finir en octets nuls. Résultat : 0 rupture et 0 somme fausse
+(128 et 131 avant C-2), sur 1 438 redémarrages et 533 queues déclarées. Ce que le modèle prouve : aucune `reprise` ne
+chaîne, ne déclare ni ne somme des octets qu'une coupure peut retirer, et aucune ligne du fichier de sommes ne précède
+les octets qu'elle somme. Ce qu'il ne prouve pas : la durabilité d'une entrée de dossier (le modèle ne retire jamais
+un fichier, §6.4) ; un `fsync` qui rend sans avoir écrit (cache d'écriture du disque) ; une perte sous la taille
+synchronisée d'un fichier. Un journal neuf dont le premier fichier n'est pas encore synchronisé (avant son premier
+marqueur) peut toujours, après une coupure, n'avoir aucune ligne intègre (§7.6).
 
 **Arrêt sur erreur d'entrée-sortie** (CB-2d, C-2) : toute `OSError` levée par une écriture, un `fsync`, une ouverture
 ou une fermeture de fichier pendant `ouvrir`, `ecrire` ou `marqueur` (bascule, sommes et reprise comprises) laisse

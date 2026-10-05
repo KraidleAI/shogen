@@ -1295,3 +1295,45 @@ Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; bo
 - deux textes du FORMAT ; plancher non relevé.
 
 Suite : 192 tests ; plancher du job : 192, égalité exigée (`--egal`).
+
+## CB-19d (2026-10-05) : fsync de ce dont dépend une `reprise` en segment neuf (C-2 (b) et C-4 (c) de la relecture)
+
+Objet : C-2 (b), adjugée telle qu'écrite : avant d'écrire une `reprise` en segment neuf, l'écrivain synchronise le
+fichier dont elle chaîne la dernière ligne intègre et ceux dont elle déclare la queue, même déjà sommés ; avant
+d'écrire la somme d'un fichier (reprise sur place comprise), il synchronise ce fichier. FORMAT §4 réécrit : points de
+`fsync` énumérés, ce qui retire le « et seulement là » que les §6.2, §6.3 et §7.4 contredisaient (C-4 (c), portée ici
+parce que C-2 réécrit le même paragraphe), preuve du banc, ce que son modèle prouve et ne prouve pas.
+
+Preuve exigée, banc à coupures du réviseur (`outils/banc_ecrivain.py`, sha256 `edca2fa8…`, et sa sonde, `0b2d0dcd…`,
+rejoués sans modification par un agrégateur du worker qui appelle `graine(g)` et compte l'état final comme la
+relecture ; le même agrégateur sur la base 47b2177 redonne les chiffres de la relecture, ce qui valide le compte) :
+
+| banc (graines) | état | redémarrages | queues déclarées | rupture finale | dont lien rompu | dont déclaration fausse | somme fausse | illisibles |
+|---|---|---|---|---|---|---|---|---|
+| coupures (0 à 299) | base 47b2177 | 1 455 | 576 | 128 | 86 | 86 | 131 | 14 |
+| coupures (0 à 299) | CB-19d | 1 438 | 533 | 0 | 0 | 0 | 0 | 19 |
+| sans coupure (0 à 999) | CB-19d | 4 876 | 1 622 | 0 | 0 | 0 | 0 | 27 |
+
+Sans coupure, les 27 journaux illisibles et les trois refus finals (graines 39, 97 et 297) sont ceux de la mesure du
+réviseur : C-2 n'ajoute aucune cause. Sous coupures, les trajectoires diffèrent de la base (le banc tire ses pannes
+au sort à chaque `fsync`, et C-2 en ajoute) ; les illisibles restent ceux d'un journal neuf dont le premier fichier
+n'est pas synchronisé avant son premier marqueur (item 1 de la relecture, non traité ici). Le modèle ne porte que sur
+la taille des fichiers : la durabilité des entrées de dossier (C-2 (a)) n'est pas prouvée par ce banc.
+
+Rouge : sur l'état CB-19c, aucun `fsync` des dépendances ni du fichier avant sa somme (`[] != […]`), §4 d'avant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 405 | — |
+| `tests/test_reprise.py` | 320 | 25 (2 de plus : deux reprises, la seconde après la coupure du segment de la première, dépendances déjà sommées ; somme rattrapée après le `fsync` du fichier) |
+| `tests/test_format.py` | 163 | 8 (1 de plus : §4, points de `fsync`, preuve du banc et ses limites) |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin VIVANT) : 13 mutants neufs, 13 tués (0 vivant, 0 FATAL) :
+- aucun `fsync` des dépendances, le fichier chaîné seul, les queues seules, après l'écriture de la reprise, condition
+  inversée, `fsync` répété du seul fichier chaîné : test des deux reprises ;
+- somme sans `fsync` du fichier, `fsync` après la somme : test de la somme rattrapée ;
+- quatre textes du FORMAT (« et seulement là » revenu, résultat du banc, limites du modèle, puce) ; plancher non
+  relevé.
+
+Suite : 195 tests ; plancher du job : 195, égalité exigée (`--egal`).

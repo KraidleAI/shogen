@@ -3,8 +3,10 @@ JSON canonique (clés triées, séparateurs « , » et « : », UTF-8 sans écha
 entiers de 640 chiffres au plus : SHOGEN-S2BIS-ENTIER-ECRIVAIN-1, I-1 de la G2 du recalcul ; 64 niveaux
 d'imbrication au plus, la racine au niveau 1 : lettre C-4 du FORMAT, CB-18n) qui porte `seq` (rang depuis 0) et
 `prec` (sha256 des octets de la ligne précédente, saut de ligne compris ; GENESE pour la première). Écriture sans
-tampon ; `fsync` (injectable) au marqueur de fenêtre seulement ; la fenêtre qui clôt une heure est suivie d'un point
-de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
+tampon ; `fsync` (injectable) au marqueur de fenêtre, et hors des fenêtres à la bascule, aux sommes, à la reprise et
+sur le dossier (CB-19c, CB-19d : C-2 de la relecture d'intégration de P1, fsync du dossier après chaque création, des
+fichiers dont dépend une `reprise` en segment neuf, de tout fichier avant sa somme) ; la fenêtre qui clôt une heure
+est suivie d'un point de contrôle `point`, dont l'empreinte est la tête exportée. Un enregistrement de
 fenêtre n'est admis que sur la grille, pour une fenêtre non close (ws ≥ `suivante`) et jamais avant la dernière
 fenêtre écrite (C-1). Tout refus est nommé (ErreurJournal) et n'écrit rien : l'enregistrement est contrôlé avant
 toute bascule et tout trou (C-6). Après une OSError, tout appel est refusé (JOURNAL/casse, C-2). E-C-16 : un seul
@@ -361,14 +363,18 @@ class Journal:
                 self._ecrire({"type": "cloture", "jour": j})
                 self.fsync(self.fd)
                 self._clore()
-            self._sommes([x for _j, _k, x in fichiers])
+            durables = list(dict.fromkeys([n, *(x["fichier"] for x in queues)]))   # C-2 (b) : chaîné, queues
+            for x in () if ouvert else durables:                # ouvert : n vient d'être synchronisé (clôture)
+                self._synchro(x)
+            self._sommes([x for _j, _k, x in fichiers], durables)
             jn = max(jour(ws), fichiers[-1][0])                 # N-1 : jamais avant le jour d'un fichier présent
             self._creer(jn, self._numero(jn), reprise)
         self.fsync(self.fd)
 
-    def _sommes(self, noms):
-        """Inscrit au fichier de sommes chaque fichier de `noms` qui n'y est pas (coupure avant l'inscription) ; une
-        dernière ligne coupée y est close par un saut de ligne, jamais réécrite."""
+    def _sommes(self, noms, durables=()):
+        """Inscrit au fichier de sommes chaque fichier de `noms` qui n'y est pas (coupure avant l'inscription), après
+        un fsync de ce fichier s'il n'est pas dans `durables` (déjà synchronisés, C-2 (b)) ; une dernière ligne coupée
+        y est close par un saut de ligne, jamais réécrite."""
         chemin, texte = os.path.join(self.dossier, self.prefixe + ".sha256"), ""
         if os.path.exists(chemin):
             with open(chemin, encoding="utf-8", errors="replace") as f:
@@ -380,6 +386,8 @@ class Journal:
         lus = {ligne.split("  ", 1)[-1] for ligne in texte.split("\n")}
         for x in noms:
             if x not in lus:
+                if x not in durables:
+                    self._synchro(x)                            # C-2 (b) : le fichier est durable avant sa somme
                 self._sommer(x, _empreinte(os.path.join(self.dossier, x))[0])
 
     def _ecrire(self, enr):

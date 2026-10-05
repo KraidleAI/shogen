@@ -1,5 +1,6 @@
 """CB-2, E-C-21 : reprise au dernier enregistrement intègre, queue non intègre conservée à l'octet et déclarée dans un
-segment neuf, fenêtre du redémarrage refusée, sommes rattrapées. Queues calculées sur les octets du test."""
+segment neuf, fenêtre du redémarrage refusée, sommes rattrapées. Queues calculées sur les octets du test. CB-19d
+(C-2 (b) de la relecture d'intégration de P1) : fsync de ce dont la reprise dépend, relevé par l'espion."""
 import errno
 import hashlib
 import json
@@ -284,3 +285,36 @@ class Reprise(AvecJournal):
         self.journal(J2 + 120)
         e = self.etat()
         self.assertEqual(e["pool.sha256"], f"0123\n{hashlib.sha256(e[FICHIER]).hexdigest()}  {FICHIER}\n".encode())
+
+    def test_segment_neuf_apres_fsync_de_ce_dont_la_reprise_depend(self):  # CB-19d, C-2 (b) de la relecture
+        """Avant d'écrire une `reprise` en segment neuf, l'écrivain synchronise le fichier dont elle chaîne la dernière
+        ligne intègre et ceux dont elle déclare la queue, même déjà sommés, à leur taille entière, avant que le segment
+        n'existe ; un fichier qu'elle somme l'est avant sa somme. SEG1 sans ligne intègre : la première reprise écrit
+        SEG2 et somme FICHIER et SEG1 ; SEG2 coupé à 10 octets (coupure de courant) ; la seconde reprise dépend de
+        FICHIER, SEG1 et SEG2, somme SEG2 et écrit le segment 3."""
+        self.preparer()
+        with open(os.path.join(self.d, SEG1), "wb") as f:
+            f.write(bytes(10))
+        self.journal(m(7)).fermer()
+        with open(os.path.join(self.d, SEG2), "r+b") as f:
+            f.truncate(10)
+        n, tailles, premiers = len(self.appels), {x: len(o) for x, o in self.etat().items()}, {}
+        self.journal(m(9)).fermer()
+        for nom, inst in self.appels[n:]:
+            premiers.setdefault(nom, inst)
+        self.assertEqual([(x, premiers[x][x], "pool-2026-10-04-3.jsonl" in premiers[x]) for x in (FICHIER, SEG1, SEG2)
+                          if x in premiers], [(x, tailles[x], False) for x in (FICHIER, SEG1, SEG2)])
+        self.assertEqual(premiers[SEG2]["pool.sha256"], tailles["pool.sha256"])        # somme de SEG2 non écrite
+
+    def test_somme_rattrapee_apres_fsync_du_fichier(self):            # CB-19d, C-2 (b) de la relecture d'intégration
+        """Reprise sur place : un fichier clos dont la somme manque (coupure) est synchronisé avant que sa somme ne
+        soit écrite."""
+        jl = self.journal(J1 - 60)
+        jl.marqueur(J1)
+        jl.marqueur(J2)
+        jl.fermer()
+        open(os.path.join(self.d, "pool.sha256"), "wb").close()
+        n = len(self.appels)
+        self.journal(J2 + 120).fermer()
+        premiers = [inst for nom, inst in self.appels[n:] if nom == FICHIER][:1]
+        self.assertEqual([(i[FICHIER], i["pool.sha256"]) for i in premiers], [(len(self.etat()[FICHIER]), 0)])

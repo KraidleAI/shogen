@@ -96,6 +96,18 @@ class Format(unittest.TestCase):
                                                 "n'est pas suivie d'un `fsync` du dossier")], [True] * 4 + [False])
         self.assertEqual([("CB-19c" in p) for p in puces if p.startswith("**Corrections** :")], [True])
 
+    def test_paragraphe_4_points_de_fsync_et_preuve_du_banc(self):    # CB-19d, C-2 (b) et C-4 (c) de la relecture
+        """§4 : « et seulement là » retiré (C-4 (c) : contredit les §6.2, §6.3 et §7.4) ; les fsync de C-2 (b) nommés
+        (fichier chaîné, queues déclarées, avant la `reprise` en segment neuf ; fichier sommé, avant sa somme) ; preuve
+        du banc à coupures (0 rupture, 0 somme fausse, contre 128 et 131), ce que son modèle prouve et ne prouve pas ;
+        puce « Corrections » : CB-19d."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("et seulement là", "dont elle chaîne la dernière ligne intègre", "dont elle déclare la queue",
+                    "avant d'écrire la somme d'un fichier", "0 rupture et 0 somme fausse (128 et 131 avant C-2)",
+                    "Ce que le modèle prouve", "Ce qu'il ne prouve pas")
+        self.assertEqual([x in sections["4"] for x in attendus], [False] + [True] * 6)
+        self.assertEqual([("CB-19d" in p) for p in puces if p.startswith("**Corrections** :")], [True])
+
     def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
         """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
         et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite
