@@ -273,6 +273,29 @@ class TestModeComplet(unittest.TestCase):
                     regle.oracle(series, "binance", graine, "calme", n, n, PRM, 999, avec_S)
             self.assertEqual(c.exception.code, "REGLE/oracle", j)
 
+    def test_oracle_frontiere_c_s_t_reg_2(self):
+        """T-REG-2, frontière de « C_S ≤ seuil » dans oracle() (CC-1 du contre-contrôle de la tranche 3 ; E-S-29),
+        d'après le prototype du réviseur : mock.patch.object sur deux_modes, S suivie, même valeur et mêmes causes des
+        deux côtés ; seul C_S diffère. R = 999, seuil 9 (α·(R + 1) − 1, à la main) : anticipé C_S = 9 contre complet
+        C_S = 10, réponses opposées à « C_S ≤ 9 », REGLE/oracle ; anticipé contre complet 8 et 9, 10 et 11, 9 et 9 :
+        même réponse, aucun refus, résultat anticipé rendu. R = 9 999, seuil 99 : 99 contre 100, REGLE/oracle ;
+        98 et 99, 100 et 101, 99 et 99, aucun refus (borne fixée aux deux R). Mutations X-01 du réviseur (« < » au lieu
+        de « ≤ »), M-8H-01 (« ≤ seuil + 1 »), M-8H-02 (seuil du R de parametres.json au lieu du R de l'appel), M-8H-03
+        (C_S de l'anticipé lu des deux côtés), M-8H-04 (« = » au lieu de « ≤ »), M-8H-05 (résultat complet rendu),
+        S-8H-01 (seuil du R de l'approche, 9 à tout R)."""
+        def code(R, ca, cf):
+            a, f = ({"valeur": "NE REJETTE PAS", "causes": [], "C_S": c} for c in (ca, cf))
+            with mock.patch.object(regle, "deux_modes", return_value=(a, f)):
+                try:
+                    rendu = regle.oracle({"binance": 3, "okx": 3}, "binance", G, "calme", 2, 2, PRM, R, True)
+                except commun.Refus as e:
+                    return e.code
+            self.assertIs(rendu, a, (R, ca, cf))
+            return None
+        cas = {999: ((9, 10), (8, 9), (10, 11), (9, 9)), 9999: ((99, 100), (98, 99), (100, 101), (99, 99))}
+        for R, paires in cas.items():
+            self.assertEqual([code(R, ca, cf) for ca, cf in paires], ["REGLE/oracle", None, None, None], R)
+
     def test_sequence_et_f3_t_reg_3(self):
         """T-REG-3 (E-S-30, E-S-31 ; ADR-0029 l.204) : ETH (F2) testé seulement si BTC REJETTE dans la strate, sinon
         « NON TESTÉ (séquence) », son test sans condition gardé en diagnostic ; rejet familial (au moins un rejet, BTC
