@@ -404,3 +404,19 @@ visé au second passage (0 vivant, 0 FATAL), dont « classe dans l'entrée du ha
 borne de 300 s (FATAL), le diff de `unittest` sur deux listes de 9 999 valeurs ne se terminant pas ; l'assertion compare
 désormais des booléens, puis la campagne a été relancée en entier. Coût mesuré : `ROTATION-S2BIS.md` §6. Suite :
 130 tests ; plancher du job : 130, égalité exigée (`--egal`).
+
+## RB-1a (2026-10-05) : lecteur en flux, ligne intègre et ordre des fichiers
+
+Objet : `lecteur.py`, intégrité d'une ligne au sens de l'écrivain de référence (FORMAT §7.1, `collecte/journal.py`
+`_lire` : saut de ligne final, JSON canonique, chaîne dans le fichier, première ligne `ouverture` ou `reprise`, champs
+typés comme l'écrivain les relit), cause nommée de toute ligne non intègre (`LECTEUR/fin`, `json`, `canonique`,
+`chaine`, `champ`, `flottant`, `entier-long`), entier JSON de plus de 640 chiffres nommé quel que soit le réglage
+`int_max_str_digits` de l'interpréteur (SHOGEN-JSON-ENTIER-LONG-1, transposé) ; fichiers d'un préfixe dans l'ordre de la
+chaîne (jour, segment en entier) ; aucun fichier : refus nommé `LECTEUR/absent`.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/lecteur.py` | 82 | 4 (`tests/test_lecteur.py`, 77 lignes) |
+
+Mutants (commande du job, runner puis `--plancher 134`, borne de 300 s, réseau isolé) : 20 tués sur 20 par leur test
+visé (0 vivant, 0 FATAL). Suite : 134 tests ; plancher du job : 134, égalité exigée (`--egal`).
