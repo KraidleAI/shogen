@@ -28,9 +28,11 @@ def planifier(formes, espaces=()):
 
 class Boucle:
     def __init__(self, journal, lectures, plan, places, w=60, delta=DELTA, marge=MARGE, horloge=horloge,
-                 dormir=None, attendre=None):
-        """`lectures` {nom: lire(suivi)} ; `plan` de `planifier` ; `places` : taille scellée du pool ; attentes à t."""
+                 dormir=None, attendre=None, sondes=None):
+        """`lectures` {nom: lire(suivi)} ; `plan` de `planifier` ; `places` : taille scellée du pool ; attentes à t ;
+        `sondes` (sante.Sondes, CB-11) : lancées au départ, jointes avant l'échéance, versées à `sante`."""
         self.journal, self.lectures, self.plan, self.horloge, self.w = journal, lectures, plan, horloge, w
+        self.sondes = sondes
         self.delta, self.marge, self.places, self.abandons = delta, marge, threading.BoundedSemaphore(places), []
         self.dormir = dormir or (lambda t: time.sleep(max(0, t - horloge()) / S))
         self.attendre = attendre or (lambda futurs, t: concurrent.futures.wait(futurs, max(0, t - horloge()) / S))
@@ -46,7 +48,10 @@ class Boucle:
 
     def fenetre(self, ws):
         depart, echeance = (ws + self.w) * S - self.delta, (ws + self.w) * S - self.marge
-        lancees, non_parties, retards = [], 0, []
+        lancees, non_parties, retards, sondes = [], 0, [], []
+        if self.sondes:                                             # sondes de santé au départ (Q-C-03)
+            self.dormir(depart)
+            sondes = self.sondes.lancer()
         for decalage, nom in self.plan:
             self.dormir(depart + decalage)
             if not self.places.acquire(blocking=False):
@@ -56,7 +61,7 @@ class Boucle:
             retards.append(suivi["depart"] - depart - decalage)
             threading.Thread(target=self._lire, args=(nom, suivi, futur), daemon=True).start()
             lancees.append((nom, depart + decalage, suivi, futur))
-        self.attendre([f for *_x, f in lancees], echeance)
+        self.attendre([f for *_x, f in lancees] + [f for _c, f in sondes], echeance)
         finis, vivants = concurrent.futures.wait(self.abandons, timeout=0)
         tardives, self.abandons = sorted(f.result().fin - f.result().depart for f in finis), list(vivants)
         for nom, prevu, suivi, futur in lancees:
@@ -69,7 +74,8 @@ class Boucle:
                 self.abandons.append(futur)
             self.journal.ecrire("lecture", ws, forme=nom, prevu=prevu, **lu.enregistrement())
         self.journal.ecrire("sante", ws, d2={"retard_max": max(retards, default=None), "non_parties": non_parties},
-                            fils={"abandonnes": len(self.abandons), "tardives": tardives})
+                            fils={"abandonnes": len(self.abandons), "tardives": tardives},
+                            **(self.sondes.joindre(sondes) if self.sondes else {}))
         self.journal.marqueur(ws)
 
     def _lire(self, nom, suivi, futur):

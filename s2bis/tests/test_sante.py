@@ -1,5 +1,5 @@
-"""CB-11, E-C-25 à E-C-29 : sondes de santé, commande d'horloge, requêtes DNS et lancement injectés. sha256 de la
-configuration du résolveur calculé hors du code (printf, sha256sum)."""
+"""CB-11, E-C-25 à E-C-29 : sondes de santé, commande d'horloge, requêtes DNS et lancement injectés ; branchement à la
+boucle (liste blanche des clés de `sante`). sha256 de la configuration du résolveur par printf et sha256sum."""
 import concurrent.futures
 import os
 import subprocess
@@ -9,8 +9,11 @@ import time
 import types
 import unittest
 
-from shogen_s2bis.collecte import sante
+from shogen_s2bis.collecte import boucle, sante
 from shogen_s2bis.collecte.lecture import S
+from tests.test_boucle import D, Temps, rapide
+from tests.test_journal import FICHIER, Base, chaine
+from tests.test_reprise import m, sans_chaine
 
 GELEE = b"sortie gelee, une ligne : 0.000012,0.25\n" + bytes([0xFF])           # octet hors UTF-8 : remplacé
 RESOLV, EMPREINTE = b"nameserver 192.0.2.53\n", "d6bb96afccde62f60825d960dc109539de2c9c4de7315256247fea6f6fce77c5"
@@ -87,3 +90,25 @@ class Sondes(unittest.TestCase):
         concurrent.futures.wait([lancees[0][1]], 5)                         # la sonde d'horloge finit seule
         r = s.joindre(lancees)
         self.assertEqual((r["d3"]["code"], r["d4"], r["d5"]), (0, [None], [None]))
+
+
+class Branchement(Base):
+    def test_sante_liste_blanche_sondes_au_depart_jointes_avant_l_echeance(self):
+        temps, instants = Temps(m(2) * S + 5 * S), []
+
+        def interroger(*a, **k):
+            instants.append(temps())
+            time.sleep(0.3)                                             # plus lente que la lecture
+            return {"statut": "reponse"}
+        s = sante.Sondes(["horloge"], TEMOINS[:1], NOMS[:1], "192.0.2.53", self.d, os.path.join(self.d, "absent"),
+                         interroger=interroger, lancer=Faux().lancer)
+        boucle.Boucle(self.journal(m(2)), {"a": rapide}, [(S, "a")], 8, horloge=temps, dormir=temps.dormir,
+                      attendre=temps.attendre, sondes=s).tourner(1)
+        enr = sans_chaine(chaine(self.etat()[FICHIER])[2])[-2]
+        self.assertEqual((sorted(enr), sorted(enr["d2"]), sorted(enr["fils"])),
+                         (["d2", "d3", "d4", "d5", "disque", "fils", "resolveur", "type", "ws"],
+                          ["non_parties", "retard_max"], ["abandonnes", "tardives"]))
+        self.assertEqual((enr["d3"]["code"], enr["d4"], enr["d5"], enr["resolveur"], instants),
+                         (0, [{"adresse": TEMOINS[0], "statut": "reponse"}], [{"nom": NOMS[0], "statut": "reponse"}],
+                          None, [D, D]))
+        self.assertEqual(temps.appels[:2], [("dormir", D), ("dormir", D + S)])

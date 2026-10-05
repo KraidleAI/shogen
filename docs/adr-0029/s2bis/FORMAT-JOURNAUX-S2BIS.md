@@ -238,3 +238,25 @@ champs :
 Une réponse n'est retenue que si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête
 (tiré au hasard sur 16 bits), le bit QR et la même question ; tout autre datagramme est ignoré. La requête ne passe par
 aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-0029 l.109).
+
+## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
+
+1. Un enregistrement `sante` par fenêtre lue, avant le marqueur. Ses clés forment une **liste blanche fermée** :
+   `type`, `ws`, `seq`, `prec`, `d2`, `fils` (§11.6), `d3`, `d4`, `d5`, `disque`, `resolveur`. Aucune clé n'est tirée
+   d'une lecture de source ; aucun champ ne porte de jugement (« dégradé » se juge au recalcul et dans `status`, avec
+   les seuils scellés, E-C-26).
+2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
+   hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
+   cours à l'échéance vaut null.
+3. `d3` : sortie brute de la commande d'horloge scellée (configuration de l'observateur ; relevé chrony, ADR-0029
+   l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard lue en UTF-8 (octet invalide
+   remplacé par U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur`
+   valant `absente` (commande introuvable), `delai` (plus de 2 s) ou `autre`. Le collecteur n'analyse pas cette
+   sortie : la borne d'erreur, le statut et l'âge du relevé se lisent au recalcul.
+4. `d4` : liste, dans l'ordre des témoins scellés, de `{adresse, …}` : adresse IPv4 littérale du témoin, puis le
+   résultat de la requête SOA de « . » sans récursion, délai de 2 s (§12). `d5` : liste, dans l'ordre des noms
+   scellés, de `{nom, …}` : le nom témoin, puis le résultat de sa requête A, avec récursion, au résolveur de
+   l'observateur, délai de 2 s (§12).
+5. `disque` : `{total, libre}` du système de fichiers du journal, en octets (`libre` : blocs disponibles pour un
+   utilisateur ordinaire) ; ou `{erreur}` (nom de l'exception). `resolveur` : sha256 des octets de la configuration
+   du résolveur de l'observateur (`/etc/resolv.conf` par défaut), null si elle ne se lit pas.

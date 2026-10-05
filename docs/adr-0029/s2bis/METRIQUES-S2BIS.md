@@ -214,3 +214,13 @@ Suite : 87 tests ; plancher du job : 87, égalité exigée (`--egal`).
 Mutants : 15 tués sur 15 (0 vivant, 0 FATAL). Limite : le mutant « blocs libres pour l'administrateur au lieu des blocs
 disponibles » (M-11a-07) n'est tué que sur un système de fichiers qui réserve des blocs (ext4 de l'hôte de session :
 oui). Suite : 91 tests ; plancher du job : 91, égalité exigée (`--egal`).
+
+## CB-11b (2026-10-04) : sondes branchées à la boucle, liste blanche de `sante`
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 89 | 1 (`tests/test_sante.py`, classe `Branchement` ; 114 lignes en tout) |
+
+Mutants : 10 tués sur 10 au dernier passage (0 vivant, 0 FATAL). Premier passage : 9 tués, 1 hors cible (M-11b-02,
+mutant mal écrit : bloc vide, erreur de syntaxe, le test nommé n'a pas tourné) ; mutant corrigé, campagne relancée.
+Suite : 92 tests ; plancher du job : 92, égalité exigée (`--egal`).
