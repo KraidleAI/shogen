@@ -48,6 +48,46 @@ class TestOracleR1(unittest.TestCase):
         self.assertEqual((plan["commit_analyse"], o["fichiers"]["shogen_s2/window.py"]), (COMMIT, WINDOW))
         self.assertEqual(sorted(H), ["r1", "window"])
 
+    def test_schema_du_commit(self):
+        """O-1 de la G2 de la tranche 4 : le commit épinglé est un hexadécimal minuscule de 40 caractères (schéma de
+        parametres.json) ; abrégé, en majuscules ou de 41 caractères : PARAMETRES/schema. Mutation R-15 du réviseur
+        (commit non contraint)."""
+        for faux in ("f35a70c", COMMIT.upper(), COMMIT + "0"):
+            p = json.loads(json.dumps(PRM))
+            p["oracle_r1"]["commit"] = faux
+            with self.assertRaises(commun.Refus) as c:
+                commun.controler(p, commun.SCHEMA)
+            self.assertEqual(c.exception.code, "PARAMETRES/schema", faux)
+
+    def test_nettoyage_du_dossier(self):
+        """Q-T4-12 (O-1 de la G2 de la tranche 4) : dans un processus neuf, à TMPDIR vide (E-S-06), charger extrait le
+        harnais dans un seul dossier « oracle_r1_… » de TMPDIR, d'où r1 est chargé ; ce dossier est retiré à la sortie
+        du processus. Mutation R-08 du réviseur (dossier jamais retiré)."""
+        code = chr(10).join(["import os, tempfile, commun, oracle_r1",
+                             "h = oracle_r1.charger(commun.charger_parametres(environ={}))",
+                             "d = tempfile.gettempdir()",
+                             "print(sorted(x[:10] for x in os.listdir(d)), h['r1'].__file__.startswith(d))"])
+        with tempfile.TemporaryDirectory() as d:
+            env = {k: v for k, v in os.environ.items() if k != commun.VARIABLE}
+            env["TMPDIR"] = d
+            p = subprocess.run([sys.executable, "-B", "-c", code], cwd=commun.ICI, env=env, capture_output=True,
+                               text=True, timeout=120)
+            self.assertEqual((p.stdout.strip(), os.listdir(d)), ("['oracle_r1_'] True", []), p.stderr[-300:])
+
+    def test_cache_indexe_sur_l_epingle(self):
+        """O-3 de la G2 de la tranche 4 (Q-T4-12) : un chargement par processus, cache indexé sur l'épingle (commit,
+        dossier, fichiers et leurs empreintes) : même épingle, mêmes modules, sans nouvelle extraction (la source n'est
+        pas de l'épingle) ; autre commit, autre dossier ou autre empreinte : ORACLE/epingle, jamais le harnais d'une
+        autre épingle. Mutations M-14E-01 (épingle non comparée), M-14E-02 (empreintes hors de l'épingle), M-14E-03
+        (source dans l'épingle), M-14E-04 (commit hors de l'épingle)."""
+        o = PRM["oracle_r1"]
+        self.assertIs(oracle_r1.charger(dict(PRM, oracle_r1=dict(o, source="autre")))["r1"], H["r1"])
+        for faux in (dict(o, commit="0" * 40), dict(o, dossier="ailleurs"),
+                     dict(o, fichiers=dict(o["fichiers"], **{"shogen_s2/r1.py": "0" * 64}))):
+            with self.assertRaises(commun.Refus) as c:
+                oracle_r1.charger(dict(PRM, oracle_r1=faux))
+            self.assertEqual(c.exception.code, "ORACLE/epingle")
+
     def test_modules_hors_epingles(self):
         """Dans un processus neuf : un shogen_s2 déjà chargé d'ailleurs, ou un module shogen_s2.* hors des fichiers
         épinglés : ORACLE/modules. Mutations M-14-08 (contrôle des modules chargés retiré), M-14-09 (shogen_s2 déjà

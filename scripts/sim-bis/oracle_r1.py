@@ -23,13 +23,22 @@ from decimal import localcontext
 import commun
 
 _CHARGE: dict = {}
+_EPINGLE: list = []
+
+
+def epingle(prm: dict) -> tuple:
+    """Épingle du harnais (O-3 de la G2 de la tranche 4) : commit, dossier, fichiers et leurs empreintes ; la source
+    n'en est pas."""
+    o = prm["oracle_r1"]
+    return o["commit"], o["dossier"], tuple(sorted(o["fichiers"].items()))
 
 
 def extraire(prm: dict, dossier: str, depot: str = commun.RACINE) -> str:
     """Fichiers épinglés du harnais au commit de la section « oracle_r1 », lus par `git --no-optional-locks -C <depot>
     archive` et écrits sous `dossier` ; seuls les membres attendus, fichiers réguliers, sont lus (aucune extraction
-    d'archive en bloc). git absent, commit ou fichier introuvable : ORACLE/extraction ; empreinte différente de
-    l'épingle : ORACLE/sha256. Rend le chemin du paquet shogen_s2 extrait."""
+    d'archive en bloc). Le dépôt doit porter le commit (Q-T4-11 : historique complet en CI). git absent, commit ou
+    fichier introuvable : ORACLE/extraction ; empreinte différente de l'épingle : ORACLE/sha256. Rend le chemin du
+    paquet shogen_s2 extrait."""
     commun.garde_campagne()
     o = prm["oracle_r1"]
     chemins = {f"{o['dossier']}/{f}": f for f in sorted(o["fichiers"])}
@@ -53,9 +62,11 @@ def extraire(prm: dict, dossier: str, depot: str = commun.RACINE) -> str:
 
 
 def charger(prm: dict) -> dict:
-    """{"r1", "window"} du harnais extrait (extraire), une fois par processus ; dossier temporaire retiré à la sortie.
-    Paquet shogen_s2 chargé par importlib sous son nom ; un shogen_s2 déjà chargé d'ailleurs, ou un module chargé hors
-    des fichiers épinglés : ORACLE/modules."""
+    """{"r1", "window"} du harnais extrait (extraire), une fois par processus, dans un dossier temporaire de TMPDIR
+    retiré à la sortie (Q-T4-12). Paquet shogen_s2 chargé par importlib sous son nom ; un shogen_s2 déjà chargé
+    d'ailleurs, ou un module chargé hors des fichiers épinglés : ORACLE/modules. Cache indexé sur l'épingle (O-3 de la
+    G2 de la tranche 4) : même épingle, mêmes modules ; autre épingle dans le même processus : ORACLE/epingle (un seul
+    paquet shogen_s2 par processus), jamais le harnais d'une autre épingle."""
     if not _CHARGE:
         dossier = tempfile.mkdtemp(prefix="oracle_r1_")
         atexit.register(shutil.rmtree, dossier, True)
@@ -73,6 +84,9 @@ def charger(prm: dict) -> dict:
         if charges - epingles:
             raise commun.Refus("ORACLE/modules", f"modules hors des fichiers épinglés : {sorted(charges - epingles)}")
         _CHARGE.update(mods)
+        _EPINGLE.append(epingle(prm))
+    if _EPINGLE != [epingle(prm)]:
+        raise commun.Refus("ORACLE/epingle", "harnais déjà chargé sous une autre épingle dans ce processus")
     return dict(_CHARGE)
 
 
