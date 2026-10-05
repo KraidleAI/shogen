@@ -204,3 +204,13 @@ qui exige 20 octets) ; contrôle retiré, mutant remplacé. Suite : 85 tests ; p
 Mutants : 12 tués sur 12 au dernier passage (0 vivant, 0 FATAL). Premier passage : 11 tués, 1 vivant (M-10b-12, délai
 doublé : la borne haute du test était trop large) ; borne resserrée, délai du test porté à 0,2 s, campagne relancée.
 Suite : 87 tests ; plancher du job : 87, égalité exigée (`--egal`).
+
+## CB-11a (2026-10-04) : sondes de santé (D-3 brute, D-4, D-5, disque, empreinte du résolveur)
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/sante.py` | 80 | 4 (`tests/test_sante.py`, 89 lignes : commande, requêtes DNS et lancement injectés) |
+
+Mutants : 15 tués sur 15 (0 vivant, 0 FATAL). Limite : le mutant « blocs libres pour l'administrateur au lieu des blocs
+disponibles » (M-11a-07) n'est tué que sur un système de fichiers qui réserve des blocs (ext4 de l'hôte de session :
+oui). Suite : 91 tests ; plancher du job : 91, égalité exigée (`--egal`).
