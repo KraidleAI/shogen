@@ -11,6 +11,7 @@ from fractions import Fraction
 import calib_fiv
 import calibration
 import commun
+import sources
 
 PRM = commun.charger_parametres(environ={})
 K_ = PRM["calibration"]
@@ -148,6 +149,45 @@ class TestModeleE1(unittest.TestCase):
             self.assertEqual(r, calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 0))
             self.assertNotEqual(r, calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 1))
 
+    def test_composition_e1(self):
+        """C-1 de la G2 de la tranche 4 (E-S-03, E-S-38 ; Q-T4-13) : composition du fond d'E1 écrite dans
+        parametres.json (e1.fond, avec sa source) et lue par replication : f = 1, part des pannes longues 0, autres 1,
+        hors-enveloppe 0, classe BTC (rang 0 de sources.CLASSES). États égaux, hôte par hôte, à ceux de
+        sources.Replication sous ce fond écrit à la main (ni dérive, ni incident, ni unité faible) ; chaque retouche de
+        e1.fond (f = 1/2, longues 1/2, hors-enveloppe 1/4 000, classe USDC, classe ETH à autres 2) donne les états du
+        fond retouché écrit de même, autres que ceux du fond scellé ; classe inconnue : E1/classe. Mutations R-02 et
+        R-03 du réviseur, transposées dans parametres.json et dans le code, M-14C-01 à M-14C-07."""
+        e = PRM["e1"].get("fond", {})
+        self.assertEqual({k: v for k, v in e.items() if k != "source"},
+                         {"f": [1, 1], "longues": [0, 1], "autres": [1, 1], "hors_enveloppe": [0, 1], "classe": "BTC"})
+        self.assertTrue(all(x in e["source"] for x in ("E-S-38", "PROPOSITION l.197", "Q-T4-13")), e["source"])
+        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        main = {"f": Fraction(1), "longues": Fraction(0), "autres": Fraction(1), "hors_enveloppe": Fraction(0)}
+
+        def attendu(prm, point, fond, c):
+            rep = sources.Replication(prm, EP, dict(fond, regime={s: point for s in cal["masques"]}), "E1-fond", 0,
+                                      cal["masques"], cal["horizon"])
+            return {h: rep.pannes(h) | rep.ecarts(h, c) for h in prm["sources"]["classes"][sources.CLASSES[c]]}
+
+        def diff(a, b):
+            """Hôtes dont l'état diffère, clés comprises (message court : masques de 46 468 bits)."""
+            return sorted(h for h in set(a) | set(b) if a.get(h) != b.get(h))
+        point = (Fraction(1, 10), Fraction(20), 240)
+        r = calib_fiv.replication(PRM, EP, cal, point, "E1-fond", 0)["etats"]
+        self.assertEqual(diff(r, attendu(PRM, point, main, 0)), [])
+        scelle = attendu(PRM, None, main, 0)
+        for cle, v, fond, c in (("f", [1, 2], dict(main, f=Fraction(1, 2)), 0),
+                                ("longues", [1, 2], dict(main, longues=Fraction(1, 2)), 0),
+                                ("hors_enveloppe", [1, 4000], dict(main, hors_enveloppe=Fraction(1, 4000)), 0),
+                                ("classe", "USDC", main, 2), ("classe", "ETH", dict(main, autres=Fraction(2)), 1)):
+            prm = dict(PRM, e1=dict(PRM["e1"], fond=dict(e, **{cle: v}, **({"autres": [2, 1]} if v == "ETH" else {}))))
+            x = attendu(prm, None, fond, c)
+            self.assertNotEqual(diff(x, scelle), [], (cle, v))
+            self.assertEqual(diff(calib_fiv.replication(prm, EP, cal, None, "E1-fond", 0)["etats"], x), [], (cle, v))
+        with self.assertRaises(commun.Refus) as r:
+            calib_fiv.replication(dict(PRM, e1=dict(PRM["e1"], fond=dict(e, classe="XRP"))), EP, cal, None, "E1-x", 0)
+        self.assertEqual(r.exception.code, "E1/classe")
+
     def test_taux_c0_e_s_39(self):
         """E-S-39 : sous C0, sans observateur, à f = 1, la part de fenêtres de calme où binance est en écart, sur 30
         réplications, égale le taux d'EP l.15 (372/24 585, écart propre nul) à 5 erreurs-types près (variance binomiale
@@ -213,16 +253,22 @@ def m(*fiv):
 class TestCritereE1(unittest.TestCase):
     def test_parametres_e1(self):
         """Section « e1 » : grille φ × κ × τ_D de 64 points dans l'ordre déclaré, 200 réplications par point, pool
-        D1-bis (cible EP l.128-161), ℓ = 240 pour C1 ; source citée ; cellule E1-C0 et E1-<φ>-<κ>-<τ_D>. Mutations
-        M-10-28 (grille sans τ_D = 4 320), M-10-29 (cellule sans φ)."""
+        D1-bis (cible EP l.128-161), ℓ = 240 pour C1 ; source citée ; cellules E1-C0 et E1-<num>_<den>-<κ>-<τ_D>, φ =
+        num/den irréductible (Q-T4-8, forme modifiée par l'avis, AVIS-SIM-T4.md l.56-59 : aucun « / », le nom de
+        cellule nommant aussi les fichiers partiels de calcul, E-S-45) : 65 noms distincts, aucun « / ». Mutations
+        M-10-28 (grille sans τ_D = 4 320), M-10-29 (cellule sans φ), M-14C-08 (« / » remis), M-14C-09 (séparateur
+        « - »)."""
         g = calib_fiv.grille(PRM)
         self.assertEqual((len(g), g[0], g[1], g[-1]), (64, (Fraction(1, 100), 5, 60), (Fraction(1, 100), 5, 240),
                                                         (Fraction(1, 10), 50, 4320)))
         e = PRM["e1"]
         self.assertEqual((e["replications"], e["pool"], e["ell_c1"]), (200, "D1-bis", 240))
         self.assertTrue(all(x in e["source"] for x in ("E-S-38", "PROPOSITION l.197", "AVIS.md l.24")))
-        self.assertEqual([calib_fiv.cellule(PRM, x) for x in (None, P1, (Fraction(1, 20), Fraction(10), 4320))],
-                         ["E1-C0", "E1-1/100-5-60", "E1-1/20-10-4320"])
+        self.assertEqual([calib_fiv.cellule(PRM, x) for x in (None, P1, (Fraction(1, 20), Fraction(10), 4320),
+                                                              (Fraction(2, 100), Fraction(5), 240))],
+                         ["E1-C0", "E1-1_100-5-60", "E1-1_20-10-4320", "E1-1_50-5-240"])
+        noms = [calib_fiv.cellule(PRM, x) for x in [None] + g]
+        self.assertEqual((len(set(noms)), [x for x in noms if "/" in x]), (65, []))
 
     def test_critere(self):
         """Somme des carrés des écarts de log aux ℓ dont la garde d'EP est tenue : modèle 2, 4, 1 contre cible 1, 2, 1

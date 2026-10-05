@@ -97,16 +97,22 @@ def calendrier_j28(seg: dict, cal: dict) -> dict:
 
 
 def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> dict:
-    """Une réplication d'E1 (E-S-38) : unités indépendantes vues d'un seul observateur (aucun observateur simulé), à
-    f = 1, régime `point` = (φ, κ, τ_D), ou None (C0), dans chaque strate ; ni pannes longues, ni hors-enveloppe, ni
-    dérive, ni incident, ni unité faible (sources.Replication, flux de la cellule `cellule`, réplication i) ; état
-    D*(u) = H(u) ∪ F(u, BTC) de chaque hôte du pool BTC D1-bis (calibration.unites) ; I_t = 1 si au moins deux hôtes
-    sont en écart (regle.deux), sur les positions de chaque strate. Rend {"strates" : {s : (positions, I)},
-    "etats" : {hôte : D*}}."""
-    fond = {"f": Fraction(1), "regime": {s: point for s in cal["masques"]}, "longues": Fraction(0),
-            "autres": Fraction(1), "hors_enveloppe": Fraction(0)}
+    """Une réplication d'E1 (E-S-38) : unités indépendantes vues d'un seul observateur (aucun observateur simulé),
+    régime `point` = (φ, κ, τ_D), ou None (C0), dans chaque strate ; composition du fond lue dans la section e1.fond de
+    parametres.json (C-1 de la G2 de la tranche 4 ; Q-T4-13 : f = 1, ni pannes longues, ni hors-enveloppe, classe BTC) :
+    f, part des pannes longues, multiplicateur hors de BTC, part hors-enveloppe, classe ; ni dérive, ni incident, ni
+    unité faible (clés absentes du fond de sources.Replication ; flux de la cellule `cellule`, réplication i) ; classe
+    hors de sources.classes : E1/classe ; état D*(u) = H(u) ∪ F(u, classe) de chaque hôte du pool de la classe (BTC :
+    pool D1-bis, calibration.unites) ; I_t = 1 si au moins deux hôtes sont en écart (regle.deux), sur les positions de
+    chaque strate. Rend {"strates" : {s : (positions, I)}, "etats" : {hôte : D*}}."""
+    e, cl = prm["e1"]["fond"], sources.classes(prm)
+    if e["classe"] not in [x for x, _p in cl]:
+        raise commun.Refus("E1/classe", f"{e['classe']!r} : classe de sources.classes attendue")
+    c = [x for x, _p in cl].index(e["classe"])
+    fond = {"f": Fraction(*e["f"]), "regime": {s: point for s in cal["masques"]}, "longues": Fraction(*e["longues"]),
+            "autres": Fraction(*e["autres"]), "hors_enveloppe": Fraction(*e["hors_enveloppe"])}
     rep = sources.Replication(prm, ep, fond, cellule, i, cal["masques"], cal["horizon"])
-    etats = {h: rep.pannes(h) | rep.ecarts(h, 0) for h, _f in prm["calibration"]["unites"]}
+    etats = {h: rep.pannes(h) | rep.ecarts(h, c) for h in cl[c][1]}
     i_t = regle.deux(list(etats.values()))
     return {"strates": {s: (m, i_t & m) for s, m in cal["masques"].items()}, "etats": etats}
 
@@ -136,11 +142,12 @@ def grille(prm: dict) -> list:
 
 
 def cellule(prm: dict, point) -> str:
-    """Nom de cellule des flux d'une réplication d'E1 (Q-T4-8) : « <préfixe>-C0 », ou « <préfixe>-<φ>-<κ>-<τ_D> », φ
-    en fraction irréductible."""
+    """Nom de cellule des flux d'une réplication d'E1 (Q-T4-8, forme modifiée par l'avis : aucun « / », le nom
+    nommant aussi les fichiers partiels de calcul, E-S-45) : « <préfixe>-C0 », ou « <préfixe>-<num>_<den>-<κ>-<τ_D> »,
+    φ = num/den en fraction irréductible."""
     if point is None:
         return f"{prm['e1']['cellule']}-C0"
-    return f"{prm['e1']['cellule']}-{point[0].numerator}/{point[0].denominator}-{point[1]}-{point[2]}"
+    return f"{prm['e1']['cellule']}-{point[0].numerator}_{point[0].denominator}-{point[1]}-{point[2]}"
 
 
 def _ln(x, ctx) -> Decimal:
