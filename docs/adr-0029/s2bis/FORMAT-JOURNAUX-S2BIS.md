@@ -10,7 +10,7 @@
 - **Corrections** : le diff CB-2d (2026-10-04) applique les corrections C-1, C-2 et C-6 (a) à (c) de la relecture G2
   de la tranche A de P1 (§2, §3.2, §4, §7.5, §8.1) ; le diff CB-2e applique C-3 (§8.4). Relecture G2 de la tranche B
   de P1 (2026-10-05) : le diff CB-11c applique C-1 et l'observation O-5 (§11.4, §11.6, §11.7, §13.2) ; CB-11d, C-5 et
-  l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1).
+  l'observation O-7 (§11.6, §13.1, §13.2) ; CB-11e, C-4 (§10.2, §11.6, §12, §13.1) ; CB-11f, C-2 (§12).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -245,8 +245,9 @@ L'écrivain ne se partage pas entre fils : un seul fil l'appelle (contrainte pou
 
 Les sondes D-4 et D-5 de l'enregistrement `sante` (§13) portent chacune le résultat d'une requête DNS en UDP, objet de
 champs :
-- `statut` : `reponse` (une réponse retenue), `delai` (aucune réponse retenue avant le délai), `forme` (requête
-  impossible, ou réponse retenue mal formée) ou `reseau` (envoi refusé par le système) ;
+- `statut` : `reponse` (une réponse retenue), `delai` (aucune réponse retenue avant le délai), `forme` (adresse qui
+  n'est pas une IPv4 littérale canonique, requête impossible, ou réponse appariée mal formée) ou `reseau` (envoi
+  refusé par le système) ;
 - `rcode` : code de réponse (entier de 0 à 15 ; 0 NOERROR, 3 NXDOMAIN) ; `tc` : drapeau de troncature ; null tous deux
   sans réponse retenue ;
 - `reponses` : liste de la section réponse, chaque élément `[nom, type, ttl, données]` : `nom` en texte terminé par
@@ -256,9 +257,13 @@ champs :
 - `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes, sur l'horloge murale ; le délai se
   compte sur l'horloge monotone (C-4).
 
-Une réponse n'est retenue que si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête
-(tiré au hasard sur 16 bits), le bit QR et la même question ; tout autre datagramme est ignoré. La requête ne passe par
-aucune résolution : l'adresse est une IPv4 littérale (RFC 1035 §4.1 ; ADR-0029 l.109).
+Une réponse est **appariée** si elle vient de l'adresse et du port interrogés, porte l'identifiant de la requête (tiré
+au hasard sur 16 bits), le bit QR, une seule question et la même (casse ignorée) ; elle est alors retenue, ou `forme`
+si la suite est mal formée. Tout autre datagramme (écho de la requête, réponse à une autre question, datagramme trop
+court) est ignoré, et l'attente continue jusqu'au délai (C-2). La requête ne passe par aucune résolution : l'adresse
+est une IPv4 littérale **canonique** (quatre entiers décimaux pointés, sans zéro de tête : forme rendue par
+`ipaddress`) ; toute autre valeur (nom, forme abrégée comme « 127.1 », null) donne `forme`, sans exception, sans
+résolution et sans envoi (RFC 1035 §4.1 ; ADR-0029 l.109).
 
 ## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
 

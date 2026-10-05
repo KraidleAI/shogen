@@ -283,3 +283,20 @@ Mutants (commande du job, `--plancher 106`, borne de 300 s) : 12 tués sur 12 (0
 réécrits sur le texte de CB-11e avec la même mutation ; M-11e-06 (délai DNS doublé) est tué par
 `test_delai_reseau_forme_et_identifiant_aleatoire`, et non par le test qu'il visait. Suite : 106 tests ; plancher du
 job : 106, égalité exigée (`--egal`).
+
+## CB-11f (2026-10-05) : correction C-2 et mutants MG-18, MG-19, MG-21, MG-24 (C-7) de la relecture G2 de la tranche B
+
+Objet : un datagramme qui ne répond pas à la requête (source, identifiant, bit QR, une seule question, la même) est
+ignoré et l'attente continue ; `forme` réservé à une réponse appariée mal formée ; adresse qui n'est pas une IPv4
+littérale canonique refusée en `forme`, sans exception, résolution ni envoi (C-2) ; tests nommés des mutants vivants
+MG-18, MG-19, MG-21 et MG-24 (C-7).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/dns.py` | 119 | — |
+| `tests/test_dns.py` | 191 | 13 (5 de plus : TXT en latin-1, types d'étiquette réservés, datagrammes non appariés, adresse non littérale, identifiant sur 16 bits) |
+
+Mutants (commande du job, `--plancher 111`, borne de 300 s) : 12 tués sur 12 par leur test visé (0 vivant, 0 FATAL),
+dont MG-18, MG-19, MG-24, et MG-17 et MG-21 réécrits sur le texte de CB-11f avec la même mutation. MG-22 (rcode sur
+3 bits) reste équivalent en pratique (relecture G2) : non rejoué ici. Suite : 111 tests ; plancher du job : 111,
+égalité exigée (`--egal`).

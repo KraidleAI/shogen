@@ -1,10 +1,12 @@
 """CB-10, E-C-27, E-C-28 : client DNS filaire. Octets écrits à la main selon la RFC 1035 (§4.1, pointeur §4.1.4 ;
 libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui en tire les mêmes valeurs (journal G1).
-CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7)."""
+CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7). CB-11f : datagramme non apparié ignoré,
+adresse non littérale refusée sans envoi (C-2) ; MG-18, MG-19, MG-21, MG-24 (C-7)."""
 import socket
 import threading
 import time
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import dns
 from shogen_s2bis.collecte.lecture import S
@@ -65,6 +67,17 @@ class Messages(unittest.TestCase):
             "a.root-servers.net.", "nstld.verisign-grs.com.", 2026100400, 1800, 900, 604800, 86400]]])
         self.assertEqual(dns.analyser(R_TXT, Q_TXT)["reponses"], [[WE, 16, 60, ["hello", "world"]]])
         self.assertEqual(dns.analyser(R_A[:2] + bytes([0x83]) + R_A[3:], Q_A)["tc"], True)
+
+    def test_txt_hors_ascii_lu_en_latin1(self):
+        """MG-18 : une chaîne TXT hors ASCII se lit en latin-1 (octet 0xE9 : U+00E9), sans refus."""
+        r = dns.analyser(R_TXT[:-10] + bytes([0xE9]) + R_TXT[-9:], Q_TXT)
+        self.assertEqual(r["reponses"], [[WE, 16, 60, ["h" + chr(0xE9) + "llo", "world"]]])
+
+    def test_types_d_etiquette_reserves_refuses(self):
+        """MG-19 : un octet d'étiquette de 0x40 à 0xBF (combinaisons 01 et 10 réservées, RFC 1035 §4.1.4) est refusé,
+        même quand assez d'octets le suivent pour le lire comme une longueur (0x41 : 65 octets « a »)."""
+        rr = bytes([0x41]) + b"a" * 65 + bytes.fromhex("00 0001 0001 0000003c 0004 c0000201")
+        self.assertRaises(dns.Forme, dns.analyser, R_A[:7] + bytes([1]) + R_A[8:len(Q_A)] + rr, Q_A)
 
     def test_reponses_mal_formees_refusees_en_temps_borne(self):
         n, refus = len(Q_A), []
@@ -143,3 +156,36 @@ class Interroger(unittest.TestCase):
         r = dns.interroger("127.0.0.1", WE, "A", delai=S, port=port, monotone=lambda: next(instants, S + 1))
         fil.join(5)
         self.assertEqual(r["statut"], "delai")
+
+    def test_datagrammes_non_apparies_ignores(self):
+        """C-2 (a) : de la bonne source, avec le bon identifiant, l'écho de la requête (QR nul, S-D1), la réponse à une
+        autre question (S-D2), une réponse à deux questions (MG-21) et un datagramme de deux octets sont ignorés :
+        l'attente continue jusqu'à la réponse appariée, retenue."""
+        def comportement(srv, requete, client):
+            for m in (requete, requete[:2] + R_NX[2:12] + Q_TXT[12:], requete[:2] + R_NX[2:5] + bytes([2]) + R_NX[6:],
+                      requete[:2], requete[:2] + R_A[2:]):
+                srv.sendto(m, client)
+        port, _r, fil = udp(comportement)
+        r = dns.interroger("127.0.0.1", WE, "A", delai=S, port=port)
+        fil.join(5)
+        self.assertEqual((r["statut"], r["rcode"], r["reponses"]), ("reponse", 0, A2))
+
+    def test_adresse_non_litterale_refusee_sans_envoi(self):
+        """C-2 (b) : une adresse qui n'est pas une IPv4 littérale canonique (« 127.1 », S-D7 ; None, S-D8 ;
+        « localhost », S-D9 ; zéro de tête ; espace ; entier) donne `forme`, sans exception, résolution ni envoi."""
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as srv:
+            srv.bind(("127.0.0.1", 0))
+            for adresse in ("127.1", None, "localhost", "127.0.0.01", " 127.0.0.1", 2130706433):
+                with self.subTest(adresse=adresse):
+                    r = dns.interroger(adresse, WE, "A", delai=S // 10, port=srv.getsockname()[1])
+                    self.assertEqual((r["statut"], r["rcode"]), ("forme", None))
+            srv.setblocking(False)
+            self.assertRaises(BlockingIOError, srv.recvfrom, 4096)         # aucune requête n'est partie
+
+    def test_identifiant_tire_sur_16_bits(self):
+        """MG-24 : l'identifiant est tiré par `secrets.randbelow(65536)` et porté tel quel par la requête."""
+        port, recues, fil = udp(lambda *a: None)
+        with mock.patch.object(dns.secrets, "randbelow", return_value=0xBEEF) as tirage:
+            dns.interroger("127.0.0.1", WE, "A", delai=S // 10, port=port)
+        fil.join(5)
+        self.assertEqual((tirage.call_args_list, recues[0][:2]), ([mock.call(1 << 16)], bytes([0xBE, 0xEF])))

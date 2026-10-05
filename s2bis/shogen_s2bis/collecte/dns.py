@@ -1,9 +1,12 @@
 """Client DNS filaire (CB-10 ; E-C-27, E-C-28 ; ADR-0029 §2.3, D-4 et D-5), format RFC 1035 (§4.1) : octets d'une
 requête (en-tête de 12 octets, une question A, SOA ou TXT de classe IN) ; analyse d'une réponse, retenue seulement si
-elle porte le même identifiant, le bit QR et la même question ; données prêtes pour le journal (rcode, drapeau TC,
-réponses avec leur TTL). Le jugement (D-4, D-5) se fait au recalcul. `interroger` (CB-10b) : une requête en UDP vers une
-adresse IPv4 littérale, sans aucune résolution, identifiant tiré au hasard ; tout datagramme qui ne vient pas de cette
-adresse et de ce port, ou d'un autre identifiant, est ignoré ; ne lève jamais (instants en microsecondes)."""
+elle porte le même identifiant, le bit QR, une seule question et la même ; données prêtes pour le journal (rcode,
+drapeau TC, réponses avec leur TTL). Le jugement (D-4, D-5) se fait au recalcul. `interroger` (CB-10b) : une requête
+en UDP vers une adresse IPv4 littérale canonique, sans aucune résolution (autre adresse : `forme`, rien n'est envoyé),
+identifiant tiré au hasard ; un datagramme qui ne vient pas de cette adresse et de ce port ou qui ne répond pas à la
+requête est ignoré, l'attente continue ; `forme` est réservé à une réponse appariée mal formée (C-2 de la G2 de P1-B) ;
+ne lève jamais (instants en microsecondes)."""
+import ipaddress
 import secrets
 import socket
 import struct
@@ -63,12 +66,18 @@ def _donnees(m, t, i, fin):
     raise Forme(f"données de type {t}")
 
 
+def repond(m, q):
+    """`m` répond-il à `q` ? Même identifiant, bit QR, une seule question, la même (casse ignorée)."""
+    return (len(m) >= len(q) and m[:2] == q[:2] and m[2] >= 0x80 and int.from_bytes(m[4:6], "big") == 1
+            and m[12:len(q)].lower() == q[12:].lower())
+
+
 def analyser(m, q):
     """{rcode, tc, reponses : [nom, type, ttl, données]} ; Forme si `m` est mal formé ou ne répond pas à `q`."""
+    if not repond(m, q):
+        raise Forme("pas une réponse à la requête")
     try:
-        ident, drapeaux, qd, an = struct.unpack(">4H", m[:8])
-        if m[:2] != q[:2] or not drapeaux & 0x8000 or qd != 1 or m[12:len(q)].lower() != q[12:].lower():
-            raise Forme("pas une réponse à la requête")
+        drapeaux, an = struct.unpack(">2xH2xH", m[:8])
         reponses, i = [], len(q)
         for _ in range(an):
             nom, i = _nom(m, i)
@@ -85,18 +94,20 @@ def analyser(m, q):
 def interroger(adresse, nom, qtype, recursion=True, delai=2 * S, port=53, horloge=horloge, ident=None,
                monotone=monotone):
     """Une requête vers `adresse`:`port`, réponse attendue `delai` au plus, compté sur l'horloge `monotone` (C-4) ;
-    `debut`, `fin` sur l'horloge murale. Statut : reponse, delai, forme (requête impossible ou réponse retenue mal
-    formée) ou reseau (envoi refusé)."""
+    `debut`, `fin` sur l'horloge murale. Statut : reponse, delai, forme (adresse qui n'est pas une IPv4 littérale
+    canonique, requête impossible, ou réponse appariée mal formée) ou reseau (envoi refusé)."""
     r = {"statut": "delai", "rcode": None, "tc": None, "reponses": None, "debut": horloge()}
     fin = monotone() + delai
     try:
+        if str(ipaddress.IPv4Address(adresse)) != adresse:          # ni résolution ni forme non canonique (C-2)
+            raise Forme(f"adresse {adresse!r} : IPv4 littérale canonique attendue")
         q = requete(secrets.randbelow(1 << 16) if ident is None else ident, nom, qtype, recursion)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
             s.sendto(q, (adresse, port))
             while (reste := fin - monotone()) > 0:
                 s.settimeout(reste / S)
                 m, source = s.recvfrom(65535)
-                if source == (adresse, port) and m[:2] == q[:2]:
+                if source == (adresse, port) and repond(m, q):
                     r.update(statut="reponse", **analyser(m, q))
                     break
     except TimeoutError:
