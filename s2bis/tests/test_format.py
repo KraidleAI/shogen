@@ -4,7 +4,9 @@ RFC 1035 §7.3 et marquer la règle de source (adresse et port interrogés) comm
 « Corrections » » ; I-2 : « FORMAT §7.1 doit dire les contrôles de type que fait `_lire` (`suivante`, `ws`, `a`,
 dernière fenêtre) ». CB-18j (G2 de la tranche C) : convention des citations « ADR-0029 l.N » écrite dans l'en-tête
 (SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1 : « elles suivent l'ADR au commit e16956b, convention du G0 ») ; `run_params`
-placé dans l'ordre de la première fenêtre d'une exécution (§11.5, observation de la G2)."""
+placé dans l'ordre de la première fenêtre d'une exécution (§11.5, observation de la G2). CB-18o (lettres C-1 et C-2 du
+FORMAT, avis sur le banc de concordance) : une seule définition d'« intègre » au §7.1, points (a) à (e), sans limite
+déclarée, et `_lire` la fait."""
 import hashlib
 import json
 import os
@@ -27,11 +29,12 @@ def decoupe(texte):
 
 
 def integres(*enrs):
-    """Nombre de lignes intègres selon `Journal._lire` d'un fichier fait des enregistrements `enrs`, chaînés ici."""
+    """Nombre de lignes intègres selon `Journal._lire` d'un fichier fait des enregistrements `enrs`, chaînés ici
+    (`seq` et `prec` d'un enregistrement, s'il les porte, remplacent ceux de la chaîne ; des octets : ligne brute)."""
     prec, lignes = "0" * 64, []
     for seq, e in enumerate(enrs):
-        lignes.append(json.dumps({**e, "seq": seq, "prec": prec}, sort_keys=True, separators=(",", ":")).encode()
-                      + NL.encode())
+        lignes.append(e if type(e) is bytes else json.dumps({"seq": seq, "prec": prec, **e}, sort_keys=True,
+                                                             separators=(",", ":")).encode() + NL.encode())
         prec = hashlib.sha256(lignes[-1]).hexdigest()
     with tempfile.TemporaryDirectory() as d:
         pathlib.Path(d, "pool-2026-10-04-0.jsonl").write_bytes(b"".join(lignes))
@@ -54,22 +57,35 @@ class Format(unittest.TestCase):
         corrections = [p for p in puces if p.startswith("**Corrections** :")]
         self.assertEqual([("CB-11h" in p) for p in corrections], [True])
 
-    def test_paragraphe_7_1_dit_les_controles_de_type_de_lire(self):
-        """I-2 : au point 1 du §7, une phrase, une seule, dit les contrôles de type et nomme `suivante`, `ws`, `a` et la
-        dernière fenêtre, en entiers ; `_lire` les fait : la même ligne, intègre au champ entier, ne l'est plus quand ce
-        champ est une chaîne (le texte ne promet rien que le code ne fasse)."""
+    def test_paragraphe_7_1_definition_unique_d_integre(self):        # CB-18o, lettres C-1 et C-2 (et I-2)
+        """Au point 1 du §7, une seule définition d'« intègre », points (a) à (e) de la lettre (bornes de 640 chiffres
+        et de 64 niveaux, types du §1.3 et du §2, chaîne), un booléen n'étant jamais un entier, et plus aucune « limite
+        déclarée ». `_lire` la fait : chaque champ commun ou propre, au type du FORMAT, laisse la ligne intègre ; à un
+        autre type (booléen pour un entier compris), ou absent, il la rend non intègre (le texte ne promet rien que le
+        code ne fasse). Valeurs prises au texte de la lettre."""
         _puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
         point1 = sections["7"].split(" 2. ")[0]
-        phrases = [p for p in point1.split(". ") if "contrôlés en type" in p]
-        noms = ("`suivante`", "`ws`", "`a`", "dernière fenêtre", "entier")
-        self.assertEqual([[x in p for x in noms] for p in phrases], [[True] * 5])
-        o = {"type": "ouverture", "jour": "2026-10-04", "suivante": WS}
-        for champ, enr in (("suivante", o), ("ws", {"type": "marqueur", "ws": WS}),
-                           ("ws", {"type": "lecture", "ws": WS}), ("a", {"type": "trou", "de": WS, "a": WS})):
-            avant = [] if enr is o else [o]
-            with self.subTest(champ=champ, type=enr["type"]):
-                self.assertEqual((integres(*avant, enr), integres(*avant, {**enr, champ: "x"})),
-                                 (len(avant) + 1, len(avant)))
+        self.assertEqual([x in point1 for x in ("(a)", "(b) ", "(c) ", "(d) ", "(e) ", "640 chiffres", "N = 64",
+                                                 "Un booléen JSON n'est jamais un entier", "Limites déclarées")],
+                         [True] * 8 + [False])
+        o, cle = {"type": "ouverture", "jour": "2026-10-04", "suivante": WS}, "2026-10-04"
+        types = {"ouverture": {"jour": cle, "suivante": WS}, "marqueur": {"ws": WS}, "point": {"ws": WS},
+                 "cloture": {"jour": cle}, "reprise": {"ws": WS, "suivante": WS, "queue": None},
+                 "trou": {"de": WS, "a": WS, "cause": "saut"}, "lecture": {"ws": WS}}
+        for genre, champs in types.items():
+            for champ, bon in champs.items():
+                mauvais = ["x", True, None] if type(bon) is int else [5, None] if bon == cle or champ == "cause" else [
+                    {}, "x", 5]
+                with self.subTest(type=genre, champ=champ):
+                    self.assertEqual([integres(o, {"type": genre, **champs, champ: v}) for v in [bon] + mauvais] + [
+                        integres(o, {"type": genre, **{k: v for k, v in champs.items() if k != champ}})],
+                        [2] + [1] * (len(mauvais) + 1))
+        self.assertEqual([integres(o, {"type": "lecture", "ws": WS, "seq": s}) for s in (1, True)], [2, 1])   # (c)
+        self.assertEqual([integres(o, {"type": 5, "ws": WS}), integres({**o, "prec": "0" * 63}),
+                          integres({**o, "prec": None})] + [integres({**o, "prec": p * 64}) for p in "0aAg"],
+                         [1, 0, 0, 1, 1, 0, 0])                                                             # (c)
+        self.assertEqual([integres(o, {"type": "reprise", "ws": WS, "suivante": WS, "queue": [{"fichier": "f"}]}),
+                          integres(o, ("[1]" + NL).encode())], [2, 1])                                     # (d), (b)
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et

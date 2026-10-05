@@ -34,7 +34,12 @@ import time
 GENESE = "0" * 64
 HEURE = 3600
 LIMITE = 1 << 22                                                   # octets d'une ligne au plus, saut de ligne compris
-RESERVES = {"ouverture", "marqueur", "point", "cloture", "reprise", "trou"}
+ENTIER, CHAINE = (int,), (str,)    # C-2 : types exacts, comparés par type(v) ; un booléen n'est jamais un entier
+CHAMPS = {"ouverture": {"jour": CHAINE, "suivante": ENTIER}, "marqueur": {"ws": ENTIER}, "point": {"ws": ENTIER},
+          "cloture": {"jour": CHAINE}, "reprise": {"ws": ENTIER, "suivante": ENTIER, "queue": (list, type(None))},
+          "trou": {"de": ENTIER, "a": ENTIER, "cause": CHAINE}}  # champs propres des types réservés (FORMAT §2, §7.1 d)
+RESERVES = set(CHAMPS)
+HEX = re.compile("[0-9a-f]{64}")
 CHIFFRES = 640                     # I-1 : plus petite limite non nulle de conversion des entiers (sys.int_info)
 BORNE = 10 ** CHIFFRES
 NIVEAUX = 64                       # C-4 : niveaux d'imbrication au plus, la racine au niveau 1 (FORMAT §8.3)
@@ -71,6 +76,16 @@ def _parcours(enr):
             chemin.add(id(v))
             pile += [(v, True)] + [(x, False) for x in enfants]
     return long_, None if cycle else haut[id(enr)]
+
+
+def _types(e):
+    """C-2 (FORMAT §7.1, points c et d) : objet dont `type` est une chaîne, `seq` un entier et `prec` 64 chiffres
+    hexadécimaux minuscules, et dont les champs propres du §2 (`ws` seul pour un type non réservé : R-2) sont présents,
+    aux types exacts ; `type(v)`, jamais `isinstance`, qui admettrait un booléen pour un entier."""
+    if type(e) is not dict or type(e.get("type")) is not str:
+        return False
+    champs = {"seq": ENTIER, "prec": CHAINE, **CHAMPS.get(e["type"], {"ws": ENTIER})}
+    return all(k in e and type(e[k]) in t for k, t in champs.items()) and HEX.fullmatch(e["prec"]) is not None
 
 
 def canonique(enr):
@@ -258,32 +273,31 @@ class Journal:
         return self._ecrire(premier)
 
     def _lire(self, n):
-        """(position de la queue, état, empreinte du préfixe intègre) du fichier `n`. Intègre : ligne canonique, chaînée
-        à la précédente ; la première est une `ouverture` ou une `reprise`. État : celui du dernier intègre, ou None ;
-        `derniere` : ws du dernier enregistrement écrit par `ecrire` ou `marqueur`, None si le fichier n'en a pas."""
+        """(position de la queue, état, empreinte du préfixe intègre) du fichier `n`. Intègre : définition unique du
+        FORMAT §7.1, points (a) à (e) (lettres C-1, C-2 et C-4) ; la lecture s'arrête à la première ligne non intègre.
+        État : celui du dernier intègre, ou None ; `derniere` : ws du dernier enregistrement écrit par `ecrire` ou
+        `marqueur`, None si le fichier n'en a pas."""
         etat, pos, h = None, 0, hashlib.sha256()
         with open(os.path.join(self.dossier, n), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 try:
                     e = json.loads(ligne)
-                    t = e["type"]
-                    if etat:
-                        lien = (e["seq"], e["prec"]) == (etat["seq"] + 1, etat["prec"])
-                    else:
-                        lien = t in ("ouverture", "reprise") and type(e["seq"]) is int
-                    if t in ("ouverture", "reprise"):
-                        attendu = e["suivante"]                # première fenêtre ni close ni déclarée en trou
-                    elif t in ("marqueur", "trou"):
-                        attendu = e["ws" if t == "marqueur" else "a"] + self.w
-                    else:
-                        attendu = etat["attendu"]
-                    derniere = e["ws"] if t == "marqueur" or t not in RESERVES else etat and etat["derniere"]
-                    intact = lien and type(attendu) is int and canonique(e) == ligne and (
-                        derniere is None or type(derniere) is int)
-                except (ValueError, KeyError, TypeError, RecursionError, ErreurJournal):
+                    intact = _types(e) and canonique(e) == ligne                     # (c), (d), puis (b)
+                except (ValueError, RecursionError, ErreurJournal):
                     intact = False
+                if intact:                                                          # (e)
+                    intact = (e["seq"], e["prec"]) == (etat["seq"] + 1, etat["prec"]) if etat else e["type"] in (
+                        "ouverture", "reprise")
                 if not intact:
                     break
+                t = e["type"]
+                if t in ("ouverture", "reprise"):
+                    attendu = e["suivante"]                    # première fenêtre ni close ni déclarée en trou
+                elif t in ("marqueur", "trou"):
+                    attendu = e["ws" if t == "marqueur" else "a"] + self.w
+                else:
+                    attendu = etat["attendu"]
+                derniere = e["ws"] if t == "marqueur" or t not in RESERVES else etat and etat["derniere"]
                 etat = {"seq": e["seq"], "prec": hashlib.sha256(ligne).hexdigest(), "type": t, "attendu": attendu,
                         "derniere": derniere}
                 h.update(ligne)

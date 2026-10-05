@@ -26,7 +26,8 @@
   diff CB-18j écrit la convention des citations (en-tête, SHOGEN-S2BIS-CITATIONS-ADR-DECALEES-1) et place `run_params`
   dans l'ordre de la fenêtre (§11.5, observation de la G2). Lettres C-1 à C-5 du FORMAT (avis de l'advisor sur le
   banc de concordance des lecteurs du recalcul, adjugé par l'orchestrateur le 2026-10-05) : le diff CB-18n écrit C-4
-  (§2, §8.3).
+  (§2, §8.3) ; le diff CB-18o, C-1 et C-2 (§7.1 : définition unique d'« intègre », sans limite déclarée ; l'item
+  proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet).
 - **Items de l'annexe B fermés au sous-lot CB-18** (2026-10-05) : le diff CB-18a ferme SHOGEN-S2BIS-ECRIVAIN-USAGE-1
   pour l'écrivain (§5) et porte les retouches de SHOGEN-S2BIS-FORMAT-RETOUCHES-1 (§12, en-tête) ; le diff CB-18b ferme
   SHOGEN-S2BIS-SOMMEIL-MURAL-1 (§10.2, §11.8), SHOGEN-S2BIS-SONDES-ECHEANCE-1 (§11.4, §13.2) et, pour la boucle,
@@ -150,15 +151,31 @@ test contrôle que toute méthode publique de l'écrivain la porte, `fermer` exc
 
 1. À l'ouverture d'un journal existant, verrou pris, l'écrivain relit les fichiers du plus récent au plus ancien, ligne
    à ligne (LIMITE = 4 194 304 octets au plus par ligne, saut compris ; l'écrivain refuse d'écrire une ligne plus
-   longue), jusqu'au premier fichier qui contient un enregistrement intègre. Intègre : ligne terminée par 0x0A, objet
-   JSON canonique, chaîné à la ligne précédente (`seq` + 1, `prec`) ; la première ligne d'un fichier est une
-   `ouverture` ou une `reprise`. Les champs dont la reprise se sert sont contrôlés en type (`Journal._lire`, code de
-   référence ; I-2 de la G2 du recalcul) : `seq` de la première ligne d'un fichier, entier ; `suivante` d'une
-   `ouverture` ou d'une `reprise`, entier ; `ws` d'un `marqueur` ou d'un enregistrement de fenêtre, entier (il donne la
-   **dernière fenêtre écrite**, §7.5) ; `a` d'un `trou`, tel que `a` + w soit un entier. Limites déclarées : un booléen
-   JSON passe dans `a` et, hors de la première ligne, dans `seq` (`true` y vaut 1) ; `de` d'un `trou`, `ws` d'un
-   `point` ou d'une `reprise` et `jour` ne sont pas contrôlés. La lecture d'un fichier s'arrête à la première ligne non
-   intègre : elle et tout ce qui suit forment la **queue** du fichier.
+   longue), jusqu'au premier fichier qui contient un enregistrement intègre. **Définition unique d'« intègre »**
+   (lettres C-1 et C-2 du FORMAT, diff CB-18o ; elle remplace celle du diff CB-18f, I-2 de la G2 du recalcul, et les
+   limites qu'il déclarait). Une ligne est **intègre** si et seulement si :
+   (a) elle se termine par 0x0A et fait au plus LIMITE octets, saut compris ;
+   (b) ses octets sont un objet JSON canonique (§1.2) dont tout entier a au plus 640 chiffres, signe exclu, et dont
+   aucun conteneur n'est au-delà du niveau N = 64 (§8.3) ;
+   (c) ses champs communs ont les types du §1.3 : `type` chaîne, `seq` entier, `prec` chaîne de 64 chiffres
+   hexadécimaux minuscules ;
+   (d) si `type` est réservé (§2), ses champs propres ont les types du §2 : `jour` chaîne ; `suivante`, `ws`, `de`,
+   `a` entiers ; `queue` liste ou null ; `cause` chaîne ; un champ propre manquant rend la ligne non intègre ;
+   (e) elle est chaînée à la ligne intègre qui la précède dans le fichier : `seq` + 1, `prec` égal au sha256 de ses
+   octets ; la première ligne d'un fichier est une `ouverture` ou une `reprise`.
+   Un booléen JSON n'est jamais un entier. Le lien de la première ligne d'un fichier à la dernière ligne intègre du
+   fichier précédent ne fait pas partie de l'intégrité : il se juge à part (§7.7) et ne se juge que par les lecteurs.
+   La lecture d'un fichier s'arrête à la première ligne non intègre : elle et tout ce qui suit forment la **queue** du
+   fichier. Cette définition est la même chez l'écrivain (`Journal._lire`, code de référence), le lecteur du recalcul
+   (RB-1) et le lecteur indépendant (RB-18) ; aucun des trois ne la relâche.
+   Elle type aussi le `ws` d'un type non réservé (`lecture`, `sante`, `run_params`…), seul champ que le §2 lui donne :
+   un entier, requis comme un champ propre au point (d) ; avec celui du `marqueur`, il donne la **dernière fenêtre
+   écrite** (§7.5). Risque R-2 de l'avis, vérifié type par type au diff CB-18o : aucun type n'a de `ws` null ;
+   `ouvrir` (dont la fenêtre est le `ws` de la `reprise`), `ecrire` et `marqueur` refusent tout `ws` qui n'est pas un
+   entier (`JOURNAL/fenetre`, booléen compris), `point` reprend le `ws` de son marqueur, `run_params` s'écrit par
+   `ecrire` (§11.5) ; le journal du test de bout en bout, relu à son second démarrage, n'a aucune queue. Les valeurs
+   (`ws` multiple de w, `ws` ≥ `suivante`, `cause` parmi trois mots, `jour` au calendrier) restent de la
+   **validité**, jugée au recalcul (RB-3), pas de l'intégrité (§3, §8).
 2. Une queue n'est jamais réécrite ni tronquée. S'il en existe une (dans le fichier repris, ou un fichier plus récent
    sans enregistrement intègre), l'écrivain ouvre un **segment** neuf, premier enregistrement `reprise` : son jour est
    le plus tardif entre celui de l'horloge, celui du fichier repris et celui de tout fichier présent au dossier ; son

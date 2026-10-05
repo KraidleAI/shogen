@@ -184,6 +184,7 @@ class BoutEnBout(unittest.TestCase):
         types = [e["type"] for e in enrs[1:] if e["type"] in ("run_params", "reprise", "trou", "marqueur")]
         self.assertIn((enrs[0]["type"], types), [("ouverture", ["run_params"] + ["marqueur"] * 3 + ["reprise",
                       "run_params"] + x + ["marqueur"] * 2) for x in ([], ["trou"])])      # trou : redémarrage
+        self.assertEqual([e["queue"] for e in enrs if e["type"] == "reprise"], [None])  # R-2 : §7.1 tient tout intègre
         self.assertEqual([(e["forme"], e["statut"], e["sous_type"], e["code"]) for e in enrs if e["type"] == "lecture"],
                          [("a", "ok", None, 200), ("b", "panne_http", None, 503), ("c", "panne_transport", "connexion",
                           None)] * 3 + [("a", "panne_transport", "tls", None), ("b", "panne_transport", "tls", None),

@@ -139,7 +139,8 @@ class Ecrivain(Base):
         for code, appel in (("JOURNAL/type", lambda: jl.ecrire("lecture", WS + 120, prix=1.5)),
                             ("JOURNAL/type", lambda: jl.ecrire("lecture", WS + 120, brut=b"x")),
                             ("JOURNAL/type", lambda: jl.ecrire("lecture", WS + 120, d={1: 2})),
-                            ("JOURNAL/reserve", lambda: jl.ecrire("marqueur", WS + 120)),
+                            *[("JOURNAL/reserve", lambda t=t: jl.ecrire(t, WS + 120)) for t in (
+                                "ouverture", "marqueur", "point", "cloture", "reprise", "trou")],   # FORMAT §2
                             ("JOURNAL/reserve", lambda: jl.ecrire("lecture", WS + 120, seq=9)),
                             ("JOURNAL/reserve", lambda: jl.ecrire("lecture", WS + 120, prec="0")),    # C-5 (G-13)
                             ("JOURNAL/fenetre", lambda: jl.ecrire("lecture", WS + 60, k=2)),

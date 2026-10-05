@@ -890,3 +890,32 @@ Mutants (commande du job, `--plancher 181`, borne de 300 s ; python3.12 ; résea
 0 FATAL), dont N décalé d'une unité dans les deux sens, la hauteur prise au premier enfant et le cycle non relevé.
 MR-08 et MR-09 du réviseur, dont les lignes visées ont changé, y sont portés et tués. Suite : 181 tests ; plancher du
 job : 181, égalité exigée (`--egal`).
+
+## CB-18o (2026-10-05) : définition unique d'« intègre » (lettres C-1 et C-2 du FORMAT)
+
+Objet : le §7.1 porte une seule définition d'« intègre », points (a) à (e) de la lettre adjugée : ligne close par
+0x0A d'au plus LIMITE octets ; objet JSON canonique aux entiers de 640 chiffres au plus (C-1 : une telle ligne est une
+queue ; le refus de l'écrivain reste `JOURNAL/entier`) et aux conteneurs au niveau 64 au plus ; `type` chaîne, `seq`
+entier, `prec` de 64 chiffres hexadécimaux minuscules ; champs propres des types réservés présents et typés ; chaîne.
+Un booléen n'est jamais un entier : `_types` compare `type(v)`, jamais `isinstance`. Les limites déclarées de CB-18f
+sont retirées (l'item proposé SHOGEN-S2BIS-LIRE-BOOLEENS-1 n'a plus d'objet). Risque R-2, vérifié type par type :
+aucun type n'écrit `ws` null (`ouvrir`, `ecrire` et `marqueur` refusent tout `ws` qui n'est pas un entier) ; le `ws`
+d'un type non réservé est typé et requis de même, et la reprise du second démarrage du test de bout en bout ne déclare
+aucune queue. `RESERVES` est tiré de la table des champs propres. Rouge : sur le code d'avant, dix sous-tests en échec
+(champs propres non typés ou absents, booléen pour `seq`), `type` non chaîne et `prec` mal formé admis. FORMAT §7.1.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 373 | — |
+| `tests/test_format.py` | 104 | 3 (1 réécrit : définition unique au §7.1, sans limite déclarée ; `_lire` la fait, champ par champ et type par type, booléen, absence, ligne JSON qui n'est pas un objet et `prec` en tête compris) |
+| `tests/test_journal.py` | 286 | 14 (1 complété : les six types réservés refusés à `ecrire`) |
+| `tests/test_bout_en_bout.py` | 203 | 1 (complété : aucune queue déclarée au second démarrage, R-2) |
+
+Mutants (commande du job, `--plancher 181`, borne de 300 s ; python3.12 ; réseau isolé) : 20 tués sur 20 au dernier
+passage (0 vivant, 0 FATAL) : objet exigé ; `type` ; `seq` booléen ; forme et casse de `prec` ; `queue`, `cause`,
+`de`, `ws` d'un `point`, `jour` d'une `cloture` et d'une `ouverture` ; `ws` d'un type non réservé ; booléen admis
+partout, ou par `isinstance` ; champ manquant pris pour null ; première ligne ; canonicité ; RecursionError du
+décodeur ; `point` retiré des types réservés ; sonde R-2 (`ws` de `run_params` exigé null : le test de bout en bout
+échoue). Passage précédent, non compté : 19 tués et 1 vivant (`point` retiré des types réservés, le test des
+refus ne couvrant que `marqueur`) ; le test a été complété. Suite : 181 tests ; plancher du job : 181, égalité exigée
+(`--egal`).
