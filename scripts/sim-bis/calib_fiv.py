@@ -144,10 +144,11 @@ def grille(prm: dict) -> list:
 
 def cellule(prm: dict, point) -> str:
     """Nom de cellule des flux d'une réplication d'E1 (Q-T4-8, forme modifiée par l'avis : aucun « / », le nom
-    nommant aussi les fichiers partiels de calcul, E-S-45) : « <préfixe>-C0 », ou « <préfixe>-<num>_<den>-<κ>-<τ_D> »,
+    nommant aussi les fichiers partiels de calcul, E-S-45) : « <préfixe>-C0-v2 » (C0 renommée avant E0, nom jamais
+    employé : E-4, valeurs de E1-C0 possiblement vues en mise au point), ou « <préfixe>-<num>_<den>-<κ>-<τ_D> »,
     φ = num/den en fraction irréductible."""
     if point is None:
-        return f"{prm['e1']['cellule']}-C0"
+        return f"{prm['e1']['cellule']}-C0-v2"
     return f"{prm['e1']['cellule']}-{point[0].numerator}_{point[0].denominator}-{point[1]}-{point[2]}"
 
 

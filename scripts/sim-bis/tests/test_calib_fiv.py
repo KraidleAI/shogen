@@ -260,11 +260,11 @@ def cible3():
 class TestCritereE1(unittest.TestCase):
     def test_parametres_e1(self):
         """Section « e1 » : grille φ × κ × τ_D de 64 points dans l'ordre déclaré, 200 réplications par point, pool
-        D1-bis (cible EP l.128-161), ℓ = 240 pour C1 ; source citée ; cellules E1-C0 et E1-<num>_<den>-<κ>-<τ_D>, φ =
-        num/den irréductible (Q-T4-8, forme modifiée par l'avis, AVIS-SIM-T4.md l.56-59 : aucun « / », le nom de
+        D1-bis (cible EP l.128-161), ℓ = 240 pour C1 ; source citée ; cellules E1-C0-v2 et E1-<num>_<den>-<κ>-<τ_D>,
+        φ = num/den irréductible (Q-T4-8, forme modifiée par l'avis, AVIS-SIM-T4.md l.56-59 : aucun « / », le nom de
         cellule nommant aussi les fichiers partiels de calcul, E-S-45) : 65 noms distincts, aucun « / ». Mutations
         M-10-28 (grille sans τ_D = 4 320), M-10-29 (cellule sans φ), M-14C-08 (« / » remis), M-14C-09 (séparateur
-        « - »)."""
+        « - »), M-14G-01 (E1-C0 rétabli)."""
         g = calib_fiv.grille(PRM)
         self.assertEqual((len(g), g[0], g[1], g[-1]), (64, (Fraction(1, 100), 5, 60), (Fraction(1, 100), 5, 240),
                                                         (Fraction(1, 10), 50, 4320)))
@@ -273,9 +273,22 @@ class TestCritereE1(unittest.TestCase):
         self.assertTrue(all(x in e["source"] for x in ("E-S-38", "PROPOSITION l.197", "AVIS.md l.24")))
         self.assertEqual([calib_fiv.cellule(PRM, x) for x in (None, P1, (Fraction(1, 20), Fraction(10), 4320),
                                                               (Fraction(2, 100), Fraction(5), 240))],
-                         ["E1-C0", "E1-1_100-5-60", "E1-1_20-10-4320", "E1-1_50-5-240"])
+                         ["E1-C0-v2", "E1-1_100-5-60", "E1-1_20-10-4320", "E1-1_50-5-240"])
         noms = [calib_fiv.cellule(PRM, x) for x in [None] + g]
         self.assertEqual((len(set(noms)), [x for x in noms if "/" in x]), (65, []))
+
+    def test_cellule_c0_renommee(self):
+        """Décision de l'orchestrateur du 2026-10-05 sur l'item C-3 des corrections G2 de la tranche 4, avant E0 : la
+        cellule de C0 s'appelle « E1-C0-v2 », nom jamais employé, et plus aucun nom d'E1 n'est « E1-C0 » (E-4 : valeurs
+        de E1-C0 i = 0..9 possiblement vues en mise au point, 2026-10-05) ; le nom et ce motif sont écrits dans
+        e1.questions (Q-T4-8). Mutations M-14G-01 (E1-C0 rétabli dans cellule), M-14G-02 (E1-C0 rétabli dans Q-T4-8),
+        M-14G-03 (motif retiré)."""
+        noms = [calib_fiv.cellule(PRM, x) for x in [None] + calib_fiv.grille(PRM)]
+        self.assertEqual((noms[0], "E1-C0" in noms), ("E1-C0-v2", False))
+        q = PRM["e1"]["questions"]["Q-T4-8"]
+        self.assertEqual([x in q for x in ("cellules « E1-C0-v2 » pour C0",
+                                           "E-4 : valeurs de E1-C0 i = 0..9 possiblement vues en mise au point, "
+                                           "2026-10-05")], [True, True])
 
     def test_critere(self):
         """Somme des carrés des écarts de log aux ℓ dont la garde d'EP est tenue : modèle 2, 4, 1 contre cible 1, 2, 1
