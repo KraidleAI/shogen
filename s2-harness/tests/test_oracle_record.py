@@ -373,7 +373,8 @@ class TestOracleRecord(unittest.TestCase):
     def test_suites_s2bis_et_sim_bis_par_la_ligne_du_job(self):
         """SHOGEN-S2BIS-ENREG-ROLE-1 : `suite-s2bis` et `suite-sim-bis` lancent, depuis la racine de l'extraction, la
         ligne du vérificateur de leur job telle qu'écrite dans le gates.yml du commit (plancher committé compris),
-        python3 remplacé par l'interpréteur ; vérificateur réel du dépôt. Conforme : exit 0 et enregistrement conforme ;
+        python3 remplacé par l'interpréteur en mode isolé (-I, OUT-1b du lot R-1) ; vérificateur réel du dépôt.
+        Conforme : exit 0 et enregistrement conforme ;
         plancher du commit faux : exit 1 consigné ; ligne répétée, job absent, ligne d'une autre suite ou ligne du
         vérificateur de s2bis présente dans le seul job suivant (C-2 de la G2 de la tranche C), leurres C1 (ligne dans
         un bloc `name: >`) et C4 (ligne dans une étape `if: false`), la vraie ligne étant affaiblie
@@ -408,8 +409,8 @@ class TestOracleRecord(unittest.TestCase):
                 {**base, ".github/workflows/gates.yml": c4}])
         chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
         rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
-        ligne = [sys.executable, "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut", "--egal", "--plancher",
-                 "1"]
+        ligne = [sys.executable, "-I", "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut", "--egal",
+                 "--plancher", "1"]                                 # -I : OUT-1b (lot R-1)
         self.assertEqual((code, [(r["nom"], r["arbre"], r["commande"], r["exit"]) for r in rec["runs"]]), (0, [
             ("suite-s2bis", ".", [x.format("s2bis") for x in ligne], 0),
             ("suite-sim-bis", ".", [x.format("scripts/sim-bis") for x in ligne], 0)]))
@@ -430,6 +431,57 @@ class TestOracleRecord(unittest.TestCase):
                             "--commit", ok, "--sortie", d, "--commande", "suite-sim-bis"], capture_output=True,
                            text=True)
         self.assertEqual((p.returncode, p.stderr), (0, ""))
+
+
+    def test_verificateur_du_commit_egal_a_celui_de_l_outil(self):
+        """SHOGEN-S2BIS-ENREG-VERIF-COMMIT-1 (lot R-1, OUT-1b) : pour une commande de JOBS, le vérificateur du commit
+        (sha256 consigné dans tree.sha256) doit être celui de l'outil (VERIF). Leurre L2 de la G2 d'intégration de P1
+        (vérificateur complaisant, test rouge) : refus nommé avant toute écriture ; à la lecture, tree.sha256 qui porte
+        un autre vérificateur : refus (vérificateur). Vérificateur égal, module subprocess.py posé à côté par le
+        commit : vérificateur lancé en -I, module sans effet, exit 1 consigné. ligne_du_job : exception au chargement
+        de l'analyseur (RuntimeError, SystemExit) ou gates.yml non UTF-8 : refus qui la nomme. Rougit si :
+        comparaison absente, sur un autre fichier ou après l'écriture ; lecture sans ce contrôle ; -I retiré ;
+        exception au chargement non rattrapée ou non nommée."""
+        d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-verif"), "claude-opus-5-5"
+        cle, verif, nl = "enforcement/verdict-suite-s2.py", Path(orc.VERIF).read_bytes(), chr(10)
+        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+                         "        run: |", "          python3 -B " + cle + " s2bis --aucun-saut --egal --plancher 1",
+                         ""]).encode()
+        faux = nl.join(["import sys", "print('verdict-suite-s2 : conforme')", "sys.exit(0)", ""]).encode()   # L2
+        masque = nl.join(["class P:", "    returncode, stdout = 0, b''", "    stderr = (chr(10) + '-' * 70 + chr(10) + "
+                          "'Ran 1 test in 0.001s' + chr(10) * 2 + 'OK' + chr(10)).encode()", "", "",
+                          "def run(*a, **k):", "    return P()", ""]).encode()    # subprocess complaisant
+        base = {".github/workflows/gates.yml": gates, "s2bis/tests/__init__.py": b"", cle: verif}
+        rouge = T.replace(b"pass", b"self.fail()")
+        honnete, l2, cache = depot(dep, [{**base, "s2bis/tests/test_t.py": T},
+                                         {**base, "s2bis/tests/test_t.py": rouge, cle: faux},
+                                         {**base, "s2bis/tests/test_t.py": rouge, "enforcement/subprocess.py": masque}])
+        chemin, code = orc.enregistrer(d, "G2", a, dep, honnete, ("suite-s2bis",))
+        self.assertEqual((code, json.loads(Path(chemin).read_text(encoding="utf-8"))["tree"]["sha256"][cle],
+                          orc.verifier(chemin, "G2", honnete, dep)["exit"]), (0, hashlib.sha256(verif).hexdigest(), 0))
+        avant = sorted(os.listdir(d))
+        with self.assertRaisesRegex(ValueError, rf"^vérificateur du commit {cle} .* — refus$"):
+            orc.enregistrer(d, "G2", a, dep, l2, ("suite-s2bis",))
+        self.assertEqual(sorted(os.listdir(d)), avant)
+        c, code = orc.enregistrer(d, "G2", a, dep, cache, ("suite-s2bis",))
+        run = json.loads(Path(c).read_text(encoding="utf-8"))["runs"][0]
+        self.assertEqual((code, run["exit"], run["commande"][:4]), (1, 1, [sys.executable, "-I", "-B", cle]))
+        p = self.copie(d, chemin, "autre.json", lambda r: r["tree"]["sha256"].update({cle: hashlib.sha256(
+            faux).hexdigest()}))
+        with self.assertRaisesRegex(ValueError, r"^refus \(vérificateur\) : "):
+            orc.verifier(p, "G2", honnete)
+        arbre = os.path.join(d, "arbre")
+        os.makedirs(os.path.join(arbre, ".github", "workflows"))
+        Path(arbre, ".github", "workflows", "gates.yml").write_bytes(gates)
+        for nom, corps, motif in (("leve.py", "raise RuntimeError('analyseur')", "RuntimeError"),
+                                  ("sort.py", "import sys" + nl + "sys.exit(0)", "SystemExit")):
+            Path(d, nom).write_text(corps + nl, encoding="utf-8")
+            with self.subTest(analyseur=nom), mock.patch.object(orc, "VERIF", os.path.join(d, nom)):
+                with self.assertRaisesRegex(ValueError, rf"{motif}.* — refus$"):
+                    orc.ligne_du_job(arbre, "s2bis-unittest", "s2bis")
+        Path(arbre, ".github", "workflows", "gates.yml").write_bytes(bytes([255]) + gates)
+        with self.assertRaisesRegex(ValueError, r"UnicodeDecodeError.* — refus$"):
+            orc.ligne_du_job(arbre, "s2bis-unittest", "s2bis")
 
 
 if __name__ == "__main__":

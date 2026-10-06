@@ -25,7 +25,7 @@ import subprocess
 import sys
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
-PLANCHER = 406      # tests de la suite après le diff ENREG-ROLE de CB-18 (2026-10-05 ; 405 après DETTES-B1) ; un lot
+PLANCHER = 407      # tests de la suite après OUT-1b du lot R-1 (2026-10-06 ; 406 après ENREG-ROLE de CB-18) ; un lot
                     # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
                     # (--egal) ; l'abaisser desserre la gate : décision datée seulement
 SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]

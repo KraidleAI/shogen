@@ -11,7 +11,9 @@ docs/adr-0029/g0-collecte/) : suites `s2bis` et `scripts/sim-bis` au même enreg
 de leur job, lue dans le gates.yml du commit extrait (SHOGEN-S2BIS-G3-LIGNE-JOB-1), jamais recopiée ici.
 SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : cette ligne est lue par l'analyseur unique des cas K du
 runner (`lignes_du_job` du vérificateur de l'arbre de l'outil, VERIF), dans les seuls blocs `run:` des étapes
-admises."""
+admises. SHOGEN-S2BIS-ENREG-VERIF-COMMIT-1 (lot R-1, réserve R-1 de l'accord de P1, OUT-1b) : le vérificateur que la
+ligne lance, celui du commit (sha256 consigné dans tree.sha256), doit être celui de l'outil (VERIF), à l'écriture comme
+à la lecture ; il est lancé en mode isolé (-I : aucun module posé à côté de lui par le commit n'est importé)."""
 from __future__ import annotations
 
 import argparse
@@ -48,6 +50,7 @@ RUN = ("nom", "arbre", "commande", "exit", "sortie", "tests_avec_variable")
 LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "enforcement",
                     "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
 VERIF = os.path.join(os.path.dirname(LINT), "verdict-suite-s2.py")    # analyseur unique des lignes de job, non recopié
+VERIF_COMMIT = "enforcement/verdict-suite-s2.py"     # vérificateur que lance la ligne d'un job, dans l'extraction
 DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
 EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
 
@@ -104,15 +107,15 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     N », une seule fois dans les blocs `run:` des étapes admises du job, lue par `lignes_du_job` de VERIF (étapes
     `if:` et `continue-on-error` exclues, `name: >` jamais lu). Job absent, ligne absente ou répétée, analyseur
     illisible, plancher 0 ou à zéro de tête (N suit `[1-9][0-9]*`, comme K-02 du runner : C-5 (a) de la relecture
-    d'intégration de P1) : ValueError (refus)."""
+    d'intégration de P1) : ValueError (refus). Toute exception au chargement est rattrapée et nommée (OUT-1b)."""
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
             texte = f.read()
         spec = importlib.util.spec_from_file_location("verdict_suite_s2", VERIF)
         analyseur = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(analyseur)
-    except (OSError, SyntaxError) as e:
-        raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e}) — refus") from e
+    except BaseException as e:                     # OUT-1b : toute exception au chargement, SystemExit comprise
+        raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e!r}) — refus") from e
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
              + " --aucun-saut --egal --plancher [1-9][0-9]*")      # C-5 (a) : plancher 0 refusé, comme K-02
     trouves = analyseur.lignes_du_job(texte, job, motif)
@@ -156,7 +159,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     maximal par commande (s ; None : DELAI_DEFAUT) : au dépassement, commande arrêtée, exit EXIT_DELAI consigné, ligne
     de dépassement en fin de sortie, enregistrement écrit quand même. auteur hors liste blanche : refus avant tout git.
     journaux : dossier substitué au marqueur JOURNAUX (exigé si une commande le porte). arret_premier_echec : aucun
-    run lancé après un run en échec. Commandes de JOBS : ligne du job lue dans l'extraction, refus avant tout run."""
+    run lancé après un run en échec. Commandes de JOBS : ligne du job lue dans l'extraction, vérificateur du commit
+    égal à VERIF (sha256), sinon refus avant tout run (OUT-1b) ; ligne lancée en mode isolé (-I)."""
     delai = DELAI_DEFAUT if delai is None else delai
     if role not in ROLES or not commandes or any(c not in COMMANDES for c in commandes):
         raise ValueError(f"rôle {role!r} ou commande(s) {list(commandes)} hors des listes fermées {ROLES}, "
@@ -180,9 +184,13 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     try:
         hashes = extraire(depot, sha, arbre)
         lignes = {c: ligne_du_job(arbre, *JOBS[c]) for c in commandes if c in JOBS}     # refus avant tout run
+        if lignes and hashes.get(VERIF_COMMIT) != sha256_fichier(VERIF):              # OUT-1b : leurre L2
+            raise ValueError(f"vérificateur du commit {VERIF_COMMIT} (sha256 {hashes.get(VERIF_COMMIT)}) autre que "
+                             f"celui de l'outil {VERIF} (sha256 {sha256_fichier(VERIF)}) — refus")
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
-            cmd, sortie = [sys.executable, *(journaux if x == JOURNAUX else x for x in args)], f"{nom}.{i}-{c}.out"
+            cmd = [sys.executable, *["-I"][:c in JOBS], *(journaux if x == JOURNAUX else x for x in args)]
+            sortie = f"{nom}.{i}-{c}.out"
             try:
                 p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, timeout=delai)
@@ -222,8 +230,9 @@ def zero(x) -> bool:
 def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     """Relit un enregistrement ; refus nommé, ValueError « refus (<contrôle>) : … », au premier contrôle non conforme :
     champs, schema, rôle attendu, auteur (identifiant de la liste blanche du lint, ou cet identifiant suivi de [1m],
-    par égalité exacte), tree.commit égal au sha complet attendu, tree.sha256 égal par fichier à la ré-extraction du
-    commit si `depot` est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
+    par égalité exacte), tree.commit égal au sha complet attendu, vérificateur du commit (tree.sha256) égal à VERIF si
+    une commande de JOBS a été lancée (OUT-1b), tree.sha256 égal par fichier à la ré-extraction du commit si `depot`
+    est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
     paquet.sha256 et runs (suite, puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de
     ce rôle, served_from nul, ou chemin et sha256 d'un
     enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
@@ -247,6 +256,9 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     exige(ok, "auteur", f" : {rec['auteur']!r}, attendu un identifiant de la liste blanche de {LINT}, ou cet "
           "identifiant suivi de [1m]")
     exige(rec["tree"]["commit"] == commit, "tree.commit", f" : {rec['tree']['commit']!r}, attendu {commit!r}")
+    if any(r["nom"] in tuple(JOBS) for r in rec["runs"]):     # OUT-1b : vérificateur lancé par la ligne du job
+        v = rec["tree"]["sha256"].get(VERIF_COMMIT) if isinstance(rec["tree"]["sha256"], dict) else None
+        exige(v == sha256_fichier(VERIF), "vérificateur", f" : {VERIF_COMMIT} {v!r}, attendu le sha256 de {VERIF}")
     if depot is not None:
         e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
         exige(not e, "tree.sha256", f" : {e[:3]}{' …' if len(e) > 3 else ''} (ré-extraction depuis {depot})")
