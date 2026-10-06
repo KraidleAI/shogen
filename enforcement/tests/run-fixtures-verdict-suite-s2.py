@@ -26,10 +26,19 @@ seul ; L-37 à L-41. CB-18w (O-2 de la relecture de SIM-T4) : la ligne y est exi
 contre-contrôle cc4) : L-43 (indentation 8) et L-44 (après le nom de l'étape du runner) fixent l'égalité exacte et la
 place de la ligne. CB-19h (C-5 (b) de la relecture d'intégration de P1) : toute exception au chargement du
 vérificateur, SystemExit compris, donne la sortie 3 ; R-01 et R-02, copie du runner avec un vérificateur qui sort
-en 0 ou lève à son chargement. Sortie : 0 tout passe, 1 un cas échoue, 3 erreur."""
+en 0 ou lève à son chargement. Lot R-1 (réserve R-1 de l'accord de P1 ; SHOGEN-S2BIS-RUNNER-SORTIE-1, OUT-1a) : le
+runner ne charge plus le vérificateur ; un sous-processus le charge et répond à chaque attribut ou appel par une
+ligne JSON entière (Q-1 : le runner compte et juge seul) ; la sortie 0 exige CAS cas joués, ni plus ni moins (Q-2).
+R-03 à R-08 : os._exit(0) au chargement ; sys.exit(0) ou os._exit(0) pendant un cas (réponse absente) ; réponse
+tronquée ; exception pendant un cas ; copie à CAS + 1. B-01 à B-04 : `bilan`. La valeur fictive de la variable
+scellée (E-05) passe au sous-processus comme donnée d'un appel, jamais comme environnement. Sortie : 0 tout passe (CAS
+cas), 1 un cas échoue ou le vérificateur rompt pendant un cas, 3 erreur (vérificateur illisible au chargement
+compris)."""
+import atexit
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import re
 import shutil
@@ -42,13 +51,106 @@ GY = os.path.join(ICI, "..", "..", ".github", "workflows", "gates.yml")
 if not os.path.isfile(GY):
     print(f"ERREUR : {GY} introuvable", file=sys.stderr)
     sys.exit(3)
-try:
-    _S = importlib.util.spec_from_file_location("verdict", os.path.join(ICI, "..", "verdict-suite-s2.py"))
-    v = importlib.util.module_from_spec(_S)
-    _S.loader.exec_module(v)
-except BaseException as e:                  # C-5 (b) : toute exception au chargement, SystemExit compris, échoue fermé
-    print(f"ERREUR : vérificateur illisible ({e!r})", file=sys.stderr)
+
+
+def servir():
+    """Sous-processus du vérificateur (Q-1) : le charge, écrit « pret », puis répond à chaque requête (ligne JSON :
+    attribut, ou appel et ses arguments) par une ligne JSON sur le canal, stdout d'origine ; ce que le vérificateur
+    imprime va sur stderr. SystemExit n'est pas rattrapée : le runner reste sans réponse."""
+    canal, sys.stdout = sys.stdout, sys.stderr
+    s = importlib.util.spec_from_file_location("verdict", os.path.join(ICI, "..", "verdict-suite-s2.py"))
+    m = importlib.util.module_from_spec(s)
+    s.loader.exec_module(m)
+    print("pret", file=canal, flush=True)
+    for ligne in sys.stdin:
+        q = json.loads(ligne)
+        try:
+            x = getattr(m, q[1])
+            r = json.dumps(["fonction", None] if q[0] == "attr" and callable(x) else [
+                "valeur", x(*q[2], **q[3]) if q[0] == "appel" else x])
+        except Exception as e:
+            r = json.dumps(["exception", repr(e)])
+        print(r, file=canal, flush=True)
+
+
+if sys.argv[1:] == ["--serveur"]:
+    servir()
+    sys.exit(0)
+
+
+class Rompu(Exception):
+    """Vérificateur rompu pendant un cas : réponse absente, tronquée ou illisible, ou exception levée (sortie 1)."""
+
+
+class Distant:
+    """Le vérificateur vu du runner, qui ne le charge jamais (Q-1) : chaque attribut et chaque appel est une requête au
+    sous-processus, dont la réponse doit être une ligne JSON entière."""
+
+    def __init__(self, p):
+        self.p = p
+
+    def __getattr__(self, nom):
+        genre, x = self.demande(["attr", nom])
+        return (lambda *a, **k: self.demande(["appel", nom, a, k])[1]) if genre == "fonction" else x
+
+    def demande(self, q):
+        try:
+            self.p.stdin.write(json.dumps(q) + chr(10))
+            self.p.stdin.flush()
+            ligne = self.p.stdout.readline()
+        except OSError:
+            ligne = ""
+        if not ligne.endswith(chr(10)):
+            raise Rompu(f"réponse {'tronquée' if ligne else 'absente'} à {q[:2]} (code {self.p.poll()}) : {trace()}")
+        try:
+            r = json.loads(ligne)
+        except ValueError:
+            r = None
+        if not (isinstance(r, list) and len(r) == 2 and r[0] in ("valeur", "fonction", "exception")):
+            raise Rompu(f"réponse illisible à {q[:2]} : {ligne[:80]!r}")
+        if r[0] == "exception":
+            raise Rompu(f"le vérificateur a levé {r[1]} à {q[:2]}")
+        return r
+
+
+def trace():
+    """Fin de ce que le sous-processus a écrit sur stderr."""
+    TRACE.seek(0)
+    t = TRACE.read()[-240:].decode("utf-8", "replace")
+    TRACE.seek(0, 2)
+    return repr(t)
+
+
+def bilan(ok, ko, attendus):
+    """Sortie du runner (Q-2) : 0 si `attendus` cas exactement sont joués et passent, 1 sinon."""
+    return 0 if (ok, ko) == (attendus, 0) else 1
+
+
+TRACE = tempfile.TemporaryFile()
+P = subprocess.Popen([sys.executable, *["-X", "dev"][:2 * sys.flags.dev_mode], *("-W" + w for w in sys.warnoptions),
+                      "-B", os.path.abspath(__file__), "--serveur"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                     stderr=TRACE, text=True, encoding="utf-8")
+
+
+@atexit.register
+def fermer():
+    for f in (P.stdin, P.stdout):
+        with contextlib.suppress(OSError):
+            f.close()
+    try:
+        P.wait(timeout=60)
+    except subprocess.TimeoutExpired:
+        P.kill()
+        P.wait()
+    TRACE.close()
+
+
+if P.stdout.readline() != "pret" + chr(10):        # C-5 (b) et RUNNER-SORTIE-1 : sortie au chargement, échec fermé
+    print(f"ERREUR : vérificateur illisible (aucun « pret », code {P.poll()}) : {trace()}", file=sys.stderr)
     sys.exit(3)
+v = Distant(P)
+sys.excepthook = lambda t, e, tb: print(f"ÉCHEC vérificateur rompu : {e}", file=sys.stderr) if t is Rompu else (
+    sys.__excepthook__(t, e, tb))
 VAR, TIRETS = "SHOGEN_S2_CAMPAGNE_CONTROL", "-" * 70
 NOMME = f"'{VAR} absente : copie du control.jsonl scellé non fournie'"
 
@@ -61,6 +163,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
+CAS = 97                    # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -135,19 +238,43 @@ try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             r = v.main([d, *opt])
         cas(nom, [] if r == rc else [f"code {r}, attendu {rc}"], None)
-    for nom, *corps in (("R-01 vérificateur qui sort en 0 à son chargement : runner en sortie 3", "import sys",
-                        "sys.exit(0)"),
-                       ("R-02 vérificateur qui lève à son chargement : runner en sortie 3", "raise RuntimeError()")):
+    PAS = ["PLANCHER = 406", "def verdict(*a, **k):"]          # RUNNER-SORTIE-1 : vérificateur rompu pendant V-01
+    for nom, rc, motif, *corps in (
+            ("R-01 vérificateur qui sort en 0 à son chargement : runner en sortie 3", 3, "vérificateur illisible",
+             "import sys", "sys.exit(0)"),
+            ("R-02 vérificateur qui lève à son chargement : runner en sortie 3", 3, "vérificateur illisible",
+             "raise RuntimeError()"),
+            ("R-03 os._exit(0) au chargement du vérificateur : runner en sortie 3", 3, "vérificateur illisible",
+             "import os", "os._exit(0)"),
+            ("R-04 sys.exit(0) pendant un cas : réponse absente, runner en sortie 1", 1, "réponse absente",
+             "import sys", *PAS, "    sys.exit(0)"),
+            ("R-05 os._exit(0) pendant un cas : réponse absente, runner en sortie 1", 1, "réponse absente",
+             "import os", *PAS, "    os._exit(0)"),
+            ("R-06 réponse sans fin de ligne, puis os._exit(0) : réponse tronquée, runner en sortie 1", 1,
+             "réponse tronquée", "import json, os, sys", *PAS, "    sys.__stdout__.write(json.dumps(['valeur', []]))",
+             "    sys.__stdout__.flush()", "    os._exit(0)"),
+            ("R-07 vérificateur qui lève pendant un cas : runner en sortie 1", 1, "a levé", *PAS,
+             "    raise RuntimeError('rompu')"),
+            ("R-08 copie du runner, vérificateur réel, CAS + 1 : runner en sortie 1", 1, "cas attendus")):
+        if sys.argv[1:] == ["--copie"]:                 # dans une copie : aucune copie de plus (récursion), cas compté
+            cas(nom, [], None)
+            continue
         d = os.path.join(W, nom[:4], "enforcement", "tests")         # copie du runner, gates.yml réel (C-5 (b))
         os.makedirs(d)
         os.makedirs(os.path.join(W, nom[:4], ".github", "workflows"))
         shutil.copy(GY, os.path.join(W, nom[:4], ".github", "workflows"))
-        shutil.copy(os.path.abspath(__file__), d)
-        with open(os.path.join(d, "..", "verdict-suite-s2.py"), "w", encoding="utf-8") as f:
-            f.write(chr(10).join(corps) + chr(10))
-        p = subprocess.run([sys.executable, "-B", os.path.join(d, os.path.basename(__file__))], capture_output=True,
-                           text=True, timeout=120)
-        cas(nom, [] if (p.returncode, "vérificateur illisible" in p.stderr) == (3, True) else [
+        with open(os.path.abspath(__file__), encoding="utf-8") as f:
+            src = f.read()
+        with open(os.path.join(d, os.path.basename(__file__)), "w", encoding="utf-8") as f:
+            f.write(src if corps else src.replace(f"CAS = {CAS} ", f"CAS = {CAS + 1} ", 1))
+        if corps:
+            with open(os.path.join(d, "..", "verdict-suite-s2.py"), "w", encoding="utf-8") as f:
+                f.write(chr(10).join(corps) + chr(10))
+        else:
+            shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), os.path.join(d, ".."))
+        p = subprocess.run([sys.executable, "-B", os.path.join(d, os.path.basename(__file__)), "--copie"],
+                           capture_output=True, text=True, timeout=120)
+        cas(nom, [] if (p.returncode, motif in p.stderr) == (rc, True) else [
             f"sortie {p.returncode} : {p.stderr[-160:]!r}"], None)
 finally:
     shutil.rmtree(W)
@@ -334,5 +461,12 @@ for nom, texte, attendu in (                            # analyseur seul : ce qu
          [])):
     cas(f"{nom} (analyseur unique)", [] if v.etapes(chr(10).join(texte), "s2bis-unittest") == attendu else ["écart"],
         None)
+for nom, ok, ko, rc in (("B-01 CAS cas joués, tous passés : sortie 0", CAS, 0, 0),      # RUNNER-SORTIE-1 (Q-2)
+                        ("B-02 un cas de moins que CAS : sortie 1", CAS - 1, 0, 1),
+                        ("B-03 un cas de plus que CAS : sortie 1", CAS + 1, 0, 1),
+                        ("B-04 un cas en échec : sortie 1", CAS - 1, 1, 1)):
+    cas(nom, [] if bilan(ok, ko, CAS) == rc else [f"bilan {bilan(ok, ko, CAS)}, attendu {rc}"], None)
 print(f"verdict-suite-s2 : {OK_} ok, {KO} échec")
-sys.exit(1 if KO else 0)
+if OK_ + KO != CAS:
+    print(f"ÉCHEC compte des cas : {OK_ + KO} joués, {CAS} cas attendus (CAS)", file=sys.stderr)
+sys.exit(1 if KO else bilan(OK_, KO, CAS))           # un cas en échec suffit, même si `bilan` est faux (A8)
