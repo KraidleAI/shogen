@@ -274,6 +274,32 @@ transposition K&L, les axes, k_eff, les mesures pilotes de S2 comme
 évaluation. arXiv d'abord (dater l'antériorité), venue ensuite.
 **Aucun claim de nouveauté sans le verdict R-1 ; aucun chiffre sans S2.**
 
+## Au-delà de S5 — produits sur le moteur *(pistes inscrites, aucun jalon ouvert)*
+
+> *Ajout daté du 2026-10-07 18:07:09 UTC (heure produite par `date -u` ; annexe B.75 de l'ADR-0028, item SHOGEN-PRODUITS-MOTEUR-1)* :
+> à la demande de l'investisseur. Ce sont des pistes, pas des jalons : chacune demande une ADR, un G0 et un critère
+> de sortie binaire avant tout code. Le moteur pose la même question à plusieurs fournisseurs, scelle chaque réponse
+> et laisse quiconque recalculer le verdict ; tout fournisseur qui rend un fait est donc mesurable.
+
+**Règle de tri : Shōgen mesure, il n'est jamais mesuré.** Une piste qui ferait de Shōgen un opérateur du service
+qu'il mesure est écartée ou confiée à une entité séparée ; la surveillance est payée par ceux qui consomment les
+données, jamais par ceux qui sont mesurés.
+
+Ordre proposé, après la clôture des oracles de prix :
+
+1. **RPC** : mesure neutre et multi-chaînes des points d'accès aux chaînes : exactitude des réponses, fraîcheur,
+   transactions refusées sans retour ; chaque mesure reliée à sa preuve.
+2. **Valeur des fonds tokenisés et réserves** : Shōgen en auditeur des oracles qui publient ces valeurs.
+3. **Sources de résolution des marchés de prédiction** : dossier de preuve neutre en cas de contestation.
+4. **Ponts et réseaux de couche 2** : comportement mesuré (délais, finalité, messages perdus ou altérés).
+5. **Plus loin** : indices financiers de référence (preuve d'audit), API de faits consommées par des agents d'IA.
+
+Piste en tension, à trancher par ADR : une passerelle « Shōgen à l'intérieur » qui interroge plusieurs fournisseurs,
+compare leurs réponses et remet un reçu par réponse. Elle touche deux non-buts ci-dessous (pas de transport
+propriétaire, ADR-0001 ; pas de choix de sources pour le client) ; elle n'est admissible que comme bibliothèque
+adoptée par des tiers, ou portée par une entité séparée. Tout produit lié à un acteur sous divulgation coordonnée
+attend la date de divulgation et l'accord écrit de l'investisseur.
+
 ## Ce qui n'est pas sur la route (non-buts re-dits)
 
 Pas de transport propriétaire (ADR-0001). Pas de choix de sources pour le

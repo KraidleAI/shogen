@@ -1191,3 +1191,11 @@ Inscription seule, sans code ni lancement : aucune ADR ne porte encore la platef
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-PLATEFORME-TABLEAU-1 | la plateforme publique n'a ni ADR ni G0 ; forme proposée : un tableau de toutes les sources mesurées, une page par source (mesures, méthode, date), chaque chiffre relié à sa preuve (commit, sha256) et reproductible, méthode publiée, historique des mesures et des corrections, droit de réponse ; des mesures, aucune note ni aucun qualificatif (registre S-G4) ; pages statiques générées depuis le dépôt ; ordre : V0 page du rapport S2 publié, V1 tableau et pages par source, V2 mesures en continu après DEPLOI ; aucune source nommée en public avant la fin des préavis et sans l'accord écrit de l'investisseur | orch. ; décision produit : investisseur | à l'ouverture du chantier du site, au plus tôt après la publication du rapport S2 | une ADR et un G0, puis un générateur statique [inféré] | demande de l'investisseur, 2026-10-07 |
+
+## B.75 Amendement daté du 2026-10-07 18:07:09 UTC (heure produite par `date -u`) : produits sur le moteur, pistes portées à la feuille de route à la demande de l'investisseur
+
+Inscription seule, sans code ni lancement. L'investisseur a demandé le 2026-10-07 quels autres produits le moteur pourrait porter, puis « inscrit ça dans la roadmap ». Les pistes sont portées à `docs/05-roadmap.md`, section « Au-delà de S5 — produits sur le moteur ».
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PRODUITS-MOTEUR-1 | pistes de produits sur le moteur, sans ADR ni G0 : RPC, valeur des fonds tokenisés et réserves, sources de résolution des marchés de prédiction, ponts et couche 2, puis indices de référence et API de faits pour agents d'IA ; règle de tri : Shōgen mesure, il n'est jamais mesuré ; la passerelle « Shōgen à l'intérieur » touche deux non-buts (ADR-0001 ; choix de sources pour le client) et reste à trancher par ADR ; tout produit lié à un acteur sous divulgation coordonnée attend la date de divulgation et l'accord écrit de l'investisseur | orch. ; décision produit : investisseur | après la clôture des oracles de prix, piste par piste | une ADR, un G0 et un critère de sortie binaire par piste [inféré] | demande de l'investisseur, 2026-10-07 |
