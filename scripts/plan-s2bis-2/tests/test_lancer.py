@@ -1,7 +1,10 @@
 """lancer.sh dans une arborescence jetable (forme de PS2 tests/test_lancer.py l.1-76) : faux paquet (bloc machine), faux
 journaux, fausses pièces de PLAN-S2BIS sous leurs épingles, faux scripts du lot qui écrivent leurs arguments, SHA256SUMS
 du lot et son sha256 en argument, dépôt git temporaire dont l'arbre (git write-tree, aucun commit) tient lieu de commit
-d'analyse. Aucun harnais ni journal réel. Chaque test nomme la mutation qui le rougit."""
+d'analyse. Aucun harnais ni journal réel. Les faux scripts importent un faux socle, qui charge commun de PLAN-S2BIS par
+son chemin (forme de socle.charger_module), et lisent leur code de sortie et la dépendance à la graine dans la clé
+« faux » du parametres.json du lot : l'environnement des scripts est une liste fermée (C-1 de la G2). Chaque test nomme
+la mutation qui le rougit."""
 import hashlib
 import json
 import os
@@ -14,12 +17,26 @@ import tests
 
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NL = chr(10)
-FAUX = NL.join(["import os, sys", "a = sys.argv", "i = a.index('--sortie')",
+FAUX = NL.join(["import os, sys", "import socle", "a, faux = sys.argv, socle.P['faux']",
+                "nom, i = os.path.basename(a[0])[:-3], a.index('--sortie')",
                 "noms = {'masque_fiv': ['masque_j28.txt', 'fiv_unites.txt'], 'intervalles': ['intervalles.txt']}",
-                "for n in noms[os.path.basename(a[0])[:-3]]:", "    with open(os.path.join(a[i + 1], n), 'w') as f:",
-                "        g = os.environ.get('PYTHONHASHSEED', '') if 'FAUX_GRAINE' in os.environ else ''",
-                "        f.write(' '.join(a[1:i]) + g)",
-                "sys.exit(int(os.environ.get('FAUX_CODE_' + os.path.basename(a[0])[:-3], '0')))", ""])
+                "for n in noms[nom] if faux.get('ecrire', True) else []:",
+                "    with open(os.path.join(a[i + 1], n), 'w') as f:",
+                "        f.write(' '.join(a[1:i]) + (os.environ['PYTHONHASHSEED'] if faux.get('graine') else ''))",
+                "sys.exit(faux.get('code', {}).get(nom, 0))", ""])
+SOCLE = NL.join(["import importlib.util, json, os", "ICI = os.path.dirname(os.path.abspath(__file__))",
+                 "with open(os.path.join(ICI, 'parametres.json'), encoding='utf-8') as f:", "    P = json.load(f)",
+                 "c = os.path.join(os.path.dirname(os.path.dirname(ICI)), P['plan_s2bis']['chemins']['commun'])",
+                 "m = importlib.util.spec_from_file_location('commun', c)",
+                 "m.loader.exec_module(importlib.util.module_from_spec(m))", ""])
+FORGE = NL.join(["import importlib.util, marshal, os, sys", "src, marque = sys.argv[1:]",
+                 "with open(src, encoding='utf-8') as f:", "    texte = f.read()",
+                 "ajout = 'open(' + repr(marque) + ', ' + repr('a') + ').write(__name__ + chr(10))'",
+                 "code = compile(texte + chr(10) + ajout + chr(10), src, 'exec')",
+                 "st, cible = os.stat(src), importlib.util.cache_from_source(src)",
+                 "os.makedirs(os.path.dirname(cible), exist_ok=True)", "with open(cible, 'wb') as f:",
+                 "    f.write(importlib.util.MAGIC_NUMBER + bytes(4) + int(st.st_mtime).to_bytes(4, 'little')",
+                 "            + st.st_size.to_bytes(4, 'little') + marshal.dumps(code))", ""])
 INTERDITS = ["docs/rapports/TEMOIN.md", "docs/adr-0025/TEMOIN.md", "docs/adr-0028/monark-m009a/TEMOIN.md",
              "docs/15-TEMOIN.md", "docs/16-TEMOIN.md", "docs/pocket-report/TEMOIN.md",
              "docs/adr-0028/execution/TEMOIN.md"]                             # septième témoin (P-9)
@@ -41,6 +58,28 @@ def sha_de(chemin):
         return sha(f.read())
 
 
+def ombre(marque):
+    """json.py d'ombre transparent : note son exécution dans marque, puis rend le vrai json."""
+    return NL.join(["import os, sys", f"with open({marque!r}, 'a', encoding='utf-8') as f:",
+                    "    f.write('ombre json' + chr(10))", "ici = os.path.dirname(os.path.abspath(__file__))",
+                    "sys.path[:] = [x for x in sys.path if os.path.abspath(x or '.') != ici]",
+                    "del sys.modules['json']", "import json", ""])
+
+
+def vu(marque):
+    """Marqueur d'exécution étrangère présent ; retiré après lecture."""
+    if os.path.exists(marque):
+        os.remove(marque)
+        return True
+    return False
+
+
+def forger(src, marque):
+    """Bytecode forgé de src (ajout : écrire __name__ dans marque), en-tête aux mtime et taille de src, dans le
+    __pycache__ voisin, au format du python3 que le lanceur appelle."""
+    subprocess.run(["python3", "-I", "-c", FORGE, src, marque], check=True)
+
+
 class TestLancer(unittest.TestCase):
     def setUp(self):
         self.t = tempfile.mkdtemp(prefix="p2_lancer_")
@@ -49,8 +88,8 @@ class TestLancer(unittest.TestCase):
         self.lot = os.path.join(self.depot, "scripts", "plan-s2bis-2")
         os.makedirs(self.lot)
         shutil.copy(os.path.join(ICI, "lancer.sh"), self.lot)
-        for s in ("masque_fiv", "intervalles"):
-            ecrire(os.path.join(self.lot, s + ".py"), FAUX)
+        for s, texte in (("masque_fiv", FAUX), ("intervalles", FAUX), ("socle", SOCLE)):
+            ecrire(os.path.join(self.lot, s + ".py"), texte)
         for x in ["s2-harness/shogen_s2/__init__.py", *INTERDITS]:          # faux harnais et témoins interdits
             ecrire(os.path.join(self.depot, x), "# témoin" + NL)
         g = ["git", "-c", "core.hooksPath=/dev/null", "-C", self.depot]
@@ -66,9 +105,10 @@ class TestLancer(unittest.TestCase):
                      + [f"journal {n} {sha(b)}" for n, b in self.journaux.items()] + ["sommes " + "0" * 64])
         self.ecrire()
 
-    def ecrire(self, ouvertures=1, fermer=True, commit_prm=None):
-        """Faux paquet ; fausses pièces de PLAN-S2BIS (parametres.json : paquet et commit d'analyse) ; parametres.json
-        du lot (huit épingles, passes) ; SHA256SUMS du lot ; self.epingle = son sha256."""
+    def ecrire(self, ouvertures=1, fermer=True, commit_prm=None, faux=None):
+        """Faux paquet ; fausses pièces de PLAN-S2BIS (parametres.json : paquet et commit d'analyse ; les autres, des
+        commentaires) ; parametres.json du lot (huit épingles, passes, faux) ; SHA256SUMS du lot ; self.epingle = son
+        sha256."""
         paquet = ("# faux paquet" + NL + ("```shogen-paquet-v1" + NL) * ouvertures + NL.join(self.bloc) + NL
                   + ("```" + NL if fermer else "") + "fin" + NL)
         ecrire(os.path.join(self.depot, PAQUET), paquet)
@@ -76,12 +116,12 @@ class TestLancer(unittest.TestCase):
         ps2 = {"paquet_s2": {"chemin": PAQUET, "sha256": sha(paquet.encode())},
                "commit_analyse": commit_prm or self.arbre}
         for k, rel in c.items():
-            ecrire(os.path.join(self.depot, rel), json.dumps(ps2) if k == "parametres" else f"pièce {k}" + NL)
+            ecrire(os.path.join(self.depot, rel), json.dumps(ps2) if k == "parametres" else f"# pièce {k}" + NL)
         lot = {"plan_s2bis": {"chemins": c, "sha256": {k: sha_de(os.path.join(self.depot, r)) for k, r in c.items()}},
-               "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1}}
+               "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1}, "faux": faux or {}}
         ecrire(os.path.join(self.lot, "parametres.json"), json.dumps(lot))
         sommes = "".join(f"{sha_de(os.path.join(self.lot, n))}  {n}" + NL
-                         for n in ("intervalles.py", "lancer.sh", "masque_fiv.py", "parametres.json"))
+                         for n in ("intervalles.py", "lancer.sh", "masque_fiv.py", "parametres.json", "socle.py"))
         ecrire(os.path.join(self.lot, "SHA256SUMS"), sommes)
         self.epingle = sha(sommes.encode())
 
@@ -171,9 +211,9 @@ class TestLancer(unittest.TestCase):
         self.assertEqual((r.returncode, r.stderr), (3, "REFUS P2/journal : journal absent : journal.jsonl" + NL))
 
     def test_commit_extraction(self):
-        """T-P2-LAN-6 (fin). Commit du bloc différent du commit d'analyse : P2/commit ; extraction déjà présente dans
-        le dossier de travail : P2/sortie ; code 3. Mutation M-P2-27 : commit du bloc non comparé ; M-P2R4-6 :
-        extraction déjà présente admise."""
+        """T-P2-LAN-6 (fin). Commit du bloc différent du commit d'analyse : P2/commit ; extraction, ou cache de bytecode
+        (pyc, C-1 b), déjà présents dans le dossier de travail : P2/sortie ; code 3. Mutation M-P2-27 : commit du bloc
+        non comparé ; M-P2R4-6 : extraction déjà présente admise ; M-P2R6-9 : cache de bytecode déjà présent admis."""
         self.ecrire(commit_prm="f" * 40)
         self.assertRien(self.lancer(), 3, "P2/commit")
         self.ecrire()
@@ -181,6 +221,9 @@ class TestLancer(unittest.TestCase):
         r = self.lancer()
         self.assertEqual((r.returncode, r.stderr.split(" : ")[0], os.listdir(self.x)),
                          (3, "REFUS P2/sortie", [self.arbre[:7]]))
+        os.rename(os.path.join(self.x, self.arbre[:7]), os.path.join(self.x, "pyc"))
+        r = self.lancer()
+        self.assertEqual((r.returncode, r.stderr.split(" : ")[0], os.listdir(self.x)), (3, "REFUS P2/sortie", ["pyc"]))
 
     def test_lancement_complet(self):
         """T-P2-LAN-1 et T-P2-LAN-2. Code 0 ; sortie = passe A (trois sorties et SHA256SUMS, octet pour octet) ;
@@ -214,9 +257,9 @@ class TestLancer(unittest.TestCase):
         r = self.lancer()
         self.assertEqual((r.returncode, os.path.exists(os.path.join(self.x, "A"))), (4, False), r.stderr)
         self.bloc[0] = "commit_analyse " + self.arbre
-        self.ecrire()
+        self.ecrire(faux={"code": {"masque_fiv": 1}})
         shutil.rmtree(self.x)
-        r = self.lancer(FAUX_CODE_masque_fiv="1")
+        r = self.lancer()
         a, b = (os.path.join(self.x, n) for n in "AB")
         self.assertEqual((r.returncode, sorted(os.listdir(a)), os.path.exists(b), os.path.exists(self.s)),
                          (5, ["fiv_unites.txt", "masque_j28.txt"], False, False))
@@ -225,7 +268,8 @@ class TestLancer(unittest.TestCase):
         """T-P2-LAN-8. Faux scripts dont la sortie dépend de PYTHONHASHSEED : P2/identite, code 5, sortie absente, les
         deux SHA256SUMS (six lignes de sha256) à l'écran. Mutation M-P2-30 : comparaison de A et B retirée ; M-P2R5-2 :
         même graine pour A et B."""
-        r = self.lancer(FAUX_GRAINE="1")
+        self.ecrire(faux={"graine": True})
+        r = self.lancer()
         hexa = [x for x in r.stdout.splitlines() if x[64:66] == "  " and set(x[:64]) <= set("0123456789abcdef")]
         self.assertEqual((r.returncode, r.stderr.split(" : ")[0], len(hexa), os.path.exists(self.s)),
                          (5, "REFUS P2/identite", 6, False))
@@ -239,3 +283,54 @@ class TestLancer(unittest.TestCase):
                 with open(os.path.join(self.depot, rel), "a", encoding="utf-8") as f:
                     f.write(" ")
                 self.assertRien(self.lancer(), 3, "P2/plan-s2bis")
+
+    def test_entree_hors_sommes(self):
+        """T-P2-LAN-10 (C-1 c de la G2, vecteur S8). Entrée du dossier du lot absente de SHA256SUMS, dossiers à part :
+        json.py d'ombre à côté des scripts ; fichier caché dans un sous-dossier : P2/epingle, code 3, rien d'exécuté.
+        Mutation M-P2R6-1 : contrôle des entrées retiré ; M-P2R6-2 : sous-dossiers non parcourus ; M-P2R6-3 :
+        entrées cachées ignorées."""
+        marque = os.path.join(self.t, "marque")
+        for i, rel in enumerate(("json.py", "sous/.cache")):
+            ecrire(os.path.join(self.lot, rel), ombre(marque))
+            r = self.lancer(self.j, self.s + str(i), self.x + str(i), self.epingle)
+            os.remove(os.path.join(self.lot, rel))
+            self.assertEqual((r.returncode, r.stderr.split(" : ")[0], vu(marque)), (3, "REFUS P2/epingle", False), rel)
+
+    def test_ombre_pythonpath(self):
+        """T-P2-LAN-11 (C-1 a et b de la G2, vecteur S9). json.py d'ombre dans un dossier passé par PYTHONPATH : jamais
+        exécuté (parametres.json lus en python3 -I ; scripts sous env -i, liste fermée), code 0, quatre sorties.
+        Mutation M-P2R6-4 : premier heredoc sans -I ; M-P2R6-5 : second heredoc sans -I ; M-P2R6-6 : environnement
+        des scripts hérité."""
+        marque, pp = os.path.join(self.t, "marque"), os.path.join(self.t, "pp")
+        ecrire(os.path.join(pp, "json.py"), ombre(marque))
+        r = self.lancer(PYTHONPATH=pp)
+        self.assertEqual((r.returncode, os.path.exists(marque), len(os.listdir(self.s))), (0, False, 4), r.stderr)
+
+    def test_bytecode(self):
+        """T-P2-LAN-12 (C-1 b et c de la G2, vecteur S22). Bytecode forgé, en-tête aux mtime et taille de la source
+        épinglée : dans scripts/plan-s2bis-2/__pycache__ (socle), P2/epingle, code 3 ; dans
+        scripts/plan-s2bis/__pycache__ (commun), ignoré (PYTHONPYCACHEPREFIX vers <travail>/pyc), code 0 ; jamais
+        exécuté. Mutation M-P2R6-7 : PYTHONPYCACHEPREFIX retiré ; M-P2R6-8 : __pycache__ hors du contrôle des
+        entrées."""
+        marque = os.path.join(self.t, "marque")
+        ps2 = os.path.join(self.depot, tests.PRM["plan_s2bis"]["chemins"]["commun"])
+        for i, (src, code, refus) in enumerate(((os.path.join(self.lot, "socle.py"), 3, "REFUS P2/epingle"),
+                                                (ps2, 0, ""))):
+            forger(src, marque)
+            r = self.lancer(self.j, self.s + str(i), self.x + str(i), self.epingle)
+            shutil.rmtree(os.path.join(os.path.dirname(src), "__pycache__"))
+            self.assertEqual((r.returncode, r.stderr.split(" : ")[0], vu(marque)), (code, refus, False), r.stderr)
+
+    def test_site_hostile(self):
+        """T-P2-LAN-14 (Q-CORR-5 adjugée : python3 -S). Préfixe jetable : venv sous TMPDIR, dont le python3 précède
+        celui du système dans PATH et dont le site-packages porte un .pth hostile (le site utilisateur passe par le
+        même module site, qu'on n'écrit jamais dans le HOME réel) ; parametres.json lus en -I -S, scripts en -S :
+        rien d'exécuté, code 0, quatre sorties. Mutation M-P2R6-18 : scripts sans -S ; M-P2R6-19 : premier heredoc
+        sans -S ; M-P2R6-20 : second heredoc sans -S."""
+        venv, marque = os.path.join(self.t, "venv"), os.path.join(self.t, "marque")
+        subprocess.run(["python3", "-I", "-m", "venv", "--without-pip", venv], check=True)
+        site = subprocess.run([os.path.join(venv, "bin", "python3"), "-I", "-c", "import sysconfig; print(sysconfig."
+                               "get_path('purelib'))"], capture_output=True, text=True, check=True).stdout.strip()
+        ecrire(os.path.join(site, "zz_hostile.pth"), f"import os; open({marque!r}, 'a').write('pth' + chr(10))" + NL)
+        r = self.lancer(PATH=os.path.join(venv, "bin") + os.pathsep + os.environ["PATH"])
+        self.assertEqual((r.returncode, vu(marque), len(os.listdir(self.s))), (0, False, 4), r.stderr)

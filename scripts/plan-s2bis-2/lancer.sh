@@ -3,18 +3,24 @@
 # P2R-5, et §7 ; forme de scripts/plan-s2bis/lancer.sh). Usage, par l'orchestrateur seul, une fois, détaché, après
 # l'épinglage au JOURNAL :
 #   bash scripts/plan-s2bis-2/lancer.sh <journaux> <sortie> <travail> <sha256 du SHA256SUMS du code>
-# Ordre, chaque étape fermant la suivante :
-#   1. variable de campagne non posée ; dossier des journaux présent ; sortie absente ou vide ;
-#   2. épingle : sha256 du SHA256SUMS du lot égal à l'argument, puis sha256sum -c dans le dossier du lot ;
-#   3. parametres.json de PLAN-S2BIS égal à son épingle ; paquet de S2 et commit d'analyse lus dans lui ;
-#   4. aucune extraction dans le dossier de travail ; sha256 du paquet ; bloc machine (une ouverture, une clôture) ;
-#      chaque journal du bloc présent et de sha256 égal ; commit du bloc = commit d'analyse ; control.jsonl et
-#      journal.jsonl nommés ; les sept autres pièces de PLAN-S2BIS égales à leurs épingles ;
+# Ordre du code, chaque étape fermant la suivante :
+#   1. quatre arguments ; variable de campagne non posée ; dossier des journaux présent ; sortie absente ou vide ;
+#   2. épingle : sha256 du SHA256SUMS du lot égal à l'argument, sha256sum -c dans le dossier du lot, et aucune entrée
+#      de ce dossier, dossiers à part, hors de SHA256SUMS (__pycache__ compris) ;
+#   3. épingles de PLAN-S2BIS lues dans le parametres.json du lot ; parametres.json de PLAN-S2BIS égal à son épingle,
+#      puis les sept autres pièces égales aux leurs ; paquet de S2 et commit d'analyse lus dans ce parametres.json ;
+#   4. commit d'analyse bien formé ; ni extraction ni cache de bytecode (pyc) dans le dossier de travail ; sha256 du
+#      paquet ; bloc machine (une ouverture, une clôture) ; chaque journal du bloc présent et de sha256 égal ; commit
+#      du bloc = commit d'analyse ; control.jsonl et journal.jsonl nommés ;
 #   5. extraction du commit d'analyse dans <travail>/<7 premiers caractères>, dossiers interdits exclus (P-9) ;
 #   6. passe A (PYTHONHASHSEED de A), puis passe B : masque_fiv.py, puis intervalles.py, sorties dans <travail>/A et
 #      <travail>/B, chacune avec son SHA256SUMS ; un script hors 0 arrête tout (B non commencée si A échoue, P-7) ;
 #   7. SHA256SUMS de A et de B comparés à l'octet : égaux, les trois sorties de A et son SHA256SUMS copiés dans
 #      <sortie> ; différents, refus P2/identite, rien dans <sortie>, les deux SHA256SUMS affichés (P-8).
+# Code exécuté = code épinglé (C-1 de la G2 ; Q-CORR-5) : parametres.json lus par python3 -I -S ; scripts en
+# python3 -S -B sous un environnement réduit à une liste fermée (PATH, LC_ALL, PYTHONHASHSEED de la passe,
+# PYTHONDONTWRITEBYTECODE, PYTHONPYCACHEPREFIX vers <travail>/pyc, neuf) : ni site-packages, système ou utilisateur,
+# ni .pth, ni bytecode voisin des sources.
 # N'affiche que des noms, des codes et des sha256 : aucun journal n'est ouvert ici (sha256sum seul), aucune sortie
 # n'est affichée ; messages des scripts dans <travail>/lancer.log. Codes : 0 ; 2 usage ; 3 refus avant tout
 # lancement ; 4 extraction impossible ; 5 un script hors 0, ou A ≠ B. Aucune barre oblique inverse dans ce fichier.
@@ -33,7 +39,10 @@ J="$1"; S="$2"; T="$3"; E="$4"
 if [ -e "$S" ]; then { [ -d "$S" ] && [ -z "$(ls -A "$S")" ]; } || refus P2/sortie "dossier de sortie non vide"; fi
 egal "$ICI/SHA256SUMS" "$E" || refus P2/epingle "sha256 du SHA256SUMS du lot différent de l'argument"
 ( cd "$ICI" && sha256sum --quiet --strict -c SHA256SUMS ) > /dev/null 2>&1 || refus P2/epingle "sha256sum -c en échec"
-mapfile -t EPI < <(python3 -B - "$P" <<'FIN'
+LISTE="$(cut -d' ' -f3- "$ICI/SHA256SUMS" | sort)"
+[ "$(cd "$ICI" && find . ! -type d ! -path ./SHA256SUMS | cut -c3- | sort)" = "$LISTE" ] ||
+  refus P2/epingle "entrée du dossier du lot hors de SHA256SUMS"
+mapfile -t EPI < <(python3 -I -S -B - "$P" <<'FIN'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     p = json.load(f)
@@ -52,7 +61,7 @@ for x in "${EPI[@]:0:8}"; do
   read -r k c h <<< "$x"
   [ "$k" = parametres ] || egal "$DEPOT/$c" "$h" || refus P2/plan-s2bis "pièce $k de PLAN-S2BIS ≠ son épingle"
 done
-mapfile -t V < <(python3 -B - "$PS2" <<'FIN'
+mapfile -t V < <(python3 -I -S -B - "$PS2" <<'FIN'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     p = json.load(f)
@@ -66,7 +75,8 @@ PAQ="$DEPOT/${V[0]}"
 COMMIT="${V[2]}"
 [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || refus P2/plan-s2bis "commit_analyse de PLAN-S2BIS malformé"
 X="$T/${COMMIT:0:7}"
-[ ! -e "$X" ] || refus P2/sortie "extraction déjà présente dans le dossier de travail"
+[ ! -e "$X" ] && [ ! -e "$T/pyc" ] ||
+  refus P2/sortie "extraction ou cache de bytecode déjà présent dans le dossier de travail"
 egal "$PAQ" "${V[1]}" || refus P2/paquet "sha256 du paquet de S2 différent de l'épingle"
 [ "$(grep -c '^```shogen-paquet-v1$' "$PAQ")" = 1 ] || refus P2/paquet "bloc machine : ouverture absente ou multiple"
 LIRE='f && /^```$/ {g = 1; exit} f {print} /^```shogen-paquet-v1$/ {f = 1} END {exit !g}'
@@ -91,10 +101,11 @@ for n in control.jsonl journal.jsonl; do
 done
 EXCL=(--exclude=docs/rapports --exclude=docs/adr-0025 --exclude=docs/adr-0028/monark-m009a)
 EXCL+=(--exclude=docs/adr-0028/execution "--exclude=docs/15-*" "--exclude=docs/16-*" --exclude=docs/pocket-report)
-mkdir -p "$X" || exit 4
+mkdir -p "$X" "$T/pyc" || exit 4
+PYC="$(cd "$T/pyc" && pwd)" || exit 4
 git --no-optional-locks -C "$DEPOT" archive "$COMMIT" | tar -x -C "$X" "${EXCL[@]}" || {
   echo "extraction impossible : code 4" >&2; exit 4; }
-PY=(env -u SHOGEN_S2_CAMPAGNE_CONTROL PYTHONDONTWRITEBYTECODE=1)
+PY=(env -i PATH="$PATH" LC_ALL=C PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$PYC")
 ARGS=(--journaux "$J" --harnais "$X/s2-harness" --parametres "$P")
 LOG="$T/lancer.log"
 read -r _p GA GB <<< "${EPI[8]}"
@@ -102,7 +113,7 @@ for passe in A B; do
   graine="$GA"; [ "$passe" = A ] || graine="$GB"
   mkdir -p "$T/$passe" || exit 5
   for s in masque_fiv intervalles; do
-    "${PY[@]}" PYTHONHASHSEED="$graine" python3 -B "$ICI/$s.py" "${ARGS[@]}" --sortie "$T/$passe" >> "$LOG" 2>&1
+    "${PY[@]}" PYTHONHASHSEED="$graine" python3 -S -B "$ICI/$s.py" "${ARGS[@]}" --sortie "$T/$passe" >> "$LOG" 2>&1
     r=$?
     echo "passe $passe $s : code $r"
     [ "$r" -eq 0 ] || exit 5

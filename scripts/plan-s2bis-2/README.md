@@ -39,9 +39,14 @@ Python 3.11 au moins (`hashlib.file_digest` de `commun.py`) ; le test d'identit�
 1. Dans ce dossier, `sha256sum -c SHA256SUMS` sort 0, et le sha256 de `SHA256SUMS` est celui du JOURNAL. Puis, détaché,
    sortie absente ou vide, travail neuf, PID consigné et fin constatée en sondant le PID :
    `setsid nohup bash scripts/plan-s2bis-2/lancer.sh <journaux> <sortie> <travail> <sha256> > <travail>.out 2>&1 &`
-2. Codes : 0 deux scripts en 0 dans chaque passe et A = B ; 2 usage ; 3 refus avant tout lancement ; 4 extraction
+2. Règle du code exécuté (C-1 de la G2 ; Q-CORR-5) : ce dossier ne porte que les fichiers de `SHA256SUMS` (et des
+   dossiers) ; toute autre entrée, `__pycache__` compris (tests lancés sans `-B`), est refusée (P2/epingle). Les
+   `parametres.json` sont lus par `python3 -I -S` ; les scripts tournent en `python3 -S -B` sous `env -i` avec PATH,
+   LC_ALL, PYTHONHASHSEED de la passe, PYTHONDONTWRITEBYTECODE et PYTHONPYCACHEPREFIX vers `<travail>/pyc`, neuf : ni
+   site-packages (système ou utilisateur), ni fichier `.pth`, ni bytecode voisin ne sont lus.
+3. Codes : 0 deux scripts en 0 dans chaque passe et A = B ; 2 usage ; 3 refus avant tout lancement ; 4 extraction
    impossible ; 5 un script hors 0, ou A ≠ B. L'écran ne porte que des noms, des codes et des sha256.
-3. Lettre de Q-P2-08 (PERIMETRE-REDUIT.md §7), mot pour mot :
+4. Lettre de Q-P2-08 (PERIMETRE-REDUIT.md §7), mot pour mot :
 
 > « un seul lancement ; dans ce lancement, deux passes A et B (`PYTHONHASHSEED` 0 et 1) ; sha256 comparés ; A ≠ B est
 > un refus (code 5), aucune sortie n'est versée ni ouverte par quiconque, les deux `SHA256SUMS` seuls sont consignés ;
