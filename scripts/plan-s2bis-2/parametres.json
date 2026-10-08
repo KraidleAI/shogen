@@ -1,0 +1,52 @@
+{
+ "lot": "PLAN-S2BIS-2",
+ "rattachement": "G0 docs/adr-0029/g0-plan2/G0-PLAN-S2BIS-2.md (2026-10-05 17:06:39 UTC) ; PERIMETRE-REDUIT.md",
+ "plan_s2bis": {
+  "chemins": {
+   "commun": "scripts/plan-s2bis/commun.py",
+   "regles": "scripts/plan-s2bis/regles.py",
+   "episodes": "scripts/plan-s2bis/episodes.py",
+   "parametres": "scripts/plan-s2bis/parametres.json",
+   "fixtures": "scripts/plan-s2bis/tests/fixtures.py",
+   "sha256sums": "scripts/plan-s2bis/SHA256SUMS",
+   "ep": "docs/adr-0029/plan-s2bis/episodes.txt",
+   "ep_sha256sums": "docs/adr-0029/plan-s2bis/SHA256SUMS"
+  },
+  "sha256": {
+   "commun": "14920e8703febf43de324960975413e276227ac2281bb4f85380cf465d47b3f2",
+   "regles": "a01401880714e2baa792d1e7a2c36414df2b848c055c73429e22b4646d2f88a6",
+   "episodes": "90c7842d9e1193b0629de41cfd91fbbebb45d4ec4731af89b77e70a96af43fd2",
+   "parametres": "7e214864e23634e9b3a4174745e3f5bbabf8c5a74d8e78e0411b449ee7d1d632",
+   "fixtures": "17ae3c130a1e4a1fcde2b3fc8d8a4384a77f513533836f0ec6fad657b4903913",
+   "sha256sums": "65c26310c98db6e4ddd7293d06601fffd3599dde3892fc606806c59aa9c94398",
+   "ep": "c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6",
+   "ep_sha256sums": "f21f929329f11e9baf00057e3a7b250e5fb3a05a31fd5bcc64bb9860218f601f"
+  },
+  "source": "PERIMETRE-REDUIT.md §1 (sha256sum) ; lignes des deux SHA256SUMS de PLAN-S2BIS ; E-P2-03"
+ },
+ "masque": {
+  "calendrier_hors_d5": {"calme": 30286, "stress": 13491},
+  "sautees_hors_d5": {"calme": 5701, "stress": 2094},
+  "source": "ADR-0029 l.31 ; recompte de calc_p2.py et du test de SB-10B l.148-161 ; E-P2-11 (b)"
+ },
+ "voisinage": {
+  "nom": "sensibilité au voisinage des lacunes",
+  "d": 1,
+  "lacune": "position de grille non retenue dans la strate : absente, exclue, D5, de l'autre strate, hors portée",
+  "bords": "bords de la portée comptés comme lacunes",
+  "grille": "fiv.ell de scripts/plan-s2bis/parametres.json",
+  "garde": "recalculée sur le n réduit (episodes.courbe)",
+  "source": "AVIS.md l.81 (Q-P2-10 b) ; PERIMETRE-REDUIT.md P-4 ; E-P2-13"
+ },
+ "passes": {
+  "variable": "PYTHONHASHSEED",
+  "A": 0,
+  "B": 1,
+  "source": "lettre de Q-P2-08 (PERIMETRE-REDUIT.md §7 ; G0, adjudication 4) ; E-P2-18"
+ },
+ "sous_arbres": {
+  "lus": ["segment", "strates", "pool_d1bis", "classes", "episodes", "fiv"],
+  "epingles": ["commit_analyse", "harnais_sha256", "rendu_j28", "paquet_s2"],
+  "source": "PERIMETRE-REDUIT.md P-3 (G0, adjudication 3) ; E-P2-06"
+ }
+}
