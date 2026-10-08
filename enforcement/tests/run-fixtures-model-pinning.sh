@@ -11,6 +11,7 @@
 # banni, est construit à l'exécution. Chaque cas vérifie la sortie ET le jeton ; un cas
 # « 0 » exige le message OK et son compte de fichiers. Un seul résumé fait foi.
 # Lot D8c (ADR-0028 D8) : cas T-77 à T-92, table du G0 de D8c §7.4 (docs/adr-0028/G0-lot-D8c.md) ; T-93 à T-95 (revue G2).
+# Lot LINT-HAIKU (2026-10-08 ; annexe B, bloc B.76 ; G0 docs/adr-0028/G0-lot-LINT-HAIKU.md) : cas T-96 à T-164.
 # Usage : run-fixtures-model-pinning.sh [lint]   Sortie : 0 tout passe, 1 un cas échoue,
 # 3 erreur fatale.
 
@@ -154,6 +155,124 @@ arbre D; ins 10 '# c'; ins 11 '  x'; cas T-92 2 R-1/hors-liste
 arbre D; ins 12 'hooks: [model: opus]'; cas T-93 2 R-1/cle-model
 arbre D; ins 12 'hooks: {Stop: [model: opus]}'; cas T-94 2 R-1/cle-model
 arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 '    - model: claude-opus-5-5'; ins 15 '      type: prompt'; cas T-95 0 1
+# Lot LINT-HAIKU (2026-10-08 ; G0 docs/adr-0028/G0-lot-LINT-HAIKU.md, ajouts datés des §6 et §7 compris). E-LH-1 :
+# claude-haiku-5-5 admis comme valeur de la clé model de premier niveau d'un frontmatter (agent, skill, commande :
+# T-96 à T-98), refusé (R-1/role) partout dans un réglage JSON (T-99, inversé au §7, T-100, T-111) et hors de cette
+# clé (T-142 et suivants). E-LH-2 : rien d'autre n'est élargi (T-101 à T-110 ; T-48, tier nu, inchangé). Espace
+# final refusé dans une chaîne entre guillemets (T-106, T-107) ; hors guillemets, YAML ne le garde pas et norm le
+# retire, pour toute la liste. Revue G2 : C-2 (T-108), C-3 (T-109, T-110). Octets en octal par printf : UTF-8 de
+# U+00A0, U+200B, U+3000, U+2003, U+1680, U+2028, U+2009, U+205F ; FF, octet 0xFF seul (UTF-8 invalide).
+NB="$(printf '\302\240')"; ZW="$(printf '\342\200\213')"; U3="$(printf '\343\200\200')"
+EM="$(printf '\342\200\203')"; OG="$(printf '\341\232\200')"; LS="$(printf '\342\200\250')"
+TH="$(printf '\342\200\211')"; MM="$(printf '\342\201\237')"; FF="$(printf '\377')"
+arbre D 'model: claude-haiku-5-5'; cas T-96 0 1
+arbre D; md .claude/skills/s/SKILL.md 'name: s' 'model: claude-haiku-5-5'; cas T-97 0 2
+arbre D; md .claude/commands/c.md 'description: c' 'model: claude-haiku-5-5'; cas T-98 0 2
+arbre D; echo '{ "model": "claude-haiku-5-5" }' > "$T/.claude/settings.json"; cas T-99 2 R-1/role
+arbre D; echo '{ "advisorModel": "claude-haiku-5-5" }' > "$T/.claude/settings.local.json"; cas T-100 2 R-1/role
+arbre D 'model: claude-haiku-4-5'; cas T-101 2 R-1/hors-liste
+arbre D 'model: claude-haiku-5'; cas T-102 2 R-1/hors-liste
+arbre D 'model: claude-haiku-5-5-20260101'; cas T-103 2 R-1/hors-liste
+arbre D 'model: claude-haiku-5-5[1m]'; cas T-104 2 R-1/suffixe
+arbre D 'model: Claude-Haiku-5-5'; cas T-105 2 R-1/hors-liste
+arbre D 'model: "claude-haiku-5-5 "'; cas T-106 2 R-1/hors-liste
+arbre D; echo '{ "model": "claude-haiku-5-5 " }' > "$T/.claude/settings.json"; cas T-107 2 R-1/hors-liste
+arbre D 'model: Claude-haiku-5-5'; cas T-108 2 R-1/hors-liste
+arbre D "model: claude-haiku-5-5$NB"; cas T-109 2 R-1/hors-liste
+arbre D "model: claude-haiku-5-5$ZW"; cas T-110 2 R-1/hors-liste
+arbre D; echo '{ "MODEL": "claude-haiku-5-5" }' > "$T/.claude/settings.json"; cas T-111 2 R-1/role
+# E-LH-5 : verdict indépendant de la locale. Les cas suivants tournent sans LC_ALL ni LC_CTYPE hérités ; casl lance
+# le lint sous LANG=POSIX, LANG=C.UTF-8, LC_ALL=C.UTF-8 et LC_CTYPE=C.UTF-8 (revue de la vague 2, C-1), chacune
+# seule, comme sur un hôte qui n'en pose qu'une. T-112, témoin : sous C.UTF-8, bash range U+3000 dans [[:space:]] ;
+# sinon, les cas sous C.UTF-8 ne prouvent rien sur cet hôte et le runner échoue (pas de vert par absence). T-113 à
+# T-117 : formes de la revue G2 (item I-1), admises sous C.UTF-8 avant le lot. T-118 à T-125 : formes que C.UTF-8
+# refusait et que LC_ALL=C seul admettrait (blancs Unicode BU du lint, chaque branche du motif BU portée par un cas
+# au moins ; octet UTF-8 invalide dans le commentaire d'une ligne model), refusées sous toutes.
+unset LC_ALL LC_CTYPE
+casl() { for l in POSIX C.UTF-8; do LANG="$l" cas "$1/$l" "$2" "$3"; done
+  LC_ALL=C.UTF-8 cas "$1/LC_ALL" "$2" "$3"; LC_CTYPE=C.UTF-8 cas "$1/LC_CTYPE" "$2" "$3"; }
+if LANG=C.UTF-8 bash -c '[[ $1 =~ ^[[:space:]]$ ]]' _ "$U3" 2> /dev/null; then OK=$((OK + 1))
+else KO=$((KO + 1)); echo "ÉCHEC T-112 : C.UTF-8 sans effet sur cet hôte (témoin U+3000)" >&2; fi
+arbre D "model:${U3}claude-haiku-5-5"; casl T-113 2 R-1/hors-liste
+arbre D "model: ${U3}claude-haiku-5-5"; casl T-114 2 R-1/hors-liste
+arbre D "model:${EM}claude-haiku-5-5"; casl T-115 2 R-1/hors-liste
+arbre D "model:${OG}claude-haiku-5-5"; casl T-116 2 R-1/hors-liste
+arbre D "model:${LS}claude-haiku-5-5"; casl T-117 2 R-1/hors-liste
+arbre D; md .claude/skills/s/SKILL.md 'name: s' 'model: opus'; S="$T/.claude/skills/s/SKILL.md"
+{ echo "---$U3"; tail -n +2 "$S"; } > "$T/x" && mv "$T/x" "$S"; casl T-118 2 R-1/cle-model
+arbre D; md .claude/skills/s/SKILL.md 'name: s' "model$EM: opus"; casl T-119 2 R-1/cle-model
+arbre D; md .claude/skills/s/SKILL.md 'name: s' "${OG}model: opus"; casl T-120 2 R-1/cle-model
+arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 "    -${LS}model: opus"; casl T-121 2 R-1/cle-model
+arbre D; ins 12 "hooks: [${TH}model: opus]"; casl T-122 2 R-1/cle-model
+arbre D; ins 10 "$MM${MM}x"; casl T-123 2 R-1/cle-model
+arbre D; echo "await agent$U3('p', {model: 'opus'})" > "$T/wf.mjs"; casl T-124 2 R-1/workflow
+arbre D; F="$FX/shogen-devops.md"
+{ head -n 9 "$F"; echo "model: claude-haiku-5-5 #$FF"; tail -n +11 "$F"; } > "$A"; casl T-125 2 R-1/hors-liste
+# Tour 3 (revue de la vague 2, C-1 à C-3 ; G0 §7). Commentaire d'une ligne model (I-R-4) : seul l'UTF-8 invalide
+# (U8 du lint) est refusé : T-126 (TAB avant #) et T-130 (octet loin du #) refusés, T-127 (# décision) admis, sous
+# toutes les locales (C-2). Bornes de U8 : T-131 admis (TAB, DEL, premier et dernier point de chaque branche) ;
+# T-132 à T-139 refusés (surlongs, substitut, au-delà de U+10FFFF, F5, tronqué, octet de suite seul). UTF-8
+# invalide hors d'une ligne model : T-140, T-141 (sous C.UTF-8, l'octet en tête de ligne masquait l'indentation).
+# Appel agent( : T-128, T-129 (C-3). Rôle (G0 §7) : SIGNAL refusé partout dans un réglage JSON (T-142 à T-145), et
+# hors de la clé model de premier niveau d'un frontmatter : hook, clé imbriquée, flux ouvert sur plusieurs lignes
+# (T-146 à T-151, T-154, T-155) ; refusé aussi après toute ligne qui porte [ ou { (T-152, inversé au tour 4 : prix de
+# FL, décision de l'orchestrateur) ; admis d'un fichier à l'autre (T-153 : FL remis à zéro par fichier).
+TB="$(printf '\011')"; DE="$(printf 'd\303\251cision')"
+ml() { arbre D; { head -n 9 "$F"; printf '%s\n' "$1"; tail -n +11 "$F"; } > "$A"; }
+sk() { arbre D; md .claude/skills/s/SKILL.md 'name: s' "$@"; }
+ml "model: claude-opus-5-5$TB# x$FF"; casl T-126 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # $DE"; casl T-127 0 1
+arbre D; echo "await agent $U3('p', {model: 'opus'})" > "$T/wf.mjs"; casl T-128 2 R-1/workflow
+arbre D; echo "await agent('p', {model: 'opus'})" > "$T/wf.cjs"; cas T-129 2 R-1/workflow
+ml "model: claude-opus-5-5 # x$FF"; casl T-130 2 R-1/hors-liste
+V="$(printf '\001\011\177\302\200\337\277\340\240\200\341\200\200\354\277\277\355\237\277\356\200\200')"
+V="$V$(printf '\357\277\277\360\220\200\200\361\200\200\200\363\277\277\277\364\217\277\277')"
+ml "model: claude-opus-5-5 # a${TB}b $V"; cas T-131 0 1
+ml "model: claude-opus-5-5 # x$(printf '\301\277')y"; cas T-132 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\340\237\277')y"; cas T-133 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\355\240\200')y"; cas T-134 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\360\217\277\277')y"; cas T-135 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\364\220\200\200')y"; cas T-136 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\365\200\200\200')y"; cas T-137 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\343\200')y"; cas T-138 2 R-1/hors-liste
+ml "model: claude-opus-5-5 # x$(printf '\200')y"; cas T-139 2 R-1/hors-liste
+arbre D; md .claude/skills/s/SKILL.md "${FF}x: y" '  model: claude-opus-5-5'; casl T-140 2 R-1/cle-model
+sk 'model: claude-opus-5-5' "$FF  x" '  y'; casl T-141 2 R-1/cle-model
+arbre D; J='{"hooks": {"Stop": [{"hooks": [{"type": "prompt", "model": "claude-haiku-5-5"}]}]}}'
+echo "$J" > "$T/.claude/settings.json"; cas T-142 2 R-1/role
+arbre D; echo '{"env": {"ANTHROPIC_MODEL": "claude-haiku-5-5"}}' > "$T/.claude/settings.json"; cas T-143 2 R-1/role
+arbre D; printf '{"env": {"X": "Claude-H\134u0061iku-5-5"}}\n' > "$T/.claude/settings.local.json"; cas T-144 2 R-1/role
+arbre D; J='{"permissions": {"allow": ["Bash(claude --model claude-haiku-5-5)"]}}'
+echo "$J" > "$T/.claude/settings.local.json"; cas T-145 2 R-1/role
+arbre D; ins 12 'hooks:'; ins 13 '  Stop:'; ins 14 '    - model: claude-haiku-5-5'; ins 15 '      type: prompt'
+cas T-146 2 R-1/role
+sk 'advisor:' '  model: claude-haiku-5-5'; cas T-147 2 R-1/role
+sk 'hooks: {Stop: [' 'model: claude-haiku-5-5' ']}'; cas T-148 2 R-1/role
+sk 'hooks: {Stop: [' '  "]}",' 'model: claude-haiku-5-5' ']}'; cas T-149 2 R-1/role
+sk 'hooks: {Stop: [' "  ']}'," 'model: claude-haiku-5-5' ']}'; cas T-150 2 R-1/role
+sk 'hooks: {Stop: [  # ]}' 'model: claude-haiku-5-5' ']}'; cas T-151 2 R-1/role
+arbre D 'model: claude-haiku-5-5'; ins 9 'x: [Read, "a[b", '"'c{d'"'] # ['; cas T-152 2 R-1/role
+arbre D 'model: claude-haiku-5-5'; ins 10 'note: voir [1'; cp "$A" "$T/.claude/agents/b.md"; cas T-153 0 2
+sk 'description: voir x]]' 'hooks: {Stop: [' 'model: claude-haiku-5-5' ']}'; cas T-154 2 R-1/role
+sk 'hooks: {' 'model: claude-haiku-5-5' '}'; cas T-155 2 R-1/role
+# Tour 4 (revue du tour 3, C-1 à C-3 ; adjudication : remède R1). C-1, FL ne compte plus les fermants : hook imbriqué
+# selon PyYAML 6.0.1 malgré une chaîne sur deux lignes qui porte les fermants (T-156), des apostrophes de scalaires
+# (T-157), des tirets de scalaire (T-160), une chaîne ouverte sur une ligne sans crochet (T-161), un ouvrant après un
+# dièse qui n'ouvre pas de commentaire (T-163) ; la ligne model ne se juge pas sous ses propres crochets (T-162,
+# admis). C-2 : majuscules échappées dans un réglage JSON (T-158). C-3 : octet invalide entre deux dièses (T-159) ;
+# après le second (T-164 : le commentaire se lit jusqu'à la fin de la ligne).
+sk 'hooks: {Stop: [{hooks: [{type: prompt, prompt: "voir' '  la suite ]}]}]}",' 'model: claude-haiku-5-5' '}]}]}'
+cas T-156 2 R-1/role
+sk "hooks: [l'outil, [x, l'autre]," 'model: claude-haiku-5-5' ']'; cas T-157 2 R-1/role
+arbre D; J='{"env": {"ANTHROPIC_MODEL": "CL\134u0041UDE-H\134u0041I\134u004BU-5-5"}}'
+printf "$J\n" > "$T/.claude/settings.json"; cas T-158 2 R-1/role
+ml "model: claude-opus-5-5 # x$FF # y"; casl T-159 2 R-1/hors-liste
+sk 'hooks: {Stop: [{type: prompt, prompt: relire-la-piece-entiere,' 'model: claude-haiku-5-5' '}]}'
+cas T-160 2 R-1/role
+sk 'hooks: [' '  "voir' '  ]' '  ",' 'model: claude-haiku-5-5' ']'; cas T-161 2 R-1/role
+ml 'model: claude-haiku-5-5 # cf. [B.76]'; cas T-162 0 1
+sk 'hooks:' '  a#b: [' 'model: claude-haiku-5-5' '  ]'; cas T-163 2 R-1/role
+ml "model: claude-opus-5-5 # a # x$FF"; casl T-164 2 R-1/hors-liste
 
 echo "model-pinning : $OK ok, $KO échec"
 [ "$KO" -eq 0 ]
