@@ -3,6 +3,7 @@
 l.128 (γ̂₀ et σ̂²_bloc à ℓ = 1 ne dépendent que de n et K), et comptage naïf des γ̂_k depuis leur définition (paires de
 la grille, écarts à Ī, en Fraction) sur des séries aléatoires à lacunes ; chaque test nomme les mutations qui le
 rougissent."""
+import hashlib
 import random
 import unittest
 from decimal import Decimal
@@ -234,6 +235,98 @@ class TestModeleE1(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             calib_fiv.moyenne([])
         self.assertEqual(c.exception.code, "FIV/entree")
+
+
+T = 1796428560                                     # vendredi 2026-12-04 23:56 UTC (date -u -d @1796428560)
+SEG = {"t0": T, "t_fin": T + 480, "n_fixe": 8, "plages": [(T + 360, T + 360)]}       # j 0-3 vendredi, 4-7 samedi
+L5 = "  lacune j = 5 à 6 : 2 positions (calme 0, stress 2)"
+
+
+def masque_fictif(*remplacements) -> str:
+    """masque_j28.txt fictif écrit à la main sur SEG (forme de scripts/plan-s2bis-2/masque_fiv.py) : D5 = j 6,
+    lacunes j 1 et j 5-6, chaîne c-ccs--s (printf | sha256sum : 51633e11…) ; chaque (avant, après) remplacé."""
+    t = chr(10).join([
+        "préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)", "en-tête du lot",
+        "[MASQUE J28] positions j = (ws − t0)/w de la portée ; strate par jour UTC ; retenue = fenêtre retenue de la "
+        "strate", f"  portée : t0 = {T} ; t_fin = {T + 480} ; positions = 8 ; plage D5 : j = 6 à 6 (1 positions)",
+        "  « calme » : calendrier hors D5 = 4 ; retenues = 3 ; sautées hors D5 = 1",
+        "  « stress » : calendrier hors D5 = 3 ; retenues = 2 ; sautées hors D5 = 1",
+        "  contrôle : retenues = n du bloc 3 ; sautées = ADR-0029 l.31 ; strate de chaque retenue = calendrier : égaux",
+        "  empreinte : sha256 de la chaîne de 8 caractères (c calme retenue, s stress retenue, - non retenue) = "
+        "51633e111ca9087deff66039169933974ac07c1c88b85672d6e474a33b14c0b3",
+        "  lacunes : 2 suites maximales de positions non retenues, plage D5 comprise, en ordre croissant",
+        "  lacune j = 1 à 1 : 1 positions (calme 1, stress 0)", L5, ""])
+    for a, b in remplacements:
+        assert t.count(a) == 1, a
+        t = t.replace(a, b)
+    return t
+
+
+class TestMasqueE1(unittest.TestCase):
+    def test_masque_fictif(self):
+        """Point (3) : masque relu sur la fixture : présentes calme j 0, 2, 3 et stress j 4, 7 ; génération (portée
+        hors D5) inchangée : calme j 0-3, stress j 4, 5, 7 ; mêmes présentes sans plage exclue (« aucune ») et avec une
+        plage hors de la portée (« aucune position »), stress hors D5 = 4. Mutations M-15B-01 (lacune comptée
+        retenue), M-15B-02 (strate par la mauvaise initiale), M-15B-10 (comptes des lacunes hors D5)."""
+        cal = PRM["calendrier"]
+        self.assertEqual(calib_fiv.masque_j28(masque_fictif(), SEG, cal),
+                         {"calme": bits(0, 2, 3), "stress": bits(4, 7)})
+        for seg, d5 in ((dict(SEG, plages=[]), "aucune"), (dict(SEG, plages=[(T - 600, T - 540)]), "aucune position")):
+            texte = masque_fictif(("j = 6 à 6 (1 positions)", d5), ("3 ; retenues = 2 ; sautées hors D5 = 1",
+                                                                    "4 ; retenues = 2 ; sautées hors D5 = 2"))
+            self.assertEqual(calib_fiv.masque_j28(texte, seg, cal), {"calme": bits(0, 2, 3), "stress": bits(4, 7)}, d5)
+        self.assertEqual(calib_fiv.calendrier_j28(SEG, cal)["masques"],
+                         {"calme": bits(0, 1, 2, 3), "stress": bits(4, 5, 7)})
+
+    def test_masque_refus(self):
+        """Chaque retouche de la fixture : E1/masque. Empreinte, retenues, plage D5, nombre de lacunes, comptes d'une
+        lacune, t_fin, étiquette, section absente ; lacune coupée en deux (chaîne et empreinte inchangées, suites non
+        maximales) ; lacunes désordonnées ; ligne de lacune illisible ; saut de ligne final absent, ligne en trop ;
+        j 6 (D5) retenue, empreinte f5fe5be6… de c-ccs-ss et comptes cohérents ; lacune j 5 à 8, hors de la grille de
+        8 positions, empreinte 38523657… de c-ccs--- et comptes cohérents. Mutations M-15B-03 à M-15B-07, M-15B-11."""
+        f5 = "f5fe5be6f79cb00b34d28d1cb77d4cf9cb4899130c6fdf1deb2d2b790ca382ab"     # printf '%s' c-ccs-ss | sha256sum
+        l55, l66 = ("  lacune j = 5 à 5 : 1 positions (calme 0, stress 1)",
+                    "  lacune j = 6 à 6 : 1 positions (calme 0, stress 1)")
+        l1, nl = "  lacune j = 1 à 1 : 1 positions (calme 1, stress 0)", chr(10)
+        cas = [[("= 51633e", "= 51633f")], [("retenues = 3", "retenues = 4")], [("j = 6 à 6 (1", "j = 5 à 6 (2")],
+               [("lacunes : 2", "lacunes : 3")], [("(calme 0, stress 2)", "(calme 1, stress 1)")],
+               [(f"t_fin = {T + 480}", f"t_fin = {T + 540}")], [("= FAUX)", "= VRAI)")],
+               [("[MASQUE J28]", "[MASQUE]")], [("lacunes : 2", "lacunes : 3"), (L5, l55 + nl + l66)],
+               [(l1 + nl + L5, L5 + nl + l1)], [("j = 1 à 1 :", "j = 1 :")], [("stress 2)" + nl, "stress 2)")],
+               [("stress 2)" + nl, "stress 2)" + nl + "fin" + nl)],
+               [(L5, l55), ("= 51633e111ca9087deff66039169933974ac07c1c88b85672d6e474a33b14c0b3", "= " + f5),
+                ("3 ; retenues = 2 ; sautées hors D5 = 1", "3 ; retenues = 3 ; sautées hors D5 = 0")],
+               [(L5, "  lacune j = 5 à 8 : 4 positions (calme 0, stress 3)"),
+                ("= 51633e111ca9087deff66039169933974ac07c1c88b85672d6e474a33b14c0b3",
+                 "= 385236576d42550fda9651c6cca5599046c25e5c0e97d00ef620eb48e28c4651"),
+                ("3 ; retenues = 2 ; sautées hors D5 = 1", "3 ; retenues = 1 ; sautées hors D5 = 2")]]
+        for c in cas:
+            with self.assertRaises(commun.Refus) as r:
+                calib_fiv.masque_j28(masque_fictif(*c), SEG, PRM["calendrier"])
+            self.assertEqual(r.exception.code, "E1/masque", c)
+
+    def test_masque_reel(self):
+        """masque_j28.txt versé, sous ses deux épingles : 46 468 positions ; présentes calme 24 585 et stress 11 397
+        (n de l'en-tête du masque et n_s d'EP) ; génération sur la portée hors D5 : 30 286 et 13 491 ; positions
+        relevées par un oracle hors dépôt (datetime, lacunes lues par découpage de texte) : j 0 c, 1550 -, 3180 s,
+        4320 -, 6871 -, 6872 c, 41717 c, 41718 -, 44408 -, 44409 s, 46467 c ; chaîne c/s/- recalculée ici : sha256
+        670dc46e… (ligne du fichier) ; présentes incluses dans la génération ; fichiers lus inscrits. Mutations
+        M-15B-08 (masque non relu : présentes = génération), M-15B-09 (lu sous les sommes de PLAN-S2BIS)."""
+        lus = {}
+        cal = calib_fiv.calendrier_e1(PRM, lus, environ={})
+        p, g = cal["presentes"], cal["masques"]
+        self.assertEqual((cal["horizon"], p["calme"].bit_count(), p["stress"].bit_count(), g["calme"].bit_count(),
+                          g["stress"].bit_count()), (46468, 24585, 11397, 30286, 13491))
+        bc, bs = (format(p[s], "b")[::-1].ljust(46468, "0") for s in ("calme", "stress"))
+        ch = "".join("c" if x == "1" else "s" if y == "1" else "-" for x, y in zip(bc, bs))
+        self.assertEqual("".join(ch[j] for j in (0, 1550, 3180, 4320, 6871, 6872, 41717, 41718, 44408, 44409, 46467)),
+                         "c-s--cc--sc")
+        self.assertEqual(hashlib.sha256(ch.encode("ascii")).hexdigest(),
+                         "670dc46eae832264875af8fdb5a586896750e0d7a78f04e28b4dae3cabe3a37f")
+        self.assertEqual([(p[s] & ~g[s]).bit_count() for s in p], [0, 0])
+        d = "docs/adr-0029/plan-s2bis"
+        self.assertEqual(sorted(lus), [f"{d}-2/SHA256SUMS", f"{d}-2/masque_j28.txt", f"{d}/SHA256SUMS",
+                                       f"{d}/episodes.txt"])
 
 
 L22 = Decimal("0.480453013918201424667102526326664971730552951594545586866864")     # bc -l : l(2)^2, scale = 60

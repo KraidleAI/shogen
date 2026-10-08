@@ -6,18 +6,25 @@ contexte de r1 (précision calibration.precision, ROUND_HALF_EVEN, le reste du D
 SB-10b : portée du segment J28 lue sur EP l.6, calendrier de la grille, réplication du modèle d'E1 (unités
 indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. SB-10c :
 grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le contexte de r1 : aucune fonction de libm),
-choix de C2 et de C1. Entiers et rationnels seuls, sauf les logarithmes du critère : aucun flottant, aucune
-puissance."""
+choix de C2 et de C1. SB-15b (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (3)) : calendrier d'E1, positions
+présentes = masque mesuré de J28 versé par PLAN-S2BIS-2. Entiers et rationnels
+seuls, sauf les logarithmes du critère : aucun flottant, aucune puissance."""
+import hashlib
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
 
 import calendrier
+import calibration
 import commun
 import regle
 import sources
 
-NOMBRE = re.compile("(?<![a-z])[0-9]+")         # nombres d'EP l.6 (« t0 » exclu)
+NOMBRE = re.compile("(?<![a-z])[0-9]+")         # nombres d'EP l.6 (« t0 » exclu) et des lignes du masque
+SECTION_MASQUE = ("[MASQUE J28] positions j = (ws − t0)/w de la portée ; strate par jour UTC ; retenue = fenêtre "
+                  "retenue de la strate")
+CONTROLE_MASQUE = ("  contrôle : retenues = n du bloc 3 ; sautées = ADR-0029 l.31 ; strate de chaque retenue = "
+                   "calendrier : égaux")
 
 
 def _entree(pres, val, ells) -> None:
@@ -95,6 +102,54 @@ def calendrier_j28(seg: dict, cal: dict) -> dict:
         trou = ((1 << (jb - ja + 1)) - 1) << ja if ja <= jb else 0
         out = {s: x & ~trou for s, x in out.items()}
     return {"masques": out, "horizon": (tf - t0) // w}
+
+
+def masque_j28(texte: str, seg: dict, cal: dict) -> dict:
+    """Positions présentes d'E1 (point (3)) : masque des fenêtres évaluables de J28 versé par PLAN-S2BIS-2, section
+    [MASQUE J28] de masque_j28.txt (forme de scripts/plan-s2bis-2/masque_fiv.py, lignes_masque), sur la grille de la
+    portée `seg` d'EP l.6 : position non retenue ⇔ dans une lacune (suites maximales en ordre croissant, D5 comprise) ;
+    strate de chaque position par le calendrier (calendrier_j28 sans plage). La section, réécrite depuis la portée, le
+    calendrier et les bornes des lacunes, doit lui être identique jusqu'au saut de ligne final, empreinte comprise
+    (sha256 de la chaîne c/s/- reconstruite) ; aucune retenue dans une plage exclue ; sinon E1/masque. Rend {strate :
+    masque des positions présentes}."""
+    lignes, w, t0 = texte.split(commun.NL), cal["w"], seg["t0"]
+    plein, hors = calendrier_j28(dict(seg, plages=[]), cal), calendrier_j28(seg, cal)["masques"]
+    n, m = plein["horizon"], plein["masques"]
+    if lignes[0] != calibration.ETIQUETTE_EP or lignes.count(SECTION_MASQUE) != 1:
+        raise commun.Refus("E1/masque", "masque_j28.txt : étiquette d'EP ou section [MASQUE J28] unique attendue")
+    i = lignes.index(SECTION_MASQUE)
+    lac = [[int(y) for y in NOMBRE.findall(x)][:2] for x in lignes[i + 5 + len(m):-1]]
+    if not all(len(x) == 2 and x[0] <= x[1] < n for x in lac) or any(a[1] + 1 >= b[0] for a, b in zip(lac, lac[1:])):
+        raise commun.Refus("E1/masque", "lacunes hors de la grille, chevauchantes, contiguës ou désordonnées")
+    trou = sum(((1 << (b - a + 1)) - 1) << a for a, b in lac)
+    pres = {s: x & ~trou for s, x in m.items()}
+    bits = {s: format(x, "b")[::-1].ljust(n, "0") for s, x in pres.items()}
+    chaine = "".join(next((s[0] for s in pres if bits[s][j] == "1"), "-") for j in range(n))
+    jp = [(max(0, -(-(a - t0) // w)), min(n - 1, (b - t0) // w)) for a, b in seg["plages"]]
+    d5 = " ; ".join(f"j = {a} à {b} ({b - a + 1} positions)" if a <= b else "aucune position" for a, b in jp)
+    canon = [SECTION_MASQUE, f"  portée : t0 = {t0} ; t_fin = {seg['t_fin']} ; positions = {n} ; plage D5 : "
+             + (d5 or "aucune")]
+    canon += [f"  « {s} » : calendrier hors D5 = {hors[s].bit_count()} ; retenues = {x.bit_count()} ; sautées hors "
+              f"D5 = {hors[s].bit_count() - x.bit_count()}" for s, x in pres.items()]
+    canon += [CONTROLE_MASQUE, f"  empreinte : sha256 de la chaîne de {n} caractères (c calme retenue, s stress "
+              f"retenue, - non retenue) = {hashlib.sha256(chaine.encode('ascii')).hexdigest()}", f"  lacunes : "
+              f"{len(lac)} suites maximales de positions non retenues, plage D5 comprise, en ordre croissant"]
+    canon += [f"  lacune j = {a} à {b} : {b - a + 1} positions ("
+              + ", ".join(f"{s} {(x >> a & ((1 << (b - a + 1)) - 1)).bit_count()}" for s, x in m.items()) + ")"
+              for a, b in lac]
+    if lignes[i:] != canon + [""] or any(x & ~hors[s] for s, x in pres.items()):
+        raise commun.Refus("E1/masque", "section [MASQUE J28] différente de sa réécriture, ou retenue dans une plage "
+                                        "exclue")
+    return pres
+
+
+def calendrier_e1(prm: dict, lus=None, environ=None) -> dict:
+    """Calendrier d'E1 pour C0, C1 et C2 (point (3)) : génération sur la grille de la portée d'EP l.6 hors D5
+    (calendrier_j28) ; positions présentes : masque mesuré (masque_j28), lu sous ses deux épingles (parametres.json,
+    puis le SHA256SUMS de PLAN-S2BIS-2, sommes_plan2). Rend {"masques", "horizon", "presentes"}."""
+    seg = portee(commun.lire_entree(prm, "episodes", lus, environ).decode("utf-8"), prm["calendrier"])
+    texte = commun.lire_entree(prm, "masque_j28", lus, environ, sommes="sommes_plan2").decode("utf-8")
+    return dict(calendrier_j28(seg, prm["calendrier"]), presentes=masque_j28(texte, seg, prm["calendrier"]))
 
 
 def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> dict:
