@@ -9,9 +9,15 @@
 #   3. parametres.json de PLAN-S2BIS égal à son épingle ; paquet de S2 et commit d'analyse lus dans lui ;
 #   4. aucune extraction dans le dossier de travail ; sha256 du paquet ; bloc machine (une ouverture, une clôture) ;
 #      chaque journal du bloc présent et de sha256 égal ; commit du bloc = commit d'analyse ; control.jsonl et
-#      journal.jsonl nommés.
-# N'affiche que des noms, des codes et des sha256 : aucun journal n'est ouvert ici (sha256sum seul).
-# Codes : 2 usage ; 3 refus avant tout lancement. Aucune barre oblique inverse dans ce fichier.
+#      journal.jsonl nommés ; les sept autres pièces de PLAN-S2BIS égales à leurs épingles ;
+#   5. extraction du commit d'analyse dans <travail>/<7 premiers caractères>, dossiers interdits exclus (P-9) ;
+#   6. passe A (PYTHONHASHSEED de A), puis passe B : masque_fiv.py, puis intervalles.py, sorties dans <travail>/A et
+#      <travail>/B, chacune avec son SHA256SUMS ; un script hors 0 arrête tout (B non commencée si A échoue, P-7) ;
+#   7. SHA256SUMS de A et de B comparés à l'octet : égaux, les trois sorties de A et son SHA256SUMS copiés dans
+#      <sortie> ; différents, refus P2/identite, rien dans <sortie>, les deux SHA256SUMS affichés (P-8).
+# N'affiche que des noms, des codes et des sha256 : aucun journal n'est ouvert ici (sha256sum seul), aucune sortie
+# n'est affichée ; messages des scripts dans <travail>/lancer.log. Codes : 0 ; 2 usage ; 3 refus avant tout
+# lancement ; 4 extraction impossible ; 5 un script hors 0, ou A ≠ B. Aucune barre oblique inverse dans ce fichier.
 set -u -o pipefail
 export LC_ALL=C
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -42,6 +48,10 @@ declare -A CH SH
 for x in "${EPI[@]}"; do read -r k c h <<< "$x"; CH[$k]="$c"; SH[$k]="$h"; done
 PS2="$DEPOT/${CH[parametres]}"
 egal "$PS2" "${SH[parametres]}" || refus P2/plan-s2bis "parametres.json de PLAN-S2BIS différent de son épingle"
+for x in "${EPI[@]:0:8}"; do
+  read -r k c h <<< "$x"
+  [ "$k" = parametres ] || egal "$DEPOT/$c" "$h" || refus P2/plan-s2bis "pièce $k de PLAN-S2BIS ≠ son épingle"
+done
 mapfile -t V < <(python3 -B - "$PS2" <<'FIN'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
@@ -79,5 +89,33 @@ done <<< "$BLOC"
 for n in control.jsonl journal.jsonl; do
   case "$NOMS" in *" $n "*) ;; *) refus P2/journal "$n absent du bloc machine" ;; esac
 done
-echo "REFUS P2/usage : lanceur incomplet, passes A et B au sous-lot P2R-5" >&2
-exit 5
+EXCL=(--exclude=docs/rapports --exclude=docs/adr-0025 --exclude=docs/adr-0028/monark-m009a)
+EXCL+=(--exclude=docs/adr-0028/execution "--exclude=docs/15-*" "--exclude=docs/16-*" --exclude=docs/pocket-report)
+mkdir -p "$X" || exit 4
+git --no-optional-locks -C "$DEPOT" archive "$COMMIT" | tar -x -C "$X" "${EXCL[@]}" || {
+  echo "extraction impossible : code 4" >&2; exit 4; }
+PY=(env -u SHOGEN_S2_CAMPAGNE_CONTROL PYTHONDONTWRITEBYTECODE=1)
+ARGS=(--journaux "$J" --harnais "$X/s2-harness" --parametres "$P")
+LOG="$T/lancer.log"
+read -r _p GA GB <<< "${EPI[8]}"
+for passe in A B; do
+  graine="$GA"; [ "$passe" = A ] || graine="$GB"
+  mkdir -p "$T/$passe" || exit 5
+  for s in masque_fiv intervalles; do
+    "${PY[@]}" PYTHONHASHSEED="$graine" python3 -B "$ICI/$s.py" "${ARGS[@]}" --sortie "$T/$passe" >> "$LOG" 2>&1
+    r=$?
+    echo "passe $passe $s : code $r"
+    [ "$r" -eq 0 ] || exit 5
+  done
+  ( cd "$T/$passe" && sha256sum fiv_unites.txt intervalles.txt masque_j28.txt ) > "$T/$passe.sommes" || exit 5
+  mv "$T/$passe.sommes" "$T/$passe/SHA256SUMS" || exit 5
+done
+if ! cmp -s "$T/A/SHA256SUMS" "$T/B/SHA256SUMS"; then
+  echo "REFUS P2/identite : SHA256SUMS des passes A et B différents (affichés ci-dessous, A puis B)" >&2
+  cat "$T/A/SHA256SUMS" "$T/B/SHA256SUMS"
+  exit 5
+fi
+mkdir -p "$S" || exit 5
+for n in SHA256SUMS fiv_unites.txt intervalles.txt masque_j28.txt; do cp "$T/A/$n" "$S/" || exit 5; done
+cat "$S/SHA256SUMS"
+exit 0

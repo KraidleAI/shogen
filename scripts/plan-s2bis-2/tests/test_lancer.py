@@ -21,7 +21,8 @@ FAUX = NL.join(["import os, sys", "a = sys.argv", "i = a.index('--sortie')",
                 "        f.write(' '.join(a[1:i]) + g)",
                 "sys.exit(int(os.environ.get('FAUX_CODE_' + os.path.basename(a[0])[:-3], '0')))", ""])
 INTERDITS = ["docs/rapports/TEMOIN.md", "docs/adr-0025/TEMOIN.md", "docs/adr-0028/monark-m009a/TEMOIN.md",
-             "docs/15-TEMOIN.md", "docs/16-TEMOIN.md", "docs/pocket-report/TEMOIN.md"]
+             "docs/15-TEMOIN.md", "docs/16-TEMOIN.md", "docs/pocket-report/TEMOIN.md",
+             "docs/adr-0028/execution/TEMOIN.md"]                             # septième témoin (P-9)
 PAQUET = "docs/adr-0028/PAQUET-PREREG-S2.md"
 
 
@@ -180,3 +181,61 @@ class TestLancer(unittest.TestCase):
         r = self.lancer()
         self.assertEqual((r.returncode, r.stderr.split(" : ")[0], os.listdir(self.x)),
                          (3, "REFUS P2/sortie", [self.arbre[:7]]))
+
+    def test_lancement_complet(self):
+        """T-P2-LAN-1 et T-P2-LAN-2. Code 0 ; sortie = passe A (trois sorties et SHA256SUMS, octet pour octet) ;
+        arguments des scripts : --harnais de l'extraction du dossier de travail, journaux, parametres.json du lot ;
+        écran fait de noms, de codes et de sha256 seuls ; aucun des sept témoins des dossiers interdits extrait.
+        Mutation M-P2-38 : harnais pris au dépôt ; M-P2-28 : exclusions retirées ; M-P2R5-1 : docs/adr-0028/execution
+        non exclu (P-9)."""
+        r = self.lancer()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        x = os.path.join(self.x, self.arbre[:7])
+        self.assertEqual(sorted(os.listdir(self.s)), ["SHA256SUMS", "fiv_unites.txt", "intervalles.txt",
+                                                      "masque_j28.txt"])
+        for n in os.listdir(self.s):
+            self.assertEqual(sha_de(os.path.join(self.s, n)), sha_de(os.path.join(self.x, "A", n)), n)
+        with open(os.path.join(self.s, "masque_j28.txt"), encoding="utf-8") as f:
+            a = f.read().split(" ")
+        self.assertEqual([a[a.index(o) + 1] for o in ("--journaux", "--harnais", "--parametres")],
+                         [self.j, os.path.join(x, "s2-harness"), os.path.join(self.lot, "parametres.json")])
+        for ligne in r.stdout.splitlines():
+            hexa = len(ligne) > 66 and ligne[64:66] == "  " and set(ligne[:64]) <= set("0123456789abcdef")
+            self.assertTrue(hexa or ligne.endswith((" : code 0", " : sha256 égal au bloc machine")), ligne)
+        self.assertEqual(([t for t in INTERDITS if os.path.exists(os.path.join(x, t))], os.path.isdir(
+            os.path.join(x, "s2-harness"))), ([], True))
+
+    def test_extraction_impossible_script_en_echec(self):
+        """T-P2-LAN-7. Arbre inconnu du dépôt (bloc et paramètres d'accord) : code 4, aucun script ; masque_fiv à 1 dans
+        la passe A : code 5, rien dans la sortie, intervalles non lancé, passe B non commencée (P-7). Mutation
+        M-P2-29 : échec d'un script non reporté."""
+        self.bloc[0] = "commit_analyse " + "e" * 40
+        self.ecrire(commit_prm="e" * 40)
+        r = self.lancer()
+        self.assertEqual((r.returncode, os.path.exists(os.path.join(self.x, "A"))), (4, False), r.stderr)
+        self.bloc[0] = "commit_analyse " + self.arbre
+        self.ecrire()
+        shutil.rmtree(self.x)
+        r = self.lancer(FAUX_CODE_masque_fiv="1")
+        a, b = (os.path.join(self.x, n) for n in "AB")
+        self.assertEqual((r.returncode, sorted(os.listdir(a)), os.path.exists(b), os.path.exists(self.s)),
+                         (5, ["fiv_unites.txt", "masque_j28.txt"], False, False))
+
+    def test_identite_a_b(self):
+        """T-P2-LAN-8. Faux scripts dont la sortie dépend de PYTHONHASHSEED : P2/identite, code 5, sortie absente, les
+        deux SHA256SUMS (six lignes de sha256) à l'écran. Mutation M-P2-30 : comparaison de A et B retirée ; M-P2R5-2 :
+        même graine pour A et B."""
+        r = self.lancer(FAUX_GRAINE="1")
+        hexa = [x for x in r.stdout.splitlines() if x[64:66] == "  " and set(x[:64]) <= set("0123456789abcdef")]
+        self.assertEqual((r.returncode, r.stderr.split(" : ")[0], len(hexa), os.path.exists(self.s)),
+                         (5, "REFUS P2/identite", 6, False))
+
+    def test_epingles_plan_s2bis(self):
+        """T-P2-LAN-9. Copie altérée de chacune des sept autres pièces épinglées de PLAN-S2BIS : P2/plan-s2bis, code 3.
+        Mutation M-P2-39 : épingles de PLAN-S2BIS non contrôlées au lanceur."""
+        for k, rel in tests.PRM["plan_s2bis"]["chemins"].items():
+            if k != "parametres":
+                self.ecrire()
+                with open(os.path.join(self.depot, rel), "a", encoding="utf-8") as f:
+                    f.write(" ")
+                self.assertRien(self.lancer(), 3, "P2/plan-s2bis")
