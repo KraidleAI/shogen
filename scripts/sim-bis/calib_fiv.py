@@ -7,8 +7,10 @@ SB-10b : portée du segment J28 lue sur EP l.6, calendrier de la grille, réplic
 indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. SB-10c :
 grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le contexte de r1 : aucune fonction de libm),
 choix de C2 et de C1. SB-15b (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (3)) : calendrier d'E1, positions
-présentes = masque mesuré de J28 versé par PLAN-S2BIS-2 ; SB-15c : masque appliqué après la génération. Entiers et
-rationnels seuls, sauf les logarithmes du critère : aucun flottant, aucune puissance."""
+présentes = masque mesuré de J28 versé par PLAN-S2BIS-2 ; SB-15c : masque appliqué après la génération ; SB-15e
+(point (1)) : C1 = point de Q₁ minimal sur les FIV_u de fiv_unites.txt (convention du milieu des logs et e1.ell_c1
+retirées, point (7)). Entiers et rationnels seuls, sauf les logarithmes des
+critères : aucun flottant, aucune puissance."""
 import hashlib
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
@@ -235,39 +237,55 @@ def critere(modele: list, cible: list, ells: list, ctx):
     return s
 
 
+def q1(moy: dict, cible: dict, ells: list, ctx):
+    """Q₁(p) d'une strate (point (1)) : Σ_u Σ_ℓ (ln F̄_u,p(ℓ) − ln F_u(ℓ))², sur les hôtes u de `cible` ({hôte : points
+    de fiv_unites.txt}, ordre du format) dont F_u(ℓ) est défini, sans garde sur leur nombre de cellules d'écart, et sur
+    les ℓ de la grille de calibration où la garde de fiv_unites.txt est tenue ; moy = {hôte : moyenne()} du point
+    (F̄_u,p exact sur ses réplications définies) ; somme par hôte (critere, logarithmes par Decimal.ln), puis sur les
+    hôtes dans leur ordre, sous le contexte de r1 ; F̄_u,p(ℓ) indéfini à un (u, ℓ) retenu : None (point écarté) ; hôte
+    de la cible sans moyenne : E1/unite."""
+    s = Decimal(0)
+    for h, cs in cible.items():
+        if h not in moy:
+            raise commun.Refus("E1/unite", f"hôte {h!r} de fiv_unites.txt sans moyenne du modèle")
+        x = critere(moy[h]["fiv"], [dict(c, garde=c["garde"] and c["fiv"] is not None) for c in cs], ells, ctx)
+        if x is None:
+            return None
+        s = ctx.add(s, x)
+    return s
+
+
 def _rang(item) -> tuple:
     """Ordre de choix : valeur, puis plus petit κ, puis plus petit τ_D (E-S-38), puis plus petit φ (Q-T4-9)."""
     v, (phi, kappa, tau) = item
     return v, kappa, tau, phi
 
 
-def selection(prm: dict, cible: dict, moyennes: dict) -> dict:
-    """C2 et C1 de chaque strate (E-S-38) : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la
-    grille, ou None pour C0 : {strate : moyenne()}}. C2 = point de critère minimal ; C1 = point de la grille dont
-    ln FIV(ell_c1) est le plus proche de la moyenne des ln FIV(ell_c1) de C0 et de C2, C2 compris (lettre d'E-S-38) ;
-    égalités : _rang. Rend {strate : {"C2", "C1", "criteres" : {point : critère}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ)
-    aux ℓ gardés}}. ell_c1 absent de calibration.ell : E1/ell ; point absent, C0 compris : E1/point ; strate de la cible
-    sans courbe pour un point ou pour C0 : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, ou
-    FIV(ell_c1) de C0 ou de C2 indéfini : E1/indefini."""
-    ctx, ells, pts = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm)
-    if prm["e1"]["ell_c1"] not in ells:
-        raise commun.Refus("E1/ell", f"ell_c1 = {prm['e1']['ell_c1']!r} absent de calibration.ell")
-    j, out = ells.index(prm["e1"]["ell_c1"]), {}
+def selection(prm: dict, cible: dict, moyennes: dict, unites: dict, moyennes_u: dict) -> dict:
+    """C2 et C1 de chaque strate : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la grille, ou
+    None pour C0 (sortie d'E1 complète exigée ; C0 n'entre plus dans C1) : {strate : moyenne() de I_t}} ; unites =
+    {strate : {hôte : points de fiv_unites.txt}} (calibration.charger_unites) ; moyennes_u = {point de la grille :
+    {strate : {hôte : moyenne() de D*(u) sur les positions présentes}}}, réplications du point (celles de C2). C2 =
+    point de critère minimal (E-S-38, inchangé) ; C1 = point de Q₁ minimal (point (1)) ; égalités : _rang ; point à
+    critère indéfini écarté de C2 (Q-T4-10), à Q₁ indéfini écarté de C1. Rend {strate : {"C2", "C1", "criteres" :
+    {point : critère}, "Q1" : {point : Q₁}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés}}. Point absent, C0
+    compris : E1/point ; strate de la cible sans courbe pour un point ou pour C0, sans FIV_u, ou sans moyennes par hôte
+    pour un point : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, aucun Q₁ défini, ou aucun (u, ℓ)
+    retenu dans la strate : E1/indefini."""
+    ctx, ells, pts, out = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm), {}
     if any(p not in moyennes for p in [None] + pts):
         raise commun.Refus("E1/point", "point de la grille ou C0 sans courbe")
-    if any(s not in moyennes[p] for p in [None] + pts for s in cible):
-        raise commun.Refus("E1/strate", "strate de la cible sans courbe pour un point de la grille ou pour C0")
+    if any(s not in moyennes[p] for p in [None] + pts for s in cible) or any(
+            s not in unites or any(s not in moyennes_u.get(p, {}) for p in pts) for s in cible):
+        raise commun.Refus("E1/strate", "strate de la cible sans courbe, sans FIV_u ou sans moyennes par hôte")
     for s, cs in cible.items():
         crit = {p: critere(moyennes[p][s]["fiv"], cs, ells, ctx) for p in pts}
-        defs = [(v, p) for p, v in crit.items() if v is not None]
-        c2 = min(defs, key=_rang)[1] if defs else None
-        f0, f2 = moyennes[None][s]["fiv"][j], None if c2 is None else moyennes[c2][s]["fiv"][j]
-        if f0 is None or f2 is None:
-            raise commun.Refus("E1/indefini", f"strate {s} : critère ou FIV({ells[j]}) indéfini")
-        mil = ctx.divide(ctx.add(_ln(f0, ctx), _ln(f2, ctx)), 2)
-        dist = [(ctx.subtract(_ln(moyennes[p][s]["fiv"][j], ctx), mil).copy_abs(), p) for p in pts
-                if moyennes[p][s]["fiv"][j] is not None]
-        out[s] = {"C2": c2, "C1": min(dist, key=_rang)[1], "criteres": crit,
+        q = {p: q1(moyennes_u[p][s], unites[s], ells, ctx) for p in pts}
+        d2, d1 = ([(v, p) for p, v in x.items() if v is not None] for x in (crit, q))
+        if not (d2 and d1 and any(c["garde"] and c["fiv"] is not None for xs in unites[s].values() for c in xs)):
+            raise commun.Refus("E1/indefini", f"strate {s} : aucun critère, aucun Q₁ défini, ou aucun (u, ℓ) retenu")
+        c2, c1 = min(d2, key=_rang)[1], min(d1, key=_rang)[1]
+        out[s] = {"C2": c2, "C1": c1, "criteres": crit, "Q1": q,
                   "residus": [ctx.subtract(_ln(x, ctx), _ln(c["fiv"], ctx))
                               for x, c in zip(moyennes[c2][s]["fiv"], cs) if c["garde"]]}
     return out
