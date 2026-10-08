@@ -126,3 +126,57 @@ class TestLancer(unittest.TestCase):
                              (3, "REFUS P2/sortie", False))
         shutil.rmtree(self.s)
         self.assertRien(self.lancer(self.j, self.s, self.x), 2, "P2/usage")
+
+    def test_paquet_et_bloc(self):
+        """T-P2-LAN-4. Paquet altéré après son épingle ; bloc machine ouvert deux fois ; bloc non fermé : P2/paquet,
+        code 3. Mutation M-P2-24 : sha256 du paquet non contrôlé ; M-P2-25 : ouverture multiple admise ; M-P2R4-4 :
+        clôture non exigée."""
+        with open(os.path.join(self.depot, PAQUET), "a", encoding="utf-8") as f:
+            f.write("ajout" + NL)
+        self.assertRien(self.lancer(), 3, "P2/paquet")
+        for cas in ({"ouvertures": 2}, {"fermer": False}):
+            self.ecrire(**cas)
+            self.assertRien(self.lancer(), 3, "P2/paquet")
+
+    def test_journal(self):
+        """T-P2-LAN-5. sha256 d'un journal différent du bloc ; ligne « journal » malformée au bloc ; journal nommé au
+        bloc par un nom commençant par « . » (présent, de sha256 égal) ; journal nommé absent ; control.jsonl non nommé
+        au bloc : P2/journal, code 3. Mutation M-P2-26 : sha256 des journaux non comparés ; M-P2R4-5 : journal absent
+        admis ; M-P2R4-7 : control.jsonl et journal.jsonl non exigés au bloc ; M-P2R4-8 : ligne malformée admise ; G-26
+        (G2) : nom en point admis ; M-P2R4-11 : seuls les noms en « .. » refusés ; M-P2R4-12 : seul « . » refusé."""
+        with open(os.path.join(self.j, "raw.jsonl"), "ab") as f:
+            f.write(b"x")
+        self.assertRien(self.lancer(), 3, "P2/journal")
+        with open(os.path.join(self.j, "raw.jsonl"), "wb") as f:
+            f.write(self.journaux["raw.jsonl"])
+        self.bloc.append("journal autre.jsonl " + "0" * 63)
+        self.ecrire()
+        r = self.lancer()
+        self.assertEqual((r.returncode, r.stderr),
+                         (3, "REFUS P2/journal : ligne journal malformée au bloc machine" + NL))
+        self.bloc.pop()
+        with open(os.path.join(self.j, ".cache.jsonl"), "wb") as f:
+            f.write(b"x")
+        self.bloc.append("journal .cache.jsonl " + sha(b"x"))
+        self.ecrire()
+        r = self.lancer()
+        self.assertEqual((r.returncode, r.stderr), (3, "REFUS P2/journal : nom de journal refusé" + NL))
+        self.bloc.pop()
+        self.bloc = [x for x in self.bloc if not x.startswith("journal control.jsonl ")]
+        self.ecrire()
+        self.assertRien(self.lancer(), 3, "P2/journal")
+        os.remove(os.path.join(self.j, "journal.jsonl"))
+        r = self.lancer()
+        self.assertEqual((r.returncode, r.stderr), (3, "REFUS P2/journal : journal absent : journal.jsonl" + NL))
+
+    def test_commit_extraction(self):
+        """T-P2-LAN-6 (fin). Commit du bloc différent du commit d'analyse : P2/commit ; extraction déjà présente dans
+        le dossier de travail : P2/sortie ; code 3. Mutation M-P2-27 : commit du bloc non comparé ; M-P2R4-6 :
+        extraction déjà présente admise."""
+        self.ecrire(commit_prm="f" * 40)
+        self.assertRien(self.lancer(), 3, "P2/commit")
+        self.ecrire()
+        os.makedirs(os.path.join(self.x, self.arbre[:7]))
+        r = self.lancer()
+        self.assertEqual((r.returncode, r.stderr.split(" : ")[0], os.listdir(self.x)),
+                         (3, "REFUS P2/sortie", [self.arbre[:7]]))

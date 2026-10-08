@@ -42,5 +42,42 @@ declare -A CH SH
 for x in "${EPI[@]}"; do read -r k c h <<< "$x"; CH[$k]="$c"; SH[$k]="$h"; done
 PS2="$DEPOT/${CH[parametres]}"
 egal "$PS2" "${SH[parametres]}" || refus P2/plan-s2bis "parametres.json de PLAN-S2BIS différent de son épingle"
+mapfile -t V < <(python3 -B - "$PS2" <<'FIN'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    p = json.load(f)
+print(p["paquet_s2"]["chemin"])
+print(p["paquet_s2"]["sha256"])
+print(p["commit_analyse"])
+FIN
+)
+[ "${#V[@]}" -eq 3 ] || refus P2/plan-s2bis "parametres.json de PLAN-S2BIS illisible"
+PAQ="$DEPOT/${V[0]}"
+COMMIT="${V[2]}"
+[[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || refus P2/plan-s2bis "commit_analyse de PLAN-S2BIS malformé"
+X="$T/${COMMIT:0:7}"
+[ ! -e "$X" ] || refus P2/sortie "extraction déjà présente dans le dossier de travail"
+egal "$PAQ" "${V[1]}" || refus P2/paquet "sha256 du paquet de S2 différent de l'épingle"
+[ "$(grep -c '^```shogen-paquet-v1$' "$PAQ")" = 1 ] || refus P2/paquet "bloc machine : ouverture absente ou multiple"
+LIRE='f && /^```$/ {g = 1; exit} f {print} /^```shogen-paquet-v1$/ {f = 1} END {exit !g}'
+BLOC="$(awk "$LIRE" "$PAQ")" || refus P2/paquet "bloc machine non fermé"
+NOMS=" "
+CB=""
+while read -r cle a b reste; do
+  case "$cle" in
+    commit_analyse) CB="$a" ;;
+    journal)
+      { [ -z "$reste" ] && [[ "$b" =~ ^[0-9a-f]{64}$ ]]; } || refus P2/journal "ligne journal malformée au bloc machine"
+      case "$a" in ''|*/*|.*) refus P2/journal "nom de journal refusé" ;; esac
+      [ -f "$J/$a" ] || refus P2/journal "journal absent : $a"
+      [ "$(empreinte "$J/$a")" = "$b" ] || refus P2/journal "sha256 de $a différent du bloc machine"
+      echo "journal $a : sha256 égal au bloc machine"
+      NOMS="$NOMS$a " ;;
+  esac
+done <<< "$BLOC"
+[ "$CB" = "$COMMIT" ] || refus P2/commit "commit_analyse du bloc machine différent de celui de PLAN-S2BIS"
+for n in control.jsonl journal.jsonl; do
+  case "$NOMS" in *" $n "*) ;; *) refus P2/journal "$n absent du bloc machine" ;; esac
+done
 echo "REFUS P2/usage : lanceur incomplet, passes A et B au sous-lot P2R-5" >&2
 exit 5
