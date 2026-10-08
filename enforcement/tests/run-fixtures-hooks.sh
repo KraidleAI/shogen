@@ -4,7 +4,8 @@
 # H-21 (git grep en erreur), H-22 (lancement direct depuis un sous-dossier), I-14 (argument inconnu) ;
 # C-01 à C-12 (branchement du lint d'épinglage de D8a et de la gate des secrets de D8b), C-13 (ajouté au
 # G1 : extraction de l'index en échec), C-14 (ajouté au G1 : lancement direct, index inchangé, forme d'O-13).
-# Ajouté à la revue G2 (2026-10-01) : H-23 (git commit --amend, consommateur 1 du G0 §10).
+# Ajouté à la revue G2 (2026-10-01) : H-23 (git commit --amend, consommateur 1 du G0 §10). Lot DETTES-B2 (2026-10-04) :
+# H-24a à H-24c (étape de balayage du job g5, git grep en erreur : SHOGEN-G5-ERREUR-GREP-1), H-20 lu sur la forme captée.
 # Dépôt modèle sous mktemp, hors de tout dépôt : git init -b main, identité factice, commit.gpgsign=false,
 # core.autocrlf=false ; un commit avec deux agents valides (fixtures de D8a), puis le commit de base qui
 # ajoute le lint et la gate de l'arbre, le hook et l'installeur sous test, dont ATTENDU est remplacé par
@@ -82,12 +83,21 @@ c1; f docs/w.md propre; pr w && echo "# $M1" >> "$R/docs/w.md" && ci 1 HOOK/g5 -
 c1; f docs/w.md propre; pr w && echo "# $M1" >> "$R/docs/w.md" && ci 1 HOOK/g5 -- docs/w.md; res H-17 $?
 c1; git -C "$R" worktree add -q -b wt "$R.wt" || fatal worktree; D="$R.wt"; f docs/x.md "# $M1"; ci 1 HOOK/g5 && f docs/x.md propre && ci 0 -; res H-18 $?
 mkdir "$W/hors" || fatal hors; o="$(cd "$W/hors" && bash "$HOOK" < /dev/null 2>&1)"; [ $? = 2 ] && printf '%s\n' "$o" | grep -qF "REFUS (HOOK/echec)"; res H-19 $?
-g="$(sed -n "s/^ *if git grep -nE '\([^']*\)' \(-- [^;]*\); then\$/\1 \2/p" "$GY")"
+g="$(sed -n "s/^ *g=0; git grep -nE '\([^']*\)' \(-- [^|]*\) || g=\$?\$/\1 \2/p" "$GY")"
 k="$(sed -n "s/^M='\([^']*\)'\$/\1/p" "$HOOK") $(sed -n 's/^O="$(git grep --cached -nE "$M" \(-- [^)]*\))"; g=$?$/\1/p' "$HOOK")"
 E="motif ou exclusions différents du job g5"; [ -n "$g" ] && [ "$g" = "$k" ]; res H-20 $?
 c1; : > "$R/.git/index"; o="$(cd "$R" && bash "$HOOK" < /dev/null 2>&1)"; [ $? = 2 ] && printf '%s\n' "$o" | grep -qF "REFUS (HOOK/echec) : git grep"; res H-21 $?
 c1; f docs/x.md "# $M1" && f sub/a.txt propre && o="$(cd "$R/sub" && bash "$HOOK" < /dev/null 2>&1)"; [ $? = 2 ] && printf '%s\n' "$o" | grep -qF "REFUS (HOOK/g5)"; res H-22 $?
 c1; f docs/w.md propre; pr w && echo "# $M1" >> "$R/docs/w.md" && git -C "$R" add docs/w.md && ci 1 HOOK/g5 --amend; res H-23 $?
+# H-24 (lot DETTES-B2, SHOGEN-G5-ERREUR-GREP-1) : le bloc run: du job g5 qui porte git grep -nE, extrait de gates.yml et lancé
+# par bash -e (shell d'une étape sans shell:, inféré) : propre 0 et OK, marqueur 1, git grep en erreur (index vide) ni 0 ni OK.
+awk 'function f() { if (b ~ /git grep -nE/) { printf "%s", b; b = ""; exit } b = ""; n = 0 } /^        run: \|$/ { f(); n = 1; next }
+  n && (/^          / || /^$/) { b = b substr($0, 11) "\n"; next } n { f() } END { f() }' "$GY" > "$W/g5.sh" || fatal "extraction g5"
+g5() { o="$(cd "$R" && bash -e "$W/g5.sh" 2>&1)"; r=$?; }
+c1; g5; E="étape g5 sur un dépôt propre"; [ "$r" = 0 ] && printf '%s\n' "$o" | grep -qF "OK: aucun marqueur"; res H-24a $?
+c1; f docs/x.md "# $M1 reprendre"; g5; E="étape g5 sur un marqueur"; [ "$r" = 1 ] && printf '%s\n' "$o" | grep -qF "::error::Marqueur"; res H-24b $?
+c1; : > "$R/.git/index"; g5; E="étape g5, git grep en erreur : sortie $r"; [ "$r" != 0 ] && printf '%s\n' "$o" | grep -qF "::error::git grep a échoué" &&
+  ! printf '%s\n' "$o" | grep -qF "OK: aucun"; res H-24c $?
 # Installeur (§7.2).
 c1; e0="$(etat)"; inst 0 "déjà conforme" && [ "$(etat)" = "$e0" ]; res I-02 $?
 c0; printf '#!/bin/sh\nexit 0\n' > "$R/.git/hooks/pre-commit"; d="$(ho)"

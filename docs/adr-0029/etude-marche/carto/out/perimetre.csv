@@ -1,0 +1,425 @@
+id,name,slug,parent,category,scope,tvl_usd,taille,chaine_principale,chaines_tvl,oracles_actifs,source_oracles,n_oracles,n_externes,deja_etudie,incidents_oracle_defillama
+1599,Aave V3,aave-v3,parent#aave,Lending,A,18280731902,G,Ethereum,Ethereum=15403556691;Base=557946218;Arbitrum=527167885;Plasma=431804751;Avalanche=350726733;Monad=324421999,Chainlink(Primary),breakdown,1,1,1,1
+4025,Morpho Blue,morpho-blue,parent#morpho,Lending,A,11334060819,G,Ethereum,Ethereum=5159205312;Base=4525274066;Robinhood Chain=599153123;Arc=316641554;Monad=191831617;Hyperliquid=170658361,,none,0,0,1,0
+118,Sky Lending,sky-lending,parent#maker,CDP,A,5918749216,G,Ethereum,Ethereum=5918749216,Chronicle(Aggregator);Internal(Aggregator),breakdown,2,1,0,0
+2929,SparkLend,sparklend,parent#spark,Lending,A,5607087515,G,Ethereum,Ethereum=5606867940;xDai=219574,Chainlink(Aggregator);Chronicle(Aggregator);RedStone(Aggregator),breakdown,3,3,1,0
+4133,Ethena USDe,ethena-usde,parent#ethena,Basis Trading,A,4905423025,G,Ethereum,Ethereum=4905423025,,none,0,0,0,0
+494,JustLend V1,justlend-v1,parent#justlend,Lending,A,3902638521,G,Tron,Tron=3902638521,Internal(Primary),breakdown,1,0,0,0
+587,Maple,maple,parent#maple-finance,Lending,A,3003846051,G,Ethereum,Ethereum=3003846051,Chainlink(Primary),breakdown,1,1,0,0
+6212,Steakhouse Financial,steakhouse-financial,,Risk Curators,B,2529099622,G,Base,Base=1119872875;Ethereum=746643387;Robinhood Chain=531939264;Solana=70058740;Monad=47401967;Arbitrum=7055693,Chronicle(Primary)@Monad/Arbitrum;Chaos(Primary)@Corn;RedStone(Primary)@Unichain;Chainlink(Primary)@Katana/Ethereum/Base,breakdown,4,4,0,0
+6807,Sentora Curator,sentora-curator,parent#sentora,Risk Curators,B,2498739325,G,Ethereum,Ethereum=1179701231;Ink=906551068;Solana=374297012;Tempo=38190014,Chainlink(Primary),breakdown,1,1,0,0
+6790,Falcon Finance,falcon-finance,,Basis Trading,A,1655186500,G,Ethereum,Ethereum=1655186500,,none,0,0,0,0
+6202,Gauntlet,gauntlet,,Risk Curators,B,1650745678,G,Base,Base=614145558;BNB Chain=574894195;Ethereum=382771035;Morph=42151942;Stable=21889111;Solana=7981289,RedStone(Primary)@Unichain/Katana/Monad;Chainlink(Primary)@Polygon/Base/Ethereum;Chronicle(Primary)@Tempo,breakdown,3,3,0,0
+2088,Compound V3,compound-v3,parent#compound-finance,Lending,A,1514613141,G,Ethereum,Ethereum=1397239335;Arbitrum=72129598;Base=27388577;Optimism=9991419;Polygon=4789139;Mantle=1696930,Chainlink(Primary);RedStone(Primary)@Unichain;Api3(Primary)@Mantle,breakdown,3,3,1,0
+3770,Kamino Lend,kamino-lend,parent#kamino-finance,Lending,A,1397196806,G,Solana,Solana=1397196806,Pyth(Aggregator);Chainlink(Aggregator),breakdown,2,2,1,0
+212,Venus Core Pool,venus-core-pool,parent#venus-finance,Lending,A,1342852321,G,BNB Chain,BNB Chain=1338313122;Ethereum=2594325;Arbitrum=1347834;zkSync Era=523257;Base=52818;Unichain=17263,RedStone(Secondary);Chainlink(Primary)@Ethereum/Arbitrum/zkSync Era/Optimism/Base/Op_Bnb;Chainlink(Aggregator)@BNB Chain;Atlas(Aggregator)@BNB Chain,breakdown,3,3,1,0
+6600,Jupiter Lend,jupiter-lend,parent#jupiter,Lending,A,1318094025,G,Solana,Solana=1318094025,Pyth(Primary),breakdown,1,1,0,0
+5898,USDD,usdd,,CDP,A,1271869669,G,Tron,Tron=1222544594;Ethereum=31310519;BNB Chain=18014556,Chainlink(Primary),breakdown,1,1,0,0
+2308,Jito Liquid Staking,jito-liquid-staking,parent#jito,Liquid Staking,B,1269046930,G,Solana,Solana=1269046930,Switchboard(Secondary),breakdown,1,1,0,0
+382,Pendle V2,pendle-v2,parent#pendle,Yield,B,1256402378,G,Ethereum,Ethereum=741600904;Monad=204589694;Arbitrum=173561860;X Layer=71244048;Plasma=43530177;Hyperliquid=9841083,RedStone(Primary)@Redstone,breakdown,1,1,0,0
+6056,Lista Lending,lista-lending,parent#lista-dao,Lending,A,1040083761,G,BNB Chain,BNB Chain=1026024260;Ethereum=14059500,Atlas(Primary);RedStone(Primary);Chainlink(Secondary);Binance Oracle(Secondary),breakdown,4,4,0,0
+4077,Jupiter Perpetual Exchange,jupiter-perpetual-exchange,parent#jupiter,Derivatives,A,820392918,M,Solana,Solana=820392918,Chaos(Primary);Pyth(Fallback);Chainlink(Fallback),breakdown,3,3,0,0
+3391,Liquid Collective,liquid-collective,,Liquid Staking,B,739700612,M,Ethereum,Ethereum=739700612,Internal(legacy),legacy,1,0,0,0
+4167,Fluid Lending,fluid-lending,parent#fluid,Lending,A,714193950,M,Ethereum,Ethereum=500018484;Arbitrum=141821632;Plasma=42936670;Base=25003297;Polygon=4413867,Chainlink(Primary)@Ethereum/Arbitrum/Base,breakdown,1,1,0,0
+7594,Aave V4,aave-v4,parent#aave,Lending,A,672806738,M,Ethereum,Ethereum=461253385;Arc=181420107;Avalanche=30133246,Chainlink(Primary),breakdown,1,1,1,0
+4265,Invesco USTB,invesco-ustb,parent#superstate,RWA,A,558164026,M,Ethereum,Ethereum=550335339;Plume Mainnet=3915555;Solana=3913132,,none,0,0,0,0
+6205,K3 Capital,k3-capital,,Risk Curators,B,496191157,M,Monad,Monad=368720096;Ethereum=113213326;Optimism=7558831;Hyperliquid=2055646;Plasma=2000977;BNB Chain=1349317,RedStone(Primary)@Unichain;Atlas(Aggregator)@BNB Chain;Chainlink(Aggregator)@BNB Chain,breakdown,3,3,0,0
+5506,Ethena USDtb,ethena-usdtb,parent#ethena,RWA,A,492749896,M,Ethereum,Ethereum=492749896,,none,0,0,0,0
+7930,Huma,huma,,RWA,A,415047481,M,Solana,Solana=260114513;Ethereum=150114812;Stellar=2727104;Monad=2091052,,none,0,0,0,0
+7182,Re,re,,RWA,A,398177924,M,Ethereum,Ethereum=393855143;Base=4311261;Arbitrum=6449;Avalanche=5072,Chainlink(PoR),breakdown,1,1,0,0
+5940,HyperLend Pooled,hyperlend-pooled,parent#hyperlend,Lending,A,392695765,M,Hyperliquid,Hyperliquid=392695765,Chainlink(Primary);Pyth(Secondary);RedStone(Primary),breakdown,3,3,0,0
+711,Polymarket International,polymarket-international,parent#polymarket,Prediction Market,B,368409151,M,Polygon,Polygon=368409151,UMA(legacy),legacy,1,1,0,0
+2187,Dolomite,dolomite,,Lending,A,359949631,M,Ethereum,Ethereum=329180471;Arbitrum=25291921;Berachain=5394336;Mantle=81937;X Layer=966,Chainlink(Primary)@Arbitrum/Polygon zkEVM/X Layer;Chronicle(Primary)@Mantle;RedStone(Primary)@Berachain;Chainsight(Secondary)@Berachain,breakdown,4,4,0,0
+5044,Euler V2,euler-v2,parent#euler,Lending,A,347970024,M,Monad,Monad=257047869;Ethereum=53709664;Base=18042390;BOB=4989825;Avalanche=4608753;Hyperliquid=2262642,,none,0,0,1,0
+6190,USD AI,usd-ai,,RWA,A,334344893,M,Arbitrum,Arbitrum=334344893,Chainlink(Primary),breakdown,1,1,0,0
+5481,Anemoy Capital,anemoy-capital,,RWA,A,333338003,M,Ethereum,Ethereum=326190087;Base=7147916;Celo=0,,none,0,0,0,0
+5376,CIAN Yield Layer,cian-yield-layer,parent#cian-protocol,Yield Aggregator,B,311633461,M,Ethereum,Ethereum=214100085;Mantle=95063165;Arbitrum=2453151;Optimism=14998;Base=1435;BNB Chain=627,Chainlink(Primary),breakdown,1,1,0,0
+6372,EtherFi Borrowing Market,etherfi-borrowing-market,parent#ether-fi,Lending,A,305212432,M,Optimism,Optimism=305180045;Scroll=32388,Chaos(Primary)@scroll;Pyth(Primary)@optimism,breakdown,2,2,0,0
+6432,OnRe,onre,,RWA,A,291666385,M,Solana,Solana=291666385,Internal(Primary),breakdown,1,0,0,0
+6204,Hyperithm,hyperithm,,Risk Curators,B,284297268,M,Monad,Monad=209861437;Ethereum=73869820;Arbitrum=386982;Plasma=135245;Solana=36345;Hyperliquid=7264,Chronicle(Primary)@Arbitrum,breakdown,1,1,0,0
+6579,cap,cap,,Lending,A,274509749,M,Ethereum,Ethereum=274509749,RedStone(Primary),breakdown,1,1,0,0
+7106,Aave Horizon RWA,aave-horizon-rwa,parent#aave,Lending,A,257605556,M,Ethereum,Ethereum=257605556,Chainlink(Primary),breakdown,1,1,1,0
+<5471>,OpenTrade,opentrade,,RWA,A,252043735,M,Avalanche,Avalanche=171046994;Ethereum=46311914;Plume Mainnet=34684827,,none,0,0,0,0
+6373,EtherFi Cash Liquid,etherfi-cash-liquid,parent#ether-fi,Crypto Card Issuer,B,246880536,M,Optimism,Optimism=246848493;Scroll=32043,Chaos(Primary)@scroll;Pyth(Primary)@optimism,breakdown,2,2,0,0
+6492,Figure Markets Democratized Prime,figure-markets-democratized-prime,parent#figure-markets,Lending,A,241629485,M,Provenance,Provenance=241629485,,none,0,0,0,0
+5785,BitFi Basis,bitfi-basis,parent#bitfi,Basis Trading,A,240853962,M,BNB Chain,BNB Chain=107328779;Ethereum=75192263;Base=29958764;Pharos=28173143;Hemi=173819;Bitlayer=26991,,none,0,0,0,0
+7437,Cooler Loans,cooler-loans,,Lending,A,238569490,M,Ethereum,Ethereum=238569490,,none,0,0,0,0
+4146,KPK,kpk,,Risk Curators,B,234988512,M,Ethereum,Ethereum=209140133;dYdX=14219966;xDai=7617599;Base=3766626;Arbitrum=156065;BNB Chain=88117,Internal(Primary)@Ethereum;Chainlink(Secondary)@Ethereum;RedStone(Secondary)@Ethereum,breakdown,3,2,0,0
+6199,Clearstar,clearstar,,Risk Curators,B,232933062,M,Base,Base=88026328;Flare=75843700;Ethereum=41830703;Monad=21389724;Hyperliquid=3477588;Katana=1473503,Chainlink(Primary)@Base,breakdown,1,1,0,0
+5284,Plume Vaults,plume-vaults,,RWA,A,232765144,M,Plume Mainnet,Plume Mainnet=81309858;Ethereum=80904904;BNB Chain=32835104;Solana=32421776;Avalanche=5293501,,none,0,0,0,0
+3365,GMX V2 Perps,gmx-v2-perps,parent#gmx,Derivatives,A,213438116,M,Arbitrum,Arbitrum=203721241;Avalanche=9153603;MegaETH=563272,Chainlink(Primary),breakdown,1,1,0,0
+6789,Solstice,solstice,,Basis Trading,A,212121199,M,Solana,Solana=212121199,,none,0,0,0,0
+3572,Solv Basis Trading,solv-basis-trading,parent#solv-protocol,Basis Trading,A,210544555,M,BNB Chain,BNB Chain=210517412;Arbitrum=23782;Ethereum=3334;Mantle=26,,none,0,0,0,0
+5241,M0,m0,,Stablecoin Issuer,A,199791722,M,Ethereum,Ethereum=199791722,Chronicle(Primary),breakdown,1,1,0,0
+1546,Rhea Lend,rhea-lend,parent#rhea-finance,Lending,A,196137453,M,Near,Near=196137453,Atlas(Aggregator);Pyth(Aggregator);OutLayer(Aggregator),breakdown,3,3,0,1
+270,Liquity V1,liquity-v1,parent#liquity,CDP,A,195164362,M,Ethereum,Ethereum=195164362,Chainlink(Primary),breakdown,1,1,0,0
+3923,Derive V2,derive-v2,parent#lyra,Derivatives,A,194822855,M,Base,Base=55151787;Hyperliquid=51586964;Ethereum=35701982;Optimism=32568821;Arbitrum=19813301,,none,0,0,0,0
+3323,NAVI Lending,navi-lending,parent#navi-protocol,Lending,A,188969613,M,Sui,Sui=188969613,Supra(legacy);Pyth(legacy),legacy,2,2,0,0
+5448,Hyperliquid HLP,hyperliquid-hlp,parent#hyperliquid,Derivatives,A,181598068,M,Hyperliquid,Hyperliquid=181598068,,none,0,0,0,0
+4274,Suilend,suilend,parent#suilend-protocol,Lending,A,174065616,M,Sui,Sui=174065616,Pyth(Primary),breakdown,1,1,0,0
+6122,Blend Pools V2,blend-pools-v2,parent#blend,Lending,A,163913065,M,Stellar,Stellar=163913065,RedStone(Aggregator);Reflector(Aggregator),breakdown,2,2,0,1
+2994,crvUSD,crvusd,parent#curve-finance,CDP,A,159287361,M,Ethereum,Ethereum=159287361,,none,0,0,0,0
+753,RealT Tokens,realt-tokens,parent#realt,RWA,A,155063091,M,xDai,xDai=155063091,,none,0,0,0,0
+5120,Bitwise USCC,bitwise-uscc,parent#superstate,Basis Trading,A,140811610,M,Ethereum,Ethereum=107161864;Plume Mainnet=16970771;Solana=16678976,,none,0,0,0,0
+6875,Tydro,tydro,,Lending,A,137893548,M,Ink,Ink=137893548,Chainlink(Primary),breakdown,1,1,0,0
+6771,Yield Basis,yield-basis,,Leveraged Farming,A,136462025,M,Ethereum,Ethereum=136462025,,none,0,0,0,0
+3344,fx Protocol,fx-protocol,,Dual-Token Stablecoin,A,134267294,M,Ethereum,Ethereum=134267294,Chainlink(Primary),breakdown,1,1,0,0
+7766,R25,r25,,RWA,A,133813354,M,Pharos,Pharos=133813354,,none,0,0,0,0
+6785,Telos Consilium,telos-consilium,,Risk Curators,B,132978490,M,Plasma,Plasma=91869185;Ethereum=41109305,eOracle(Primary)@Plasma,breakdown,1,1,0,0
+8604,Theo Network thUSD,theo-network-thusd,parent#theo,RWA,A,132293960,M,Ethereum,Ethereum=132293960,Chainlink(Primary),breakdown,1,1,0,0
+467,Benqi Lending,benqi-lending,parent#benqi,Lending,A,130161390,M,Avalanche,Avalanche=130161390,Chainlink(Primary),breakdown,1,1,0,0
+7053,Curvance,curvance,,Lending,A,128853759,M,Monad,Monad=128853759,Chainlink(Primary),breakdown,1,1,0,0
+3933,Renzo,renzo,,Liquid Restaking,B,126007400,M,Ethereum,Ethereum=90334327;Linea=19873754;Solana=5053940;Arbitrum=4825253;Zircuit=2358387;Mode=1544450,Chainlink(Primary)@Ethereum/Arbitrum/Linea/Base/Optimism,breakdown,1,1,0,0
+5887,Extended Perps,extended-perps,parent#extended,Derivatives,A,119315110,M,Starknet,Starknet=119126572;Ethereum=188538,Stork(Primary),breakdown,1,1,0,0
+122,Nexus Mutual,nexus-mutual,,Insurance,B,114773296,M,Ethereum,Ethereum=114773296,Chainlink(Primary),breakdown,1,1,0,0
+111,Aave V2,aave-v2,parent#aave,Lending,A,113633144,M,Ethereum,Ethereum=86240758;Polygon=18317091;Avalanche=9075295,Chainlink(Primary),breakdown,1,1,1,0
+114,Compound V2,compound-v2,parent#compound-finance,Lending,A,112100970,M,Ethereum,Ethereum=112100970,Chainlink(Primary),breakdown,1,1,1,0
+8261,Lighter Robinhood Perps,lighter-robinhood-perps,parent#lighter,Derivatives,A,111737656,M,Robinhood Chain,Robinhood Chain=111737656,,none,0,0,0,0
+5619,SoSoValue Indexes,sosovalue-indexes,parent#sosovalue,Indexes,B,111480157,M,Bitcoin,Bitcoin=69503396;Ethereum=21816299;Hyperliquid=7209406;BNB Chain=4576402;Ripple=3986840;Solana=3378627,RedStone(Primary),breakdown,1,1,0,0
+5386,Aster USDF,aster-usdf,parent#astherus,Basis Trading,A,111272013,M,BNB Chain,BNB Chain=111272013,,none,0,0,0,0
+5656,Liquity V2,liquity-v2,parent#liquity,CDP,A,108131616,M,Ethereum,Ethereum=108131616,,none,0,0,0,0
+6598,Frax USD,frax-usd,parent#frax-finance,RWA,A,107706858,M,Ethereum,Ethereum=107706858,,none,0,0,0,0
+4411,River Omni-CDP,river-omni-cdp,parent#river-inc,CeDeFi,B,106582564,M,BNB Chain,BNB Chain=55884063;Base=28977577;BSquared=21103573;Ethereum=468929;BOB=51829;Bitlayer=31594,Chainlink(Primary)@BOB/BNB Chain/Arbitrum;DIA(Primary)@BEVM;Api3(Primary)@BOB;eOracle(Primary)@bsc/hemi;RedStone(Secondary)@hemi;Chainlink(Secondary)@bsc,breakdown,5,5,0,0
+8283,Valos,valos,,RWA,A,105654505,M,Monad,Monad=105654505,,none,0,0,0,0
+1952,Lofty,lofty,,RWA,A,101224779,M,Algorand,Algorand=101224779,,none,0,0,0,0
+225,Enzyme Finance,enzyme-finance,,Indexes,B,99803487,M,Ethereum,Ethereum=91670294;Polygon=6407433;Arbitrum=1725761,Chainlink(Primary);RedStone(Secondary),breakdown,2,2,0,0
+458,Save,save,parent#save-protocol,Lending,A,97913218,M,Solana,Solana=97913218,Pyth(Primary);Switchboard(Fallback),breakdown,2,2,0,1
+6210,Re7 Labs,re7-labs,,Risk Curators,B,94319772,M,World Chain,World Chain=33508884;Avalanche=20221814;Plasma=14310484;Ethereum=7701762;BNB Chain=5890053;Starknet=5709727,Chronicle(Primary)@Berachain;Stork(Primary)@Plume Mainnet;RedStone(Primary)@Unichain;eOracle(Primary)@TAC/Plasma;Chainlink(Primary)@Polygon/Base,breakdown,5,5,0,0
+220,Vesper,vesper,,Yield Aggregator,B,94317117,M,Ethereum,Ethereum=83121061;Base=8415473;Optimism=2751531;Polygon=29053,Chainlink(Primary),breakdown,1,1,0,0
+6461,Loopscale Lending,loopscale-lending,parent#loopscale,Lending,A,91565364,M,Solana,Solana=91565364,Pyth(Primary),breakdown,1,1,0,0
+2038,Lista CDP,lista-cdp,parent#lista-dao,CDP,A,88731375,M,BNB Chain,BNB Chain=88731375,RedStone(Primary);Chainlink(Secondary);Binance Oracle(Secondary);Api3(Secondary),breakdown,4,4,0,0
+4882,Usual USD0,usual-usd0,parent#usual,RWA,A,87804258,M,Ethereum,Ethereum=87804258,Chainlink(Primary)@Ethereum;Pyth(Primary)@Arbitrum,breakdown,2,2,0,0
+6997,Yuzu Money,yuzu-money,,Yield,B,79050856,M,Plasma,Plasma=64845738;Monad=7599005;Ethereum=6606112,RedStone(Primary),breakdown,1,1,0,0
+5145,Fusion by IPOR,fusion-by-ipor,parent#ipor,Onchain Capital Allocator,B,78267221,M,Base,Base=41065981;Ethereum=36692019;Arbitrum=492007;Katana=11729;Unichain=3530;Avalanche=1047,Chainlink(Primary),breakdown,1,1,0,0
+2062,Kamino Liquidity,kamino-liquidity,parent#kamino-finance,Liquidity Manager,B,75976162,M,Solana,Solana=75976162,Pyth(Aggregator);Chainlink(Aggregator),breakdown,2,2,1,0
+4321,Curve LlamaLend,curve-llamalend,parent#curve-finance,Lending,A,75935979,M,Ethereum,Ethereum=74463323;Arbitrum=1373424;Fraxtal=91850;Optimism=7383,,none,0,0,0,0
+3665,Sky RWA,sky-rwa,parent#maker,RWA,A,75330643,M,Ethereum,Ethereum=75330643,Chronicle(Primary),breakdown,1,1,0,0
+7449,Zest V2,zest-v2,parent#zest,Lending,A,75124590,M,Stacks,Stacks=75124590,Pyth(Secondary);DIA(Primary),breakdown,2,2,0,0
+8063,Tori Finance,tori-finance,,Basis Trading,A,74466569,M,Ethereum,Ethereum=74466569,,none,0,0,0,0
+5343,Reservoir Protocol,reservoir-protocol,,CDP,A,71618058,M,Monad,Monad=59596454;Ethereum=5293400;Pharos=3908459;Plasma=2819744;World Chain=1;Berachain=1,,none,0,0,0,0
+7184,Project 0,project-0,,Lending,A,70221279,M,Solana,Solana=70221279,Switchboard(Primary),breakdown,1,1,0,0
+4067,dYdX V4,dydx-v4,parent#dydx,Derivatives,A,69754302,M,dYdX,dYdX=69754302,,none,0,0,0,0
+6251,Yearn Curating,yearn-curating,parent#yearn,Risk Curators,B,67462266,M,Ethereum,Ethereum=52753046;Katana=11342883;Base=3355338;Arbitrum=10265;Hyperliquid=733,Chainlink(Primary)@Katana/Base,breakdown,1,1,0,0
+3790,Frankencoin,frankencoin,,CDP,A,64285274,M,Ethereum,Ethereum=64285274,,none,0,0,0,0
+8466,Axis,axis,,Basis Trading,A,61134507,M,Ethereum,Ethereum=61134507,,none,0,0,0,0
+6265,ZEROBASE CeDeFi,zerobase-cedefi,,Basis Trading,A,61078596,M,BNB Chain,BNB Chain=18867767;Ethereum=14515653;Base=10541361;Arbitrum=8414331;Optimism=8101332;Polygon=632178,,none,0,0,0,0
+7603,Current,current,,Lending,A,59501318,M,Sui,Sui=59501318,Pyth(Primary),breakdown,1,1,0,0
+6914,UltraYield Curator,ultrayield-curator,parent#ultrayield,Risk Curators,B,57676728,M,Ethereum,Ethereum=40566637;Hyperliquid=11073227;Etherlink=4942166;Base=607084;Monad=436250;Plasma=44031,eOracle(Primary)@TAC,breakdown,1,1,0,0
+3193,stUSDT,stusdt,,RWA,A,56974011,M,Tron,Tron=55145207;Ethereum=1828805,Chainlink(Primary),breakdown,1,1,0,0
+4592,Origami Finance,origami-finance,,Leveraged Farming,A,56814560,M,Ethereum,Ethereum=56757594;Plasma=56966,,none,0,0,0,0
+7539,Bitway Earn,bitway-earn,,Basis Trading,A,56759264,M,BNB Chain,BNB Chain=56759264,,none,0,0,0,0
+4323,Aera V2,aera-v2,parent#aera,Onchain Capital Allocator,B,55187216,M,Ethereum,Ethereum=55173008;Base=13775;Polygon=335;Arbitrum=99,Chainlink(Primary),breakdown,1,1,0,0
+6061,40 Acres,40-acres,,Lending,A,54275829,M,Base,Base=45062122;Optimism=5398005;Avalanche=3815702,,none,0,0,0,0
+5963,Resupply,resupply,,Lending,A,54222365,M,Ethereum,Ethereum=54222365,,none,0,0,0,0
+6340,Unitas USDu,unitas-usdu,parent#unitas,Basis Trading,A,52178223,M,BNB Chain,BNB Chain=39755790;Solana=12422433,,none,0,0,0,0
+8342,AZverse Perps,azverse-perps,parent#azverse,Derivatives,A,52124763,M,Arbitrum,Arbitrum=50531095;BNB Chain=847424;Ethereum=653690;Bitcoin=82327;Berachain=10227,,none,0,0,0,0
+7217,JupUSD,jupusd,parent#jupiter,Basis Trading,A,49048724,P,Solana,Solana=49048724,,none,0,0,0,0
+6296,Vault Bridge,vault-bridge,,Risk Curators,B,46930899,P,Ethereum,Ethereum=46930899,Chainlink(Primary),breakdown,1,1,0,0
+6213,Tulipa Capital,tulipa-capital,,Risk Curators,B,45434858,P,Ethereum,Ethereum=45275758;Berachain=90747;Avalanche=39858;BOB=22858;Monad=2815;BNB Chain=2733,RedStone(Primary)@Ethereum,breakdown,1,1,0,0
+6493,Hylo Protocol,hylo-protocol,parent#hylo,Dual-Token Stablecoin,A,43993785,P,Solana,Solana=43993785,Pyth(Primary),breakdown,1,1,0,0
+2537,Flux Finance,flux-finance,,Lending,A,43559137,P,Ethereum,Ethereum=43559137,,none,0,0,0,0
+6240,Felix Vaults,felix-vaults,parent#felix,Onchain Capital Allocator,B,43413081,P,Hyperliquid,Hyperliquid=43413081,RedStone(Primary),breakdown,1,1,0,0
+4058,Brickken,brickken,,RWA,A,42380319,P,BNB Chain,BNB Chain=29047976;Ethereum=8212525;Base=5119797;Avalanche=18;Polygon=2,Chainlink(legacy);TWAP(legacy),legacy,2,1,0,0
+6415,Rysk V12,rysk-v12,parent#rysk-finance,Options Vault,A,42321190,P,Hyperliquid,Hyperliquid=33754231;Ethereum=8566959,Stork(Aggregator);Pyth(Aggregator),breakdown,2,2,0,0
+438,AUTOfinance,autofinance,,Yield,B,42032126,P,Ethereum,Ethereum=37450570;Base=4005994;Arbitrum=572825;Sonic=2289;Plasma=436;Monad=12,RedStone(legacy);Chainlink(legacy),legacy,2,2,0,0
+7923,3F,3f,,Leveraged Farming,A,41829545,P,Ethereum,Ethereum=41829545,,none,0,0,0,0
+2231,Tangible RWA,tangible-rwa,parent#tangible,RWA,A,41534757,P,Polygon,Polygon=41534709;Arbitrum=28;Optimism=20,Curve(legacy),legacy,1,0,0,0
+7749,Alchemix V3,alchemix-v3,parent#alchemix,Synthetics,A,41112081,P,Ethereum,Ethereum=37537731;Optimism=3235308;Arbitrum=339043,,none,0,0,0,0
+359,Frax,frax,parent#frax-finance,Algo-Stables,A,40357141,P,Ethereum,Ethereum=40357141,Chainlink(Primary),breakdown,1,1,0,0
+1532,MetalX Lending,metalx-lending,parent#metalx,Lending,A,39794563,P,Proton,Proton=39794563,TWAP(Primary),breakdown,1,0,0,0
+5689,KAIO,kaio,,RWA,A,39654453,P,Sei,Sei=14681057;Aptos=6613457;Immutable zkEVM=6269295;Sui=4061133;Near=3996887;Avalanche=2999817,,none,0,0,0,0
+4915,Kinetic,kinetic,,Lending,A,39112683,P,Flare,Flare=39112683,RedStone(Secondary),breakdown,1,1,0,0
+8009,Curve LlamaLend V2,curve-llamalend-v2,parent#curve-finance,Lending,A,38663960,P,Ethereum,Ethereum=38260149;Optimism=403811,,none,0,0,0,0
+1453,Vaulta REX,vaulta-rex,,Lending,A,38621608,P,EOS,EOS=38621608,,none,0,0,0,0
+144,dYdX V3,dydx-v3,parent#dydx,Derivatives,A,38416396,P,Ethereum,Ethereum=38416396,Chainlink(Primary),breakdown,1,1,0,0
+6964,Makina,makina,,Onchain Capital Allocator,B,38400198,P,Ethereum,Ethereum=38400198,Chainlink(Primary),breakdown,1,1,0,1
+8141,Arcus Perps,arcus-perps,parent#arcus,Derivatives,A,38213208,P,Robinhood Chain,Robinhood Chain=38213208,,none,0,0,0,0
+345,Alpaca Leveraged Yield Farming,alpaca-leveraged-yield-farming,parent#alpaca-finance,Leveraged Farming,A,37060553,P,BNB Chain,BNB Chain=37057221;Fantom=3333,,none,0,0,0,0
+2974,Extra Finance Leverage Farming,extra-finance-leverage-farming,parent#extra-finance,Leveraged Farming,A,36041153,P,Base,Base=34283357;Optimism=1757784;Berachain=12,Chainlink(Primary),breakdown,1,1,0,0
+3191,xALGO Liquid Staking,xalgo-liquid-staking,parent#folks-finance,Liquid Staking,B,34596323,P,Algorand,Algorand=34596323,Internal(legacy),legacy,1,0,0,0
+6024,Aegis YUSD,aegis-yusd,parent#aegis,Basis Trading,A,34342315,P,Ethereum,Ethereum=32683069;BNB Chain=1659247,,none,0,0,0,0
+6019,Mystic Finance Lending,mystic-finance-lending,parent#mystic-finance,Lending,A,33933152,P,Flare,Flare=27784592;Citrea=4049859;Plume Mainnet=2098701,Stork(Aggregator);eOracle(Aggregator),breakdown,2,2,0,0
+2433,Inverse Finance FiRM,inverse-finance-firm,parent#inverse-finance,CDP,A,33435308,P,Ethereum,Ethereum=33435308,Chainlink(Primary),breakdown,1,1,0,0
+6570,Templar Protocol,templar-protocol,,Lending,A,32250909,P,Stellar,Stellar=13328014;Ethereum=11483532;Bitcoin=6396466;Near=754161;Zcash=230907;Ripple=57816,Pyth(Primary),breakdown,1,1,0,0
+4822,Apex Omni,apex-omni,parent#apex-protocol,Derivatives,A,31465433,P,Ethereum,Ethereum=17791014;Arbitrum=6118002;Base=3293365;BNB Chain=3041734;Mantle=1221319,Stork(Primary),breakdown,1,1,0,0
+6015,Felix CDP,felix-cdp,parent#felix,CDP,A,31417619,P,Hyperliquid,Hyperliquid=31417619,RedStone(Primary),breakdown,1,1,0,0
+6271,Hydration Lending,hydration-lending,,Lending,A,30495331,P,HydraDX,HydraDX=30495331,DIA(Primary),breakdown,1,1,0,0
+1642,Folks Finance Lending,folks-finance-lending,parent#folks-finance,Lending,A,30307243,P,Algorand,Algorand=30307243,Internal(legacy);Pyth(legacy);Chainlink(legacy),legacy,3,2,0,0
+7467,Decibel,decibel,,Derivatives,A,29418888,P,Aptos,Aptos=29418888,,none,0,0,0,0
+7297,GMX Solana,gmx-solana,parent#gmx,Derivatives,A,29382082,P,Solana,Solana=29382082,,none,0,0,0,0
+4190,RealT RMM Marketplace V2,realt-rmm-marketplace-v2,parent#realt,Lending,A,29152530,P,xDai,xDai=29152530,Internal(legacy),legacy,1,0,0,0
+6682,Pacifica Perps,pacifica-perps,parent#pacifica,Derivatives,A,27424962,P,Solana,Solana=27424962,,none,0,0,0,0
+4799,TermMax,termmax,,Lending,A,27057587,P,Ethereum,Ethereum=26885115;Berachain=95513;BNB Chain=53813;Robinhood Chain=11298;X Layer=7189;Arbitrum=4149,RedStone(Primary);eOracle(Secondary);Chainlink(Secondary),breakdown,3,3,0,0
+4662,Manta CeDeFi,manta-cedefi,,Basis Trading,A,26949681,P,Manta,Manta=26949681,,none,0,0,0,0
+1108,Gearbox,gearbox,,Lending,A,25451340,P,Ethereum,Ethereum=23610582;Etherlink=1450822;Monad=257625;Plasma=56013;Hemi=33960;Arbitrum=18931,RedStone(Primary)@Ethereum;Chainlink(Primary)@Ethereum;eOracle(Primary)@Hemi,breakdown,3,3,0,0
+4020,RIF ON CHAIN,rif-on-chain,,Dual-Token Stablecoin,A,25203153,P,RSK,RSK=25203153,,none,0,0,0,0
+4818,BitU Protocol,bitu-protocol,,CDP,A,25067964,P,BNB Chain,BNB Chain=25067964,Chainlink(Primary),breakdown,1,1,0,0
+5548,Neutral Trade,neutral-trade,,Onchain Capital Allocator,B,24748559,P,Solana,Solana=22435346;Robinhood Chain=2199294;Ethereum=103920;Monad=9999,Pyth(Primary),breakdown,1,1,0,0
+2076,Fraxlend,fraxlend,parent#frax-finance,Lending,A,24268333,P,Ethereum,Ethereum=23651031;Fraxtal=435536;Arbitrum=181766,Chainlink(Primary)@Ethereum/Arbitrum;Api3(Secondary)@Fraxtal;RedStone(Primary)@Fraxtal,breakdown,3,3,0,0
+7078,GoldFinger,goldfinger,,RWA,A,23549183,P,BNB Chain,BNB Chain=23549183,,none,0,0,0,0
+331,MoneyOnChain,moneyonchain,,Dual-Token Stablecoin,A,23154470,P,RSK,RSK=23154470,,none,0,0,0,0
+5983,T RIZE,t-rize,,RWA,A,23000000,P,Base,Base=23000000,,none,0,0,0,0
+6107,Hyperbeat Earn,hyperbeat-earn,parent#hyperbeat,Yield Aggregator,B,22915759,P,Hyperliquid,Hyperliquid=22915759,RedStone(Primary),breakdown,1,1,0,0
+6194,9Summits,9summits,,Risk Curators,B,22693456,P,Ethereum,Ethereum=22599917;Avalanche=75865;Base=17673;Unichain=1,RedStone(Primary)@Unichain/Ethereum/Monad;Chainlink(Primary)@Base,breakdown,2,2,0,0
+1115,Tectonic,tectonic,,Lending,A,22252408,P,Cronos,Cronos=22252408,,none,0,0,0,0
+4553,MorpheusAI,morpheusai,,AI Agents,B,21506194,P,Ethereum,Ethereum=21506194,Chainlink(Primary),breakdown,1,1,0,0
+2844,Sovryn Zero,sovryn-zero,parent#sovryn,CDP,A,21252436,P,RSK,RSK=21252436,,none,0,0,0,0
+4879,Clearpool TPOOL,clearpool-tpool,parent#clearpool,RWA,A,21114470,P,Flare,Flare=20964392;Ethereum=150078,,none,0,0,0,0
+1207,Across,across,,Cross Chain Bridge,B,21039382,P,Ethereum,Ethereum=21039382,UMA(legacy),legacy,1,1,0,0
+4663,Native Credit Pool,native-credit-pool,parent#native,Lending,A,21039371,P,Ethereum,Ethereum=10067001;BNB Chain=4839459;Morph=4495217;Base=646974;Arbitrum=519640;Robinhood Chain=357656,RedStone(Primary),breakdown,1,1,0,0
+6482,Liminal Basis,liminal-basis,parent#liminal,Basis Trading,A,20959581,P,Hyperliquid,Hyperliquid=20959581,,none,0,0,0,0
+7806,RISEx,risex,,Derivatives,A,20670500,P,RISE,RISE=20670500,Stork(Primary),breakdown,1,1,0,0
+7012,Piku Finance,piku-finance,,Basis Trading,A,20036490,P,Ethereum,Ethereum=20036490,,none,0,0,0,0
+5182,Sygnum FIUSD Liquidity Fund,sygnum-fiusd-liquidity-fund,,RWA,A,18286179,P,zkSync Era,zkSync Era=18286179,,none,0,0,0,0
+3206,Bucket CDP,bucket-cdp,parent#bucket-protocol,CDP,A,17988101,P,Sui,Sui=17988101,Supra(legacy);Switchboard(legacy);Pyth(legacy),legacy,3,3,0,0
+520,Youves,youves,,Synthetics,A,17569688,P,Tezos,Tezos=17569688,Acurast(legacy),legacy,1,1,0,0
+475,Yield Yak Aggregator,yield-yak-aggregator,parent#yield-yak,Yield Aggregator,B,17430042,P,Avalanche,Avalanche=12612285;Arbitrum=4816140;Base=1496;Mantle=120,RedStone(Primary),breakdown,1,1,0,0
+6535,GAIB,gaib,,RWA,A,16988376,P,Ethereum,Ethereum=16974205;Base=8475;Arbitrum=3698;BNB Chain=1998,,none,0,0,0,0
+7862,STRATO,strato,,CDP,A,16001849,P,Strato,Strato=16001849,,none,0,0,0,0
+5658,Moonlander,moonlander,,Derivatives,A,15933048,P,Cronos,Cronos=15927495;Cronos zkEVM=5553,Pyth(Primary),breakdown,1,1,0,0
+2264,Orderly Bridge,orderly-bridge,parent#orderly-network,Bridge,B,15891922,P,Solana,Solana=7376412;Arbitrum=2068608;BNB Chain=1997676;Ethereum=1790096;Berachain=1360694;Near=361628,Stork(Fallback);Pyth(Fallback),breakdown,2,2,0,0
+2797,Aevo Perps,aevo-perps,parent#aevo,Derivatives,A,15366412,P,Ethereum,Ethereum=12629193;Arbitrum=1863877;Base=495242;Optimism=378099,Pyth(Primary),breakdown,1,1,0,0
+266,Set Protocol,set-protocol,,Indexes,B,15290754,P,Ethereum,Ethereum=15290754,Chainlink(Primary),breakdown,1,1,0,0
+7403,Stobox,stobox,,RWA,A,13952059,P,Arbitrum,Arbitrum=13952059,,none,0,0,0,0
+5226,Estate Protocol,estate-protocol,,RWA,A,13951546,P,Arbitrum,Arbitrum=13951546,,none,0,0,0,0
+2833,Juicebox V1,juicebox-v1,parent#juicebox,Launchpad,B,13928904,P,Ethereum,Ethereum=13928904,Chainlink(Primary),breakdown,1,1,0,0
+7418,Paimon,paimon,,RWA,A,13853387,P,BNB Chain,BNB Chain=13853387,,none,0,0,0,0
+2641,Fulcrom Perps,fulcrom-perps,parent#fulcrom,Derivatives,A,13737587,P,Cronos,Cronos=13215965;zkSync Era=464576;Cronos zkEVM=57045,Pyth(Primary),breakdown,1,1,0,0
+1853,Moonwell Lending,moonwell-lending,parent#moonwell,Lending,A,13655906,P,Base,Base=11735606;Optimism=1275746;Ethereum=644554,Chainlink(Primary),breakdown,1,1,0,3
+3027,Alpaca Finance 2.0,alpaca-finance-2.0,parent#alpaca-finance,Lending,A,13587928,P,BNB Chain,BNB Chain=13587928,,none,0,0,0,0
+135,Kava Mint,kava-mint,,CDP,A,13570413,P,Kava,Kava=13570413,Internal(legacy),legacy,1,0,0,0
+504,Mento V2,mento-v2,parent#mento,Algo-Stables,A,13226641,P,Ethereum,Ethereum=6844439;Celo=5606662;Monad=775539;Bitcoin=1,Chainlink(Primary),breakdown,1,1,0,0
+3602,Contango V2,contango-v2,parent#contango,Derivatives,A,13166035,P,Ethereum,Ethereum=6827374;Arbitrum=4456618;Base=978059;Optimism=472864;Avalanche=242020;xDai=144050,,none,0,0,0,0
+4877,Vesu,vesu,,Lending,A,13132726,P,Starknet,Starknet=13132726,Pragma(legacy),legacy,1,1,0,0
+2491,Liqwid,liqwid,,Lending,A,13087585,P,Cardano,Cardano=13087585,,none,0,0,0,0
+6737,XSY,xsy,,Basis Trading,A,12989375,P,Base,Base=12989375,,none,0,0,0,0
+7750,Flying Tulip Lend,flying-tulip-lend,parent#flying-tulip,Lending,A,12988809,P,Ethereum,Ethereum=11805648;Sonic=1183160,,none,0,0,0,0
+4427,Merchant Moe Liquidity Book,merchant-moe-liquidity-book,parent#merchant-moe,Dexs,B,12969469,P,Mantle,Mantle=12969469,RedStone(Primary),breakdown,1,1,0,0
+146,DODO AMM,dodo-amm,parent#dodo,Dexs,B,12911016,P,BNB Chain,BNB Chain=4421509;Ethereum=3041441;Polygon=1663030;Avalanche=1506835;Arbitrum=1322431;Base=854869,Chainlink(Primary),breakdown,1,1,0,0
+2385,Exactly,exactly,,Lending,A,12351060,P,Base,Base=9512841;Optimism=2838170;Ethereum=49,Chainlink(Primary),breakdown,1,1,0,0
+8240,AFX LP,afx-lp,parent#afx-protocol,Derivatives,A,12225918,P,AFX L1,AFX L1=12225918,,none,0,0,0,0
+6702,Theo Network thBill,theo-network-thbill,parent#theo,RWA,A,12183194,P,Monad,Monad=12181100;Ethereum=2092;Arbitrum=1,,none,0,0,0,0
+5588,YieldFi,yieldfi,,Yield Aggregator,B,11686289,P,Ethereum,Ethereum=11156676;Base=205001;Arbitrum=176030;Plume Mainnet=61783;Sonic=35347;BNB Chain=26442,Chainlink(Primary)@Arbitrum/Base/BNB Chain/Katana/Optimism/Sonic/Linea/Saga/Plasma;eOracle(Primary)@Ethereum/Plume Mainnet/TAC;Pyth(Fallback),breakdown,3,3,0,0
+1961,Scallop Lend,scallop-lend,parent#scallop,Lending,A,11620452,P,Sui,Sui=11620452,Supra(legacy);Switchboard(legacy);Pyth(legacy),legacy,3,3,0,0
+6897,BEND,bend,,Lending,A,11584208,P,Berachain,Berachain=11584208,,none,0,0,0,0
+6208,MEV Capital,mev-capital,,Risk Curators,B,11548420,P,Ethereum,Ethereum=10295695;Hyperliquid=1127083;Sui=67686;Base=53147;Avalanche=4505;Arbitrum=140,RedStone(Primary)@Unichain;Chronicle(Primary)@Arbitrum;eOracle(Primary)@Sonic,breakdown,3,3,0,0
+6978,BounceBit Prime,bouncebit-prime,,Basis Trading,A,11452688,P,BNB Chain,BNB Chain=6298494;Ethereum=5154194,,none,0,0,0,0
+4108,Veranta,veranta,,Derivatives,A,11405042,P,Base,Base=11405042,Pyth(legacy);Chainlink(legacy),legacy,2,2,0,0
+2205,Pando Leaf,pando-leaf,parent#pando,CDP,A,11396474,P,Mixin,Mixin=11396474,,none,0,0,0,0
+2428,Metronome Synth,metronome-synth,parent#metronome,Synthetics,A,11130271,P,Ethereum,Ethereum=8532384;Optimism=2121443;Base=476444,,none,0,0,0,0
+253,BiFi,bifi,,Lending,A,10984373,P,Bifrost Network,Bifrost Network=10540584;Ethereum=239143;BNB Chain=157096;Klaytn=44938;Avalanche=2612,Chainlink(legacy);TWAP(legacy),legacy,2,1,0,0
+6244,BIMA CDP,bima-cdp,,CDP,A,10863924,P,Bitcoin,Bitcoin=10860724;Ethereum=1725;Hemi=1475,Stork(Primary)@Hemi/CORE/Goat;Chainlink(Primary)@Ethereum/BNB Chain/Sonic,breakdown,2,2,0,0
+6198,Block Analitica,block-analitica,,Risk Curators,B,10861551,P,Base,Base=10441323;Ethereum=404228;Arbitrum=8521;Sonic=7479,Chainlink(Primary)@Base/Ethereum,breakdown,1,1,0,0
+208,ACryptoS,acryptos,,Liquidity Manager,B,10538854,P,BNB Chain,BNB Chain=9428116;Arbitrum=874007;Avalanche=116197;Base=113813;Astar=3977;Linea=2745,Chainlink(Primary)@BNB Chain/Arbitrum/Optimism/Base/Polygon,breakdown,1,1,0,0
+6686,Bucket Protocol V2,bucket-protocol-v2,parent#bucket-protocol,CDP,A,10197570,P,Sui,Sui=10197570,,none,0,0,0,0
+2254,MUX Perps,mux-perps,parent#mux-protocol,Derivatives,A,10122497,P,Arbitrum,Arbitrum=9126375;Avalanche=463235;BNB Chain=324289;Optimism=207554;Fantom=1044,Chainlink(Primary),breakdown,1,1,0,0
+128,Hegic,hegic,,Options,A,10044784,P,Arbitrum,Arbitrum=9040964;Ethereum=1003820,,none,0,0,0,0
+3573,Solv RWA,solv-rwa,parent#solv-protocol,RWA,A,9683956,P,BNB Chain,BNB Chain=8735703;Mantle=948253,,none,0,0,0,0
+7844,Vena Finance,vena-finance,,Lending,A,9427130,P,Fluent,Fluent=9427130,Pyth(Primary),breakdown,1,1,0,0
+2965,Meld Gold,meld-gold,,RWA,A,9362520,P,Algorand,Algorand=9362520,Chainlink(legacy),legacy,1,1,0,0
+4198,EVAA Protocol,evaa-protocol,,Lending,A,9348351,P,TON,TON=9348351,Stork(Aggregator);RedStone(Aggregator);Pyth(Aggregator),breakdown,3,3,0,0
+4978,Reya Perps,reya-perps,parent#reya,Derivatives,A,9150533,P,Reya Network,Reya Network=9150533,Stork(Primary),breakdown,1,1,0,0
+4091,Binaryx Platform,binaryx-platform,,RWA,A,8999462,P,Polygon,Polygon=8999462,,none,0,0,0,0
+1018,Gains Network,gains-network,,Derivatives,A,8960895,P,Arbitrum,Arbitrum=6933093;Base=1011859;Polygon=828119;ApeChain=124030;MegaETH=63794,,none,0,0,0,0
+7137,Enosys Loans,enosys-loans,parent#enosys,CDP,A,8782873,P,Flare,Flare=8782873,,none,0,0,0,0
+3857,Deri V4,deri-v4,parent#deri,Options,A,8570835,P,Linea,Linea=8464378;BNB Chain=97243;zkSync Era=4652;Supra=2180;Arbitrum=1475;Base=412,Pyth(Primary),breakdown,1,1,0,0
+1838,Aave V1,aave-v1,parent#aave,Lending,A,8471032,P,Ethereum,Ethereum=8471032,Chainlink(Primary),breakdown,1,1,1,0
+2921,Blur Lending,blur-lending,parent#blur,NFT Lending,A,8408436,P,Ethereum,Ethereum=8408436,,none,0,0,0,0
+7005,Neverland,neverland,,Lending,A,8359963,P,Monad,Monad=8359963,RedStone(Secondary);Chainlink(Primary),breakdown,2,2,0,0
+5616,Republic Note,republic-note,,RWA,A,8348886,P,Avalanche,Avalanche=8348886,,none,0,0,0,0
+4367,Echelon Market,echelon-market,,Lending,A,8138405,P,Aptos,Aptos=7544042;Echelon Chain=555951;Move=38411,Chainlink(Primary)@Aptos;Pyth(Primary)@Move;Pyth(Secondary)@Aptos;Switchboard(Secondary)@Aptos,breakdown,3,3,0,0
+6536,Boros,boros,parent#pendle,Interest Rate Derivatives,B,7968809,P,Arbitrum,Arbitrum=7968809,Chaos(Primary);Chainlink(Primary),breakdown,2,2,0,0
+7016,Antarctic,antarctic,,Derivatives,A,7961674,P,Arbitrum,Arbitrum=7961674,,none,0,0,0,0
+140,Kava Lend,kava-lend,,Lending,A,7958157,P,Kava,Kava=7958157,Internal(legacy),legacy,1,0,0,0
+4501,BTCFi CDP,btcfi-cdp,parent#btcfi,CDP,A,7871861,P,Bitcoin,Bitcoin=3987544;Bifrost Network=3778691;Base=105607;CORE=19,,none,0,0,0,0
+7987,BULK,bulk,,Derivatives,A,7864854,P,Solana,Solana=7864854,,none,0,0,0,0
+3247,Hatom Lending,hatom-lending,parent#hatom-protocol,Lending,A,7808842,P,Elrond,Elrond=7808842,,none,0,0,0,0
+4932,Ostium,ostium,,Derivatives,A,7679489,P,Arbitrum,Arbitrum=7679489,Stork(legacy);Chainlink(legacy),legacy,2,2,0,0
+4744,Anzen V2,anzen-v2,parent#anzen-finance,RWA,A,7663643,P,Base,Base=6318943;Ethereum=760635;Manta=472606;Arbitrum=73198;Blast=38261,,none,0,0,0,0
+6033,Uranium.io,uranium.io,,RWA,A,7574909,P,Etherlink,Etherlink=7574909,,none,0,0,0,0
+6323,Avant avBTC,avant-avbtc,parent#avant-protocol,Onchain Capital Allocator,B,7564576,P,Avalanche,Avalanche=7564576,Chainlink(Primary),breakdown,1,1,0,0
+612,Vires Finance,vires-finance,,Lending,A,7452599,P,Waves,Waves=7452599,,none,0,0,0,0
+6077,Solomon USDv,solomon-usdv,,Basis Trading,A,7386070,P,Solana,Solana=7386070,,none,0,0,0,0
+4856,Harmonix Finance,harmonix-finance,,Yield,B,7369202,P,Hyperliquid,Hyperliquid=6842774;Arbitrum=513739;Ethereum=12689,Chainlink(Primary),breakdown,1,1,0,0
+5001,Capyfi,capyfi,,Lending,A,7307993,P,Ethereum,Ethereum=7139914;Base=79460;LaChain Network=45132;World Chain=43487,,none,0,0,0,0
+4861,Aurus,aurus,,RWA,A,7302784,P,Ethereum,Ethereum=7302784,,none,0,0,0,0
+8176,Vault Street,vault-street,parent#resolv,RWA,A,7275454,P,Ethereum,Ethereum=7275454,,none,0,0,0,0
+6286,Seamless V2,seamless-v2,parent#seamless-protocol,Lending,A,7273483,P,Ethereum,Ethereum=7212658;Base=60826,Chainlink(Primary),breakdown,1,1,0,0
+4455,Arcadia V2,arcadia-v2,parent#arcadia-finance,Liquidity Manager,B,7268087,P,Base,Base=6686740;Optimism=368694;Robinhood Chain=212569;Unichain=84,Chainlink(Primary),breakdown,1,1,0,0
+7462,Defa By InvoiceMate,defa-by-invoicemate,,RWA,A,7189509,P,Stellar,Stellar=4014711;ZIGChain=2099870;Starknet=1074929,,none,0,0,0,0
+8534,HertzFlow,hertzflow,,Derivatives,A,7140067,P,BNB Chain,BNB Chain=7140067,Pyth(Primary),breakdown,1,1,0,0
+6268,Granite,granite,,Lending,A,7063969,P,Stacks,Stacks=7063969,Pyth(Primary),breakdown,1,1,0,0
+1881,Toros,toros,parent#dhedge,Yield,B,6998986,P,Arbitrum,Arbitrum=4042121;Optimism=1614738;Base=807802;Ethereum=434934;Polygon=73299;Hyperliquid=26091,Chainlink(Primary),breakdown,1,1,0,0
+6679,Mansory,mansory,,RWA,A,6962014,P,BNB Chain,BNB Chain=3960064;Solana=3001950,,none,0,0,0,0
+7329,Fira,fira,,Lending,A,6921103,P,Ethereum,Ethereum=6921103,,none,0,0,0,0
+5783,Takara Lend,takara-lend,,Lending,A,6852966,P,Sei,Sei=6852966,RedStone(Primary);Api3(Secondary);Pyth(Fallback),breakdown,3,3,0,0
+8561,NaraUSD,narausd,,RWA,A,6812959,P,Ethereum,Ethereum=6812959,,none,0,0,0,0
+7302,Digital Gold,digital-gold,,RWA,A,6704932,P,Ethereum,Ethereum=6704932,,none,0,0,0,0
+5199,Folks Finance xChain,folks-finance-xchain,parent#folks-finance,Lending,A,6703811,P,Avalanche,Avalanche=5147150;Polygon=915552;Ethereum=277788;Monad=239407;Arbitrum=70716;Base=27587,Chainlink(Primary),breakdown,1,1,0,0
+3938,Unitus,unitus,parent#dforce,Lending,A,6474789,P,Conflux,Conflux=4412318;Ethereum=1590549;BNB Chain=417488;Arbitrum=40088;Polygon=7724;Optimism=3530,Pyth(Primary)@Conflux,breakdown,1,1,0,0
+6216,Revert Lend,revert-lend,parent#revert,Lending,A,6424161,P,Arbitrum,Arbitrum=2752589;Base=2414987;Ethereum=1256585,,none,0,0,0,0
+6966,TurboFlow Perps,turboflow-perps,parent#turboflow,Derivatives,A,6397869,P,BNB Chain,BNB Chain=5704364;Solana=693505,,none,0,0,0,0
+4721,YeiLend,yeilend,parent#yei-finance,Lending,A,6322676,P,Sei,Sei=6322676,Api3(Primary);Pyth(Fallback);RedStone(Secondary),breakdown,3,3,0,0
+5655,Resolv USR,resolv-usr,parent#resolv,Basis Trading,A,6248707,P,Ethereum,Ethereum=6248707,,none,0,0,0,0
+5611,Silo V2,silo-v2,parent#silo-finance,Lending,A,6243819,P,Avalanche,Avalanche=2241379;Sonic=2231901;Ethereum=1597739;Arbitrum=172799,RedStone(Primary)@Sonic/Ethereum;eOracle(Primary)@Avalanche/Arbitrum;Chainlink(Secondary),breakdown,3,3,0,1
+2484,Djed Stablecoin,djed-stablecoin,,Dual-Token Stablecoin,A,6113980,P,Cardano,Cardano=6113980,COTI's Oracle(Primary)@Cardano,breakdown,1,1,0,0
+2204,Pando Rings,pando-rings,parent#pando,Lending,A,6076082,P,Mixin,Mixin=6076082,,none,0,0,0,1
+138,Hakka Finance,hakka-finance,,Derivatives,A,5931255,P,Ethereum,Ethereum=5931255;BNB Chain=0,Chainlink(Primary),breakdown,1,1,0,0
+4952,Troves,troves,,Yield,B,5913530,P,Starknet,Starknet=5913530,Pragma(Primary),breakdown,1,1,0,0
+6312,Hydro Lending,hydro-lending,parent#hydro-protocol,Lending,A,5758377,P,Injective,Injective=5758377,,none,0,0,0,0
+5838,HypurrFi Pooled,hypurrfi-pooled,parent#hypurfi,Lending,A,5540330,P,Hyperliquid,Hyperliquid=5540330,Pyth(Aggregator);RedStone(Aggregator),breakdown,2,2,0,0
+183,Wing Finance,wing-finance,,Lending,A,5538094,P,Ontology,Ontology=5196388;Ethereum=232588;BNB Chain=109118,Chainlink(Primary),breakdown,1,1,0,0
+5287,Bonzo Lend,bonzo-lend,parent#bonzo-finance,Lending,A,5424355,P,Hedera,Hedera=5424355,Chainlink(Primary);Supra(Secondary),breakdown,2,2,0,1
+7751,eva Markets,eva-markets,,RWA,A,5284099,P,Ethereum,Ethereum=5284099,,none,0,0,0,0
+8264,Morpho Midnight,morpho-midnight,parent#morpho,Lending,A,5185558,P,Base,Base=4642161;Ethereum=543397,,none,0,0,1,0
+276,Stafi,stafi,,Liquid Staking,B,5155511,P,Ethereum,Ethereum=5026732;Solana=105438;BNB Chain=19755;Cosmos=3586,Chainlink(Primary),breakdown,1,1,0,0
+347,Abracadabra Spell,abracadabra-spell,parent#abracadabra,CDP,A,5075518,P,Ethereum,Ethereum=2588436;Arbitrum=2274915;BNB Chain=157993;Avalanche=37407;Blast=13629;Fantom=2964,Chainlink(Primary)@Arbitrum/Avalanche/BNB Chain/Ethereum/Fantom/Optimism;RedStone(Primary)@Blast/Kava,breakdown,2,2,0,0
+349,Injective Bridge,injective-bridge,,Bridge,B,5050637,P,Ethereum,Ethereum=5050637,Chainlink(legacy);Band(legacy);DIA(legacy),legacy,3,3,0,0
+239,PoolTogether V3,pooltogether-v3,parent#pooltogether,Yield Lottery,B,4964109,P,Ethereum,Ethereum=4854541;Polygon=60959;Celo=39727;BNB Chain=8882,Chainlink(Primary),breakdown,1,1,0,0
+7586,Chainflip Lending,chainflip-lending,parent#chainflip,Lending,A,4951649,P,Chainflip,Chainflip=4951649,Chainlink(Primary),breakdown,1,1,0,0
+338,Inverse Finance Frontier,inverse-finance-frontier,parent#inverse-finance,CDP,A,4898870,P,Ethereum,Ethereum=4898870,,none,0,0,0,2
+4075,Eigenpie,eigenpie,parent#magpie-ecosystem,Liquid Restaking,B,4843026,P,Ethereum,Ethereum=4843026,RedStone(Primary),breakdown,1,1,0,0
+5916,Bumpin Trade,bumpin-trade,,Derivatives,A,4610253,P,Solana,Solana=4610253,,none,0,0,0,0
+3883,Storm Trade,storm-trade,,Derivatives,A,4547133,P,TON,TON=4547133,Pyth(legacy);Stork(legacy),legacy,2,2,0,0
+1805,Mole,mole,,Yield,B,4493448,P,Sui,Sui=4233112;Aptos=260336,Supra(Aggregator)@Sui;Pyth(Aggregator)@Sui/Aptos,breakdown,2,2,0,0
+7546,Mento V3,mento-v3,parent#mento,Dexs,B,4440820,P,Monad,Monad=3904406;Celo=536414,Chainlink(Primary),breakdown,1,1,0,0
+281,Ribbon,ribbon,parent#ribbon-finance,Options Vault,A,4435315,P,Ethereum,Ethereum=3768699;Solana=551192;Avalanche=115408;BNB Chain=16,Pyth(Primary),breakdown,1,1,0,0
+2309,Indigo,indigo,,CDP,A,4427878,P,Cardano,Cardano=4427878,,none,0,0,0,0
+7116,Lista RWA,lista-rwa,parent#lista-dao,RWA,A,4405251,P,BNB Chain,BNB Chain=4052863;Ethereum=352388,,none,0,0,0,0
+7478,Liquidium,liquidium,,Lending,A,4318345,P,ICP,ICP=4318345,,none,0,0,0,0
+7922,Tangent Finance,tangent-finance,,Lending,A,4249913,P,Ethereum,Ethereum=4249913,Chainlink(Primary);RedStone(Fallback),breakdown,2,2,0,0
+254,Bunny,bunny,,Yield,B,4242578,P,BNB Chain,BNB Chain=4216557;Polygon=26021,Chainlink(Primary),breakdown,1,1,0,1
+2633,AnyHedge,anyhedge,,Derivatives,A,4240562,P,Bitcoincash,Bitcoincash=4240562,Oracles.Cash(legacy),legacy,1,1,0,0
+5051,Echo Lending,echo-lending,parent#echo-protocol,Lending,A,4187265,P,Aptos,Aptos=4187265,Chainlink(Primary);Pyth(Fallback),breakdown,2,2,0,0
+5320,MORE Markets,more-markets,parent#more-markets,Lending,A,4185206,P,Flow,Flow=4185206,Pyth(Primary),breakdown,1,1,0,0
+6864,mStable V2,mstable-v2,parent#dhedge,CDP,A,4123814,P,Ethereum,Ethereum=4123814,,none,0,0,0,0
+7510,AlphaFi Lending,alphafi-lending,parent#alphafi,Lending,A,4008709,P,Sui,Sui=4008709,,none,0,0,0,0
+6096,Nawa Protocol,nawa-protocol,,RWA,A,4005659,P,ZIGChain,ZIGChain=3447556;Ethereum=558103;CORE=0,,none,0,0,0,0
+2479,DeltaPrime,deltaprime,,Leveraged Farming,A,3853886,P,Avalanche,Avalanche=2114573;Arbitrum=1739313,RedStone(Primary),breakdown,1,1,0,0
+7532,Perpl,perpl,,Derivatives,A,3818952,P,Monad,Monad=3818952,,none,0,0,0,0
+6494,Surf Lending,surf-lending,,Lending,A,3711771,P,Cardano,Cardano=3711771,,none,0,0,0,0
+1461,WOOFi Swap,woofi-swap,parent#woofi,Dexs,B,3673913,P,Arbitrum,Arbitrum=812923;Avalanche=613105;Optimism=600947;BNB Chain=472902;Polygon=456057;Base=325197,Chainlink(Primary),breakdown,1,1,0,1
+6497,Evedex,evedex,,Derivatives,A,3658157,P,Arbitrum,Arbitrum=3658157,,none,0,0,0,0
+3393,TermFinance Lend,termfinance-lend,parent#termfinance,Lending,A,3647295,P,Ethereum,Ethereum=3646657;Plasma=498;Arbitrum=67;Base=54;Avalanche=20,Chainlink(Primary),breakdown,1,1,0,0
+4093,Neptune Finance,neptune-finance,,Lending,A,3545246,P,Injective,Injective=3545246,Pyth(Primary),breakdown,1,1,0,0
+3997,Compound V1,compound-v1,parent#compound-finance,Lending,A,3532700,P,Ethereum,Ethereum=3532700,,none,0,0,1,0
+4043,LiquidLoans,liquidloans,,CDP,A,3515541,P,Pulse,Pulse=3515541,,none,0,0,0,0
+337,GMX V1 Perps,gmx-v1-perps,parent#gmx,Derivatives,A,3407793,P,Avalanche,Avalanche=2040785;Arbitrum=1367008,Chainlink(Primary),breakdown,1,1,0,0
+1812,FluidTokens,fluidtokens,,Lending,A,3332436,P,Cardano,Cardano=3332436,,none,0,0,0,0
+8639,Kamui,kamui,,RWA,A,3256734,P,Ethereum,Ethereum=3256734,,none,0,0,0,0
+636,Keep3r Network,keep3r-network,,Derivatives,A,3242476,P,Ethereum,Ethereum=3242476,,none,0,0,0,0
+7041,LeverUp,leverup,,Derivatives,A,3231658,P,Monad,Monad=3231658,Pyth(Primary),breakdown,1,1,0,0
+7270,Mezo Borrow,mezo-borrow,parent#mezo-swap,CDP,A,3219677,P,Mezo,Mezo=3219677,,none,0,0,0,0
+5286,Fragmetric,fragmetric,,Liquid Restaking,B,3171880,P,Solana,Solana=3171880,Switchboard(Fallback),breakdown,1,1,0,0
+5495,ComTech Gold,comtech-gold,,RWA,A,3171575,P,XDC,XDC=3171575,,none,0,0,0,0
+7388,Twyne,twyne,,Lending,A,3126684,P,Ethereum,Ethereum=3126684,,none,0,0,0,0
+8019,Monetrix USDM,monetrix-usdm,parent#monetrix,Basis Trading,A,3122729,P,Hyperliquid,Hyperliquid=3122729,,none,0,0,0,0
+3171,Kinza Finance,kinza-finance,,Lending,A,3105380,P,BNB Chain,BNB Chain=3052097;Op_Bnb=32758;Ethereum=16738;Mantle=3786,Binance Oracle(legacy);Chainlink(legacy),legacy,2,2,0,0
+4215,SynFutures V3,synfutures-v3,parent#synfutures,Derivatives,A,3083895,P,Base,Base=2569457;Blast=514438,Chainlink(Primary)@Base;Pyth(Primary)@Blast,breakdown,2,2,0,0
+4003,KUMA Protocol,kuma-protocol,,RWA,A,3074176,P,Ethereum,Ethereum=3038898;Linea=34055;Polygon=1051;Telos=172,,none,0,0,0,0
+6719,Kea Credit,kea-credit,,RWA,A,2975875,P,Hedera,Hedera=2975875,,none,0,0,0,0
+5561,Gondi V3,gondi-v3,parent#gondi,NFT Lending,A,2965589,P,Ethereum,Ethereum=2965589,,none,0,0,0,0
+5777,SoSoValue Basis,sosovalue-basis,parent#sosovalue,Basis Trading,A,2935775,P,Base,Base=2935775,,none,0,0,0,0
+4975,AlphaX,alphax,,Derivatives,A,2864267,P,BNB Chain,BNB Chain=1464537;Ethereum=700968;Arbitrum=381284;Tron=317478,,none,0,0,0,0
+4420,Zest V1,zest-v1,parent#zest,Lending,A,2849865,P,Stacks,Stacks=2849865,Pyth(Secondary);DIA(Primary),breakdown,2,2,0,0
+265,Reflexer,reflexer,,CDP,A,2842495,P,Ethereum,Ethereum=2842495,Chainlink(Primary),breakdown,1,1,0,0
+125,mStable CDP,mstable-cdp,parent#dhedge,CDP,A,2801571,P,Ethereum,Ethereum=2680218;Polygon=121353,,none,0,0,0,0
+7496,Venus Flux,venus-flux,parent#venus-finance,Lending,A,2652862,P,BNB Chain,BNB Chain=2652862,,none,0,0,1,0
+8365,Meridian Perps,meridian-perps,parent#meridiandotxyz,Derivatives,A,2633054,P,Robinhood Chain,Robinhood Chain=2633054,,none,0,0,0,0
+7464,Usual ETH0,usual-eth0,parent#usual,Synthetics,A,2559248,P,Ethereum,Ethereum=2559248,,none,0,0,0,0
+8579,Longbow,longbow,,Lending,A,2538528,P,Robinhood Chain,Robinhood Chain=2538528,Chainlink(Primary),breakdown,1,1,0,0
+6147,Yala,yala,,CDP,A,2471962,P,Bitcoin,Bitcoin=2471962;Ethereum=0,Chainlink(Primary),breakdown,1,1,0,0
+449,QiDao,qidao,,CDP,A,2434017,P,Polygon,Polygon=1178872;Base=556773;Ethereum=210939;Avalanche=166097;Optimism=159320;Fantom=116895,,none,0,0,0,0
+6856,Oro Finance,oro-finance,,RWA,A,2416045,P,Solana,Solana=2416045,Pyth(Primary);Switchboard(Primary),breakdown,2,2,0,0
+6173,Strike Finance Perpetuals,strike-finance-perpetuals,,Derivatives,A,2408896,P,Cardano,Cardano=1854239;Ethereum=554658,,none,0,0,0,0
+4376,POWERCITY Earn Protocol,powercity-earn-protocol,parent#powercity,CDP,A,2402803,P,Pulse,Pulse=2402803,TWAP(Primary),breakdown,1,0,0,0
+954,REX Staking,rex-staking,,Lending,A,2401346,P,Telos,Telos=2401346,,none,0,0,0,0
+4531,International Stable Currency,international-stable-currency,,RWA,A,2395794,P,Solana,Solana=2395794,,none,0,0,0,0
+3693,PoolTogether V5,pooltogether-v5,parent#pooltogether,Yield Lottery,B,2391614,P,Optimism,Optimism=1338365;Ethereum=485079;Base=435087;World Chain=101412;xDai=17744;Arbitrum=12988,Witnet(RNG),breakdown,1,1,0,0
+4682,NX Finance,nx-finance,,Yield Aggregator,B,2374460,P,Solana,Solana=2374460,Pyth(Primary),breakdown,1,1,0,0
+3250,LayerBank,layerbank,,Lending,A,2339833,P,RSK,RSK=2261822;Move=63822;Manta=2768;BOB=2303;Plume Mainnet=1880;Taiko=1581,eOracle(Primary)@zkLink/Manta/Scroll/Linea/Mode/BSquared/BOB/Hemi/Morph,breakdown,1,1,0,0
+1191,Katana,katana,,Options Vault,A,2294236,P,Solana,Solana=2294236,Pyth(Primary),breakdown,1,1,0,0
+8778,Alpend,alpend,,Lending,A,2291529,P,Canton,Canton=2291529,,none,0,0,0,0
+4812,Threshold thUSD,threshold-thusd,parent#threshold-network,CDP,A,2284289,P,Ethereum,Ethereum=2284289,,none,0,0,0,0
+6783,SYMMIO,symmio,,Derivatives,A,2280579,P,Base,Base=1027041;Arbitrum=591071;Berachain=347862;Coti=162477;Mantle=60633;BNB Chain=58040,,none,0,0,0,0
+8039,Panoptic V2,panoptic-v2,parent#panoptic,Options,A,2237266,P,Ethereum,Ethereum=2220019;Robinhood Chain=17247,,none,0,0,0,0
+3392,OmniBTC,omnibtc,,Lending,A,2229307,P,Sui,Sui=2229292;Arbitrum=7;Base=6;Ethereum=2;Polygon=0;Optimism=0,Pyth(Primary)@Sui,breakdown,1,1,0,0
+5657,ZTLN-P,ztln-p,parent#zoth,RWA,A,2199883,P,Ethereum,Ethereum=2199883,,none,0,0,0,0
+5305,Synatra,synatra,,Yield Aggregator,B,2161552,P,Solana,Solana=2161552,Switchboard(Primary),breakdown,1,1,0,0
+448,Balanced Exchange,balanced-exchange,parent#balanceddao,Dexs,B,2115287,P,Avalanche,Avalanche=1698252;Icon=153031;Solana=147131;Arbitrum=86720;BNB Chain=10413;Archway=5739,Band(Primary),breakdown,1,1,0,0
+5826,BAMM,bamm,parent#frax-finance,Lending,A,2106112,P,Fraxtal,Fraxtal=2106112,,none,0,0,0,0
+152,Augur,augur,,Prediction Market,B,2102746,P,Ethereum,Ethereum=2102746,Chainlink(Primary),breakdown,1,1,0,0
+5733,Solera,solera,,Lending,A,2100051,P,Plume Mainnet,Plume Mainnet=2098702;Hemi=1348,Stork(Primary);eOracle(Secondary),breakdown,2,2,0,0
+5726,Affluent,affluent,,Lending,A,2091146,P,TON,TON=2091146,RedStone(Primary),breakdown,1,1,0,0
+8165,Byzanlink RWA Markets,byzanlink-rwa-markets,,RWA,A,2081055,P,Hedera,Hedera=1185941;Solana=893029;Ethereum=2085,,none,0,0,0,0
+1299,Guru Network Classic,guru-network-classic,parent#guru-network-dao,Yield,B,2080626,P,BNB Chain,BNB Chain=1375712;Sonic=518941;MultiVAC=175210;Fantom=6988;Arbitrum=3129;Kucoin=267,Band(Primary),breakdown,1,1,0,0
+4054,INIT Capital,init-capital,,Lending,A,2075668,P,Mantle,Mantle=1956362;Blast=119306,Api3(Primary),breakdown,1,1,0,0
+1829,Interest Protocol,interest-protocol,,CDP,A,2026444,P,Ethereum,Ethereum=2026036;Optimism=408,Chainlink(Primary),breakdown,1,1,0,0
+5823,Hermetica USDh,hermetica-usdh,parent#hermetica,Basis Trading,A,1983325,P,Stacks,Stacks=1983325,,none,0,0,0,0
+7614,Katana Perps,katana-perps,,Derivatives,A,1949372,P,Katana,Katana=1949372,,none,0,0,0,0
+6967,DipCoin Perps,dipcoin-perps,parent#dipcoin,Derivatives,A,1929779,P,Sui,Sui=1929779,Pyth(Primary),breakdown,1,1,0,0
+4889,DeSyn Basis Trading,desyn-basis-trading,parent#desyn-protocol,Basis Trading,A,1893341,P,Bitlayer,Bitlayer=1893341,,none,0,0,0,0
+8622,Levr Bet,levr-bet,,Prediction Market,B,1877887,P,Monad,Monad=1877887,Pyth(Primary),breakdown,1,1,0,0
+6910,Ethereal DEX,ethereal-dex,,Derivatives,A,1862917,P,Ethereal,Ethereal=1862917,Pyth(Primary),breakdown,1,1,0,0
+756,Angle,angle,,CDP,A,1830538,P,Ethereum,Ethereum=1578774;Arbitrum=244055;Polygon=6705;Optimism=904;Avalanche=100;BNB Chain=0,Chainlink(legacy);TWAP(legacy);RedStone(legacy);Pyth(legacy),legacy,4,3,0,0
+149,B.Protocol,b.protocol,,Liquidations,B,1826568,P,Ethereum,Ethereum=1815106;Arbitrum=11364;Polygon=98,Chainlink(Primary),breakdown,1,1,0,0
+3379,Yamato Protocol,yamato-protocol,,CDP,A,1825276,P,Ethereum,Ethereum=1825276,Chainlink(Primary),breakdown,1,1,0,0
+4063,Peapods Finance,peapods-finance,,Yield,B,1794994,P,Ethereum,Ethereum=950852;Base=781832;Sonic=37916;Arbitrum=24383;Berachain=11,DIA(Primary),breakdown,1,1,0,0
+5554,Extra Finance Xlend,extra-finance-xlend,parent#extra-finance,Lending,A,1786203,P,Base,Base=1308018;Optimism=478185,,none,0,0,0,0
+1572,DeFIL,defil,,Lending,A,1758756,P,Ethereum,Ethereum=1619778;BNB Chain=138978,Chainlink(Primary),breakdown,1,1,0,0
+8519,Monetrix mxHYPE,monetrix-mxhype,parent#monetrix,Basis Trading,A,1752383,P,Hyperliquid,Hyperliquid=1752383,,none,0,0,0,0
+3638,HOPE Collateral,hope-collateral,parent#hope-money,Basis Trading,A,1735835,P,Bitcoin,Bitcoin=1734484;Ethereum=1351,,none,0,0,0,0
+4331,HiYield,hiyield,,RWA,A,1721525,P,Avalanche,Avalanche=1721525,,none,0,0,0,0
+8035,JustLend V2,justlend-v2,parent#justlend,Lending,A,1693580,P,Tron,Tron=1693580,Internal(Primary),breakdown,1,0,0,0
+3960,LandX Finance,landx-finance,,RWA,A,1639866,P,Ethereum,Ethereum=1639866,Chainlink(Primary),breakdown,1,1,0,0
+6196,Apostro,apostro,,Risk Curators,B,1630555,P,Ethereum,Ethereum=1092365;Base=523583;BNB Chain=14607,Pyth(Primary)@Base,breakdown,1,1,0,0
+1356,Hubble,hubble,,CDP,A,1579539,P,Solana,Solana=1579539,Pyth(Primary),breakdown,1,1,0,0
+1020,Arkadiko,arkadiko,,CDP,A,1576655,P,Stacks,Stacks=1576655,Pyth(Primary),breakdown,1,1,0,0
+6451,Bluefin Pro,bluefin-pro,parent#bluefin,Derivatives,A,1567462,P,Sui,Sui=1567462,Pyth(Primary)@Sui,breakdown,1,1,0,0
+6465,Sigma Money,sigma-money,,CDP,A,1562129,P,BNB Chain,BNB Chain=1562129,,none,0,0,0,0
+5791,King Protocol,king-protocol,,Liquid Restaking,B,1561087,P,Ethereum,Ethereum=1561087,Chainlink(Primary),breakdown,1,1,0,0
+8005,Hyperbeat USD,hyperbeat-usd,parent#hyperbeat,Lending,A,1559754,P,Hyperliquid,Hyperliquid=1559739;Ethereum=14,RedStone(Primary),breakdown,1,1,0,0
+6238,SMARDEX USDN,smardex-usdn,parent#smardex-ecosystem,Basis Trading,A,1516512,P,Ethereum,Ethereum=1516512,,none,0,0,0,0
+6733,Rezerve Lending,rezerve-lending,parent#rezerve,Lending,A,1450376,P,Ethereum,Ethereum=1450376,DIA(Primary),breakdown,1,1,0,0
+1878,ApeX Pro,apex-pro,parent#apex-protocol,Derivatives,A,1427131,P,Ethereum,Ethereum=1427048;Polygon=83;Arbitrum=0;BNB Chain=0,Stork(Primary),breakdown,1,1,0,0
+4596,Mitosis,mitosis,,Onchain Capital Allocator,B,1422854,P,BNB Chain,BNB Chain=1131849;Linea=150006;Arbitrum=81311;Ethereum=45335;Morph=9303;Base=4556,Stork(Primary),breakdown,1,1,0,0
+3243,ZeroLend Lending,zerolend-lending,parent#zerolend,Lending,A,1416837,P,zkSync Era,zkSync Era=858066;Blast=478728;Abstract=32371;Manta=25429;Linea=10115;X Layer=9210,RedStone(Primary)@Blast/Base/Manta/Zircuit;Chainlink(Primary)@Linea/Ethereum;Pyth(Primary)@zkSync Era;eOracle(Primary)@Hemi;Api3(Primary)@X Layer,breakdown,5,5,0,0
+8328,Surge Credit,surge-credit,,Lending,A,1405035,P,Bitcoin,Bitcoin=1405035,Chainlink(Primary),breakdown,1,1,0,0
+3598,Mountain Protocol,mountain-protocol,,RWA,A,1400450,P,Ethereum,Ethereum=1279861;zkSync Era=58635;Arbitrum=45344;Base=9299;Optimism=5239;Polygon=2071,,none,0,0,0,0
+8397,Rujira Money Market,rujira-money-market,parent#rujira,Lending,A,1398790,P,Thorchain,Thorchain=1398790,,none,0,0,0,0
+5589,dTRINITY dUSD,dtrinity-dusd,parent#dtrinity,Partially Algorithmic Stablecoin,A,1387414,P,Ethereum,Ethereum=854761;Sonic=234046;Katana=204091;Fraxtal=94515,,none,0,0,0,0
+6728,Propbase,propbase,,RWA,A,1385248,P,Aptos,Aptos=1385248,,none,0,0,0,0
+3329,KiloEx,kiloex,,Derivatives,A,1381735,P,BNB Chain,BNB Chain=681543;Op_Bnb=363885;Base=336306;Manta=0,Chainlink(legacy);Pyth(legacy),legacy,2,2,0,1
+8076,Jupiter Offerbook,jupiter-offerbook,parent#jupiter,Lending,A,1374894,P,Solana,Solana=1374894,,none,0,0,0,0
+536,Larix,larix,,Lending,A,1373209,P,Solana,Solana=1373209,Pyth(Primary),breakdown,1,1,0,0
+141,Outcome Finance,outcome-finance,,Synthetics,A,1359677,P,Ethereum,Ethereum=1306800;Polygon=28689;Boba=24188,UMA(legacy),legacy,1,1,0,0
+5160,ELFi Protocol,elfi-protocol,,Derivatives,A,1358725,P,Base,Base=1336723;Arbitrum=22002,Chainlink(Primary),breakdown,1,1,0,0
+3814,Sumer.money,sumer.money,,Lending,A,1354899,P,Berachain,Berachain=1206333;Meter=84788;Arbitrum=18712;CORE=16667;Goat=13683;Base=8817,RedStone(Primary)@zkLink;Pyth(Primary)@Meter;Chainlink(Primary)@Arbitrum/Base/Ethereum;eOracle(Primary)@Berachain,breakdown,4,4,0,0
+7669,Bounce.Tech,bounce.tech,,Derivatives,A,1318326,P,Hyperliquid,Hyperliquid=1318326,,none,0,0,0,0
+4473,Avalon Finance,avalon-finance,parent#avalon-labs,Lending,A,1306814,P,IoTeX,IoTeX=636523;BNB Chain=240755;Merlin=143500;Bitlayer=103453;Pharos=55020;Arbitrum=38240,Chainlink(Primary)@Ethereum/Mantle;RedStone(Primary)@Sonic/BNB Chain/Taiko,breakdown,2,2,0,0
+4903,BMX Freestyle,bmx-freestyle,parent#bmx,Derivatives,A,1296767,P,Base,Base=1296767,,none,0,0,0,0
+5893,MovePosition,moveposition,,Lending,A,1294287,P,Move,Move=1294287;Movement=1294287,Pyth(Aggregator);Switchboard(Aggregator);Coingecko(Aggregator),breakdown,3,2,0,0
+534,Overtime,overtime,,Prediction Market,B,1277544,P,Arbitrum,Arbitrum=491256;Base=453408;Optimism=318636;Polygon=14244,Chainlink(Primary)@Optimism/Arbitrum/Polygon/Base,breakdown,1,1,0,0
+1627,LendFlare,lendflare,,Lending,A,1260112,P,Ethereum,Ethereum=1260112,,none,0,0,0,0
+3421,Mendi Finance,mendi-finance,,Lending,A,1228367,P,Linea,Linea=1228367,Api3(legacy);Chainlink(legacy);eOracle(legacy),legacy,3,3,0,0
+489,Moola Market,moola-market,,Lending,A,1227390,P,Celo,Celo=1227390,cLabs(Primary);RedStone(Fallback),breakdown,2,2,0,1
+6687,Flat Money V2,flat-money-v2,parent#dhedge,Partially Algorithmic Stablecoin,A,1206617,P,Arbitrum,Arbitrum=1206361;Optimism=257,Pyth(Primary);Chainlink(Fallback),breakdown,2,2,0,0
+8552,Strat Perps,strat-perps,,Derivatives,A,1202345,P,Strat,Strat=1202345,Stork(Primary),breakdown,1,1,0,0
+285,Opyn Gamma,opyn-gamma,parent#opyn,Options,A,1169311,P,Ethereum,Ethereum=1167921;Avalanche=768;Polygon=622,Chainlink(Primary),breakdown,1,1,0,0
+7876,Silo V3,silo-v3,parent#silo-finance,Lending,A,1159644,P,Ethereum,Ethereum=581965;Avalanche=298746;XDC=278397;Arbitrum=491;Sonic=45,,none,0,0,0,0
+5545,Theo Straddle Vaults,theo-straddle-vaults,parent#theo,Basis Trading,A,1154545,P,Ethereum,Ethereum=852357;Linea=149343;Arbitrum=129956;Base=22889,,none,0,0,0,0
+4295,Lets Get HAI,lets-get-hai,,CDP,A,1150640,P,Optimism,Optimism=1150640,Chainlink(Primary);RedStone(Secondary),breakdown,2,2,0,0
+2150,Ribbon Earn,ribbon-earn,parent#ribbon-finance,Options,A,1146652,P,Ethereum,Ethereum=1146652,,none,0,0,0,0
+8109,XOXNO Lending,xoxno-lending,parent#xoxno,Lending,A,1117386,P,Elrond,Elrond=986679;Stellar=130707,,none,0,0,0,0
+7889,Flex,flex,,Lending,A,1115190,P,Ethereum,Ethereum=1115190,,none,0,0,0,0
+6008,Decentralized Euro,decentralized-euro,,CDP,A,1112238,P,Ethereum,Ethereum=1112238,,none,0,0,0,0
+2736,Teller,teller,,Lending,A,1109476,P,Base,Base=668304;Ethereum=299390;Arbitrum=55860;Katana=34472;BNB Chain=20008;ApeChain=15662,,none,0,0,0,0
+3245,Venus Isolated Pools,venus-isolated-pools,parent#venus-finance,Lending,A,1109182,P,BNB Chain,BNB Chain=886715;Ethereum=162139;Arbitrum=60328,Binance Oracle(legacy);Chainlink(legacy),legacy,2,2,1,0
+5395,MortgageFi,mortgagefi,,Lending,A,1096985,P,Base,Base=1034622;Arbitrum=62363,Internal(legacy),legacy,1,0,0,0
+5590,dTRINITY dLEND,dtrinity-dlend,parent#dtrinity,Lending,A,1076555,P,Ethereum,Ethereum=705615;Sonic=185559;Fraxtal=185381,Api3(Primary),breakdown,1,1,0,0
+143,Flexa,flexa,,Payments,B,1063947,P,Ethereum,Ethereum=1063947,Chainlink(Primary),breakdown,1,1,0,0
+136,Rari Capital,rari-capital,,Yield Aggregator,B,1058273,P,Ethereum,Ethereum=1057927;Arbitrum=346,Chainlink(Primary),breakdown,1,1,0,0
+6209,Ouroboros Capital,ouroboros-capital,,Risk Curators,B,1056578,P,Monad,Monad=1050166;Ethereum=6412,eOracle(Primary)@Ethereum,breakdown,1,1,0,0
+123,dForce Lending,dforce-lending,parent#dforce,Lending,A,1025219,P,Ethereum,Ethereum=973873;BNB Chain=51260;Optimism=59;Arbitrum=26,Chainlink(Primary)@Ethereum;Pyth(Primary)@Conflux,breakdown,2,2,0,0
+7150,CHATEAU,chateau,,RWA,A,1024629,P,Plasma,Plasma=1024629,,none,0,0,0,0
+6287,RealtyX,realtyx,,RWA,A,1021643,P,Base,Base=549716;Plume Mainnet=471927,,none,0,0,0,0

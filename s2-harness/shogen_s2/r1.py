@@ -6,8 +6,9 @@ i/ii/iii, précédence **panne > staleness > hors-enveloppe**), §5.4 (seuil
 « historique insuffisant » `n·P̂_more·(1−P̂_more) ≥ 10`, source UConn OER Math
 3160 ch.9 p.121). Plan S2 §3, [C5].
 
-`Decimal` partout, **précision fixée** (`DECIMAL_PREC`) → recalcul
-bit-identique par l'oracle. Ne lit QUE les fichiers de journal
+`Decimal` partout, **précision fixée** (`DECIMAL_PREC`) et **arrondi fixé**
+(`contexte_decimal()`, neuf, dans chaque `localcontext`, jamais celui de l'appelant : SHOGEN-DECIMAL-ARRONDI-1 et 2,
+SHOGEN-DECIMAL-CONTEXTE-1) → recalcul bit-identique par l'oracle. Ne lit QUE les fichiers de journal
 (`control.jsonl` + `journal.jsonl`) : aucun accès à Shōgen, aucun paramètre
 hors-bande (σ_classe, τ_classe, w, pool viennent de `run_params`).
 
@@ -45,8 +46,10 @@ from __future__ import annotations
 
 import enum
 import math
+import sys
+from bisect import bisect_left
 from collections import Counter
-from decimal import Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Context, Decimal, DivisionByZero, InvalidOperation, Overflow, localcontext
 from typing import Optional
 
 from . import records
@@ -54,6 +57,16 @@ from .model import Status
 from .window import strate_from_spec, verify_markers_against_spec, window_end
 
 DECIMAL_PREC = 50                 # précision fixée → recalcul bit-identique (oracle)
+
+
+def contexte_decimal() -> Context:
+    """Contexte nommé complet (SHOGEN-DECIMAL-CONTEXTE-1), neuf à chaque appel : aucun objet partagé à modifier
+    (SHOGEN-CONTEXTE-MUTABLE-1) ; passé à chaque localcontext de r1, lm, r2 et report : valeurs du DefaultContext de
+    la bibliothèque standard, précision mise à part ; closure.py (quarantaine, D6 i) hors champ."""
+    return Context(prec=DECIMAL_PREC, rounding=ROUND_HALF_EVEN, Emin=-999999, Emax=999999, capitals=1, clamp=0,
+                   flags=[], traps=[InvalidOperation, DivisionByZero, Overflow])
+
+
 SEUIL_HIST = Decimal(10)          # n·P̂_more·(1−P̂_more) ≥ 10 (10 §5.4)
 N_MIN_HORSENV = 4                 # N ≥ 4 répondantes pour l'enveloppe leave-one-out (10 §5.2)
 SEUIL_Z = Decimal("2.33")         # point 99% normale standard (K&L — 10 §5.1)
@@ -90,8 +103,7 @@ def _as_dec(x) -> Decimal:
 def _median(values: list[Decimal]) -> Decimal:
     # Précision FIXÉE (pas le contexte ambiant) : sinon _median([1, 1+1e-27])
     # diverge prec 28 vs 50 (démontré par l'oracle) → recalcul non identique.
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         s = sorted(values)
         m = len(s)
         if m % 2 == 1:
@@ -164,8 +176,7 @@ def classify_ecart(
     indéfinie → « non évaluable », jamais « pas d'écart » (§5.2 ; jamais une
     division par zéro ni un verdict fabriqué). Toute l'arithmétique Decimal est à
     précision FIXÉE (DECIMAL_PREC), comme les statistiques."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         # (iii) panne — précédence maximale : une panne n'a pas de valeur.
         if reading is None or reading.get("status") != "ok" or reading.get("price") is None:
             return Ecart.PANNE
@@ -203,31 +214,23 @@ def classify_ecart(
 # ── Formules K&L §5 (identité élémentaire) — Decimal, précision fixée ──────────
 
 def poisson_binomial(phats: list[Decimal]) -> tuple[Decimal, Decimal, Decimal]:
-    """(P₀, P₁, P_more) pour des écarts indépendants de probabilités `phats`
-    (10 §5.1). P_more = 1 − P₀ − P₁ **par construction**."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
-        one = Decimal(1)
-        p0 = one
-        for p in phats:
-            p0 *= (one - p)
-        p1 = Decimal(0)
-        for i, pi in enumerate(phats):
-            term = pi
-            for j, pj in enumerate(phats):
-                if j != i:
-                    term *= (one - pj)
-            p1 += term
-        p_more = one - p0 - p1
-        return +p0, +p1, +p_more
+    """(P₀, P₁, P_more) pour des écarts indépendants de probabilités `phats` (10 §5.1). P_more = 1 − P₀ − P₁
+    tenu en rationnels exacts, sans annulation Decimal (SHOGEN-PMORE-RESIDU-1) : p̂ᵢ = aᵢ/bᵢ exact
+    (`as_integer_ratio`), D = Π bᵢ, N₀ = Π (bᵢ − aᵢ), N₁ = Σᵢ aᵢ·Πⱼ≠ᵢ (bⱼ − aⱼ) en entiers, puis une seule division
+    Decimal par valeur : N₀/D, N₁/D, (D − N₀ − N₁)/D. Un seul p̂ᵢ non nul : P_more = 0 exact."""
+    d, n0, n1 = 1, 1, 0
+    for p in phats:
+        a, b = p.as_integer_ratio()
+        d, n0, n1 = d * b, n0 * (b - a), n1 * (b - a) + n0 * a
+    with localcontext(contexte_decimal()):
+        return Decimal(n0) / Decimal(d), Decimal(n1) / Decimal(d), Decimal(d - n0 - n1) / Decimal(d)
 
 
 def _ecart_relatif(rep: dict, f: str) -> Decimal:
     """|p_f − médiane_LOO|/médiane_LOO d'une cellule arrivée à l'axe (i), `rep` = prix des répondantes de la
     fenêtre : le rapport que classify_ecart compare à τ_classe, même médiane, même précision (ADR-0028
     annexe D.5)."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         m = _median([p for g, p in rep.items() if g != f])
         return +(abs(rep[f] - m) / m)
 
@@ -247,8 +250,7 @@ def _tau_observe(ratios: dict, tau: dict) -> dict:
 
 def gate_value(n: int, p_more: Decimal) -> Decimal:
     """`n·P̂_more·(1−P̂_more)` (10 §5.4) — la forme produit-variance."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         return +(Decimal(n) * p_more * (Decimal(1) - p_more))
 
 
@@ -260,8 +262,7 @@ def insufficient_history(n: int, p_more: Decimal) -> bool:
 def z_score(n: int, k: int, p_more: Decimal) -> Decimal:
     """`z = (K − n·P_more)/√(n·P_more·(1−P_more))` (10 §5.1), test unilatéral.
     Appeler UNIQUEMENT si `not insufficient_history` (sinon division par ~0)."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         mean = Decimal(n) * p_more
         var = Decimal(n) * p_more * (Decimal(1) - p_more)
         return +((Decimal(k) - mean) / var.sqrt())
@@ -287,8 +288,7 @@ def binomial_tail_ge(k_obs: int, n: int, p_more: Decimal) -> Decimal:
     *alternative*, jamais une co-publication (l'arête nomme sa statistique, §4.2) ;
     la queue exacte est toujours calculable à l'échelle de campagne (`n ≲ 2·10⁴`,
     10 §9.5), donc Poisson serait du code mort — non implémenté à dessein."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         one = Decimal(1)
         if k_obs <= 0:
             return +one                          # P(K ≥ 0) = 1 (toutes les fenêtres)
@@ -309,8 +309,7 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
     (Σ_s (K_s − n_s·P̂_s), Σ_s n_s·P̂_s·(1 − P̂_s), z_pool = premier / √second). Jamais l'union brute
     des fenêtres. Un seul terme : la valeur de `z_score`. Dénominateur ≤ 0 : ValueError, jamais une
     valeur fabriquée."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         num = sum((Decimal(k) - Decimal(n) * p for n, k, p in termes), Decimal(0))
         var = sum((Decimal(n) * p * (Decimal(1) - p) for n, k, p in termes), Decimal(0))
         if var <= 0:
@@ -322,7 +321,8 @@ def z_pool_stratifie(termes) -> tuple[Decimal, Decimal, Decimal]:
 def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
     """Variance de long terme par blocs d'UNE strate (ADR-0028 §1 bis.1 pt 3 ; A-2) :
     σ̂²_bloc = γ̂₀ + 2·Σ_{k=1}^{ℓ−1} (1 − k/ℓ)·γ̂_k, γ̂_k = Σ (I_t − Ī)(I_{t+k} − Ī) sur les paires de la
-    grille, Ī = K/n. Forme de Künsch 1989 (P-01, OCR seul, [2nd]) : blocs mobiles, noyau de Bartlett, non
+    grille, Ī = K/n. Forme de Künsch 1989 (P-01, versé et lu : Thm 3.1, éq. (3.9), p. 1224 ; avec ces γ̂_k
+    centrés sur Ī, correspondance par les poids, approchée : paquet §10.4) : blocs mobiles, noyau de Bartlett, non
     restreinte. Elle égale (1/ℓ)·Σ_j B_j² (sommes de blocs de la série centrée complétée par des 0), d'où
     σ̂² ≥ 0 et σ̂² = 0 ⇔ K ∈ {0, n} (CRITIQUE v2 §4.1). `serie` : couples (window_start, I_t), window_start
     entiers strictement croissants, écarts multiples de `w`, I_t ∈ {0, 1} ; sinon ValueError. Lag k ⇔ écart
@@ -350,8 +350,7 @@ def block_long_run_variance(serie, w: int, ell: int = ELL_BLOC) -> dict:
         pk, vk = pres >> k, val >> k                               # bit t : position t + k
         num += 2 * (ell - k) * (n * n * (val & vk).bit_count() + (pres & pk).bit_count() * k1 * k1
                                 - n * k1 * ((val & pk).bit_count() + (pres & vk).bit_count()))   # n²·γ̂_k
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         return {"n": n, "K": k1, "numerateur": num, "gamma0": +(Decimal(n * k1 - k1 * k1) / Decimal(n)),
                 "sigma2_bloc": +(Decimal(num) / Decimal(ell * n * n))}
 
@@ -376,8 +375,7 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
     for ws, it in serie:
         c = (c + 1 if avant == ws - w else 1) if it else 0
         nombre, run_max, avant = nombre + (c == 1), max(run_max, c), ws
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         if n == 0:
             mz = mf = ms = "aucune fenêtre (n = 0)"
         else:
@@ -397,11 +395,48 @@ def bloc_strate(serie, w: int, p_more: Decimal, gate: Decimal, ell: int = ELL_BL
 
 # ── Agrégation R1 depuis le journal ──────────────────────────────────────────
 
+class PrixIllisible(ValueError):
+    """Prix de journal.jsonl ni chaîne ni nombre JSON, ou chaîne que Decimal ne lit pas (SHOGEN-PRIX-ILLISIBLE-1)."""
+
+
+class PrixHorsContexte(ValueError):
+    """Prix fini de journal.jsonl d'exposant ajusté au-delà d'Emax du contexte nommé (SHOGEN-PRIX-HORS-CONTEXTE-1)."""
+
+
 def parse_journal(path: str) -> list[dict]:
     """Relit `journal.jsonl` (une ligne par fenêtre×flux). `parse_float=Decimal`
     → `source_ts` exact (ADR-0003) ; `price` reste chaîne (déjà exacte).
-    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F)."""
-    return records.read_jsonl_tolerant(path, parse_float=Decimal)
+    Lecture TOLÉRANTE à une dernière ligne tronquée (crash mi-écriture, §F).
+    Point unique des lectures de R1, L&M, R2 et du rapport (lot CORR, SHOGEN-PRIX-NON-FINI-1) : un prix non fini (NaN,
+    sNaN, Infinity, toute casse ou forme que Decimal admet) est lu comme absent (None : panne au sens de
+    classify_ecart), quel que soit le statut, compté par flux sur stderr, jamais la valeur. Refus nommés, quel que soit
+    le statut, valeur jamais reproduite : prix ni chaîne ni nombre JSON (booléen, liste, objet), ou chaîne que Decimal
+    ne lit pas, PrixIllisible (SHOGEN-PRIX-ILLISIBLE-1) ; prix fini non nul d'exposant ajusté au-delà d'Emax du
+    contexte nommé, PrixHorsContexte (SHOGEN-PRIX-HORS-CONTEXTE-1) ; tout autre prix fini : inchangé."""
+    lus, nf, ctx = records.read_jsonl_tolerant(path, parse_float=Decimal), Counter(), contexte_decimal()
+    with localcontext(ctx):                         # « abc » lève sous ce contexte (illisible : refus), jamais NaN
+        for r in (x for x in lus if isinstance(x, dict) and x.get("price") is not None):
+            p = r["price"]
+            try:                                    # float : jetons JSON NaN, Infinity (parse_float ne les lit pas)
+                d = Decimal(p) if isinstance(p, (str, int, float, Decimal)) and not isinstance(p, bool) else None
+            except (ValueError, ArithmeticError):
+                d = None
+            if d is None or d.is_finite() and d and d.adjusted() > ctx.Emax:
+                ou = (f"dans {path} (flux {r.get('flux_id')!r}, window_start {r.get('window_start')!r} ; valeur non "
+                      "reproduite)")
+                if d is None:
+                    raise PrixIllisible(f"prix ni chaîne ni nombre JSON lu par Decimal {ou} — refus "
+                                        "(SHOGEN-PRIX-ILLISIBLE-1)")
+                raise PrixHorsContexte(f"prix fini d'exposant au-delà d'Emax = {ctx.Emax} du contexte nommé {ou} — "
+                                       "refus (SHOGEN-PRIX-HORS-CONTEXTE-1)")
+            if not d.is_finite():
+                r["price"] = None
+                nf[r.get("flux_id")] += 1
+    if nf:
+        sys.stderr.write(f"[s2-harness] AVERTISSEMENT : prix non fini(s) lu(s) comme absent(s) dans {path}, fichier "
+                         "entier — par flux : " + ", ".join(f"{f} {k}" for f, k in sorted(nf.items(), key=str))
+                         + " (SHOGEN-PRIX-NON-FINI-1 : panne au sens de classify_ecart ; valeurs non reproduites).\n")
+    return lus
 
 
 def build_window_strate(markers: list[dict]) -> dict[int, str]:
@@ -602,8 +637,7 @@ def compute_r1(
             ecart = t[Ecart.PANNE] + t[Ecart.STALENESS] + t[Ecart.HORS_ENVELOPPE]
             # p̂ᵢ à la précision FIXÉE (pas le contexte ambiant) → recalcul
             # bit-identique quel que soit le contexte de l'oracle (ADR-0003).
-            with localcontext() as ctx:
-                ctx.prec = DECIMAL_PREC
+            with localcontext(contexte_decimal()):
                 phat = +(Decimal(ecart) / Decimal(n))
             phats.append(phat)
             axes = ["panne"]                       # (iii) toujours évaluable
@@ -643,8 +677,7 @@ def compute_r1(
         queue_note = None
         queue_applicable = False
         if insufficient:
-            with localcontext() as ctx:
-                ctx.prec = DECIMAL_PREC
+            with localcontext(contexte_decimal()):
                 degenere = (n == 0) or (p_more == Decimal(0)) or (p_more == Decimal(1))
             if degenere:
                 queue_note = ("dégénérée : P̂_more ∈ {0,1} ou n=0 — queue triviale, "
@@ -681,9 +714,9 @@ def compute_r1(
 
 
 def regle_critere(r1_out: dict) -> dict:
-    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : ADR-0028 §1 bis.1, pts 1-11
-    (docs/adr-0028/ADR-0028-decisions-sortie-S2.md, commit f5b8269), non recopié ici (une seule vérité). Lit
-    r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
+    """Règle SHOGEN-CRITERE-R1-1, forme scellée sans repli. Texte normatif : le paquet de pré-enregistrement scellé,
+    docs/adr-0028/PAQUET-PREREG-S2.md §10.2, pts 1-11 (recopie d'ADR-0028 §1 bis.1), non recopié ici (une seule
+    vérité). Lit r1_out["strates"] seul : la strate poolée n'y est jamais (pt 9). Compare les Decimal publiées par
     compute_r1 (z, bloc.z_bloc), sans arrondi ni contexte posé, à SEUIL_Z par « ≥ » ; aucune p-valeur (pt 4).
     Par strate (pt 5) : valeur, cas (garde_5_4, z_sous_seuil, rejette, discordance, rejet_non_qualifiable)
     et, pour toute strate qui NE REJETTE PAS, EMD = (SEUIL_Z + Z_PUISSANCE)·√max(n·P̂(1 − P̂), σ̂²_bloc)
@@ -698,8 +731,7 @@ def regle_critere(r1_out: dict) -> dict:
              "REJETTE" if cas == "rejette" else "NE REJETTE PAS")
         emd = frac = None
         if v == "NE REJETTE PAS":
-            with localcontext() as ctx:
-                ctx.prec = DECIMAL_PREC
+            with localcontext(contexte_decimal()):
                 emd = +((SEUIL_Z + Z_PUISSANCE) * max(b["gate_value"], b["bloc"]["sigma2_bloc"]).sqrt())
                 frac = +(emd / Decimal(b["n"]))
         par[st] = {"valeur": v, "cas": cas, "emd": emd, "emd_fraction": frac}
@@ -744,13 +776,37 @@ def fenetres_sautees(ws_journal, spec: dict, w: int, borne=None, ranges=()) -> d
     return {st: s for st, s in out.items() if s}
 
 
+def fenetres_sautees_vivant(ws_journal, demarrages, spec: dict, w: int, borne=None, ranges=()) -> dict:
+    """Part « harnais vivant » des fenêtres sautées (SHOGEN-CENSURE-CAUSES-1, option (a), ADR-0028 annexe B.23) : les
+    fenêtres comptées par `fenetres_sautees` (mêmes marqueurs, portée et plages) qui tombent entre deux marqueurs d'un
+    même démarrage (`demarrages` : records.demarrages), c'est-à-dire dans l'union des intervalles [premier marqueur ;
+    dernier marqueur] des démarrages (bornes marquées, jamais sautées ; chevauchements comptés une fois) ; aucun seuil
+    de temps. Le reste de s : arrêt ou passage entre démarrages, cause non attribuée par le journal. Rend {strate :
+    nombre}, strates sans fenêtre vivante absentes."""
+    ws = sorted(set(ws_journal))
+    if borne is None and not ws:
+        return {}
+    t0, t_fin = borne or (ws[0], ws[-1] + w)
+    union, out = [], {}
+    for a, b in sorted((min(g), max(g)) for g in demarrages if g):
+        if union and a <= union[-1][1]:
+            union[-1][1] = max(union[-1][1], b)
+        else:
+            union.append([a, b])
+    for a, b in union:                    # marqueurs de la portée seuls : coût linéaire en jours, portées, marqueurs
+        lo, hi = max(a, t0), min(b, t_fin)
+        for st, k in (fenetres_sautees(ws[bisect_left(ws, lo):bisect_left(ws, hi)], spec, w, (lo, hi), ranges).items()
+                      if lo < hi else ()):
+            out[st] = out.get(st, 0) + k
+    return out
+
+
 def bornes_censure(n: int, k: int, p_more: Decimal, s: int, sigma2_bloc: Optional[Decimal] = None) -> dict:
     """Bornes à P̂_more fixé (ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1 ; A-6), s fenêtres sautées imputées
     sans co-écart (bas) puis avec (haut) : z_bas = z_score(n + s, K, P̂), z_haut = z_score(n + s, K + s, P̂),
     la fonction de z_s (s = 0 : z_s) ; si sigma2_bloc est donné, (K [+ s] − (n + s)·P̂)/σ̂_bloc, l'expression
     de bloc_strate (s = 0 : z_bloc). Non extérieures (CV2-24). À n'appeler que si z_s est publiée (§5.4)."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         zb = [None, None] if sigma2_bloc is None else [
             +((Decimal(x) - Decimal(n + s) * p_more) / sigma2_bloc.sqrt()) for x in (k, k + s)]
     return {"s": s, "z_bas": z_score(n + s, k, p_more), "z_haut": z_score(n + s, k + s, p_more),
@@ -797,3 +853,23 @@ def recompute_from_journal(control_path: str, journal_path: str, exclude_ranges=
         seuil_hist=Decimal(str(params["seuil_historique_valeur"])),
         n_min=int(params["n_min_hors_enveloppe"]),
     )
+
+
+def recompute_d5_from_journal(control_path: str, journal_path: str, exclude_ranges=(), segment=None) -> dict:
+    """Fonction sœur de `recompute_from_journal` pour le lecteur tiers (SHOGEN-D5-RECALCUL-TIERS-1 ; ADR-0028 annexe
+    D.5) : garde §5.3 et filtre de lecture (`records.filtre_lecture`) par `recompute_from_journal`, puis, comme le
+    rendu, s par strate (`fenetres_sautees` sur les marqueurs du journal entier, portée du segment, plages D5 ; bloc 1)
+    et bornes de censure par strate de R1 (bloc 3) : None sous la garde §5.4 (z_s non publiée), variante σ̂_bloc si
+    z_bloc est publiée ; part « harnais vivant » de s, comme le bloc 1 (SHOGEN-CENSURE-CAUSES-TIERS-1). Rend
+    {"fenetres_sautees": {strate : s}, "fenetres_sautees_vivant": {strate : part}, "bornes_censure": {strate : bornes
+    ou None}} (strates à 0 absentes des deux premiers)."""
+    out = recompute_from_journal(control_path, journal_path, exclude_ranges, segment)
+    params_list, _clock, markers = records.parse_control(control_path)
+    params, ranges = records.effective_run_params(params_list), records.exclusion_ranges(exclude_ranges)
+    seg = records.filtre_lecture(params, markers, ranges=ranges, segment=segment)[3]
+    ws, spec, w = build_window_strate(markers), params["strate_calendar"], int(params["w"])
+    s = fenetres_sautees(ws, spec, w, seg, ranges)
+    return {"fenetres_sautees": s, "fenetres_sautees_vivant": fenetres_sautees_vivant(
+        ws, records.demarrages(control_path), spec, w, seg, ranges), "bornes_censure": {
+        st: None if b["z"] is None else bornes_censure(b["n"], b["K"], b["P_more"], s.get(st, 0), b["bloc"][
+            "sigma2_bloc"] if b["bloc"]["z_bloc"] is not None else None) for st, b in out["strates"].items()}}

@@ -112,7 +112,7 @@ jobs:
   pr:
     name: fuzz (15 min)
     if: github.event_name == 'pull_request' || github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -168,7 +168,7 @@ jobs:
   nightly:
     name: fuzz nightly (4 h)
     if: github.event_name == 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
     timeout-minutes: 300
     steps:
       - name: Checkout
@@ -233,7 +233,7 @@ jobs:
   # paire existante n'est pas touchée (elle n'a aucun outil à installer).
   cargo-fuzz:
     name: fuzz instrumenté — cargo-fuzz / libFuzzer (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
     # Dimensionné sur le cas long (4 h de campagne) plus l'installation et la
     # construction. Marges mesurées LOCALEMENT le 2026-08-13 (WSL2, 24 cœurs) :
     # outil 19,3 s, construction 9,9 s. Le runner GitHub est plus lent ; les
@@ -379,7 +379,7 @@ jobs:
   #
   # Ce job n'introduit AUCUNE toolchain : `cargo-afl` tourne sur la 1.97.1 du
   # dépôt. Son coût est ailleurs — il construit AFL++ DEPUIS LES SOURCES, ce
-  # qui exige une chaîne C sur le runner (présente sur `ubuntu-latest`).
+  # qui exige une chaîne C sur le runner (présente sur `ubuntu-24.04`).
   # Mesures LOCALES du 2026-08-13 (WSL2, 24 cœurs, gcc 15.2.0), qui
   # dimensionnent le `timeout-minutes` ci-dessous : `cargo install cargo-afl
   # --version =0.18.2 --locked` = 49,0 s ; `cargo afl config --build --force`
@@ -388,7 +388,7 @@ jobs:
   # elle est dite pour ce qu'elle est — une marge, pas une mesure sur runner.
   cargo-afl:
     name: fuzz instrumenté — cargo-afl / AFL++ (Linux)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
     timeout-minutes: 300
     steps:
       - name: Checkout

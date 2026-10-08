@@ -42,10 +42,12 @@ de collecte de prix. Les enregistrements ASN vont dans `control.jsonl`
     évaluable », JAMAIS un k_eff fabriqué par absence de donnée. Un hôte à résolution
     échouée = singleton « non attribué » ; RIPEstat ≠ Cymru = pas de fusion +
     discordance publiée (jamais « choisir une base »).
-  - **Drapeau 2 tri-état** : levé (z ≥ 2,33 ∧ k_eff = k nominal) / éteint (z publié
-    mais < 2,33 ou k_eff < k nominal) / non évaluable (z non publié par la garde
-    §5.4, ou k_eff non évaluable). La localisation consomme la matrice de co-écarts
-    complète de M1b (lm.pair_phi) sur les paires inter-clusters.
+  - **Drapeau 2 tri-état** (règle SHOGEN-CRITERE-R1-1, pt 10 ; `drapeau_2`) : levé
+    (« R1 discrimine » VRAI ∧ k_eff = k nominal, k_eff non borne supérieure) / éteint
+    (FAUX, ou VRAI ∧ k_eff < k nominal) / non évaluable (k_eff non évaluable, « R1
+    discrimine » NON ÉVALUABLE, ou VRAI ∧ borne supérieure égale à k nominal). La
+    localisation consomme la matrice de co-écarts complète de M1b (lm.pair_phi) sur
+    les paires inter-clusters.
   - **(K,z) co-aberrance** : marginales par signe observées, puis RÉUTILISE tel quel
     le trio r1.gate_value/z_score/binomial_tail_ge avec la garde §5.4 — « la
     machinerie de §5.1 recalculée sur les résidus » (§4.2 (2c)).
@@ -74,6 +76,7 @@ from .r1 import (
     binomial_tail_ge,
     build_reading_map,
     build_window_strate,
+    contexte_decimal,
     gate_value,
     z_score,
 )
@@ -431,8 +434,7 @@ def pearson(xs: list[Decimal], ys: list[Decimal]) -> tuple[Optional[Decimal], st
     """Corrélation de Pearson SIGNÉE de deux séries appariées, précision FIXÉE.
     None si n < 2 ou une série est constante (variance nulle → ρ non défini) — jamais
     un 0 fabriqué (fail-closed de publication, §5.2). Rend (ρ, note)."""
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         n = len(xs)
         if n < 2:
             return None, f"n={n} < 2 — corrélation non définie"
@@ -472,8 +474,7 @@ def lnprice_by_window(wins: list[int], reading_map: dict) -> dict[int, dict[str,
     flux) (chaque ln calculé UNE fois, jamais par paire). Bit-identique : même valeur,
     calculée une fois ou N fois (arrondi correct, prec fixée — ADR-0003)."""
     out: dict[int, dict[str, Decimal]] = {}
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         for (ws, f), rd in reading_map.items():
             if rd.get("status") == "ok" and rd.get("price") is not None:
                 p = Decimal(rd["price"])
@@ -488,8 +489,7 @@ def log_returns(wins: list[int], lnp: dict, f: str, w: int) -> dict[int, Decimal
     non ponté (un rendement enjambant un trou a la mauvaise variance). Clé = ws de j.
     Consomme le précalcul `lnp` (lnprice_by_window)."""
     out: dict[int, Decimal] = {}
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         for k in range(1, len(wins)):
             ws, prev = wins[k], wins[k - 1]
             if ws - prev != w:
@@ -521,8 +521,7 @@ def rho_resid(wins, lnp, a, b, n_min, k_min=4) -> dict:
     à < k_min autres répondantes est exclue (jamais un résidu au pool mal défini).
     Consomme le précalcul `lnp` (O(fenêtres × flux), plus de re-balayage par paire)."""
     xa, xb, ncommon = [], [], []
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         for ws in wins:
             cell = lnp.get(ws, {})
             if a not in cell or b not in cell:
@@ -545,8 +544,7 @@ def _quantize(p: Decimal, tick_rule: str) -> Decimal:
     quantum décimal (ex. « 0.01 »)."""
     if tick_rule == "exact":
         return p
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         return p.quantize(Decimal(tick_rule))
 
 
@@ -581,8 +579,7 @@ def tick_identity(wins, reading_map, a, b, w, n_min, tick_rule, delta_windows) -
         n_shift += 1
         if _quantize(pa, tick_rule) == _quantize(pb2, tick_rule):
             eq_shift += 1
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         T = None if n_common == 0 else +(Decimal(eq) / Decimal(n_common))
         T_delta = None if n_shift == 0 else +(Decimal(eq_shift) / Decimal(n_shift))
     non_constant = len(values_seen) >= 2
@@ -601,8 +598,7 @@ def _aberrance_by_window(wins, lnp, pool, kappa) -> dict[int, dict]:
     Consomme le précalcul `lnp` ; la médiane des e est calculée UNE fois (pas par élément)."""
     out: dict[int, dict] = {}
     poolset = set(pool)
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         for ws in wins:
             elns = {f: v for f, v in lnp.get(ws, {}).items() if f in poolset}
             if len(elns) < 2:
@@ -642,8 +638,7 @@ def coaberrance_kz(aber: dict, a, b, seuil_hist=SEUIL_HIST) -> dict:
     if n == 0:
         return {"K": 0, "n": 0, "z": None, "queue": None,
                 "note": "aucune fenêtre co-évaluable (MAD nulle ou pool trop petit)"}
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         pa_p, pa_n = Decimal(ap) / Decimal(n), Decimal(an) / Decimal(n)
         pb_p, pb_n = Decimal(bp) / Decimal(n), Decimal(bn) / Decimal(n)
         p_co = +(pa_p * pb_p + pa_n * pb_n)
@@ -665,8 +660,7 @@ def _jumps(wins, lnp, f, w, jump_sigma) -> dict[int, int]:
     r = log_returns(wins, lnp, f, w)
     if len(r) < 2:
         return {}
-    with localcontext() as ctx:
-        ctx.prec = DECIMAL_PREC
+    with localcontext(contexte_decimal()):
         vals = list(r.values())
         m = sum(vals, Decimal(0)) / Decimal(len(vals))
         var = sum(((v - m) ** 2 for v in vals), Decimal(0)) / Decimal(len(vals))
@@ -784,20 +778,29 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     k_nominal = len(hosts)
     fbh = flux_by_host(flux_hosts, pool)
 
-    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé)
+    # last-wins par hôte + détection de divergence d'ASN (résidu 4, jamais écrasé), base par base sur les valeurs non
+    # muettes (SHOGEN-ASN-DIVERGENCE-PARTIELLE-1) : la référence de chaque base est son dernier relevé ok où elle n'est
+    # pas muette ; un relevé ok dont une base non muette diffère de sa référence publie une divergence par relevé de
+    # référence distinct (avant, après : relevés entiers) ; un échec n'est ni divergence ni référence
+    # (SHOGEN-ASN-DIVERGENCE-ECHEC-1) ; by_host (k_eff) garde le dernier relevé, quel qu'il soit
     by_host: dict[str, dict] = {}
+    ref: dict[str, dict] = {}
     asn_divergences: list[dict] = []
     for rec in asn_records:
         h = rec.get("host")
-        if h in by_host:
-            prev, cur = by_host[h], rec
-            if (prev.get("asn_ripestat"), prev.get("asn_cymru")) != \
-               (cur.get("asn_ripestat"), cur.get("asn_cymru")):
-                asn_divergences.append({
-                    "host": h,
-                    "avant": (prev.get("asn_ripestat"), prev.get("asn_cymru"), prev.get("ts")),
-                    "apres": (cur.get("asn_ripestat"), cur.get("asn_cymru"), cur.get("ts")),
-                })
+        if rec.get("status") == "ok":
+            ref_h, avants = ref.setdefault(h, {}), []
+            for base in ("asn_ripestat", "asn_cymru"):
+                if rec.get(base) is not None:
+                    prev = ref_h.get(base)
+                    if prev is not None and prev.get(base) != rec.get(base) and all(prev is not a for a in avants):
+                        avants.append(prev)
+                    ref_h[base] = rec
+            asn_divergences.extend({
+                "host": h,
+                "avant": (prev.get("asn_ripestat"), prev.get("asn_cymru"), prev.get("ts")),
+                "apres": (rec.get("asn_ripestat"), rec.get("asn_cymru"), rec.get("ts")),
+            } for prev in avants)
         by_host[h] = rec
 
     states = {h: _asn_state(by_host.get(h)) for h in hosts}
@@ -884,7 +887,7 @@ def compute_partition(asn_records, flux_hosts, pool, content) -> dict:
     k_eff_is_upper_bound = False
     if not measured:
         k_eff = None
-        k_eff_note = ("axe ASN NON MESURÉ (aucun enregistrement asn_attribution) — k_eff "
+        k_eff_note = ("axe ASN NON MESURÉ (aucun enregistrement asn_attribution retenu) — k_eff "   # SHOGEN-KEFF-NOTE-1
                       "NON ÉVALUABLE ; une partition en singletons ici ne serait pas une "
                       "indépendance mesurée mais une absence de donnée (fail-closed §5.6)")
     elif not all_probed:
@@ -934,8 +937,7 @@ def cluster_lm_correlations(partition, markers, readings, pool, w, sigma_by_clas
         fa, fb = ca["flux"], cb["flux"]
         na, nb = len(fa), len(fb)
         xs, ys = [], []
-        with localcontext() as ctx:
-            ctx.prec = DECIMAL_PREC
+        with localcontext(contexte_decimal()):
             for ws in wins:
                 ma = sum(1 for f in fa if cells.get((ws, f)) in ECARTS)
                 mb = sum(1 for f in fb if cells.get((ws, f)) in ECARTS)

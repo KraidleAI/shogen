@@ -1,0 +1,24 @@
+préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)
+okx — contribution de la paire OKX à K de S2 (SHOGEN-R1-HOTE-STRUCTUREL-1)
+script okx.py ; modules du lot chargés : commun.py sha256 14920e8703febf43de324960975413e276227ac2281bb4f85380cf465d47b3f2 ; okx.py sha256 5efe4e584b09817088bf95a340e404555333a583c031c0cb78b82f500cd9f7d0 ; parametres.json sha256 7e214864e23634e9b3a4174745e3f5bbabf8c5a74d8e78e0411b449ee7d1d632
+harnais : extraction du commit d'analyse f35a70c19ba8269f1f7e2bcd31775e4fc513da20 ; modules épinglés : __init__.py 4db0d8d6d85c374a72a3e4def3047f0baacf118e71a24db8daf24ea695d8b4dc ; model.py e56240c74be546e631189280711115095a2c9ff48690d28230c6461ff3948480 ; records.py a2e9a7744d8d60a017a888efe10de5b8fc0073c08b571671189d83de4a58edd2 ; window.py f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94 ; r1.py 0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f
+journaux : control.jsonl sha256 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff ; journal.jsonl sha256 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+portée : segment [1787770800 ; 1790558880) (t0 = 1787770800, n fixe = 38600), plages exclues [(1790273880, 1790435280)]
+pool S2 (D1) : « calme » 11 flux ; « stress » 11 flux ; retraits : « calme » pyth (ok 0 sur 24585 lectures) ; « stress » pyth (ok 0 sur 11397 lectures)
+pool D1-bis : « calme » 10 hôtes ; « stress » 10 hôtes ; retraits : aucun
+rendu de contrôle shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out : sha256 égal à l'épingle ; bloc 3 relu égal aux valeurs épinglées
+contrôle de cohérence (bloc 3 du rendu J28) « calme » : recompté (n, K, P̂_more) = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') ; épinglé = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') : égaux
+contrôle de cohérence (bloc 3 du rendu J28) « stress » : recompté (n, K, P̂_more) = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') ; épinglé = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') : égaux
+[OKX] contribution de la paire de flux (okx_ticker, okx_index ; même hôte) à K de S2 ; descriptif, comptes de fenêtres (SHOGEN-R1-HOTE-STRUCTUREL-1)
+« calme » : n = 24585 ; K (pool S2 du rendu) = 154 ; écarts : okx_ticker 64, okx_index 64 fenêtres ; co-écart des deux flux : 29 fenêtres, dont 29 dans K
+  dans K, types du co-écart (okx_ticker, okx_index) : (panne, panne) 29
+  dans K, les deux flux en panne_transport : 29
+  K si la paire compte pour une unité (écart si l'un des deux flux l'est) = 150 (contribution de la paire : 4 fenêtres, fraction de K 0.025974025974025974025974025974025974025974025974026)
+  K sans okx_index (classement inchangé) = 148 ; K sans okx_ticker = 144
+  K sur le pool D1-bis (médiane leave-one-out et retraits D1-bis appliqués) = 148 (n = 24585)
+« stress » : n = 11397 ; K (pool S2 du rendu) = 133 ; écarts : okx_ticker 6, okx_index 7 fenêtres ; co-écart des deux flux : 2 fenêtres, dont 2 dans K
+  dans K, types du co-écart (okx_ticker, okx_index) : (panne, panne) 2
+  dans K, les deux flux en panne_transport : 2
+  K si la paire compte pour une unité (écart si l'un des deux flux l'est) = 132 (contribution de la paire : 1 fenêtres, fraction de K 0.0075187969924812030075187969924812030075187969924812)
+  K sans okx_index (classement inchangé) = 130 ; K sans okx_ticker = 132
+  K sur le pool D1-bis (médiane leave-one-out et retraits D1-bis appliqués) = 130 (n = 11397)

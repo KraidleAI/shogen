@@ -33,8 +33,14 @@ WS = [int(datetime(2026, 8, 7, 23, 57, tzinfo=timezone.utc).timestamp()) + i * W
 # avant f1f379f2…483de6 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis de CRITERE-a2 (bloc 3 : famille,
 # section règle ; avant 3398167f…95fbf44 ; P2P texte : docs/G1-lot-CRITERE-regle.md) ; puis de CRITERE-b2
 # (bloc 6 : ligne d'entrées du drapeau 2 ; avant dc7210d3…82910a3 ; même journal) ; puis de D5-AMEND-b (blocs
-# 1 et 3, [SENSIBILITÉ] ; avant 0410039b…eac18 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
-SHA_BASE_AVEC_OPTION = "b0b4f3b75058ab286723982b82984dcfa83e6af19bc7ee10bfd4068f7b67d2d0"
+# 1 et 3, [SENSIBILITÉ] ; avant 0410039b…eac18 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md) ; puis du
+# sous-lot A2 de l'étape A, partie 2 (bloc 3 : renvoi τ relatif ; bloc 5 : ligne N_min ; avant b0b4f3b7…67d2d0) ;
+# puis du sous-lot A3 (bloc 1 et [SENSIBILITÉ] : deux lignes insérées ; avant c1fd5391…c397686) ; puis du
+# sous-lot B1 de l'étape B (bloc 6 : ligne « sans ts » insérée, SHOGEN-BLOC6-TS-1 ; avant d0f785eb…fe5eeb0) ; puis du
+# sous-lot B5 (bloc 1 : deux lignes par strate insérées, SHOGEN-CENSURE-CAUSES-1 ; avant 7b6059f5…e0dbf90) ; puis du
+# lot DETTES-B1, sous-lot 3 (bloc 5 (d) et note k_eff du bloc 6 : deux libellés corrigés, SHOGEN-BLOC5-LIBELLE-1 et
+# SHOGEN-KEFF-NOTE-1, lignes remplacées seules ; avant d079dd9d…12de608).
+SHA_BASE_AVEC_OPTION = "f53fab05af0b8f4da0f4918a9d404f23faa7f4882a1213c3c9def908a3c694c6"
 
 
 class Coupure(Exception):
@@ -111,7 +117,10 @@ class TestPoolAnalyse(unittest.TestCase):
         os.mkdir(sans)
         c2, j2 = collecte(sans, 6, lambda f, i: "ok", specs=VIFS)   # même collecte, P privé de f
         txt = report.render_report(c, j)
-        self.assertEqual(txt.split("[BLOC 3]")[1], report.render_report(c2, j2).split("[BLOC 3]")[1])
+        b4, lib = "\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = 2 flux ", "(pool d'analyse, ADR-0028 D1)\n"
+        self.assertIn(b4 + lib, txt)           # libellé du pool d'analyse au cas (a) (C-4 de R-B ; lot CORR, CORR-3)
+        self.assertEqual(txt.split("[BLOC 3]")[1].replace(b4 + lib, b4 + "(pool)\n"),
+                         report.render_report(c2, j2).split("[BLOC 3]")[1])
         self.assertEqual(txt.count("pool_analyse_retrait"), 2)
         dev = [[x for x in t.splitlines() if "devise_composition" in x]
                for t in (txt, report.render_report(c2, j2))]

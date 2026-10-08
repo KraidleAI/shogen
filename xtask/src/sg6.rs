@@ -67,13 +67,7 @@ pub fn executer(racine: &Path) -> Rapport {
     };
     let artefacts: Vec<_> = fichiers
         .iter()
-        .filter(|chemin| **chemin != chemin_index)
-        .filter(|chemin| {
-            chemin
-                .extension()
-                .map(|e| e.to_string_lossy().to_ascii_lowercase())
-                != Some(String::from("sidecar"))
-        })
+        .filter(|chemin| octet_verse(chemin, &chemin_index))
         .collect();
 
     if artefacts.is_empty() {
@@ -136,4 +130,14 @@ pub fn executer(racine: &Path) -> Rapport {
         artefacts.len()
     ));
     rapport
+}
+
+/// Un octet versé : tout fichier de `biblio/` hors `INDEX.md` et hors `*.sidecar` ; sans aucun,
+/// l'environnement est « sans octets ». Prédicat partagé avec la borne `biblio/` de S-G9 (revue G2 de
+/// DETTES-B2, C-1).
+pub(crate) fn octet_verse(chemin: &Path, chemin_index: &Path) -> bool {
+    let sidecar = chemin
+        .extension()
+        .is_some_and(|e| e.to_string_lossy().eq_ignore_ascii_case("sidecar"));
+    chemin != chemin_index && !sidecar
 }

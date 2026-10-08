@@ -1,5 +1,9 @@
-//! **S-G5 `citations`** — une citation dans `docs/` doit exister dans le
-//! registre bibliographique ou dans les octets détenus.
+//! **S-G5 `citations`** — une citation dans `docs/` ou `s2-harness/` doit
+//! exister dans le registre bibliographique ou dans les octets détenus.
+//!
+//! Périmètre : celui de S-G4 (`crate::sg4::PERIMETRE`) — `docs/**/*.md`,
+//! puis `s2-harness/**/*.md` depuis le 2026-10-02 (SHOGEN-ORACLE-PERIMETRE-1
+//! (i), ADR-0028 annexe B).
 //!
 //! Ce qu'elle casse (DEVOPS §3) : « une citation entre guillemets dans
 //! `docs/` introuvable dans les sidecars de `biblio/` — la règle
@@ -29,18 +33,27 @@
 //! **Résidu nommé** : la gate vérifie « la citation existe dans le corpus »,
 //! pas « la citation est fidèle à sa source » — la fidélité reste
 //! l'adjudication de l'orchestrateur au versement (méthodologie doc 03).
+//!
+//! **Emplacements interdits** (lot SG5-INTERDITS, 2026-10-04 ;
+//! SHOGEN-SG5-NOTES-INTERDITS-1, ADR-0028 annexe B.51) : une citation
+//! introuvable située sous `EMPLACEMENTS_INTERDITS` se rapporte par
+//! `chemin:ligne` seul, en note comme en violation, jamais par son texte.
+//! Verdict et comptes n'en dépendent pas. Limites : le masque ne couvre que
+//! S-G5 (S-G4 imprime encore la ligne en extrait) ; un emplacement absent de
+//! la liste, ou atteint par un lien symbolique, imprime son texte.
 
 use crate::documents::{
     compte_declare_en_tete, fichiers_du_repertoire, fichiers_markdown, normaliser_pour_recherche,
 };
 use crate::rapport::{Rapport, lire};
 use crate::roles::chemin_relatif;
+use crate::sg4::PERIMETRE;
 use crate::source::ligne_de;
 use std::path::Path;
 
 /// Longueur minimale (octets, après normalisation) d'un fragment contrôlé —
 /// en dessous, le fragment est trop court pour identifier une source.
-const LONGUEUR_MINIMALE: usize = 15;
+pub(crate) const LONGUEUR_MINIMALE: usize = 15;
 
 /// Mots-fonction anglais **forts** (aucun n'est aussi un mot français ni un
 /// mot de titre isolé). Un fragment est réputé citation anglaise s'il en
@@ -64,11 +77,44 @@ const EXTENSIONS_TEXTE: &[&str] = &[
     "html", "htm", "txt", "md", "sidecar", "json", "xml", "rs", "toml", "yml", "yaml", "lock",
 ];
 
+/// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
+/// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
+/// séparateur `/` (invariant 1 d'ADR-0013). `docs/15-` et `docs/16-` couvrent
+/// fichier ou dossier ; les autres finissent par `/`.
+pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
+    "docs/15-",
+    "docs/16-",
+    "docs/pocket-report/",
+    "docs/rapports/",
+    "docs/adr-0025/",
+    "docs/adr-0028/monark-m009a/",
+];
+
+/// Vrai si `relatif` (chemin relatif, séparateur `/`) est sous un emplacement
+/// interdit : ses citations se rapportent par `chemin:ligne` seul.
+pub(crate) fn emplacement_interdit(relatif: &str) -> bool {
+    EMPLACEMENTS_INTERDITS
+        .iter()
+        .any(|prefixe| relatif.starts_with(prefixe))
+}
+
 pub fn executer(racine: &Path) -> Rapport {
     let mut rapport = Rapport::nouveau("S-G5", "citations (une-citation-un-grep, mécanisée)");
-    rapport
-        .chemins_couverts
-        .push(String::from("docs/**/*.md (extraction des « … » anglais)"));
+    // Le périmètre est recensé d'abord : sa couverture s'imprime même quand
+    // le registre manque (retour anticipé ci-dessous).
+    let mut fichiers = Vec::new();
+    for relatif in PERIMETRE {
+        let recensement = fichiers_markdown(racine, relatif);
+        for incident in recensement.incidents {
+            rapport.incident(incident);
+        }
+        rapport.chemins_couverts.push(format!(
+            "{relatif}/**/*.md : {} fichier(s) (extraction des « … » anglais)",
+            recensement.fichiers.len()
+        ));
+        fichiers.extend(recensement.fichiers);
+    }
+    rapport.presents = fichiers.len();
     rapport.chemins_couverts.push(String::from(
         "corpus : biblio/INDEX.md + octets texte de biblio/ présents",
     ));
@@ -141,21 +187,17 @@ pub fn executer(racine: &Path) -> Rapport {
         None => octets_presents == 0,
     };
 
-    // 2. Les citations des docs.
-    let recensement = fichiers_markdown(racine, "docs");
-    for incident in &recensement.incidents {
-        rapport.incident(incident.clone());
-    }
-    rapport.presents = recensement.fichiers.len();
-
+    // 2. Les citations des documents du périmètre.
     let mut controlees = 0usize;
     let mut ecartes = 0usize;
+    let mut masques = 0usize;
     let mut non_controlables = Vec::new();
-    for chemin in &recensement.fichiers {
+    for chemin in &fichiers {
         let Some(texte) = lire(&mut rapport, racine, chemin) else {
             continue;
         };
         let relatif = chemin_relatif(racine, chemin);
+        let interdit = emplacement_interdit(&relatif);
         for (decalage, citation) in citations_francaises(&texte) {
             for fragment in fragments(&citation) {
                 let normalise = normaliser_pour_recherche(&fragment);
@@ -187,17 +229,28 @@ pub fn executer(racine: &Path) -> Rapport {
                     continue;
                 }
                 let (ligne, _) = ligne_de(&texte, decalage);
+                // Emplacement interdit : `chemin:ligne` seul, jamais le texte
+                // (SHOGEN-SG5-NOTES-INTERDITS-1) ; le verdict est le même.
+                if interdit {
+                    masques = masques.saturating_add(1);
+                }
                 if corpus_incomplet {
-                    non_controlables.push(format!("{relatif}:{ligne} — « {normalise} »"));
+                    non_controlables.push(if interdit {
+                        format!("{relatif}:{ligne}")
+                    } else {
+                        format!("{relatif}:{ligne} — « {normalise} »")
+                    });
                 } else {
-                    rapport.violation(
-                        relatif.clone(),
-                        ligne,
+                    let motif = if interdit {
+                        String::from(
+                            "citation introuvable dans le registre et les octets détenus (emplacement interdit : texte jamais imprimé)",
+                        )
+                    } else {
                         format!(
                             "citation introuvable dans le registre et les octets détenus : « {normalise} »"
-                        ),
-                        String::new(),
-                    );
+                        )
+                    };
+                    rapport.violation(relatif.clone(), ligne, motif, String::new());
                 }
             }
         }
@@ -206,6 +259,9 @@ pub fn executer(racine: &Path) -> Rapport {
     rapport.notes.push(format!(
         "{controlees} fragment(s) de citation contrôlé(s), {ecartes} écarté(s) sous seuil (longueur ou langue — borne de couverture) ; corpus : INDEX + {octets_presents} artefact(s) local(aux) sur {} déclaré(s)",
         declares.map_or_else(|| String::from("?"), |n| n.to_string())
+    ));
+    rapport.notes.push(format!(
+        "emplacements interdits (SHOGEN-SG5-NOTES-INTERDITS-1) : {masques} fragment(s) introuvable(s) rapporté(s) par chemin:ligne seul, texte jamais imprimé ; verdict inchangé"
     ));
     if corpus_incomplet {
         rapport.notes.push(format!(
@@ -360,7 +416,7 @@ fn retirer_balises(texte: &str) -> String {
 /// Heuristique de langue : le corpus détenu est anglophone ; un fragment
 /// sous `OCCURRENCES_MINIMALES` mots-fonction anglais est de la prose ou un
 /// titre du projet, hors périmètre (borne de couverture, imprimée en note).
-fn parait_anglais(fragment: &str) -> bool {
+pub(crate) fn parait_anglais(fragment: &str) -> bool {
     let bas = format!(" {} ", fragment.to_ascii_lowercase());
     let occurrences: usize = MOTS_ANGLAIS
         .iter()

@@ -1,0 +1,11 @@
+ajoutée après le pré-enregistrement, hors décision ; ne change pas le verdict de la règle scellée (« R1 discrimine » = FAUX, docs/11 §3)
+hote_horloge.py horloge — SHOGEN-HORLOGE-ETENDUE-1
+script hote_horloge.py sha256 145241f15d8d03694dc061fed4b69d89f78de286bf019326675ea4e17d0cd653 ; commun.py sha256 72948a511ba958507ba3ed9a3d38c94592b6ea423bc1023314857e3242d9e7a1
+journaux : control.jsonl 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff ; journal.jsonl 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+rendu de contrôle : shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out sha256 26877549658b7271f766b433e941c79a35169398238755fa4bbf77a4911d65c0
+portée : segment [1787770800 ; 1790558880) (t0 = 1787770800, n fixe = 38600), plages exclues [(1790273880, 1790435280)] ; pool D1 : « calme » 11 flux ; « stress » 11 flux
+contrôle de cohérence (rendu, bloc 3) « calme » : recompté (n, K, P̂_more) = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') ; rendu = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') : égaux
+contrôle de cohérence (rendu, bloc 3) « stress » : recompté (n, K, P̂_more) = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') ; rendu = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') : égaux
+[SHOGEN-HORLOGE-ETENDUE-1] offset médian (harness_ts − source_ts, médiane par relevé) des clock_check retenus par le filtre de lecture (segment, plage D5 sur harness_ts) ; descriptif, sans seuil
+relevés retenus : 3610 (phases : {'startup': 3610}) ; non évaluables (médiane nulle) : 0
+minimum = -52.162537813186646 s ; médiane = 1.41501599550247195 s ; maximum = 96.27402925491333 s ; étendue = 148.436567068099976 s

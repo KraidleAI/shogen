@@ -5,7 +5,9 @@
 # D8) : ce workflow porte G5 (g5-no-naked-todo, R-13, avec les cas du hook pre-commit
 # versionné), G1 (g1-model-pinning, R-1 : épinglage des modèles), le G3 des secrets
 # (g3-secrets, plancher de motifs) et le G3 du chemin de recalcul S2
-# (s2-harness-unittest). Les gates de forge du code Rust vivent dans squelette.yml,
+# (s2-harness-unittest) ; s2bis-unittest ajouté le 2026-10-04 (lot COLLECTE-BIS, CB-0 :
+# paquet s2bis/ d'ADR-0029) ; sim-bis-unittest ajouté le 2026-10-05 (lot SIM-BIS, SB-0 :
+# scripts/sim-bis/ d'ADR-0029 §6 lot 4). Les gates de forge du code Rust vivent dans squelette.yml,
 # mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
 # s2-harness a deux périmètres (ADR-0028 D6 (i)) :
 #   - chemin de recalcul : records (hors append_asn), window, r1, lm, r2 (hors
@@ -46,7 +48,8 @@ jobs:
     # avance par le lot D8c (le job porte désormais des tests).
     runs-on: ubuntu-24.04
     # Étapes mesurées en local (Git Bash, 2026-10-01) : 51 cas du hook en 93 à 98 s, balayage
-    # de l'arbre en 68 à 78 ms. 10 min bornent un blocage sans couper un run normal.
+    # de l'arbre en 68 à 78 ms ; 54 cas en 31 s (lot DETTES-B2, 2026-10-04, Linux de la session
+    # cloud, charge moyenne 17 sur 4 cœurs). 10 min bornent un blocage sans couper un run normal.
     timeout-minutes: 10
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
@@ -61,13 +64,16 @@ jobs:
         # Motif élargi (lot D8c) : marqueur suivi de deux-points, ou introduit par un
         # délimiteur de commentaire ; 0 marqueur mesuré à 293b7a7 et à 40b4cfb (G0 du lot
         # D8c, §5.3). Exclusions : biblio/ (corpus de recherche), .claude/ (instructions
-        # d'agents), ce workflow (fichier vérificateur).
+        # d'agents), ce workflow (fichier vérificateur). Code de git grep capté (lot DETTES-B2,
+        # SHOGEN-G5-ERREUR-GREP-1) : 1 vert, 0 refus, tout autre code refus (un git grep en
+        # erreur sortait en 0 par le if) ; cas H-24 du runner du hook.
         run: |
-          if git grep -nE '(\b(TODO|FIXME):|(//|#|--|;|/\*|\*|<!--)[[:space:]]*(TODO|FIXME)\b)' -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml'; then
-            echo '::error::Marqueur TODO/FIXME nu. Registre de dette + ADR, ou résoudre (R-13).'
-            exit 1
-          fi
-          echo "OK: aucun marqueur de dette nu."
+          g=0; git grep -nE '(\b(TODO|FIXME):|(//|#|--|;|/\*|\*|<!--)[[:space:]]*(TODO|FIXME)\b)' -- ':!biblio/' ':!.claude/' ':!.github/workflows/gates.yml' || g=$?
+          case "$g" in
+            1) echo "OK: aucun marqueur de dette nu." ;;
+            0) echo '::error::Marqueur TODO/FIXME nu. Registre de dette + ADR, ou résoudre (R-13).'; exit 1 ;;
+            *) echo "::error::git grep a échoué (code $g) ; échec fermé."; exit 1 ;;
+          esac
 
   g1-model-pinning:
     # Lot D8a (2026-09-30, ADR-0028 D8, C-14 ; G0 docs/adr-0028/G0-lot-D8a.md, journal
@@ -113,8 +119,10 @@ jobs:
     runs-on: ubuntu-24.04
     # Étapes mesurées en local (Git Bash) : 113 cas en 136 à 139 s (2026-10-01, re-revue rr1) ;
     # l'arbre du dépôt (302 à 304 fichiers, boucle par fichier du moteur porté) en 63 à 68 s et
-    # l'historique (141 commits, --all) en 1,5 à 1,6 s (2026-09-30, après la revue G2). 15 min
-    # bornent un blocage sans couper un run normal.
+    # l'historique (141 commits, --all) en 1,5 à 1,6 s (2026-09-30, après la revue G2) ; lot D8d
+    # (2026-10-04, Linux de la session cloud, 4 cœurs) : 144 cas en 57 à 66 s sous une charge moyenne
+    # de 17, 146 cas en 15 à 20 s sous une charge de 1 à 3 ; historique avec messages et objets des
+    # refs (346 à 351 commits) en 2,4 à 5,5 s. 15 min bornent un blocage sans couper un run normal.
     timeout-minutes: 15
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1, le
@@ -141,6 +149,13 @@ jobs:
     # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
     # l'oracle local la rejoue sous garde réseau (0 tentative). Le job ne coupe pas
     # le réseau du runner (item SHOGEN-CI-S2-FORGE-1).
+    # Sous-lot D8a-3 (2026-10-04, lot DETTES-B1 ; SHOGEN-CI-S2-SAUT-1, ADR-0028
+    # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
+    # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final
+    # exigé, sauts dont le motif nomme la variable scellée seuls admis, Ran ≥ plancher
+    # committé) ; ses cas tournent avant la suite. Diff CB-18m (G2 de la tranche C de P1,
+    # décision de l'orchestrateur) : --egal exige Ran = PLANCHER du vérificateur ; un
+    # plancher oublié ou abaissé fait échouer le job (SHOGEN-CI-PLANCHER-SUIVI-1).
     # name: = identifiant du job, un seul nom pour le futur required check.
     name: s2-harness-unittest
     # Image épinglée : ubuntu-latest bascule vers Ubuntu 26 à partir du 2026-10-19
@@ -149,8 +164,9 @@ jobs:
     # que python3 le désigne est inféré, la ligne python3 --version le mesure au
     # premier run.
     runs-on: ubuntu-24.04
-    # Suite mesurée à moins de 10 s en local (188 tests, 2026-09-29) : 10 min
-    # bornent un blocage sans couper un run normal.
+    # Suite mesurée à moins de 10 s en local (188 tests, 2026-09-29) ; 398 tests en
+    # 63 à 168 s dans le conteneur Linux du lot DETTES-B1 (2026-10-04), cas du
+    # vérificateur en 1 à 2 s : 10 min bornent un blocage sans couper un run normal.
     timeout-minutes: 10
     steps:
       # actions/checkout épinglé par SHA de commit (ADR-0013, point 5) : tag v7.0.1,
@@ -161,16 +177,71 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
-      - name: suite unittest de s2-harness (fixtures, sans variable scellée)
+      - name: cas du vérificateur de la suite (D8a-3, SHOGEN-CI-S2-SAUT-1)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de s2-harness (fixtures, sans variable scellée), jugée par le vérificateur
         # shell: bash, soit bash --noprofile --norc -eo pipefail {0} (syntaxe des
         # workflows GitHub, table du mot-clé shell).
         # SHOGEN_S2_CAMPAGNE_CONTROL n'est pas posée par ce job, et unset la retire
-        # si l'environnement la portait : sans elle, le test (ii) de test_exclusion,
-        # seul lecteur du control.jsonl scellé (ADR-0028, annexe D.2 pt 7), lève
-        # SkipTest. L'option -v imprime chaque test et le motif de ce saut.
+        # si l'environnement la portait (le vérificateur la retire aussi de celui de
+        # la suite) : sans elle, les deux tests nommés de test_exclusion, seuls
+        # lecteurs du control.jsonl scellé (ADR-0028, annexe D.4 a), lèvent SkipTest.
+        # Le vérificateur lance la suite avec -v (chaque test et le motif de chaque
+        # saut), recopie sa sortie, puis juge résumé, sauts et compte.
         shell: bash
         run: |
           unset SHOGEN_S2_CAMPAGNE_CONTROL
           python3 --version
-          cd s2-harness
-          python3 -B -m unittest discover -s tests -t . -v
+          python3 -B enforcement/verdict-suite-s2.py --egal
+
+  s2bis-unittest:
+    # Lot COLLECTE-BIS, sous-lot CB-0 (2026-10-04 ; ADR-0029 §2.9 ; G0 docs/adr-0029/g0-collecte/, PROPOSITION
+    # §1 pt 6, E-C-40, E-C-41) : suite unittest du paquet s2bis/ (bibliothèque standard seule, fixtures, garde
+    # réseau posée par s2bis/tests/__init__.py). Verdict par le vérificateur de s2-harness-unittest : résumé final
+    # exigé, aucun saut admis, Ran ≥ plancher committé ci-dessous (SHOGEN-CI-S2-SAUT-1), relevé au compte mesuré à
+    # chaque sous-lot (SHOGEN-CI-PLANCHER-SUIVI-1). Étapes lues par le cas K-02 du runner (SHOGEN-CI-S2-CABLAGE-1).
+    # Diff CB-2e (Q-2 de la G2 de P1) : --egal exige Ran = plancher ; un plancher oublié ou abaissé fait échouer le job.
+    name: s2bis-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas du vérificateur de la suite (câblage des deux jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de s2bis (fixtures, garde réseau), jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 255
+
+  sim-bis-unittest:
+    # Lot SIM-BIS, sous-lot SB-0 (2026-10-05 ; ADR-0029 §6 lot 4 ; G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md, PROPOSITION
+    # Q-S-20 (a), adoptée par l'AVIS) : suite unittest de scripts/sim-bis (bibliothèque standard seule, données
+    # synthétiques et sorties versées de PLAN-S2BIS). Verdict par le vérificateur des jobs unittest : résumé final exigé,
+    # aucun saut admis, Ran = plancher committé ci-dessous (--egal), relevé au compte mesuré à chaque sous-lot ; étapes
+    # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Tant que la forge ne lance pas les jobs, le G3 opérant
+    # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20). Sous-lot SB-14
+    # (2026-10-05 ; E-S-01, E-S-39) : l'adaptateur oracle_r1 lit le harnais de f35a70c par git archive, d'où
+    # l'historique complet (fetch-depth: 0, Q-T4-11) ; une copie sans ce commit échoue fermé (ORACLE/extraction).
+    name: sim-bis-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: cas du vérificateur de la suite (câblage des jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de scripts/sim-bis, jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 172

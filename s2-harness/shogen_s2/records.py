@@ -7,8 +7,10 @@ de `journal.jsonl` (lectures — une ligne par fenêtre×flux, contrat inchangé
 de `raw.jsonl` (octets bruts). L'écriture passe par `journal.append_jsonl`
 (réutilisé) ; seuls les DICTS sont neufs.
 
-Trois types, discriminés par le champ ``record`` (les lignes de lecture de
-`journal.jsonl` produites par `journal.journal_entry` n'ont PAS ce champ) :
+Quatre types, discriminés par le champ ``record`` (les lignes de lecture de
+`journal.jsonl` produites par `journal.journal_entry` n'ont PAS ce champ) ; le quatrième,
+``asn_attribution`` (relevé ASN daté par hôte, `asn_attribution_record`, lu par `parse_asn`),
+est décrit avec R2 (M1c) :
 
   - ``run_params`` : les paramètres de la campagne (§6.1, bloc Paramètres),
     écrits au démarrage pour rendre « recalculable depuis le journal seul »
@@ -27,14 +29,20 @@ Trois types, discriminés par le champ ``record`` (les lignes de lecture de
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
+import math
 import sys
+from collections import Counter
 from decimal import Decimal
 from typing import Optional
 
 # Champs de run_params qui GOUVERNENT LA RECLASSIFICATION : un désaccord entre
 # démarrages ferait recalculer l'historique sous les derniers en silence (§E,
-# le mal visé). Les sept premiers sont les entrées de compute_r1. `strate_calendar`
+# le mal visé). Entrées de compute_r1 : les cinq premiers, `seuil_historique_valeur` et
+# `n_min_hors_enveloppe` ; `decimal_prec` n'en est pas une (r1 calcule à DECIMAL_PREC, la valeur
+# du journal n'est contrôlée qu'en présence et en concordance). `strate_calendar`
 # n'est PAS une entrée de compute_r1 mais gouverne les **étiquettes de strate**
 # des marqueurs que compute_r1/L&M groupent : un changement de calendrier
 # mi-campagne mélangerait DEUX partitions dans le même `n` par strate — même mal
@@ -73,32 +81,63 @@ def read_jsonl_tolerant(path: str, *, parse_float=None) -> list[dict]:
     """Relit un JSONL en TOLÉRANT une **dernière** ligne tronquée (crash
     mi-écriture — la machine de Phase A a un historique de coupures, plan §4.2).
 
-    - dernière ligne non vide illisible → **consignée** sur stderr puis ignorée
-      (jamais silencieux) ;
+    - dernière ligne non vide illisible (JSON, ou UTF-8 coupé dans un caractère) → **consignée** sur stderr
+      puis ignorée (jamais silencieux) ;
     - une ligne illisible **non finale** → corruption → ValueError (fail-closed :
       un journal au milieu corrompu n'est pas recalculable).
+    Lecture en octets, fins de ligne universelles (LF, CRLF, CR, comme le mode texte), décodage UTF-8 ligne par
+    ligne : une coupure dans un caractère multi-octets n'empêche plus la lecture (SHOGEN-TORN-LINE-UTF8-1, HS2-03).
     """
-    with open(path, encoding="utf-8") as f:
-        raw_lines = f.readlines()
-    idx = [i for i, ln in enumerate(raw_lines) if ln.strip()]
+    with open(path, "rb") as f:
+        raw_lines = f.read().splitlines()
+    idx = [i for i, ln in enumerate(raw_lines) if ln.decode("utf-8", "replace").strip()]
     objs: list[dict] = []
     for pos, i in enumerate(idx):
-        s = raw_lines[i].strip()
         try:
-            objs.append(json.loads(s, parse_float=parse_float))
-        except json.JSONDecodeError as e:
+            objs.append(json.loads(raw_lines[i].decode("utf-8").strip(), parse_float=parse_float))
+        except (UnicodeDecodeError, json.JSONDecodeError) as e:
+            utf = isinstance(e, UnicodeDecodeError)
             if pos == len(idx) - 1:
                 sys.stderr.write(
                     f"[s2-harness] AVERTISSEMENT : dernière ligne tronquée ignorée "
-                    f"dans {path} (ligne {i + 1}) — crash mi-écriture probable "
-                    f"(plan §4.2) ; consigné, non silencieux.\n"
+                    f"dans {path} (ligne {i + 1}{', non décodable en UTF-8' if utf else ''}) — crash mi-écriture "
+                    f"probable (plan §4.2) ; consigné, non silencieux.\n"
                 )
             else:
                 raise ValueError(
-                    f"ligne JSON corrompue NON finale dans {path} (ligne {i + 1}) : "
-                    f"recalcul impossible (fail-closed)"
+                    f"ligne {'non décodable en UTF-8' if utf else 'JSON corrompue'} NON finale dans {path} "
+                    f"(ligne {i + 1}) : recalcul impossible (fail-closed)"
                 ) from e
     return objs
+
+
+def verifier_raw(raw_path: str, journal_path: str) -> dict:
+    """Lecteur et oracle de `raw.jsonl` (SHOGEN-RAW-LECTEUR-1 ; promesse de journal.py : « le sha256 du journal doit
+    y correspondre ») : relecture par le lecteur tolérant, décodage de raw_b64 (base64 strict), sha256 recalculé égal
+    à sha256_raw de la ligne, puis à celui de la lecture correspondante de journal.jsonl (même window_start, flux_id,
+    fetch_ts ; multiplicités comprises). Tout écart lève ValueError, refus nommé. Rend les comptes de lectures."""
+    def cle(o):
+        return o.get("window_start"), o.get("flux_id"), o.get("fetch_ts")
+    brut: Counter = Counter()
+    for o in read_jsonl_tolerant(raw_path, parse_float=Decimal):
+        try:
+            sha = None if o.get("raw_b64") is None else hashlib.sha256(
+                base64.b64decode(o["raw_b64"], validate=True)).hexdigest()
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"raw.jsonl, lecture {cle(o)} : raw_b64 non décodable (base64 strict) — refus "
+                             "(SHOGEN-RAW-LECTEUR-1)") from e
+        if sha != o.get("sha256_raw"):
+            raise ValueError(f"raw.jsonl, lecture {cle(o)} : sha256 recalculé {sha} ≠ sha256_raw de la ligne "
+                             f"{o.get('sha256_raw')} — refus (SHOGEN-RAW-LECTEUR-1)")
+        brut[cle(o), sha] += 1
+    jour = Counter((cle(o), o.get("sha256_raw")) for o in read_jsonl_tolerant(journal_path, parse_float=Decimal))
+    r, j = {k for k, _ in brut - jour}, {k for k, _ in jour - brut}
+    for ecart, motif in ((r & j, "sha256 des octets ≠ sha256_raw de journal.jsonl"),
+                         (r - j, "lecture(s) de raw.jsonl absente(s) de journal.jsonl"),
+                         (j - r, "lecture(s) de journal.jsonl absente(s) de raw.jsonl")):
+        if ecart:
+            raise ValueError(f"{motif} : {sorted(ecart, key=str)[:5]} — refus (SHOGEN-RAW-LECTEUR-1)")
+    return {"lectures": sum(brut.values()), "avec_octets": sum(n for (_k, s), n in brut.items() if s is not None)}
 
 
 def effective_run_params(params_list: list[dict], load_bearing=LOAD_BEARING_KEYS) -> dict:
@@ -279,6 +318,20 @@ def parse_control(path: str) -> tuple[list[dict], list[dict], list[dict]]:
     return run_params_list, clock_checks, markers
 
 
+def demarrages(path: str) -> list:
+    """window_start des marqueurs window_close de chaque démarrage, dans l'ordre du journal (SHOGEN-CENSURE-CAUSES-1,
+    ADR-0028 annexe B.23) : un démarrage s'ouvre à chaque run_params et à chaque clock_check de phase « startup »
+    (collector.collect écrit les deux en tête de chaque appel, chunk ou reprise : l'un suffit si l'autre manque) ;
+    marqueurs écrits avant toute ligne de démarrage : hors de tout démarrage. Lecture tolérante (§F)."""
+    out: list = []
+    for o in read_jsonl_tolerant(path):
+        if o.get("record") == "run_params" or o.get("record") == "clock_check" and o.get("phase") == "startup":
+            out.append([])
+        elif o.get("record") == "window_close" and out:
+            out[-1].append(int(o["window_start"]))
+    return out
+
+
 def exclusion_ranges(ranges=()) -> list:
     """Plages d'exclusion du lecteur (ADR-0025 déc. 2) : entières, FERMÉES `[from, to]`,
     TRIÉES (déterminisme) ; `from > to` ou borne < 0 LÈVE (fail-closed, jamais une exclusion vide
@@ -303,8 +356,9 @@ def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
     """UN SEUL outil de lecture par horodatage, pour tous les types (ADR-0028 D4, D5 ; HS2-08) : filtre
     d'ANALYSE, jamais une excision du journal. Exclusion d'ADR-0025 déc. 1 amendée par D5 : `window_start`
     dans la plage FERMÉE [A ; B] ; `ts` et `harness_ts` dans [A ; B + w), durée de la dernière fenêtre
-    (w de run_params) ; run_params conservé ; type sans règle : ValueError. Segment `(t0, t_fin)`, avant
-    l'exclusion : [t0 ; t_fin) semi-ouvert, MÊME borne, tous types (D4). Sans plage ni segment : inchangé."""
+    (w de run_params) ; run_params conservé ; type sans règle, horodatage absent, booléen, non numérique ou non fini
+    (G2, C-8) : ValueError. Segment `(t0, t_fin)`, avant l'exclusion : [t0 ; t_fin) semi-ouvert, MÊME borne, tous
+    types (D4). Sans plage ni segment : inchangé."""
     rs = exclusion_ranges(ranges)
     if not rs and segment is None:
         return list(recs)
@@ -313,6 +367,13 @@ def filtre_horodatage(recs: list, ranges=(), w=None, segment=None) -> list:
         if r.get("record") not in HORODATAGE:
             raise ValueError(f"type {r.get('record')!r} sans champ d'horodatage connu — fail-closed")
         champ = HORODATAGE[r["record"]]
+        if champ is not None and r.get(champ) is None:     # jamais KeyError (SHOGEN-BLOC6-TS-1)
+            raise ValueError(f"{r['record']} sans {champ} : placement dans le segment ou la plage indécidable — "
+                             "fail-closed (SHOGEN-BLOC6-TS-1)")
+        v = r.get(champ)                                   # booléen, non numérique ou non fini : refus (G2, C-8)
+        if champ is not None and (isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v)):
+            raise ValueError(f"{r['record']} : {champ} = {v!r} non numérique ou non fini — fail-closed "
+                             "(SHOGEN-BLOC6-TS-NUM-1)")
         if champ is not None and segment is not None and not segment[0] <= r[champ] < segment[1]:
             continue
         if champ == "window_start":

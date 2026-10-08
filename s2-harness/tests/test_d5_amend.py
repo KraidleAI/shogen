@@ -27,7 +27,7 @@ from shogen_s2.sources import SIGMA_CLASS_OF_FLUX
 from tests.test_collector import BY_ID, DELTA, FakeClock, _taumap, sbc_huge
 from tests.test_exclusion import HARNESS
 from tests.test_r1 import mk, rd
-from tests.test_critere import rotation
+from tests.test_critere import ell, rotation
 from tests.test_rendu_blocs import couture, journal, proche
 from tests.test_sensibilite import H, fixture, t as heure
 
@@ -123,6 +123,23 @@ def strate3(b3: list, st: str) -> tuple:
     n, k = map(int, re.findall(r"= (\d+)", b3[i])[:2])
     p = next(ln for ln in b3[i:] if ln.startswith("    P̂_more  = ")).split("= ")[1]
     return n, k, F(p), next(ln for ln in b3[i:] if ln.startswith("    z       = ")).split()[2]
+
+
+def lus(txt: str) -> tuple:
+    """Rendu : ({strate : s} non nuls du bloc 1, {strate : (s, z_bas, z_haut, z_bloc_bas, z_bloc_haut)} du bloc 3)."""
+    s = re.search(r"hors plages D5 : (.*?) — toutes causes", txt).group(1)
+    b3 = re.findall(r"^    « (\w+) » : s = (\d+) ; (?:z_bas = (\S+) ; z_haut = (\S+) ; avec \S+ : (?:z_bas = (\S+) ; "
+                    r"z_haut = (\S+))?)?", txt.split("[BLOC 3]")[1].split("[BLOC 4]")[0], re.M)
+    return ({st: int(k) for st, k in re.findall(r"(\w+) (\d+)", s) if int(k)},
+            {m[0]: (int(m[1]), *(x or None for x in m[2:])) for m in b3})
+
+
+def servis(d5: dict) -> tuple:
+    """Mêmes valeurs, servies par r1.recompute_d5_from_journal et écrites par report._fmt_dec."""
+    k = ("z_bas", "z_haut", "z_bloc_bas", "z_bloc_haut")
+    return d5["fenetres_sautees"], {st: (d5["fenetres_sautees"].get(st, 0), *(None if b is None or b[x] is None else
+                                                                             report._fmt_dec(b[x]) for x in k))
+                                    for st, b in d5["bornes_censure"].items()}
 
 
 class TestDecompositionK(unittest.TestCase):
@@ -388,6 +405,28 @@ class TestRendu(unittest.TestCase):
                       "+ w), sans marqueur window_close, hors plages D5 : calme 23, stress 48 — ", txt)
         self.assertIn("    « calme » : s = 23 ; bornes non publiées (garde §5.4 : z_s non publié)", txt)
         self.assertEqual(len(re.findall(r"(?m)^    « \w+ » : τ_classe = \S+ ; N = 0 : non défini$", txt)), 5)
+
+    def test_recalcul_tiers_d5_egal_au_rendu(self):
+        """SHOGEN-D5-RECALCUL-TIERS-1 : r1.recompute_d5_from_journal (lecteur tiers) = s du bloc 1 et bornes du bloc
+        3, même journal, mêmes options. s écrits à la main : trou de 10 fenêtres stress (rangs 240-249) ; plage qui en
+        couvre 5 (borne fractionnaire, normalisée comme au rendu) ; plage qui retire les 20 marqueurs d'après le trou
+        (s inchangé, portée du journal entier) ; segment dès le rang −5 ; week-end entier sauté (calme sous la garde).
+        Rougit si : s sur les marqueurs filtrés, sans la portée du segment, sans les plages ou sur plages non
+        normalisées ; bornes à s = 0 ; variante σ̂_bloc absente, ou sans z_bloc publiée ; bornes sous la garde §5.4."""
+        we = fixture(tempfile.mkdtemp(prefix="s2d5t_"), blocs=[range(heure(7, 10), heure(7, 11), H),
+                                                               range(heure(10, 10), heure(10, 11), H)])
+        rf_ = (self.c, self.j)
+        for cj, kw, n, s in ((rf_, {}, 240, {"stress": 10}), (rf_, {}, 2, {"stress": 10}),
+                             (rf_, {"exclude_ranges": [(rang(245) + 0.5, rang(252))]}, 240, {"stress": 5}),
+                             (rf_, {"exclude_ranges": [(rang(250), rang(300))]}, 240, {"stress": 10}),
+                             (rf_, {"segment": {"t0": rang(-5), "t_fin": rang(255)}}, 240, {"calme": 5, "stress": 10}),
+                             (we, {}, 240, {"calme": 23, "stress": 48})):
+            with self.subTest(kw=kw, ell=n), ell(n):
+                d5 = r1.recompute_d5_from_journal(*cj, **kw)
+                self.assertEqual((d5["fenetres_sautees"], lus(report.render_report(*cj, **kw))), (s, servis(d5)))
+        b, z = (r1.recompute_d5_from_journal(*rf_)["bornes_censure"]["calme"],
+                r1.recompute_from_journal(*rf_)["strates"]["calme"]["z"])
+        self.assertEqual((b["s"], b["z_bas"], b["z_haut"], b["z_bloc_bas"]), (0, z, z, None))
 
 
 if __name__ == "__main__":

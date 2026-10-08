@@ -1,0 +1,91 @@
+{
+ "lot": "PLAN-S2BIS",
+ "etiquette": "préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)",
+ "rattachement": "G0 docs/adr-0029/G0-lot-PLAN-S2BIS.md (sha256 81bf3f336929509af60284e6522627ecac77e22339044e4232d5f1968128b5ad) ; ADR-0029 révision 3, §2.6 (amendée par ajout daté du 2026-10-04 16:20:56 UTC, l.181) et §6 lot 3 (sha256 02f8f6ccd1c40c423d120d9a9d7267429ff35dd4dc2943b6f283f097e106a6d0) ; annexe B d'ADR-0028 : SHOGEN-TAU-REDERIV-1, SHOGEN-R1-HOTE-STRUCTUREL-1, SHOGEN-POSTPREREG-PARAMS-SCEAU-1, SHOGEN-FICHE-WORKER-POSTEXEC-1",
+ "regle_adr0029_l178_180": [
+  "  - **population** : cellules (fenêtre, unité) arrivées à l'axe (i) sous le σ de S2 (celle du τ observé, paquet de S2 l.180), **recalculée sur le pool D1-bis de 10 hôtes** (sans `okx_index`, Pyth exclu : la médiane leave-one-out change) ;",
+  "  - **τ_classe** : **τ_c = grid-ceil(1,5 × max_s P99,9_{c,s}, 0,05 %)**, maximum sur les deux strates comme ADR-0022 (l.19), borné par 0,05 % ≤ τ_c < 2,85 % (CAPO, ADR-0022 l.19, l.36). Motif : les 28 jours de S2 peuvent contenir de vrais écarts, que le maximum transformerait en seuil (note de PX-Shogen-13 : τ observé et P99 de calibration ne portent pas sur la même population, annexe B l.662-664) ; à titre indicatif, la règle au maximum donnerait 0,50 / 1,30 / 2,65 / 2,70 % (places horodatées, sans horodatage, agrégateurs, Chainlink) [calc, 1,5 × maximum, rendu l.435526-435530, sur le pool de 11 flux de S2], Chainlink à 0,15 point de la borne CAPO, sur un axe déjà presque silencieux (§1.2 pt 6) ; pour les places sans horodatage, où la staleness n'est pas évaluable, elle rendrait l'axe aveugle aux prix figés [inféré]. Le facteur 1,5 reste une marge nommée ; son motif devient la dérive de régime entre S2 et S2-bis (autres observateurs, autres mois), non plus le sous-échantillonnage de 48 h [inféré, avis STATS Q4]. La valeur de la règle au maximum est imprimée à côté, descriptive. Les options « P99 » (déjà imprimé, donc vu) et « τ committé de S2 gardé » (refuse PX-Shogen-13 et laisse l'axe mort) sont écartées au §4. Risque déclaré : un τ plus bas pour les places multiplie les écarts hors-enveloppe propres à un observateur (cache, instant de lecture) ; le vote tout axe les absorbe, chacun ne faisant qu'un vote ;",
+  "  - **σ_classe** : règle de clôture d'ADR-0021, σ = max(plancher, 3 × P99 staleness) (`s2-harness/shogen_s2/run_campaign.py` l.27-28), même population, maximum sur les deux strates, planchers nommés en valeur au paquet (planchers d'ADR-0020 : 30 s pour les places horodatées, 300 s pour les agrégateurs, 5 400 s pour Chainlink, aucun pour les places sans horodatage, `s2-harness/shogen_s2/sources.py` l.330-336). Limite écrite : pour Chainlink (heartbeat d'environ 1 h, ADR-0022 l.29), 3 × P99 donne environ 3 h (σ de S2 : 10 695 s, rendu l.12) et rend l'axe staleness presque aveugle par construction ; choix de conception imprimé."
+ ],
+ "amendement_adr0029_l181": [
+  "- *Amendement daté du 2026-10-04 16:20:56 UTC (décision technique de l'orchestrateur, sur la relecture G2 du lot PLAN-S2BIS, avant tout calcul sur les journaux)* : (1) **population de σ_classe** : la population de la règle de clôture d'ADR-0021 (répondantes `ok`, avec prix et horodatage porté, pool D1-bis), et non « la même population » que τ ; motif : la population de τ retire les cellules que l'axe de staleness signale et plafonne σ_c à 3 × σ_S2 par construction ; la lecture d'origine est imprimée comme descriptive, avec les comptes au-delà de σ_S2 ; (2) **borne haute de τ** : si grid-ceil(1,5 × max_s P99,9) atteint 2,85 %, la valeur n'est pas écrêtée : refus nommé de la classe, la valeur de la règle imprimée, décision renvoyée à l'orchestrateur avant le sceau (jamais un τ deviné) ; la borne basse 0,05 % est inchangée."
+ ],
+ "commit_analyse": "f35a70c19ba8269f1f7e2bcd31775e4fc513da20",
+ "harnais_sha256": {
+  "shogen_s2/__init__.py": "4db0d8d6d85c374a72a3e4def3047f0baacf118e71a24db8daf24ea695d8b4dc",
+  "shogen_s2/model.py": "e56240c74be546e631189280711115095a2c9ff48690d28230c6461ff3948480",
+  "shogen_s2/records.py": "a2e9a7744d8d60a017a888efe10de5b8fc0073c08b571671189d83de4a58edd2",
+  "shogen_s2/window.py": "f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94",
+  "shogen_s2/r1.py": "0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f"
+ },
+ "paquet_s2": {
+  "chemin": "docs/adr-0028/PAQUET-PREREG-S2.md",
+  "sha256": "4d2a8276316b1c66a08aabb15ff3b39be812978e93dafc01a4e627f20d0af528",
+  "source": "manifeste du sceau docs/adr-0028/sceau/PAQUET.sha256 ; bloc machine, section 13"
+ },
+ "rendu_j28": {
+  "chemin": "docs/adr-0028/execution/rendu-2026-10-04/shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out",
+  "sha256": "26877549658b7271f766b433e941c79a35169398238755fa4bbf77a4911d65c0",
+  "bloc3": {"calme": [24585, 154, "0.0013629504227977629135010363906355205959215005903986"], "stress": [11397, 133, "0.0014663989614904143004161900453685779659861375123928"]},
+  "source": "bloc 3 du rendu J28 (en-têtes de strate et P̂_more seuls), ADR-0029 Conventions"
+ },
+ "segment": {
+  "t0": 1787770800,
+  "n_fixe": 38600,
+  "plages_exclues": [[1790273880, 1790435280]],
+  "source": "paquet de S2 §3 (D5) et §6 (J28) ; rendu_unique.SORTIES « j28 » à f35a70c"
+ },
+ "strates": ["calme", "stress"],
+ "pool_d1bis": {
+  "unites": {"binance": "binance", "bitfinex": "bitfinex", "bitstamp": "bitstamp", "chainlink": "chainlink", "coinbase": "coinbase", "coingecko": "coingecko", "defillama": "defillama", "gemini": "gemini", "kraken": "kraken", "okx": "okx_ticker"},
+  "hors_pool": ["okx_index", "pyth"],
+  "seuil_presque_mort": true,
+  "source": "ADR-0029 §2.5 l.166 (unités = hôtes, okx par okx_ticker) et l.168 (règle D1 reprise, plus le seuil de flux presque mort ex ante) ; seuil d'annexe B.39 : retrait de la strate s si 2·ok(u, s) < n_s, égalité : l'unité reste ; D1 (a)/(b) en sont des cas particuliers"
+ },
+ "classes": {
+  "binance": "sans_horodatage",
+  "bitfinex": "sans_horodatage",
+  "bitstamp": "place_horodatee",
+  "chainlink": "oracle_chainlink",
+  "coinbase": "place_horodatee",
+  "coingecko": "agregateur",
+  "defillama": "agregateur",
+  "gemini": "place_horodatee",
+  "kraken": "sans_horodatage",
+  "okx_ticker": "place_horodatee"
+ },
+ "tau": {
+  "facteur": "1.5",
+  "quantile": [999, 1000],
+  "pas": "0.0005",
+  "borne_basse": "0.0005",
+  "borne_haute_exclue": "0.0285",
+  "aux_bornes": "sous la borne basse (seulement si P99,9 = 0) : premier multiple du pas qui l'atteint, signalé ; à ou au-delà de la borne haute : refus nommé, la ligne tau porte REFUS et la valeur de la règle, jamais une valeur écrêtée (adjudication A-2 de l'orchestrateur, 2026-10-04)",
+  "source": "ADR-0029 §2.6 l.179 ; ADR-0022 l.19, l.36 ; rang le plus proche ⌈999·N/1000⌉"
+ },
+ "sigma": {
+  "facteur": "3",
+  "quantile": [99, 100],
+  "planchers_s": {"agregateur": 300, "oracle_chainlink": 5400, "place_horodatee": 30, "sans_horodatage": null},
+  "source": "ADR-0029 §2.6 l.180 ; règle de clôture d'ADR-0021 (closure.compute_closure, rang le plus proche ⌈99·N/100⌉ ; aucune staleness : plancher) ; planchers d'ADR-0020, sources.py l.330-336"
+ },
+ "sigma_population": "cloture",
+ "sigma_population_source": "adjudication A-1 de l'orchestrateur, 2026-10-04, avant tout calcul sur les journaux (G2 du lot, C-1) : au paquet, population de la règle de clôture d'ADR-0021 (répondantes statut ok avec prix et horodatage porté, pool D1-bis) ; « axe_i » (cellules arrivées à l'axe (i) sous le σ de S2, lecture littérale d'ADR-0029 l.180) imprimée, descriptive, avec les comptes au-delà du σ de S2 ; amendement daté d'ADR-0029 §2.6 par l'orchestrateur",
+ "episodes": {
+  "types": {"panne": ["panne"], "ecart": ["panne", "staleness", "hors_enveloppe"]},
+  "seuils": "σ et τ committés de S2 (run_params du journal), classification de r1._classify_window",
+  "pool": "D1-bis de la strate",
+  "continuite": "suite maximale de positions de grille consécutives (pas w) parmi les fenêtres retenues de la strate ; une fenêtre absente, exclue ou de l'autre strate coupe l'épisode (forme des runs de r1.bloc_strate)",
+  "censure": "épisode dont la fenêtre de grille voisine (avant ou après) n'est pas retenue dans la strate",
+  "quantiles": [[50, 100], [90, 100], [99, 100]]
+ },
+ "fiv": {
+  "ell": [1, 2, 3, 5, 10, 15, 20, 30, 60, 90, 120, 180, 240, 360, 480, 720, 1440],
+  "pools": ["S2 (D1)", "D1-bis"],
+  "source": "FIV_série = σ̂²_bloc/γ̂₀ de r1.block_long_run_variance (forme de r1.bloc_strate) ; série I_t = 1{au moins deux écarts}, σ et τ committés de S2 ; ℓ de 1 fenêtre à 1 jour, garde n ≥ 30·ℓ imprimée"
+ },
+ "okx": {
+  "flux": ["okx_ticker", "okx_index"],
+  "source": "SHOGEN-R1-HOTE-STRUCTUREL-1 (ADR-0029 §8.1) ; ADR-0029 §1.2 pt 5 ; rendu l.435688"
+ }
+}

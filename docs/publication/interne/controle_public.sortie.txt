@@ -1,0 +1,158 @@
+=== Contrôle du brouillon public (lot DOCS11-PUBLIC) ===
+source    : /home/user/shogen/docs/11-mesures-pilotes.md
+            sha256 fcf93b87f95eb793d565232cb488ccffc504ae7cb9fe045cee737c6e876353b7
+brouillon : 11-mesures-pilotes-public.md
+            sha256 c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561
+table     : TABLE-CORRESPONDANCE.md
+            sha256 d78b65fdb19e17774cbcd0466311065a47a4aa8490c60be758a591b1c76040ec
+
+--- 1. Nombres (aucun inventé, aucun ajouté) ---
+  composite : source 1051 distincts / 2564 occurrences ; brouillon 1047 distincts / 2557 occurrences
+  groupe : source 44 distincts / 66 occurrences ; brouillon 44 distincts / 66 occurrences
+  chiffres : source 814 distincts / 3859 occurrences ; brouillon 811 distincts / 3851 occurrences
+  inventés (absents de la source) : 0
+  ajoutés (plus fréquents que dans la source) : 0
+  retirés (moins fréquents que dans la source ; à rapprocher de la table) : 11
+    retiré chiffres « 0025 » : source 2, brouillon 0
+    retiré chiffres « 04924 » : source 1, brouillon 0
+    retiré chiffres « 1 » : source 372, brouillon 371
+    retiré chiffres « 2 » : source 259, brouillon 256
+    retiré chiffres « 90684 » : source 1, brouillon 0
+    retiré composite « 1 » : source 107, brouillon 106
+    retiré composite « 2 » : source 58, brouillon 57
+    retiré composite « 90684fb2 » : source 1, brouillon 0
+    retiré composite « ADR-0025 » : source 2, brouillon 0
+    retiré composite « D.2 » : source 1, brouillon 0
+    retiré composite « aa04924 » : source 1, brouillon 0
+  retouches de la table qui ajoutent un nombre : 0
+  => OK
+
+--- 2. Motifs interdits du point 1 du brief (0 occurrence exigée dans le brouillon) ---
+  [chemin local] lecteur Windows suivi d'une barre : source 1 (l.211) ; brouillon 0
+  [chemin local] lecteur C:, D: ou F: accolé : source 1 (l.211) ; brouillon 0
+  [chemin local] barre oblique inverse : source 2 (l.211) ; brouillon 0
+  [chemin local] dossier d'utilisateur Windows : source 0 ; brouillon 0
+  [bac à sable] /tmp : source 0 ; brouillon 0
+  [bac à sable] scratchpad : source 0 ; brouillon 0
+  [bac à sable] racine d'hôte (/home, /root, /mnt) : source 0 ; brouillon 0
+  [bac à sable] dossier de session du harnais : source 0 ; brouillon 0
+  [dossier non public] docs/15-* : source 0 ; brouillon 0
+  [dossier non public] docs/16-* : source 0 ; brouillon 0
+  [dossier non public] docs/rapports/ : source 0 ; brouillon 0
+  [dossier non public] ADR-0025 (docs/adr-0025/) : source 2 (l.178,624) ; brouillon 0
+  [dossier non public] docs/adr-0028/monark-m009a/ : source 0 ; brouillon 0
+  [dossier non public] Pocket : source 0 ; brouillon 0
+  [pièce D.2] n° 1 : dossier shogen-j28 : source 0 ; brouillon 0
+  [pièce D.2] n° 2 et 12 : mesure M009a : source 0 ; brouillon 0
+  [pièce D.2] n° 3 et 4 : cartographie hors dépôt : source 0 ; brouillon 0
+  [pièce D.2] n° 5 : cartographie l.51 : source 0 ; brouillon 0
+  [pièce D.2] n° 6 : ADR-0025 l.14 : source 0 ; brouillon 0
+  [pièce D.2] n° 7 et 8 : dossier de campagne : source 1 (l.211) ; brouillon 0
+  [pièce D.2] n° 8 : étude hors dépôt : source 0 ; brouillon 0
+  [pièce D.2] n° 10 : registre PAROXYSME : source 0 ; brouillon 0
+  [pièce D.2] n° 11 : transcription de session : source 0 ; brouillon 0
+  [pièce D.2] n° 12 : commit aa04924 : source 1 (l.915) ; brouillon 0
+  [pièce D.2] Drive : source 1 (l.729) ; brouillon 0
+  [dépôt privé] organisation KraidleAI : source 2 (l.914,1064) ; brouillon 0
+  [dépôt privé] monark-governance : source 1 (l.914) ; brouillon 0
+  [identifiant] session_ : source 0 ; brouillon 0
+  [identifiant] session courte 90684fb2 : source 1 (l.933) ; brouillon 0
+  [identifiant] session suivie d'un hexadécimal : source 1 (l.933) ; brouillon 0
+  [identifiant] agent carto: : source 1 (l.934) ; brouillon 0
+  [identifiant] workflow wf_ : source 0 ; brouillon 0
+  [identifiant] fiche d'agent shogen-* : source 1 (l.3) ; brouillon 0
+  [identifiant] lien ou marque de session : source 0 ; brouillon 0
+  [gouvernance interne] priorité stratégique : source 1 (l.71) ; brouillon 0
+  [gouvernance interne] routage interne : source 1 (l.14) ; brouillon 0
+  [décision de l'investisseur] « Pyth est mort » : source 1 (l.892) ; brouillon 0
+  [décision de l'investisseur] consigne verbatim « pas sur mon PC » : source 2 (l.213,214) ; brouillon 0
+  [décision de l'investisseur] pièces présentées comme remises avec le rapport : source 2 (l.502,794) ; brouillon 0
+  [adjudication B.57] liste des pièces remises sans le paquet ni les scripts : source 1 (l.1066) ; brouillon 0
+  motifs présents dans le brouillon : 0 => OK
+
+--- 3. Registre du doc 09 (S-G4 et extension) ---
+  occurrences dans la source : 4 (dont admises : 3)
+    source l.71 « validé » INTERDITE : validé ; priorité, « Position d'abord (Recommandé) ». Le JOURNAL y note que la bifurcation D9 suit la branche
+    source l.162 « k sources (10 sources) » admise : | calme | pyth, cas (a) | « ok = 0 / 24585 lectures, n = 24585 » | « 10 sources / 11 flux » | J28 l.42, l.44 |
+    source l.163 « k sources (10 sources) » admise : | stress | pyth, cas (a) | « ok = 0 / 11397 lectures, n = 11397 » | « 10 sources / 11 flux » | J28 l.43, l.45 …
+    source l.866 « validé » admise : validé le texte et le format, pas les valeurs. À l'exécution, les journaux téléchargés leur sont égaux (§8.3).
+  occurrences dans le brouillon : 3 (dont admises : 3)
+    brouillon l.172 « k sources (10 sources) » admise — §2.2 : sortie imprimée recopiée (J28 l.44), colonne « k nominal_s » : citation verbatim, k nominal nommé : | calme | pyth, cas (a) | « ok = 0 / 24585 lectures, n = 24585 » | « 10 sources / 11 flux » | J28 l.42, l.44 |
+    brouillon l.173 « k sources (10 sources) » admise — §2.2 : sortie imprimée recopiée (J28 l.45), colonne « k nominal_s » : citation verbatim, k nominal nommé : | stress | pyth, cas (a) | « ok = 0 / 11397 lectures, n = 11397 » | « 10 sources / 11 flux » | J28 l.43, l.45 …
+    brouillon l.876 « validé » admise — §9.2 pt 20 : limite recopiée du paquet §12 (point 2 du brief) ; verbe dont le sujet est un acteur nommé (le validateur du paquet), portée bornée (« pas les valeurs ») : forme « reviewed (qui) » du doc 09 : validé le texte et le format, pas les valeurs. À l'exécution, les journaux téléchargés leur sont égaux (§8.3).
+  => OK
+
+--- 4. Passages protégés (point 2 du brief) ---
+  OK « **« R1 discrimine » = FAUX** » : 1 = 1
+  OK « « R1 discrimine » vaut FAUX » : 1 = 1
+  OK « la règle rend dans chacune des deux strates la valeur **NE REJETTE PAS, au titre de » : 1 = 1
+  OK « la cause n'est pas identifiée entre co-défaillance des sources et dépendance sérielle des … » : 2 = 2
+  OK «   « R1 discrimine » (§1 bis.1 pt 6 ; déclencheur de D6 (vi) et D9) = FAUX : aucune strate … » : 1 = 1
+  OK « Il n'établit ni n'exclut une co-défaillance des sources » : 1 = 1
+  OK « Il n'établit pas l'indépendance des sources (doc 09). » : 1 = 1
+  OK « « ajoutée après le pré-enregistrement, hors décision ; ne change pas le verdict » : 1 = 1
+  OK « hors décision » : 29 = 29
+  OK « Hors décision » : 6 = 6
+  OK « NE REJETTE PAS » : 9 = 9
+  OK « 4d2a8276316b1c66a08aabb15ff3b39be812978e93dafc01a4e627f20d0af528 » : 2 = 2
+  OK « 519423510b21ecbebda895d6e225ab0748fb0fe5a2b257a36c9301e36bfaa3e9 » : 1 = 1
+  OK « 9edb19b53379f370e291c5da01d4df3bc269b67a44feddb589d1211ec5ec6b0e » : 1 = 1
+  OK « série `0x08CFC8D5`, **genTime 2026-10-03T01:04:10Z**, horloge de FreeTSA » : 1 = 1
+  OK « 494d770d704dc7c342f0c6deec269e5642b3621bf451922f991e4ca1fb968097 » : 2 = 2
+  OK « 680a95fdf50908cea797ae4fe9f0b42c43b5a99fcad755cb410e26fa6e794209 » : 1 = 1
+  OK « genTime 2026-10-02T17:44:30Z » : 3 = 3
+  OK « f35a70c19ba8269f1f7e2bcd31775e4fc513da20 » : 2 = 2
+  OK « 06d189cf84e7dca97bdfc0e1b695fc827a09473779505c7a8f1af1e7c26e9050 » : 2 = 2
+  OK « Python 3.11.15 » : 1 = 1
+  OK « `bash scripts/sceau/verify.sh` » : 2 = 2
+  OK « 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff » : 1 = 1
+  OK « 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74 » : 1 = 1
+  OK « 39ffb13fb0e5939ff88285ce256fbd416b0665c20ee6394c512eed7d2175c15d » : 1 = 1
+  OK « 70910984076474987239d8c7a9da786acc95c38b375ad572d78afa297bf8caf4 » : 1 = 1
+  OK « 41 676 139, 148 930 880 et 204 107 558 octets » : 1 = 1
+  OK « Une nouvelle production par `rendu_unique.py` serait une seconde exécution, déviation décl… » : 1 = 1
+  OK « tout rejeu (`recompute_*`) ou ré-exécution du rendu de S2 se fait sur une extraction de `f… » : 1 = 1
+  OK « peut contrôler le sceau et l'arithmétique des rendus, pas recalculer les rendus » : 1 = 1
+  => OK (30 passages)
+  passages exigés par les décisions de l'investisseur et l'adjudication B.57 : 7 ; absents du brouillon : 0
+    présent ×1 « Aucune donnée de prix n'a été reçue de Pyth sur toute la campagne »
+    présent ×1 « rien ne montre une panne de Pyth »
+    présent ×1 « La publication porte sur ce rapport seul »
+    présent ×1 « le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur … »
+    présent ×1 « pièces remises sur demande, sous accord »
+    présent ×1 « Le contrôle du sceau exige le paquet scellé, remis avec le sceau sur demande »
+    présent ×1 « poste personnel de l'investisseur »
+  => OK
+
+--- 5. Sections modifiées contre sections déclarées par la table ---
+  sections de la source : 58 ; du brouillon : 58
+  modifiées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
+  déclarées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
+  sections identiques à l'octet : 46 sur 58
+  rejeu de la table sur la source (20 retouches, chacune exactement une fois) : brouillon identique à l'octet
+  => OK
+
+--- 6. Structure ---
+  clés de titres, même ordre : oui (58 / 58)
+  clôtures de code : source 18, brouillon 18
+  lignes de table : source 134, brouillon 134
+  => OK
+
+--- 7. Citations « … » (parité avec la gate S-G5) ---
+  citations : source 146, brouillon 146
+    nouvelle ou modifiée (française) : « Reproduire »
+    nouvelle ou modifiée (française) : « Ce qui n'est pas public »
+    nouvelle ou modifiée (française) : « motif de l'exclusion (harnais dégradé, / […]) : causalité non établie »
+  => OK
+
+--- Informatif (non bloquant) : mentions gardées après examen ---
+  identifiant de modèle « claude-opus-5-5 » : source 3, brouillon 3
+  citation du JOURNAL « JOURNAL l. » : source 18, brouillon 18
+  pièce hors dépôt citée par un rendu « AVIS-advisor-defi » : source 1, brouillon 1
+  projet connexe « MONARK » : source 8, brouillon 9
+  poste de collecte « poste de l'investisseur » : source 1, brouillon 0
+  rôle de session « session cloud » : source 6, brouillon 6
+  journal des décisions « décision 270 » : source 3, brouillon 3
+  consigne verbatim de l'investisseur « cette fois on le fait sur un VPS » : source 1, brouillon 0
+
+VERDICT : CONFORME — sept contrôles sur sept (sortie 0)

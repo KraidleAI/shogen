@@ -296,6 +296,8 @@ sur ρ). N_min = 300 est un **choix de conception**, fixé ex ante dans ce docum
 calcul de puissance (à porter au paquet de pré-enregistrement, ADR-0028 D2). Le rapport n'a jamais
 publié d'IC sur ρ ; le point est corrigé avant le paquet (l'erratum doit y figurer avant son scellement).
 
+*Ajout daté du 2026-10-02 (SHOGEN-DOC-ERRATA-P3-1 ; l'erratum qui précède est inchangé)* : « primaire en procurement L-46, non détenu » est périmé : Fisher 1921 (*Metron* 1:3-32) est versé (`biblio/INDEX.md` l.337) et lu (`docs/adr-0028/LECTURES-PARTIE-3.md`) ; il n'imprime pas « 1/√(n−3) » ; la formulation retenue est au paquet de pré-enregistrement (`docs/adr-0028/PAQUET-PREREG-S2.md` §12 pt 12 : poids N−3 sur l'échelle z, pp. 14 et 18), où figure l'erratum z′/ρ, scellé le 2026-10-02.
+
 | stat | définition | ce qu'elle capte |
 |---|---|---|
 | (1) ρ_raw | Pearson des log-rendements `r_s(j) = ln p_s(j) − ln p_s(j−1)`, par paire | plancher commun, PAS discriminant : ≈ 1 pour toute paire honnête de la classe (facteur marché) ; un ρ_raw *bas* est le signal étrange |

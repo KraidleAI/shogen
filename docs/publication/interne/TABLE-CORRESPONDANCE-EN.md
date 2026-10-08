@@ -1,0 +1,64 @@
+# Table de correspondance, section par section (fr → en) — lot DOCS11-EN
+
+Générée par `controle_en.py --table` depuis l'alignement des unités (une unité : titre, paragraphe, élément de liste, ligne de table, bloc de code ou paragraphe de citation). Source sha256 `c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561` ; traduction sha256 `60f7dc7a7b6784a2d528e5d5f2ffe1798bef20b20c12156be688e92a7b2021d6`. Les deux paragraphes d'en-tête ajoutés (brief, point 6) et le glossaire final ne figurent pas ici : ce sont des ajouts déclarés, contrôlés à part (contrôles 10 et 11).
+
+| # | titre français (l.) | titre anglais (l.) | unités : para / liste / table / code / bloc | nombres (composites) fr = en | nombres identiques par unité | citations gardées | citations traduites | gloses |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Les mesures pilotes S2 — rapport de la campagne (exécution unique du 2026-10-04) (l.1) | The S2 pilot measurements — campaign report (single execution of 2026-10-04) (l.1) | 0 / 0 / 0 / 0 / 4 | 22 = 22 | oui | 0 | 2 | 0 |
+| 2 | 1. Résumé (l.30) | 1. Summary (l.15) | 7 / 4 / 0 / 0 / 0 | 101 = 101 | oui | 5 | 12 | 7 |
+| 3 | Conventions de lecture et lexique (l.84) | Reading conventions and lexicon (l.36) | 3 / 18 / 9 / 0 / 0 | 81 = 81 | oui | 2 | 3 | 3 |
+| 4 | 2. Instrument et campagne (l.142) | 2. Instrument and campaign (l.74) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
+| 5 | 2.1 Classe de fait, pool, flux et hôtes (l.144) | 2.1 Fact class, pool, feeds and hosts (l.76) | 0 / 5 / 7 / 0 / 0 | 39 = 39 | oui | 4 | 0 | 3 |
+| 6 | 2.2 Pool d'analyse (ADR-0028 D1) (l.168) | 2.2 Analysis pool (ADR-0028 D1) (l.93) | 1 / 0 / 4 / 0 / 0 | 23 = 23 | oui | 4 | 1 | 3 |
+| 7 | 2.3 Segment J28 (ADR-0028 D4, D2 pt 6) (l.179) | 2.3 J28 segment (ADR-0028 D4, D2 pt 6) (l.102) | 0 / 3 / 0 / 0 / 0 | 21 = 21 | oui | 1 | 0 | 1 |
+| 8 | 2.4 Exclusion D5 (l.188) | 2.4 D5 exclusion (l.108) | 0 / 4 / 0 / 0 / 0 | 29 = 29 | oui | 1 | 0 | 1 |
+| 9 | 2.5 Strates et n par strate (l.198) | 2.5 Strata and n per stratum (l.115) | 0 / 3 / 0 / 0 / 0 | 26 = 26 | oui | 1 | 0 | 1 |
+| 10 | 2.6 Fenêtres sautées (l.207) | 2.6 Skipped windows (l.121) | 0 / 4 / 0 / 0 / 0 | 27 = 27 | oui | 1 | 0 | 1 |
+| 11 | 2.7 Hôte de collecte et limites de l'observateur (l.217) | 2.7 Collection host and limitations of the observer (l.128) | 0 / 5 / 0 / 0 / 0 | 34 = 34 | oui | 3 | 0 | 2 |
+| 12 | 3. Verdict confirmatoire (J28, règle SHOGEN-CRITERE-R1-1) (l.234) | 3. Confirmatory verdict (J28, rule SHOGEN-CRITERE-R1-1) (l.136) | 1 / 0 / 0 / 0 / 0 | 9 = 9 | oui | 1 | 0 | 0 |
+| 13 | 3.1 Entrées et valeur par strate (valeurs complètes) (l.240) | 3.1 Inputs and value per stratum (complete values) (l.140) | 2 / 0 / 20 / 0 / 0 | 112 = 112 | oui | 0 | 0 | 0 |
+| 14 | 3.2 Énoncés imprimés (pt 8), mot pour mot (l.272) | 3.2 Printed statements (pt 8), word for word (l.167) | 2 / 0 / 0 / 1 / 0 | 57 = 57 | oui | 1 | 1 | 1 |
+| 15 | 3.3 « R1 discrimine » (l.294) | 3.3 « R1 discrimine » (l.184) | 1 / 0 / 0 / 0 / 0 | 7 = 7 | oui | 2 | 0 | 1 |
+| 16 | 3.4 Famille de Bonferroni et prémisse de la borne (pt 7) (l.300) | 3.4 Bonferroni family and premise of the bound (pt 7) (l.188) | 2 / 0 / 0 / 1 / 0 | 43 = 43 | oui | 0 | 1 | 0 |
+| 17 | 3.5 Écarts par flux (bloc 3) (l.318) | 3.5 Anomalies per feed (block 3) (l.198) | 1 / 0 / 13 / 0 / 0 | 135 = 135 | oui | 1 | 0 | 2 |
+| 18 | 4. Drapeaux et R2 (blocs 5 et 6 du J28) (l.337) | 4. Flags and R2 (blocks 5 and 6 of J28) (l.216) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
+| 19 | 4.1 Tête de certificat (bloc 6), recopiée (l.339) | 4.1 Certificate head (block 6), copied (l.218) | 1 / 4 / 0 / 1 / 0 | 84 = 84 | oui | 5 | 0 | 5 |
+| 20 | 4.2 R2 en résumé (bloc 5) (l.379) | 4.2 R2 in summary (block 5) (l.249) | 0 / 5 / 0 / 0 / 0 | 35 = 35 | oui | 2 | 0 | 1 |
+| 21 | 4.3 Divergences ASN pour des hôtes hors du pool (SHOGEN-ASN-DIVERGENCE-HORS-POOL-1, annexe B.44) (l.404) | 4.3 ASN divergences for hosts outside the pool (SHOGEN-ASN-DIVERGENCE-HORS-POOL-1, annex B.44) (l.257) | 1 / 0 / 0 / 0 / 0 | 10 = 10 | oui | 0 | 0 | 0 |
+| 22 | 4.4 Caveats du chemin de lecture (RPC) (l.412) | 4.4 Caveats of the reading path (RPC) (l.261) | 0 / 3 / 0 / 0 / 0 | 13 = 13 | oui | 1 | 0 | 1 |
+| 23 | 5. Descriptifs pré-enregistrés (annexe D.5, paquet §11), hors décision (l.423) | 5. Pre-registered descriptives (annex D.5, package §11), hors décision (l.267) | 1 / 0 / 0 / 0 / 0 | 3 = 3 | oui | 0 | 0 | 0 |
+| 24 | 5.1 τ observé contre τ committé (SHOGEN-TAU-REDERIV-1) (l.428) | 5.1 Observed τ against committed τ (SHOGEN-TAU-REDERIV-1) (l.271) | 2 / 0 / 7 / 0 / 0 | 48 = 48 | oui | 0 | 0 | 0 |
+| 25 | 5.2 Décomposition de K par lectures `panne_transport` (SHOGEN-HOST-DEGRADED-1) (l.450) | 5.2 Decomposition of K by `panne_transport` readings (SHOGEN-HOST-DEGRADED-1) (l.285) | 2 / 0 / 0 / 1 / 0 | 30 = 30 | oui | 0 | 0 | 0 |
+| 26 | 5.3 Censure : fenêtres sautées et bornes non extérieures (SHOGEN-CENSURE-INFO-1) (l.467) | 5.3 Censoring: skipped windows and non-outer bounds (SHOGEN-CENSURE-INFO-1) (l.297) | 2 / 0 / 4 / 0 / 0 | 27 = 27 | oui | 2 | 0 | 2 |
+| 27 | 5.4 Diagnostic de runs de I_t et FIV (l.485) | 5.4 Diagnostic of runs of I_t and FIV (l.308) | 0 / 3 / 0 / 0 / 0 | 32 = 32 | oui | 2 | 0 | 2 |
+| 28 | 6. Lift et identité φ de D3 (SHOGEN-D3-LIFT-1, annexe B.42) (l.499) | 6. Lift and φ identity of D3 (SHOGEN-D3-LIFT-1, annex B.42) (l.314) | 4 / 3 / 8 / 0 / 0 | 173 = 173 | oui | 0 | 3 | 0 |
+| 29 | 7. Sorties hors décision (paquet §10.2 pt 9) (l.542) | 7. Outputs hors décision (package §10.2 pt 9) (l.337) | 1 / 0 / 0 / 0 / 0 | 8 = 8 | oui | 3 | 0 | 1 |
+| 30 | 7.1 J14 principal (l.549) | 7.1 Main J14 (l.341) | 4 / 0 / 9 / 2 / 0 | 111 = 111 | oui | 3 | 0 | 3 |
+| 31 | 7.2 J14 second (sensibilité « seconde coupe ») (l.589) | 7.2 Second J14 (« seconde coupe » sensitivity) (l.373) | 3 / 0 / 9 / 1 / 0 | 73 = 73 | oui | 3 | 0 | 1 |
+| 32 | 7.3 Strate poolée (exploratoire, hors famille, hors décision) (l.616) | 7.3 Pooled stratum (exploratory, outside the family, hors décision) (l.395) | 2 / 2 / 0 / 0 / 0 | 24 = 24 | oui | 1 | 0 | 1 |
+| 33 | 7.4 Sensibilité « plage incluse » (liste fermée, D2 pt 7) (l.629) | 7.4 « plage incluse » sensitivity (closed list, D2 pt 7) (l.404) | 1 / 4 / 6 / 1 / 0 | 64 = 64 | oui | 3 | 0 | 3 |
+| 34 | 7.5 L&M (bloc 4) (l.663) | 7.5 L&M (block 4) (l.424) | 2 / 0 / 8 / 0 / 0 | 51 = 51 | oui | 1 | 0 | 0 |
+| 35 | 7.6 Queues exactes (l.683) | 7.6 Exact tails (l.439) | 1 / 0 / 0 / 0 / 0 | 7 = 7 | oui | 0 | 0 | 0 |
+| 36 | 8. Contrôles de l'exécution (l.689) | 8. Checks of the execution (l.443) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
+| 37 | 8.1 Sceau (l.691) | 8.1 Seal (l.445) | 0 / 7 / 0 / 0 / 0 | 51 = 51 | oui | 1 | 2 | 1 |
+| 38 | 8.2 Gardes (annexe D.4 b ; paquet §9) (l.719) | 8.2 Guards (annex D.4 b; package §9) (l.455) | 0 / 3 / 0 / 0 / 0 | 35 = 35 | oui | 1 | 0 | 1 |
+| 39 | 8.3 Journaux et sorties (l.733) | 8.3 Journals and outputs (l.461) | 0 / 2 / 0 / 0 / 0 | 15 = 15 | oui | 0 | 0 | 0 |
+| 40 | 8.4 Enregistrement d'oracle (D6 (viii)) (l.745) | 8.4 Oracle record (D6 (viii)) (l.466) | 1 / 0 / 0 / 0 / 0 | 31 = 31 | oui | 1 | 0 | 1 |
+| 41 | 8.5 Suite `s2-harness` (l.756) | 8.5 `s2-harness` suite (l.470) | 1 / 0 / 0 / 0 / 0 | 10 = 10 | oui | 0 | 0 | 0 |
+| 42 | 8.6 Oracle `recompute_*` (run `recalcul-tiers`) : ce qu'il établit et ce qu'il n'établit pas (l.762) | 8.6 `recompute_*` oracle (run `recalcul-tiers`): what it establishes and what it does not establish (l.474) | 0 / 3 / 0 / 0 / 0 | 34 = 34 | oui | 1 | 1 | 0 |
+| 43 | 8.7 Verdict du journal brut (l.781) | 8.7 Verdict of the raw journal (l.480) | 1 / 2 / 0 / 1 / 0 | 35 = 35 | oui | 0 | 1 | 0 |
+| 44 | 8.8 Durée (l.797) | 8.8 Duration (l.491) | 1 / 0 / 0 / 0 / 0 | 9 = 9 | oui | 0 | 0 | 0 |
+| 45 | 8.9 Recomptes du rédacteur [calc] (l.802) | 8.9 Recounts by the drafter [calc] (l.495) | 2 / 0 / 6 / 0 / 0 | 31 = 31 | oui | 0 | 0 | 0 |
+| 46 | 9. Limites (l.819) | 9. Limitations (l.508) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
+| 47 | 9.1 Limites écrites avec la règle (paquet §10.2, pts 2, 7 et 11) (l.821) | 9.1 Limitations written with the rule (package §10.2, pts 2, 7 and 11) (l.510) | 0 / 8 / 0 / 0 / 0 | 36 = 36 | oui | 0 | 1 | 0 |
+| 48 | 9.2 Limites et procédures écrites au paquet (§12, points 1 à 20) (l.838) | 9.2 Limitations and procedures written in the package (§12, points 1 to 20) (l.521) | 0 / 20 / 0 / 0 / 0 | 58 = 58 | oui | 4 | 1 | 1 |
+| 49 | 9.3 Limites constatées d'après l'exécution (l.878) | 9.3 Limitations observed from the execution (l.544) | 0 / 14 / 0 / 0 / 0 | 94 = 94 | oui | 4 | 0 | 2 |
+| 50 | 10. Déviations et expositions déclarées (l.918) | 10. Declared deviations and exposures (l.561) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
+| 51 | 10.1 Lecture D.1 n° 16 : exposition de l'orchestrateur de la session cloud (l.920) | 10.1 Reading D.1 No. 16: exposure of the orchestrator of the cloud session (l.563) | 0 / 3 / 0 / 0 / 0 | 27 = 27 | oui | 0 | 2 | 0 |
+| 52 | 10.2 Fermeture de MONARK-S2-M009A-EXPOSITION-1 (annexe B.38) (l.938) | 10.2 Closure of MONARK-S2-M009A-EXPOSITION-1 (annex B.38) (l.569) | 1 / 0 / 0 / 0 / 0 | 14 = 14 | oui | 0 | 3 | 0 |
+| 53 | 10.3 Remplacement du premier sceau (A-8 ; lot CORR) (l.950) | 10.3 Replacement of the first seal (A-8; CORR work package) (l.573) | 0 / 5 / 0 / 0 / 0 | 32 = 32 | oui | 0 | 1 | 0 |
+| 54 | 10.4 Précédence D-4 (SHOGEN-D4-PRECEDENCE-RAPPORT-1, annexe B.45) (l.968) | 10.4 Precedence D-4 (SHOGEN-D4-PRECEDENCE-RAPPORT-1, annex B.45) (l.581) | 1 / 0 / 0 / 0 / 0 | 19 = 19 | oui | 3 | 0 | 0 |
+| 55 | 10.5 Autres déviations (l.977) | 10.5 Other deviations (l.585) | 1 / 0 / 0 / 0 / 0 | 13 = 13 | oui | 1 | 0 | 1 |
+| 56 | 11. Analyses ajoutées après le pré-enregistrement : non faites à la date du rapport (l.986) | 11. Analyses added after the pre-registration: not done at the date of the report (l.589) | 1 / 0 / 10 / 0 / 0 | 41 = 41 | oui | 2 | 4 | 1 |
+| 57 | 11.1 Ajout daté du 2026-10-04 : analyses faites après le pré-enregistrement (lot POST-PREREG), hors décision (l.1002) | 11.1 Addition dated 2026-10-04: analyses done after the pre-registration (POST-PREREG work package), hors décision (l.604) | 4 / 0 / 13 / 0 / 0 | 166 = 166 | oui | 4 | 2 | 1 |
+| 58 | 12. Reproduire (l.1058) | 12. Reproduce (l.628) | 0 / 6 / 0 / 0 / 2 | 65 = 65 | oui | 0 | 2 | 0 |

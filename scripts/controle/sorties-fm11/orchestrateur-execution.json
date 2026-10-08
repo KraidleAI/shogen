@@ -1,0 +1,37 @@
+{
+ "transcription": "orchestrateur de la session cloud (D.2 n° 11 : non versée)",
+ "evenements": 5896,
+ "evenement_du_go": 5169,
+ "horodatage_du_go": "2026-10-04T01:06:19.159Z",
+ "fragments_l51_l14_apres_go": {
+  "resultats": 0,
+  "entrees": 0
+ },
+ "fragments_fichier_entier": {
+  "resultats": 1,
+  "entrees": 0
+ },
+ "fragment_avant_go": {
+  "evenement": 288,
+  "horodatage": "2026-10-02T02:46:54.012Z",
+  "lecture": "D.1 n° 15 (SHOGEN-EXPOSITION-ORCH-CLOUD-1), déclarée avant le premier sceau"
+ },
+ "motifs_apres_go": {
+  "resultats": {
+   "(?<![\\w-])(control|journal|raw)\\.jsonl": 4,
+   "7ba84933-ba6d": 31,
+   "adr-0025": 2,
+   "PAROXYSME-Shogen": 1,
+   "paroxysme-2026-09-27": 1,
+   "AVIS-advisor-2026-09-26": 1
+  },
+  "entrees": {
+   "7ba84933-ba6d": 77,
+   "session_013dvmub": 17,
+   "adr-0025": 29,
+   "(?<![\\w-])(control|journal|raw)\\.jsonl": 4,
+   "SHA256SUMS-cloture": 3,
+   "shogen-campagne": 1
+  }
+ }
+}

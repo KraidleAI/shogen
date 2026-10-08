@@ -32,15 +32,16 @@ claim de recalculabilité (plan §5).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from collections import Counter
 from decimal import Decimal, localcontext
 
 from . import r2, records
 from .lm import compute_lm
 from .r1 import (
     A_WINDOW_STATIONARITY,
-    DECIMAL_PREC,
     ELL_BLOC,
     ETIQUETTE_POOLEE,
     GARDE_BLOCS,
@@ -50,7 +51,9 @@ from .r1 import (
     build_window_strate,
     classify_cells,
     compute_r1,
+    contexte_decimal,
     fenetres_sautees,
+    fenetres_sautees_vivant,
     parse_journal,
     regle_critere,
 )
@@ -68,8 +71,11 @@ ETIQUETTE_CENSURE = ("bornes à P̂_more fixé, non extérieures ; verdict non i
 
 
 def _fmt_dec(x) -> str:
-    """Decimal → chaîne exacte (recalculable) ; None → tiret."""
-    return "-" if x is None else str(x)
+    """Decimal → chaîne exacte (recalculable) ; zéro Decimal exact → « 0 », forme unique quel que soit l'exposant
+    hérité du calcul (SHOGEN-RENDU-ZERO-1) ; None → tiret. Écrit sous le contexte nommé, jamais celui de l'appelant
+    (capitals de l'exposant : SHOGEN-FMT-CONTEXTE-1)."""
+    with localcontext(contexte_decimal()):
+        return "-" if x is None else "0" if isinstance(x, Decimal) and x == 0 else str(x)
 
 
 def _iso_utc(ts) -> str:
@@ -88,10 +94,14 @@ def _comptes(recs, strates) -> list:
 
 
 def _retires(avant, apres, strates) -> str:
-    """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1)."""
+    """Comptes retirés d'`avant` à `apres` (bloc 1 ; ADR-0028 D5, SHOGEN-EXCL-COMPTE-1) ; asn_attribution
+    ventilées par valeur du statut de l'enregistrement, sur la même assiette (SHOGEN-ASN-STATUT-1)."""
     d = [x - y for x, y in zip(_comptes(avant, strates), _comptes(apres, strates))]
     fen = ", ".join(f"{st} {k}" for st, k in zip(strates, d)) or "0 (aucune fenêtre au journal)"
-    return f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]} ; clock_check {d[-1]}"
+    st = Counter(r.get("status") for r in avant[2]) - Counter(r.get("status") for r in apres[2])
+    ven = ", ".join(f"{'sans statut' if k is None else k} {v}" for k, v in sorted(st.items(), key=str))
+    return (f"fenêtres distinctes (window_close) {fen} ; asn_attribution {d[-2]}" + (f" ({ven})" if ven else "")
+            + f" ; clock_check {d[-1]}")
 
 
 def _duree(s: int) -> str:
@@ -120,7 +130,7 @@ def _ligne_variante(st: str, nom: str, blk) -> str:
     if blk is None:
         return tete + "absente (0 fenêtre retenue)"
     zs = f"z = {_fmt_dec(blk['z'])}" if blk["z"] is not None else (
-        "z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) ; " + (
+        f"z non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < {_fmt_dec(blk['seuil_historique'])}) ; " + (
             f"queue exacte P(K ≥ K_obs | Bin(n, P̂_more)) = {_fmt_dec(blk['queue_binomiale_P_K_ge_Kobs'])}"
             if blk["queue_exacte_applicable"] else "queue dégénérée (P̂_more ∈ {0,1})"))
     return (tete + f"n = {blk['n']} ; K = {blk['K']} ; P̂_more = {_fmt_dec(blk['P_more'])} ; {zs} ; "
@@ -182,12 +192,13 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
        "journal seul (ADR-0003)")
     ap("=" * 78)
     ap("\n[BLOC 1] PARAMÈTRES")
-    for key in ("harness_version", "classe", "pool", "w", "sample_lead",
-                "sigma_classe", "sigma_class_of_flux", "tau_classe", "kappa",
-                "seuil_historique_valeur",
-                "n_min_hors_enveloppe", "strate_defaut", "decimal_prec",
-                "seuil_historique", "seuil_z", "residu_staleness",
-                "n_windows_demande", "started_utc", "note_skeleton"):
+    cles = ("harness_version", "classe", "pool", "w", "sample_lead",
+            "sigma_classe", "sigma_class_of_flux", "tau_classe", "kappa",
+            "seuil_historique_valeur",
+            "n_min_hors_enveloppe", "strate_defaut", "decimal_prec",
+            "seuil_historique", "seuil_z", "residu_staleness",
+            "n_windows_demande", "started_utc", "note_skeleton")
+    for key in cles:
         if key in params:
             ap(f"  {key:24} = {params[key]}")
     ap(f"  {'run_params_demarrages':24} = {len(params_list)} (concordants sur les "
@@ -203,6 +214,11 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                                   f"{_iso_utc(deb[-1])} (window_start)" if deb else "") + " — HS2-05")
     ap(f"  {'portee_run_params':24} = journal entier, jamais segmenté ni exclu (§E) : run_params_demarrages"
        " = tous les démarrages ; started_utc, n_windows_demande = dernier démarrage (HS2-05)")
+    nb = [k for k in cles if k in params and k not in records.LOAD_BEARING_KEYS + records.R2_LOAD_BEARING_KEYS]
+    ap(f"  {'run_params_non_porteurs':24} = valeurs distinctes sur les {len(params_list)} démarrages, par clé non "
+       "porteuse imprimée ci-dessus (valeur du dernier démarrage, hors contrôle de concordance §E) : " + ", ".join(
+           f"{k} {len({json.dumps(p.get(k), sort_keys=True) for p in params_list})}" for k in nb)
+       + " — SHOGEN-BLOC1-RUNPARAMS-1")
     dans_seg = records.filtre_lecture(params, *tous, (), segment)[:3]   # assiette des comptes par plage
     if seg is not None:
         ap(f"  {'segment':24} = [{seg[0]} ; {seg[1]}) = [{_iso_utc(seg[0])} ; {_iso_utc(seg[1])}) "
@@ -236,6 +252,17 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
        f"marqueur window_close, hors plages D5 : {ss}" if bs else "aucune fenêtre au journal") + " — toutes "
        "causes confondues, sous l'hypothèse H_perte (pertes d'outillage non informatives : "
        "A(loss-non-informative), registre 08) ; ADR-0028 annexe D.5, SHOGEN-CENSURE-INFO-1")
+    # SHOGEN-CENSURE-CAUSES-1, option (a) (ADR-0028 annexe B.23) : s = part vivante + reste, par strate
+    vivant = fenetres_sautees_vivant(ws_tous, records.demarrages(control_path), params["strate_calendar"], w, seg,
+                                     ranges)
+    for st in sorted({*strates, *sautees}):
+        v, s = vivant.get(st, 0), sautees.get(st, 0)
+        ap(f"  {'sautees_harnais_vivant':24} = « {st} » : {v} sur s = {s} — sautées entre deux marqueurs window_close "
+           "d'un même démarrage (run_params ou clock_check « startup », ordre du journal) : harnais vivant — "
+           "SHOGEN-CENSURE-CAUSES-1")
+        ap(f"  {'sautees_non_attribuees':24} = « {st} » : {s - v} sur s = {s} — arrêt ou passage entre démarrages, "
+           "cause non attribuée par le journal (fenêtres entre started_epoch et le premier marqueur d'un démarrage "
+           "comprises) — SHOGEN-CENSURE-CAUSES-1")
     for st, f, k_ok, k_tot, n_s in retraits:   # ADR-0028 D1 (c) : uniquement si retrait
         cas = "(a), hors R2 aussi" if f not in pool_an else "(b), gardé par R2"
         ap(f"  {'pool_analyse_retrait':24} = {f} strate « {st} » : ok = {k_ok} / {k_tot} "
@@ -281,7 +308,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # ── Bloc 3 : R1 ────────────────────────────────────────────────────────
     ap("\n[BLOC 3] R1 (test K&L §5 transposé — 10 §5.1/§5.2/§5.4)")
-    ap("  définition d'écart (10 §5.2 ; r1.classify_ecart), par fenêtre et par flux du pool d'analyse, "
+    ap("  définition d'écart (10 §5.2 ; τ relatif : ADR-0020 déc. 2, ADR-0022 ; r1.classify_ecart), par fenêtre "
+       "et par flux du pool d'analyse, "
        "précédence panne > staleness > hors-enveloppe : panne = lecture absente, statut ≠ ok ou prix "
        "absent ; staleness = win_end − source_ts > σ_classe de la classe du flux (σ_classe ou source_ts "
        "absent : non évaluée) ; hors-enveloppe = |p − médiane_LOO|/médiane_LOO > τ_classe, N ≥ n_min "
@@ -314,7 +342,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         ap(f"    n·P̂_more·(1−P̂_more) = {_fmt_dec(blk['gate_value'])} "
            f"(seuil {_fmt_dec(blk['seuil_historique'])})")
         if blk["flag_historique_insuffisant"]:
-            ap("    z       = non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < 10) — "
+            ap("    z       = non publié (garde §5.4 : n·P̂_more·(1−P̂_more) < "
+               f"{_fmt_dec(blk['seuil_historique'])}) — "
                "aucun z non significatif présenté comme absence de dépendance (04 §2)")
             if blk.get("queue_exacte_applicable"):
                 ap(f"    queue exacte P(K ≥ K_obs={blk['K']} | Bin(n={blk['n']}, P̂_more)) "
@@ -373,7 +402,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     # Règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 5, 6, 8) : valeurs de r1.regle_critere, sans recalcul
     ap("\n  ── règle SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pts 1-11 ; forme scellée) : valeur par strate ; "
        "comparaisons sur les Decimal publiées, non arrondies, au seuil 2.33, « ≥ » ; aucune p-valeur")
-    kp, axes = r2_out["partition"], "axes panne / staleness / hors-enveloppe"
+    kp = r2_out["partition"]
     ke = ("= non évaluable" if kp["k_eff"] is None else f"≤ {kp['k_eff']} (borne supérieure)"
           if kp.get("k_eff_is_upper_bound") else f"= {kp['k_eff']}")
     suites = {"garde_5_4": " : strate non testée, hors décision (§1 bis.1 pt 2)",
@@ -381,8 +410,14 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
               "discordance": " (discordance)"}
     for st, e in rg["strates"].items():
         blk, cas, tete = r1["strates"][st], e["cas"], f"    « {st} » : "
-        z, zb = blk["z"], blk["bloc"]["z_bloc"]
-        zs = ("z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < 10)" if z is None else
+        z, zb, src = blk["z"], blk["bloc"]["z_bloc"], blk["per_source"].values()
+        fo, ne = blk["residu_staleness_fail_open"], sum(s["non_eval_hors_env"] for s in src)   # AXES-ENONCE-1 (b)
+        res = [f"staleness fail-open : {', '.join(fo)}"] * bool(fo) + [
+            f"hors-enveloppe non évaluable : {ne} cellules (fenêtre, flux)"] * bool(ne)
+        axes = "axes " + " / ".join(a.replace("_", "-") for a in ("panne", "staleness", "hors_enveloppe") if any(
+            a in s["axes_evaluables"] for s in src)) + f" (résidu : {' ; '.join(res) or 'aucun'})"
+        zs = (f"z_s non publié (garde §5.4 : n·P̂_more·(1 − P̂_more) < {_fmt_dec(blk['seuil_historique'])})"
+              if z is None else
               f"z_s = {_fmt_dec(z)} {'<' if cas == 'z_sous_seuil' else '≥'} 2,33"
               + (" (z_s ≤ −2,33 : hors famille, sans conclusion)" if z <= -SEUIL_Z else ""))
         zbt = ("" if cas in ("garde_5_4", "z_sous_seuil") else
@@ -452,7 +487,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     lm_out = compute_lm(markers, readings, pool_an, w, sigma_by_class,
                         sigma_class_of_flux, tau, n_min, pools)
     ap(f"\n[BLOC 4] L&M (§5.5) — fonction de difficulté Θ ; N = {lm_out['N']} flux "
-       + ("(pool d'analyse ; N par strate ci-dessous, ADR-0028 D1)" if cas_b else "(pool)"))
+       + ("(pool d'analyse ; N par strate ci-dessous, ADR-0028 D1)" if cas_b else
+          "(pool d'analyse, ADR-0028 D1)" if pool_an != pool else "(pool)"))      # cas (a) : C-4 de R-B
     for st, blk in lm_out["strates"].items():
         ap(f"\n  ── strate « {st} » : n = {blk['n']} ; Σ mⱼ = {blk['sum_m']}"
            + (f" ; N = {blk['N']}" if cas_b else ""))
@@ -526,8 +562,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
 
     # 5b. Axe contenu (§4.2) — 5 statistiques PAR PAIRE, jamais fusionnées
     content = r2_out["content"]
-    ap(f"\n  (b) AXE CONTENU (§4.2) — {content['n_windows']} fenêtres ; N_min = "
-       f"{content['n_min']} (Fisher)")
+    ap(f"\n  (b) AXE CONTENU (§4.2) — {content['n_windows']} fenêtres ; N_min = {content['n_min']} fenêtres "
+       "communes par paire (choix de conception, doc 10 §4.2 b ; SE(artanh r) = 1/√(N−3), transformation de "
+       "Fisher, Penn State STAT 509 L7 §7.8)")
     ap(f"      {content['grid_note']}")
     ap(f"      critère de fusion contenu v0 : {content['merge_criterion']}")
     ap(f"      {content['coab_staleness_note']}")
@@ -572,8 +609,8 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
         for k, v in sorted(cc["cluster_pairs"].items()):
             ap(f"      {k} : ρ(Θ̂)={_fmt_dec(v['rho'])} ({v['signe']}) [{v['note']}]")
     else:
-        ap(f"      aucun cluster à ≥ 2 flux ({cc['n_multi_clusters']}) → tout reste au φ "
-           "par paire de flux (bloc 4)")
+        ap(f"      moins de deux clusters à ≥ 2 flux ({cc['n_multi_clusters']}) : aucune paire de clusters → tout "
+           "reste au φ par paire de flux (bloc 4)")              # SHOGEN-BLOC5-LIBELLE-1
 
     # 5e. Les 7 résidus de l'axe ASN (§4.1) — publiés avec l'observable
     ap("\n  (e) LES 7 RÉSIDUS DE L'AXE ASN (§4.1) — un observable est un témoignage "
@@ -593,12 +630,16 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
     else:
         ap(f"  k_eff     = {_fmt_dec(part['k_eff'])}  — {part['k_eff_note']}")
     hs = [h for h in part["hosts"] if h in part["attribution_by_host"]]      # hôtes du pool, relevé retenu
-    ts = sorted(part["attribution_by_host"][h]["ts"] for h in hs)
+    sans = [h for h in hs if part["attribution_by_host"][h].get("ts") is None]     # SHOGEN-BLOC6-TS-1
+    ts = sorted(part["attribution_by_host"][h]["ts"] for h in hs if h not in sans)
     ap("  date de la partition, axe ASN (ADR-0026 déc. 1 ; HS2-07) = " + (
         f"relevé asn_attribution retenu (dernier par hôte, après filtre de lecture) : min {ts[0]} = "
-        f"{_iso_utc(ts[0])} ; max {ts[-1]} = {_iso_utc(ts[-1])} ; {len(hs)} / {len(part['hosts'])} hôtes "
-        "du pool" if ts else "non mesurée (aucun hôte du pool n'a de relevé asn_attribution retenu)")
-       + " — descriptif seulement (ADR-0028 annexe D.5)")
+        f"{_iso_utc(ts[0])} ; max {ts[-1]} = {_iso_utc(ts[-1])} ; {len(ts)} / {len(part['hosts'])} hôtes "
+        "du pool" if ts else "non mesurée (aucun hôte du pool n'a de relevé asn_attribution retenu"
+        + (" daté)" if sans else ")")) + " — descriptif seulement (ADR-0028 annexe D.5)")
+    ap(f"  relevés asn_attribution retenus sans ts (hôtes du pool, entrée malformée) = {len(sans)}"
+       + (f" : {', '.join(sans)}" if sans else "") + " — comptés à part, hors date de la partition "
+       "(SHOGEN-BLOC6-TS-1)")
     ap("  R3 (déclaration : entité légale, juridiction, méthodologie annoncée) ne "
        "modifie JAMAIS k_eff (§5.6 / 04 §3) — seuls les recouvrements R2 measured partitionnent.")
     ap("  PARTITION NOMMÉE (ADR-0007 : nomme l'amont, jamais un compte anonyme) :")
@@ -645,8 +686,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                           seuil_hist, n_min, pools_i)
         sc = params["strate_calendar"]
         we, jours = sc.get("kind") == "weekend_utc", set(sc.get("stress_weekdays", ()))
-        ap("\n[SENSIBILITÉ] PLAGE D'EXCLUSION INCLUSE — ADR-0025 déc. 4 ; ADR-0028 D2 pt 7 (liste fermée), "
-           "§1 bis.1 pt 9 : hors décision")
+        ap("\n[SENSIBILITÉ] " + ("PLAGE D'EXCLUSION INCLUSE" if len(ranges) == 1 else    # SENS-PLAGES-1
+                                f"{len(ranges)} PLAGES D'EXCLUSION INCLUSES") + " — ADR-0025 déc. 4 ; ADR-0028 D2 "
+           "pt 7 (liste fermée), §1 bis.1 pt 9 : hors décision")
         ap("  variante « exclue » = principale (blocs 1-6) ; variante « incluse » = sensibilité — biaisée "
            "vers le haut par construction ; documente l'exclusion D5 ; pas un estimateur alternatif")
         ap("  motif de l'exclusion (harnais dégradé, ADR-0025) : causalité non établie")
@@ -656,6 +698,18 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
            "(SHOGEN-DP-JOURNAL-LOSS-1, ADR-0028 annexe D.5 ; repris du bloc 1, sans second calcul) :")
         for t in pertes:
             ap(f"    {t}")
+        ws_seg = build_window_strate(dans_seg[0])           # SHOGEN-SENS-PERTES-2 : assiette du segment
+        for a, b in ranges:
+            sa = fenetres_sautees(ws_tous, sc, w, (a, b + 1) if seg is None else (max(a, seg[0]),
+                                                                                   min(b + 1, seg[1])))
+            ab = Counter()
+            for x, s in ws_seg.items():
+                ab[s] += sum((x, f) not in reading_map for f in pools_i[s]) if a <= x <= b else 0
+            ls = sorted({*strates, *sa})
+            ap(f"    [{a} ; {b}] pertes du journal dans la plage : fenêtres de grille sans marqueur "
+               + ", ".join(f"{s} {sa.get(s, 0)}" for s in ls) + " ; lectures absentes des fenêtres à marqueur "
+               "(pool D1 de la variante incluse) " + ", ".join(f"{s} {ab[s]}" for s in ls)
+               + " — SHOGEN-SENS-PERTES-2")
         for st in (sorted({sc["calme"], sc["stress"]}) if we else [sc.get("strate", STRATE_DEFAUT)]):
             e, i = r1.get("strates", {}).get(st), r1_i.get("strates", {}).get(st)
             ap(_ligne_variante(st, "exclue (principale)", e))
@@ -663,10 +717,9 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
             if e is None or i is None or e["z"] is None or i["z"] is None:
                 ap(f"  {st:8} écart de z : non calculable (z non publié ou strate absente d'une variante)")
             else:
-                with localcontext() as ctx:
-                    ctx.prec = DECIMAL_PREC
+                with localcontext(contexte_decimal()):
                     dz = +(i["z"] - e["z"])
-                ap(f"  {st:8} écart de z = {_fmt_dec(dz) if dz else '0'}")
+                ap(f"  {st:8} écart de z = {_fmt_dec(dz)}")
             if e is not None and i is not None and pools[st] != pools_i[st]:
                 ap(f"  {st:8} pool d'analyse D1 : exclue {pools[st]} ; incluse {pools_i[st]} (diffèrent)")
         if not (we and 0 < len(jours) < 7):
@@ -679,6 +732,7 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                               if weekday_utc(d * 86400) in jours}, sc) if jrs else {}
             inc = {k: inc.get(k, 0) for k in sorted(set(inc) | set(cal))}
             plein = {k: len(range(-(-k[0] // w) * w, k[1], w)) for k in inc}
+            pl = "la plage" if len(ranges) == 1 else f"les {len(ranges)} plages"      # SENS-PLAGES-2
             ap(f"  couverture par week-end (fenêtres « {sc['stress']} », stress_weekdays = {sorted(jours)} "
                f"UTC ; w = {w} s de run_params ; durée = fenêtres × w) :"
                + ("" if inc else " aucun week-end"))
@@ -686,11 +740,11 @@ def render_report(control_path: str, journal_path: str, exclude_ranges=(), segme
                 n_e = ex.get((a, b), 0)
                 ap(f"    week-end {_iso_utc(a)[:10]} [{a} ; {b}) : complet = {plein[a, b]} fenêtres = "
                    f"{_duree(plein[a, b] * w)} ; exclue {n_e} = {_duree(n_e * w)} ; incluse {n_i} = "
-                   f"{_duree(n_i * w)} ; retirées par la plage {n_i - n_e}")
+                   f"{_duree(n_i * w)} ; retirées par {pl} {n_i - n_e}")
             tot = [sum(1 for k in inc if d.get(k, 0) == plein[k]) for d in (ex, inc)]
             par = [sum(1 for k in inc if 0 < d.get(k, 0) < plein[k]) for d in (ex, inc)]
             ap(f"    en totalité : exclue {tot[0]}, incluse {tot[1]} ; partiellement : exclue {par[0]}, "
-               f"incluse {par[1]} ; retirés en totalité par la plage : "
+               f"incluse {par[1]} ; retirés en totalité par {pl} : "
                f"{sum(1 for k in inc if inc[k] and k not in ex)}")
             ap("    non couverts (0 fenêtre dans les deux variantes, entre la première et la dernière "
                f"fenêtre de l'assiette) : {sum(1 for k in inc if not inc[k])}")

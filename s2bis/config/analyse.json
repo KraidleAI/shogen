@@ -1,0 +1,12 @@
+{
+  "degradation": {"d2_retard_s": 5, "d3_age_s": 120, "d3_borne_s": 1, "d4_delai_s": 2, "d4_echecs": 2,
+                  "d5_delai_s": 2, "d5_echecs": 2},
+  "gardes": {"diviseur_n": 2, "k_crit": 2, "runs": 2, "unites": 2},
+  "n_s": null,
+  "p_j": {"grille": ["0.0025", "0.005", "0.01", "0.02"], "seuil": "0.005"},
+  "rotations": {"R": 9999, "seuil": 99},
+  "t_max_s": null,
+  "tau_sigma": null,
+  "tolerance_evenements": null,
+  "unites": null
+}

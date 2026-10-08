@@ -1,0 +1,60 @@
+=== Contrôle de la traduction anglaise (lot DOCS11-EN) ===
+source     : /home/user/shogen/docs/publication/11-mesures-pilotes-public.md
+             sha256 c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561
+traduction : 11-pilot-measurements-public-en.md
+             sha256 60f7dc7a7b6784a2d528e5d5f2ffe1798bef20b20c12156be688e92a7b2021d6
+glossaire  : sha256 4beaf0643faad055eb87f66d5b7facbdc45823dbe14ded874cdd2335e844d76c
+
+--- 1. Structure et alignement ---
+  unités : source 410 ; traduction : corps 410, en-tête ajouté 2, glossaire final 116
+  titres alignés : 58 ; blocs de code : 9 ; lignes de table : 133
+  => OK
+
+--- 2. Nombres (par unité, puis global) ---
+  composites : source 1037 distincts / 2491 occurrences ; traduction 1037 distincts / 2491 occurrences
+  suites de chiffres : source 806 distincts / 3785 occurrences ; traduction 806 distincts / 3785 occurrences
+  multiensemble global normalisé : inventés 0, perdus 0 — identique
+  nombres en lettres : source {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 44, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2} ; traduction {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 44, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2}
+  => OK
+
+--- 3. Citations ---
+  source : 120 citations « … » de premier niveau, 96 distinctes ; traduction (corps) : 78 gardées « … », 43 traduites “ … ”
+  => OK
+
+--- 4. Gloses (première occurrence) ---
+  gloses déclarées 55 ; trouvées dans le corps 55
+  => OK
+
+--- 5. Passages protégés et libellés de verdict ---
+  33 passages protégés ; 7 libellés comptés
+  => OK
+
+--- 6. Motifs interdits (0 exigé dans la traduction) ---
+  46 motifs ; présents dans la source : 0 ; dans la traduction : 0
+  => OK
+
+--- 7. Registre du doc 09 en anglais (S-G4 comprise) ---
+  15 locutions S-G4 + 52 locutions anglaises + motif « k sources » ; occurrences admises : 2
+  admise : « k sources » (l.97) —  = 24585*] |                          [*10 sources / 11 feeds*] | J28 l.42, l.44…
+  admise : « k sources » (l.16) — ool) ok = 0 / 24585 readings, n = 24585 10 sources / 11 feeds ok = 0 / 11397 rea…
+  => OK
+
+--- 8. Résidus français en zone anglaise ---
+  69 mots-outils cherchés
+  => OK
+
+--- 9. Convention des nombres en zone anglaise ---
+  => OK
+
+--- 10. En-tête anglais (brief, point 6) ---
+  => OK
+
+--- 11. Glossaire final ---
+  55 passages gardés ; 54 lignes de termes
+  => OK
+
+--- Informatif : rapport de longueur anglais / français par unité (hors [0,6 ; 1,5]) ---
+
+table de correspondance écrite : TABLE-CORRESPONDANCE-EN.md
+
+VERDICT : CONFORME — onze contrôles sur onze (sortie 0)

@@ -1,0 +1,638 @@
+test_regle_scellee_fixture_j2_sous_round_down (tests.test_arrondi.TestArrondiDecimal.test_regle_scellee_fixture_j2_sous_round_down)
+Non-régression de SHOGEN-CRITERE-R1-1 (G0 de l'étape A, risque (c)) : fixture J2 de test_critere, ... ok
+test_round_down_ambiant_rend_la_valeur_par_defaut (tests.test_arrondi.TestArrondiDecimal.test_round_down_ambiant_rend_la_valeur_par_defaut)
+SHOGEN-DECIMAL-ARRONDI-1 : chaque site calculant de r1, appelé sous un contexte ambiant ROUND_DOWN, rend ... ok
+test_un_seul_flux_en_ecart_p_more_nul_exact (tests.test_arrondi.TestPmoreResidu.test_un_seul_flux_en_ecart_p_more_nul_exact)
+SHOGEN-PMORE-RESIDU-1 : p̂ = (0, 1/28, 0) ⇒ P̂_more == 0 exact, P̂₁ = p̂, P̂₀ = 1 − p̂ arrondi une fois ... ok
+test_asn_retirees_ventilees_par_statut_sur_l_assiette (tests.test_bloc1.TestBloc1.test_asn_retirees_ventilees_par_statut_sur_l_assiette)
+SHOGEN-ASN-STATUT-1 : une sonde « resolve_failed » par hôte à A + 30. Plage [w2 ; w4] : A, A + 30, B, ... ok
+test_bloc5_sondes_toutes_retirees_message_vrai (tests.test_bloc1.TestBloc1.test_bloc5_sondes_toutes_retirees_message_vrai)
+(c), G2 de B-SEG-1 : [w0 ; w5 − 1] retire toutes les sondes ; le bloc 5 le dit, avec ses deux ... ok
+test_bornes_ts_harness_ts_w_lu_de_run_params (tests.test_bloc1.TestBloc1.test_bornes_ts_harness_ts_w_lu_de_run_params)
+w = 120 s (fixture du G2 de B-SEG-1) : [A ; B + 120) et les retraits sur cette borne. Rougit si : ... ok
+test_dates_de_campagne_avant_filtre_et_retraits_du_segment (tests.test_bloc1.TestBloc1.test_dates_de_campagne_avant_filtre_et_retraits_du_segment)
+Segment [w1 ; w4) et plage [w3 ; w5] : dates de campagne au journal entier (6 fenêtres distinctes ... ok
+test_epoch_negatif_rc2_cli_et_valueerror_api (tests.test_bloc1.TestBloc1.test_epoch_negatif_rc2_cli_et_valueerror_api)
+SHOGEN-NEG-EPOCH-1 (Q-G2-5), étendu au segment ((d), G2 de B-SEG-1) : CLI rc 2, message sur stderr, ... ok
+test_epoch_zero_accepte_t0_fractionnaire_refuse (tests.test_bloc1.TestBloc1.test_epoch_zero_accepte_t0_fractionnaire_refuse)
+Bord de SHOGEN-NEG-EPOCH-1 (G2 de B-SEG-2) : 0 n'est pas négatif, accepté à la CLI et à l'API ; ... ok
+test_journal_sans_fenetre_dates_de_campagne_sans_lever (tests.test_bloc1.TestBloc1.test_journal_sans_fenetre_dates_de_campagne_sans_lever)
+Un démarrage sans fenêtre (0 marqueur) : la ligne sort, sans première ni dernière. Rougit si : la ... ok
+test_plage_bornes_par_type_et_retraits_par_strate_et_type (tests.test_bloc1.TestBloc1.test_plage_bornes_par_type_et_retraits_par_strate_et_type)
+[w2 ; w4] : ts et harness_ts sur [A ; B + w) ; retirés calme 1, stress 2, 3 × H sondes, 3 horloges, ... ok
+test_plage_vide_comptes_a_zero_visibles_rc0 (tests.test_bloc1.TestBloc1.test_plage_vide_comptes_a_zero_visibles_rc0)
+Plage avant la campagne : aucun enregistrement dedans, lignes de la plage et de l'union à 0, rc 0 ... ok
+test_plages_chevauchantes_chaque_plage_seule_puis_union (tests.test_bloc1.TestBloc1.test_plages_chevauchantes_chaque_plage_seule_puis_union)
+[w2 ; w4] et [w1 ; w3] : chaque plage seule (ordre trié), puis l'union comptée une fois ; la somme ... ok
+test_premiere_et_derniere_fenetre_hors_ordre_du_journal (tests.test_bloc1.TestBloc1.test_premiere_et_derniere_fenetre_hors_ordre_du_journal)
+Premières occurrences écrites hors ordre (w3-w5, puis w0-w2 ; collecteur réel, horloge scriptée) : ... ok
+test_run_params_non_porteurs_valeurs_distinctes (tests.test_bloc1.TestBloc1.test_run_params_non_porteurs_valeurs_distinctes)
+SHOGEN-BLOC1-RUNPARAMS-1 : sept démarrages (build_fixture : n_windows 6 et 3 ; poser : cinq à 0), ... ok
+test_bloc3_definition_et_parametres_de_run_params (tests.test_bloc3_bloc6.TestBloc3Bloc6.test_bloc3_definition_et_parametres_de_run_params)
+HS2-06, C-8 : définition au bloc 3, sous l'en-tête ; σ_classe, τ_classe et n_min lus de run_params ... ok
+test_bloc6_date_releve_retenu_apres_filtre (tests.test_bloc3_bloc6.TestBloc3Bloc6.test_bloc6_date_releve_retenu_apres_filtre)
+HS2-07, C-5 (iii), C-8 : sondes à A − 1 et A (poser), puis coinbase seul à A − 30 et un hôte hors ... ok
+test_integration_fixture_recompute (tests.test_blocs.TestBlocIntegration.test_integration_fixture_recompute)
+C-7 : fixture du lot B (`tests.test_sensibilite.fixture` : w = 3600 s, blocs séparés par des ... ok
+test_z_bloc_publie_par_compute_r1 (tests.test_blocs.TestBlocIntegration.test_z_bloc_publie_par_compute_r1)
+G2 C-2 : z_bloc publié par compute_r1 (n = 30·ℓ = 7 200, une strate, deux flux, co-pannes par ... ok
+test_cv_theorique_racines_exactes (tests.test_blocs.TestBlocStrate.test_cv_theorique_racines_exactes)
+cv_theorique = √(4ℓ/(3n)) : ℓ = 3, n = 100 → 0,2 ; ℓ = 3, n = 4 → 1. Rougit si : cv en ... ok
+test_degeneres_n0_garde_nulle (tests.test_blocs.TestBlocStrate.test_degeneres_n0_garde_nulle)
+P̂_more = 0 (garde 0) : FIV et R_centrage absents, FIV_motif ; série vide : 12 clés, valeurs ... ok
+test_garde_de_blocs_frontiere_et_garde_5_4 (tests.test_blocs.TestBlocStrate.test_garde_de_blocs_frontiere_et_garde_5_4)
+Garde de blocs n ≥ 30·ℓ : ℓ = 3, n = 90 publie z_bloc, 89 non (motif chiffré) ; ℓ = 1, 30 ... ok
+test_runs_grille (tests.test_blocs.TestBlocStrate.test_runs_grille)
+Runs sur la grille : positions (0, 1, 2, 4, 5, 7), I = (1, 1, 1, 1, 1, 0) : le trou en 3 ... ok
+test_schema_ferme_valeurs_a_la_main (tests.test_blocs.TestBlocStrate.test_schema_ferme_valeurs_a_la_main)
+S1 (n = 10, ℓ = 3), P̂_more = 0,3 (garde 2,1) : 12 clés ; γ̂₀ = 12/5, R_centrage = 8/7 (== ... ok
+test_serie_iterateur (tests.test_blocs.TestBlocStrate.test_serie_iterateur)
+G2 C-3 (D-15) : un itérateur donne la même clé `bloc` qu'une liste (deux parcours : variance, ... ok
+test_sigma2_nul_motifs (tests.test_blocs.TestBlocStrate.test_sigma2_nul_motifs)
+K ∈ {0, n}, n = 30 ≥ 30·ℓ (ℓ = 1) : σ̂² = 0, z_bloc absent, seul motif « σ̂²_bloc = 0 ... ok
+test_trous_de_grille_enumeration_explicite (tests.test_blocs.TestBlocStrate.test_trous_de_grille_enumeration_explicite)
+Séries trouées tirées (graine fixe ; ℓ ∈ {2, 3, 7, 240} ; w ∈ {60, 3600} ; positions < 300) : ... ok
+test_bit_identite_deux_appels (tests.test_blocs.TestVarianceBlocsPure.test_bit_identite_deux_appels)
+Deux appels sur une série trouée : sorties égales, Decimal de même str (ADR-0003) ; ℓ par ... ok
+test_contrat_entree (tests.test_blocs.TestVarianceBlocsPure.test_contrat_entree)
+Contrat d'entrée (C-2) : écart w/2 ou 1,5·w, window_start dupliqué ou décroissant, ... ok
+test_identite_l1_gamma0 (tests.test_blocs.TestVarianceBlocsPure.test_identite_l1_gamma0)
+ℓ = 1 : σ̂²_bloc = γ̂₀ = n·Ī(1 − Ī) = K(n − K)/n, avec ou sans trous (CRITIQUE ... ok
+test_positivite_trous_sommes_de_blocs (tests.test_blocs.TestVarianceBlocsPure.test_positivite_trous_sommes_de_blocs)
+Grilles trouées tirées (graine fixe), ℓ ∈ {1, 2, 3, 5, 8}, w ∈ {60, 3600}, origine ... ok
+test_serie_a_runs_facteur_calcule (tests.test_blocs.TestVarianceBlocsPure.test_serie_a_runs_facteur_calcule)
+Série à runs I = (1,1,1,1,0,0,0,0), ℓ = 4 (valeur à la main du journal G1, §4) : ... ok
+test_valeurs_a_la_main_n10_l3 (tests.test_blocs.TestVarianceBlocsPure.test_valeurs_a_la_main_n10_l3)
+n = 10, ℓ = 3 : σ̂² = 88/75 et 208/75, N = 352 et 832, γ̂₀ = 12/5 (CRITIQUE v2 ... ok
+test_marqueurs_avant_tout_demarrage_et_week_end_sans_marqueur (tests.test_censure_causes.TestCensureCauses.test_marqueurs_avant_tout_demarrage_et_week_end_sans_marqueur)
+Marqueurs 96 et 98 écrits avant toute ligne de démarrage : 97 et 99 non attribuées. Fixture de ... ok
+test_plages_et_segment (tests.test_censure_causes.TestCensureCauses.test_plages_et_segment)
+Plages [110 ; 110], [122 ; 124] et [154 ; 154] : 110 et 123 exclues, plus sautées ; 121 et 153 restent ... ok
+test_recalcul_tiers_ventilation (tests.test_censure_causes.TestCensureCauses.test_recalcul_tiers_ventilation)
+SHOGEN-CENSURE-CAUSES-TIERS-1 : recompute_d5_from_journal sert la part « harnais vivant » (clé ... ok
+test_somme_des_deux_lignes_egale_s (tests.test_censure_causes.TestCensureCauses.test_somme_des_deux_lignes_egale_s)
+Valeurs lues dans le rendu, sans option, sous plages et sous segment : part vivante + non attribuées = s de ... ok
+test_vivant_entre_deux_marqueurs_reste_non_attribue (tests.test_censure_causes.TestCensureCauses.test_vivant_entre_deux_marqueurs_reste_non_attribue)
+Sans option : 110 (calme) ; 121, 123, 132 et 153 (stress) entre deux marqueurs d'un même démarrage ; non ... ok
+test_cli_emits_json (tests.test_closure.TestClosureRecalculable.test_cli_emits_json) ... ok
+test_deterministic (tests.test_closure.TestClosureRecalculable.test_deterministic) ... ok
+test_legacy_scalar_sigma_classe_fails_closed (tests.test_closure.TestClosureRecalculable.test_legacy_scalar_sigma_classe_fails_closed) ... ok
+test_legacy_scalar_tau_classe_fails_closed (tests.test_closure.TestClosureRecalculable.test_legacy_scalar_tau_classe_fails_closed) ... ok
+test_roundtrip_closure_to_campagne_resolve (tests.test_closure.TestClosureRecalculable.test_roundtrip_closure_to_campagne_resolve) ... ok
+test_floor_wins_when_3xp99_below_floor (tests.test_closure.TestClosureStaleness.test_floor_wins_when_3xp99_below_floor) ... ok
+test_no_staleness_data_falls_back_to_floor (tests.test_closure.TestClosureStaleness.test_no_staleness_data_falls_back_to_floor) ... ok
+test_sigma_s_is_max_floor_3xp99 (tests.test_closure.TestClosureStaleness.test_sigma_s_is_max_floor_3xp99) ... ok
+test_no_revision_when_clean (tests.test_closure.TestClosureTauRevision.test_no_revision_when_clean) ... ok
+test_revision_needed_when_p99_rel_above_threshold (tests.test_closure.TestClosureTauRevision.test_revision_needed_when_p99_rel_above_threshold) ... ok
+test_hand_values (tests.test_closure.TestPercentileNearestRank.test_hand_values) ... ok
+test_result_is_observed_value_no_interpolation (tests.test_closure.TestPercentileNearestRank.test_result_is_observed_value_no_interpolation) ... ok
+test_unsorted_input_sorted_internally (tests.test_closure.TestPercentileNearestRank.test_unsorted_input_sorted_internally) ... ok
+test_second_run_appends_and_is_idempotent (tests.test_collector.TestAppendOnlyIdempotent.test_second_run_appends_and_is_idempotent) ... ok
+test_end_to_end_clean_run (tests.test_collector.TestCollectClean.test_end_to_end_clean_run) ... ok
+test_recompute_from_journal_clean (tests.test_collector.TestCollectClean.test_recompute_from_journal_clean) ... ok
+test_injected_pannes_flow_to_r1 (tests.test_collector.TestCollectWithPannes.test_injected_pannes_flow_to_r1) ... ok
+test_no_false_staleness_realistic_sigma (tests.test_collector.TestEndOfWindowSampling.test_no_false_staleness_realistic_sigma) ... ok
+test_read_instant_is_in_window_half_open (tests.test_collector.TestEndOfWindowSampling.test_read_instant_is_in_window_half_open) ... ok
+test_collect_all_twelve_flux_clean (tests.test_collector.TestFullPool.test_collect_all_twelve_flux_clean) ... ok
+test_horsenveloppe_on_mixed_class_flags_bitfinex (tests.test_collector.TestFullPool.test_horsenveloppe_on_mixed_class_flags_bitfinex) ... ok
+test_divergent_run_params_fail_closed (tests.test_collector.TestRunParamsConcordance.test_divergent_run_params_fail_closed) ... ok
+test_divergent_strate_calendar_fail_closed (tests.test_collector.TestRunParamsConcordance.test_divergent_strate_calendar_fail_closed) ... ok
+test_legacy_scalar_sigma_classe_fail_closed (tests.test_collector.TestRunParamsConcordance.test_legacy_scalar_sigma_classe_fail_closed) ... ok
+test_missing_load_bearing_key_fail_closed (tests.test_collector.TestRunParamsConcordance.test_missing_load_bearing_key_fail_closed) ... ok
+test_corrupt_non_final_line_raises (tests.test_collector.TestTruncatedLine.test_corrupt_non_final_line_raises) ... ok
+test_truncated_last_line_tolerated_and_logged (tests.test_collector.TestTruncatedLine.test_truncated_last_line_tolerated_and_logged) ... ok
+test_markers_carry_calendar_strate_and_counts_per_strate (tests.test_collector.TestTwoStrateCalendar.test_markers_carry_calendar_strate_and_counts_per_strate) ... ok
+test_tampered_marker_strate_is_fail_closed (tests.test_collector.TestTwoStrateCalendar.test_tampered_marker_strate_is_fail_closed) ... ok
+test_contexte_nomme_complet (tests.test_contexte_decimal.TestContexteDecimalNomme.test_contexte_nomme_complet)
+DefaultContext de la bibliothèque standard (_pydecimal.py), précision DECIMAL_PREC, rendu par la fabrique ... ok
+test_contexte_nomme_non_modifiable (tests.test_contexte_decimal.TestContexteDecimalNomme.test_contexte_nomme_non_modifiable)
+SHOGEN-CONTEXTE-MUTABLE-1 : contexte neuf à chaque usage ; affectations sur un contexte rendu (prec 10, ... ok
+test_fmt_dec_sous_capitals_0 (tests.test_contexte_decimal.TestContexteDecimalNomme.test_fmt_dec_sous_capitals_0)
+SHOGEN-FMT-CONTEXTE-1 (annexe B.22) : sous capitals = 0 ambiant, _fmt_dec écrit l'exposant en capitale, celle ... ok
+test_rendu_j2_et_regle_sous_contexte_hostile (tests.test_contexte_decimal.TestContexteDecimalNomme.test_rendu_j2_et_regle_sous_contexte_hostile)
+Rendu de J2 (sans option, puis plage des 100 dernières fenêtres stress : écart de z inexact) et règle : ... ok
+test_sites_sous_contexte_hostile (tests.test_contexte_decimal.TestContexteDecimalNomme.test_sites_sous_contexte_hostile)
+13 sites de r1 (CAS de test_arrondi), 10 de lm et r2 non exercés sur J2 (X), médiane de 1E-75 et 3E-75 (0E-69 ... ok
+test_bloc6_entrees_k_nominal_heterogene (tests.test_critere.TestDrapeau2Regle.test_bloc6_entrees_k_nominal_heterogene)
+Ligne d'entrées (§3.3) : J1 à ℓ = 1 (VRAI nommé), J2 avec ASN (FAUX), fixture_b de B0 (D1 cas b, ... ok
+test_composition_cli_petites_fixtures (tests.test_critere.TestDrapeau2Regle.test_composition_cli_petites_fixtures)
+Chemin servi (CLI, processus neuf) à ℓ = 240 : NON ÉVALUABLE (J1), ÉTEINT (J2), NON ÉVALUABLE sans ... ok
+test_drapeau2_aligne_sur_la_regle (tests.test_critere.TestDrapeau2Regle.test_drapeau2_aligne_sur_la_regle)
+Rougit si : drapeau 2 lu sur le max des z (v0 : J1 à ℓ = 240 LEVÉ) ; LEVÉ sans k_eff = k nominal ... ok
+test_drapeau_run_max (tests.test_critere.TestDrapeau2Regle.test_drapeau_run_max)
+J1 sous la couture ℓ = 25 : run maximal 25 ≥ ℓ en calme (drapeau), 21 < ℓ en stress (aucun) ; à ... ok
+test_drapeau2_keff_borne (tests.test_critere.TestKeffBorneEtPoolStrate.test_drapeau2_keff_borne)
+C-G2-5 et Q-G2-1 (option a) : k_eff borne supérieure égale à k nominal. Rougit si : LEVÉ sur une ... ok
+test_enonce_rejette_keff_borne (tests.test_critere.TestKeffBorneEtPoolStrate.test_enonce_rejette_keff_borne)
+C-G2-3 : énoncé REJETTE quand k_eff est une borne supérieure (hôte non attribué). Rougit si : la ... ok
+test_k_nominal_s_cas_b (tests.test_critere.TestKeffBorneEtPoolStrate.test_k_nominal_s_cas_b)
+C-G2-4 : énoncé REJETTE sous D1 cas b, k nominal_s = flux du pool de la strate (2), pas celui du ... ok
+test_j1_couture_l1_rejette_et_discordance (tests.test_critere.TestRegleFixtures.test_j1_couture_l1_rejette_et_discordance)
+ℓ = 1 : calme REJETTE (z² = 40/3, z_bloc² = 50/7) ; stress discordance (z² = 2312/375, z_bloc² = ... ok
+test_j1_production_rejet_non_qualifiable (tests.test_critere.TestRegleFixtures.test_j1_production_rejet_non_qualifiable)
+ℓ = 240, sans couture : n = 200 < 7 200, z_bloc non publiée, z_s ≥ 2,33 dans les deux strates : ... ok
+test_j2_k0_negatif_et_emd_sigma_bloc (tests.test_critere.TestRegleFixtures.test_j2_k0_negatif_et_emd_sigma_bloc)
+ℓ = 240 : calme K = 0, z ≤ −2,33 (z² = 40/3), EMD² = 188607123/1600000 (garde) ; stress K = 13, ... ok
+test_j3_k_egal_n_et_garde (tests.test_critere.TestRegleFixtures.test_j3_k_egal_n_et_garde)
+ℓ = 1 : calme K = n = 54, z² = 189/10, σ̂²_bloc = 0 (seul motif, garde de blocs tenue à ℓ = 1) : ... ok
+test_composition_bloc3_bloc6_api_cli (tests.test_critere.TestRegleLong.test_composition_bloc3_bloc6_api_cli)
+Rougit si : bloc 6 incohérent avec le bloc 3 (drapeau 2 sur le max des z, autre règle) ; chemin ... ok
+test_production_l240_rejette_calme (tests.test_critere.TestRegleLong.test_production_l240_rejette_calme)
+J4 (§2.2) : calme z² = 321723783226467079200/170332635149538239, z_bloc² = ... ok
+test_borne_exacte_et_voisine (tests.test_critere.TestRegleRendu.test_borne_exacte_et_voisine)
+C-G2-2 (revue G2) : étiquette « z_s ≤ −2,33 » à la borne exacte z_s = −2,33, absente à ... ok
+test_famille_m_dynamique_premisse (tests.test_critere.TestRegleRendu.test_famille_m_dynamique_premisse)
+SHOGEN-POOLEE-FAMILLE-1, test nommé (D-8) : m = nombre de strates testées, « m ≤ 2 », borne 0,02 et ... ok
+test_rendu_valeurs_enonces_emd (tests.test_critere.TestRegleRendu.test_rendu_valeurs_enonces_emd)
+Rougit si : EMD omis ; « R1 discrimine » sans strate nommée ; discordance imprimée « n'est pas ... ok
+test_z_negatif_au_dessus_de_la_borne (tests.test_critere.TestRegleRendu.test_z_negatif_au_dessus_de_la_borne)
+C-G2-2 (revue G2) : −2,33 < z_s < 0 sans étiquette (deux(50, 40), stress : K = 10, z_s ≈ −0,73) ; ... ok
+test_r1_discrimine_m_et_poolee (tests.test_critere.TestRegleTable.test_r1_discrimine_m_et_poolee)
+C1 à C7. Rougit si : rejet non qualifiable sans effet sur FAUX (C3) ; m statique ; strate poolée ... ok
+test_table_de_verite_par_strate (tests.test_critere.TestRegleTable.test_table_de_verite_par_strate)
+U1 à U8. Rougit si : « ≥ » remplacé par « > » sur z_s (U2) ou sur z_bloc (U3) ; arrondi avant ... ok
+test_bornes_valeurs_a_la_main (tests.test_d5_amend.TestCensure.test_bornes_valeurs_a_la_main)
+§2.4. Rougit si : z_haut sans « + s » ; n au lieu de n + s ; bornes permutées ; variante σ̂_bloc ... ok
+test_fenetres_sautees_grille_portee_plages (tests.test_d5_amend.TestCensure.test_fenetres_sautees_grille_portee_plages)
+§2.5, addendum 2 §B.3 et §B.6. Rougit si : fenêtre exclue comptée sautée ; marqueur d'une plage ... ok
+test_fenetres_sautees_plages_desordre_bornes_fractionnaires (tests.test_d5_amend.TestCensure.test_fenetres_sautees_plages_desordre_bornes_fractionnaires)
+Revue G2, C-1 (a) à (c) : mono-strate, w = 60, M_k = mer. 2026-08-05 10:00Z + 60·k, un seul jour ... ok
+test_rf_recalcul_depuis_le_journal (tests.test_d5_amend.TestCensure.test_rf_recalcul_depuis_le_journal)
+Fixture RF (§2.6, addendum 2 §B.1), collecteur réel : r1.recompute_from_journal, chemin du lecteur ... ok
+test_s_nul_egalite_exacte_z_et_z_bloc (tests.test_d5_amend.TestCensure.test_s_nul_egalite_exacte_z_et_z_bloc)
+s = 0 : z_bas = z_haut = r1.z_score (même fonction que z_s) et = z_bloc de r1.bloc_strate (ℓ = 1, ... ok
+test_dk_composantes_somme_inclusions (tests.test_d5_amend.TestDecompositionK.test_dk_composantes_somme_inclusions)
+Fixture DK (fichier scellé §2.1). Rougit si : « ≥ 2 » écrit « > 2 » ; composante omise ou ... ok
+test_pool_un_flux_c_hors_de_K (tests.test_d5_amend.TestDecompositionK.test_pool_un_flux_c_hors_de_K)
+Revue G2, C-1 (e) et C-2 : pool d'un flux, lecture panne_transport, un seul écart : K = 0 et ... ok
+test_pool_vide_c_nul (tests.test_d5_amend.TestDecompositionK.test_pool_vide_c_nul)
+Pool vide, une fenêtre : c_s = 0. Rougit si : « chaque flux du pool » tenu sur un pool vide. ... ok
+test_tous_hors_enveloppe_restreint_a_K (tests.test_d5_amend.TestDecompositionK.test_tous_hors_enveloppe_restreint_a_K)
+Revue G2, C-1 (f), τ = 0,5 : fenêtre 0, f seul hors-enveloppe (un écart, hors de K) ; fenêtre 1, ... ok
+test_bloc1_fenetres_sautees_portee_plage_segment (tests.test_d5_amend.TestRendu.test_bloc1_fenetres_sautees_portee_plage_segment)
+§2.6, addendum 2 §B.2. Rougit si : s hors de la portée imprimée ; fenêtre exclue comptée sautée ; ... ok
+test_bloc3_tau_decomposition_bornes (tests.test_d5_amend.TestRendu.test_bloc3_tau_decomposition_bornes)
+§2.6, ℓ = 240 (z_bloc non publié) ; lignes attendues écrites depuis r1.recompute_from_journal, ... ok
+test_recalcul_tiers_d5_egal_au_rendu (tests.test_d5_amend.TestRendu.test_recalcul_tiers_d5_egal_au_rendu)
+SHOGEN-D5-RECALCUL-TIERS-1 : r1.recompute_d5_from_journal (lecteur tiers) = s du bloc 1 et bornes du bloc ... ok
+test_sensibilite_comptes_du_bloc1_et_cli (tests.test_d5_amend.TestRendu.test_sensibilite_comptes_du_bloc1_et_cli)
+C-12 : avec une plage et un segment, [SENSIBILITÉ] reprend mot pour mot les comptes retirés du ... ok
+test_variante_non_publiee_sigma2_nul (tests.test_d5_amend.TestRendu.test_variante_non_publiee_sigma2_nul)
+Addendum 3 : fixture J3 de test_critere (K = n = 60, z_s publiée, σ̂²_bloc = 0). Rougit si : ... ok
+test_variante_sigma_bloc_couture (tests.test_d5_amend.TestRendu.test_variante_sigma_bloc_couture)
+ℓ = 2 par la couture (garde 60) : z_bloc publiée dans les deux strates. Rougit si : variante sur ... ok
+test_week_end_saute_garde_classes_sans_cellule (tests.test_d5_amend.TestRendu.test_week_end_saute_garde_classes_sans_cellule)
+Addendum 2 §B.5 : fixture de test_sensibilite (3 flux, w = 3 600), ven. 10:00Z et lun. 10:00Z ... ok
+test_contexte_decimal_ambiant_sans_effet (tests.test_d5_amend.TestTauObserve.test_contexte_decimal_ambiant_sans_effet)
+Revue G2, C-1 (d), τ = 0,5 : f à 200 contre la médiane 150 des autres répondantes, rapport 1/3 ; τ ... ok
+test_dk_strates_cumulees_et_tm_mediane_loo (tests.test_d5_amend.TestTauObserve.test_dk_strates_cumulees_et_tm_mediane_loo)
+DK : cumul sur les deux strates (cA 20, cB 14) ; TM (§2.3, addendum 2 §B.4) : médiane des AUTRES ... ok
+test_rang_p99_n_multiple_de_100 (tests.test_d5_amend.TestTauObserve.test_rang_p99_n_multiple_de_100)
+Revue G2, C-1 (g) : TA réduite aux fenêtres 0 à 24 et au pool abcd, N = 100 (75 rapports nuls, ... ok
+test_ta_rang_le_plus_proche_et_population (tests.test_d5_amend.TestTauObserve.test_ta_rang_le_plus_proche_et_population)
+Fixture TA (§2.2) : N = 103, P99 = 0,24 (rang 102), max = 0,25. Rougit si : P99 = max ; rang ... ok
+test_garde_53_voit_les_marqueurs_exclus (tests.test_exclusion.TestExclusionFixture.test_garde_53_voit_les_marqueurs_exclus)
+w3 (samedi, DANS la plage) ré-étiqueté « calme » lève toujours, aux quatre points ... ok
+test_i_n_exact_bornes_fermees_doublons (tests.test_exclusion.TestExclusionFixture.test_i_n_exact_bornes_fermees_doublons)
+(i) Rougit si : borne exclusive ([w2;w4) garde w4 stress, (w2;w4] garde w2 calme) ; ... ok
+test_iii_deterministe_et_bloc1_par_la_cli (tests.test_exclusion.TestExclusionFixture.test_iii_deterministe_et_bloc1_par_la_cli)
+(iii) Deux processus (PYTHONHASHSEED 1 et 2, plages en ordre inverse) ⇒ mêmes ... ok
+test_iv_sans_option_octets_d_avant_le_lot (tests.test_exclusion.TestExclusionFixture.test_iv_sans_option_octets_d_avant_le_lot)
+(iv) Sans option : les octets épinglés (lot A ; re-capture justifiée de B-SEG-2, HS2-05), et la ... ok
+test_v_ligne_nmin_suit_le_journal (tests.test_exclusion.TestExclusionFixture.test_v_ligne_nmin_suit_le_journal)
+(v bis) SHOGEN-REPORT-FISHER-1 (DOCS-S2-b ; forme finale : docs/G1-lot-DOCS-S2.md §2) : ligne N_min du ... ok
+test_v_window_start_bornes_a_une_seconde (tests.test_exclusion.TestExclusionFixture.test_v_window_start_bornes_a_une_seconde)
+(v) G2 B-SEG-1 : [w3 + 1 ; w4] garde w3 (= A − 1) ; [w2 ; w3 − 1] garde w3 (= B + 1), aux quatre ... ok
+test_ii_plage_adr0025_comptes_par_type (tests.test_exclusion.TestExclusionJournalReel.test_ii_plage_adr0025_comptes_par_type)
+(ii bis) Comptes par type de la plage ADR-0025 sur le control.jsonl RÉEL scellé (copie, via ... ok
+test_ii_plage_adr0025_retire_2618_fenetres (tests.test_exclusion.TestExclusionJournalReel.test_ii_plage_adr0025_retire_2618_fenetres)
+(ii) control.jsonl RÉEL scellé (copie ; n = marqueurs) via SHOGEN_S2_CAMPAGNE_CONTROL, ... ok
+test_d5_bornes_par_type_aux_points_d_entree_et_cli (tests.test_exclusion.TestExclusionTousTypes.test_d5_bornes_par_type_aux_points_d_entree_et_cli)
+Gardés : A − 1, B + 60 (et les démarrages w0, w1) ; retirés : A, B, B + 59. Rougit si : borne ... ok
+test_d5_deux_plages_sur_ts_et_harness_ts (tests.test_exclusion.TestExclusionTousTypes.test_d5_deux_plages_sur_ts_et_harness_ts)
+G2 B-SEG-1 : [w0 ; w0] et [B ; B] retirent horloges et sondes de [w0 ; w0 + w) et de ... ok
+test_type_vide_rendu_sans_asn_ni_horloge (tests.test_exclusion.TestExclusionTousTypes.test_type_vide_rendu_sans_asn_ni_horloge)
+C-15 : [WS[0] ; WS[5] − 1] retire tout clock_check et tout asn (t < WS[5] + 59) mais garde w5 ... ok
+test_bornes_egales_une_seule_fenetre (tests.test_g2_adversarial.TestG2Adversarial.test_bornes_egales_une_seule_fenetre)
+[ws ; ws] retire exactement la fenetre ws (doublee ou non), aux quatre points. ... ok
+test_cli_non_entier_et_negatif_rc2 (tests.test_g2_adversarial.TestG2Adversarial.test_cli_non_entier_et_negatif_rc2) ... ok
+test_doublons_tous_les_marqueurs_d_une_fenetre_exclue_retires (tests.test_g2_adversarial.TestG2Adversarial.test_doublons_tous_les_marqueurs_d_une_fenetre_exclue_retires)
+Dedup last-wins : les DEUX marqueurs de w2 et w3 (doublees, dans la plage) sont ... ok
+test_epochs_adr0025_ratifies_en_iso (tests.test_g2_adversarial.TestG2Adversarial.test_epochs_adr0025_ratifies_en_iso)
+Valeurs de la commande J28 (ADR-0025 amendee, decision 272) : 1790273880 ; 1790435280. ... ok
+test_fenetre_a_cheval_bornes_hors_grille (tests.test_g2_adversarial.TestG2Adversarial.test_fenetre_a_cheval_bornes_hors_grille)
+[w2+30 ; w4+30] : w2 (a cheval sur la borne basse) RETENUE, w3 et w4 exclues. ... ok
+test_journal_intact_apres_rendu_filtre (tests.test_g2_adversarial.TestG2Adversarial.test_journal_intact_apres_rendu_filtre) ... ok
+test_plage_hors_campagne_sans_effet_ligne_bloc1_seule (tests.test_g2_adversarial.TestG2Adversarial.test_plage_hors_campagne_sans_effet_ligne_bloc1_seule)
+Plages avant w0 et apres w5 : n inchange ; le rendu ne differe du rendu sans option ... ok
+test_plage_inversee_leve_a_chaque_point_d_entree_et_cli_rc1 (tests.test_g2_adversarial.TestG2Adversarial.test_plage_inversee_leve_a_chaque_point_d_entree_et_cli_rc1) ... ok
+test_plage_vidant_une_strate (tests.test_g2_adversarial.TestG2Adversarial.test_plage_vidant_une_strate) ... ok
+test_plages_chevauchantes_et_emboitees (tests.test_g2_adversarial.TestG2Adversarial.test_plages_chevauchantes_et_emboitees) ... ok
+test_eteint_borne_superieure_sous_k_nominal (tests.test_hote_deux_flux.TestHoteDeuxFlux.test_eteint_borne_superieure_sous_k_nominal)
+coinbase et kraken sur un même AS (fusion), www.okx.com discordant (non attribué) : k_eff ≤ 2 (borne ... ok
+test_leve_k_nominal_en_hotes_k_nominal_s_en_flux (tests.test_hote_deux_flux.TestHoteDeuxFlux.test_leve_k_nominal_en_hotes_k_nominal_s_en_flux)
+Un AS par hôte : k_eff = 3 = k nominal du segment (hôtes) → LEVÉ ; énoncé REJETTE avec k nominal_s = 4 ... ok
+test_releve_sans_ts_avec_filtre_refus_nomme (tests.test_lecteur.TestBloc6SansTs.test_releve_sans_ts_avec_filtre_refus_nomme)
+Avec une plage, le relevé sans ts ne se place pas : refus nommé (ValueError), jamais KeyError. Rougit si : ... ok
+test_releve_sans_ts_compte_a_part (tests.test_lecteur.TestBloc6SansTs.test_releve_sans_ts_compte_a_part)
+Bloc 6 rendu ; date sur les deux hôtes datés ; ligne « sans ts » = 1 et l'hôte ; sans entrée malformée, ... ok
+test_derniere_ligne_coupee_dans_un_caractere_multi_octets (tests.test_lecteur.TestLecteurOctets.test_derniere_ligne_coupee_dans_un_caractere_multi_octets)
+HS2-03 : dernière ligne coupée dans « é » (0xC3 seul) ; séparateurs CR, LF, CRLF ; ligne 2 blanche (espace ... ok
+test_ligne_non_decodable_non_finale_refusee (tests.test_lecteur.TestLecteurOctets.test_ligne_non_decodable_non_finale_refusee)
+Refus gardé et nommé : ligne 2 non décodable suivie d'une ligne valide. Rougit si : ligne non décodable ... ok
+test_rendu_controle_coupe_dans_un_caractere (tests.test_lecteur.TestLecteurOctets.test_rendu_controle_coupe_dans_un_caractere)
+Chemin de recalcul : control.jsonl terminé par une copie de run_params coupée dans « é » (crash ... ok
+test_conforme (tests.test_lecteur.TestRawLecteur.test_conforme)
+27 lectures, toutes à octets. Rougit si : sha256 pris sur le texte base64 ; compte faux. ... ok
+test_ecarts_refus_nommes (tests.test_lecteur.TestRawLecteur.test_ecarts_refus_nommes)
+b64 altéré (valide, autres octets), b64 invalide, sha de la ligne altéré, sha de journal.jsonl altéré, ... ok
+test_trois_champs_sous_segment_ou_plage_seule (tests.test_lecteur.TestTsNumerique.test_trois_champs_sous_segment_ou_plage_seule)
+C-2 de R-C (SHOGEN-TESTS-C8-SUITE-1) : même refus nommé pour window_start (window_close), harness_ts ... ok
+test_ts_non_numerique_ou_non_fini_refus_nomme (tests.test_lecteur.TestTsNumerique.test_ts_non_numerique_ou_non_fini_refus_nomme)
+SHOGEN-BLOC6-TS-NUM-1 (G2, C-8) : relevé asn_attribution sous segment, ts lu par json.loads : true, NaN, ... ok
+test_e_theta2_var_hand_values (tests.test_lm.TestConsistencyWithR1.test_e_theta2_var_hand_values) ... ok
+test_e_theta_equals_mean_of_phats (tests.test_lm.TestConsistencyWithR1.test_e_theta_equals_mean_of_phats) ... ok
+test_sum_m_equals_sum_of_r1_ecarts_exactly (tests.test_lm.TestConsistencyWithR1.test_sum_m_equals_sum_of_r1_ecarts_exactly) ... ok
+test_n_lt_2_pool_e_theta2_none (tests.test_lm.TestDegenerate.test_n_lt_2_pool_e_theta2_none) ... ok
+test_renvois_m1c_present (tests.test_lm.TestDegenerate.test_renvois_m1c_present) ... ok
+test_pairwise_estimator_unbiased_for_theta_squared (tests.test_lm.TestPairwisePropertyEmmMinus1.test_pairwise_estimator_unbiased_for_theta_squared) ... ok
+test_pairwise_second_moment_hand_values (tests.test_lm.TestPairwisePropertyEmmMinus1.test_pairwise_second_moment_hand_values) ... ok
+test_m_series_cut_per_strate (tests.test_lm.TestPerStrate.test_m_series_cut_per_strate) ... ok
+test_constant_indicator_phi_none (tests.test_lm.TestPhiSigned.test_constant_indicator_phi_none) ... ok
+test_perfect_anti_correlation_is_minus_one (tests.test_lm.TestPhiSigned.test_perfect_anti_correlation_is_minus_one) ... ok
+test_perfect_co_failure_is_plus_one (tests.test_lm.TestPhiSigned.test_perfect_co_failure_is_plus_one) ... ok
+test_auteur_refuse_a_l_ecriture (tests.test_oracle_record.TestOracleRecord.test_auteur_refuse_a_l_ecriture)
+SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu ... ok
+test_cli_ecriture_verifier_et_git_dir_herite (tests.test_oracle_record.TestOracleRecord.test_cli_ecriture_verifier_et_git_dir_herite)
+CLI : écriture (rôle cp-2) sous un GIT_DIR hérité qui désigne un autre dépôt, --verifier conforme (code 0), ... ok
+test_collision_sans_ecrasement_et_lien_sortant (tests.test_oracle_record.TestOracleRecord.test_collision_sans_ecrasement_et_lien_sortant)
+Même instant, même pid, même rôle et commit : la seconde écriture lève FileExistsError sans écraser la ... ok
+test_consigne_et_tests_lances (tests.test_oracle_record.TestOracleRecord.test_consigne_et_tests_lances)
+Fonctions pures, sur un mapping (aucun processus ne reçoit la variable) et des sorties -v de 3.11 et 3.10. ... ok
+test_delai_depasse_exit_non_nul_enregistrement_ecrit (tests.test_oracle_record.TestOracleRecord.test_delai_depasse_exit_non_nul_enregistrement_ecrit)
+SHOGEN-ENREG-VERIF-1 (iii) : test qui dort 20 s sous un délai de 1 s : commande arrêtée, exit 124 consigné ... ok
+test_enregistrement_champs_et_sha (tests.test_oracle_record.TestOracleRecord.test_enregistrement_champs_et_sha)
+Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la ... FAIL
+test_journaux_substitues_et_arret_au_premier_echec (tests.test_oracle_record.TestOracleRecord.test_journaux_substitues_et_arret_au_premier_echec)
+G0 §C (Q5, Q8) : le marqueur JOURNAUX d'une commande de la liste fermée est remplacé par le chemin absolu du ... ok
+test_rendu_base_echec_et_refus (tests.test_oracle_record.TestOracleRecord.test_rendu_base_echec_et_refus)
+Rôle « rendu », commit dont le test échoue, base = premier commit : paquet.sha256 et genTime écrits, exit 1 ; ... ok
+test_verifier_auteur_liste_blanche_du_lint (tests.test_oracle_record.TestOracleRecord.test_verifier_auteur_liste_blanche_du_lint)
+SHOGEN-ENREG-VERIF-1 (i) : auteur égal à un identifiant de la liste blanche (oracle : celle qu'imprime le ... ok
+test_verifier_depot_recalcule_tree_sha256 (tests.test_oracle_record.TestOracleRecord.test_verifier_depot_recalcule_tree_sha256)
+SHOGEN-ENREG-VERIF-1 (ii) : avec --depot, tree.commit ré-extrait et tree.sha256 égal par fichier (attendu : ... ok
+test_verifier_un_refus_nomme_par_controle (tests.test_oracle_record.TestOracleRecord.test_verifier_un_refus_nomme_par_controle)
+Lecture : enregistrements conformes acceptés (G2, rendu à six runs écrits ici, served_from conforme), puis un ... ok
+test_a_flux_mort_partout_hors_r1_lm_r2_aux_quatre_points (tests.test_pool_analyse.TestPoolAnalyse.test_a_flux_mort_partout_hors_r1_lm_r2_aux_quatre_points)
+Cas (a), f en panne HTTP 401 dans les 6 fenêtres. Rougit si : règle désactivée ou omise à ... ok
+test_a_mort_hors_tete_et_hote_partage (tests.test_pool_analyse.TestPoolAnalyse.test_a_mort_hors_tete_et_hote_partage)
+G2 C-3 : flux mort en fin de pool, deux flux vifs d'un même hôte. Rougit : retrait par ... ok
+test_b_mort_en_stress_seul_retire_de_cette_strate_seulement (tests.test_pool_analyse.TestPoolAnalyse.test_b_mort_en_stress_seul_retire_de_cette_strate_seulement)
+Cas (b), sous-lot B0-2. Rougit si : (b) traité comme (a) ; (b) appliqué à R2 ; N de L&M ... ok
+test_epingle_sans_flux_mort_octets_de_base_avec_option (tests.test_pool_analyse.TestPoolAnalyse.test_epingle_sans_flux_mort_octets_de_base_avec_option)
+Épingle (CA-13 bis ; re-captures B-SEG-2 : lignes ajoutées au bloc 1) : sans flux mort, le rendu ... ok
+test_regle_apres_exclusion_strate_videe_hors_de_s (tests.test_pool_analyse.TestPoolAnalyse.test_regle_apres_exclusion_strate_videe_hors_de_s)
+[w0 ; w2] vide la strate calme : S = {stress}, où f n'a aucune lecture ok retenue, donc ... ok
+test_g2_cas_b_pools_distincts_par_strate (tests.test_poolee.TestPooleeG2.test_g2_cas_b_pools_distincts_par_strate)
+D1 cas (b) : bitstamp sans lecture ok en stress seulement : pool de 3 flux en calme, de 2 en ... ok
+test_g2_numerateur_negatif_signe_conserve (tests.test_poolee.TestPooleeG2.test_g2_numerateur_negatif_signe_conserve)
+Kc = 30, Ks = 10 : numérateurs −14 et −6 ; z_pool = −20/√45 = −2,98…, imprimé avec son signe. ... ok
+test_g2_poolee_franchit_strates_non_drapeau2_zmax (tests.test_poolee.TestPooleeG2.test_g2_poolee_franchit_strates_non_drapeau2_zmax)
+Kc = 56, Ks = 23 : z_calme = 12/√33 = 2,08… et z_stress = 7/√12 = 2,02… < 2,33 ≤ z_pool = 19/√45 ... ok
+test_c4_i_une_strate_sous_la_garde (tests.test_poolee.TestPooleeGardes.test_c4_i_une_strate_sous_la_garde)
+Rougit si : garde ignorée (poolée publiée avec une strate non testée). ... ok
+test_c4_ii_strate_degeneree_variance_nulle (tests.test_poolee.TestPooleeGardes.test_c4_ii_strate_degeneree_variance_nulle)
+Rougit si : dégénérée non distinguée ; garde ignorée (la variance de calme seule ferait un z). ... ok
+test_c4_iii_deux_strates_degenerees_denominateur_nul (tests.test_poolee.TestPooleeGardes.test_c4_iii_deux_strates_degenerees_denominateur_nul)
+Fixture d'exclusion (lectures toutes ok : P̂_more = 0 partout). Rougit si : garde ignorée ... ok
+test_c4_iv_v_une_seule_strate_n_nul (tests.test_poolee.TestPooleeGardes.test_c4_iv_v_une_seule_strate_n_nul)
+n_s = 0 ⇔ strate absente : exclusion qui vide la strate stress. Rougit si : poolée publiée sur ... ok
+test_formule_valeurs_a_la_main_identite_denominateur_nul (tests.test_poolee.TestPooleeR1.test_formule_valeurs_a_la_main_identite_denominateur_nul)
+[(100, 30, 1/4), (50, 5, 1/10)] : 5, 23,25, 10/√93. Rougit si : dénominateur non stratifié ... ok
+test_nominale_valeur_a_la_main_et_entrees (tests.test_poolee.TestPooleeR1.test_nominale_valeur_a_la_main_et_entrees)
+Calme : numérateur 33 ; z_pool = 33/√21,796875 = 264/√1395 = 7,068… ; entrées n, K, P̂ et pool ... ok
+test_poolee_jamais_dans_strates_cle_separee (tests.test_poolee.TestPooleeR1.test_poolee_jamais_dans_strates_cle_separee)
+ADR-0028 §1 bis.1 pt 9 : r1_out["strates"] = strates du calendrier seules ; poolée sous ... ok
+test_simpson_union_gonflee_stratifiee_nulle (tests.test_poolee.TestPooleeR1.test_simpson_union_gonflee_stratifiee_nulle)
+K_s = n_s·P̂_s, P̂ = 1/16 (calme) et 49/64 (stress) : z_s = 0, z_pool = 0 ; l'union brute des ... ok
+test_bloc3_non_publie_motif_et_mono_strate (tests.test_poolee.TestPooleeRendu.test_bloc3_non_publie_motif_et_mono_strate)
+Rougit si : motif absent du rendu ; famille « m = 2 » imprimée sous un calendrier mono-strate. ... ok
+test_bloc3_ordre_etiquette_famille_valeurs_cli (tests.test_poolee.TestPooleeRendu.test_bloc3_ordre_etiquette_famille_valeurs_cli)
+Fixture nominale. Rougit si : étiquette manquante ou réécrite ; famille (m, seuil, borne) fausse ; ... ok
+test_flux_de_l_avertissement_tries_par_nom (tests.test_prix_non_fini.TestPrixNonFini.test_flux_de_l_avertissement_tries_par_nom)
+G2 du lot CORR (mutant G03) : flux de l'avertissement triés par nom, non dans l'ordre du fichier (zeta y ... ok
+test_formes_lues_comme_absentes_ou_inchangees (tests.test_prix_non_fini.TestPrixNonFini.test_formes_lues_comme_absentes_ou_inchangees)
+r1.parse_journal sur une ligne : toute forme non finie que Decimal admet (casse, signe, sNaN, charge utile, ... ok
+test_rendu_et_recalcul_comme_prix_null (tests.test_prix_non_fini.TestPrixNonFini.test_rendu_et_recalcul_comme_prix_null)
+Sorties j14-principal, j28 (plage exclue) et recalcul-tiers sur la fixture à prix NaN et Infinity (lectures ... ok
+test_full_support_sums_to_one (tests.test_r1.TestBinomialTail.test_full_support_sums_to_one) ... ok
+test_k_ge_one_three_trials_hand_value (tests.test_r1.TestBinomialTail.test_k_ge_one_three_trials_hand_value) ... ok
+test_k_ge_zero_is_one (tests.test_r1.TestBinomialTail.test_k_ge_zero_is_one) ... ok
+test_k_gt_n_is_zero (tests.test_r1.TestBinomialTail.test_k_gt_n_is_zero) ... ok
+test_recurrence_matches_bruteforce_comb (tests.test_r1.TestBinomialTail.test_recurrence_matches_bruteforce_comb) ... ok
+test_symmetric_p_half_median (tests.test_r1.TestBinomialTail.test_symmetric_p_half_median) ... ok
+test_garde_egale_a_10_z_publie (tests.test_r1.TestBordsR1.test_garde_egale_a_10_z_publie)
+40 fenêtres, trois flux en panne chacun 20 fois (p̂ = 1/2) : P̂_more = 3/4 − 2/8 = 1/2, garde = 40·1/4 = ... ok
+test_staleness_egale_a_sigma_pas_d_ecart (tests.test_r1.TestBordsR1.test_staleness_egale_a_sigma_pas_d_ecart)
+win_end − source_ts = σ = 60 : pas de staleness (N = 3 : non évaluable) ; 61 : staleness. Rougit si ... ok
+test_horsenv_inside_envelope_is_pas_ecart (tests.test_r1.TestClassifyPrecedence.test_horsenv_inside_envelope_is_pas_ecart) ... ok
+test_horsenv_requires_four_responding (tests.test_r1.TestClassifyPrecedence.test_horsenv_requires_four_responding) ... ok
+test_panne_beats_staleness_and_horsenv (tests.test_r1.TestClassifyPrecedence.test_panne_beats_staleness_and_horsenv) ... ok
+test_staleness_beats_horsenv (tests.test_r1.TestClassifyPrecedence.test_staleness_beats_horsenv) ... ok
+test_staleness_nonevaluable_without_source_ts (tests.test_r1.TestClassifyPrecedence.test_staleness_nonevaluable_without_source_ts) ... ok
+test_flag_clears_and_z_published_when_history_sufficient (tests.test_r1.TestComputeR1FlagEndToEnd.test_flag_clears_and_z_published_when_history_sufficient) ... ok
+test_flag_fires_on_short_history (tests.test_r1.TestComputeR1FlagEndToEnd.test_flag_fires_on_short_history) ... ok
+test_absent_and_orphan_windows_not_counted (tests.test_r1.TestComputeR1HarnessDown.test_absent_and_orphan_windows_not_counted) ... ok
+test_no_markers_is_degenerate_flag (tests.test_r1.TestComputeR1HarnessDown.test_no_markers_is_degenerate_flag) ... ok
+test_duplicate_window_counted_once_end_to_end (tests.test_r1.TestComputeR1LastWins.test_duplicate_window_counted_once_end_to_end) ... ok
+test_marker_dedup_counts_window_once (tests.test_r1.TestComputeR1LastWins.test_marker_dedup_counts_window_once) ... ok
+test_reading_last_wins (tests.test_r1.TestComputeR1LastWins.test_reading_last_wins) ... ok
+test_five_pool_two_pannes_gives_three_responding_noneval (tests.test_r1.TestComputeR1RespondingGate.test_five_pool_two_pannes_gives_three_responding_noneval) ... ok
+test_five_responding_horsenv_fires (tests.test_r1.TestComputeR1RespondingGate.test_five_responding_horsenv_fires) ... ok
+test_gate_function_10_minus_eps_and_plus (tests.test_r1.TestGateBoundary.test_gate_function_10_minus_eps_and_plus) ... ok
+test_pmore_zero_and_one_degenerate (tests.test_r1.TestGateBoundary.test_pmore_zero_and_one_degenerate) ... ok
+test_equal_p_matches_binomial (tests.test_r1.TestPoissonBinomialIdentity.test_equal_p_matches_binomial) ... ok
+test_known_values_quarter_half (tests.test_r1.TestPoissonBinomialIdentity.test_known_values_quarter_half) ... ok
+test_known_values_two_sources (tests.test_r1.TestPoissonBinomialIdentity.test_known_values_two_sources) ... ok
+test_sum_is_one_by_construction (tests.test_r1.TestPoissonBinomialIdentity.test_sum_is_one_by_construction) ... ok
+test_bare_insufficient_when_pmore_degenerate (tests.test_r1.TestQueueUnderGuard.test_bare_insufficient_when_pmore_degenerate) ... ok
+test_boundary_above_guard_publishes_z_not_queue (tests.test_r1.TestQueueUnderGuard.test_boundary_above_guard_publishes_z_not_queue) ... ok
+test_boundary_below_guard_publishes_queue (tests.test_r1.TestQueueUnderGuard.test_boundary_below_guard_publishes_queue) ... ok
+test_no_queue_when_z_published (tests.test_r1.TestQueueUnderGuard.test_no_queue_when_z_published) ... ok
+test_queue_published_when_pmore_strict_interior (tests.test_r1.TestQueueUnderGuard.test_queue_published_when_pmore_strict_interior) ... ok
+test_none_floor_class_skips_staleness (tests.test_r1.TestSigmaParClasse.test_none_floor_class_skips_staleness) ... ok
+test_real_adr0020_floors_dispatch (tests.test_r1.TestSigmaParClasse.test_real_adr0020_floors_dispatch) ... ok
+test_same_staleness_different_class_verdict (tests.test_r1.TestSigmaParClasse.test_same_staleness_different_class_verdict) ... ok
+test_unknown_flux_both_axes_non_evaluable (tests.test_r1.TestSigmaParClasse.test_unknown_flux_both_axes_non_evaluable) ... ok
+test_abs_stays_in_numerator_below_median_fires (tests.test_r1.TestTauRelatif.test_abs_stays_in_numerator_below_median_fires) ... ok
+test_is_relative_not_absolute_scale_invariance (tests.test_r1.TestTauRelatif.test_is_relative_not_absolute_scale_invariance) ... ok
+test_median_negative_guard_is_non_evaluable (tests.test_r1.TestTauRelatif.test_median_negative_guard_is_non_evaluable) ... ok
+test_median_zero_guard_is_non_evaluable (tests.test_r1.TestTauRelatif.test_median_zero_guard_is_non_evaluable) ... ok
+test_threshold_divides_by_median (tests.test_r1.TestTauRelatif.test_threshold_divides_by_median) ... ok
+test_hand_value_exact (tests.test_r1.TestZScore.test_hand_value_exact) ... ok
+test_all_attributed_keff_not_upper_bound (tests.test_r2.TestAsnPartition.test_all_attributed_keff_not_upper_bound) ... ok
+test_asn_divergence_published_not_overwritten (tests.test_r2.TestAsnPartition.test_asn_divergence_published_not_overwritten) ... ok
+test_content_exact_copy_merges_hosts (tests.test_r2.TestAsnPartition.test_content_exact_copy_merges_hosts) ... ok
+test_cross_confirmed_shared_asn_merges (tests.test_r2.TestAsnPartition.test_cross_confirmed_shared_asn_merges) ... ok
+test_discordant_ripestat_cymru_no_merge (tests.test_r2.TestAsnPartition.test_discordant_ripestat_cymru_no_merge) ... ok
+test_echec_et_base_muette_ne_sont_pas_des_divergences (tests.test_r2.TestAsnPartition.test_echec_et_base_muette_ne_sont_pas_des_divergences)
+SHOGEN-ASN-DIVERGENCE-ECHEC-1 (B-1 de R-B) : un relevé resolve_failed, ou à base muette, n'est ni une ... ok
+test_failed_resolution_is_singleton_and_keff_upper_bound (tests.test_r2.TestAsnPartition.test_failed_resolution_is_singleton_and_keff_upper_bound) ... ok
+test_incomplete_probing_keff_non_evaluable (tests.test_r2.TestAsnPartition.test_incomplete_probing_keff_non_evaluable) ... ok
+test_no_asn_records_keff_non_evaluable (tests.test_r2.TestAsnPartition.test_no_asn_records_keff_non_evaluable) ... ok
+test_ripestat_muette_et_changement_d_une_seule_base (tests.test_r2.TestAsnPartition.test_ripestat_muette_et_changement_d_une_seule_base)
+G2 du lot CORR (mutants G07, G08) : un relevé à RIPEstat muette n'est ni divergence ni référence (h0) ; un ... ok
+test_rpc_read_path_caveat_carried (tests.test_r2.TestAsnPartition.test_rpc_read_path_caveat_carried) ... ok
+test_shared_asn_cluster_labeled_cote_livraison (tests.test_r2.TestAsnPartition.test_shared_asn_cluster_labeled_cote_livraison) ... ok
+test_cluster_correlation_for_multi_member (tests.test_r2.TestClusterCorrelations.test_cluster_correlation_for_multi_member) ... ok
+test_aberrance_detects_clear_outlier (tests.test_r2.TestCoaberrance.test_aberrance_detects_clear_outlier) ... ok
+test_kz_counts_same_sign_and_reuses_r1_machinery (tests.test_r2.TestCoaberrance.test_kz_counts_same_sign_and_reuses_r1_machinery) ... ok
+test_kz_degenerate_p_co_zero (tests.test_r2.TestCoaberrance.test_kz_degenerate_p_co_zero) ... ok
+test_mock_resolver_writes_records_read_by_parse_asn (tests.test_r2.TestCollectAsn.test_mock_resolver_writes_records_read_by_parse_asn) ... ok
+test_real_resolver_is_the_default_seam (tests.test_r2.TestCollectAsn.test_real_resolver_is_the_default_seam) ... ok
+test_constant_series_not_a_copy_merge (tests.test_r2.TestContentStats.test_constant_series_not_a_copy_merge) ... ok
+test_insufficient_history_below_n_min (tests.test_r2.TestContentStats.test_insufficient_history_below_n_min) ... ok
+test_log_returns_skip_gaps (tests.test_r2.TestContentStats.test_log_returns_skip_gaps) ... ok
+test_rho_raw_honest_near_one_and_low_is_signal (tests.test_r2.TestContentStats.test_rho_raw_honest_near_one_and_low_is_signal) ... ok
+test_rho_resid_requires_four_others (tests.test_r2.TestContentStats.test_rho_resid_requires_four_others) ... ok
+test_tick_identity_exact_copy_is_one_and_beats_shifted (tests.test_r2.TestContentStats.test_tick_identity_exact_copy_is_one_and_beats_shifted) ... ok
+test_direction_lead_lag (tests.test_r2.TestDelta.test_direction_lead_lag) ... ok
+test_eteint_when_shared_asn (tests.test_r2.TestDrapeau2.test_eteint_when_shared_asn) ... ok
+test_eteint_when_z_below_threshold (tests.test_r2.TestDrapeau2.test_eteint_when_z_below_threshold) ... ok
+test_leve_when_z_signif_and_clean_partition (tests.test_r2.TestDrapeau2.test_leve_when_z_signif_and_clean_partition) ... ok
+test_non_evaluable_when_keff_none (tests.test_r2.TestDrapeau2.test_non_evaluable_when_keff_none) ... ok
+test_non_evaluable_when_no_z (tests.test_r2.TestDrapeau2.test_non_evaluable_when_no_z) ... ok
+test_eleven_distinct_hosts (tests.test_r2.TestFluxHost.test_eleven_distinct_hosts) ... ok
+test_okx_two_flux_one_host (tests.test_r2.TestFluxHost.test_okx_two_flux_one_host) ... ok
+test_five_basis_doc_edges (tests.test_r2.TestMethodEdges.test_five_basis_doc_edges) ... ok
+test_upstream_edges_trigger_content_not_merge (tests.test_r2.TestMethodEdges.test_upstream_edges_trigger_content_not_merge) ... ok
+test_anti_is_minus_one (tests.test_r2.TestPearson.test_anti_is_minus_one) ... ok
+test_constant_series_none (tests.test_r2.TestPearson.test_constant_series_none) ... ok
+test_fixed_precision_deterministic (tests.test_r2.TestPearson.test_fixed_precision_deterministic) ... ok
+test_linear_is_plus_one (tests.test_r2.TestPearson.test_linear_is_plus_one) ... ok
+test_deterministic (tests.test_r2.TestRecomputeHousePattern.test_deterministic) ... ok
+test_missing_r2_load_bearing_key_fail_closed (tests.test_r2.TestRecomputeHousePattern.test_missing_r2_load_bearing_key_fail_closed) ... ok
+test_peg_path_end_to_end (tests.test_r2.TestRecomputeHousePattern.test_peg_path_end_to_end) ... ok
+test_recompute_keff_and_partition (tests.test_r2.TestRecomputeHousePattern.test_recompute_keff_and_partition) ... ok
+test_report_asn_table_dated_and_r3_stated (tests.test_r2.TestRecomputeHousePattern.test_report_asn_table_dated_and_r3_stated) ... ok
+test_report_marks_keff_upper_bound_on_unattributed (tests.test_r2.TestRecomputeHousePattern.test_report_marks_keff_upper_bound_on_unattributed) ... ok
+test_tampered_strate_fail_closed (tests.test_r2.TestRecomputeHousePattern.test_tampered_strate_fail_closed) ... ok
+test_decimal_ensembles_en_listes_triees (tests.test_recalcul_json_copie.TestRecalculCopieExacte.test_decimal_ensembles_en_listes_triees)
+_decimal (default de json.dumps) : frozenset et set en liste triée ({8, 1} s'itère 8 puis 1 sous CPython : ... ok
+test_recalcul_tiers_paire_copie_en_liste_triee (tests.test_recalcul_json_copie.TestRecalculCopieExacte.test_recalcul_tiers_paire_copie_en_liste_triee)
+recalcul-tiers, table de fixture : code 0, JSON relisible, aucun avertissement ; dans chaque variante ... ok
+test_g2_k_nul_garde_positive (tests.test_rendu_blocs.TestRenduBlocsG2.test_g2_k_nul_garde_positive)
+C-3 : K = 0 et P̂_more > 0 (coinbase puis kraken en panne, jamais ensemble ; ℓ = 240) : FIV et ... ok
+test_g2_mono_strate_nommee (tests.test_rendu_blocs.TestRenduBlocsG2.test_g2_mono_strate_nommee)
+C-1 (cp-1 C-3 : « chaque strate de r1_out["strates"] », fixture mono-strate) : calendrier ... ok
+test_g2_z_bloc_negatif_et_nul_publies (tests.test_rendu_blocs.TestRenduBlocsG2.test_g2_z_bloc_negatif_et_nul_publies)
+C-2 : couture ℓ = 1 (garde de blocs 30), bitstamp jamais en panne, P̂_more = p̂_c·p̂_k = 1/100, ... ok
+test_cli_processus_neuf_long (tests.test_rendu_blocs.TestRenduBlocsLong.test_cli_processus_neuf_long)
+Chemin servi (python -m shogen_s2.report, processus neuf, PYTHONHASHSEED imposé) = API sur la ... ok
+test_garde_tenue_l240_oracle_sommes_de_blocs (tests.test_rendu_blocs.TestRenduBlocsLong.test_garde_tenue_l240_oracle_sommes_de_blocs)
+Oracle d'une autre forme : série I_t tirée du script de pannes (jamais d'une sortie de r1), ... ok
+test_couture_l1_fiv_critique (tests.test_rendu_blocs.TestRenduBlocsMain.test_couture_l1_fiv_critique)
+Fixture U, ℓ = 1 : FIV(ℓ = 1) = Ī(1−Ī)/(P̂(1−P̂)) à P̂ = 0,01 pour des excès de +20 % et +50 % ... ok
+test_couture_l3_valeurs_critique (tests.test_rendu_blocs.TestRenduBlocsMain.test_couture_l3_valeurs_critique)
+Fixture S, ℓ = 3 : σ̂² = 88/75 et 208/75, FIV = 55/63 et 130/63, FIV_série = 22/45 et 52/45. ... ok
+test_motif_garde_de_blocs_production (tests.test_rendu_blocs.TestRenduBlocsStructure.test_motif_garde_de_blocs_production)
+Fixture S, ℓ = 240 : 0 < K < n, n = 10 < 7 200 (journal G1 §3). Rougit si : valeur imprimée à ... ok
+test_motifs_sigma2_nul_garde_nulle (tests.test_rendu_blocs.TestRenduBlocsStructure.test_motifs_sigma2_nul_garde_nulle)
+Fixture du lot A (build_fixture : K = 0, P̂_more = 0, drapeau 1 levé, n = 3 par strate). ... ok
+test_sans_strate_ni_en_tete_ligne_adep_seule (tests.test_rendu_blocs.TestRenduBlocsStructure.test_sans_strate_ni_en_tete_ligne_adep_seule)
+D-3 (ajouté après le scellement, mutant MR19 écrit avec le code) : plage qui retire toutes les ... ok
+test_section_position_etiquette_vocabulaire (tests.test_rendu_blocs.TestRenduBlocsStructure.test_section_position_etiquette_vocabulaire)
+Fixture S, production. Rougit si : étiquette absente ou altérée ; section hors position (après la ... ok
+test_enonce_axes_evaluables_et_residu (tests.test_rendu_libelles.TestRenduLibelles.test_enonce_axes_evaluables_et_residu)
+AXES-ENONCE-1 (b), fixture RF : hors-enveloppe évaluable (aucune cellule non évaluable), staleness ... ok
+test_garde_seuil_applique_aux_trois_sites (tests.test_rendu_libelles.TestRenduLibelles.test_garde_seuil_applique_aux_trois_sites)
+GARDE-LIBELLE-1 : seuil_historique_valeur = 12 réécrit dans chaque démarrage (fixture du lot A, K = 0, ... ok
+test_lignes_week_end_accordees_au_nombre_de_plages (tests.test_rendu_libelles.TestRenduLibelles.test_lignes_week_end_accordees_au_nombre_de_plages)
+SENS-PLAGES-2 : une, deux puis trois plages (la troisième hors campagne) : chaque ligne de week-end finit ... ok
+test_titre_sensibilite_accorde_au_nombre_de_plages (tests.test_rendu_libelles.TestRenduLibelles.test_titre_sensibilite_accorde_au_nombre_de_plages)
+SENS-PLAGES-1 : une, deux puis trois plages (la troisième hors campagne) : titre au singulier, puis au ... ok
+test_zero_exact_forme_unique_trois_fixtures (tests.test_rendu_libelles.TestRenduLibelles.test_zero_exact_forme_unique_trois_fixtures)
+RENDU-ZERO-1 : FIV et R_centrage nuls (K = 0), z_bloc nul publié (couture ℓ = 1), φ nul au bloc 4 ... ok
+test_cible_apparue_avant_le_renommage (tests.test_rendu_production.TestProduction.test_cible_apparue_avant_le_renommage)
+SHOGEN-RENDU-RENAME-POSIX-1 : répertoire vide posé à la place de --sortie pendant le dernier run, après le ... ok
+test_deviation_seconde_sortie_premiere_intacte (tests.test_rendu_production.TestProduction.test_deviation_seconde_sortie_premiere_intacte)
+D.4 b, G0 §C : première exécution (runs factices) écrite ; relance sans --deviation : refus sortie, rien ... ok
+test_echec_a_chaque_pas_rien_ne_reste (tests.test_rendu_production.TestProduction.test_echec_a_chaque_pas_rien_ne_reste)
+Q8 : runs factices ; échec à chaque run, sortie altérée pendant le dernier run (relecture : refus sortie), ... ok
+test_gentime_du_jeton_dans_l_enregistrement (tests.test_rendu_production.TestProduction.test_gentime_du_jeton_dans_l_enregistrement)
+SHOGEN-RENDU-T0-1 : voie (a) (autorité de test d'openssl), runs factices : sceau.genTime = genTime du jeton, ... ok
+test_head_lu_une_fois_production_sur_le_commit_garde (tests.test_rendu_production.TestProduction.test_head_lu_une_fois_production_sur_le_commit_garde)
+C-2 (sonde du réviseur) : gardes levées sur X ; un commit Y retire le sha du paquet de JOURNAL.md et change ... ok
+test_nominal_bout_en_bout (tests.test_rendu_production.TestProduction.test_nominal_bout_en_bout)
+Q5, Q8 : runs réels de l'enregistreur sur l'extraction d'un dépôt jetable qui porte le code d'analyse : code ... ok
+test_parent_de_la_sortie_absent (tests.test_rendu_production.TestProduction.test_parent_de_la_sortie_absent)
+SHOGEN-RENDU-MKDTEMP-1 (H-1 de R-C) : dossier parent de --sortie absent, gardes levées : « gardes levées » ... ok
+test_script_hors_depot_enregistreur_voisin_modifie (tests.test_rendu_production.TestProduction.test_script_hors_depot_enregistreur_voisin_modifie)
+C-2 (sonde du réviseur) : copie du dépôt de rendu_unique.py lancée hors du dépôt, oracle_record.py voisin ... ok
+test_avertissements_du_lecteur_dans_les_sorties (tests.test_rendu_production.TestSortiesNommees.test_avertissements_du_lecteur_dans_les_sorties)
+C-5 (G2) : dernière ligne de control.jsonl et de raw.jsonl tronquée, deux copies des journaux dans deux ... ok
+test_produire_reserve_a_l_execution_unique (tests.test_rendu_production.TestSortiesNommees.test_produire_reserve_a_l_execution_unique)
+C-1 (G2 de la partie 2) : --produire j14-principal, recalcul-tiers et raw en sous-processus (table de ... ok
+test_raw_refus_sans_chemin_des_journaux (tests.test_rendu_production.TestSortiesNommees.test_raw_refus_sans_chemin_des_journaux)
+SHOGEN-RAW-CHEMIN-1 (B-1 de R-C) : raw.jsonl à ligne 2 coupée (non finale), mêmes journaux dans deux ... ok
+test_raw_verdict_et_exit_0 (tests.test_rendu_production.TestSortiesNommees.test_raw_verdict_et_exit_0)
+Q7, SHOGEN-RAW-FIN-1 : verdict de records.verifier_raw écrit sur la sortie, code 0 conforme comme en refus ... ok
+test_recalcul_tiers_quatre_recompute_et_variante_incluse (tests.test_rendu_production.TestSortiesNommees.test_recalcul_tiers_quatre_recompute_et_variante_incluse)
+Q6 : JSON des quatre recompute_* (r1, d5 avec la ventilation de B5, lm, r2) par sortie, mêmes options, ... ok
+test_sortie_etiquette_puis_rendu (tests.test_rendu_production.TestSortiesNommees.test_sortie_etiquette_puis_rendu)
+Q1, Q2, Q4 : chaque sortie de la table = « [ÉTIQUETTE] <nom> : <étiquette> », puis render_report avec ses ... ok
+test_table_reelle_constantes (tests.test_rendu_production.TestSortiesNommees.test_table_reelle_constantes)
+SHOGEN-RENDU-TABLE-REELLE-1 et décisions Q1 à Q4 : bornes recalculées ici depuis les dates d'ADR-0028 (D4, ... ok
+test_bloc_absent_duplique_malforme (tests.test_rendu_unique.TestRenduUnique.test_bloc_absent_duplique_malforme)
+Bloc machine (G0 §C) : paquet sans bloc : refus (bloc ; (2) à (4) non évaluées), rien d'écrit ; lecteur ... ok
+test_deux_voies_t0_le_plus_tardif (tests.test_rendu_unique.TestRenduUnique.test_deux_voies_t0_le_plus_tardif)
+(5), les deux voies établies : go épinglé trois jours avant le jeton ; horloge à T0 du go + 25 h, avant ... ok
+test_garde_1_sha_du_paquet_a_head (tests.test_rendu_unique.TestRenduUnique.test_garde_1_sha_du_paquet_a_head)
+(1) : sha256 complet du paquet absent de JOURNAL.md à HEAD : présent seulement sur le disque (non commité), ... ok
+test_garde_2_code_d_analyse (tests.test_rendu_unique.TestRenduUnique.test_garde_2_code_d_analyse)
+(2) : code d'analyse différent du commit du bloc (commit qui change tools), commit du bloc absent du dépôt, ... ok
+test_garde_3_journaux_bloc_et_sommes (tests.test_rendu_unique.TestRenduUnique.test_garde_3_journaux_bloc_et_sommes)
+(3) et EX-E1-1 : journal modifié ; sommes qui diffèrent du fichier et du bloc (sha des sommes au bloc mis à ... ok
+test_garde_4_sha_du_script (tests.test_rendu_unique.TestRenduUnique.test_garde_4_sha_du_script)
+(4) : sha256_script du bloc différent du sha256 des octets de l'outil (dernier chiffre changé) ; outil ou ... ok
+test_gardes_lisent_le_head_resolu_une_fois (tests.test_rendu_unique.TestRenduUnique.test_gardes_lisent_le_head_resolu_une_fois)
+C-2 (i) et RENDU-STATUS-HEAD-1 : HEAD déplacé sur Y (commit sans parent : sha du paquet et go absents de ... ok
+test_gentime_formes (tests.test_rendu_unique.TestRenduUnique.test_gentime_formes)
+genTime de openssl ts -reply -text : forme d'OpenSSL et ISO 8601, fin de ligne CRLF, fraction de seconde ... ok
+test_ni_jeton_ni_go_horloge_seule (tests.test_rendu_unique.TestRenduUnique.test_ni_jeton_ni_go_horloge_seule)
+D.4 b (6) : ni jeton vérifié ni go épinglé (pas de dossier de sceau, puis dossier vide) : refus (5) et (6), ... ok
+test_nominal_et_cli (tests.test_rendu_unique.TestRenduUnique.test_nominal_et_cli)
+Fixture sans jeton ni go : seules refusent (5) et (6), en processus et par la ligne de commande (code 2, ... ok
+test_ouverture_voie_t0_gentime (tests.test_rendu_unique.TestRenduUnique.test_ouverture_voie_t0_gentime)
+SHOGEN-RENDU-T0-1 : evaluer_gardes rend les refus et le contexte ; ouverture() en tire la voie, T0 (le plus ... ok
+test_refus_auteur_sortie_deviation_noms (tests.test_rendu_unique.TestRenduUnique.test_refus_auteur_sortie_deviation_noms)
+Avant toute garde : auteur hors de la liste blanche du lint (refus auteur) ; --sortie présent sans ... ok
+test_refus_debris_d_une_tentative_interrompue (tests.test_rendu_unique.TestRenduUnique.test_refus_debris_d_une_tentative_interrompue)
+C-4 (G2) : dossier .sortie.abcd (débris d'une tentative interrompue) à côté de --sortie : refus sortie, rien ... ok
+test_voie_a_jeton_verifie_et_garde_5 (tests.test_rendu_unique.TestRenduUnique.test_voie_a_jeton_verifie_et_garde_5)
+(5) et (6), voie (a), préfixes de D.4 c remplacés par ceux de la chaîne de test : horloge à genTime + 24 h ... ok
+test_voie_a_refus (tests.test_rendu_unique.TestRenduUnique.test_voie_a_refus)
+(6), voie (a), horloge à genTime + 48 h : bloc d'une autre chaîne que cacert.pem ou tsa.crt (même préfixe) ; ... ok
+test_voie_b_go_epingle_et_garde_5 (tests.test_rendu_unique.TestRenduUnique.test_voie_b_go_epingle_et_garde_5)
+(5) et (6), voie (b), textconv hostile posé sur JOURNAL.md : horloge à T0 + 24 h exactement (T0 = date du ... ok
+test_voie_b_premiere_ligne_entiere_pas_une_sous_chaine (tests.test_rendu_unique.TestRenduUnique.test_voie_b_premiere_ligne_entiere_pas_une_sous_chaine)
+GO-PICKAXE-1 : S et Gc = premiers commits dont JOURNAL.md porte une ligne qui contient le sha entier (comme ... ok
+test_voie_b_refus (tests.test_rendu_unique.TestRenduUnique.test_voie_b_refus)
+(6), voie (b), horloge en 2100 : go avec BOM, en CRLF, sans LF final, avec une ligne de plus, sans accent, ... ok
+test_corrections_published (tests.test_report.TestReport.test_corrections_published) ... ok
+test_currency_marked_class_published (tests.test_report.TestReport.test_currency_marked_class_published) ... ok
+test_deterministic (tests.test_report.TestReport.test_deterministic) ... ok
+test_flag_and_stationarity_and_noneval_published (tests.test_report.TestReport.test_flag_and_stationarity_and_noneval_published) ... ok
+test_lm_and_r2_blocks_present (tests.test_report.TestReport.test_lm_and_r2_blocks_present) ... ok
+test_missing_load_bearing_key_fail_closed (tests.test_report.TestReport.test_missing_load_bearing_key_fail_closed) ... ok
+test_recalculable_reads_only_journal_files (tests.test_report.TestReport.test_recalculable_reads_only_journal_files) ... ok
+test_strate_calendar_published (tests.test_report.TestReport.test_strate_calendar_published) ... ok
+test_three_blocks_present (tests.test_report.TestReport.test_three_blocks_present) ... ok
+test_queue_shown_when_guard_nondegenerate (tests.test_report.TestReportQueueExacte.test_queue_shown_when_guard_nondegenerate) ... ok
+test_end_to_end_table6_renders (tests.test_run_campaign.RunSegmentCase.test_end_to_end_table6_renders) ... ok
+test_resume_is_idempotent_no_overcollect (tests.test_run_campaign.RunSegmentCase.test_resume_is_idempotent_no_overcollect) ... ok
+test_two_chunks_distinct_windows_and_concordant_run_params (tests.test_run_campaign.RunSegmentCase.test_two_chunks_distinct_windows_and_concordant_run_params) ... ok
+test_absent_file_is_zero (tests.test_run_campaign.TestDistinctCompleted.test_absent_file_is_zero) ... ok
+test_calibration_returns_per_class_provisional_floors (tests.test_run_campaign.TestSigmaTauFidele.test_calibration_returns_per_class_provisional_floors) ... ok
+test_campagne_file_absolute_tau_fails_closed (tests.test_run_campaign.TestSigmaTauFidele.test_campagne_file_absolute_tau_fails_closed) ... ok
+test_campagne_file_scalar_sigma_fails_closed (tests.test_run_campaign.TestSigmaTauFidele.test_campagne_file_scalar_sigma_fails_closed) ... ok
+test_campagne_file_tau_null_pending_revision_fails_closed (tests.test_run_campaign.TestSigmaTauFidele.test_campagne_file_tau_null_pending_revision_fails_closed) ... ok
+test_campagne_with_committed_file_loads_per_class (tests.test_run_campaign.TestSigmaTauFidele.test_campagne_with_committed_file_loads_per_class) ... ok
+test_campagne_without_file_fails_closed (tests.test_run_campaign.TestSigmaTauFidele.test_campagne_without_file_fails_closed) ... ok
+test_demo_returns_per_class_provisional_floors (tests.test_run_campaign.TestSigmaTauFidele.test_demo_returns_per_class_provisional_floors) ... ok
+test_ignored_file_warning_helper (tests.test_run_campaign.TestSigmaTauFidele.test_ignored_file_warning_helper) ... ok
+test_main_campagne_without_file_returns_failclosed_code (tests.test_run_campaign.TestSigmaTauFidele.test_main_campagne_without_file_returns_failclosed_code) ... ok
+test_sigma_class_of_flux_covers_pool_matches_decoded_fixtures (tests.test_run_campaign.TestSigmaTauFidele.test_sigma_class_of_flux_covers_pool_matches_decoded_fixtures) ... ok
+test_make_tsq_puis_verify_depuis_la_racine (tests.test_sceau.TestSceauScripts.test_make_tsq_puis_verify_depuis_la_racine)
+Dépôt scellé (manifeste écrit par make-tsq.sh, jeton de la TSA de test sur la requête) : verify.sh lancé à la ... ok
+test_make_tsq_refuse_un_chemin_hors_convention (tests.test_sceau.TestSceauScripts.test_make_tsq_refuse_un_chemin_hors_convention)
+make-tsq.sh, fichier du paquet donné hors de la convention (chemin absolu, segment « .. », lettre de ... ok
+test_verify_lie_le_jeton_a_la_requete (tests.test_sceau.TestSceauScripts.test_verify_lie_le_jeton_a_la_requete)
+SHOGEN-SCEAU-VERIFY-DATA-1, autre moitié (sonde d'équivalence du G1 de P3g, §2) : après le jeton, requête ... ok
+test_verify_lie_le_jeton_au_manifeste (tests.test_sceau.TestSceauScripts.test_verify_lie_le_jeton_au_manifeste)
+SHOGEN-SCEAU-VERIFY-DATA-1 (sonde du G1 de P3) : après le jeton, paquet et manifeste réécrits d'accord (une ... ok
+test_bornes_hors_grille_et_type_vide (tests.test_segment.TestSegment.test_bornes_hors_grille_et_type_vide)
+[w1 + 1 ; w3 + 1) : w1 (= t0 − 1) hors, w3 (= t_fin − 1) dedans ; C-15 : [w5 ; w5 + w) ne garde ... ok
+test_bornes_tous_types_aux_quatre_points_et_cli (tests.test_segment.TestSegment.test_bornes_tous_types_aux_quatre_points_et_cli)
+clock_check et asn gardés sur t0 et t_fin − 1, retirés sur t0 − 1, t_fin et w0. Rougit si : borne ... ok
+test_garde_53_sur_tous_les_marqueurs (tests.test_segment.TestSegment.test_garde_53_sur_tous_les_marqueurs)
+w5 (hors segment) ré-étiquetée « calme » lève aux quatre points. Rougit si : garde §5.3 ... ok
+test_moins_de_n_fenetres_leve_jamais_silencieux (tests.test_segment.TestSegment.test_moins_de_n_fenetres_leve_jamais_silencieux)
+5 fenêtres distinctes ≥ t0 : n = 5 rend t_fin = w5 + w ; n = 6 : rc 1 à la CLI (ValueError aux ... ok
+test_n_fixe_lu_du_journal_avant_exclusion (tests.test_segment.TestSegment.test_n_fixe_lu_du_journal_avant_exclusion)
+n = 3 : t_fin = 3e window_start distinct ≥ t0 (w3), + w = w4, malgré les doublons w1-w3, w0 avant ... ok
+test_run_params_hors_segment_toujours_verifies (tests.test_segment.TestSegment.test_run_params_hors_segment_toujours_verifies)
+Démarrage à τ divergent posé hors segment (w5 + 2w) : lève aux quatre points. Rougit si : ... ok
+test_segment_incomplet_double_ou_vide_refuse (tests.test_segment.TestSegment.test_segment_incomplet_double_ou_vide_refuse)
+CLI rc 2 : début seul, fin seule, n seul, deux fins ; API : segment vide ou inversé (t0 ≥ t_fin), ... ok
+test_w_lu_de_run_params_exclusion_et_n_fixe (tests.test_segment.TestSegmentW120.test_w_lu_de_run_params_exclusion_et_n_fixe)
+G2 B-SEG-1 : w = 120 (run_params). [ws2 ; ws3] retire horloges et sondes jusqu'à B + 119, garde ... ok
+test_pertes_du_journal_par_plage_et_par_strate (tests.test_sensibilite.TestSensPertes.test_pertes_du_journal_par_plage_et_par_strate)
+SHOGEN-SENS-PERTES-2 : plages [lun. 10 00:00Z ; 05:00Z] (calme) et [sam. 15 04:00Z ; 09:00Z] (stress), ... ok
+test_couverture_week_ends_recomptee (tests.test_sensibilite.TestSensibilite.test_couverture_week_ends_recomptee)
+ADR-0025 déc. 4, C-2 : 08-08 complet, 08-15 partiel (5 retirées), 08-22 retiré en totalité ; ... ok
+test_forme_j28_cli_segment_n_fixe_et_plages (tests.test_sensibilite.TestSensibilite.test_forme_j28_cli_segment_n_fixe_et_plages)
+C-7 : --segment-from, --segment-n-fixe et deux --exclude-window-start-range, processus neuf : ... ok
+test_mono_strate_sans_week_end_ni_exception (tests.test_sensibilite.TestSensibilite.test_mono_strate_sans_week_end_ni_exception)
+C-2 : calendrier mono-strate : table de sa seule strate, couverture « non applicable », jamais une ... ok
+test_plage_sans_effet_variantes_egales_ecart_0 (tests.test_sensibilite.TestSensibilite.test_plage_sans_effet_variantes_egales_ecart_0)
+C-5 (iv) : une plage hors campagne ne retire rien : lignes exclue et incluse égales, écart 0, ... ok
+test_queue_degeneree_fixture_d_exclusion (tests.test_sensibilite.TestSensibilite.test_queue_degeneree_fixture_d_exclusion)
+Garde §5.4 à P̂_more = 0 dans les deux variantes (fixture de test_exclusion, [w2 ; w4]) : « queue ... ok
+test_table_cellules_ecart_pools_etiquettes (tests.test_sensibilite.TestSensibilite.test_table_cellules_ecart_pools_etiquettes)
+C-3, C-4, C-5 : stress, z publié dans les deux variantes ; calme sous la garde, queue exacte ; ... ok
+test_g2_bloc6_k_sur_n (tests.test_sensibilite.TestSensibiliteG2.test_g2_bloc6_k_sur_n)
+C-3 : un seul hôte du pool sondé : « 1 / 3 hôtes du pool ». Rougit si : N = k (MR06). ... ok
+test_g2_couverture_calendriers_et_w (tests.test_sensibilite.TestSensibiliteG2.test_g2_couverture_calendriers_et_w)
+C-1 : stress_weekdays [6, 0] (enjambe la semaine), [4, 5, 6], [2], puis [5, 6] à w = 90 s ... ok
+test_g2_non_applicable_absente_et_mono_nommee (tests.test_sensibilite.TestSensibiliteG2.test_g2_non_applicable_absente_et_mono_nommee)
+C-2 : stress_weekdays vide ou plein : « non applicable », strate absente des deux variantes, écart ... ok
+test_g2_pool_cas_a_entre_variantes (tests.test_sensibilite.TestSensibiliteG2.test_g2_pool_cas_a_entre_variantes)
+C-4 : bitstamp n'a de lecture ok que dans RA : hors du pool du segment dans la variante exclue ... ok
+test_g2_week_end_sans_fenetre_visible (tests.test_sensibilite.TestSensibiliteG2.test_g2_week_end_sans_fenetre_visible)
+C-5 : le week-end du 08-15, sans aucune fenêtre entre deux fenêtres de l'assiette, est listé à 0 et ... ok
+test_empty_body_is_panne (tests.test_sources.TestFailClosed.test_empty_body_is_panne) ... ok
+test_garbage_body_is_panne_never_a_value (tests.test_sources.TestFailClosed.test_garbage_body_is_panne_never_a_value) ... ok
+test_cryptocompare_fixture_is_401 (tests.test_sources.TestFixtureRegression.test_cryptocompare_fixture_is_401) ... ok
+test_each_decoder_matches_frozen_fixture (tests.test_sources.TestFixtureRegression.test_each_decoder_matches_frozen_fixture) ... ok
+test_bitfinex_short_array_is_panne (tests.test_sources.TestQuirks.test_bitfinex_short_array_is_panne) ... ok
+test_bitfinex_uses_index_6_not_last_element (tests.test_sources.TestQuirks.test_bitfinex_uses_index_6_not_last_element) ... ok
+test_chainlink_answer_is_word_2_updatedat_word_4 (tests.test_sources.TestQuirks.test_chainlink_answer_is_word_2_updatedat_word_4) ... ok
+test_chainlink_wrong_word_count_is_panne (tests.test_sources.TestQuirks.test_chainlink_wrong_word_count_is_panne) ... ok
+test_kraken_error_list_is_panne (tests.test_sources.TestQuirks.test_kraken_error_list_is_panne) ... ok
+test_kraken_indexes_returned_key_not_requested_pair (tests.test_sources.TestQuirks.test_kraken_indexes_returned_key_not_requested_pair) ... ok
+test_pyth_price_is_mantissa_times_ten_pow_expo (tests.test_sources.TestQuirks.test_pyth_price_is_mantissa_times_ten_pow_expo) ... ok
+test_make_strate_fn_closes_over_spec (tests.test_window.TestStrateCalendar.test_make_strate_fn_closes_over_spec) ... ok
+test_single_spec_always_calme (tests.test_window.TestStrateCalendar.test_single_spec_always_calme) ... ok
+test_unknown_spec_kind_raises (tests.test_window.TestStrateCalendar.test_unknown_spec_kind_raises) ... ok
+test_verify_markers_against_spec_detects_tamper (tests.test_window.TestStrateCalendar.test_verify_markers_against_spec_detects_tamper) ... ok
+test_weekend_spec_stress_on_sat_sun_calme_otherwise (tests.test_window.TestStrateCalendar.test_weekend_spec_stress_on_sat_sun_calme_otherwise) ... ok
+test_epoch_is_thursday (tests.test_window.TestWeekdayArithmetic.test_epoch_is_thursday) ... ok
+test_matches_datetime_weekday_over_two_weeks (tests.test_window.TestWeekdayArithmetic.test_matches_datetime_weekday_over_two_weeks) ... ok
+test_sk_hynix_motivating_date_is_a_tuesday (tests.test_window.TestWeekdayArithmetic.test_sk_hynix_motivating_date_is_a_tuesday) ... ok
+test_default_strate_single (tests.test_window.TestWindowAlignment.test_default_strate_single) ... ok
+test_epoch_scale_exact_no_float_drift (tests.test_window.TestWindowAlignment.test_epoch_scale_exact_no_float_drift) ... ok
+test_half_open_boundary (tests.test_window.TestWindowAlignment.test_half_open_boundary) ... ok
+test_negative_epoch_rejected (tests.test_window.TestWindowAlignment.test_negative_epoch_rejected) ... ok
+test_returns_int (tests.test_window.TestWindowAlignment.test_returns_int) ... ok
+test_window_end (tests.test_window.TestWindowAlignment.test_window_end) ... ok
+
+======================================================================
+FAIL: test_enregistrement_champs_et_sha (tests.test_oracle_record.TestOracleRecord.test_enregistrement_champs_et_sha)
+Rôle G2, commit court : champs de D6 (viii), paquet.sha256 et sceau.genTime nuls, sha256 par fichier et de la
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/tmp/oracle_i4arn6jk/s2-harness/tests/test_oracle_record.py", line 79, in test_enregistrement_champs_et_sha
+    self.assertEqual((code, rec), (0, {
+AssertionError: Tuples differ: (0, {'auteur': 'claude-opus-5-5', 'base': None,[1221 chars]'}}}) != (0, {'schema': 'shogen.oracle-record.v1', 'role[1088 chars]ne}})
+
+First differing element 1:
+{'auteur': 'claude-opus-5-5', 'base': None,[1220 chars]c'}}}
+{'schema': 'shogen.oracle-record.v1', 'role[1087 chars]one}}
+
+Diff is 1918 characters long. Set self.maxDiff to None to see it.
+
+----------------------------------------------------------------------
+Ran 398 tests in 70.722s
+
+FAILED (failures=1)

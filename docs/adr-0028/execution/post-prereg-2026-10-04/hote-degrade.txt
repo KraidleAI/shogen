@@ -1,0 +1,18 @@
+ajoutée après le pré-enregistrement, hors décision ; ne change pas le verdict de la règle scellée (« R1 discrimine » = FAUX, docs/11 §3)
+hote_horloge.py hote — SHOGEN-HOST-DEGRADED-2
+script hote_horloge.py sha256 145241f15d8d03694dc061fed4b69d89f78de286bf019326675ea4e17d0cd653 ; commun.py sha256 72948a511ba958507ba3ed9a3d38c94592b6ea423bc1023314857e3242d9e7a1
+journaux : control.jsonl 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff ; journal.jsonl 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+rendu de contrôle : shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out sha256 26877549658b7271f766b433e941c79a35169398238755fa4bbf77a4911d65c0
+portée : segment [1787770800 ; 1790558880) (t0 = 1787770800, n fixe = 38600), plages exclues [(1790273880, 1790435280)] ; pool D1 : « calme » 11 flux ; « stress » 11 flux
+contrôle de cohérence (rendu, bloc 3) « calme » : recompté (n, K, P̂_more) = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') ; rendu = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') : égaux
+contrôle de cohérence (rendu, bloc 3) « stress » : recompté (n, K, P̂_more) = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') ; rendu = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') : égaux
+[SHOGEN-HOST-DEGRADED-2] fenêtres retirées : dernier marqueur dans un démarrage dont la sonde ASN porte au moins un resolve_failed ; clock_check hors critère (dépend des sources qui répondent à la sonde)
+démarrages : 4172 (ouverts par run_params : 4093) ; dégradés : 631 ; relevés asn_attribution rattachés : 45030, dont resolve_failed 1550 ; sonde finale non rattachée : 0 ; marqueurs hors démarrage : 0
+démarrages à clock_check non évaluable : 2, dont dégradés : 2
+« calme » : fenêtres retenues par la règle scellée 24585 ; retirées 3341 ; pool D1 restant 11 flux
+« stress » : fenêtres retenues par la règle scellée 11397 ; retirées 720 ; pool D1 restant 11 flux
+démarrages ouverts par un clock_check après un run_params sans clock_check, marqueurs entre les deux ; fenêtres retenues dont le dernier marqueur y tombe (constat de l'exécution) : 74 ; 0
+retraits D1 sur les fenêtres restantes : [('calme', 'pyth'), ('stress', 'pyth')]
+règle recalculée « calme » : n = 21244 ; K = 70 ; P̂_more = 0.00050661095839157334114997971466672852893655543164077 ; garde = 10.756990828406361429289433357741312818871924268078 ; z_s = 18.061413642924286388641051759510123591680676826945 ; σ̂²_bloc = 1078.9716387947338272085342118757204473832081840826 ; z_bloc = 1.8034002415845508940603643107664849142894798219397 ; valeur = NE REJETTE PAS (discordance) ; EMD_s = 104.17977707576326855142705673585345093338307856962
+règle recalculée « stress » : n = 10677 ; K = 59 ; P̂_more = 0.00056478562602387256404525529035434207222150290167681 ; garde = 6.0268103496653787186696495359580609724792697553152 ; z_s = - ; σ̂²_bloc = 723.35922683261436226841535545665761469187850990342 ; z_bloc = 1.9694782461219935339541096375652519071957909272485 ; valeur = NON ÉVALUABLE (garde_5_4) ; EMD_s = -
+« R1 discrimine » recalculé sous cette sensibilité (hors décision ; ne change pas le verdict) = FAUX

@@ -12,7 +12,7 @@ import sys
 import tempfile
 import unittest
 
-from shogen_s2 import collector, records, report, window
+from shogen_s2 import collector, r2, records, report, window
 from tests.test_collector import (BY_ID, DELTA, SKELETON, TAU, W, FakeClock, _taumap, frozen_read_fn,
                                   sbc_huge)
 from tests.test_exclusion import HARNESS, WS, build_fixture, comptes_outil, poser, recompte_independant
@@ -23,6 +23,11 @@ H = len(HOTES)                        # poser : une sonde asn_attribution par h�
 FEN, ASS = "fenêtres distinctes (window_close)", "seule (assiette : ligne segment) :"
 UNI, EXC = "plage(s), union (assiette : ligne segment) :", "— SHOGEN-EXCL-COMPTE-1"
 CAMP = "fenêtres distinctes au journal (window_close, avant segment et exclusion)"
+
+
+def ok(n: int) -> str:
+    """asn_attribution retirées, ventilées par statut (SHOGEN-ASN-STATUT-1) : poser n'écrit que des « ok »."""
+    return f"asn_attribution {n} (ok {n})"
 
 
 def cli(d, *args):
@@ -52,7 +57,7 @@ class TestBloc1(unittest.TestCase):
         self.assertEqual(ligne(txt, "exclusion_ts_harness_ts"), [
             f"[{A} ; {B + W}) = [{iso(A)} ; {iso(B + W)}) semi-ouvert : asn_attribution (ts), clock_check "
             f"(harness_ts), w = {W} s de run_params — ADR-0028 D5"])
-        cpt = f"{FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 3"
+        cpt = f"{FEN} calme 1, stress 2 ; {ok(3 * H)} ; clock_check 3"
         self.assertEqual(ligne(txt, "exclusion_retraits"), [f"[{A} ; {B}] {ASS} {cpt}"])
         self.assertEqual(ligne(txt, "exclusion_retraits_union"), [f"1 {UNI} {cpt} {EXC}"])
         voie = {"window_close": 3, "asn_attribution": 3 * H, "clock_check": 3}
@@ -64,10 +69,10 @@ class TestBloc1(unittest.TestCase):
         dépasse l'union (C-4 i). Rougit si : union = somme des plages ; plage comptée après une autre."""
         txt = report.render_report(self.c, self.j, exclude_ranges=[(A, B), (WS[1], WS[3])])
         self.assertEqual(ligne(txt, "exclusion_retraits"), [
-            f"[{WS[1]} ; {WS[3]}] {ASS} {FEN} calme 2, stress 1 ; asn_attribution {2 * H} ; clock_check 3",
-            f"[{A} ; {B}] {ASS} {FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 3"])
+            f"[{WS[1]} ; {WS[3]}] {ASS} {FEN} calme 2, stress 1 ; {ok(2 * H)} ; clock_check 3",
+            f"[{A} ; {B}] {ASS} {FEN} calme 1, stress 2 ; {ok(3 * H)} ; clock_check 3"])
         self.assertEqual(ligne(txt, "exclusion_retraits_union"), [
-            f"2 {UNI} {FEN} calme 2, stress 2 ; asn_attribution {4 * H} ; clock_check 5 {EXC}"])
+            f"2 {UNI} {FEN} calme 2, stress 2 ; {ok(4 * H)} ; clock_check 5 {EXC}"])
 
     def test_plage_vide_comptes_a_zero_visibles_rc0(self):
         """Plage avant la campagne : aucun enregistrement dedans, lignes de la plage et de l'union à 0, rc 0
@@ -101,7 +106,7 @@ class TestBloc1(unittest.TestCase):
         self.assertEqual(ligne(sans, "segment"), ["aucun (journal entier) — ADR-0028 D4"])
         self.assertEqual(len(ligne(txt, "segment")), 1)          # sous segment : [t0 ; t_fin) seule
         self.assertEqual(ligne(txt, "segment_retraits"), [
-            f"hors segment : {FEN} calme 1, stress 2 ; asn_attribution {3 * H} ; clock_check 4 "
+            f"hors segment : {FEN} calme 1, stress 2 ; {ok(3 * H)} ; clock_check 4 "
             "— ADR-0028 D4"])
         self.assertEqual(ligne(txt, "exclusion_retraits"), [
             f"[{WS[3]} ; {WS[5]}] {ASS} {FEN} calme 0, stress 1 ; asn_attribution 0 ; clock_check 0"])
@@ -118,7 +123,7 @@ class TestBloc1(unittest.TestCase):
             f"[{a} ; {b + 120}) = [{iso(a)} ; {iso(b + 120)}) semi-ouvert : asn_attribution (ts), "
             "clock_check (harness_ts), w = 120 s de run_params — ADR-0028 D5"])
         self.assertEqual(ligne(txt, "exclusion_retraits"), [
-            f"[{a} ; {b}] {ASS} {FEN} calme 0, stress 2 ; asn_attribution {3 * H} ; clock_check 3"])
+            f"[{a} ; {b}] {ASS} {FEN} calme 0, stress 2 ; {ok(3 * H)} ; clock_check 3"])
 
     def test_journal_sans_fenetre_dates_de_campagne_sans_lever(self):
         """Un démarrage sans fenêtre (0 marqueur) : la ligne sort, sans première ni dernière. Rougit si : la
@@ -193,6 +198,46 @@ class TestBloc1(unittest.TestCase):
         sans = report.render_report(*build_fixture(tempfile.mkdtemp(prefix="s2bloc1n_")))
         self.assertIn("aucun enregistrement asn_attribution au journal (collect_asn non lancé", sans)
         self.assertNotIn("retenu pour les hôtes du pool", sans)
+
+    def test_note_keff_aucune_sonde_retenue(self):
+        """SHOGEN-KEFF-NOTE-1 (annexe B.9) : fixture de test_bloc5_sondes_toutes_retirees_message_vrai, [w0 ; w5 − 1]
+        retire les 5·H sondes du journal : la note k_eff du bloc 6 dit « aucun enregistrement asn_attribution retenu »,
+        comme la ligne (a) du bloc 5 ; journal sans sonde : même note, vraie aussi. Rougit si : note d'origine
+        (« aucun enregistrement asn_attribution », fausse sous ce filtre)."""
+        note = ("\n  k_eff     = -  — axe ASN NON MESURÉ (aucun enregistrement asn_attribution retenu) — k_eff NON "
+                "ÉVALUABLE ; ")
+        txt = report.render_report(self.c, self.j, exclude_ranges=[(WS[0], WS[5] - 1)])
+        sans = report.render_report(*build_fixture(tempfile.mkdtemp(prefix="s2bloc1n_")))
+        for t in (txt, sans):
+            self.assertIn(note, t)
+
+    def test_asn_retirees_ventilees_par_statut_sur_l_assiette(self):
+        """SHOGEN-ASN-STATUT-1 : une sonde « resolve_failed » par hôte à A + 30. Plage [w2 ; w4] : A, A + 30, B,
+        B + 59 retirées (ok 3·H, resolve_failed H), ligne de la plage, union et copie de [SENSIBILITÉ] ; sous le
+        segment [w1 ; B) (assiette : A − 1, A, A + 30) : A et A + 30 seulement. Rougit si : retraits non ventilés ;
+        statuts comptés hors de l'assiette de la ligne ; statuts permutés."""
+        r2.collect_asn([BY_ID[f] for f in SKELETON], self.c, now_fn=lambda: float(A + 30),
+                       resolve_fn=lambda h, r: {"status": "resolve_failed"})
+        txt = report.render_report(self.c, self.j, exclude_ranges=[(A, B)])
+        v = f"{FEN} calme 1, stress 2 ; asn_attribution {4 * H} (ok {3 * H}, resolve_failed {H}) ; clock_check 3"
+        self.assertEqual(ligne(txt, "exclusion_retraits") + ligne(txt, "exclusion_retraits_union"),
+                         [f"[{A} ; {B}] {ASS} {v}", f"1 {UNI} {v} {EXC}"])
+        self.assertIn(f"\n    union de 1 plage(s) : {v}\n", txt)
+        seg = report.render_report(self.c, self.j, exclude_ranges=[(A, B)], segment={"t0": WS[1], "t_fin": B})
+        self.assertEqual(ligne(seg, "exclusion_retraits"), [
+            f"[{A} ; {B}] {ASS} {FEN} calme 1, stress 1 ; asn_attribution {2 * H} (ok {H}, resolve_failed {H}) ; "
+            "clock_check 1"])
+
+    def test_run_params_non_porteurs_valeurs_distinctes(self):
+        """SHOGEN-BLOC1-RUNPARAMS-1 : sept démarrages (build_fixture : n_windows 6 et 3 ; poser : cinq à 0),
+        started_utc distincts, strate_defaut = strate de la fenêtre de démarrage (collector.py:186 : calme le
+        vendredi, stress à B, B + 59, B + 60) : une ligne, nombre de valeurs distinctes par clé non porteuse du
+        bloc 1. Rougit si : valeurs du seul dernier démarrage ; nombre de démarrages pour chaque clé."""
+        cles = ("harness_version 1, classe 1, sample_lead 1, kappa 1, strate_defaut 2, seuil_historique 1, "
+                "seuil_z 1, residu_staleness 1, n_windows_demande 3, started_utc 7, note_skeleton 1")
+        self.assertEqual(ligne(report.render_report(self.c, self.j), "run_params_non_porteurs"), [
+            "valeurs distinctes sur les 7 démarrages, par clé non porteuse imprimée ci-dessus (valeur du dernier "
+            f"démarrage, hors contrôle de concordance §E) : {cles} — SHOGEN-BLOC1-RUNPARAMS-1"])
 
 
 if __name__ == "__main__":

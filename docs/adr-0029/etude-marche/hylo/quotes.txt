@@ -1,0 +1,109 @@
+pages2/x-fullsail-2026-08-29.txt||suspected
+pages2/inc-switchboard-shutdown.txt||a separate decision from that incident
+pages2/inc-switchboard-postmortem.txt||No keys were extracted
+pages/hylodocs-introduction.md||a highly decentralized stablecoin with no single point of failure
+pages/hylodocs-introduction.md||No fund manager, no third-party trading dependencies.
+pages/hylodocs-product-guide-xassets.md||Coming soon.
+pages/llama-protocols.json||Dual-Token Stablecoin
+pages/x-hylo.derived.txt||Hylo surpassed $700M in cumulative volume, holds nearly $70M in TVL
+pages/x-hylo.derived.txt||nearly $70M
+pages/hylodocs-protocol-overview-multi-asset-architecture.md||The Pyth SOL/USD oracle then converts SOL to USD.
+pages/hylodocs-protocol-overview-multi-asset-architecture.md||Pyth BTC/USD price oracle.
+pages/hylodocs-technical-addendum-hylo-equations.md||Pyth HYPE/USD price oracle
+pages/hylodocs-technical-addendum-hylo-equations.md||Pyth USDC/USD price oracle, used as a par check only
+pages/hylodocs-technical-addendum-value-at-risk-analysis.md||Multiple sources available
+pages/sdk-hylo-core-src-error.rs||Oracle price update is not fully verified
+pages/sdk-hylo-core-src-pyth-oracle.rs||Use lower in minting, higher in redeeming
+pages/hylodocs-protocol-overview-collateral-rebalancing.md||Collateral Rebalancing Oracle Pricing (Pyth plus or minus CI)
+pages/hylodocs-protocol-overview-multi-asset-architecture.md||USDC routes are only available while the Pyth USDC/USD price stays within a small configured tolerance of $1.
+pages/sdk-hylo-core-src-error.rs||Oracle did not yield a price within the configured age window.
+pages/sdk-hylo-core-src-error.rs||Oracle confidence interval is too wide.
+pages/audit-Accretion-HyloV2-July2026.txt||an oracle becomes rejected by the protocol due to quoting too wide or being stale
+pages/audit-Accretion-HyloV2-July2026.txt||can happen in a crash
+pages/audit-Accretion-HyloV2-July2026.txt||liveness risk on the exact paths used for rebalancing
+pages2/pyth-core.txt||120+ first-party publishers including major exchanges, trading firms, and market makers
+pages2/pyth-aggregation.txt||Pythnet is shutting down; Pyth Pro documents the current architecture
+pages2/pyth-upg-how.txt||The network consists of five independently operated routers.
+pages2/pyth-pro-how.txt||Douro Labs operates the relayer service for the Pyth Pro network.
+pages2/pyth-upg-solana.txt||hardcodes the Pyth program addresses
+pages2/pyth-upg-contracts.txt||You kept your address, and your feed IDs didn't change
+pages/audit-OtterSec-Exchange-Stability-Pool-20250513.txt||conducted between February 10th and February 27th, 2025
+pages/hylodocs-security-audits.md||OtterSec, Feb 2025
+pages/audit-OtterSec-Exchange-Stability-Pool-20250513.txt||it creates an arbitrage opportunity at the expense of the protocol
+pages/audit-OtterSec-Exchange-Stability-Pool-20250513.txt||Resolved in PR #200
+pages/audit-Accretion-Hylo-Dec2025.txt||the protocol does not enforce canonical accounts for sol_usd_pyth_feed
+pages/audit-Accretion-HyloV2-July2026.txt||no critical or high
+pages/hylodocs-security-audits.md||by multiple researchers at top tier security firms
+pages/x-hylo.derived.txt||Liquidation-resistant leveraged tokens. Highest yielding stablecoin on Solana.
+pages/2nd-solanafloor-hylo.derived.txt||Hylo’s pseudonymous co-founder and CEO, Plish
+pages/ddg-hylo-team.derived.txt||founded in 2024 by Narek Asadorian
+pages/hylodocs-technical-addendum-value-at-risk-analysis.md||Wrapped asset custody, bridge security, oracle reliability
+pages/hylodocs-technical-addendum-value-at-risk-analysis.md||Unique Risk Factors
+pages/hylodocs-protocol-overview-collateral-rebalancing.md||Because the spread is a fixed schedule rather than a function of live market data, pricing stays deterministic.
+pages/hylodocs-protocol-overview-collateral-rebalancing.md||scales with how much the pool needs the flow
+pages2/hl-oracle.txt||until sufficient liquidity is met
+pages2/kamino-oracles.txt||Chainlink Data Streams and Pyth Pro
+pages2/kamino-oracles.txt||Multi-Price Oracle System
+pages2/kamino-oracles.txt||If a provider's feed goes stale, deviates significantly from other providers, or fails a validation check, Scope automatically falls back to the next-best source.
+pages2/kamino-priceprot.txt||the price is rejected and the protocol falls back to the previous valid price or an alternative provider
+pages2/kamino-oracles.txt||0 Oracle Exploits
+pages2/kamino-oracles.txt||$19.33B Volume
+pages2/kamino-oracles.txt||Independent infrastructure and operators
+pages2/pyth-pro-how.txt||permissioned
+pages2/jup-lend-oracles.txt||The system computes exchange rates by processing prices from up to four sources in a sequential chain.
+pages2/jup-lend-oracles.txt||Only Pyth validates confidence.
+pages2/jupusd.txt||The JupUSD program uses oracle price feeds from
+pages2/jupusd.txt||There is no fallback mechanism.
+pages2/jupusd.txt||Each vault requires a specific set of Pyth oracle accounts
+pages2/jup-dev-llms.txt||The Custody account stores parameters and state for each token (SOL, ETH, BTC, USDC, USDT, JupUSD) managed by the JLP pool
+pages2/velocity-migrate.txt||Velocity Protocol is a fork of Drift Protocol v2
+pages2/velocity-migrate.txt||The Drift program is paused
+pages2/velocity-oracles.txt||Two sources are supported: Pyth Lazer and Pyth push.
+pages2/velocity-oracles.txt||The Switchboard and Pyth pull variants are deprecated and rejected onchain.
+pages2/velocity-oracles.txt||no outside anchor
+pages2/velocity-oracles.txt||liquidation and trigger orders still run
+pages2/hl-oracle.txt||weighted median of Binance, OKX, Bybit, Kraken, Kucoin, Gate IO, MEXC, and Hyperliquid spot mid prices for each asset
+pages2/hl-oracle.txt||where the validators are weighted by their stake
+pages2/hl-hip3.txt||setting oracle prices, leverage limits, and settling the market if needed
+pages2/hl-hip3.txt||maintained for a minimum of 183 days after the dex is deployed
+pages2/hl-hip3.txt||a reliable external oracle source
+pages2/hl-oracle.txt||do not include Hyperliquid spot prices in the oracle
+pages2/felix-cdp.txt||builds on Liquity V2
+pages2/felix-risk.txt||Felix uses RedStone Oracles as the primary solution for crypto assets pricing.
+pages2/moonwell-oev.txt||Moonwell delays Chainlink price updates by a short window
+pages2/inc-moonwell-2068.json||a 5-day governance voting and timelock period, which could not be bypassed
+pages2/suilend-risks.txt||Suilend relies on Pyth and Switchboard for their price feeds to power liquidations.
+pages2/suilend-liq.txt||Pyth or Switchboard oracles
+pages2/suilend-risks.txt||these oracles report incorrect prices, causing wrongful liquidations
+pages2/suilend-risks.txt||via top-ups from the Insurance fund
+pages2/thala-oracles.txt||The price from the primary oracle is always preferred unless the price feed reports a stale price or detects unusual price movements
+pages2/echelon-oracles.txt||Echelon will switch to a temporary fallback by performing a cron job that fetches prices from DEXs and CEXs
+pages2/aries-oracles.txt||and Switchboard Oracle, which provides up-to-date token price data to smart contracts on the Aptos ecosystem
+pages2/inc-marginfi-refund.txt||MarginFi had recently made changes to its Oracle system
+pages2/inc-marginfi-refund.txt||3 days after the incident
+pages2/inc-hl-jelly-coindesk.txt||allegedly manipulated
+pages2/inc-hl-jelly-coindesk.txt||as opposed to $0.50 that was being fed to oracles via decentralized exchanges
+pages2/inc-hl-jelly-coindesk.txt||the validator set convened and voted to delist JELLY perps
+pages2/inc-loopscale.txt||Pyth oracle feeds
+pages2/inc-moonwell-1983.json||oracles were quoting significantly lower prices than DEXs, potentially due to heavy reliance on Binance data
+pages2/inc-moonwell-2017.json||1 wrsETH equals 1,649,934.60732 ETH
+pages2/inc-moonwell-2017.json||erroneously reported
+pages2/inc-hl-popcat.txt||Hyperliquid paused deposits and withdrawals after a trader’s $3M POPCAT bet caused $25M in liquidations and a $4.9M HLP loss.
+pages2/inc-hl-popcat.txt||what appeared to be a deliberate attempt
+pages2/inc-moonwell-2068.json||the oracle used only the raw cbETH/ETH exchange rate
+pages2/inc-drift-chainalysis.txt||deploying a price oracle they controlled to feed that artificial price to Drift
+pages2/inc-drift-nexus.txt||The oracle manipulation was a downstream effect of the key compromise, not an independent failure of Drift's oracle system.
+pages2/inc-sui-scallop.txt||The attacker used a flash loan to manipulate Scallop's oracle price feeds
+pages2/inc-moonwell-2208.json||the MAMO/USD source feed rose from approximately $0.010597 to $0.43127363
+pages2/inc-switchboard-postmortem.txt||an attacker exploited a defect in the attestation logic of Switchboard's Move-language oracle implementation to install a signing key they controlled
+pages2/inc-switchboard-postmortem.txt||No keys were extracted and no infrastructure was breached.
+pages2/inc-switchboard-postmortem.txt||We have received no reports of similar behavior on Solana.
+pages2/inc-switchboard-shutdown.txt||at that time
+pages2/x-virtue-incident-report.txt||The attacker minted 4,942,737.62 VUSD against 1.027 IOTA of collateral, reducing protocol-wide backing to 8.0%.
+pages2/x-fullsail-2026-08-29.txt||A loss of funds has been confirmed.
+pages2/x-switchboardfdn-profile.txt||An update: Switchboard is shutting down.
+pages2/inc-switchboard-shutdown.txt||all implementations are deprecated effective immediately, with all support services ending on September 25
+pages2/inc-switchboard-postmortem.txt||There is no guarantee of future support and any remediation is dependent on new contributors
+pages2/inc-switchboard-shutdown.txt||suspected key compromise
+pages2/x-virtue-incident-report.txt||The incident exposed an additional defense-in-depth requirement around price magnitude and source independence
+pages2/x-virtue-incident-report.txt||All four aggregaters now use Pyth, CertRule or VCertRule only; none reads Switchboard.
