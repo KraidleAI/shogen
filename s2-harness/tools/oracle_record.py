@@ -22,7 +22,9 @@ tourne depuis un arbre dont le vérificateur a été relu, et elle est triviale 
 enregistré. SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : toute commande autre que `suite` est lancée en mode isolé (-I) ;
 -I implique -E (mesuré sous 3.10 à 3.13) : ces commandes ignorent PYTHONHASHSEED, PYTHONPATH, PYTHONDEVMODE et
 PYTHONWARNINGS de l'environnement consigné, que seule `suite` applique ; racine s2-harness masquée refusée pour toute
-commande qui y tourne ; bytecode committé (__pycache__, .pyc) refusé ; VERIF exécuté depuis sa source."""
+commande qui y tourne ; bytecode committé (__pycache__, .pyc) refusé ; VERIF exécuté depuis sa source.
+SHOGEN-S2BIS-MASQUES-LECTURE-1 (OUT-2f) : la lecture refuse (masque) un arbre qui porte un masque à la racine de la
+suite d'un run, ou du bytecode, que l'outil qui l'a écrit l'ait vu ou non (E7 de la G2 d'OUT-2)."""
 from __future__ import annotations
 
 import argparse
@@ -110,12 +112,18 @@ def auteur_admis(a) -> bool:
     return isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis)
 
 
+def masquants(noms) -> list:
+    """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (OUT-2b) : `noms` d'entrées au nom d'un module de la bibliothèque standard
+    (sys.stdlib_module_names, nom pris avant le premier point), triés. Règle de `masques` du vérificateur, écrite ici
+    parce que la commande `suite` ne charge pas VERIF : le rendu de production tourne d'un arbre sans vérificateur
+    (test_rendu_production) ; appliquée à l'extraction (`masques`) et, à la lecture, à tree.sha256 (OUT-2f).
+    sys.stdlib_module_names n'existe qu'à partir de Python 3.10 : version minimale réelle de l'outil et de sa suite."""
+    return sorted(x for x in noms if x.split(".")[0] in sys.stdlib_module_names)
+
+
 def masques(dossier: str) -> list:
-    """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (OUT-2b) : entrées de `dossier` au nom d'un module de la bibliothèque
-    standard (sys.stdlib_module_names, nom pris avant le premier point), triées ; -m unittest lancé de ce dossier les
-    importerait à sa place. Règle de `masques` du vérificateur, écrite ici parce que la commande `suite` ne charge pas
-    VERIF : le rendu de production tourne d'un arbre sans vérificateur (test_rendu_production)."""
-    return sorted(x for x in os.listdir(dossier) if x.split(".")[0] in sys.stdlib_module_names)
+    """Entrées de `dossier` retenues par `masquants` : -m unittest lancé de ce dossier les importerait à la place."""
+    return masquants(os.listdir(dossier))
 
 
 def bytecode(chemins) -> list:
@@ -267,8 +275,10 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     par égalité exacte), tree.commit égal au sha complet attendu, vérificateur du commit (tree.sha256) égal à VERIF si
     une commande de JOBS a été lancée (OUT-1b), tree.sha256 égal par fichier à la ré-extraction du commit si `depot`
     est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
-    paquet.sha256 et runs (suite, puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de
-    ce rôle, served_from nul, ou chemin et sha256 d'un
+    masque (OUT-2f : tree.sha256 sans entrée au nom d'un module standard à la racine de la suite d'un run, s2-harness
+    pour `suite` et la production, dossier de la suite pour JOBS, ni bytecode), paquet.sha256 et runs (suite, puis
+    PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou chemin et
+    sha256 d'un
     enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
     def exige(ok, controle, detail=""):
         if not ok:
@@ -302,6 +312,12 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     for r in rec["runs"]:
         p = os.path.join(racine, str(r["sortie"]["chemin"]))
         exige(os.path.isfile(p) and sha256_fichier(p) == r["sortie"]["sha256"], "sortie", f" : {p}")
+    t = rec["tree"]["sha256"] if isinstance(rec["tree"]["sha256"], dict) else {}       # OUT-2f : lecture des masques
+    noms = [r["nom"] for r in rec["runs"] if r["nom"] in tuple(COMMANDES)]
+    racines = sorted({JOBS[c][1] if c in JOBS else COMMANDES[c][0] for c in noms} - {"."})
+    m = [f"{x}/{y}" for x in racines for y in masquants({k[len(x) + 1:].split("/")[0] for k in t if k.startswith(
+        x + "/")})] + bytecode(t)
+    exige(not m, "masque", f" : {m[:3]} (module standard à la racine de la suite d'un run, ou bytecode)")
     if role == "rendu":
         exige(isinstance(rec["paquet"]["sha256"], str) and HEX.fullmatch(rec["paquet"]["sha256"]), "paquet.sha256")
         noms = [r["nom"] for r in rec["runs"]]

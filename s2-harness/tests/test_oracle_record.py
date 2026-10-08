@@ -582,6 +582,33 @@ class TestOracleRecord(unittest.TestCase):
         with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest absent"):
             orc.ligne_du_job(os.path.join(d, "arbre"), "s2bis-unittest", "s2bis")
 
+    def test_verifier_refuse_un_arbre_qui_porte_un_masque(self):
+        """SHOGEN-S2BIS-MASQUES-LECTURE-1 (lot OUT-2, OUT-2f) : la lecture refuse, nommément (masque), un
+        enregistrement dont l'arbre (tree.sha256) porte, à la racine de la suite d'un run (s2-harness pour `suite` et la
+        production, dossier de la suite pour JOBS), une entrée au nom d'un module standard, ou un fichier de bytecode.
+        E7 de la G2 d'OUT-2 : enregistrement `suite` d'un commit dont la racine est masquée (écrit par un outil d'avant
+        OUT-2b ; tree.sha256 juste, recalculé avec --depot) ; paquet json/ à la racine de s2bis pour `suite-s2bis` ;
+        .pyc. Témoin : masque hors de la racine d'un run lancé (s2bis/ pour `suite`, tools/), conforme. Rougit si :
+        contrôle absent ; racine des JOBS, paquet, ou bytecode, non lus ; contrôle étendu aux racines d'aucun run."""
+        d, dep, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-lecture"), chr(10)
+        masque = {**OK, "s2-harness/unittest.py": nl.join(["import sys", "sys.exit(0)", ""]).encode()}
+        (sale,) = depot(dep, [masque])
+        g2 = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c1)[0]
+        e7 = self.copie(d, g2, "e7.json", lambda r: r["tree"].update(commit=sale, sha256={
+            k: hashlib.sha256(x).hexdigest() for k, x in masque.items()}))
+        verif = {orc.VERIF_COMMIT: hashlib.sha256(Path(orc.VERIF).read_bytes()).hexdigest()}
+        jobs = self.copie(d, g2, "jobs.json", lambda r: (r["runs"][0].update(nom="suite-s2bis"), r["tree"][
+            "sha256"].update({**verif, "s2bis/json/__init__.py": "0" * 64})))                     # paquet masquant
+        pyc = self.copie(d, g2, "pyc.json", lambda r: r["tree"]["sha256"].update({
+            "s2-harness/tests/__pycache__/test_t.cpython-312.pyc": "0" * 64}))
+        temoin = self.copie(d, g2, "temoin.json", lambda r: r["tree"]["sha256"].update({
+            "s2bis/json.py": "0" * 64, "s2-harness/tools/json.py": "0" * 64}))
+        for p, commit, depot_ in ((e7, sale, dep), (jobs, self.c1, None), (pyc, self.c1, None)):
+            with self.subTest(enregistrement=os.path.basename(p)), self.assertRaisesRegex(ValueError,
+                                                                                          "^refus [(]masque[)] : "):
+                orc.verifier(p, "G2", commit, depot_)
+        self.assertEqual(orc.verifier(temoin, "G2", self.c1)["tree"]["commit"], self.c1)
+
 
 if __name__ == "__main__":
     unittest.main()

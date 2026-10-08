@@ -14,7 +14,8 @@ qualité produit, sous G0-G7 complets (R-22) ; la **collecte** (`collector`,
 meurt après le rapport `11-mesures-pilotes.md`, sauf décision de l'investisseur
 après le rendu (ADR-0028 D6 vi). Frontière : ADR-0028 D6 (i).
 
-- **Zéro dépendance** hors bibliothèque standard Python (≥ 3.9) : `urllib` +
+- **Zéro dépendance** hors bibliothèque standard Python (≥ 3.9 ; ≥ 3.10 pour `tools/oracle_record.py`, sa suite et
+  le vérificateur des jobs depuis le lot OUT-2 : `sys.stdlib_module_names`, absent de 3.9) : `urllib` +
   décodage hex à la main. Aucune clé, aucun token, aucun cookie (décision
   « strictement sans clé », 10 §9.3).
 - **Pool** : 12 flux / 11 sources répondantes (10 §3.1) ; CryptoCompare
