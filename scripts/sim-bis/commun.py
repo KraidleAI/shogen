@@ -63,7 +63,8 @@ def question_t4(v) -> bool:
 
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
-          "entrees": {"sommes": ENTREE, "episodes": ENTREE, "source": texte},
+          "entrees": {**{k: ENTREE for k in ("sommes", "episodes", "sommes_plan2", "masque_j28", "fiv_unites",
+                                             "intervalles")}, "source": texte},
           "aleas": {"prefixe": texte, "graine": positif, "rangs": positif, "garde": positif, "source": texte},
           "calibration": {"strates": [texte], "unites": [(texte, texte)], "types": [texte], "quantiles": [positif],
                           "pools": [texte], "ell": [positif], "garde_blocs": positif, "precision": positif,
@@ -162,20 +163,21 @@ def charger_parametres(chemin: str = PARAMETRES, lus=None, environ=None) -> dict
     return prm
 
 
-def lire_entree(prm: dict, nom: str, lus=None, environ=None, racine: str = RACINE) -> bytes:
+def lire_entree(prm: dict, nom: str, lus=None, environ=None, racine: str = RACINE, sommes: str = "sommes") -> bytes:
     """Octets de l'entrée `nom` (chemin relatif à la racine) : sha256 égal à son épingle de parametres.json, puis,
-    sauf pour « sommes », égal à sa ligne « <sha256>  <chemin relatif au dossier des sommes> » du fichier de sommes,
-    lui-même lu sous son épingle (E-S-02). Inscrit chaque fichier lu dans `lus`."""
+    sauf pour le fichier de sommes lui-même, égal à sa ligne « <sha256>  <chemin relatif au dossier des sommes> » du
+    fichier de sommes `sommes` (« sommes » : PLAN-S2BIS ; « sommes_plan2 » : PLAN-S2BIS-2), lui-même lu sous son
+    épingle (E-S-02). Inscrit chaque fichier lu dans `lus`."""
     garde_campagne(environ)
     e = prm["entrees"][nom]
     octets = _lire(os.path.join(racine, e["chemin"]))
     sha = hashlib.sha256(octets).hexdigest()
     if sha != e["sha256"]:
         raise Refus("ENTREE/sha256-parametres", f"{e['chemin']} : {sha}, épingle {e['sha256']}")
-    if nom != "sommes":
-        s = prm["entrees"]["sommes"]["chemin"]
+    if nom != sommes:
+        s = prm["entrees"][sommes]["chemin"]
         ligne = f"{sha}  {posixpath.relpath(e['chemin'], posixpath.dirname(s))}"
-        if ligne not in lire_entree(prm, "sommes", lus, environ, racine).decode("utf-8").split(NL):
+        if ligne not in lire_entree(prm, sommes, lus, environ, racine, sommes).decode("utf-8").split(NL):
             raise Refus("ENTREE/sha256-sommes", f"{e['chemin']} : « {ligne} » absente de {s}")
     if lus is not None:
         lus[e["chemin"]] = sha

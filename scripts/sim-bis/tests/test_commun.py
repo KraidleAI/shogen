@@ -226,6 +226,57 @@ class TestSocle(unittest.TestCase):
         prm["entrees"]["e"]["sha256"], prm["entrees"]["sommes"]["sha256"] = DONNEE, AUTRE
         self.refus("ENTREE/sha256-parametres", commun.lire_entree, prm, "e", {}, {}, self.r)
 
+    def test_lire_entree_sommes_nommees(self):
+        """Fixture écrite ici : une entrée lue sous le fichier de sommes nommé (sommes2, dossier d2), lui-même lu sous
+        son épingle sans autre fichier de sommes ; la même entrée sous les sommes par défaut (d/SHA256SUMS, sans sa
+        ligne) : ENTREE/sha256-sommes ; sommes2 retouché dans parametres : ENTREE/sha256-parametres. Mutations
+        M-15A-01 (sommes par défaut toujours relues), M-15A-02 (fichier de sommes nommé contrôlé contre un autre)."""
+        self.poser("d/SHA256SUMS", (DONNEE + "  e.txt" + NL).encode())
+        self.poser("d2/f.txt", b"donnee" + NL.encode())
+        self.poser("d2/SHA256SUMS", (DONNEE + "  f.txt" + NL).encode())
+        sommes2 = "f2d2121f1918731d7a3e4df0c93844fe7810a92df86b03402ff5ff6a9965eabf"     # echo "<DONNEE>  f.txt"
+        prm = {"entrees": {"sommes": {"chemin": "d/SHA256SUMS", "sha256": SOMMES},
+                           "sommes2": {"chemin": "d2/SHA256SUMS", "sha256": sommes2},
+                           "f": {"chemin": "d2/f.txt", "sha256": DONNEE}}}
+        lus = {}
+        self.assertEqual(commun.lire_entree(prm, "f", lus, {}, self.r, "sommes2"), b"donnee" + NL.encode())
+        self.assertEqual(lus, {"d2/SHA256SUMS": sommes2, "d2/f.txt": DONNEE})
+        self.refus("ENTREE/sha256-sommes", commun.lire_entree, prm, "f", {}, {}, self.r)
+        prm["entrees"]["sommes2"]["sha256"] = AUTRE
+        self.refus("ENTREE/sha256-parametres", commun.lire_entree, prm, "f", {}, {}, self.r, "sommes2")
+
+    def test_sorties_plan_s2bis_2(self):
+        """Ajout daté du G0 du 2026-10-05 15:05:43 UTC, points (1), (3) et (6) : les trois sorties versées de
+        PLAN-S2BIS-2 lues sous leurs deux épingles (parametres.json, puis leur ligne du SHA256SUMS du versement,
+        sommes_plan2, lui-même épinglé) ; empreintes et tailles mesurées par sha256sum et wc -c, préfixes égaux à
+        ceux du JOURNAL du 2026-10-08 16:10:16 UTC ; fichiers lus inscrits ; sous les sommes de PLAN-S2BIS :
+        ENTREE/sha256-sommes ; copie dont le SHA256SUMS du versement, ou le masque, perd son dernier octet :
+        ENTREE/sha256-parametres ; épingle en majuscules : PARAMETRES/schema. Mutations M-15A-03 (épingle d'une sortie
+        retouchée), M-15A-04 (épingle du SHA256SUMS du versement retouchée), M-15A-09 (épingles des nouvelles entrées
+        hors schéma)."""
+        lus, prm, d = {}, commun.charger_parametres(environ={}), "docs/adr-0029/plan-s2bis-2/"
+        attendu = {"masque_j28": ("0f43fbb88b2a45d2d2224045e97670d92e013e8f12c578235a48b4308cb954ce", 27576),
+                   "fiv_unites": ("68d540837e6186ce5458fa6e672fc6f3bfa2a4f4bc0237020f421ebfe852905b", 245093),
+                   "intervalles": ("2738ad341af7f99dead35edb14929a4ff68f2ea23a82bacace411bd84f23ea23", 35131)}
+        for nom, (sha, taille) in attendu.items():
+            octets = commun.lire_entree(prm, nom, lus, {}, sommes="sommes_plan2")
+            self.assertEqual((prm["entrees"][nom]["chemin"], hashlib.sha256(octets).hexdigest(), len(octets)),
+                             (d + nom + ".txt", sha, taille))
+            self.refus("ENTREE/sha256-sommes", commun.lire_entree, prm, nom, {}, {})
+        self.assertEqual(lus, {**{d + n + ".txt": s for n, (s, _t) in attendu.items()},
+                               d + "SHA256SUMS": "23926b6d6c44f31b5b5c3c14db298273419333c69a416b94f62348e94ccf48df"})
+        for f in ("SHA256SUMS", "masque_j28.txt"):
+            for g in ("SHA256SUMS", "masque_j28.txt"):
+                with open(os.path.join(commun.RACINE, d + g), "rb") as h:
+                    o = h.read()
+                self.poser(d + g, o[:-1] if g == f else o)
+            self.refus("ENTREE/sha256-parametres", commun.lire_entree, prm, "masque_j28", {}, {}, self.r,
+                       "sommes_plan2")
+        for k in ("sommes_plan2", "masque_j28", "fiv_unites", "intervalles"):
+            p = json.loads(json.dumps(prm))
+            p["entrees"][k]["sha256"] = p["entrees"][k]["sha256"].upper()
+            self.refus("PARAMETRES/schema", commun.controler, p, commun.SCHEMA)
+
     def test_ecrire_atomique_sans_ecrasement(self):
         """En entier, sans partiel restant ; cible existante : SORTIE/existe, contenu intact ; partiel présent :
         SORTIE/partiel-present ; `.jsonl` : SORTIE/jsonl. Mutations M-0-17 (os.replace), M-0-18 (partiel laissé),

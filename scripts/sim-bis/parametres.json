@@ -5,7 +5,11 @@
  "entrees": {
   "sommes": {"chemin": "docs/adr-0029/plan-s2bis/SHA256SUMS", "sha256": "f21f929329f11e9baf00057e3a7b250e5fb3a05a31fd5bcc64bb9860218f601f"},
   "episodes": {"chemin": "docs/adr-0029/plan-s2bis/episodes.txt", "sha256": "c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6"},
-  "source": "E-S-02 : sorties versées de PLAN-S2BIS (episodes.txt, « EP », seule entrée de calibration ; sa ligne de SHA256SUMS) ; empreintes mesurées par sha256sum le 2026-10-04 à la tête 435fa12"
+  "sommes_plan2": {"chemin": "docs/adr-0029/plan-s2bis-2/SHA256SUMS", "sha256": "23926b6d6c44f31b5b5c3c14db298273419333c69a416b94f62348e94ccf48df"},
+  "masque_j28": {"chemin": "docs/adr-0029/plan-s2bis-2/masque_j28.txt", "sha256": "0f43fbb88b2a45d2d2224045e97670d92e013e8f12c578235a48b4308cb954ce"},
+  "fiv_unites": {"chemin": "docs/adr-0029/plan-s2bis-2/fiv_unites.txt", "sha256": "68d540837e6186ce5458fa6e672fc6f3bfa2a4f4bc0237020f421ebfe852905b"},
+  "intervalles": {"chemin": "docs/adr-0029/plan-s2bis-2/intervalles.txt", "sha256": "2738ad341af7f99dead35edb14929a4ff68f2ea23a82bacace411bd84f23ea23"},
+  "source": "E-S-02 : sorties versées de PLAN-S2BIS (episodes.txt, « EP » ; sa ligne de SHA256SUMS) ; empreintes mesurées par sha256sum le 2026-10-04 à la tête 435fa12 ; ajout daté du G0 du 2026-10-05 15:05:43 UTC, points (1), (3) et (6) : sorties versées de PLAN-S2BIS-2 (masque_j28.txt, positions présentes d'E1 ; fiv_unites.txt, FIV_u de la règle de C1 ; intervalles.txt, impressions de SB-11), chacune sous ses deux épingles (ici, puis sa ligne du SHA256SUMS du versement, sommes_plan2, lui-même épinglé ici), empreintes mesurées par sha256sum le 2026-10-08 à la tête b46672b, égales aux préfixes du JOURNAL du 2026-10-08 16:10:16 UTC ; EP et ces trois sorties sont les seules entrées du lot"
  },
  "aleas": {
   "prefixe": "SHOGEN-SIM-BIS",
