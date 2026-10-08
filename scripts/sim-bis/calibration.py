@@ -5,7 +5,8 @@ Nombres pris en rationnels exacts depuis leur écriture décimale. Contrôles de
 quotient imprimé est refait sous le contexte décimal de r1 de f35a70c (précision 50, ROUND_HALF_EVEN, le reste du
 DefaultContext) et comparé chaîne pour chaîne. L'histogramme d'EP compte tous les épisodes, censurés compris. SB-15d
 (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (1)) : lecture de fiv_unites.txt de PLAN-S2BIS-2, même analyseur de
-ligne de courbe que pour EP (SHOGEN-SIM-BIS-POOL-EP-SEPARES-1, précision de l'annexe B, B.77)."""
+ligne de courbe que pour EP (SHOGEN-SIM-BIS-POOL-EP-SEPARES-1, précision de l'annexe B, B.77). SB-15g (Q-SI-9) :
+contrôle croisé de n et K de fiv_unites.txt contre le masque d'E1 et EP."""
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
@@ -163,7 +164,26 @@ def analyser_unites(texte: str, k: dict) -> dict:
         raise commun.Refus("CALIB/coherence", f"fiv_unites.txt : quotient impossible ({type(e).__name__})") from None
 
 
-def charger_unites(prm: dict, lus=None, environ=None) -> dict:
-    """fiv_unites.txt lu sous ses deux épingles (commun.lire_entree, sommes de PLAN-S2BIS-2), puis analysé."""
+def croiser_unites(unites: dict, presentes: dict, ep: dict) -> None:
+    """Q-SI-9 (G2 de SIM-INTEG, adjugée par l'orchestrateur le 2026-10-08) : contrôle croisé à l'exécution, par
+    strate et par hôte, de chaque ligne de fiv_unites.txt (analyser_unites) : n = nombre de positions présentes du
+    masque de la strate (presentes : {strate : masque}, calendrier d'E1), n = n_s et K = cellules de la ligne
+    « ecart » d'EP (ep : episodes de analyser, P-5 de PLAN-S2BIS-2). Égalités tenues par construction : séries D_u
+    et masque portent sur les fenêtres retenues de la strate (contrôles (b) et (f) de PLAN-S2BIS-2) ; strate absente
+    du masque, hôte absent d'EP, ou une égalité fausse : CALIB/croisement."""
+    for s, hs in unites.items():
+        for h, xs in hs.items():
+            p, e = presentes.get(s), ep.get((s, h, "ecart"))
+            if p is None or e is None or any((x["n"], x["n"], x["K"]) != (p.bit_count(), e["n_s"], e["cellules"])
+                                             for x in xs):
+                raise commun.Refus("CALIB/croisement", f"« {s} » {h} : n ou K de fiv_unites.txt différent du masque "
+                                                       "ou d'EP")
+
+
+def charger_unites(prm: dict, presentes: dict, ep: dict, lus=None, environ=None) -> dict:
+    """fiv_unites.txt lu sous ses deux épingles (commun.lire_entree, sommes de PLAN-S2BIS-2), analysé, puis contrôlé
+    contre le masque et EP (croiser_unites, Q-SI-9)."""
     texte = commun.lire_entree(prm, "fiv_unites", lus, environ, sommes="sommes_plan2").decode("utf-8")
-    return analyser_unites(texte, prm["calibration"])
+    unites = analyser_unites(texte, prm["calibration"])
+    croiser_unites(unites, presentes, ep)
+    return unites

@@ -6,6 +6,7 @@ arrondis au plus proche sont les valeurs imprimées par EP l.13."""
 import unittest
 from fractions import Fraction
 
+import calib_fiv
 import calibration
 import commun
 
@@ -13,6 +14,8 @@ NL = chr(10)
 PRM = commun.charger_parametres(environ={})
 EP = commun.lire_entree(PRM, "episodes", environ={}).decode("utf-8")
 UNITES = commun.lire_entree(PRM, "fiv_unites", environ={}, sommes="sommes_plan2").decode("utf-8")
+PRES = calib_fiv.calendrier_e1(PRM, environ={})["presentes"]
+EPI = calibration.analyser(EP, PRM["calibration"])["episodes"]
 K2 = dict(PRM["calibration"], strates=["calme"], unites=[["binance", "binance"], ["bitfinex", "bitfinex"]], ell=[1, 2])
 
 
@@ -147,7 +150,7 @@ class TestCalibration(unittest.TestCase):
         K = 6) ; sensibilité au voisinage non lue (l.371 : n = 24 081). Mutations M-15D-01 (lu sous les sommes de
         PLAN-S2BIS), M-15D-02 (flux et hôte permutés dans le préfixe)."""
         lus = {}
-        d = calibration.charger_unites(PRM, lus, environ={})
+        d = calibration.charger_unites(PRM, PRES, EPI, lus, environ={})
         self.assertEqual(sorted(lus), ["docs/adr-0029/plan-s2bis-2/SHA256SUMS",
                                        "docs/adr-0029/plan-s2bis-2/fiv_unites.txt"])
         self.assertEqual([(s, list(v), {len(x) for x in v.values()}) for s, v in d.items()],
@@ -195,6 +198,39 @@ class TestCalibration(unittest.TestCase):
             with self.assertRaises(commun.Refus) as c:
                 calibration.analyser_unites(texte, K2)
             self.assertEqual(c.exception.code, code, texte.split(NL)[4:8])
+
+    def test_croisement_q_si_9(self):
+        """Q-SI-9 (adjugée le 2026-10-08, fermée dans ce lot) : par strate et par hôte, chaque ligne de fiv_unites.txt
+        a n = positions présentes du masque d'E1, n = n_s et K = cellules « ecart » d'EP ; données versées : égaux
+        (mesuré hors code : 20 couples, calme 24 585, stress 11 397). Retouches, chacune sur le dernier hôte du format
+        (okx) ou la dernière ligne seulement : masque de calme amputé d'une position, cellules ou n_s d'EP, K ou n de
+        la ligne ℓ = 1 440 ; strate absente du masque, hôte absent d'EP : CALIB/croisement, jamais KeyError ni
+        AttributeError ; charger_unites fait le contrôle, et un appel sans presentes ni ep lève TypeError (CC-1 du
+        contre-contrôle). Mutations M-15G-01 à M-15G-12, MG-14 du réviseur (presentes et ep facultatifs)."""
+        u, cle = calibration.analyser_unites(UNITES, PRM["calibration"]), ("stress", "okx", "ecart")
+        self.assertIsNone(calibration.croiser_unites(u, PRES, EPI))
+        self.assertEqual({x["n"] for v in u.values() for xs in v.values() for x in xs}, {24585, 11397})
+        e, d = EPI[cle], dict(EPI)
+        del d[cle]
+        coupe = dict(PRES, calme=PRES["calme"] & (PRES["calme"] - 1))
+
+        def ligne(**k):
+            v = {s: {h: list(xs) for h, xs in hs.items()} for s, hs in u.items()}
+            v["stress"]["okx"][-1] = dict(v["stress"]["okx"][-1], **k)
+            return v
+        ok, x = u, u["stress"]["okx"][-1]
+        cas = [(ok, coupe, EPI), (ok, PRES, {**EPI, cle: dict(e, cellules=e["cellules"] + 1)}),
+               (ok, PRES, {**EPI, cle: dict(e, n_s=e["n_s"] + 1)}), (ligne(K=x["K"] + 1), PRES, EPI),
+               (ligne(n=x["n"] + 1), PRES, EPI), (ok, {"calme": PRES["calme"]}, EPI), (ok, PRES, d)]
+        for v, p, ep in cas:
+            with self.assertRaises(commun.Refus) as c:
+                calibration.croiser_unites(v, p, ep)
+            self.assertEqual(c.exception.code, "CALIB/croisement")
+        with self.assertRaises(commun.Refus) as c:
+            calibration.charger_unites(PRM, coupe, EPI, environ={})
+        self.assertEqual(c.exception.code, "CALIB/croisement")
+        with self.assertRaises(TypeError):
+            calibration.charger_unites(PRM, environ={})
 
     def test_quantile_au_dela_de_100(self):
         """O-1 de la G2 : un quantile au-delà de 100 n'a pas de rang (P101 : rang 336 > 332 épisodes, `bc`) : refus
