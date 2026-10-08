@@ -26,7 +26,12 @@ commande qui y tourne ; bytecode committé (__pycache__, .pyc) refusé ; VERIF e
 SHOGEN-S2BIS-MASQUES-LECTURE-1 (OUT-2f) : la lecture refuse (masque) un arbre qui porte un masque à la racine de la
 suite d'un run, ou du bytecode, que l'outil qui l'a écrit l'ait vu ou non (E7 de la G2 d'OUT-2).
 SHOGEN-S2BIS-SUITE-CODE-COMPILE-1 (OUT-2h) : la règle `bytecode` couvre tout fichier compilé (COMPILES : .pyc, .pyo,
-extensions .so et .pyd, suffixes d'extension de l'interpréteur), à l'écriture comme à la lecture (LF-04 de la revue)."""
+extensions .so et .pyd, suffixes d'extension de l'interpréteur), à l'écriture comme à la lecture (LF-04 de la revue).
+SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i) : `suite` passe par AMORCE de VERIF, comme la ligne du job, avec un nonce
+(environnement inchangé : la variable scellée y reste si elle est posée) ; un run sorti en 0 est jugé sur le compte
+réel (`compte_reel`) : refus, exit 1 consigné et motif nommé en fin de sortie, que la lecture cite (refus (exit)).
+Limites : celle d'AMORCE (un test qui altère unittest dans son processus forge encore le compte) ; un enregistrement
+écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture."""
 from __future__ import annotations
 
 import argparse
@@ -38,6 +43,7 @@ import json
 import math
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -51,9 +57,10 @@ VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ENV = (VARIABLE, "PYTHONHASHSEED", "PYTHONPATH")
 JOURNAUX = "<journaux>"     # marqueur d'argument : dossier des journaux, chemin absolu substitué (jamais un shell)
 LIGNE = "<ligne du job>"    # marqueur : arguments de la ligne du vérificateur du job, lus dans le gates.yml extrait
+AMORCE = "<AMORCE>"         # marqueur : code AMORCE de VERIF (OUT-2i), substitué au lancement de `suite`
 PRODUCTION = ("j14-principal", "j14-second", "j28", "recalcul-tiers", "raw")   # rendu unique (G0 §C, Q5 à Q7)
 JOBS = {"suite-s2bis": ("s2bis-unittest", "s2bis"), "suite-sim-bis": ("sim-bis-unittest", "scripts/sim-bis")}
-COMMANDES = {"suite": ("s2-harness", ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]),
+COMMANDES = {"suite": ("s2-harness", ["-B", "-c", AMORCE, "discover", "-s", "tests", "-t", ".", "-v"]),
              **{n: ("s2-harness", ["-B", "tools/rendu_unique.py", "--produire", n, "--journaux", JOURNAUX])
                 for n in PRODUCTION}, **{n: (".", [LIGNE]) for n in JOBS}}  # liste fermée
 GATES = os.path.join(".github", "workflows", "gates.yml")
@@ -119,8 +126,8 @@ def auteur_admis(a) -> bool:
 def masquants(noms) -> list:
     """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (OUT-2b) : `noms` d'entrées au nom d'un module de la bibliothèque standard
     (sys.stdlib_module_names, nom pris avant le premier point), triés. Règle de `masques` du vérificateur, écrite ici
-    parce que la commande `suite` ne charge pas VERIF : le rendu de production tourne d'un arbre sans vérificateur
-    (test_rendu_production) ; appliquée à l'extraction (`masques`) et, à la lecture, à tree.sha256 (OUT-2f).
+    parce que la lecture l'applique aux noms de tree.sha256 sans charger VERIF (OUT-2f) ; appliquée aussi à
+    l'extraction (`masques`), avant le chargement de VERIF par `suite` (OUT-2i).
     sys.stdlib_module_names n'existe qu'à partir de Python 3.10 : version minimale réelle de l'outil et de sa suite."""
     return sorted(x for x in noms if x.split(".")[0] in sys.stdlib_module_names)
 
@@ -139,6 +146,37 @@ def bytecode(chemins) -> list:
     return sorted(k for k in chemins if k.endswith(COMPILES))
 
 
+def charger_verif():
+    """VERIF chargé depuis sa source (OUT-2d : jamais un .pyc de son __pycache__) : analyseur des lignes de job, et
+    AMORCE et `accord` de la commande `suite` (OUT-2i) ; toute exception au chargement, SystemExit comprise, est
+    rattrapée et nommée (OUT-1b) : ValueError (refus)."""
+    try:
+        spec = importlib.util.spec_from_file_location("verdict_suite_s2", VERIF)
+        analyseur = importlib.util.module_from_spec(spec)
+        with open(VERIF, "rb") as f:                # OUT-2d : la source, jamais un .pyc de son __pycache__
+            exec(compile(f.read(), VERIF, "exec", dont_inherit=True), analyseur.__dict__)
+    except BaseException as e:                     # OUT-1b : toute exception au chargement, SystemExit comprise
+        raise ValueError(f"analyseur {VERIF} illisible ({e!r}) — refus") from e
+    return analyseur
+
+
+def compte_reel(verif, octets: bytes, t: str, n: str) -> tuple:
+    """SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i) : (octets, exit) d'un run `suite` sorti en 0, jugé sur le compte
+    réel écrit par AMORCE dans le dossier `t` au nonce `n` : `accord` de VERIF (compte absent, illisible, sans le nonce,
+    en désaccord avec le résumé final), puis échecs, erreurs ou succès inattendus non nuls ; refus : exit 1 et une
+    ligne nommée par motif, « [oracle_record] … — exit 1 », ajoutée en fin de sortie (hachée avec elle)."""
+    chemin, compte = os.path.join(t, "compte"), None
+    if os.path.isfile(chemin):
+        with open(chemin, encoding="utf-8", errors="replace") as f:
+            compte = f.read()
+    refus = verif.accord(octets.decode("utf-8", "replace"), compte, n)
+    if not refus and compte.split(" ")[2:4] + compte.split(" ")[6:] != ["0", "0", "0"]:
+        refus = [f"compte réel en désaccord avec le code 0 (échecs, erreurs ou succès inattendus) : {compte[:90]!r}"]
+    if not refus:
+        return octets, 0
+    return octets + "".join(f"{chr(10)}[oracle_record] {r} — exit 1{chr(10)}" for r in refus).encode(), 1
+
+
 def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     """Arguments de la ligne du vérificateur du job `job` de GATES dans l'extraction `arbre`, telle qu'écrite
     (plancher committé compris) : « python3 -B enforcement/verdict-suite-s2.py <suite> --aucun-saut --egal --plancher
@@ -149,12 +187,9 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
             texte = f.read()
-        spec = importlib.util.spec_from_file_location("verdict_suite_s2", VERIF)
-        analyseur = importlib.util.module_from_spec(spec)
-        with open(VERIF, "rb") as f:                # OUT-2d : la source, jamais un .pyc de son __pycache__
-            exec(compile(f.read(), VERIF, "exec", dont_inherit=True), analyseur.__dict__)
-    except BaseException as e:                     # OUT-1b : toute exception au chargement, SystemExit comprise
-        raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e!r}) — refus") from e
+    except BaseException as e:
+        raise ValueError(f"{GATES} de l'extraction illisible ({e!r}) — refus") from e
+    analyseur = charger_verif()
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
              + " --aucun-saut --egal --plancher [1-9][0-9]*")      # C-5 (a) : plancher 0 refusé, comme K-02
     trouves = analyseur.lignes_du_job(texte, job, motif)
@@ -199,7 +234,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     de dépassement en fin de sortie, enregistrement écrit quand même. auteur hors liste blanche : refus avant tout git.
     journaux : dossier substitué au marqueur JOURNAUX (exigé si une commande le porte). arret_premier_echec : aucun
     run lancé après un run en échec. Commandes de JOBS : ligne du job lue dans l'extraction, vérificateur du commit
-    égal à VERIF (sha256), sinon refus avant tout run (OUT-1b) ; ligne lancée en mode isolé (-I)."""
+    égal à VERIF (sha256), sinon refus avant tout run (OUT-1b) ; ligne lancée en mode isolé (-I). `suite` : AMORCE
+    de VERIF (VERIF illisible : refus avant tout run), run sorti en 0 jugé par `compte_reel` (OUT-2i)."""
     delai = DELAI_DEFAUT if delai is None else delai
     if role not in ROLES or not commandes or any(c not in COMMANDES for c in commandes):
         raise ValueError(f"rôle {role!r} ou commande(s) {list(commandes)} hors des listes fermées {ROLES}, "
@@ -235,17 +271,24 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         if pyc:                                      # OUT-2d, OUT-2h : pris à la place de la source relue, -I ou non
             raise ValueError(f"fichier(s) compilé(s) committé(s) dans l'extraction {pyc[:3]} : code que la relecture "
                              "ne lit pas, importé à la place de la source ou à côté d'elle — refus")
+        verif = charger_verif() if "suite" in commandes else None     # OUT-2i : AMORCE de VERIF, refus avant tout run
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
-            cmd = [sys.executable, *["-I"][:c != "suite"], *(journaux if x == JOURNAUX else x for x in args)]
+            cmd = [sys.executable, *["-I"][:c != "suite"], *(journaux if x == JOURNAUX else verif.AMORCE if x == AMORCE
+                                                             else x for x in args)]
             sortie = f"{nom}.{i}-{c}.out"
-            try:
+            n, t = (secrets.token_hex(16), tempfile.mkdtemp(prefix="oracle_compte_")) if c == "suite" else (None, None)
+            try:                                     # OUT-2i : nonce et dossier du compte sur stdin, comme le job
                 p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, timeout=delai)
-                octets, code = p.stdout, p.returncode
+                                   stderr=subprocess.STDOUT, timeout=delai, input=n and f"{n} {t}{chr(10)}".encode())
+                octets, code = compte_reel(verif, p.stdout, t, n) if n and p.returncode == 0 else (p.stdout,
+                                                                                                    p.returncode)
             except subprocess.TimeoutExpired as e:
                 octets, code = (e.stdout or b"") + (f"\n[oracle_record] délai maximal de {delai:g} s dépassé : "
                                                     f"commande arrêtée, exit {EXIT_DELAI}\n").encode(), EXIT_DELAI
+            finally:
+                if t:
+                    shutil.rmtree(t, ignore_errors=True)
             with open(os.path.join(dossier, sortie), "xb") as f:
                 f.write(octets)
             runs.append({"nom": c, "arbre": sous, "commande": cmd, "exit": code,
@@ -267,6 +310,16 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     return chemin, rec["exit"]
 
 
+def fin_nommee(chemin: str) -> str:
+    """OUT-2i : « (dernière ligne) » de la sortie `chemin` si l'outil l'y a écrite (« [oracle_record] … » : compte
+    réel, délai) ; « » sinon, ou si elle manque. Nomme à la lecture le motif d'un exit non nul."""
+    if not os.path.isfile(chemin):
+        return ""
+    with open(chemin, "rb") as f:
+        fin = f.read().decode("utf-8", "replace").rstrip(chr(10)).rsplit(chr(10), 1)[-1]
+    return f" ({fin})" if fin.startswith("[oracle_record] ") else ""
+
+
 def cles(x, attendues) -> bool:
     return isinstance(x, dict) and set(x) == set(attendues)
 
@@ -280,7 +333,8 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     champs, schema, rôle attendu, auteur (identifiant de la liste blanche du lint, ou cet identifiant suivi de [1m],
     par égalité exacte), tree.commit égal au sha complet attendu, vérificateur du commit (tree.sha256) égal à VERIF si
     une commande de JOBS a été lancée (OUT-1b), tree.sha256 égal par fichier à la ré-extraction du commit si `depot`
-    est donné, static_only false, exit 0 (et chaque commande), sha256 de chaque sortie recalculé,
+    est donné, static_only false, exit 0 (et chaque commande ; motif nommé par l'outil en fin de sortie cité, OUT-2i),
+    sha256 de chaque sortie recalculé,
     masque (OUT-2f : tree.sha256 sans entrée au nom d'un module standard à la racine de la suite d'un run, s2-harness
     pour `suite` et la production, dossier de la suite pour JOBS, ni fichier compilé), paquet.sha256 et runs (suite,
     puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou
@@ -312,8 +366,10 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
         e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
         exige(not e, "tree.sha256", f" : {e[:3]}{' …' if len(e) > 3 else ''} (ré-extraction depuis {depot})")
     exige(rec["static_only"] is False, "static_only")
-    exige(zero(rec["exit"]) and rec["runs"] and all(zero(r["exit"]) for r in rec["runs"]), "exit")
     racine = os.path.dirname(os.path.abspath(chemin))
+    ko = [f"{r['nom']} exit {r['exit']!r}{fin_nommee(os.path.join(racine, str(r['sortie']['chemin'])))}"
+          for r in rec["runs"] if not zero(r["exit"])]                    # OUT-2i : le motif nommé par l'outil
+    exige(zero(rec["exit"]) and rec["runs"] and not ko, "exit", f" : {ko[:3]}" if ko else "")
     for r in rec["runs"]:
         p = os.path.join(racine, str(r["sortie"]["chemin"]))
         exige(os.path.isfile(p) and sha256_fichier(p) == r["sortie"]["sha256"], "sortie", f" : {p}")

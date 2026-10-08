@@ -29,7 +29,11 @@ T = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):\n 
 OK = {"s2-harness/tests/__init__.py": b"", "s2-harness/tests/test_t.py": T, "LISEZ-MOI": "dépôt jetable\n".encode()}
 KO = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"self.fail()")}
 LENT = {**OK, "s2-harness/tests/test_t.py": T.replace(b"pass", b"__import__('time').sleep(20)")}
-SUITE = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
+_VSPEC = importlib.util.spec_from_file_location("verdict_reference", os.path.join(os.path.dirname(HARNESS),
+                                                                                 "enforcement", "verdict-suite-s2.py"))
+verif = importlib.util.module_from_spec(_VSPEC)         # vérificateur du dépôt, chargé ici : AMORCE de référence
+_VSPEC.loader.exec_module(verif)
+SUITE = [sys.executable, "-B", "-c", verif.AMORCE, "discover", "-s", "tests", "-t", ".", "-v"]     # OUT-2i : AMORCE
 SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
@@ -628,6 +632,61 @@ class TestOracleRecord(unittest.TestCase):
                                                                                           "^refus [(]masque[)] : "):
                 orc.verifier(p, "G2", commit, depot_)
         self.assertEqual(orc.verifier(temoin, "G2", self.c1)["tree"]["commit"], self.c1)
+
+    def test_suite_par_amorce_jugee_sur_le_compte_reel(self):
+        """SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i ; LF-06 de la revue de la vague 2) : la commande `suite` passe par
+        AMORCE du vérificateur de l'outil (VERIF), avec un nonce, comme le job ; un run sorti en 0 est jugé sur le
+        compte réel : test rouge, résumé forgé puis os._exit(0) (compte réel absent) ; flux réécrit (FAILED devient OK,
+        ou Ran 2 devient Ran 255, tous verts) et sortie forcée à 0 par atexit (résumé en désaccord) ; compte écrit par
+        un test au nonce deviné (sans le nonce) ; échec, erreur ou succès inattendu sous une sortie forcée à 0, résumé
+        FAILED laissé (désaccord avec le code 0) : exit 1 consigné, motif nommé en dernière ligne de la sortie, hachée
+        avec lui ; refus (exit) à la lecture, qui le nomme. Témoin vert : test_enregistrement_champs_et_sha (exit 0,
+        sortie sans ajout). VERIF illisible : refus avant tout run, rien d'écrit. Rougit si : -m unittest gardé, compte
+        non lu ou non jugé, résumé non comparé, échecs, erreurs ou succès inattendus non lus, motif absent ou hors du
+        sha256, lecture qui ne le nomme pas, VERIF non exigé."""
+        d, dep, a, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-compte"), "claude-opus-5-5", chr(10)
+
+        def module(test_a, test_z, *apres):           # module de test : test_a, test_z (corps), puis `apres`
+            return ["import atexit, os, sys, unittest", "", "", "class T(unittest.TestCase):", *test_a, "",
+                    "    def test_z(self):", *test_z, "", "", *apres]
+
+        def flux(*remplacements):                     # flux d'erreur réécrit, puis sortie forcée à 0 par atexit
+            r = "".join(f".replace({x!r}, {y!r})" for x, y in remplacements)
+            return ["class F:", "    def __init__(self, f):", "        self.f = f", "", "    def write(self, s):",
+                    f"        return self.f.write(s{r})", "", "    def flush(self):", "        self.f.flush()", "", "",
+                    "sys.stderr = F(sys.stderr)", "atexit.register(os._exit, 0)"]
+        rouge = ["    def test_a(self):", "        self.fail('rouge')"]
+        vert, passe = ["    def test_a(self):", "        pass"], ["        pass"]
+        forge = ["        sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 2 tests in 0.001s' + chr(10) * 2 + 'OK'"
+                 " + chr(10))", "        sys.stderr.flush()", "        os._exit(0)"]
+        nonce = ["        c = os.path.join(__import__('__main__').t, 'compte')",
+                 "        with open(c, 'x', encoding='utf-8') as f:", "            f.write('0' * 32 + ' 2 0 0 0 0 0')"]
+        code0 = "désaccord avec le code 0"
+        cas = [("compte réel absent", module(rouge, forge)),
+               ("résumé en désaccord", module(rouge, passe, *flux(("FAILED", "OK"), (" (failures=1)", "")))),
+               ("résumé en désaccord", module(vert, passe, *flux(("Ran 2 tests", "Ran 255 tests")))),
+               ("sans le nonce", module(rouge, [*nonce, *forge])),
+               (code0, module(rouge, passe, "atexit.register(os._exit, 0)")),
+               (code0, module(["    def test_a(self):", "        raise RuntimeError('erreur')"], passe,
+                              "atexit.register(os._exit, 0)")),
+               (code0, module(["    @unittest.expectedFailure", *vert], passe, "atexit.register(os._exit, 0)"))]
+        commits = list(depot(dep, [{**OK, "s2-harness/tests/test_t.py": nl.join(x).encode()} for _m, x in cas]))
+        for i, ((motif, _x), commit) in enumerate(zip(cas, commits)):
+            chemin, code = orc.enregistrer(tempfile.mkdtemp(dir=d), "G2", a, dep, commit)
+            rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
+            run, out = rec["runs"][0], Path(os.path.dirname(chemin), rec["runs"][0]["sortie"]["chemin"]).read_bytes()
+            fin = out.decode("utf-8").rstrip(nl).rsplit(nl, 1)[-1]
+            with self.subTest(cas=i, motif=motif):
+                self.assertEqual((code, rec["exit"], run["exit"], run["commande"], run["sortie"]["sha256"]),
+                                 (1, 1, 1, SUITE, hashlib.sha256(out).hexdigest()))
+                self.assertTrue(fin.startswith("[oracle_record] ") and motif in fin and fin.endswith(" — exit 1"), fin)
+                with self.assertRaisesRegex(ValueError, "^refus [(]exit[)] : .*" + motif):
+                    orc.verifier(chemin, "G2", commit)
+        avant = sorted(os.listdir(d))
+        with mock.patch.object(orc, "VERIF", os.path.join(d, "absent.py")):
+            with self.assertRaisesRegex(ValueError, "absent[.]py.* — refus$"):
+                orc.enregistrer(d, "G2", a, self.depot, self.c1)
+        self.assertEqual(sorted(os.listdir(d)), avant)
 
 
 if __name__ == "__main__":

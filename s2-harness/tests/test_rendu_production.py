@@ -260,8 +260,12 @@ def faux_runs(echec=None, pendant=lambda nom: None) -> tuple:
     def faux(cmd, *a, **k):
         if cmd[0] != sys.executable:
             return vrai(cmd, *a, **k)
-        lances.append("suite" if "unittest" in cmd else cmd[cmd.index("--produire") + 1])
+        lances.append("suite" if "discover" in cmd else cmd[cmd.index("--produire") + 1])
         pendant(lances[-1])
+        if lances[-1] == "suite" and k.get("input"):     # OUT-2i : compte réel d'AMORCE, au nonce reçu sur stdin
+            n, t = k["input"].decode("utf-8").rstrip(chr(10)).split(" ", 1)
+            with open(os.path.join(t, "compte"), "x", encoding="utf-8") as f:
+                f.write(f"{n} 1 0 0 0 0 0")
         return subprocess.CompletedProcess(cmd, int(lances[-1] == echec), f"sortie factice {lances[-1]}\n".encode())
     return mock.patch.object(subprocess, "run", faux), lances
 
@@ -284,7 +288,8 @@ T_OK = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):
 
 def monter_prod(d: str) -> dict:
     """Dépôt jetable : commit c1 = shogen_s2/ et tools/ du harnais (seule la table des sorties de rendu_unique remplacée
-    par TABLE), une suite triviale et le lint d'épinglage ; journaux du collecteur réel et sommes hors dépôt ; paquet,
+    par TABLE), une suite triviale, le lint d'épinglage et le vérificateur (AMORCE de la commande `suite`, OUT-2i) ;
+    journaux du collecteur réel et sommes hors dépôt ; paquet,
     JOURNAL.md, go épinglé (voie (b), 2026-09-01) ; f["ru"] : module chargé depuis la copie du dépôt, dont le sha256
     est sha256_script (C-2)."""
     depot, jx = os.path.join(d, "depot"), os.path.join(d, "campagne")
@@ -299,6 +304,7 @@ def monter_prod(d: str) -> dict:
     c1 = poser(depot, {".gitignore": b"__pycache__/\n", "s2-harness/tests/__init__.py": b"", "s2-harness/tests/"
                        "test_t.py": T_OK, "s2-harness/tools/rendu_unique.py": outil.encode(),
                        "enforcement/lint-model-pinning.sh": Path(LINT).read_bytes(),
+                       "enforcement/verdict-suite-s2.py": Path(LINT).with_name("verdict-suite-s2.py").read_bytes(),
                        **{f"s2-harness/{r}": Path(HARNAIS, r).read_bytes() for r in code}})
     fixture(jx)
     poser(jx, {"campagne.log": b"x\n", "segments.json": b"{}\n"}, commit=False)
