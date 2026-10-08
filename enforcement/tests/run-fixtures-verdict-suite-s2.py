@@ -44,7 +44,9 @@ M-04, témoin au nom libre ; M-05, `masques` (nom pris avant le premier point : 
 l'import prendrait pour json, C-1 de la G2 d'OUT-2). SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : le dossier du script
 quitte sys.path avant tout import qu'un fichier posé à côté masquerait (runner, serveur, copies ; vérificateur lancé en
 script) et le serveur exécute la source du vérificateur, jamais un .pyc de son __pycache__ ; I-01 à I-03, copies du
-runner où json.py, secrets.py ou ce .pyc sont posés ; I-04, subprocess.py posé à côté du vérificateur. Sortie : 0 tout
+runner où sont posés un module sous le nom de chaque import qui suit sa garde, secrets.py, ou ce .pyc ; I-04, un module
+sous le nom de chaque import qui suit la garde du vérificateur, posé à côté de lui (C-1 et C-2 de la revue de la vague
+2 : la place de chaque garde est épinglée, plus seulement json et subprocess). Sortie : 0 tout
 passe (CAS cas), 1 un cas échoue ou le vérificateur rompt pendant un cas, 3 erreur (vérificateur illisible au
 chargement compris). SHOGEN-S2BIS-SUITE-RESUME-FORGE-1 (OUT-2e) : F-01 à F-09, `accord` sur des comptes écrits ici ;
 F-10 à F-14, `main` sur des suites qui forgent leur résumé (os._exit(0), flux réécrit et atexit, compte au nonce
@@ -416,10 +418,13 @@ try:
         "'pret' + chr(10) + json.dumps(['f' * 32, 'valeur', 0]) + chr(10)")]       # corps de R-01 et de R-10
 
     def voisin(rel, *lignes):
-        """avant(d) qui pose le module `rel` (lignes) dans le dossier d du runner copié (SCRIPT-MASQUE-1)."""
+        """avant(d) qui pose le module `rel` (lignes ; un chemin relatif, ou un tuple de chemins, paquet compris) dans
+        le dossier d du runner copié (SCRIPT-MASQUE-1)."""
         def poser(d):
-            with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
-                f.write(chr(10).join(lignes) + chr(10))
+            for r in (rel,) if isinstance(rel, str) else rel:
+                os.makedirs(os.path.dirname(os.path.join(d, r)), exist_ok=True)
+                with open(os.path.join(d, r), "w", encoding="utf-8") as f:
+                    f.write(chr(10).join(lignes) + chr(10))
         return poser
 
     def pyc(d):
@@ -429,10 +434,14 @@ try:
         py_compile.compile(os.path.join(W, "I-03.py"), importlib.util.cache_from_source(os.path.join(
             d, "..", "verdict-suite-s2.py")), doraise=True,
                            invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+    APRES = ("atexit.py", "contextlib.py", "importlib/__init__.py", "io.py", "json.py", "py_compile.py", "re.py",
+             "secrets.py", "shutil.py", "subprocess.py", "tempfile.py")      # I-01 : chaque import qui suit la garde,
+    # dans l'ordre du fichier (C-1 de la revue de la vague 2) ; atexit (intégré) et io (préchargé) ne sont jamais
+    # cherchés dans sys.path (mesuré sous 3.10 à 3.13), posés pour que la liste suive les imports
     for nom, rc, motif, corps, avant in (     # SCRIPT-MASQUE-1 (OUT-2d) : rien de posé à côté n'est exécuté
-            ("I-01 json.py posé à côté du runner (« 999 ok », os._exit(0)) : jamais importé, runner en sortie 3", 3,
-             "vérificateur illisible", ILLISIBLE, voisin("json.py", "import os", "print('verdict-suite-s2 : 999 ok')",
-                                                         "os._exit(0)")),
+            ("I-01 json.py, et chaque module importé après la garde, posés à côté du runner (« 999 ok », os._exit(0))"
+             " : jamais importés, runner en sortie 3", 3, "vérificateur illisible", ILLISIBLE,
+             voisin(APRES, "import os", "print('verdict-suite-s2 : 999 ok')", "os._exit(0)")),
             ("I-02 secrets.py posé à côté du runner (nonce prévu) : jamais importé, réponse anticipée refusée", 1,
              "nonce de sa requête", ANTICIPEE, voisin("secrets.py", "def token_hex(n=16):", "    return 'f' * 2 * n")),
             ("I-03 .pyc non vérifié du vérificateur (__pycache__) : jamais exécuté, sa source l'est (sortie 3)", 3,
@@ -443,15 +452,22 @@ try:
         p = copie(nom[:4], corps, 0, avant)
         cas(nom, [] if (p.returncode, motif in p.stderr) == (rc, True) else [
             f"sortie {p.returncode} : {p.stderr[-160:]!r}"], None)
-    MARQUE4 = os.path.join(W, "I-04", "marque")        # I-04 : subprocess.py posé à côté du vérificateur, marqué
+    # I-04 : sous le nom de chaque import qui suit la garde du vérificateur (C-2 de la revue de la vague 2), un module
+    # marqué posé à côté de lui, transparent (il se retire et recharge le vrai module)
+    MARQUE4, D4 = os.path.join(W, "I-04", "marque"), os.path.join(W, "I-04")
     d = factice(os.path.join(W, "I-04", "s"), "    def test_x(self):" + chr(10) + "        self.fail()", n=1)
-    shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), os.path.join(W, "I-04"))
-    voisin("subprocess.py", "import os, sys", f"open({MARQUE4!r}, 'a').close()", "sys.path.remove(os.path.dirname("
-           "os.path.abspath(__file__)))", "del sys.modules['subprocess']", "import subprocess")(os.path.join(W, "I-04"))
-    p = subprocess.run([sys.executable, "-B", os.path.join(W, "I-04", "verdict-suite-s2.py"), d, *s2bis],
-                       stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    cas("I-04 subprocess.py posé à côté du vérificateur lancé en script (suite rouge) : jamais importé", [] if not (
-        os.path.exists(MARQUE4)) else [f"importé, sortie {p.returncode}"], None)   # la sortie n'est pas jugée (E-4)
+    shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), D4)
+    for x in ("re", "secrets", "shutil", "subprocess", "tempfile"):
+        voisin(x + ".py", "import os, sys", f"open({MARQUE4!r}, 'a').close()", "sys.path[:] = [p for p in sys.path if "
+               f"os.path.realpath(p) != os.path.realpath({D4!r})]", f"del sys.modules[{x!r}]", f"import {x}")(D4)
+    # dans une copie (--copie), comme I-01 à I-03 : cas compté, rien de lancé ; le vérificateur copié y est un leurre,
+    # ou l'enveloppe de capture de R-09a, qui lève avant toute garde (sous 3.13, l'affichage de son exception, écrit en
+    # Python, importe re depuis le dossier du script ; 3.10 à 3.12 non : mesuré)
+    p = None if sys.argv[1:] == ["--copie"] else subprocess.run([sys.executable, "-B", os.path.join(
+        D4, "verdict-suite-s2.py"), d, *s2bis], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+    cas("I-04 re.py, secrets.py, shutil.py, subprocess.py, tempfile.py posés à côté du vérificateur lancé en script "
+        "(suite rouge) : jamais importés", [] if p is None or not os.path.exists(MARQUE4) else [
+            f"importé, sortie {p.returncode}"], None)                               # la sortie n'est pas jugée (E-4)
 finally:
     shutil.rmtree(W)
 
