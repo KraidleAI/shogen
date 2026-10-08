@@ -6,14 +6,18 @@ parametres.json de PLAN-S2BIS ; contrôles (c) pool D1-bis et (d) type « ecart 
 de ligne par chr(10)."""
 from __future__ import annotations
 
+import hashlib
+import importlib.util
 import json
 import os
+import sys
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 RACINE = os.path.dirname(os.path.dirname(ICI))
 PARAMETRES = os.path.join(ICI, "parametres.json")
 NL = chr(10)
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
+MODULES = ("commun", "regles", "episodes")
 PIECES = ("commun", "regles", "episodes", "parametres", "fixtures", "sha256sums", "ep", "ep_sha256sums")
 SCHEMA = {"lot": str, "rattachement": str,
           "plan_s2bis": {"chemins": dict.fromkeys(PIECES, str), "sha256": dict.fromkeys(PIECES, str), "source": str},
@@ -63,3 +67,68 @@ def lire(chemin: str = PARAMETRES) -> dict:
     if not conforme(prm, SCHEMA):
         raise Refus("P2/parametres", "parametres.json du lot hors schéma (clé en trop ou manquante, type, flottant)")
     return prm
+
+
+def empreinte(chemin: str) -> str:
+    with open(chemin, "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()
+
+
+def piece(prm: dict, cle: str) -> str:
+    """Chemin réel de la pièce `cle` (relatif à la racine du dépôt), de sha256 égal à son épingle ; sinon
+    P2/plan-s2bis."""
+    p = prm["plan_s2bis"]
+    chemin = os.path.realpath(os.path.join(RACINE, p["chemins"][cle]))
+    if not os.path.isfile(chemin) or empreinte(chemin) != p["sha256"][cle]:
+        raise Refus("P2/plan-s2bis", f"pièce « {cle} » de PLAN-S2BIS absente ou de sha256 différent de l'épingle")
+    return chemin
+
+
+def charger_module(nom: str, chemin: str):
+    """Module `nom` du fichier `chemin` (déjà contrôlé) ; module de ce nom chargé d'ailleurs : P2/plan-s2bis."""
+    if nom not in sys.modules:
+        spec = importlib.util.spec_from_file_location(nom, chemin)
+        sys.modules[nom] = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(sys.modules[nom])
+    if os.path.realpath(getattr(sys.modules[nom], "__file__", None) or "") != chemin:
+        raise Refus("P2/plan-s2bis", f"module {nom} chargé hors de son chemin épinglé")
+    return sys.modules[nom]
+
+
+def charger(prm: dict) -> tuple:
+    """Huit pièces contrôlées avant tout import ; commun, regles, episodes chargés (P-1) ; parametres.json de
+    PLAN-S2BIS réduit aux sous-arbres et épingles déclarés (P-3) ; lignes d'EP. Rend (chemins, modules, ps2, ep)."""
+    chemins = {k: piece(prm, k) for k in PIECES}
+    mods = {n: charger_module(n, chemins[n]) for n in MODULES}
+    cles = prm["sous_arbres"]["lus"] + prm["sous_arbres"]["epingles"]
+    with open(chemins["parametres"], encoding="utf-8") as f:
+        brut = json.load(f)
+    if any(k not in brut for k in cles):
+        raise Refus("P2/plan-s2bis", "sous-arbre déclaré absent du parametres.json de PLAN-S2BIS")
+    with open(chemins["ep"], encoding="utf-8") as f:
+        ep = f.read().split(NL)
+    return chemins, mods, {k: brut[k] for k in cles}, ep
+
+
+def controle_d(ps2: dict, r1) -> None:
+    """(d) : type « ecart » de PLAN-S2BIS = r1.ECARTS ; sinon P2/ecarts."""
+    if sorted(ps2["episodes"]["types"]["ecart"]) != sorted(e.value for e in r1.ECARTS):
+        raise Refus("P2/ecarts", "type « ecart » de PLAN-S2BIS différent de r1.ECARTS")
+
+
+def ligne_pool_bis(d: dict) -> str:
+    """Ligne « pool D1-bis » de l'en-tête de PLAN-S2BIS (forme de PS2 commun.py l.192-194)."""
+    return ("pool D1-bis : " + " ; ".join(f"« {s} » {len(v)} hôtes" for s, v in d["pools_bis"].items())
+            + " ; retraits : " + (" ; ".join(f"« {s} » {h} ({f}, ok {k} sur n = {n}, {m})"
+                                             for s, h, f, k, n, m in d["retraits_bis"]) or "aucun"))
+
+
+def controle_c(d: dict, ps2: dict, ep: list) -> None:
+    """(c) : pool D1-bis de chaque strate = flux de pool_d1bis.unites, dans leur ordre ; aucun retrait ; ligne
+    « pool D1-bis » = EP l.8, chaîne pour chaîne ; sinon P2/pool."""
+    flux = list(ps2["pool_d1bis"]["unites"].values())
+    for st in ps2["strates"]:
+        if d["pools_bis"].get(st) != flux:
+            raise Refus("P2/pool", "pool D1-bis de la strate différent des unités de PLAN-S2BIS", st)
+    if d["retraits_bis"] or ep[7:8] != [ligne_pool_bis(d)]:
+        raise Refus("P2/pool", "retrait au pool D1-bis, ou ligne « pool D1-bis » différente d'EP l.8")

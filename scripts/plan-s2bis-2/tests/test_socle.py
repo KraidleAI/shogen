@@ -3,11 +3,41 @@ ou par sha256sum ; chaque test nomme la mutation qui le rougit."""
 import json
 import os
 import shutil
+import subprocess
+import sys
 import tempfile
+import types
 import unittest
 
 import socle
 import tests
+
+NL = chr(10)
+EPINGLES = {    # sha256sum des huit pièces à 12ce67f, recopiés à la main (PERIMETRE-REDUIT.md §1)
+    "commun": "14920e8703febf43de324960975413e276227ac2281bb4f85380cf465d47b3f2",
+    "regles": "a01401880714e2baa792d1e7a2c36414df2b848c055c73429e22b4646d2f88a6",
+    "episodes": "90c7842d9e1193b0629de41cfd91fbbebb45d4ec4731af89b77e70a96af43fd2",
+    "parametres": "7e214864e23634e9b3a4174745e3f5bbabf8c5a74d8e78e0411b449ee7d1d632",
+    "fixtures": "17ae3c130a1e4a1fcde2b3fc8d8a4384a77f513533836f0ec6fad657b4903913",
+    "sha256sums": "65c26310c98db6e4ddd7293d06601fffd3599dde3892fc606806c59aa9c94398",
+    "ep": "c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6",
+    "ep_sha256sums": "f21f929329f11e9baf00057e3a7b250e5fb3a05a31fd5bcc64bb9860218f601f"}
+
+
+def prm_avec(**chemins):
+    """parametres.json du lot, chemins de pièces remplacés (copie profonde)."""
+    p = json.loads(json.dumps(tests.PRM))
+    p["plan_s2bis"]["chemins"].update(chemins)
+    return p
+
+
+def processus_neuf(prm):
+    """socle.charger(prm) dans un processus neuf : [code du refus ou « - », [[nom, fichier] des modules chargés]]."""
+    code = NL.join(["import json, sys, socle", "try:", "    socle.charger(json.loads(sys.argv[1])); r = '-'",
+                    "except socle.Refus as e:", "    r = e.code",
+                    "print(json.dumps([r, [(n, m.__file__) for n, m in sys.modules.items() if n in socle.MODULES]]))"])
+    return json.loads(subprocess.run([sys.executable, "-B", "-c", code, json.dumps(prm)], cwd=socle.ICI, check=True,
+                                     capture_output=True, text=True).stdout)
 
 
 class TestSocle(unittest.TestCase):
@@ -48,3 +78,70 @@ class TestSocle(unittest.TestCase):
             with open(os.path.join(self.d, f"p{i}.json"), "w", encoding="utf-8") as f:
                 f.write(texte)
             self.refus("P2/parametres", socle.lire, os.path.join(self.d, f"p{i}.json"))
+
+    def test_epingles(self):
+        """T-P2-SOC-1. Huit sha256 recopiés = épingles ; épingle d'un fichier de PLAN-S2BIS = sa ligne du SHA256SUMS de
+        son dossier ; copie altérée d'un octet de chaque pièce, ou pièce absente : P2/plan-s2bis ; commun altéré
+        refusé avant tout import (processus neuf) ; commun, regles, episodes chargés dans cet ordre, sous ces noms,
+        depuis leurs chemins (P-1) ; module « regles » déjà chargé d'ailleurs : P2/plan-s2bis. Mutation M-P2-01 :
+        contrôle de sha256 retiré ; M-P2R0-4 : pièce absente non refusée ; M-P2R0-5 : episodes chargé avant regles ;
+        M-P2R0-8 : chemin du module chargé non contrôlé."""
+        p = tests.PRM["plan_s2bis"]
+        self.assertEqual(p["sha256"], EPINGLES)
+        for cle in ("commun", "regles", "episodes", "parametres", "fixtures", "ep"):
+            sums = "ep_sha256sums" if cle == "ep" else "sha256sums"
+            with open(tests.CHEMINS[sums], encoding="utf-8") as f:
+                lignes = f.read().split(NL)
+            rel = os.path.relpath(p["chemins"][cle], os.path.dirname(p["chemins"][sums]))
+            self.assertIn(f"{EPINGLES[cle]}  {rel}", lignes, cle)
+        for cle, chemin in tests.CHEMINS.items():
+            with open(chemin, "rb") as f:
+                b = f.read()
+            with open(os.path.join(self.d, cle), "wb") as f:
+                f.write(b[:-1] + bytes([b[-1] ^ 1]))
+            for faux in ("", ".absent"):
+                self.refus("P2/plan-s2bis", socle.charger, prm_avec(**{cle: os.path.join(self.d, cle + faux)}))
+        self.assertEqual(processus_neuf(prm_avec(commun=os.path.join(self.d, "commun"))), ["P2/plan-s2bis", []])
+        self.assertEqual(processus_neuf(tests.PRM),
+                         ["-", [[n, tests.CHEMINS[n]] for n in ("commun", "regles", "episodes")]])
+        self.addCleanup(sys.modules.__setitem__, "regles", sys.modules["regles"])
+        sys.modules["regles"] = types.ModuleType("regles")
+        sys.modules["regles"].__file__ = os.path.join(self.d, "regles.py")
+        self.refus("P2/plan-s2bis", socle.charger, tests.PRM)
+
+    def test_sous_arbres(self):
+        """T-P2-SOC-3. Valeurs recopiées à la main de scripts/plan-s2bis/parametres.json, égales à ce que lit le
+        socle ; seuls les sous-arbres et épingles de la ligne P-3 sont lus. Mutation M-P2-03 : sous-arbres pris au
+        parametres.json du lot ; M-P2R0-6 : sous-arbres non filtrés."""
+        s = tests.PS2["segment"]
+        self.assertEqual((s["t0"], s["n_fixe"], s["plages_exclues"]), (1787770800, 38600, [[1790273880, 1790435280]]))
+        self.assertEqual((len(tests.PS2["pool_d1bis"]["unites"]), tests.PS2["fiv"]["ell"]),
+                         (10, [1, 2, 3, 5, 10, 15, 20, 30, 60, 90, 120, 180, 240, 360, 480, 720, 1440]))
+        self.assertEqual(sorted(tests.PS2), ["classes", "commit_analyse", "episodes", "fiv", "harnais_sha256",
+                                             "paquet_s2", "pool_d1bis", "rendu_j28", "segment", "strates"])
+
+    def test_ecarts(self):
+        """T-P2-SOC-4. Type « ecart » de PLAN-S2BIS sans staleness, ou de même longueur avec pas_ecart au lieu de
+        staleness : P2/ecarts ; tel quel : aucun refus. Mutation M-P2-36 : contrôle (d) retiré ; G-03 (G2) : longueurs
+        seules comparées ; M-P2R0-11 : valeurs de r1.Ecart admises ; M-P2R0-12 : panne et hors_enveloppe seules."""
+        r1 = tests.fx.r1
+        self.assertIsNone(socle.controle_d(tests.PS2, r1))
+        for faux in (["panne", "hors_enveloppe"], ["panne", "pas_ecart", "hors_enveloppe"]):
+            self.refus("P2/ecarts", socle.controle_d, {"episodes": {"types": {"ecart": faux}}}, r1)
+
+    def test_pool(self):
+        """T-P2-POOL-1. (c) : hôte absent du pool d'une strate ; retrait non vide ; ligne « pool D1-bis » différente
+        d'EP l.8 : P2/pool. Ligne écrite à la main pour deux hôtes ; ligne d'EP l.8 recopiée et regénérée pour dix.
+        Mutation M-P2-37 : contrôle (c) retiré ; M-P2R0-7 : ligne « pool D1-bis » non comparée à EP l.8."""
+        ps2 = {"strates": ["calme", "stress"], "pool_d1bis": {"unites": {"ha": "a", "hb": "b"}}}
+        bon = {"pools_bis": {"calme": ["a", "b"], "stress": ["a", "b"]}, "retraits_bis": []}
+        ep = [""] * 7 + ["pool D1-bis : « calme » 2 hôtes ; « stress » 2 hôtes ; retraits : aucun"]
+        self.assertIsNone(socle.controle_c(bon, ps2, ep))
+        retrait = [("stress", "hb", "b", 1, 3, "2·ok < n_s (seuil de flux presque mort, B.39)")]
+        manque = dict(bon, pools_bis={"calme": ["a", "b"], "stress": ["a"]})
+        trois = ep[:7] + [ep[7].replace("2 h", "3 h")]
+        for d, e in ((manque, ep), (dict(bon, retraits_bis=retrait), ep), (bon, trois)):
+            self.refus("P2/pool", socle.controle_c, d, ps2, e)
+        dix = {"pools_bis": {"calme": list("abcdefghij"), "stress": list("abcdefghij")}, "retraits_bis": []}
+        self.assertEqual((tests.EP[7], socle.ligne_pool_bis(dix)),
+                         ("pool D1-bis : « calme » 10 hôtes ; « stress » 10 hôtes ; retraits : aucun",) * 2)

@@ -10,3 +10,5 @@ import socle
 if not os.environ.get("PLAN_S2BIS_HARNAIS"):
     raise RuntimeError("PLAN_S2BIS_HARNAIS non posée : s2-harness d'une extraction du commit d'analyse (README)")
 PRM = socle.lire()
+CHEMINS, MODS, PS2, EP = socle.charger(PRM)
+fx = socle.charger_module("fixtures_ps2", CHEMINS["fixtures"])
