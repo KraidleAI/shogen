@@ -19,7 +19,10 @@ le vérificateur, est refusée avant tout run si la racine de sa suite porte une
 (`masques`) ; pour les commandes de JOBS, le vérificateur la refuse lui-même. Règle d'usage
 (SHOGEN-S2BIS-ENREG-ANCRE-1, OUT-2c) : `tools/README.md` ; la comparaison des vérificateurs ne vaut que si l'outil
 tourne depuis un arbre dont le vérificateur a été relu, et elle est triviale lancée depuis l'arbre du commit
-enregistré."""
+enregistré. SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : toute commande autre que `suite` est lancée en mode isolé (-I) ;
+-I implique -E (mesuré sous 3.10 à 3.13) : ces commandes ignorent PYTHONHASHSEED, PYTHONPATH, PYTHONDEVMODE et
+PYTHONWARNINGS de l'environnement consigné, que seule `suite` applique ; racine s2-harness masquée refusée pour toute
+commande qui y tourne ; bytecode committé (__pycache__, .pyc) refusé ; VERIF exécuté depuis sa source."""
 from __future__ import annotations
 
 import argparse
@@ -115,6 +118,13 @@ def masques(dossier: str) -> list:
     return sorted(x for x in os.listdir(dossier) if x.split(".")[0] in sys.stdlib_module_names)
 
 
+def bytecode(chemins) -> list:
+    """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : `chemins` de fichiers de bytecode (.pyc : cache d'un __pycache__, ou
+    module sans source), triés ; à l'import, un .pyc à invalidation non vérifiée remplace la source relue, -I ou non
+    (mesuré)."""
+    return sorted(k for k in chemins if k.endswith(".pyc"))
+
+
 def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     """Arguments de la ligne du vérificateur du job `job` de GATES dans l'extraction `arbre`, telle qu'écrite
     (plancher committé compris) : « python3 -B enforcement/verdict-suite-s2.py <suite> --aucun-saut --egal --plancher
@@ -127,7 +137,8 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
             texte = f.read()
         spec = importlib.util.spec_from_file_location("verdict_suite_s2", VERIF)
         analyseur = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(analyseur)
+        with open(VERIF, "rb") as f:                # OUT-2d : la source, jamais un .pyc de son __pycache__
+            exec(compile(f.read(), VERIF, "exec", dont_inherit=True), analyseur.__dict__)
     except BaseException as e:                     # OUT-1b : toute exception au chargement, SystemExit comprise
         raise ValueError(f"{GATES} de l'extraction ou analyseur {VERIF} illisible ({e!r}) — refus") from e
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
@@ -201,13 +212,18 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         if lignes and hashes.get(VERIF_COMMIT) != sha256_fichier(VERIF):              # OUT-1b : leurre L2
             raise ValueError(f"vérificateur du commit {VERIF_COMMIT} (sha256 {hashes.get(VERIF_COMMIT)}) autre que "
                              f"celui de l'outil {VERIF} (sha256 {sha256_fichier(VERIF)}) — refus")
-        masque = masques(os.path.join(arbre, COMMANDES["suite"][0])) if "suite" in commandes else []
-        if masque:                                   # OUT-2b : -m unittest lancé ici même, sans le vérificateur
-            raise ValueError(f"{masque} à la racine de {COMMANDES['suite'][0]} masque la bibliothèque standard pour "
-                             "-m unittest — refus")
+        racine = COMMANDES["suite"][0]               # OUT-2b, OUT-2d : -m unittest, ou racine mise en tête par la
+        masque = masques(os.path.join(arbre, racine)) if any(COMMANDES[c][0] == racine for c in commandes) else []
+        if masque:                                   # production (rendu_unique.py), que -I n'écarte pas
+            raise ValueError(f"{masque} à la racine de {racine} masque la bibliothèque standard pour -m unittest et la "
+                             "production — refus")
+        pyc = bytecode(hashes)
+        if pyc:                                      # OUT-2d : le .pyc remplacerait la source relue, -I ou non
+            raise ValueError(f"bytecode committé dans l'extraction {pyc[:3]} : il remplacerait la source à l'import — "
+                             "refus")
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
-            cmd = [sys.executable, *["-I"][:c in JOBS], *(journaux if x == JOURNAUX else x for x in args)]
+            cmd = [sys.executable, *["-I"][:c != "suite"], *(journaux if x == JOURNAUX else x for x in args)]
             sortie = f"{nom}.{i}-{c}.out"
             try:
                 p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,

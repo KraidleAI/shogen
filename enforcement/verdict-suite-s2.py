@@ -22,15 +22,20 @@ module de la bibliothèque standard est refusée avant tout lancement (sortie 1)
 l'importerait à la place du module standard : unittest lui-même, ou l'un des 40 à 43 autres qu'il charge avant la
 découverte (mesuré sous 3.10 à 3.13 ; -I les écarte, sans refus nommé), puis tout module qu'un test importe après la
 découverte, qui met la racine en tête de sys.path (-I ne l'écarte pas).
+SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : lancé en script, le vérificateur retire son dossier de sys.path avant tout
+import ; forme équivalente à -I pour ce dossier, sans -E : PYTHONDEVMODE, PYTHONWARNINGS et PYTHONHASHSEED restent lus
+(mesuré sous 3.10 à 3.13 : -I les ignore, -X dev et -W error en ligne de commande restent tenus).
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
-import os
+import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage ; le dossier du script
+import sys                  # quitte sys.path avant tout autre import (un subprocess.py posé à côté rendrait conforme)
+if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
+    del sys.path[0]
 import re
 import subprocess
-import sys
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
-PLANCHER = 408      # tests de la suite après OUT-2b du lot OUT-2 (2026-10-08 ; 407 après OUT-1b du lot R-1) ; un lot
+PLANCHER = 412      # tests de la suite après OUT-2d du lot OUT-2 (2026-10-08 ; 408 après OUT-2b) ; un lot
                     # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
                     # (--egal) ; l'abaisser desserre la gate : décision datée seulement
 SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]

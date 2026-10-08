@@ -7,6 +7,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import py_compile
 import re
 import shutil
 import subprocess
@@ -360,7 +361,7 @@ class TestOracleRecord(unittest.TestCase):
                                            journaux=os.path.relpath(jx))
             run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
             self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
-                             (0, [sys.executable, *essai, jx], f"argv {essai[2:] + [jx]}\n"))
+                             (0, [sys.executable, "-I", *essai, jx], f"argv {essai[2:] + [jx]}\n"))   # -I : OUT-2d
             for commit, arret, noms in ((ko, True, ["suite"]), (ko, False, ["suite", "essai"]),
                                         (ok, True, ["suite", "essai"])):
                 chemin = orc.enregistrer(tempfile.mkdtemp(dir=self.d), "cp-2", "claude-opus-5-5", dep, commit,
@@ -520,6 +521,66 @@ class TestOracleRecord(unittest.TestCase):
         for n in ("unittest.py", "json.py", "json.abi3.so", "commun.py", "unittest_notes.md", "README.md"):
             Path(racine, n).write_bytes(b"")
         self.assertEqual(orc.masques(racine), ["argparse", "json.abi3.so", "json.py", "unittest.py"])    # à la main
+
+    def test_commandes_hors_suite_en_mode_isole(self):
+        """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (lot OUT-2, OUT-2d) : toute commande autre que `suite` (production, JOBS) est
+        lancée en mode isolé (-I, consigné dans « commande ») : un json.py posé à côté du script lancé (tools/) n'est
+        pas importé, la sortie est celle du vrai module. Rougit si : -I réservé à JOBS, ou retiré."""
+        d, dep, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-isole"), chr(10)
+        essai = ["-B", "tools/rendu_unique.py", "--produire", "essai"]
+        (isole,) = depot(dep, [{**OK, "s2-harness/tools/rendu_unique.py": nl.join([
+            "import json, sys", "print(json.dumps(sys.argv[1:]))", ""]).encode(), "s2-harness/tools/json.py": nl.join([
+                "def dumps(x):", "    return 'masqué'", ""]).encode()}])
+        with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", essai)}):
+            chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, isole, ("essai",))
+        run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
+        self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
+                         (0, [sys.executable, "-I", *essai], '["--produire", "essai"]' + nl))
+
+    def test_racine_de_s2_harness_masquee_refusee_pour_toute_commande(self):
+        """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : la production met la racine s2-harness en tête de sys.path
+        (rendu_unique.py) ; -I ne l'écarte pas (mesuré, D-P3 du lot) : une entrée de cette racine au nom d'un module
+        standard est refusée, nommée, avant tout run, pour toute commande lancée dans s2-harness, même sans `suite` ;
+        rien d'écrit. Rougit si : contrôle de la racine réservé à la commande `suite`."""
+        d, dep = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-racine")
+        (racine,) = depot(dep, [{**OK, "s2-harness/tools/rendu_unique.py": STUB, "s2-harness/dataclasses.py": b""}])
+        with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", ["-B", "tools/rendu_unique.py"])}):
+            with self.assertRaisesRegex(ValueError, "'dataclasses[.]py'. à la racine de s2-harness .* — refus$"):
+                orc.enregistrer(d, "G2", "claude-opus-5-5", dep, racine, ("essai",))
+        self.assertEqual(os.listdir(d), [])
+
+    def test_bytecode_committe_refuse_pour_toute_commande(self):
+        """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : un fichier de bytecode committé (__pycache__, .pyc) remplacerait la
+        source relue à l'import (.pyc à invalidation non vérifiée : mesuré, D-P4 et D-U1 du lot) et l'isolement ne
+        l'écarte pas : refus nommé avant tout run, quelle que soit la commande, rien d'écrit. Rougit si : contrôle
+        absent, ou réservé à une commande."""
+        dep = os.path.join(self.d, "depot-pyc")
+        (pyc,) = depot(dep, [{**OK, "s2-harness/tools/rendu_unique.py": STUB,
+                              "s2-harness/tests/__pycache__/test_t.cpython-312.pyc": b"leurre"}])
+        with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", ["-B", "tools/rendu_unique.py"])}):
+            for c in ("suite", "essai"):
+                d = tempfile.mkdtemp(dir=self.d)
+                with self.subTest(commande=c):
+                    with self.assertRaisesRegex(ValueError, "__pycache__/test_t[.]cpython-312[.]pyc.* — refus$"):
+                        orc.enregistrer(d, "G2", "claude-opus-5-5", dep, pyc, (c,))
+                    self.assertEqual(os.listdir(d), [])
+
+    def test_verificateur_de_l_outil_lu_dans_sa_source(self):
+        """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : ligne_du_job exécute VERIF depuis sa source ; un .pyc à
+        invalidation non vérifiée posé dans son __pycache__ (analyseur complaisant) est ignoré : job absent du
+        gates.yml, refus. Rougit si : VERIF chargé par le chargeur d'import (exec_module), qui lit ce .pyc."""
+        d, nl = tempfile.mkdtemp(dir=self.d), chr(10)
+        v, src = os.path.join(d, "enforcement", "verdict-suite-s2.py"), os.path.join(d, "complaisant.py")
+        os.makedirs(os.path.join(d, "arbre", ".github", "workflows"))
+        Path(d, "arbre", ".github", "workflows", "gates.yml").write_text("jobs:" + nl, encoding="utf-8")
+        os.makedirs(os.path.dirname(v))
+        shutil.copy(orc.VERIF, v)
+        Path(src).write_text(nl.join(["def lignes_du_job(t, j, m):", "    return ['x --plancher 9']", ""]),
+                             encoding="utf-8")
+        py_compile.compile(src, importlib.util.cache_from_source(v), doraise=True,
+                           invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+        with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest absent"):
+            orc.ligne_du_job(os.path.join(d, "arbre"), "s2bis-unittest", "s2bis")
 
 
 if __name__ == "__main__":
