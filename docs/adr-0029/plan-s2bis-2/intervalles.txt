@@ -1,0 +1,175 @@
+préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)
+intervalles — pauses entre épisodes et épisodes complets, par hôte du pool D1-bis, strate et type (PLAN-S2BIS-2 ; SHOGEN-SIM-BIS-FIV-IDENTIF-1)
+modules chargés : socle.py sha256 21e6ebb75fcc8a7a7ceb430f94c38c48e3dc2ff012570069eba7cb6384285270 ; intervalles.py sha256 a684d113fbd82a69527a9e4c9e59b29435ba52dd0e2a9eea5517eb82c9070f97 ; commun.py sha256 14920e8703febf43de324960975413e276227ac2281bb4f85380cf465d47b3f2 ; regles.py sha256 a01401880714e2baa792d1e7a2c36414df2b848c055c73429e22b4646d2f88a6 ; episodes.py sha256 90c7842d9e1193b0629de41cfd91fbbebb45d4ec4731af89b77e70a96af43fd2
+parametres.json du lot sha256 7a6a7112b728e74ff96fcafb6abe2ac2184de8919644d5500e0b3cccf1a8f697 ; parametres.json de PLAN-S2BIS sha256 7e214864e23634e9b3a4174745e3f5bbabf8c5a74d8e78e0411b449ee7d1d632 ; EP episodes.txt sha256 c0371ca5de876d0f2cb038b732172c8b1db50340fa526400078cfbb83d27dbc6
+sous-arbres lus dans scripts/plan-s2bis/parametres.json : segment, strates, pool_d1bis, classes, episodes, fiv ; épingles : commit_analyse, harnais_sha256, rendu_j28, paquet_s2
+harnais : extraction du commit d'analyse f35a70c19ba8269f1f7e2bcd31775e4fc513da20 ; modules épinglés : __init__.py 4db0d8d6d85c374a72a3e4def3047f0baacf118e71a24db8daf24ea695d8b4dc ; model.py e56240c74be546e631189280711115095a2c9ff48690d28230c6461ff3948480 ; records.py a2e9a7744d8d60a017a888efe10de5b8fc0073c08b571671189d83de4a58edd2 ; window.py f8c3b79f7f7893f343a00b6d6563cbbb502e2bd7af7888db958f895b5bc5fb94 ; r1.py 0a16e5defb7c373c07f92ab1d7780242f112e3370e17ec9970378b7b36f2cc7f
+journaux : control.jsonl sha256 351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff ; journal.jsonl sha256 98c5793ec460e3c009b7f743796800ae7259f71c65a4063a3c315e8eea595d74
+portée : segment [1787770800 ; 1790558880) (t0 = 1787770800, n fixe = 38600), plages exclues [(1790273880, 1790435280)]
+pool S2 (D1) : « calme » 11 flux ; « stress » 11 flux ; retraits : « calme » pyth (ok 0 sur 24585 lectures) ; « stress » pyth (ok 0 sur 11397 lectures)
+pool D1-bis : « calme » 10 hôtes ; « stress » 10 hôtes ; retraits : aucun
+rendu de contrôle shogen-27b0e30-rendu-20261004T011129Z-943.3-j28.out : sha256 égal à l'épingle ; bloc 3 relu égal aux valeurs épinglées
+contrôle de cohérence (bloc 3 du rendu J28) « calme » : recompté (n, K, P̂_more) = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') ; épinglé = (24585, 154, '0.0013629504227977629135010363906355205959215005903986') : égaux
+contrôle de cohérence (bloc 3 du rendu J28) « stress » : recompté (n, K, P̂_more) = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') ; épinglé = (11397, 133, '0.0014663989614904143004161900453685779659861375123928') : égaux
+[PAUSES] par hôte du pool D1-bis, strate et type ; segment, épisode, censure : définitions d'EP ; pause entre deux épisodes d'un même segment ; pause de bord censurée, comptée à part
+  contrôle : épisodes recomptés = EP l.13-92 (n_s, cellules, épisodes, censurés, complets, max, P50, P90, P99, histogramme) : égaux
+  « calme » binance (hôte binance) panne : pauses complètes = 174 ; segments = 255 ; épisodes = 332 (complets 281) ; moyenne = 38.350574712643678160919540229885057471264367816092 ; max = 1877 ; P50 = 5 ; P90 = 22 ; P99 = 1201 ; pauses de bord = 358 (dont segments sans épisode 97)
+    histogramme des pauses (longueur×nombre) : 1×30 2×26 3×9 4×16 5×11 6×8 7×6 8×6 9×9 10×3 11×6 12×4 13×4 15×3 16×3 17×2 18×4 19×1 20×1 21×2 22×4 25×1 28×1 30×1 37×1 42×1 44×1 47×1 76×1 99×1 113×1 222×1 359×1 453×1 1009×1 1201×1 1877×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×33 2×31 3×25 4×27 5×15 6×18 7×15 8×26 9×9 10×60 11×9 12×4 13×5 14×4 15×5 16×2 17×6 18×2 19×6 20×13 21×2 22×2 23×1 25×1 26×1 30×3 40×2 46×1 49×1 55×2 73×1 84×1 88×1 97×1 118×2 120×1 144×1 157×1 194×1 200×1 229×1 266×1 286×1 366×1 447×1 530×1 563×1 699×1 707×1 893×1 1056×1 1085×1 1150×1 1457×1 1550×1 1986×1
+    histogramme des épisodes complets (longueur×nombre) : 1×255 2×20 3×5 5×1
+  « calme » binance (hôte binance) ecart : pauses complètes = 174 ; segments = 255 ; épisodes = 332 (complets 281) ; moyenne = 38.350574712643678160919540229885057471264367816092 ; max = 1877 ; P50 = 5 ; P90 = 22 ; P99 = 1201 ; pauses de bord = 358 (dont segments sans épisode 97)
+    histogramme des pauses (longueur×nombre) : 1×30 2×26 3×9 4×16 5×11 6×8 7×6 8×6 9×9 10×3 11×6 12×4 13×4 15×3 16×3 17×2 18×4 19×1 20×1 21×2 22×4 25×1 28×1 30×1 37×1 42×1 44×1 47×1 76×1 99×1 113×1 222×1 359×1 453×1 1009×1 1201×1 1877×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×33 2×31 3×25 4×27 5×15 6×18 7×15 8×26 9×9 10×60 11×9 12×4 13×5 14×4 15×5 16×2 17×6 18×2 19×6 20×13 21×2 22×2 23×1 25×1 26×1 30×3 40×2 46×1 49×1 55×2 73×1 84×1 88×1 97×1 118×2 120×1 144×1 157×1 194×1 200×1 229×1 266×1 286×1 366×1 447×1 530×1 563×1 699×1 707×1 893×1 1056×1 1085×1 1150×1 1457×1 1550×1 1986×1
+    histogramme des épisodes complets (longueur×nombre) : 1×255 2×20 3×5 5×1
+  « calme » bitfinex (hôte bitfinex) panne : pauses complètes = 6 ; segments = 255 ; épisodes = 21 (complets 16) ; moyenne = 337 ; max = 1041 ; P50 = 37 ; P90 = 1041 ; P99 = 1041 ; pauses de bord = 263 (dont segments sans épisode 240)
+    histogramme des pauses (longueur×nombre) : 5×1 6×1 37×1 43×1 890×1 1041×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×4 3×6 4×2 5×1 6×3 7×3 8×1 9×4 10×108 12×1 13×1 14×1 15×1 20×51 23×1 27×1 30×18 40×10 50×9 60×2 61×1 70×1 84×1 88×1 90×2 94×1 118×1 120×1 144×1 157×1 200×1 366×1 376×1 480×1 530×1 553×1 615×1 707×1 753×1 1058×1 1083×1 1150×1 1204×1 1350×1 1457×1 1550×1 1593×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×10 2×5 5×1
+  « calme » bitfinex (hôte bitfinex) ecart : pauses complètes = 7 ; segments = 255 ; épisodes = 22 (complets 17) ; moyenne = 288.57142857142857142857142857142857142857142857143 ; max = 1041 ; P50 = 43 ; P90 = 1041 ; P99 = 1041 ; pauses de bord = 263 (dont segments sans épisode 240)
+    histogramme des pauses (longueur×nombre) : 5×1 6×1 37×1 43×1 179×1 709×1 1041×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×4 3×6 4×2 5×1 6×3 7×3 8×1 9×4 10×108 12×1 13×1 14×1 15×1 20×51 23×1 27×1 30×18 40×10 50×9 60×2 61×1 70×1 84×1 88×1 90×2 94×1 118×1 120×1 144×1 157×1 200×1 366×1 376×1 480×1 530×1 553×1 615×1 707×1 753×1 1058×1 1083×1 1150×1 1204×1 1350×1 1457×1 1550×1 1593×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×10 2×6 5×1
+  « calme » bitstamp (hôte bitstamp) panne : pauses complètes = 245 ; segments = 255 ; épisodes = 416 (complets 361) ; moyenne = 19.559183673469387755102040816326530612244897959184 ; max = 1897 ; P50 = 4 ; P90 = 15 ; P99 = 233 ; pauses de bord = 367 (dont segments sans épisode 84)
+    histogramme des pauses (longueur×nombre) : 1×46 2×34 3×35 4×15 5×14 6×11 7×16 8×14 9×10 10×2 11×3 12×10 13×5 14×5 15×4 16×2 17×2 19×1 21×2 23×1 24×1 25×1 27×1 31×2 33×1 35×1 40×1 49×1 106×1 233×1 1014×1 1897×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×39 2×36 3×27 4×20 5×17 6×12 7×17 8×19 9×13 10×59 11×4 12×10 13×9 14×6 15×6 16×5 17×4 18×3 19×2 20×17 21×2 22×1 23×1 24×2 25×1 26×1 27×2 30×1 31×1 44×1 45×1 61×1 68×1 77×1 84×1 88×1 103×1 117×1 118×1 120×1 144×1 157×1 179×1 320×1 366×1 435×1 530×1 543×1 553×1 610×1 676×1 913×1 1059×1 1085×1 1148×1 1157×1 1550×1 1675×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×322 2×29 3×6 4×3 5×1
+  « calme » bitstamp (hôte bitstamp) ecart : pauses complètes = 245 ; segments = 255 ; épisodes = 416 (complets 361) ; moyenne = 19.559183673469387755102040816326530612244897959184 ; max = 1897 ; P50 = 4 ; P90 = 15 ; P99 = 233 ; pauses de bord = 367 (dont segments sans épisode 84)
+    histogramme des pauses (longueur×nombre) : 1×46 2×34 3×35 4×15 5×14 6×11 7×16 8×14 9×10 10×2 11×3 12×10 13×5 14×5 15×4 16×2 17×2 19×1 21×2 23×1 24×1 25×1 27×1 31×2 33×1 35×1 40×1 49×1 106×1 233×1 1014×1 1897×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×39 2×36 3×27 4×20 5×17 6×12 7×17 8×19 9×13 10×59 11×4 12×10 13×9 14×6 15×6 16×5 17×4 18×3 19×2 20×17 21×2 22×1 23×1 24×2 25×1 26×1 27×2 30×1 31×1 44×1 45×1 61×1 68×1 77×1 84×1 88×1 103×1 117×1 118×1 120×1 144×1 157×1 179×1 320×1 366×1 435×1 530×1 543×1 553×1 610×1 676×1 913×1 1059×1 1085×1 1148×1 1157×1 1550×1 1675×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×322 2×29 3×6 4×3 5×1
+  « calme » chainlink (hôte chainlink) panne : pauses complètes = 13 ; segments = 255 ; épisodes = 60 (complets 45) ; moyenne = 74.923076923076923076923076923076923076923076923077 ; max = 355 ; P50 = 5 ; P90 = 333 ; P99 = 355 ; pauses de bord = 284 (dont segments sans épisode 208)
+    histogramme des pauses (longueur×nombre) : 2×2 4×1 5×4 33×2 48×1 144×1 333×1 355×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×9 2×9 3×11 4×7 5×6 6×4 7×4 8×3 9×2 10×102 11×3 12×1 13×1 18×2 19×3 20×47 23×1 25×2 28×2 29×2 30×14 32×1 36×1 38×1 40×6 50×8 60×2 61×1 69×1 70×1 84×1 90×2 110×1 118×1 120×1 144×1 157×1 169×1 200×1 268×1 279×1 366×1 530×1 553×1 612×1 790×1 1083×1 1101×1 1131×1 1204×1 1448×1 1457×1 1550×1 1593×1 2060×1 2239×1
+    histogramme des épisodes complets (longueur×nombre) : 1×42 2×2 5×1
+  « calme » chainlink (hôte chainlink) ecart : pauses complètes = 13 ; segments = 255 ; épisodes = 61 (complets 46) ; moyenne = 74.923076923076923076923076923076923076923076923077 ; max = 355 ; P50 = 5 ; P90 = 333 ; P99 = 355 ; pauses de bord = 285 (dont segments sans épisode 207)
+    histogramme des pauses (longueur×nombre) : 2×2 4×1 5×4 33×2 48×1 144×1 333×1 355×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×9 2×9 3×11 4×7 5×6 6×4 7×4 8×3 9×2 10×102 11×3 12×1 13×1 18×2 19×3 20×47 23×1 25×2 28×2 29×2 30×14 32×1 36×1 38×1 40×6 50×8 60×2 61×1 69×1 70×1 84×1 90×2 110×1 118×1 120×1 144×1 157×1 169×1 200×1 268×1 279×1 366×1 530×1 553×1 612×1 687×1 790×1 904×1 1083×1 1101×1 1131×1 1204×1 1448×1 1457×1 1550×1 2060×1 2239×1
+    histogramme des épisodes complets (longueur×nombre) : 1×42 2×3 5×1
+  « calme » coinbase (hôte coinbase) panne : pauses complètes = 9 ; segments = 255 ; épisodes = 47 (complets 35) ; moyenne = 85 ; max = 434 ; P50 = 31 ; P90 = 434 ; P99 = 434 ; pauses de bord = 278 (dont segments sans épisode 217)
+    histogramme des pauses (longueur×nombre) : 3×1 5×1 6×1 21×1 31×1 34×1 96×1 135×1 434×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×7 2×3 3×7 4×8 5×3 6×3 7×5 8×4 9×5 10×106 11×2 12×2 13×2 14×1 15×2 20×46 24×1 27×1 29×2 30×16 33×1 35×1 38×1 40×7 44×1 50×6 56×1 60×2 61×1 70×1 81×1 84×1 88×1 90×1 109×1 118×1 120×1 144×1 157×1 200×1 209×1 266×1 286×1 320×2 366×1 376×1 563×2 754×1 893×1 1059×1 1083×1 1150×1 1204×1 1454×1 1457×1 1550×1 1909×1 2858×1
+    histogramme des épisodes complets (longueur×nombre) : 1×31 2×2 3×1 6×1
+  « calme » coinbase (hôte coinbase) ecart : pauses complètes = 9 ; segments = 255 ; épisodes = 47 (complets 35) ; moyenne = 85 ; max = 434 ; P50 = 31 ; P90 = 434 ; P99 = 434 ; pauses de bord = 278 (dont segments sans épisode 217)
+    histogramme des pauses (longueur×nombre) : 3×1 5×1 6×1 21×1 31×1 34×1 96×1 135×1 434×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×7 2×3 3×7 4×8 5×3 6×3 7×5 8×4 9×5 10×106 11×2 12×2 13×2 14×1 15×2 20×46 24×1 27×1 29×2 30×16 33×1 35×1 38×1 40×7 44×1 50×6 56×1 60×2 61×1 70×1 81×1 84×1 88×1 90×1 109×1 118×1 120×1 144×1 157×1 200×1 209×1 266×1 286×1 320×2 366×1 376×1 563×2 754×1 893×1 1059×1 1083×1 1150×1 1204×1 1454×1 1457×1 1550×1 1909×1 2858×1
+    histogramme des épisodes complets (longueur×nombre) : 1×31 2×2 3×1 6×1
+  « calme » coingecko (hôte coingecko) panne : pauses complètes = 7 ; segments = 255 ; épisodes = 46 (complets 31) ; moyenne = 63.714285714285714285714285714285714285714285714286 ; max = 364 ; P50 = 16 ; P90 = 364 ; P99 = 364 ; pauses de bord = 276 (dont segments sans épisode 216)
+    histogramme des pauses (longueur×nombre) : 2×1 3×1 16×2 17×1 28×1 364×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×9 2×4 3×6 4×3 5×3 6×6 7×5 8×3 9×7 10×106 11×1 12×1 13×2 14×2 15×2 17×1 18×1 19×1 20×47 22×1 23×1 27×1 28×2 29×1 30×12 40×8 50×8 59×1 60×1 61×1 70×1 84×1 88×1 90×3 118×1 120×1 128×1 144×1 157×1 183×1 200×1 393×1 530×1 553×1 616×1 749×1 1012×1 1058×1 1083×1 1131×1 1204×1 1217×1 1457×1 1550×1 1593×1 2211×1 2366×1
+    histogramme des épisodes complets (longueur×nombre) : 1×27 2×3 6×1
+  « calme » coingecko (hôte coingecko) ecart : pauses complètes = 7 ; segments = 255 ; épisodes = 46 (complets 31) ; moyenne = 63.714285714285714285714285714285714285714285714286 ; max = 364 ; P50 = 16 ; P90 = 364 ; P99 = 364 ; pauses de bord = 276 (dont segments sans épisode 216)
+    histogramme des pauses (longueur×nombre) : 2×1 3×1 16×2 17×1 28×1 364×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×9 2×4 3×6 4×3 5×3 6×6 7×5 8×3 9×7 10×106 11×1 12×1 13×2 14×2 15×2 17×1 18×1 19×1 20×47 22×1 23×1 27×1 28×2 29×1 30×12 40×8 50×8 59×1 60×1 61×1 70×1 84×1 88×1 90×3 118×1 120×1 128×1 144×1 157×1 183×1 200×1 393×1 530×1 553×1 616×1 749×1 1012×1 1058×1 1083×1 1131×1 1204×1 1217×1 1457×1 1550×1 1593×1 2211×1 2366×1
+    histogramme des épisodes complets (longueur×nombre) : 1×27 2×3 6×1
+  « calme » defillama (hôte defillama) panne : pauses complètes = 96 ; segments = 255 ; épisodes = 150 (complets 144) ; moyenne = 35.927083333333333333333333333333333333333333333333 ; max = 921 ; P50 = 17 ; P90 = 44 ; P99 = 921 ; pauses de bord = 301 (dont segments sans épisode 201)
+    histogramme des pauses (longueur×nombre) : 5×3 7×1 8×1 9×2 10×1 11×2 12×2 13×2 14×33 17×1 18×1 19×13 24×12 25×1 29×5 34×1 39×4 44×2 49×1 54×1 69×1 99×1 124×1 140×1 171×1 212×1 921×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×10 2×8 3×11 4×5 5×5 6×8 7×10 8×7 9×5 10×100 11×5 12×4 13×4 14×1 15×1 16×1 18×3 19×2 20×43 21×1 23×3 24×1 25×2 28×1 30×16 32×2 40×4 50×6 60×2 61×1 67×1 70×1 81×1 84×1 86×1 88×1 90×1 95×1 120×1 157×1 200×1 255×1 274×1 281×1 366×1 445×1 478×1 584×1 641×1 704×1 742×1 751×1 899×1 1083×1 1204×1 1550×1 1588×1 1593×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×139 2×4 5×1
+  « calme » defillama (hôte defillama) ecart : pauses complètes = 97 ; segments = 255 ; épisodes = 151 (complets 145) ; moyenne = 36.360824742268041237113402061855670103092783505155 ; max = 921 ; P50 = 18 ; P90 = 49 ; P99 = 921 ; pauses de bord = 301 (dont segments sans épisode 201)
+    histogramme des pauses (longueur×nombre) : 5×3 7×1 8×1 9×2 10×1 11×2 12×2 13×2 14×33 17×1 18×1 19×13 24×12 25×1 29×5 34×1 39×4 44×2 49×1 54×1 69×1 78×1 99×1 124×1 140×1 171×1 212×1 921×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×10 2×8 3×11 4×5 5×5 6×8 7×10 8×7 9×5 10×100 11×5 12×4 13×4 14×1 15×1 16×1 18×3 19×2 20×43 21×1 23×3 24×1 25×2 28×1 30×16 32×2 40×4 50×6 60×2 61×1 67×1 70×1 81×1 84×1 86×1 88×1 90×1 95×1 120×1 157×1 200×1 255×1 274×1 281×1 366×1 445×1 478×1 584×1 641×1 704×1 742×1 751×1 820×1 1083×1 1204×1 1550×1 1588×1 1593×1 2550×1
+    histogramme des épisodes complets (longueur×nombre) : 1×140 2×4 5×1
+  « calme » gemini (hôte gemini) panne : pauses complètes = 36 ; segments = 255 ; épisodes = 55 (complets 48) ; moyenne = 106.11111111111111111111111111111111111111111111111 ; max = 1964 ; P50 = 4 ; P90 = 80 ; P99 = 1964 ; pauses de bord = 265 (dont segments sans épisode 236)
+    histogramme des pauses (longueur×nombre) : 1×6 2×7 3×4 4×1 5×1 6×4 7×1 11×1 13×1 14×2 29×1 34×1 38×1 75×1 80×1 109×1 1367×1 1964×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×7 2×5 3×7 4×2 5×1 6×4 7×5 8×1 9×3 10×107 13×1 20×51 22×1 27×1 30×18 40×9 45×1 50×9 60×2 61×1 65×1 70×1 71×1 84×1 88×1 90×2 118×1 120×1 144×1 157×1 200×1 366×1 388×1 435×1 501×1 530×1 553×1 604×1 648×1 1002×1 1059×1 1131×1 1157×1 1173×1 1204×1 1457×1 1484×1 1838×1
+    histogramme des épisodes complets (longueur×nombre) : 1×44 2×3 5×1
+  « calme » gemini (hôte gemini) ecart : pauses complètes = 37 ; segments = 255 ; épisodes = 58 (complets 51) ; moyenne = 103.21621621621621621621621621621621621621621621622 ; max = 1523 ; P50 = 5 ; P90 = 109 ; P99 = 1523 ; pauses de bord = 267 (dont segments sans épisode 234)
+    histogramme des pauses (longueur×nombre) : 1×6 2×7 3×4 4×1 5×1 6×4 7×1 11×1 13×1 14×2 29×1 34×1 38×1 75×1 80×1 109×1 440×1 1367×1 1523×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×7 2×5 3×8 4×2 5×1 6×5 7×5 8×1 9×3 10×106 13×1 20×51 22×1 27×1 30×18 40×9 45×1 50×9 60×2 61×1 65×1 70×1 71×1 84×1 88×1 90×2 118×1 120×1 121×1 144×1 157×1 200×1 366×1 388×1 435×1 501×1 530×1 553×1 604×1 648×1 1002×1 1009×1 1059×1 1157×1 1173×1 1204×1 1457×1 1484×1 1838×1
+    histogramme des épisodes complets (longueur×nombre) : 1×47 2×3 5×1
+  « calme » kraken (hôte kraken) panne : pauses complètes = 7 ; segments = 255 ; épisodes = 26 (complets 19) ; moyenne = 16 ; max = 33 ; P50 = 15 ; P90 = 33 ; P99 = 33 ; pauses de bord = 265 (dont segments sans épisode 236)
+    histogramme des pauses (longueur×nombre) : 5×1 6×1 10×1 15×1 21×1 22×1 33×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×4 2×4 3×7 4×5 5×4 6×3 7×3 8×2 9×3 10×106 12×1 13×2 20×51 25×1 27×1 30×18 31×1 40×9 50×9 60×2 61×1 70×1 84×1 88×1 90×2 95×1 118×1 120×1 144×1 157×1 200×1 366×1 376×1 484×1 516×1 553×1 660×1 754×1 1058×1 1083×1 1150×1 1204×1 1457×1 1550×1 1593×1 1889×1 2230×1 2373×1
+    histogramme des épisodes complets (longueur×nombre) : 1×16 2×1 3×1 5×1
+  « calme » kraken (hôte kraken) ecart : pauses complètes = 7 ; segments = 255 ; épisodes = 26 (complets 19) ; moyenne = 16 ; max = 33 ; P50 = 15 ; P90 = 33 ; P99 = 33 ; pauses de bord = 265 (dont segments sans épisode 236)
+    histogramme des pauses (longueur×nombre) : 5×1 6×1 10×1 15×1 21×1 22×1 33×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×4 2×4 3×7 4×5 5×4 6×3 7×3 8×2 9×3 10×106 12×1 13×2 20×51 25×1 27×1 30×18 31×1 40×9 50×9 60×2 61×1 70×1 84×1 88×1 90×2 95×1 118×1 120×1 144×1 157×1 200×1 366×1 376×1 484×1 516×1 553×1 660×1 754×1 1058×1 1083×1 1150×1 1204×1 1457×1 1550×1 1593×1 1889×1 2230×1 2373×1
+    histogramme des épisodes complets (longueur×nombre) : 1×16 2×1 3×1 5×1
+  « calme » okx_ticker (hôte okx) panne : pauses complètes = 9 ; segments = 255 ; épisodes = 49 (complets 36) ; moyenne = 6.7777777777777777777777777777777777777777777777778 ; max = 15 ; P50 = 6 ; P90 = 15 ; P99 = 15 ; pauses de bord = 280 (dont segments sans épisode 215)
+    histogramme des pauses (longueur×nombre) : 1×2 2×1 5×1 6×2 10×1 15×2
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×7 3×10 4×4 5×4 6×4 7×6 8×5 9×6 10×103 11×2 12×2 15×1 20×48 22×1 27×1 30×17 35×1 39×3 40×7 48×1 50×8 57×1 60×2 61×1 70×1 84×1 90×2 106×1 118×1 120×1 144×1 157×1 200×1 361×1 366×1 376×1 429×1 530×1 553×1 616×1 629×1 660×1 753×1 1083×1 1095×1 1150×1 1204×1 1550×1 1593×1 1888×1 2230×1 2241×1
+    histogramme des épisodes complets (longueur×nombre) : 1×28 2×6 3×1 6×1
+  « calme » okx_ticker (hôte okx) ecart : pauses complètes = 9 ; segments = 255 ; épisodes = 49 (complets 36) ; moyenne = 6.7777777777777777777777777777777777777777777777778 ; max = 15 ; P50 = 6 ; P90 = 15 ; P99 = 15 ; pauses de bord = 280 (dont segments sans épisode 215)
+    histogramme des pauses (longueur×nombre) : 1×2 2×1 5×1 6×2 10×1 15×2
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×7 3×10 4×4 5×4 6×4 7×6 8×5 9×6 10×103 11×2 12×2 15×1 20×48 22×1 27×1 30×17 35×1 39×3 40×7 48×1 50×8 57×1 60×2 61×1 70×1 84×1 90×2 106×1 118×1 120×1 144×1 157×1 200×1 361×1 366×1 376×1 429×1 530×1 553×1 616×1 629×1 660×1 753×1 1083×1 1095×1 1150×1 1204×1 1550×1 1593×1 1888×1 2230×1 2241×1
+    histogramme des épisodes complets (longueur×nombre) : 1×28 2×6 3×1 6×1
+  « stress » binance (hôte binance) panne : pauses complètes = 30 ; segments = 139 ; épisodes = 43 (complets 40) ; moyenne = 110.76666666666666666666666666666666666666666666667 ; max = 1131 ; P50 = 8 ; P90 = 430 ; P99 = 1131 ; pauses de bord = 149 (dont segments sans épisode 126)
+    histogramme des pauses (longueur×nombre) : 1×5 2×2 3×1 4×3 6×2 7×1 8×1 9×1 10×3 12×1 13×1 15×1 19×1 30×1 52×1 89×1 430×1 557×1 885×1 1131×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×104 2×2 3×3 4×2 5×1 6×1 7×1 8×4 9×1 10×3 11×1 12×2 13×1 16×1 18×1 22×1 23×1 24×1 27×1 44×1 58×1 59×1 64×1 79×1 98×1 109×1 182×1 265×1 286×1 432×1 558×1 610×1 830×1 1140×1 1284×1 1538×1
+    histogramme des épisodes complets (longueur×nombre) : 1×38 2×2
+  « stress » binance (hôte binance) ecart : pauses complètes = 30 ; segments = 139 ; épisodes = 43 (complets 40) ; moyenne = 110.76666666666666666666666666666666666666666666667 ; max = 1131 ; P50 = 8 ; P90 = 430 ; P99 = 1131 ; pauses de bord = 149 (dont segments sans épisode 126)
+    histogramme des pauses (longueur×nombre) : 1×5 2×2 3×1 4×3 6×2 7×1 8×1 9×1 10×3 12×1 13×1 15×1 19×1 30×1 52×1 89×1 430×1 557×1 885×1 1131×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×104 2×2 3×3 4×2 5×1 6×1 7×1 8×4 9×1 10×3 11×1 12×2 13×1 16×1 18×1 22×1 23×1 24×1 27×1 44×1 58×1 59×1 64×1 79×1 98×1 109×1 182×1 265×1 286×1 432×1 558×1 610×1 830×1 1140×1 1284×1 1538×1
+    histogramme des épisodes complets (longueur×nombre) : 1×38 2×2
+  « stress » bitfinex (hôte bitfinex) panne : pauses complètes = 0 ; segments = 139 ; épisodes = 51 (complets 2) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 101 (dont segments sans épisode 88)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×61 2×1 3×1 7×3 9×3 10×3 12×1 13×1 15×1 20×3 22×1 24×1 30×2 58×1 59×1 63×1 78×1 98×1 109×1 182×1 186×1 244×1 383×1 552×1 558×1 610×1 829×1 895×1 1250×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×2
+  « stress » bitfinex (hôte bitfinex) ecart : pauses complètes = 0 ; segments = 139 ; épisodes = 51 (complets 2) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 101 (dont segments sans épisode 88)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×61 2×1 3×1 7×3 9×3 10×3 12×1 13×1 15×1 20×3 22×1 24×1 30×2 58×1 59×1 63×1 78×1 98×1 109×1 182×1 186×1 244×1 383×1 552×1 558×1 610×1 829×1 895×1 1250×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×2
+  « stress » bitstamp (hôte bitstamp) panne : pauses complètes = 25 ; segments = 139 ; épisodes = 37 (complets 32) ; moyenne = 70.8 ; max = 932 ; P50 = 7 ; P90 = 71 ; P99 = 932 ; pauses de bord = 145 (dont segments sans épisode 127)
+    histogramme des pauses (longueur×nombre) : 1×3 3×4 4×2 5×2 6×1 7×2 8×1 9×1 14×1 23×1 27×1 28×1 47×1 49×1 71×1 509×1 932×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×100 2×2 3×1 4×1 5×2 6×3 7×1 8×5 9×2 10×3 11×1 12×1 13×1 16×1 22×2 23×1 24×1 35×1 55×1 58×1 64×1 79×1 98×1 109×1 182×1 244×1 552×1 558×1 610×1 830×1 895×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×31 2×1
+  « stress » bitstamp (hôte bitstamp) ecart : pauses complètes = 25 ; segments = 139 ; épisodes = 37 (complets 32) ; moyenne = 70.8 ; max = 932 ; P50 = 7 ; P90 = 71 ; P99 = 932 ; pauses de bord = 145 (dont segments sans épisode 127)
+    histogramme des pauses (longueur×nombre) : 1×3 3×4 4×2 5×2 6×1 7×2 8×1 9×1 14×1 23×1 27×1 28×1 47×1 49×1 71×1 509×1 932×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×100 2×2 3×1 4×1 5×2 6×3 7×1 8×5 9×2 10×3 11×1 12×1 13×1 16×1 22×2 23×1 24×1 35×1 55×1 58×1 64×1 79×1 98×1 109×1 182×1 244×1 552×1 558×1 610×1 830×1 895×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×31 2×1
+  « stress » chainlink (hôte chainlink) panne : pauses complètes = 0 ; segments = 139 ; épisodes = 112 (complets 3) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 46 (dont segments sans épisode 27)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×2 7×3 8×1 9×2 10×3 11×1 12×1 15×1 20×3 22×1 23×1 30×2 44×1 56×1 59×1 63×1 79×1 97×1 108×1 182×1 247×1 362×1 552×1 558×1 570×1 830×1 1140×1 1205×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×3
+  « stress » chainlink (hôte chainlink) ecart : pauses complètes = 0 ; segments = 139 ; épisodes = 112 (complets 3) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 46 (dont segments sans épisode 27)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×6 2×2 7×3 8×1 9×2 10×3 11×1 12×1 15×1 20×3 22×1 23×1 30×2 44×1 56×1 59×1 63×1 79×1 97×1 108×1 182×1 247×1 362×1 552×1 558×1 570×1 830×1 1140×1 1205×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×3
+  « stress » coinbase (hôte coinbase) panne : pauses complètes = 5 ; segments = 139 ; épisodes = 11 (complets 8) ; moyenne = 57.6 ; max = 86 ; P50 = 62 ; P90 = 86 ; P99 = 86 ; pauses de bord = 141 (dont segments sans épisode 133)
+    histogramme des pauses (longueur×nombre) : 1×1 57×1 62×1 82×1 86×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×100 2×1 3×1 8×3 9×2 10×4 12×1 13×1 16×1 20×3 22×1 24×1 30×2 56×1 58×1 59×1 64×1 79×1 98×1 109×1 182×1 432×1 489×1 552×1 558×1 570×1 610×1 650×1 830×1 965×1 1284×1 1521×1 1538×1
+    histogramme des épisodes complets (longueur×nombre) : 1×8
+  « stress » coinbase (hôte coinbase) ecart : pauses complètes = 5 ; segments = 139 ; épisodes = 11 (complets 8) ; moyenne = 57.6 ; max = 86 ; P50 = 62 ; P90 = 86 ; P99 = 86 ; pauses de bord = 141 (dont segments sans épisode 133)
+    histogramme des pauses (longueur×nombre) : 1×1 57×1 62×1 82×1 86×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×100 2×1 3×1 8×3 9×2 10×4 12×1 13×1 16×1 20×3 22×1 24×1 30×2 56×1 58×1 59×1 64×1 79×1 98×1 109×1 182×1 432×1 489×1 552×1 558×1 570×1 610×1 650×1 830×1 965×1 1284×1 1521×1 1538×1
+    histogramme des épisodes complets (longueur×nombre) : 1×8
+  « stress » coingecko (hôte coingecko) panne : pauses complètes = 5 ; segments = 139 ; épisodes = 127 (complets 8) ; moyenne = 54.6 ; max = 97 ; P50 = 56 ; P90 = 97 ; P99 = 97 ; pauses de bord = 42 (dont segments sans épisode 17)
+    histogramme des pauses (longueur×nombre) : 8×1 16×1 56×1 96×1 97×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×1 2×2 3×1 6×1 7×3 8×1 9×1 10×2 11×1 12×1 15×1 16×1 20×3 22×1 23×1 30×2 41×1 42×1 63×1 78×1 108×1 182×1 244×1 334×1 338×1 552×1 558×1 570×1 610×1 829×1 895×1 1093×1 1252×1 1285×1 1632×1
+    histogramme des épisodes complets (longueur×nombre) : 1×8
+  « stress » coingecko (hôte coingecko) ecart : pauses complètes = 5 ; segments = 139 ; épisodes = 127 (complets 8) ; moyenne = 54.6 ; max = 97 ; P50 = 56 ; P90 = 97 ; P99 = 97 ; pauses de bord = 42 (dont segments sans épisode 17)
+    histogramme des pauses (longueur×nombre) : 8×1 16×1 56×1 96×1 97×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×1 2×2 3×1 6×1 7×3 8×1 9×1 10×2 11×1 12×1 15×1 16×1 20×3 22×1 23×1 30×2 41×1 42×1 63×1 78×1 108×1 182×1 244×1 334×1 338×1 552×1 558×1 570×1 610×1 829×1 895×1 1093×1 1252×1 1285×1 1632×1
+    histogramme des épisodes complets (longueur×nombre) : 1×8
+  « stress » defillama (hôte defillama) panne : pauses complètes = 104 ; segments = 139 ; épisodes = 224 (complets 104) ; moyenne = 48.5 ; max = 1073 ; P50 = 14 ; P90 = 39 ; P99 = 892 ; pauses de bord = 39 (dont segments sans épisode 19)
+    histogramme des pauses (longueur×nombre) : 8×1 10×2 13×1 14×50 15×2 17×2 18×1 19×22 24×5 29×6 34×1 39×2 42×1 44×1 55×1 96×1 116×1 300×1 779×1 892×1 1073×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×1 2×2 7×3 8×1 9×1 10×3 11×1 12×1 13×1 15×1 19×1 20×3 22×1 23×1 30×2 51×1 59×1 63×1 79×1 98×1 108×1 124×1 130×1 182×1 224×1 553×1 556×1 558×1 610×1 1140×1 1284×1
+    histogramme des épisodes complets (longueur×nombre) : 1×104
+  « stress » defillama (hôte defillama) ecart : pauses complètes = 104 ; segments = 139 ; épisodes = 224 (complets 104) ; moyenne = 48.5 ; max = 1073 ; P50 = 14 ; P90 = 39 ; P99 = 892 ; pauses de bord = 39 (dont segments sans épisode 19)
+    histogramme des pauses (longueur×nombre) : 8×1 10×2 13×1 14×50 15×2 17×2 18×1 19×22 24×5 29×6 34×1 39×2 42×1 44×1 55×1 96×1 116×1 300×1 779×1 892×1 1073×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×1 2×2 7×3 8×1 9×1 10×3 11×1 12×1 13×1 15×1 19×1 20×3 22×1 23×1 30×2 51×1 59×1 63×1 79×1 98×1 108×1 124×1 130×1 182×1 224×1 553×1 556×1 558×1 610×1 1140×1 1284×1
+    histogramme des épisodes complets (longueur×nombre) : 1×104
+  « stress » gemini (hôte gemini) panne : pauses complètes = 9 ; segments = 139 ; épisodes = 16 (complets 15) ; moyenne = 26 ; max = 72 ; P50 = 8 ; P90 = 72 ; P99 = 72 ; pauses de bord = 145 (dont segments sans épisode 132)
+    histogramme des pauses (longueur×nombre) : 1×1 2×1 5×2 8×1 15×1 57×1 69×1 72×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×101 2×2 3×1 6×1 8×3 9×1 10×4 12×1 13×1 16×2 20×3 22×1 24×1 30×2 41×1 58×1 64×1 65×1 79×1 98×1 109×1 163×1 182×1 244×1 270×1 281×1 394×1 552×1 610×1 830×1 895×1 957×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×12 2×3
+  « stress » gemini (hôte gemini) ecart : pauses complètes = 9 ; segments = 139 ; épisodes = 17 (complets 16) ; moyenne = 26 ; max = 72 ; P50 = 8 ; P90 = 72 ; P99 = 72 ; pauses de bord = 146 (dont segments sans épisode 131)
+    histogramme des pauses (longueur×nombre) : 1×1 2×1 5×2 8×1 15×1 57×1 69×1 72×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×101 2×2 3×1 6×1 8×3 9×1 10×4 12×1 13×1 16×2 20×3 22×1 24×1 30×2 41×1 58×1 64×1 65×1 79×1 98×1 109×1 125×1 163×1 182×1 244×1 270×1 281×1 394×1 552×1 610×1 703×1 895×1 957×1 1284×1 1587×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×12 2×4
+  « stress » kraken (hôte kraken) panne : pauses complètes = 0 ; segments = 139 ; épisodes = 46 (complets 2) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 106 (dont segments sans épisode 93)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×66 2×1 3×2 5×1 7×3 9×2 10×3 12×1 13×1 16×1 20×3 22×1 24×1 30×2 58×1 59×1 63×1 78×1 98×1 109×1 182×1 244×1 552×1 558×1 570×1 610×1 829×1 895×1 1250×1 1284×1 1586×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×2
+  « stress » kraken (hôte kraken) ecart : pauses complètes = 0 ; segments = 139 ; épisodes = 46 (complets 2) ; moyenne = - ; max = - ; P50 = - ; P90 = - ; P99 = - ; pauses de bord = 106 (dont segments sans épisode 93)
+    histogramme des pauses (longueur×nombre) : aucune pause
+    histogramme des pauses de bord (longueur observée×nombre) : 1×66 2×1 3×2 5×1 7×3 9×2 10×3 12×1 13×1 16×1 20×3 22×1 24×1 30×2 58×1 59×1 63×1 78×1 98×1 109×1 182×1 244×1 552×1 558×1 570×1 610×1 829×1 895×1 1250×1 1284×1 1586×1 1971×1
+    histogramme des épisodes complets (longueur×nombre) : 1×2
+  « stress » okx_ticker (hôte okx) panne : pauses complètes = 2 ; segments = 139 ; épisodes = 6 (complets 6) ; moyenne = 185 ; max = 369 ; P50 = 1 ; P90 = 369 ; P99 = 369 ; pauses de bord = 143 (dont segments sans épisode 135)
+    histogramme des pauses (longueur×nombre) : 1×1 369×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×101 2×1 3×1 8×3 9×2 10×4 12×1 13×1 16×1 20×3 22×1 24×1 30×2 58×1 59×1 64×2 79×1 98×1 109×1 182×1 214×1 244×1 552×1 558×1 570×1 571×1 610×1 665×1 830×1 895×1 1285×1 1399×1 1520×1
+    histogramme des épisodes complets (longueur×nombre) : 1×6
+  « stress » okx_ticker (hôte okx) ecart : pauses complètes = 2 ; segments = 139 ; épisodes = 6 (complets 6) ; moyenne = 185 ; max = 369 ; P50 = 1 ; P90 = 369 ; P99 = 369 ; pauses de bord = 143 (dont segments sans épisode 135)
+    histogramme des pauses (longueur×nombre) : 1×1 369×1
+    histogramme des pauses de bord (longueur observée×nombre) : 1×101 2×1 3×1 8×3 9×2 10×4 12×1 13×1 16×1 20×3 22×1 24×1 30×2 58×1 59×1 64×2 79×1 98×1 109×1 182×1 214×1 244×1 552×1 558×1 570×1 571×1 610×1 665×1 830×1 895×1 1285×1 1399×1 1520×1
+    histogramme des épisodes complets (longueur×nombre) : 1×6
