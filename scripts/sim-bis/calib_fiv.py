@@ -6,18 +6,27 @@ contexte de r1 (précision calibration.precision, ROUND_HALF_EVEN, le reste du D
 SB-10b : portée du segment J28 lue sur EP l.6, calendrier de la grille, réplication du modèle d'E1 (unités
 indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. SB-10c :
 grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le contexte de r1 : aucune fonction de libm),
-choix de C2 et de C1. Entiers et rationnels seuls, sauf les logarithmes du critère : aucun flottant, aucune
-puissance."""
+choix de C2 et de C1. SB-15b (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (3)) : calendrier d'E1, positions
+présentes = masque mesuré de J28 versé par PLAN-S2BIS-2 ; SB-15c : masque appliqué après la génération ; SB-15e
+(point (1)) : C1 = point de Q₁ minimal sur les FIV_u de fiv_unites.txt (convention du milieu des logs et e1.ell_c1
+retirées, point (7)) ; SB-15f (point (8)) : bord de la grille, constaté par une ligne nommée par strate. Entiers et
+rationnels seuls, sauf les logarithmes des critères : aucun flottant, aucune puissance."""
+import hashlib
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
 
 import calendrier
+import calibration
 import commun
 import regle
 import sources
 
-NOMBRE = re.compile("(?<![a-z])[0-9]+")         # nombres d'EP l.6 (« t0 » exclu)
+NOMBRE = re.compile("(?<![a-z])[0-9]+")         # nombres d'EP l.6 (« t0 » exclu) et des lignes du masque
+SECTION_MASQUE = ("[MASQUE J28] positions j = (ws − t0)/w de la portée ; strate par jour UTC ; retenue = fenêtre "
+                  "retenue de la strate")
+CONTROLE_MASQUE = ("  contrôle : retenues = n du bloc 3 ; sautées = ADR-0029 l.31 ; strate de chaque retenue = "
+                   "calendrier : égaux")
 
 
 def _entree(pres, val, ells) -> None:
@@ -97,6 +106,54 @@ def calendrier_j28(seg: dict, cal: dict) -> dict:
     return {"masques": out, "horizon": (tf - t0) // w}
 
 
+def masque_j28(texte: str, seg: dict, cal: dict) -> dict:
+    """Positions présentes d'E1 (point (3)) : masque des fenêtres évaluables de J28 versé par PLAN-S2BIS-2, section
+    [MASQUE J28] de masque_j28.txt (forme de scripts/plan-s2bis-2/masque_fiv.py, lignes_masque), sur la grille de la
+    portée `seg` d'EP l.6 : position non retenue ⇔ dans une lacune (suites maximales en ordre croissant, D5 comprise) ;
+    strate de chaque position par le calendrier (calendrier_j28 sans plage). La section, réécrite depuis la portée, le
+    calendrier et les bornes des lacunes, doit lui être identique jusqu'au saut de ligne final, empreinte comprise
+    (sha256 de la chaîne c/s/- reconstruite) ; aucune retenue dans une plage exclue ; sinon E1/masque. Rend {strate :
+    masque des positions présentes}."""
+    lignes, w, t0 = texte.split(commun.NL), cal["w"], seg["t0"]
+    plein, hors = calendrier_j28(dict(seg, plages=[]), cal), calendrier_j28(seg, cal)["masques"]
+    n, m = plein["horizon"], plein["masques"]
+    if lignes[0] != calibration.ETIQUETTE_EP or lignes.count(SECTION_MASQUE) != 1:
+        raise commun.Refus("E1/masque", "masque_j28.txt : étiquette d'EP ou section [MASQUE J28] unique attendue")
+    i = lignes.index(SECTION_MASQUE)
+    lac = [[int(y) for y in NOMBRE.findall(x)][:2] for x in lignes[i + 5 + len(m):-1]]
+    if not all(len(x) == 2 and x[0] <= x[1] < n for x in lac) or any(a[1] + 1 >= b[0] for a, b in zip(lac, lac[1:])):
+        raise commun.Refus("E1/masque", "lacunes hors de la grille, chevauchantes, contiguës ou désordonnées")
+    trou = sum(((1 << (b - a + 1)) - 1) << a for a, b in lac)
+    pres = {s: x & ~trou for s, x in m.items()}
+    bits = {s: format(x, "b")[::-1].ljust(n, "0") for s, x in pres.items()}
+    chaine = "".join(next((s[0] for s in pres if bits[s][j] == "1"), "-") for j in range(n))
+    jp = [(max(0, -(-(a - t0) // w)), min(n - 1, (b - t0) // w)) for a, b in seg["plages"]]
+    d5 = " ; ".join(f"j = {a} à {b} ({b - a + 1} positions)" if a <= b else "aucune position" for a, b in jp)
+    canon = [SECTION_MASQUE, f"  portée : t0 = {t0} ; t_fin = {seg['t_fin']} ; positions = {n} ; plage D5 : "
+             + (d5 or "aucune")]
+    canon += [f"  « {s} » : calendrier hors D5 = {hors[s].bit_count()} ; retenues = {x.bit_count()} ; sautées hors "
+              f"D5 = {hors[s].bit_count() - x.bit_count()}" for s, x in pres.items()]
+    canon += [CONTROLE_MASQUE, f"  empreinte : sha256 de la chaîne de {n} caractères (c calme retenue, s stress "
+              f"retenue, - non retenue) = {hashlib.sha256(chaine.encode('ascii')).hexdigest()}", f"  lacunes : "
+              f"{len(lac)} suites maximales de positions non retenues, plage D5 comprise, en ordre croissant"]
+    canon += [f"  lacune j = {a} à {b} : {b - a + 1} positions ("
+              + ", ".join(f"{s} {(x >> a & ((1 << (b - a + 1)) - 1)).bit_count()}" for s, x in m.items()) + ")"
+              for a, b in lac]
+    if lignes[i:] != canon + [""] or any(x & ~hors[s] for s, x in pres.items()):
+        raise commun.Refus("E1/masque", "section [MASQUE J28] différente de sa réécriture, ou retenue dans une plage "
+                                        "exclue")
+    return pres
+
+
+def calendrier_e1(prm: dict, lus=None, environ=None) -> dict:
+    """Calendrier d'E1 pour C0, C1 et C2 (point (3)) : génération sur la grille de la portée d'EP l.6 hors D5
+    (calendrier_j28) ; positions présentes : masque mesuré (masque_j28), lu sous ses deux épingles (parametres.json,
+    puis le SHA256SUMS de PLAN-S2BIS-2, sommes_plan2). Rend {"masques", "horizon", "presentes"}."""
+    seg = portee(commun.lire_entree(prm, "episodes", lus, environ).decode("utf-8"), prm["calendrier"])
+    texte = commun.lire_entree(prm, "masque_j28", lus, environ, sommes="sommes_plan2").decode("utf-8")
+    return dict(calendrier_j28(seg, prm["calendrier"]), presentes=masque_j28(texte, seg, prm["calendrier"]))
+
+
 def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> dict:
     """Une réplication d'E1 (E-S-38) : unités indépendantes vues d'un seul observateur (aucun observateur simulé),
     régime `point` = (φ, κ, τ_D), ou None (C0), dans chaque strate ; composition du fond lue dans la section e1.fond de
@@ -104,8 +161,13 @@ def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> 
     f, part des pannes longues, multiplicateur hors de BTC, part hors-enveloppe, classe ; ni dérive, ni incident, ni
     unité faible (clés absentes du fond de sources.Replication ; flux de la cellule `cellule`, réplication i) ; classe
     hors de sources.classes : E1/classe ; état D*(u) = H(u) ∪ F(u, classe) de chaque hôte du pool de la classe (BTC :
-    pool D1-bis, calibration.unites) ; I_t = 1 si au moins deux hôtes sont en écart (regle.deux), sur les positions de
-    chaque strate. Rend {"strates" : {s : (positions, I)}, "etats" : {hôte : D*}}."""
+    pool D1-bis, calibration.unites), généré sur cal["masques"] ; I_t = 1 si au moins deux hôtes sont en écart
+    (regle.deux). Masque appliqué après la génération (point (3)) : positions présentes de chaque strate =
+    cal["presentes"], incluses dans les positions générées de la strate, sinon E1/masque. Rend {"strates" : {s :
+    (positions, I)}, "unites" : {s : {hôte : D* sur les positions}}, "etats" : {hôte : D*}}."""
+    pres = cal.get("presentes")
+    if pres is None or any(x & ~cal["masques"].get(s, 0) for s, x in pres.items()):
+        raise commun.Refus("E1/masque", "positions présentes absentes, ou hors des positions générées de leur strate")
     e, cl = prm["e1"]["fond"], sources.classes(prm)
     if e["classe"] not in [x for x, _p in cl]:
         raise commun.Refus("E1/classe", f"{e['classe']!r} : classe de sources.classes attendue")
@@ -115,7 +177,8 @@ def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> 
     rep = sources.Replication(prm, ep, fond, cellule, i, cal["masques"], cal["horizon"])
     etats = {h: rep.pannes(h) | rep.ecarts(h, c) for h in cl[c][1]}
     i_t = regle.deux(list(etats.values()))
-    return {"strates": {s: (m, i_t & m) for s, m in cal["masques"].items()}, "etats": etats}
+    return {"strates": {s: (m, i_t & m) for s, m in pres.items()},
+            "unites": {s: {h: d & m for h, d in etats.items()} for s, m in pres.items()}, "etats": etats}
 
 
 def moyenne(courbes: list) -> dict:
@@ -174,39 +237,85 @@ def critere(modele: list, cible: list, ells: list, ctx):
     return s
 
 
+def q1(moy: dict, cible: dict, ells: list, ctx):
+    """Q₁(p) d'une strate (point (1)) : Σ_u Σ_ℓ (ln F̄_u,p(ℓ) − ln F_u(ℓ))², sur les hôtes u de `cible` ({hôte : points
+    de fiv_unites.txt}, ordre du format) dont F_u(ℓ) est défini, sans garde sur leur nombre de cellules d'écart, et sur
+    les ℓ de la grille de calibration où la garde de fiv_unites.txt est tenue ; moy = {hôte : moyenne()} du point
+    (F̄_u,p exact sur ses réplications définies) ; somme par hôte (critere, logarithmes par Decimal.ln), puis sur les
+    hôtes dans leur ordre, sous le contexte de r1 ; F̄_u,p(ℓ) indéfini à un (u, ℓ) retenu : None (point écarté) ; hôte
+    de la cible sans moyenne : E1/unite."""
+    s = Decimal(0)
+    for h, cs in cible.items():
+        if h not in moy:
+            raise commun.Refus("E1/unite", f"hôte {h!r} de fiv_unites.txt sans moyenne du modèle")
+        x = critere(moy[h]["fiv"], [dict(c, garde=c["garde"] and c["fiv"] is not None) for c in cs], ells, ctx)
+        if x is None:
+            return None
+        s = ctx.add(s, x)
+    return s
+
+
 def _rang(item) -> tuple:
     """Ordre de choix : valeur, puis plus petit κ, puis plus petit τ_D (E-S-38), puis plus petit φ (Q-T4-9)."""
     v, (phi, kappa, tau) = item
     return v, kappa, tau, phi
 
 
-def selection(prm: dict, cible: dict, moyennes: dict) -> dict:
-    """C2 et C1 de chaque strate (E-S-38) : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la
-    grille, ou None pour C0 : {strate : moyenne()}}. C2 = point de critère minimal ; C1 = point de la grille dont
-    ln FIV(ell_c1) est le plus proche de la moyenne des ln FIV(ell_c1) de C0 et de C2, C2 compris (lettre d'E-S-38) ;
-    égalités : _rang. Rend {strate : {"C2", "C1", "criteres" : {point : critère}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ)
-    aux ℓ gardés}}. ell_c1 absent de calibration.ell : E1/ell ; point absent, C0 compris : E1/point ; strate de la cible
-    sans courbe pour un point ou pour C0 : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, ou
-    FIV(ell_c1) de C0 ou de C2 indéfini : E1/indefini."""
-    ctx, ells, pts = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm)
-    if prm["e1"]["ell_c1"] not in ells:
-        raise commun.Refus("E1/ell", f"ell_c1 = {prm['e1']['ell_c1']!r} absent de calibration.ell")
-    j, out = ells.index(prm["e1"]["ell_c1"]), {}
+def bord(prm: dict, c1, moy: dict, cible: dict, ctx) -> dict:
+    """Bord de la grille dans une strate (point (8), précision d'adjudication comprise) : coordonnées de C1 égales à la
+    valeur extrême de leur grille (plus grands φ, κ, τ_D d'e1 : 1/10, 50, 4 320 au G0) ; ℓ retenus ≥ e1.bord.ell : ℓ de
+    calibration.ell dont la garde de fiv_unites.txt est tenue à toutes les lignes de la strate ; hôtes de `cible`
+    (hôtes du format) à F_u défini et à résidu ln F̄_u,C1(ℓ) − ln F_u(ℓ) < 0 (Decimal.ln, contexte de r1) à chacun de
+    ces ℓ, aucun s'il n'y en a aucun ; au bord si une coordonnée est extrême ou si au moins e1.bord.hotes hôtes
+    satisfont la condition. Constat seul, aucune seconde sélection (8)(i). Rend {"C1", "extremes", "ells", "hotes",
+    "sur", "ell_min", "seuil", "au_bord"}."""
+    e, ells = prm["e1"], prm["calibration"]["ell"]
+    g = (("φ", [Fraction(*x) for x in e["phi"]]), ("κ", [Fraction(x) for x in e["kappa"]]), ("τ_D", e["tau_D"]))
+    ext = [(nom, v) for (nom, xs), v in zip(g, c1) if v == max(xs)]
+    js = [j for j, ell in enumerate(ells) if ell >= e["bord"]["ell"] and all(xs[j]["garde"] for xs in cible.values())]
+    n = sum(1 for h, xs in cible.items() if js and all(
+        xs[j]["fiv"] is not None and ctx.subtract(_ln(moy[h]["fiv"][j], ctx), _ln(xs[j]["fiv"], ctx)) < 0 for j in js))
+    return {"C1": c1, "extremes": ext, "ells": [ells[j] for j in js], "hotes": n, "sur": len(cible),
+            "ell_min": e["bord"]["ell"], "seuil": e["bord"]["hotes"], "au_bord": bool(ext) or n >= e["bord"]["hotes"]}
+
+
+def ligne_bord(strate: str, b: dict) -> str:
+    """Ligne nommée du bord (point (8)(iv)), une par strate, écrite par le script, jamais par une lecture humaine :
+    C1, coordonnées extrêmes, ℓ retenus ≥ e1.bord.ell, nombre d'hôtes qui satisfont la condition, verdict."""
+    return (f"[BORD E1] « {strate} » : C1 = (φ = {b['C1'][0]}, κ = {b['C1'][1]}, τ_D = {b['C1'][2]}) ; coordonnées "
+            "extrêmes : " + (", ".join(f"{n} = {v}" for n, v in b["extremes"]) or "aucune") + f" ; ℓ retenus ≥ "
+            f"{b['ell_min']} : " + (", ".join(str(x) for x in b["ells"]) or "aucun") + " ; hôtes à résidu négatif à "
+            f"chacun de ces ℓ : {b['hotes']} sur {b['sur']} (seuil {b['seuil']}) ; au bord : "
+            + ("OUI" if b["au_bord"] else "NON"))
+
+
+def selection(prm: dict, cible: dict, moyennes: dict, unites: dict, moyennes_u: dict) -> dict:
+    """C2 et C1 de chaque strate : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la grille, ou
+    None pour C0 (sortie d'E1 complète exigée ; C0 n'entre plus dans C1) : {strate : moyenne() de I_t}} ; unites =
+    {strate : {hôte : points de fiv_unites.txt}} (calibration.charger_unites) ; moyennes_u = {point de la grille :
+    {strate : {hôte : moyenne() de D*(u) sur les positions présentes}}}, réplications du point (celles de C2). C2 =
+    point de critère minimal (E-S-38, inchangé) ; C1 = point de Q₁ minimal (point (1)) ; égalités : _rang ; point à
+    critère indéfini écarté de C2 (Q-T4-10), à Q₁ indéfini écarté de C1. Rend {strate : {"C2", "C1", "criteres" :
+    {point : critère}, "Q1" : {point : Q₁}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés, "bord" : constat
+    de bord(), C1 inchangé}}. Point absent, C0
+    compris : E1/point ; strate de la cible sans courbe pour un point ou pour C0, sans FIV_u, ou sans moyennes par hôte
+    pour un point : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, aucun Q₁ défini, ou aucun (u, ℓ)
+    retenu dans la strate : E1/indefini."""
+    ctx, ells, pts, out = contexte(prm["calibration"]), prm["calibration"]["ell"], grille(prm), {}
     if any(p not in moyennes for p in [None] + pts):
         raise commun.Refus("E1/point", "point de la grille ou C0 sans courbe")
-    if any(s not in moyennes[p] for p in [None] + pts for s in cible):
-        raise commun.Refus("E1/strate", "strate de la cible sans courbe pour un point de la grille ou pour C0")
+    if any(s not in moyennes[p] for p in [None] + pts for s in cible) or any(
+            s not in unites or any(s not in moyennes_u.get(p, {}) for p in pts) for s in cible):
+        raise commun.Refus("E1/strate", "strate de la cible sans courbe, sans FIV_u ou sans moyennes par hôte")
     for s, cs in cible.items():
         crit = {p: critere(moyennes[p][s]["fiv"], cs, ells, ctx) for p in pts}
-        defs = [(v, p) for p, v in crit.items() if v is not None]
-        c2 = min(defs, key=_rang)[1] if defs else None
-        f0, f2 = moyennes[None][s]["fiv"][j], None if c2 is None else moyennes[c2][s]["fiv"][j]
-        if f0 is None or f2 is None:
-            raise commun.Refus("E1/indefini", f"strate {s} : critère ou FIV({ells[j]}) indéfini")
-        mil = ctx.divide(ctx.add(_ln(f0, ctx), _ln(f2, ctx)), 2)
-        dist = [(ctx.subtract(_ln(moyennes[p][s]["fiv"][j], ctx), mil).copy_abs(), p) for p in pts
-                if moyennes[p][s]["fiv"][j] is not None]
-        out[s] = {"C2": c2, "C1": min(dist, key=_rang)[1], "criteres": crit,
+        q = {p: q1(moyennes_u[p][s], unites[s], ells, ctx) for p in pts}
+        d2, d1 = ([(v, p) for p, v in x.items() if v is not None] for x in (crit, q))
+        if not (d2 and d1 and any(c["garde"] and c["fiv"] is not None for xs in unites[s].values() for c in xs)):
+            raise commun.Refus("E1/indefini", f"strate {s} : aucun critère, aucun Q₁ défini, ou aucun (u, ℓ) retenu")
+        c2, c1 = min(d2, key=_rang)[1], min(d1, key=_rang)[1]
+        out[s] = {"C2": c2, "C1": c1, "criteres": crit, "Q1": q,
+                  "bord": bord(prm, c1, moyennes_u[c1][s], unites[s], ctx),
                   "residus": [ctx.subtract(_ln(x, ctx), _ln(c["fiv"], ctx))
                               for x, c in zip(moyennes[c2][s]["fiv"], cs) if c["garde"]]}
     return out

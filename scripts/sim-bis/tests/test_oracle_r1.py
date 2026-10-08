@@ -130,13 +130,14 @@ class TestOracleR1(unittest.TestCase):
                          [])
 
     def test_oracle_e_s_39(self):
-        """E-S-39 : 10 réplications d'E1 (5 sous C0, 5 au point (1/10, 50, 1 440)), deux strates, les 17 ℓ d'EP :
-        n, K, numérateur, γ̂₀, σ̂²_bloc et FIV_série de calib_fiv égaux, chaîne pour chaîne, à r1 extrait de f35a70c
-        (forme d'episodes.courbe) ; écart mesuré : 0 valeur sur 2 040. Mutation M-14-05 (FIV_série en une seule
-        division, sans passer par les valeurs publiées)."""
+        """E-S-39 : 10 réplications d'E1 (5 sous C0, 5 au point (1/10, 50, 1 440)), deux strates, les 17 ℓ d'EP, sur
+        le calendrier d'E1 (masque mesuré, point (3) de l'ajout daté du G0 du 2026-10-05 15:05:43 UTC) : n, K,
+        numérateur, γ̂₀, σ̂²_bloc et FIV_série de calib_fiv égaux, chaîne pour chaîne, à r1 extrait de f35a70c (forme
+        d'episodes.courbe) ; écart mesuré : 0 valeur sur 2 040. Mutation M-14-05 (FIV_série en une seule division,
+        sans passer par les valeurs publiées)."""
         texte = commun.lire_entree(PRM, "episodes", environ={}).decode("utf-8")
         ep = calibration.analyser(texte, K_)["episodes"]
-        cal = calib_fiv.calendrier_j28(calib_fiv.portee(texte, PRM["calendrier"]), PRM["calendrier"])
+        cal = calib_fiv.calendrier_e1(PRM, environ={})
         vus = []
         for point in [None] * 5 + [(Fraction(1, 10), Fraction(50), 1440)] * 5:
             r = calib_fiv.replication(PRM, ep, cal, point, "E1-oracle", len(vus) // 2)
