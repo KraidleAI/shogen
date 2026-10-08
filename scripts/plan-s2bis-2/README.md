@@ -45,7 +45,9 @@ Python 3.11 au moins (`hashlib.file_digest` de `commun.py`) ; le test d'identit�
    LC_ALL, PYTHONHASHSEED de la passe, PYTHONDONTWRITEBYTECODE et PYTHONPYCACHEPREFIX vers `<travail>/pyc`, neuf : ni
    site-packages (système ou utilisateur), ni fichier `.pth`, ni bytecode voisin ne sont lus.
 3. Codes : 0 deux scripts en 0 dans chaque passe et A = B ; 2 usage ; 3 refus avant tout lancement ; 4 extraction
-   impossible ; 5 un script hors 0, ou A ≠ B. L'écran ne porte que des noms, des codes et des sha256.
+   impossible ; 5 un script hors 0 (refus dans ses sorties ; P2/lecture : entrée illisible, nommée par le seul type de
+   l'exception), A ≠ B, ou écriture impossible. Toute sortie hors 0 est nommée ; l'écran ne porte que des noms, des
+   codes et des sha256.
 4. Lettre de Q-P2-08 (PERIMETRE-REDUIT.md §7), mot pour mot :
 
 > « un seul lancement ; dans ce lancement, deux passes A et B (`PYTHONHASHSEED` 0 et 1) ; sha256 comparés ; A ≠ B est

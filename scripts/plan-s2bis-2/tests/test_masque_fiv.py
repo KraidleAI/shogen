@@ -92,8 +92,10 @@ class TestMasque(unittest.TestCase):
 
     def test_fail_closed(self):
         """T-P2-MAS-3. (b), un écart à la fois : retenues ≠ n du bloc 3 ; retenue exclue, d'une autre strate ou hors
-        grille : P2/masque ; au script, sautées attendues fausses : code 1, aucune valeur. Mutation M-P2-08 : (b)
-        retiré ; M-P2R1-9 : retenue exclue admise ; M-P2R1-10 : strate non comparée."""
+        grille ; un des deux comptes attendus sans une strate de PLAN-S2BIS (C-3 c de la G2) : P2/masque ; au script,
+        sautées attendues fausses : code 1, aucune valeur. Mutation M-P2-08 : (b) retiré ; M-P2R1-9 : retenue exclue
+        admise ; M-P2R1-10 : strate non comparée ; G-14 (G2, adapté) : strate absente admise ; M-P2R6-16 : strates des
+        deux comptes réunies ; M-P2R6-17 : calendrier seul contrôlé."""
         pos = [(0, "calme", False), (60, "calme", False), (120, "calme", True)]
         cas = (({0: "calme"}, 1, 1, None), ({0: "calme"}, 2, 1, "P2/masque"), ({0: "calme", 120: "calme"}, 2, 0,
                "P2/masque"), ({0: "stress"}, 1, 1, "P2/masque"), ({0: "calme", 30: "calme"}, 1, 1, "P2/masque"))
@@ -104,6 +106,14 @@ class TestMasque(unittest.TestCase):
                 self.assertEqual((masque_fiv.controle_b(*args), code), (None, None))
             except socle.Refus as e:
                 self.assertEqual((e.code, code), ("P2/masque", "P2/masque"))
+        for attendu in ({"calendrier_hors_d5": {"calme": 2}, "sautees_hors_d5": {}},
+                        {"calendrier_hors_d5": {}, "sautees_hors_d5": {"calme": 1}}):
+            try:
+                obtenu = masque_fiv.controle_b(pos, masque_fiv.masque(pos, {0: "calme"}), {0: "calme"}, ["calme"],
+                                               {"calme": [1, 0, "0"]}, attendu)
+            except Exception as e:
+                obtenu = getattr(e, "code", type(e).__name__)
+            self.assertEqual(obtenu, "P2/masque")
         argv, s = fixture(self, sc=2)
         self.assertEqual(masque_fiv.main(argv), 1)
         self.assertRefus(s, "P2/masque")

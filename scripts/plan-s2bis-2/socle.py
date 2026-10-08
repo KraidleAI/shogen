@@ -157,13 +157,23 @@ def executer(nom: str, objet: str, sorties: tuple, analyse, argv=None, env=None)
     Variable ; schéma ; pièces de PLAN-S2BIS ; harnais par commun.importer_harnais (P2/harnais) ; (d) ; lecture par
     commun.charger ; (a) par commun.controle (P2/coherence) ; (c) ; puis analyse(d, ps2, prm, ep), qui rend {sortie :
     lignes}. Chaque sortie : étiquette, en-tête, corps (code 0) ou une ligne de refus (code 1) ; écrite en .partiel,
-    puis renommée."""
-    a = argparse.ArgumentParser(prog=nom)
+    puis renommée. Aucune sortie non nommée (Q-P2R-3 ; SHOGEN-PLAN-S2BIS-2-REFUS-NON-NOMMES-1) : toute autre exception
+    (fenêtre hors grille, journal ou rendu absent ou illisible, strate, unité, classe, analyse) donne P2/lecture, nommé
+    par le seul type de l'exception, jamais par son message ; arguments hors de la CLI : P2/usage, code 2 ; sorties
+    non écrites : P2/sortie, code 1 ; ces deux refus sur stderr. Aucune valeur de journal à l'écran ni dans la trace."""
+    def usage(_message):
+        raise Refus("P2/usage", f"arguments de {nom} hors de la CLI")
+    a = argparse.ArgumentParser(prog=nom, add_help=False)
+    a.error = usage
     for o in ("--journaux", "--harnais", "--sortie"):
         a.add_argument(o, required=True)
     a.add_argument("--parametres", default=PARAMETRES)
     a.add_argument("--rendu")
-    x = a.parse_args(argv)
+    try:
+        x = a.parse_args(argv)
+    except Refus as r:
+        print(r, file=sys.stderr)
+        return 2
     tete = [f"{nom} — {objet} (PLAN-S2BIS-2 ; SHOGEN-SIM-BIS-FIV-IDENTIF-1)"]
     try:
         garde(os.environ if env is None else env)
@@ -189,12 +199,18 @@ def executer(nom: str, objet: str, sorties: tuple, analyse, argv=None, env=None)
             raise Refus("P2/coherence", "bloc 3 recompté différent de l'épingle (contrôle (a))")
         controle_c(d, ps2, ep)
         corps, code = analyse(d, ps2, prm, ep), 0
-    except Refus as r:
+    except Exception as e:
+        r = e if isinstance(e, Refus) else Refus("P2/lecture", f"lecture ou traitement en échec ({type(e).__name__})")
         corps, code = {s: [str(r)] for s in sorties}, 1
-    os.makedirs(x.sortie, exist_ok=True)
-    for s in sorties:
-        cible = os.path.join(x.sortie, s)
-        with open(cible + ".partiel", "w", encoding="utf-8", newline=NL) as f:
-            f.write(NL.join([ETIQUETTE, *tete, *corps[s]]) + NL)
-        os.replace(cible + ".partiel", cible)
+    try:
+        os.makedirs(x.sortie, exist_ok=True)
+        for s in sorties:
+            cible = os.path.join(x.sortie, s)
+            with open(cible + ".partiel", "w", encoding="utf-8", newline=NL) as f:
+                f.write(NL.join([ETIQUETTE, *tete, *corps[s]]) + NL)
+            os.replace(cible + ".partiel", cible)
+    except OSError as e:
+        print(Refus("P2/sortie", f"sorties non écrites dans le dossier de sortie ({type(e).__name__})"),
+              file=sys.stderr)
+        return 1
     return code

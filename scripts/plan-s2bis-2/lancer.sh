@@ -23,13 +23,15 @@
 # ni .pth, ni bytecode voisin des sources.
 # N'affiche que des noms, des codes et des sha256 : aucun journal n'est ouvert ici (sha256sum seul), aucune sortie
 # n'est affichée ; messages des scripts dans <travail>/lancer.log. Codes : 0 ; 2 usage ; 3 refus avant tout
-# lancement ; 4 extraction impossible ; 5 un script hors 0, ou A ≠ B. Aucune barre oblique inverse dans ce fichier.
+# lancement ; 4 extraction impossible ; 5 un script hors 0, A ≠ B, ou écriture impossible ; toute sortie hors 0 est
+# nommée sur l'écran. Aucune barre oblique inverse dans ce fichier.
 set -u -o pipefail
 export LC_ALL=C
 ICI="$(cd "$(dirname "$0")" && pwd)"
 DEPOT="$(cd "$ICI/../.." && pwd)"
 P="$ICI/parametres.json"
 refus() { echo "REFUS $1 : $2" >&2; exit 3; }
+echec() { echo "$2 : code $1" >&2; exit "$1"; }
 empreinte() { sha256sum < "$1" | cut -d' ' -f1; }
 egal() { [ -f "$1" ] && [ "$(empreinte "$1")" = "$2" ]; }
 [ "$#" -eq 4 ] || { echo "REFUS P2/usage : bash lancer.sh <journaux> <sortie> <travail> <sha256>" >&2; exit 2; }
@@ -42,13 +44,13 @@ egal "$ICI/SHA256SUMS" "$E" || refus P2/epingle "sha256 du SHA256SUMS du lot dif
 LISTE="$(cut -d' ' -f3- "$ICI/SHA256SUMS" | sort)"
 [ "$(cd "$ICI" && find . ! -type d ! -path ./SHA256SUMS | cut -c3- | sort)" = "$LISTE" ] ||
   refus P2/epingle "entrée du dossier du lot hors de SHA256SUMS"
-mapfile -t EPI < <(python3 -I -S -B - "$P" <<'FIN'
+mapfile -t EPI < <(python3 -I -S -B - "$P" 2> /dev/null <<'FIN'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     p = json.load(f)
 for k in sorted(p["plan_s2bis"]["chemins"]):
     print(k, p["plan_s2bis"]["chemins"][k], p["plan_s2bis"]["sha256"][k])
-assert p["passes"]["variable"] == "PYTHONHASHSEED"
+assert p["passes"]["variable"] == "PYTHONHASHSEED" and "parametres" in p["plan_s2bis"]["chemins"]
 print("passes", p["passes"]["A"], p["passes"]["B"])
 FIN
 )
@@ -61,7 +63,7 @@ for x in "${EPI[@]:0:8}"; do
   read -r k c h <<< "$x"
   [ "$k" = parametres ] || egal "$DEPOT/$c" "$h" || refus P2/plan-s2bis "pièce $k de PLAN-S2BIS ≠ son épingle"
 done
-mapfile -t V < <(python3 -I -S -B - "$PS2" <<'FIN'
+mapfile -t V < <(python3 -I -S -B - "$PS2" 2> /dev/null <<'FIN'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     p = json.load(f)
@@ -101,32 +103,31 @@ for n in control.jsonl journal.jsonl; do
 done
 EXCL=(--exclude=docs/rapports --exclude=docs/adr-0025 --exclude=docs/adr-0028/monark-m009a)
 EXCL+=(--exclude=docs/adr-0028/execution "--exclude=docs/15-*" "--exclude=docs/16-*" --exclude=docs/pocket-report)
-mkdir -p "$X" "$T/pyc" || exit 4
-PYC="$(cd "$T/pyc" && pwd)" || exit 4
-git --no-optional-locks -C "$DEPOT" archive "$COMMIT" | tar -x -C "$X" "${EXCL[@]}" || {
-  echo "extraction impossible : code 4" >&2; exit 4; }
+mkdir -p "$X" "$T/pyc" 2> /dev/null || echec 4 "extraction impossible"
+PYC="$(cd "$T/pyc" 2> /dev/null && pwd)" || echec 4 "extraction impossible"
+git --no-optional-locks -C "$DEPOT" archive "$COMMIT" | tar -x -C "$X" "${EXCL[@]}" || echec 4 "extraction impossible"
 PY=(env -i PATH="$PATH" LC_ALL=C PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$PYC")
 ARGS=(--journaux "$J" --harnais "$X/s2-harness" --parametres "$P")
 LOG="$T/lancer.log"
 read -r _p GA GB <<< "${EPI[8]}"
 for passe in A B; do
   graine="$GA"; [ "$passe" = A ] || graine="$GB"
-  mkdir -p "$T/$passe" || exit 5
+  mkdir -p "$T/$passe" 2> /dev/null || echec 5 "passe $passe : dossier impossible"
   for s in masque_fiv intervalles; do
     "${PY[@]}" PYTHONHASHSEED="$graine" python3 -S -B "$ICI/$s.py" "${ARGS[@]}" --sortie "$T/$passe" >> "$LOG" 2>&1
     r=$?
     echo "passe $passe $s : code $r"
     [ "$r" -eq 0 ] || exit 5
   done
-  ( cd "$T/$passe" && sha256sum fiv_unites.txt intervalles.txt masque_j28.txt ) > "$T/$passe.sommes" || exit 5
-  mv "$T/$passe.sommes" "$T/$passe/SHA256SUMS" || exit 5
+  { ( cd "$T/$passe" && sha256sum fiv_unites.txt intervalles.txt masque_j28.txt ) > "$T/$passe.sommes" &&
+    mv "$T/$passe.sommes" "$T/$passe/SHA256SUMS"; } 2> /dev/null || echec 5 "passe $passe : SHA256SUMS impossible"
 done
 if ! cmp -s "$T/A/SHA256SUMS" "$T/B/SHA256SUMS"; then
   echo "REFUS P2/identite : SHA256SUMS des passes A et B différents (affichés ci-dessous, A puis B)" >&2
   cat "$T/A/SHA256SUMS" "$T/B/SHA256SUMS"
   exit 5
 fi
-mkdir -p "$S" || exit 5
-for n in SHA256SUMS fiv_unites.txt intervalles.txt masque_j28.txt; do cp "$T/A/$n" "$S/" || exit 5; done
+{ mkdir -p "$S" && cp "$T/A/SHA256SUMS" "$T/A/fiv_unites.txt" "$T/A/intervalles.txt" "$T/A/masque_j28.txt" "$S/"
+  } 2> /dev/null || echec 5 "copie de la passe A impossible"
 cat "$S/SHA256SUMS"
 exit 0

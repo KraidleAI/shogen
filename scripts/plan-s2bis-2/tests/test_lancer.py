@@ -105,20 +105,22 @@ class TestLancer(unittest.TestCase):
                      + [f"journal {n} {sha(b)}" for n, b in self.journaux.items()] + ["sommes " + "0" * 64])
         self.ecrire()
 
-    def ecrire(self, ouvertures=1, fermer=True, commit_prm=None, faux=None):
+    def ecrire(self, ouvertures=1, fermer=True, commit_prm=None, faux=None, modif=None):
         """Faux paquet ; fausses pièces de PLAN-S2BIS (parametres.json : paquet et commit d'analyse ; les autres, des
-        commentaires) ; parametres.json du lot (huit épingles, passes, faux) ; SHA256SUMS du lot ; self.epingle = son
-        sha256."""
+        commentaires) ; parametres.json du lot (huit épingles, passes, faux, modif éventuel) ; SHA256SUMS du lot ;
+        self.epingle = son sha256."""
         paquet = ("# faux paquet" + NL + ("```shogen-paquet-v1" + NL) * ouvertures + NL.join(self.bloc) + NL
                   + ("```" + NL if fermer else "") + "fin" + NL)
         ecrire(os.path.join(self.depot, PAQUET), paquet)
-        c = tests.PRM["plan_s2bis"]["chemins"]
+        c = dict(tests.PRM["plan_s2bis"]["chemins"])
         ps2 = {"paquet_s2": {"chemin": PAQUET, "sha256": sha(paquet.encode())},
                "commit_analyse": commit_prm or self.arbre}
         for k, rel in c.items():
             ecrire(os.path.join(self.depot, rel), json.dumps(ps2) if k == "parametres" else f"# pièce {k}" + NL)
         lot = {"plan_s2bis": {"chemins": c, "sha256": {k: sha_de(os.path.join(self.depot, r)) for k, r in c.items()}},
                "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1}, "faux": faux or {}}
+        if modif:
+            modif(lot)
         ecrire(os.path.join(self.lot, "parametres.json"), json.dumps(lot))
         sommes = "".join(f"{sha_de(os.path.join(self.lot, n))}  {n}" + NL
                          for n in ("intervalles.py", "lancer.sh", "masque_fiv.py", "parametres.json", "socle.py"))
@@ -334,3 +336,30 @@ class TestLancer(unittest.TestCase):
         ecrire(os.path.join(site, "zz_hostile.pth"), f"import os; open({marque!r}, 'a').write('pth' + chr(10))" + NL)
         r = self.lancer(PATH=os.path.join(venv, "bin") + os.pathsep + os.environ["PATH"])
         self.assertEqual((r.returncode, vu(marque), len(os.listdir(self.s))), (0, False, 4), r.stderr)
+
+    def test_sorties_nommees(self):
+        """T-P2-LAN-13 (SHOGEN-PLAN-S2BIS-2-REFUS-NON-NOMMES-1, lanceur). Toute sortie hors 0 nommée, aucune trace
+        Python ni de bash à l'écran : parametres.json du lot sans passes, ou sans la pièce parametres (épingle
+        renommée) : P2/plan-s2bis seul ; dossier de travail qui est un fichier : extraction impossible, code 4 ;
+        dossier de passe qui est un fichier, ou script en 0 sans sorties : code 5 ; sortie sous un fichier : copie
+        impossible, code 5. Mutation M-P2R6-10 : erreurs des heredocs à l'écran ; M-P2R6-11 : création du travail non
+        nommée ; M-P2R6-12 : dossier de passe non nommé ; M-P2R6-13 : sommes de passe non nommées ; M-P2R6-14 : copie
+        non nommée ; M-P2R6-15 : pièce parametres non exigée (variable non liée, code 1)."""
+        def renommer(p):
+            for d in p["plan_s2bis"]["chemins"], p["plan_s2bis"]["sha256"]:
+                d["autre"] = d.pop("parametres")
+        for modif in (lambda p: p.pop("passes"), renommer):
+            self.ecrire(modif=modif)
+            r = self.lancer()
+            self.assertEqual((r.returncode, r.stderr), (3, "REFUS P2/plan-s2bis : épingles de PLAN-S2BIS illisibles "
+                                                           "dans parametres.json du lot" + NL))
+        f, w = (os.path.join(self.t, n) for n in ("fichier", "w"))
+        for n in (f, os.path.join(w, "A")):
+            ecrire(n, "x")
+        for t, s, faux, attendu in ((f, self.s, None, "extraction impossible : code 4"),
+                                    (w, self.s, None, "passe A : dossier impossible : code 5"),
+                                    (self.x, self.s, {"ecrire": False}, "passe A : SHA256SUMS impossible : code 5"),
+                                    (w + "2", os.path.join(f, "s"), None, "copie de la passe A impossible : code 5")):
+            self.ecrire(faux=faux)
+            r = self.lancer(self.j, s, t, self.epingle)
+            self.assertEqual((r.returncode, r.stderr), (int(attendu[-1]), attendu + NL))

@@ -1,5 +1,7 @@
 """Socle du lot PLAN-S2BIS-2 : variable, schéma, épingles, sous-arbres, écarts (d), pool (c). Attendus écrits à la main
 ou par sha256sum ; chaque test nomme la mutation qui le rougit."""
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -42,6 +44,30 @@ def processus_neuf(prm):
                     "print(json.dumps([r, [(n, m.__file__) for n, m in sys.modules.items() if n in socle.MODULES]]))"])
     return json.loads(subprocess.run([sys.executable, "-B", "-c", code, json.dumps(prm)], cwd=socle.ICI, check=True,
                                      capture_output=True, text=True).stdout)
+
+
+def appel(argv, analyse_=analyse):
+    """socle.executer dans ce processus, stderr capté : (code, ou type de l'exception sortie ; stderr)."""
+    err = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(err):
+            rc = socle.executer("essai", "objet", ("a.txt",), analyse_, argv)
+    except (Exception, SystemExit) as e:
+        rc = type(e).__name__
+    return rc, err.getvalue()
+
+
+def reecrire(d, nom, f):
+    """Journal de fixture `nom` du dossier d réécrit : lignes = f(lignes)."""
+    with open(os.path.join(d, nom), encoding="utf-8") as g:
+        lignes = g.read().split(NL)[:-1]
+    with open(os.path.join(d, nom), "w", encoding="utf-8") as g:
+        g.write(NL.join(f(lignes)) + NL)
+
+
+def lecture0(lignes, **sur):
+    """Lignes de journal.jsonl, première lecture modifiée : clés de sur posées, ou retirées si None."""
+    return [json.dumps({k: v for k, v in {**json.loads(lignes[0]), **sur}.items() if v is not None}), *lignes[1:]]
 
 
 class TestSocle(unittest.TestCase):
@@ -184,3 +210,62 @@ class TestSocle(unittest.TestCase):
             self.assertTrue(lignes[-2].startswith(f"REFUS {code} : ") if code else lignes[-2] == "ANALYSE")
             refus = [x[:6] for x in lignes].count("REFUS ")
             self.assertEqual(("ANALYSE" in lignes, refus), (not code, int(bool(code))))
+
+    def test_lecture(self):
+        """T-P2-LEC-1 (Q-P2R-3 ; SHOGEN-PLAN-S2BIS-2-REFUS-NON-NOMMES-1). Toute exception de la lecture des entrées,
+        des contrôles ou de l'analyse : P2/lecture, nommé par le seul type de l'exception ; code 1, une ligne de refus,
+        aucune analyse, stderr vide, aucune valeur de journal (fenêtre hors grille, message). Un cas par chemin :
+        journal absent ; ligne corrompue non finale ; ligne non objet ; fenêtre hors grille ; strate journalisée
+        incohérente ; strate hors paramètres ; unité hors pool ; classe divergente ; rendu absent ; prix illisible ;
+        lecture sans flux ; analyse en échec. Mutation M-P2R1-11 : Refus et ValueError seuls rattrapés ; M-P2R1-12 :
+        message de l'exception recopié ; M-P2R1-13 : refus nommés convertis en P2/lecture."""
+        fx, ven = tests.fx, tests.fx.VEN
+        hors = str(ven + 90)
+
+        def echec(d, ps2, prm, ep):
+            raise ValueError(f"valeur de journal {hors}")
+
+        def j(nom, f):
+            return lambda d, a: reecrire(d, nom, f)
+        incoherente = json.dumps(fx.records.window_close_record(ven + 240, "stress", ven + 295.0))
+        cas = [("FileNotFoundError", None, lambda d, a: os.remove(os.path.join(d, "control.jsonl")), analyse),
+               ("ValueError", None, j("journal.jsonl", lambda x: ["{", *x]), analyse),
+               ("AttributeError", None, j("control.jsonl", lambda x: ["[1]", *x]), analyse),
+               ("ValueError", None, j("control.jsonl", lambda x: [*x, json.dumps(fx.marqueur(ven + 90))]), analyse),
+               ("ValueError", None, j("control.jsonl", lambda x: [*x, incoherente]), analyse),
+               ("ValueError", lambda p: p.update(strates=["stress"]), None, analyse),
+               ("ValueError", lambda p: p["pool_d1bis"]["unites"].update(uz="z"), None, analyse),
+               ("ValueError", lambda p: p["classes"].update(a="autre"), None, analyse),
+               ("FileNotFoundError", None, lambda d, a: os.remove(a[a.index("--rendu") + 1]), analyse),
+               ("InvalidOperation", None, j("journal.jsonl", lambda x: lecture0(x, price="abc")), analyse),
+               ("KeyError", None, j("journal.jsonl", lambda x: lecture0(x, flux_id=None)), analyse),
+               ("ValueError", None, None, echec)]
+        for i, (nom, modif, apres, an) in enumerate(cas):
+            with self.subTest(cas=i):
+                argv = tests.banc(self, [ven + 60 * k for k in range(4)], lambda k, f: "ok", list("abcde"),
+                                  modif=modif, strates=["calme"])
+                if apres:
+                    apres(argv[argv.index("--journaux") + 1], argv)
+                self.assertEqual(appel(argv, an), (1, ""))
+                with open(os.path.join(argv[argv.index("--sortie") + 1], "a.txt"), encoding="utf-8") as f:
+                    texte = f.read()
+                lignes = texte.split(NL)
+                self.assertEqual((lignes[-2].split(" : ")[0], lignes[-2].endswith(f"({nom})"), lignes[-1],
+                                  hors in texte, [x[:6] for x in lignes].count("REFUS "), "ANALYSE" in lignes),
+                                 ("REFUS P2/lecture", True, "", False, 1, False))
+
+    def test_usage_et_sortie(self):
+        """T-P2-LEC-2 (SHOGEN-PLAN-S2BIS-2-REFUS-NON-NOMMES-1). Arguments hors CLI (--sortie absent, -h, option
+        inconnue) : REFUS P2/usage sur stderr, code 2, aucune sortie ; --sortie qui est un fichier : REFUS P2/sortie
+        sur stderr, code 1. Mutation M-P2R1-14 : erreur d'arguments laissée à argparse ; M-P2R1-15 : aide admise ;
+        M-P2R1-16 : écriture des sorties non rattrapée ; M-P2R1-17 : code 1 en usage."""
+        argv = tests.banc(self, [tests.fx.VEN + 60 * k for k in range(4)], lambda k, f: "ok", list("abcde"),
+                          strates=["calme"])
+        i = argv.index("--sortie")
+        for a in (argv[:i] + argv[i + 2:], argv + ["-h"], argv + ["--autre", "x"]):
+            self.assertEqual(appel(a), (2, "REFUS P2/usage : arguments de essai hors de la CLI" + NL))
+        self.assertFalse(os.path.exists(argv[i + 1]))
+        with open(argv[i + 1], "w", encoding="utf-8") as f:
+            f.write("fichier")
+        self.assertEqual(appel(argv), (1, "REFUS P2/sortie : sorties non écrites dans le dossier de sortie "
+                                          "(FileExistsError)" + NL))

@@ -39,12 +39,13 @@ def masque(pos: list, retenues: dict) -> dict:
 
 def controle_b(pos: list, m: dict, retenues: dict, strates: list, bloc3: dict, attendu: dict) -> None:
     """(b) : chaque fenêtre retenue est une position de la grille, hors des plages exclues, de strate journalisée égale
-    à celle du calendrier ; par strate, calendrier hors D5 et sautées = parametres.json du lot (ADR-0029 l.31),
-    retenues = n du bloc 3 épinglé ; sinon P2/masque."""
+    à celle du calendrier ; chacun des deux comptes attendus porte exactement les strates de PLAN-S2BIS ; par strate,
+    calendrier hors D5 et sautées = parametres.json du lot (ADR-0029 l.31), retenues = n du bloc 3 épinglé ; sinon
+    P2/masque."""
     grille = {ws: (st, x) for ws, st, x in pos}
     if any(grille.get(ws) != (st, False) for ws, st in retenues.items()):
         raise socle.Refus("P2/masque", "fenêtre retenue hors de la grille, dans une plage exclue ou hors calendrier")
-    if {s for c in attendu.values() if isinstance(c, dict) for s in c} != set(strates):
+    if any(set(attendu[k]) != set(strates) for k in ("calendrier_hors_d5", "sautees_hors_d5")):
         raise socle.Refus("P2/masque", "strates des comptes attendus différentes de celles de PLAN-S2BIS")
     for s in strates:
         cal, ret = m["calendrier"][s], m["retenues"][s]
