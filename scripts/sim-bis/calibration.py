@@ -3,7 +3,9 @@
 exigée ligne à ligne, dans l'ordre de parametres.json (strates, unités, types ; pools, strates, ℓ) : sinon CALIB/forme.
 Nombres pris en rationnels exacts depuis leur écriture décimale. Contrôles de cohérence, sinon CALIB/coherence : chaque
 quotient imprimé est refait sous le contexte décimal de r1 de f35a70c (précision 50, ROUND_HALF_EVEN, le reste du
-DefaultContext) et comparé chaîne pour chaîne. L'histogramme d'EP compte tous les épisodes, censurés compris."""
+DefaultContext) et comparé chaîne pour chaîne. L'histogramme d'EP compte tous les épisodes, censurés compris. SB-15d
+(ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (1)) : lecture de fiv_unites.txt de PLAN-S2BIS-2, même analyseur de
+ligne de courbe que pour EP (SHOGEN-SIM-BIS-POOL-EP-SEPARES-1, précision de l'annexe B, B.77)."""
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 from fractions import Fraction
@@ -17,15 +19,22 @@ TETE_EPISODES = ("[ÉPISODES] descriptif, pour calibrer SIM-NIVEAU-BIS et SIM-PU
 TETE_FIV = ("[FIV_SÉRIE(ℓ)] σ̂²_bloc(ℓ)/γ̂₀, série I_t = 1{au moins deux écarts} ; garde n ≥ 30·ℓ imprimée ; pool S2 "
             "contrôlé égal au bloc de compute_r1 à ℓ = 240")
 EN, NB = "([0-9]+)", "([0-9]+(?:[.][0-9]+)?)"
+L_FV = re.compile(" : n = " + EN + " ; K = " + EN + " ; FIV_série = ([0-9]+(?:[.][0-9]+)?|-) ; σ̂²_bloc = " + NB +
+                  " ; γ̂₀ = " + NB + " ; cv théorique = " + NB + " ; garde : (tenue|non tenue)")
+TETE_UNITES = ("[FIV_u(ℓ)] série d'écart de l'hôte u (r1.ECARTS) sur les fenêtres retenues de la strate, pool D1-bis ; "
+               "FIV_série = σ̂²_bloc/γ̂₀ de r1.block_long_run_variance (forme d'EP l.94) ; garde n ≥ 30·ℓ imprimée")
+CONTROLE_UNITES = ("  contrôle : n et K de chaque hôte = n_s et cellules « ecart » d'EP ; FIV_série de I_t (D1-bis) "
+                   "recalculée depuis les D_u = EP aux {} ℓ : égaux")
+SUITE_UNITES = "[SENSIBILITÉ VOISINAGE] "
 
 
-def _forme(i: int, ligne: str, attendu: str):
-    raise commun.Refus("CALIB/forme", f"EP l.{i + 1} : {ligne[:90]!r}, attendu {attendu}")
+def _forme(i: int, ligne: str, attendu: str, src: str = "EP"):
+    raise commun.Refus("CALIB/forme", f"{src} l.{i + 1} : {ligne[:90]!r}, attendu {attendu}")
 
 
-def _egal(i: int, quoi: str, lu, attendu) -> None:
+def _egal(i: int, quoi: str, lu, attendu, src: str = "EP") -> None:
     if lu != attendu:
-        raise commun.Refus("CALIB/coherence", f"EP l.{i + 1} : {quoi} : lu {lu}, attendu {attendu}")
+        raise commun.Refus("CALIB/coherence", f"{src} l.{i + 1} : {quoi} : lu {lu}, attendu {attendu}")
 
 
 def _episode(i: int, m, h, k: dict, ctx) -> dict:
@@ -54,16 +63,28 @@ def _episode(i: int, m, h, k: dict, ctx) -> dict:
             "moyenne_complets": Fraction(m.group(9 + nq)), "histogramme": hist}
 
 
-def _point(i: int, ell: int, m, k: dict, ctx) -> dict:
-    """Point (ℓ) d'une courbe FIV_série, après contrôle de cohérence."""
+def _point(i: int, ell: int, m, k: dict, ctx, src: str = "EP") -> dict:
+    """Point (ℓ) d'une courbe FIV_série, après contrôle de cohérence ; FIV « - » (indéfini, forme de dec de
+    scripts/plan-s2bis/commun.py) si et seulement si γ̂₀ = 0 : fiv None."""
     n, kk, fiv, s2, g0, cv = int(m.group(1)), int(m.group(2)), *m.group(3, 4, 5, 6)
     garde = m.group(7) == "tenue"
-    _egal(i, "FIV_série = σ̂²_bloc/γ̂₀", fiv, str(ctx.divide(Decimal(s2), Decimal(g0))))
-    _egal(i, "γ̂₀ = (nK − K²)/n", g0, str(ctx.divide(Decimal(n * kk - kk * kk), Decimal(n))))
-    _egal(i, "garde = (n ≥ garde_blocs·ℓ)", garde, n >= k["garde_blocs"] * ell)
-    _egal(i, "cv = √(4ℓ/3n)", cv, str(ctx.sqrt(ctx.divide(Decimal(4 * ell), Decimal(3 * n)))))
-    return {"ell": ell, "n": n, "K": kk, "fiv": Fraction(fiv), "sigma2": Fraction(s2), "gamma0": Fraction(g0),
-            "cv": Fraction(cv), "garde": garde}
+    _egal(i, "FIV_série = σ̂²_bloc/γ̂₀", fiv,
+          "-" if Decimal(g0) == 0 else str(ctx.divide(Decimal(s2), Decimal(g0))), src)
+    _egal(i, "γ̂₀ = (nK − K²)/n", g0, str(ctx.divide(Decimal(n * kk - kk * kk), Decimal(n))), src)
+    _egal(i, "garde = (n ≥ garde_blocs·ℓ)", garde, n >= k["garde_blocs"] * ell, src)
+    _egal(i, "cv = √(4ℓ/3n)", cv, str(ctx.sqrt(ctx.divide(Decimal(4 * ell), Decimal(3 * n)))), src)
+    return {"ell": ell, "n": n, "K": kk, "fiv": None if fiv == "-" else Fraction(fiv), "sigma2": Fraction(s2),
+            "gamma0": Fraction(g0), "cv": Fraction(cv), "garde": garde}
+
+
+def _ligne_fiv(i: int, ligne: str, tete: str, ell: int, k: dict, ctx, unites: bool = False) -> dict:
+    """Ligne de courbe FIV_série de la forme d'EP l.94 après le préfixe `tete` : un seul analyseur pour EP et
+    fiv_unites.txt (SHOGEN-SIM-BIS-POOL-EP-SEPARES-1) ; FIV « - » admis dans fiv_unites.txt seul (`unites` ; hôte à
+    K ∈ {0, n}), sinon CALIB/forme ; cohérence : _point."""
+    src, m = "fiv_unites.txt" if unites else "EP", L_FV.fullmatch(ligne[len(tete):])
+    if not (ligne.startswith(tete) and m) or (m.group(3) == "-" and not unites):
+        _forme(i, ligne, tete, src)
+    return _point(i, ell, m, k, ctx, src)
 
 
 def analyser(texte: str, k: dict) -> dict:
@@ -82,8 +103,6 @@ def _analyser(texte: str, k: dict) -> dict:
                       " ; taux = " + NB + " ; moyenne = " + NB + " ; max = " + EN + " ; " +
                       " ; ".join(f"P{q} = " + EN for q in k["quantiles"]) + " ; complets : " + EN + ", moyenne " + NB)
     l_hi = re.compile("    histogramme [(]longueur×nombre[)] : ([0-9]+×[0-9]+(?: [0-9]+×[0-9]+)*)")
-    l_fv = re.compile(" : n = " + EN + " ; K = " + EN + " ; FIV_série = " + NB + " ; σ̂²_bloc = " + NB + " ; γ̂₀ = " +
-                      NB + " ; cv théorique = " + NB + " ; garde : (tenue|non tenue)")
     s, u, t = len(k["strates"]), len(k["unites"]), len(k["types"])
     lignes, out = texte.split(commun.NL), {"episodes": {}, "fiv": {}}
     n = 14 + 2 * s * u * t + len(k["pools"]) * s * len(k["ell"])
@@ -105,14 +124,46 @@ def _analyser(texte: str, k: dict) -> dict:
             out["fiv"][pool, st] = []
             for ell in k["ell"]:
                 i += 1
-                tete = f"  {pool} « {st} » ℓ = {ell}"
-                m = l_fv.fullmatch(lignes[i][len(tete):])
-                if not (lignes[i].startswith(tete) and m):
-                    _forme(i, lignes[i], tete)
-                out["fiv"][pool, st].append(_point(i, ell, m, k, ctx))
+                out["fiv"][pool, st].append(_ligne_fiv(i, lignes[i], f"  {pool} « {st} » ℓ = {ell}", ell, k, ctx))
     return out
 
 
 def charger(prm: dict, lus=None, environ=None) -> dict:
     """EP lu sous ses deux épingles (commun.lire_entree, E-S-02), puis analysé."""
     return analyser(commun.lire_entree(prm, "episodes", lus, environ).decode("utf-8"), prm["calibration"])
+
+
+def analyser_unites(texte: str, k: dict) -> dict:
+    """fiv_unites.txt de PLAN-S2BIS-2 (point (1)) : {strate : {hôte : [point par ℓ]}} de la section [FIV_u(ℓ)] seule
+    (la sensibilité au voisinage, imprimée hors C1, n'est pas lue) : étiquette d'EP, en-tête et ligne de contrôle de la
+    section, puis les lignes dans l'ordre de parametres.json (strates, hôtes du format calibration.unites, ℓ), préfixe
+    « « strate » flux (hôte h) », analysées par _ligne_fiv (FIV « - » admis), puis la section suivante et le saut de
+    ligne final ; n commun à toutes les lignes d'une strate (garde commune à ses hôtes) ; sinon CALIB/forme ou
+    CALIB/coherence, quotient impossible compris."""
+    try:
+        ctx, lignes = Context(prec=k["precision"], rounding=ROUND_HALF_EVEN), texte.split(commun.NL)
+        i = lignes.index(TETE_UNITES) if lignes.count(TETE_UNITES) == 1 else 0
+        j, out = i + 2, {}
+        fin = j + len(k["strates"]) * len(k["unites"]) * len(k["ell"])
+        if (i == 0 or lignes[0] != ETIQUETTE_EP or lignes[i + 1:i + 2] != [CONTROLE_UNITES.format(len(k["ell"]))]
+                or not (lignes[fin:] or [""])[0].startswith(SUITE_UNITES) or lignes[-1] != ""):
+            _forme(i, lignes[i], "étiquette, section [FIV_u(ℓ)] et son contrôle, section suivante", "fiv_unites.txt")
+        for st in k["strates"]:
+            out[st] = {}
+            for hote, f in k["unites"]:
+                out[st][hote] = []
+                for ell in k["ell"]:
+                    tete = f"  « {st} » {f} (hôte {hote}) ℓ = {ell}"
+                    out[st][hote].append(_ligne_fiv(j, lignes[j], tete, ell, k, ctx, True))
+                    j += 1
+            _egal(j - 1, f"n commun aux lignes de « {st} »", len({x["n"] for xs in out[st].values() for x in xs}), 1,
+                  "fiv_unites.txt")
+        return out
+    except ArithmeticError as e:
+        raise commun.Refus("CALIB/coherence", f"fiv_unites.txt : quotient impossible ({type(e).__name__})") from None
+
+
+def charger_unites(prm: dict, lus=None, environ=None) -> dict:
+    """fiv_unites.txt lu sous ses deux épingles (commun.lire_entree, sommes de PLAN-S2BIS-2), puis analysé."""
+    texte = commun.lire_entree(prm, "fiv_unites", lus, environ, sommes="sommes_plan2").decode("utf-8")
+    return analyser_unites(texte, prm["calibration"])
