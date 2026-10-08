@@ -31,6 +31,10 @@ def prm_avec(**chemins):
     return p
 
 
+def analyse(d, ps2, prm, ep):
+    return {"a.txt": ["ANALYSE"]}
+
+
 def processus_neuf(prm):
     """socle.charger(prm) dans un processus neuf : [code du refus ou « - », [[nom, fichier] des modules chargés]]."""
     code = NL.join(["import json, sys, socle", "try:", "    socle.charger(json.loads(sys.argv[1])); r = '-'",
@@ -145,3 +149,38 @@ class TestSocle(unittest.TestCase):
         dix = {"pools_bis": {"calme": list("abcdefghij"), "stress": list("abcdefghij")}, "retraits_bis": []}
         self.assertEqual((tests.EP[7], socle.ligne_pool_bis(dix)),
                          ("pool D1-bis : « calme » 10 hôtes ; « stress » 10 hôtes ; retraits : aucun",) * 2)
+
+    def test_executer_refus(self):
+        """T-P2-SOC-6, étendu à l'ordre des contrôles de executer. Fixture de 4 fenêtres de calme (a et b en panne à la
+        1re, a seule à la 2e : a ok 2 fois, 2·2 = 4, gardé) : égale, code 0, corps de l'analyse. Bloc 3 épinglé à
+        K + 1 : P2/coherence ; épingle d'un module du harnais altérée : P2/harnais ; type « ecart » sans staleness :
+        P2/ecarts ; 3 fenêtres (a ok 1 fois sur 3, retiré) : P2/pool ; variable dans l'environnement passé :
+        P2/variable. En refus : code 1, étiquette, ligne 2, une ligne de refus, aucune ligne d'analyse. Mutation
+        M-P2-40 : contrôle (a) neutralisé ; M-P2-41 : harnais importé sans commun.importer_harnais ; M-P2R1-1 : code 0
+        en refus ; M-P2R1-2 : étiquette omise ; M-P2R1-3 : (c) non appelé ; M-P2R1-4 : (d) non appelé ;
+        M-P2R1-5 : garde non appelée ; M-P2R1-6 : .partiel non renommé."""
+        def motif(i, f):
+            return "panne_transport" if (i == 0 and f in "ab") or (i == 1 and f == "a") else "ok"
+
+        def k_plus_un(p):
+            p["rendu_j28"]["bloc3"]["calme"][1] += 1
+
+        def harnais(p):
+            p["harnais_sha256"]["shogen_s2/r1.py"] = "0" * 64
+
+        def ecart(p):
+            p["episodes"]["types"]["ecart"] = ["panne", "hors_enveloppe"]
+        variable = {"SHOGEN_S2_CAMPAGNE_CONTROL": "x"}
+        for n, modif, env, code in ((4, None, None, None), (4, k_plus_un, None, "P2/coherence"), (4, harnais, None,
+                                    "P2/harnais"), (4, ecart, None, "P2/ecarts"), (3, None, None, "P2/pool"),
+                                    (4, None, variable, "P2/variable")):
+            ws = [tests.fx.VEN + 60 * i for i in range(n)]
+            argv = tests.banc(self, ws, motif, list("abcde"), modif=modif, strates=["calme"])
+            rc = socle.executer("essai", "objet", ("a.txt",), analyse, argv, env)
+            with open(os.path.join(argv[argv.index("--sortie") + 1], "a.txt"), encoding="utf-8") as f:
+                lignes = f.read().split(NL)
+            tete = (socle.ETIQUETTE, "essai — objet (PLAN-S2BIS-2 ; SHOGEN-SIM-BIS-FIV-IDENTIF-1)")
+            self.assertEqual((rc, tuple(lignes[:2]), lignes[-1]), (int(bool(code)), tete, ""))
+            self.assertTrue(lignes[-2].startswith(f"REFUS {code} : ") if code else lignes[-2] == "ANALYSE")
+            refus = [x[:6] for x in lignes].count("REFUS ")
+            self.assertEqual(("ANALYSE" in lignes, refus), (not code, int(bool(code))))

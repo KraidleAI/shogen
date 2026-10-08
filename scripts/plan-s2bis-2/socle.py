@@ -6,6 +6,7 @@ parametres.json de PLAN-S2BIS ; contrôles (c) pool D1-bis et (d) type « ecart 
 de ligne par chr(10)."""
 from __future__ import annotations
 
+import argparse
 import hashlib
 import importlib.util
 import json
@@ -16,6 +17,7 @@ ICI = os.path.dirname(os.path.abspath(__file__))
 RACINE = os.path.dirname(os.path.dirname(ICI))
 PARAMETRES = os.path.join(ICI, "parametres.json")
 NL = chr(10)
+ETIQUETTE = "préparation de S2-bis ; ne change pas le verdict de S2 (« R1 discrimine » = FAUX)"
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 MODULES = ("commun", "regles", "episodes")
 PIECES = ("commun", "regles", "episodes", "parametres", "fixtures", "sha256sums", "ep", "ep_sha256sums")
@@ -132,3 +134,67 @@ def controle_c(d: dict, ps2: dict, ep: list) -> None:
             raise Refus("P2/pool", "pool D1-bis de la strate différent des unités de PLAN-S2BIS", st)
     if d["retraits_bis"] or ep[7:8] != [ligne_pool_bis(d)]:
         raise Refus("P2/pool", "retrait au pool D1-bis, ou ligne « pool D1-bis » différente d'EP l.8")
+
+
+def provenance(d: dict, ps2: dict, commun) -> list:
+    """Lignes de provenance de l'en-tête, forme de PS2 commun.py l.184-194 : harnais, journaux (sha256 seuls), portée,
+    pool S2 (D1), pool D1-bis."""
+    seg = ps2["segment"]
+    return [f"harnais : extraction du commit d'analyse {ps2['commit_analyse']} ; modules épinglés : "
+            + " ; ".join(f"{os.path.basename(k)} {v}" for k, v in ps2["harnais_sha256"].items()),
+            f"journaux : control.jsonl sha256 {commun.sha256(d['control'])} ; journal.jsonl sha256 "
+            f"{commun.sha256(d['journal'])}",
+            f"portée : segment [{d['bornes'][0]} ; {d['bornes'][1]}) (t0 = {seg['t0']}, n fixe = {seg['n_fixe']}), "
+            f"plages exclues {d['plages']}",
+            "pool S2 (D1) : " + " ; ".join(f"« {s} » {len(v)} flux" for s, v in d["pools_s2"].items())
+            + " ; retraits : " + (" ; ".join(f"« {s} » {f} (ok {k} sur {t} lectures)"
+                                             for s, f, k, t, _n in d["retraits_s2"]) or "aucun"),
+            ligne_pool_bis(d)]
+
+
+def executer(nom: str, objet: str, sorties: tuple, analyse, argv=None, env=None) -> int:
+    """CLI des scripts du lot (P2R-1 ; P-2) : --journaux, --harnais, --sortie (dossier), --parametres (du lot), --rendu.
+    Variable ; schéma ; pièces de PLAN-S2BIS ; harnais par commun.importer_harnais (P2/harnais) ; (d) ; lecture par
+    commun.charger ; (a) par commun.controle (P2/coherence) ; (c) ; puis analyse(d, ps2, prm, ep), qui rend {sortie :
+    lignes}. Chaque sortie : étiquette, en-tête, corps (code 0) ou une ligne de refus (code 1) ; écrite en .partiel,
+    puis renommée."""
+    a = argparse.ArgumentParser(prog=nom)
+    for o in ("--journaux", "--harnais", "--sortie"):
+        a.add_argument(o, required=True)
+    a.add_argument("--parametres", default=PARAMETRES)
+    a.add_argument("--rendu")
+    x = a.parse_args(argv)
+    tete = [f"{nom} — {objet} (PLAN-S2BIS-2 ; SHOGEN-SIM-BIS-FIV-IDENTIF-1)"]
+    try:
+        garde(os.environ if env is None else env)
+        prm = lire(x.parametres)
+        chemins, mods, ps2, ep = charger(prm)
+        commun, lus = mods["commun"], prm["sous_arbres"]
+        fichiers = [os.path.abspath(__file__), sys.modules[analyse.__module__].__file__, *(chemins[n] for n in MODULES)]
+        tete += ["modules chargés : " + " ; ".join(f"{os.path.basename(q)} sha256 {empreinte(q)}" for q in fichiers),
+                 f"parametres.json du lot sha256 {empreinte(x.parametres)} ; parametres.json de PLAN-S2BIS sha256 "
+                 f"{empreinte(chemins['parametres'])} ; EP {os.path.basename(chemins['ep'])} sha256 "
+                 f"{empreinte(chemins['ep'])}",
+                 f"sous-arbres lus dans {prm['plan_s2bis']['chemins']['parametres']} : " + ", ".join(lus["lus"])
+                 + " ; épingles : " + ", ".join(lus["epingles"])]
+        try:
+            commun.importer_harnais(x.harnais, ps2["harnais_sha256"])
+        except ValueError:
+            raise Refus("P2/harnais", "module du harnais hors des épingles ou de sha256 différent") from None
+        controle_d(ps2, commun.H["r1"])
+        d = commun.charger(x.journaux, ps2)
+        ok, ctrl = commun.controle(d, ps2, x.rendu or os.path.join(commun.RACINE, ps2["rendu_j28"]["chemin"]))
+        tete += provenance(d, ps2, commun) + ctrl
+        if not ok:
+            raise Refus("P2/coherence", "bloc 3 recompté différent de l'épingle (contrôle (a))")
+        controle_c(d, ps2, ep)
+        corps, code = analyse(d, ps2, prm, ep), 0
+    except Refus as r:
+        corps, code = {s: [str(r)] for s in sorties}, 1
+    os.makedirs(x.sortie, exist_ok=True)
+    for s in sorties:
+        cible = os.path.join(x.sortie, s)
+        with open(cible + ".partiel", "w", encoding="utf-8", newline=NL) as f:
+            f.write(NL.join([ETIQUETTE, *tete, *corps[s]]) + NL)
+        os.replace(cible + ".partiel", cible)
+    return code
