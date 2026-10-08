@@ -5,6 +5,7 @@ import os
 import time
 import unittest
 from collections import Counter
+from decimal import Decimal
 
 import masque_fiv
 import socle
@@ -35,6 +36,21 @@ def fixture(test, sc=1):
 def lire(dossier, nom):
     with open(os.path.join(dossier, nom), encoding="utf-8") as f:
         return f.read().split(NL)
+
+
+def fixture_fiv(test, modif_ep=None):
+    """Forme de PS2 tests/test_episodes.py l.57-66 : 10 fenêtres de calme, la 5 exclue (n = 9) ; a en panne en 0, 4,
+    6, 9 et périmée en 1 (ok 5 fois, gardé) ; b en panne en 0 ; x hors des unités, en panne sauf en 8."""
+    ws = [tests.fx.VEN + 60 * i for i in range(10)]
+
+    def motif(i, f):
+        if (f == "a" and i in (0, 4, 6, 9)) or (f == "b" and i == 0) or (f == "x" and i != 8):
+            return "panne_transport"
+        return {"etat": "ok", "age": 200} if f == "a" and i == 1 else "ok"
+    masque = {"calendrier_hors_d5": {"calme": 9}, "sautees_hors_d5": {"calme": 0}}
+    argv = tests.banc(test, ws, motif, list("abcde"), pool=list("abcdex"), plages=[(ws[5], ws[5])], masque=masque,
+                      sigma={"place": "100"}, strates=["calme"], modif_ep=modif_ep)
+    return argv, argv[argv.index("--sortie") + 1]
 
 
 class TestMasque(unittest.TestCase):
@@ -90,9 +106,14 @@ class TestMasque(unittest.TestCase):
                 self.assertEqual((e.code, code), ("P2/masque", "P2/masque"))
         argv, s = fixture(self, sc=2)
         self.assertEqual(masque_fiv.main(argv), 1)
-        lignes = lire(s, "masque_j28.txt")
-        self.assertEqual((lignes[-2][:17], lignes[-1], sum("[MASQUE" in x for x in lignes)),
-                         ("REFUS P2/masque :", "", 0))
+        self.assertRefus(s, "P2/masque")
+
+    def assertRefus(self, s, code):
+        """Chaque sortie du script : une ligne de refus en dernier, aucune section de valeurs."""
+        for nom in masque_fiv.SORTIES:
+            lignes = lire(s, nom)
+            self.assertEqual((lignes[-2].split(" : ")[0], lignes[-1], [x[:1] for x in lignes].count("[")),
+                             (f"REFUS {code}", "", 0))
 
     def test_sortie(self):
         """T-P2-OUT-1. Étiquette mot pour mot ; sha256 de socle, masque_fiv, commun, regles, episodes, des deux
@@ -114,4 +135,71 @@ class TestMasque(unittest.TestCase):
                   f"{T0 + 720})]", "pool S2 (D1) : « calme » 5 flux ; « stress » 5 flux ; retraits : aucun",
                   "pool D1-bis : « calme » 5 hôtes ; « stress » 5 hôtes ; retraits : aucun"):
             self.assertIn(x, lignes)
-        self.assertEqual(sorted(os.listdir(s)), ["masque_j28.txt"])
+        self.assertEqual(sorted(os.listdir(s)), ["fiv_unites.txt", "masque_j28.txt"])
+
+    def test_contre_ep(self):
+        """T-P2-FIV-5. Fixture de FIV (a : 5 cellules d'écart, 4 de panne [calc]) ; EP produit par episodes.main
+        épinglé : (c) et (f) égaux, code 0 ; EP altéré d'un chiffre (cellules d'écart de a ; K de la courbe D1-bis à
+        ℓ = 2 ; dernier chiffre de σ̂²_bloc de la ligne D1-bis à ℓ = 3), ou portant une ligne D1-bis de plus : P2/ep,
+        code 1, aucune valeur dans les deux sorties (lettre de (f) : EP l.128-161, chaîne pour chaîne). Mutation
+        M-P2-13 : contrôle (f) neutralisé ; M-P2-32 : FIV_u sur le type panne ; M-P2R2-1 : (f) (ii) non comparée ;
+        G-18 (G2) : n et K seuls comparés ; G-19 (G2) : compte des lignes D1-bis retiré ; M-P2R2-4 : chaînes comparées
+        jusqu'à FIV_série ; M-P2R2-5 : lignes D1-bis en trop admises."""
+        argv, s = fixture_fiv(self)
+        self.assertEqual(masque_fiv.main(argv), 0)
+
+        def remplacer(a, b):
+            def alterer(texte):
+                self.assertIn(a, texte)
+                return texte.replace(a, b)
+            return alterer
+
+        def chiffre(texte):
+            x = next(y for y in texte.split(NL) if y.startswith("  D1-bis « calme » ℓ = 3 : "))
+            u, v = x.split(" ; γ̂₀ = ")
+            return texte.replace(x, f"{u[:-1]}{(int(u[-1]) + 1) % 10} ; γ̂₀ = {v}")
+
+        def de_plus(texte):
+            return texte + [y for y in texte.split(NL) if y.startswith("  D1-bis « ")][-1] + NL
+        a, k = "(hôte ua) ecart : n_s = 9 ; cellules = ", "D1-bis « calme » ℓ = 2 : n = 9 ; K = "
+        for alterer in (remplacer(a + "5 ;", a + "6 ;"), remplacer(k + "1 ;", k + "2 ;"), chiffre, de_plus):
+            argv, s = fixture_fiv(self, alterer)
+            self.assertEqual(masque_fiv.main(argv), 1)
+            self.assertRefus(s, "P2/ep")
+
+    def test_contre_courbe(self):
+        """T-P2-FIV-6. À la main (convention de PS2 tests/test_episodes.py l.36-44 ; SB-10A l.128-134) : positions 0, 1,
+        3, 4, D = 1, 1, ·, 0, 0 : FIV_série(2) = FIV_série(3) = 3/2. Section [FIV_u(ℓ)] de la fixture de FIV = lignes
+        construites ici par episodes.courbe épinglé sur les séries écrites à la main (positions réelles, fenêtre exclue
+        absente), dans l'ordre des hôtes puis de ℓ. Mutation M-P2-10 : série comprimée (positions renumérotées)."""
+        courbe, dec, v = tests.MODS["episodes"].courbe, tests.MODS["commun"].dec, tests.fx.VEN
+        quatre = [(v, 1), (v + 60, 1), (v + 180, 0), (v + 240, 0)]
+        self.assertEqual([c["FIV_serie"] for c in courbe(quatre, 60, [2, 3])], [Decimal("1.5")] * 2)
+        argv, s = fixture_fiv(self)
+        masque_fiv.main(argv)
+        lignes = lire(s, "fiv_unites.txt")
+        uns = {"a": (0, 1, 4, 6, 9), "b": (0,), "c": (), "d": (), "e": ()}
+        attendu = [f"  « calme » {f} (hôte u{f}) ℓ = {c['ell']} : n = 9 ; K = {c['K']} ; FIV_série = "
+                   f"{dec(c['FIV_serie'])} ; σ̂²_bloc = {dec(c['sigma2_bloc'])} ; γ̂₀ = {dec(c['gamma0'])} ; "
+                   f"cv théorique = {dec(c['cv'])} ; garde : non tenue" for f in "abcde"
+                   for c in courbe([(v + 60 * i, int(i in uns[f])) for i in range(10) if i != 5], 60, [1, 2, 3])]
+        i = next(j for j, x in enumerate(lignes) if x.startswith("[FIV_u(ℓ)]"))
+        self.assertEqual(lignes[i + 2:i + 17], attendu)
+        self.assertTrue(lignes[i + 17].startswith("[SENSIBILITÉ VOISINAGE]"))
+
+    def test_voisinage(self):
+        """T-P2-VOI-1. Série à la main, positions 0 à 9, la 5 absente : d = 1 retire 0 et 9 (bords de la portée), 4 et 6
+        (voisines de la lacune). Fixture de FIV : positions retirées 4, n′ = 5 ; K − K′ : ua 4 (K = 5, K′ = 1, la
+        cellule périmée en 1), ub 1, uc, ud, ue 0 ; lignes des séries réduites à n = 5. Mutation M-P2-33 : bords de la
+        portée non comptés comme lacunes ; M-P2R2-2 : séries réduites non imprimées (séries entières)."""
+        serie = [(60 * i, int(i in (0, 1, 4, 6, 9))) for i in range(10) if i != 5]
+        self.assertEqual(masque_fiv.reduite(serie, 60, 1), [(60, 1), (120, 0), (180, 0), (420, 0), (480, 0)])
+        argv, s = fixture_fiv(self)
+        masque_fiv.main(argv)
+        lignes = lire(s, "fiv_unites.txt")
+        i = next(j for j, x in enumerate(lignes) if x.startswith("[SENSIBILITÉ VOISINAGE]"))
+        self.assertEqual(lignes[i + 1], "  « calme » : positions retirées = 4 ; n′ = 5 ; cellules d'écart voisines "
+                                        "d'une lacune (K − K′) : ua 4 ; ub 1 ; uc 0 ; ud 0 ; ue 0")
+        self.assertEqual([x.split(" ; ")[:2] for x in lignes[i + 2:-1]],
+                         [[f"  « calme » {f} (hôte u{f}) ℓ = {ell} : n = 5", f"K = {int(f == 'a')}"] for f in "abcde"
+                          for ell in (1, 2, 3)])

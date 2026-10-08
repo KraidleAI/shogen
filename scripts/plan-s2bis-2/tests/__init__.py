@@ -15,11 +15,11 @@ CHEMINS, MODS, PS2, EP = socle.charger(PRM)
 fx = socle.charger_module("fixtures_ps2", CHEMINS["fixtures"])
 
 
-def banc(test, ws, motif, unites, pool=None, plages=(), masque=None, sigma=None, modif=None, **sur):
+def banc(test, ws, motif, unites, pool=None, plages=(), masque=None, sigma=None, modif=None, modif_ep=None, **sur):
     """Fixture complète dans un dossier jetable : journaux de fixtures_ps2 (pool S2 : pool, ou les unités), bloc 3
     recompté par r1, faux rendu, parametres.json de PLAN-S2BIS (prm_fixture, ℓ = 1, 2, 3, puis sur), EP produit par
-    episodes.main épinglé, modif(parametres) éventuelle, parametres.json du lot qui épingle ces pièces (masque : comptes
-    attendus). Rend les arguments de la CLI des scripts, sorties dans <dossier>/s."""
+    episodes.main épinglé, modif(parametres) et modif_ep(texte d'EP) éventuels, parametres.json du lot qui épingle
+    ces pièces (masque : comptes attendus). Rend les arguments de la CLI des scripts, sorties dans <dossier>/s."""
     d = fx.dossier(test, "p2_banc_")
     fx.journaux(d, ws, motif, pool or unites, sigma=sigma)
     c, j = (os.path.join(d, n) for n in ("control.jsonl", "journal.jsonl"))
@@ -31,6 +31,11 @@ def banc(test, ws, motif, unites, pool=None, plages=(), masque=None, sigma=None,
     MODS["episodes"].main(a + ["--sortie", ep, "--parametres", fx.ecrire_prm(os.path.join(d, "ps2.json"), p)])
     if modif:
         modif(p)
+    if modif_ep:
+        with open(ep, encoding="utf-8") as f:
+            texte = modif_ep(f.read())
+        with open(ep, "w", encoding="utf-8") as f:
+            f.write(texte)
     lot = json.loads(json.dumps(PRM))
     for cle, chemin in (("parametres", fx.ecrire_prm(os.path.join(d, "ps2b.json"), p)), ("ep", ep)):
         lot["plan_s2bis"]["chemins"][cle], lot["plan_s2bis"]["sha256"][cle] = chemin, socle.empreinte(chemin)
