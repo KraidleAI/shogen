@@ -7,8 +7,8 @@ SB-10b : portée du segment J28 lue sur EP l.6, calendrier de la grille, réplic
 indépendantes vues d'un seul observateur, f = 1, régime caché d'E-S-12), moyenne des courbes d'un point. SB-10c :
 grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le contexte de r1 : aucune fonction de libm),
 choix de C2 et de C1. SB-15b (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (3)) : calendrier d'E1, positions
-présentes = masque mesuré de J28 versé par PLAN-S2BIS-2. Entiers et rationnels
-seuls, sauf les logarithmes du critère : aucun flottant, aucune puissance."""
+présentes = masque mesuré de J28 versé par PLAN-S2BIS-2 ; SB-15c : masque appliqué après la génération. Entiers et
+rationnels seuls, sauf les logarithmes du critère : aucun flottant, aucune puissance."""
 import hashlib
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
@@ -159,8 +159,13 @@ def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> 
     f, part des pannes longues, multiplicateur hors de BTC, part hors-enveloppe, classe ; ni dérive, ni incident, ni
     unité faible (clés absentes du fond de sources.Replication ; flux de la cellule `cellule`, réplication i) ; classe
     hors de sources.classes : E1/classe ; état D*(u) = H(u) ∪ F(u, classe) de chaque hôte du pool de la classe (BTC :
-    pool D1-bis, calibration.unites) ; I_t = 1 si au moins deux hôtes sont en écart (regle.deux), sur les positions de
-    chaque strate. Rend {"strates" : {s : (positions, I)}, "etats" : {hôte : D*}}."""
+    pool D1-bis, calibration.unites), généré sur cal["masques"] ; I_t = 1 si au moins deux hôtes sont en écart
+    (regle.deux). Masque appliqué après la génération (point (3)) : positions présentes de chaque strate =
+    cal["presentes"], incluses dans les positions générées de la strate, sinon E1/masque. Rend {"strates" : {s :
+    (positions, I)}, "unites" : {s : {hôte : D* sur les positions}}, "etats" : {hôte : D*}}."""
+    pres = cal.get("presentes")
+    if pres is None or any(x & ~cal["masques"].get(s, 0) for s, x in pres.items()):
+        raise commun.Refus("E1/masque", "positions présentes absentes, ou hors des positions générées de leur strate")
     e, cl = prm["e1"]["fond"], sources.classes(prm)
     if e["classe"] not in [x for x, _p in cl]:
         raise commun.Refus("E1/classe", f"{e['classe']!r} : classe de sources.classes attendue")
@@ -170,7 +175,8 @@ def replication(prm: dict, ep: dict, cal: dict, point, cellule: str, i: int) -> 
     rep = sources.Replication(prm, ep, fond, cellule, i, cal["masques"], cal["horizon"])
     etats = {h: rep.pannes(h) | rep.ecarts(h, c) for h in cl[c][1]}
     i_t = regle.deux(list(etats.values()))
-    return {"strates": {s: (m, i_t & m) for s, m in cal["masques"].items()}, "etats": etats}
+    return {"strates": {s: (m, i_t & m) for s, m in pres.items()},
+            "unites": {s: {h: d & m for h, d in etats.items()} for s, m in pres.items()}, "etats": etats}
 
 
 def moyenne(courbes: list) -> dict:

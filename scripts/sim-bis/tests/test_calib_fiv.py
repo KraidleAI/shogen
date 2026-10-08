@@ -3,6 +3,7 @@
 l.128 (γ̂₀ et σ̂²_bloc à ℓ = 1 ne dépendent que de n et K), et comptage naïf des γ̂_k depuis leur définition (paires de
 la grille, écarts à Ī, en Fraction) sur des séries aléatoires à lacunes ; chaque test nomme les mutations qui le
 rougissent."""
+import functools
 import hashlib
 import random
 import unittest
@@ -22,6 +23,13 @@ EP = calibration.analyser(TEXTE, K_)["episodes"]
 
 def bits(*positions):
     return sum(1 << p for p in positions)
+
+
+@functools.lru_cache(maxsize=None)
+def cal_e1():
+    """Calendrier d'E1 (point (3) de l'ajout daté du G0 du 2026-10-05 15:05:43 UTC) : génération sur la portée d'EP l.6
+    hors D5, positions présentes = masque mesuré de PLAN-S2BIS-2 ; lu une fois (jamais modifié par les tests)."""
+    return calib_fiv.calendrier_e1(PRM, environ={})
 
 
 def naif(presentes: list, vals: dict, ell: int):
@@ -138,14 +146,14 @@ class TestModeleE1(unittest.TestCase):
 
     def test_replication(self):
         """Une réplication d'E1 (C0, puis un point à régime) : I_t égal au comptage naïf « au moins deux hôtes en
-        écart », position par position, sur les positions de chaque strate ; même (cellule, i) : mêmes octets ; i
-        différent : autres octets. Mutations M-10-13 (I_t à « au moins un »), M-10-14 (strate ignorée : I_t pris sur
-        la grille)."""
-        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        écart », position par position, sur les positions présentes de chaque strate (masque mesuré, point (3)) ;
+        même (cellule, i) : mêmes octets ; i différent : autres octets. Mutations M-10-13 (I_t à « au moins un »),
+        M-10-14 (strate ignorée : I_t pris sur la grille), M-15C-01 (positions générées au lieu du masque)."""
+        cal = cal_e1()
         for point in (None, (Fraction(1, 10), Fraction(20), 240)):
             r = calib_fiv.replication(PRM, EP, cal, point, "E1-essai", 0)
             for s, (pres, val) in r["strates"].items():
-                self.assertEqual(pres, cal["masques"][s])
+                self.assertTrue(pres == cal["presentes"][s], s)          # masques de 46 468 bits : message court
                 naif_ = sum(1 << j for j in range(cal["horizon"])
                             if pres >> j & 1 and sum(x >> j & 1 for x in r["etats"].values()) >= 2)
                 self.assertEqual(val, naif_, (point, s))
@@ -164,7 +172,7 @@ class TestModeleE1(unittest.TestCase):
         self.assertEqual({k: v for k, v in e.items() if k != "source"},
                          {"f": [1, 1], "longues": [0, 1], "autres": [1, 1], "hors_enveloppe": [0, 1], "classe": "BTC"})
         self.assertTrue(all(x in e["source"] for x in ("E-S-38", "PROPOSITION l.197", "Q-T4-13")), e["source"])
-        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        cal = cal_e1()
         main = {"f": Fraction(1), "longues": Fraction(0), "autres": Fraction(1), "hors_enveloppe": Fraction(0)}
 
         def attendu(prm, point, fond, c):
@@ -197,7 +205,7 @@ class TestModeleE1(unittest.TestCase):
         majorée par un facteur 2 ; dispersion des épisodes d'EP l.16 : 476/372) ; de même quand la ligne « panne » de
         binance est vidée (EP retouché en mémoire : l'écart vient alors de F seul). Mutations M-10-15 (f = 1/2),
         M-10-23 (état réduit à la panne H)."""
-        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        cal = cal_e1()
         p, calme = Fraction(372, 24585), cal["masques"]["calme"]
         e = EP["calme", "binance", "ecart"]
         self.assertEqual(p, Fraction(e["cellules"], e["n_s"]))
@@ -214,7 +222,7 @@ class TestModeleE1(unittest.TestCase):
         au plus 1,41 (épisodes courts) ; au point (φ, κ, τ_D) = (1/10, 50, 1 440), au moins 12,05 (mesuré à la mise au
         point de ce test) : le plus petit sous régime dépasse 4 fois le plus grand sous C0. Mutation M-10-21 (régime
         ignoré : C0 partout)."""
-        cal = calib_fiv.calendrier_j28(calib_fiv.portee(TEXTE, PRM["calendrier"]), PRM["calendrier"])
+        cal = cal_e1()
         c = cal["masques"]["calme"]
 
         def fiv(point, i):
@@ -240,6 +248,11 @@ class TestModeleE1(unittest.TestCase):
 T = 1796428560                                     # vendredi 2026-12-04 23:56 UTC (date -u -d @1796428560)
 SEG = {"t0": T, "t_fin": T + 480, "n_fixe": 8, "plages": [(T + 360, T + 360)]}       # j 0-3 vendredi, 4-7 samedi
 L5 = "  lacune j = 5 à 6 : 2 positions (calme 0, stress 2)"
+
+
+def differents(a: dict, b: dict) -> list:
+    """Clés dont les valeurs diffèrent, clés absentes comprises (message court : masques de 46 468 bits)."""
+    return sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
 
 
 def masque_fictif(*remplacements) -> str:
@@ -327,6 +340,35 @@ class TestMasqueE1(unittest.TestCase):
         d = "docs/adr-0029/plan-s2bis"
         self.assertEqual(sorted(lus), [f"{d}-2/SHA256SUMS", f"{d}-2/masque_j28.txt", f"{d}/SHA256SUMS",
                                        f"{d}/episodes.txt"])
+
+    def test_masque_apres_generation(self):
+        """Point (3), à vérifier par la G2 : le masque s'applique après la génération. États D*(u) égaux à ceux d'une
+        génération dont les positions présentes sont les positions générées ; I_t et séries des hôtes rendues = cette
+        génération restreinte au masque, strate par strate ; masque et positions générées donnent des I_t différents.
+        Mutation M-15C-02 (génération sur le masque)."""
+        cal, point = cal_e1(), (Fraction(1, 10), Fraction(20), 240)
+        r = calib_fiv.replication(PRM, EP, cal, point, "E1-masque", 0)
+        g = calib_fiv.replication(PRM, EP, dict(cal, presentes=cal["masques"]), point, "E1-masque", 0)
+        self.assertEqual(differents(r["etats"], g["etats"]), [])
+        for s, m in cal["presentes"].items():
+            self.assertTrue(r["strates"][s] == (m, g["strates"][s][1] & m), s)
+            self.assertEqual(differents(r["unites"][s], {h: d & m for h, d in g["etats"].items()}), [], s)
+        self.assertTrue(r["strates"] != g["strates"])
+
+    def test_replication_refus_masque(self):
+        """Calendrier sans positions présentes, ou présentes hors des positions générées de leur strate (j 6, dans
+        D5 ; strate inconnue de la génération) : E1/masque, avant toute génération. Mutations M-15C-03 (inclusion non
+        contrôlée), M-15C-04 (présentes absentes remplacées par les positions générées), M-15C-09 (strate inconnue
+        admise)."""
+        cal = calib_fiv.calendrier_j28(SEG, PRM["calendrier"])
+        for faux in (cal, dict(cal, presentes={"calme": bits(0), "stress": bits(4, 6)}),
+                     dict(cal, presentes={"calme": bits(0), "autre": bits(0)})):
+            with self.assertRaises(commun.Refus) as r:
+                calib_fiv.replication(PRM, EP, faux, None, "E1-refus", 0)
+            self.assertEqual(r.exception.code, "E1/masque")
+        ok = dict(cal, presentes={"calme": bits(0), "stress": bits(4, 7)})
+        r = calib_fiv.replication(PRM, EP, ok, None, "E1-x", 0)
+        self.assertEqual(sorted((s, x[0]) for s, x in r["strates"].items()), [("calme", 1), ("stress", bits(4, 7))])
 
 
 L22 = Decimal("0.480453013918201424667102526326664971730552951594545586866864")     # bc -l : l(2)^2, scale = 60
