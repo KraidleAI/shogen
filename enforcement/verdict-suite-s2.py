@@ -17,6 +17,11 @@ retire).
 SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : `etapes` et `lignes_du_job`, analyseur unique de la
 ligne d'un job de gates.yml, partagé par les cas K du runner et par l'enregistreur de rôle
 (s2-harness/tools/oracle_record.py).
+SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : `masques` ; une entrée de la racine de la suite au nom d'un
+module de la bibliothèque standard est refusée avant tout lancement (sortie 1). Lancé de ce dossier, -m unittest
+l'importerait à la place du module standard : unittest lui-même, ou l'un des 40 à 43 autres qu'il charge avant la
+découverte (mesuré sous 3.10 à 3.13 ; -I les écarte, sans refus nommé), puis tout module qu'un test importe après la
+découverte, qui met la racine en tête de sys.path (-I ne l'écarte pas).
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
 import os
@@ -25,7 +30,7 @@ import subprocess
 import sys
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
-PLANCHER = 407      # tests de la suite après OUT-1b du lot R-1 (2026-10-06 ; 406 après ENREG-ROLE de CB-18) ; un lot
+PLANCHER = 408      # tests de la suite après OUT-2b du lot OUT-2 (2026-10-08 ; 407 après OUT-1b du lot R-1) ; un lot
                     # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
                     # (--egal) ; l'abaisser desserre la gate : décision datée seulement
 SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
@@ -51,6 +56,12 @@ def verdict(texte: str, code: int, plancher: int = PLANCHER, variable=VARIABLE, 
     elif egal and n > plancher:
         refus.append(f"Ran {n} > plancher {plancher} (--egal) : plancher à relever au compte des tests")
     return refus
+
+
+def masques(harnais: str) -> list:
+    """Entrées de la racine `harnais` d'une suite au nom d'un module de la bibliothèque standard
+    (sys.stdlib_module_names, Python 3.10 et plus ; nom pris avant le premier point), triées ; liste vide : aucune."""
+    return sorted(x for x in os.listdir(harnais) if x.split(".")[0] in sys.stdlib_module_names)
 
 
 def lancer(harnais: str, environ=None) -> tuple:
@@ -136,6 +147,11 @@ def main(argv: list) -> int:
     if not os.path.isdir(os.path.join(harnais, "tests")):
         print(f"verdict-suite-s2 : erreur : {os.path.join(harnais, 'tests')} introuvable", file=sys.stderr)
         return 3
+    masque = masques(harnais)                   # SUITE-MASQUE-UNITTEST-1 : refus avant tout lancement de la suite
+    if masque:
+        print(f"verdict-suite-s2 : refus : {masque} à la racine de {harnais} masque la bibliothèque standard pour -m "
+              "unittest (sys.stdlib_module_names) : suite non lancée", file=sys.stderr)
+        return 1
     err, out, code = lancer(harnais)
     sys.stdout.write(err + out)
     sys.stdout.flush()

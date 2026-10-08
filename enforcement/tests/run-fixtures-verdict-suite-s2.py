@@ -38,8 +38,11 @@ contre-contrôle de R-1), est refusée et nommée : R-09 à R-11. Garantie réel
 été joués et jugés sur le canal, chaque réponse écrite après sa requête par un code qui l'a lue ; elle ne dit pas que
 les réponses viennent du code relu. Limite : un vérificateur qui reconnaît `--serveur`, ou lit les requêtes, peut
 répondre juste au runner et mentir à l'étape du job ; la lecture humaine du diff du vérificateur reste nécessaire.
-Sortie : 0 tout passe (CAS cas), 1 un cas échoue ou le vérificateur rompt pendant un cas, 3 erreur (vérificateur
-illisible au chargement compris)."""
+SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (OUT-2b) : M-01 à M-03, racine de suite qui masque la bibliothèque standard pour
+-m unittest (unittest.py, paquet unittest/, argparse.py chargé avant la découverte), refus nommé, suite non lancée ;
+M-04, témoin au nom libre ; M-05, `masques` (nom pris avant le premier point : json.abi3.so, extension que
+l'import prendrait pour json, C-1 de la G2 d'OUT-2). Sortie : 0 tout passe (CAS cas), 1 un cas échoue ou le vérificateur
+rompt pendant un cas, 3 erreur (vérificateur illisible au chargement compris)."""
 import atexit
 import contextlib
 import importlib.util
@@ -175,7 +178,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 100                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 105                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -250,6 +253,31 @@ try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             r = v.main([d, *opt])
         cas(nom, [] if r == rc else [f"code {r}, attendu {rc}"], None)
+    MARQUE = os.path.join(W, "masque-importe")          # SUITE-MASQUE-UNITTEST-1 : leurre importé, donc suite lancée
+    LEURRE = ["import sys", f"open({MARQUE!r}, 'w').close()", "sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 3 "
+              "tests in 0.001s' + chr(10) * 2 + 'OK' + chr(10))", "sys.exit(0)"]      # résumé conforme forgé, code 0
+
+    def masquee(rep, *noms):
+        """Suite factice verte de 3 tests (C-04), et le leurre sous chacun des `noms` à sa racine."""
+        d = factice(os.path.join(W, rep), "    pass", n=2)
+        for x in noms:
+            os.makedirs(os.path.dirname(os.path.join(d, x)), exist_ok=True)
+            with open(os.path.join(d, x), "w", encoding="utf-8") as f:
+                f.write(chr(10).join(LEURRE) + chr(10))
+        return d
+    r = v.main([masquee("M-01", "unittest.py"), *s2bis])     # refus lu sur le stderr du vérificateur (trace)
+    cas("M-01 unittest.py à la racine, résumé forgé : sortie 1, refus nommé, suite non lancée", [] if (
+        r, "masque la bibliothèque standard" in trace(), os.path.exists(MARQUE)) == (1, True, False) else [
+        f"code {r}, leurre importé : {os.path.exists(MARQUE)} : {trace()}"], None)
+    for nom, noms, rc in (("M-02 paquet unittest/ à la racine : sortie 1", ["unittest/__init__.py"], 1),
+                          ("M-03 argparse.py à la racine, chargé par unittest avant la découverte : sortie 1",
+                           ["argparse.py"], 1),
+                          ("M-04 témoin, module au nom libre à la racine (commun.py) : conforme", ["commun.py"], 0)):
+        r = v.main([masquee(nom[:4], *noms), *s2bis])
+        cas(nom, [] if r == rc else [f"code {r}, attendu {rc}"], None)
+    cas("M-05 masques : noms de modules standard seuls, pris avant le premier point (json.abi3.so), triés", [] if (
+        v.masques(masquee("M-05", "unittest.py", "json.py", "json.abi3.so", "commun.py", "unittest_notes.md",
+                          "README.md")) == ["json.abi3.so", "json.py", "unittest.py"]) else ["écart"], None)
     PAS = ["PLANCHER = 406", "def verdict(*a, **k):"]          # RUNNER-SORTIE-1 : vérificateur rompu pendant V-01
     T = os.path.join(W, "transcript")        # RUNNER-REJEU-1 : canal du vérificateur réel, recopié par R-09a (D7)
     CAPTURE = ["import os, threading", "_r, _w = os.pipe()", "_s = os.dup(1)", "os.dup2(_w, 1)",

@@ -13,7 +13,10 @@ SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1 (G2 de la tranche C de P1) : cette ligne est lue
 runner (`lignes_du_job` du vérificateur de l'arbre de l'outil, VERIF), dans les seuls blocs `run:` des étapes
 admises. SHOGEN-S2BIS-ENREG-VERIF-COMMIT-1 (lot R-1, réserve R-1 de l'accord de P1, OUT-1b) : le vérificateur que la
 ligne lance, celui du commit (sha256 consigné dans tree.sha256), doit être celui de l'outil (VERIF), à l'écriture comme
-à la lecture ; il est lancé en mode isolé (-I : aucun module posé à côté de lui par le commit n'est importé)."""
+à la lecture ; il est lancé en mode isolé (-I : aucun module posé à côté de lui par le commit n'est importé).
+SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : la commande `suite`, que l'outil lance par -m unittest sans
+le vérificateur, est refusée avant tout run si la racine de sa suite porte une entrée au nom d'un module standard
+(`masques`) ; pour les commandes de JOBS, le vérificateur la refuse lui-même."""
 from __future__ import annotations
 
 import argparse
@@ -99,6 +102,14 @@ def auteur_admis(a) -> bool:
     illisible : ValueError (liste_blanche)."""
     admis = liste_blanche()
     return isinstance(a, str) and (a in admis or a.endswith("[1m]") and a[:-4] in admis)
+
+
+def masques(dossier: str) -> list:
+    """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (OUT-2b) : entrées de `dossier` au nom d'un module de la bibliothèque
+    standard (sys.stdlib_module_names, nom pris avant le premier point), triées ; -m unittest lancé de ce dossier les
+    importerait à sa place. Règle de `masques` du vérificateur, écrite ici parce que la commande `suite` ne charge pas
+    VERIF : le rendu de production tourne d'un arbre sans vérificateur (test_rendu_production)."""
+    return sorted(x for x in os.listdir(dossier) if x.split(".")[0] in sys.stdlib_module_names)
 
 
 def ligne_du_job(arbre: str, job: str, suite: str) -> list:
@@ -187,6 +198,10 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         if lignes and hashes.get(VERIF_COMMIT) != sha256_fichier(VERIF):              # OUT-1b : leurre L2
             raise ValueError(f"vérificateur du commit {VERIF_COMMIT} (sha256 {hashes.get(VERIF_COMMIT)}) autre que "
                              f"celui de l'outil {VERIF} (sha256 {sha256_fichier(VERIF)}) — refus")
+        masque = masques(os.path.join(arbre, COMMANDES["suite"][0])) if "suite" in commandes else []
+        if masque:                                   # OUT-2b : -m unittest lancé ici même, sans le vérificateur
+            raise ValueError(f"{masque} à la racine de {COMMANDES['suite'][0]} masque la bibliothèque standard pour "
+                             "-m unittest — refus")
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
             cmd = [sys.executable, *["-I"][:c in JOBS], *(journaux if x == JOURNAUX else x for x in args)]

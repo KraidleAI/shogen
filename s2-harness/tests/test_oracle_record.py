@@ -483,6 +483,44 @@ class TestOracleRecord(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"UnicodeDecodeError.* — refus$"):
             orc.ligne_du_job(arbre, "s2bis-unittest", "s2bis")
 
+    def test_racine_de_suite_qui_masque_la_bibliotheque_standard(self):
+        """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : un unittest.py à la racine d'une suite, qui
+        imprime un résumé conforme et sort en 0, masquerait le module standard pour -m unittest. Commande `suite`
+        (unittest lancé par l'outil, sans le vérificateur) : refus nommé avant tout run, rien d'écrit ; commande
+        `suite-s2bis` (ligne du job, vérificateur égal à VERIF) : refus nommé du vérificateur, suite non lancée, exit 1
+        consigné, refus (exit) à la lecture ; `masques` : noms de modules standard seuls (paquet compris), triés.
+        Rougit si : contrôle absent, sur un autre dossier ou après le run, ou limité à `suite` en première commande
+        (C-3 de la G2 d'OUT-2) ; vérificateur sans ce refus ; règle de `masques` réduite à unittest, au nom complet,
+        au nom pris avant le dernier point (json.abi3.so, C-2), ou élargie à tout module."""
+        d, dep, a, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-masque"), "claude-opus-5-5", chr(10)
+        leurre = nl.join(["import sys", "sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 1 test in 0.001s' + "
+                          "chr(10) * 2 + 'OK' + chr(10))", "sys.exit(0)", ""]).encode()      # résumé conforme forgé
+        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+                         "        run: |", "          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut "
+                         "--egal --plancher 1", ""]).encode()
+        s2, s2bis = depot(dep, [{**KO, "s2-harness/unittest.py": leurre}, {
+            ".github/workflows/gates.yml": gates, "enforcement/verdict-suite-s2.py": Path(orc.VERIF).read_bytes(),
+            "s2bis/tests/__init__.py": b"", "s2bis/tests/test_t.py": KO["s2-harness/tests/test_t.py"],
+            "s2bis/unittest.py": leurre}])
+        avant = sorted(os.listdir(d))
+        with self.assertRaisesRegex(ValueError, "unittest[.]py.* — refus$"):
+            orc.enregistrer(d, "G2", a, dep, s2)
+        with self.assertRaisesRegex(ValueError, "unittest[.]py.* — refus$"):          # `suite` après une autre (C-3)
+            orc.enregistrer(d, "G2", a, dep, s2bis, ("suite-s2bis", "suite"))
+        self.assertEqual(sorted(os.listdir(d)), avant)
+        chemin, code = orc.enregistrer(d, "G2", a, dep, s2bis, ("suite-s2bis",))
+        run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
+        out = Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")
+        self.assertEqual((code, run["exit"], "masque la bibliothèque standard" in out, "Ran 1 test" in out),
+                         (1, 1, True, False))
+        with self.assertRaisesRegex(ValueError, "^refus [(]exit[)] : "):
+            orc.verifier(chemin, "G2", s2bis)
+        racine = os.path.join(d, "racine")
+        os.makedirs(os.path.join(racine, "argparse"))
+        for n in ("unittest.py", "json.py", "json.abi3.so", "commun.py", "unittest_notes.md", "README.md"):
+            Path(racine, n).write_bytes(b"")
+        self.assertEqual(orc.masques(racine), ["argparse", "json.abi3.so", "json.py", "unittest.py"])    # à la main
+
 
 if __name__ == "__main__":
     unittest.main()
