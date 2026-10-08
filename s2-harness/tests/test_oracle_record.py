@@ -4,6 +4,7 @@ des octets écrits par le test, sha complets de git rev-parse, liste fermée éc
 from __future__ import annotations
 
 import hashlib
+import importlib.machinery
 import importlib.util
 import json
 import os
@@ -553,21 +554,29 @@ class TestOracleRecord(unittest.TestCase):
         """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : un fichier de bytecode committé (__pycache__, .pyc) remplacerait la
         source relue à l'import (.pyc à invalidation non vérifiée : mesuré, D-P4 et D-U1 du lot) et l'isolement ne
         l'écarte pas : refus nommé avant tout run, quelle que soit la commande, rien d'écrit ; cache d'un __pycache__,
-        ou module sans source (tests/aide.pyc, seul fichier compilé de son commit). Rougit si : contrôle absent, réservé
-        à une commande, ou au cache d'un __pycache__ (C-3 de la revue de la vague 2)."""
+        ou module sans source (tests/aide.pyc, seul fichier compilé de son commit). SHOGEN-S2BIS-SUITE-CODE-COMPILE-1
+        (OUT-2h) : de même tests/aide.pyo, et les extensions tests/aide.so (suffixe nu) et tests/aide.pyd, chacun seul
+        dans son commit ; COMPILES, liste écrite ici à la main. Rougit si : contrôle absent, réservé à une commande, ou
+        au cache d'un __pycache__ (C-3 de la revue de la vague 2) ; suffixe .pyo, .so, .pyd ou d'extension omis."""
         dep, sans = os.path.join(self.d, "depot-pyc"), os.path.join(self.d, "depot-pyc-sans-source")
         (pyc,) = depot(dep, [{**OK, "s2-harness/tools/rendu_unique.py": STUB,
                               "s2-harness/tests/__pycache__/test_t.cpython-312.pyc": b"leurre"}])
         (seul,) = depot(sans, [{**OK, "s2-harness/tools/rendu_unique.py": STUB, "s2-harness/tests/aide.pyc": b"x"}])
+        cas = [(dep, pyc, "'s2-harness/tests/__pycache__/test_t[.]cpython-312[.]pyc'"),
+               (sans, seul, "'s2-harness/tests/aide[.]pyc'")]
+        for s in (".pyo", ".so", ".pyd"):
+            dp = os.path.join(self.d, "depot-compile" + s)
+            (commit,) = depot(dp, [{**OK, "s2-harness/tools/rendu_unique.py": STUB, "s2-harness/tests/aide" + s: b"x"}])
+            cas.append((dp, commit, f"'s2-harness/tests/aide[.]{s[1:]}'"))
         with mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", ["-B", "tools/rendu_unique.py"])}):
-            for dp, commit, motif in ((dep, pyc, "'s2-harness/tests/__pycache__/test_t[.]cpython-312[.]pyc'"),
-                                      (sans, seul, "'s2-harness/tests/aide[.]pyc'")):
+            for dp, commit, motif in cas:
                 for c in ("suite", "essai"):
                     d = tempfile.mkdtemp(dir=self.d)
                     with self.subTest(commande=c, motif=motif):
                         with self.assertRaisesRegex(ValueError, motif + ".* — refus$"):
                             orc.enregistrer(d, "G2", "claude-opus-5-5", dp, commit, (c,))
                         self.assertEqual(os.listdir(d), [])
+        self.assertEqual(orc.COMPILES, (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES))
 
     def test_verificateur_de_l_outil_lu_dans_sa_source(self):
         """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : ligne_du_job exécute VERIF depuis sa source ; un .pyc à
@@ -592,9 +601,10 @@ class TestOracleRecord(unittest.TestCase):
         production, dossier de la suite pour JOBS), une entrée au nom d'un module standard, ou un fichier de bytecode.
         E7 de la G2 d'OUT-2 : enregistrement `suite` d'un commit dont la racine est masquée (écrit par un outil d'avant
         OUT-2b ; tree.sha256 juste, recalculé avec --depot) ; paquet json/ à la racine de s2bis pour `suite-s2bis` ;
-        .pyc de cache, ou sans source (C-3 de la revue de la vague 2). Témoin : masque hors de la racine d'un run lancé
-        (s2bis/ pour `suite`, tools/), conforme. Rougit si : contrôle absent ; racine des JOBS, paquet, ou bytecode
-        (cache ou module sans source), non lus ; contrôle étendu aux racines d'aucun run."""
+        .pyc de cache, ou sans source (C-3 de la revue de la vague 2) ; .pyo, extension .so ou .pyd (OUT-2h). Témoin :
+        masque hors de la racine d'un run lancé (s2bis/ pour `suite`, tools/), conforme. Rougit si : contrôle absent ;
+        racine des JOBS, paquet, ou fichier compilé (cache, module sans source, .pyo, extension), non lus ; contrôle
+        étendu aux racines d'aucun run."""
         d, dep, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-lecture"), chr(10)
         masque = {**OK, "s2-harness/unittest.py": nl.join(["import sys", "sys.exit(0)", ""]).encode()}
         (sale,) = depot(dep, [masque])
@@ -610,7 +620,10 @@ class TestOracleRecord(unittest.TestCase):
             "s2-harness/tests/aide.pyc": "0" * 64}))                         # module sans source, seul compilé (C-3)
         temoin = self.copie(d, g2, "temoin.json", lambda r: r["tree"]["sha256"].update({
             "s2bis/json.py": "0" * 64, "s2-harness/tools/json.py": "0" * 64}))
-        for p, commit, depot_ in ((e7, sale, dep), (jobs, self.c1, None), (pyc, self.c1, None), (seul, self.c1, None)):
+        compiles = [self.copie(d, g2, f"compile{s}.json", lambda r, s=s: r["tree"]["sha256"].update({
+            "s2-harness/tests/aide" + s: "0" * 64})) for s in (".pyo", ".so", ".pyd")]     # OUT-2h, un par copie
+        for p, commit, depot_ in ((e7, sale, dep), (jobs, self.c1, None), (pyc, self.c1, None), (seul, self.c1, None),
+                                  *((x, self.c1, None) for x in compiles)):
             with self.subTest(enregistrement=os.path.basename(p)), self.assertRaisesRegex(ValueError,
                                                                                           "^refus [(]masque[)] : "):
                 orc.verifier(p, "G2", commit, depot_)

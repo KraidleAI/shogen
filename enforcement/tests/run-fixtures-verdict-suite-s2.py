@@ -51,13 +51,18 @@ passe (CAS cas), 1 un cas échoue ou le vérificateur rompt pendant un cas, 3 er
 chargement compris). SHOGEN-S2BIS-SUITE-RESUME-FORGE-1 (OUT-2e) : F-01 à F-09, `accord` sur des comptes écrits ici ;
 F-10 à F-14, `main` sur des suites qui forgent leur résumé (os._exit(0), flux réécrit et atexit, compte au nonce
 deviné), dont un .pyc non vérifié remplacerait un module de test, ou qui lisent sys.path (comme sous -m unittest) ;
-E-01 à E-05 jugés aussi par `accord`."""
+E-01 à E-05 jugés aussi par `accord` ; F-15, .pyc écrit pendant le run dans un __pycache__ : jamais lu.
+SHOGEN-S2BIS-SUITE-CODE-COMPILE-1 (OUT-2h, C-4 de la revue de la vague 2) : P-01 à P-09, fichier compilé sous la
+racine d'une suite (.pyc sans source importé, extension .so nue, .abi3.so ou au suffixe complet, .pyo, .pyd, .pyc de
+cache, hors de tests/, dans un dossier lié hors de la racine) : refus nommé avant tout lancement ; P-10, témoin (noms
+voisins, lien en boucle) ; P-11 et P-12, `compiles` et COMPILES."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage, avant que le dossier du
 import sys                  # script entre dans sys.path ; il en sort ici, avant tout autre import (I-01, I-02)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
     del sys.path[0]
 import atexit
 import contextlib
+import importlib.machinery
 import importlib.util
 import io
 import json
@@ -191,7 +196,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 123                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 136                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -347,6 +352,72 @@ try:
                        "        self.assertEqual(sys.path[0], os.getcwd())"), *DEUX])
     cas("F-14 racine de la suite en tête de sys.path en chemin absolu, '' absent (comme -m unittest) : conforme",
         [] if r == 0 else [f"code {r} : {trace()}"], None)
+    UN = ["--aucun-saut", "--egal", "--plancher", "1"]
+    MARQUE_C, VERTE = os.path.join(W, "F-15-marque"), os.path.join(W, "F-15-vert.py")       # F-15 : .pyc vert et
+    with open(VERTE, "w", encoding="utf-8") as f:     # marqué que le module de test écrit pendant le run au chemin du
+        f.write(f"open({MARQUE_C!r}, 'a').close()" + chr(10) + "VERT = True" + chr(10))   # cache de tests/aide.py
+    d = forgee("F-15", "import os, py_compile, sys, unittest", "C = os.path.join(os.path.dirname(__file__), "
+               "'__pycache__', 'aide.' + sys.implementation.cache_tag + '.pyc')", f"py_compile.compile({VERTE!r}, C, "
+               "doraise=True, invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)",
+               "from tests import aide", "", "", "class T(unittest.TestCase):", "    def test_a(self):",
+               "        self.assertTrue(aide.VERT)")
+    with open(os.path.join(d, "tests", "aide.py"), "w", encoding="utf-8") as f:
+        f.write("VERT = False" + chr(10))                                              # source relue : rouge
+    r = v.main([d, *UN])
+    cas("F-15 .pyc vert et marqué écrit pendant le run dans tests/__pycache__, source rouge : jamais lu, sortie 1",
+        [] if (r, os.path.exists(MARQUE_C)) == (1, False) else [f"code {r}, .pyc lu : {os.path.exists(MARQUE_C)}"],
+        None)
+    MARQUE_P, AILLEURS = os.path.join(W, "P-marque"), os.path.join(W, "P-ailleurs")     # SUITE-CODE-COMPILE-1 (OUT-2h)
+    os.makedirs(AILLEURS)                                     # dossier hors de toute racine, qui porte une extension
+    open(os.path.join(AILLEURS, "aide.so"), "w").close()
+    EXT = importlib.machinery.EXTENSION_SUFFIXES[0]
+
+    def compilee(rep, *noms):
+        """Suite factice verte sous W/rep, dont le module de test pose MARQUE_P à l'import (suite lancée), et un fichier
+        vide sous chacun des `noms` (chemin relatif à la racine) ; « x -> cible » : x, lien vers le dossier cible."""
+        d = forgee(rep, "import unittest", f"open({MARQUE_P!r}, 'a').close()", "", "", "class T(unittest.TestCase):",
+                   "    def test_a(self):", "        pass")
+        for x in noms:
+            x, _, cible = x.partition(" -> ")
+            os.makedirs(os.path.dirname(os.path.join(d, x)), exist_ok=True)
+            os.symlink(cible, os.path.join(d, x)) if cible else open(os.path.join(d, x), "w").close()
+        return d
+    d = forgee("P-01", "import unittest", "from tests import aide", "", "", "class T(unittest.TestCase):",
+               "    def test_a(self):", "        self.assertTrue(aide.VERT)")
+    with open(os.path.join(W, "P-01.py"), "w", encoding="utf-8") as f:              # P-01 : module sans source, vert et
+        f.write(f"open({MARQUE_P!r}, 'a').close()" + chr(10) + "VERT = True" + chr(10))          # marqué (LE-11)
+    py_compile.compile(os.path.join(W, "P-01.py"), os.path.join(d, "tests", "aide.pyc"), doraise=True)
+    for nom, d, rc in (
+            ("P-01 tests/aide.pyc sans source (vert, marqué), importé par un test (LE-11 de la revue)", d, 1),
+            ("P-02 extension tests/aide.so (suffixe .so nu, LE-13)", compilee("P-02", "tests/aide.so"), 1),
+            ("P-03 extension tests/aide.abi3.so", compilee("P-03", "tests/aide.abi3.so"), 1),
+            ("P-04 extension au suffixe complet de l'interpréteur", compilee("P-04", "tests/aide" + EXT), 1),
+            ("P-05 tests/aide.pyo", compilee("P-05", "tests/aide.pyo"), 1),
+            ("P-06 extension Windows tests/aide.pyd", compilee("P-06", "tests/aide.pyd"), 1),
+            ("P-07 .pyc de cache tests/__pycache__/test_f.<tag>.pyc", compilee(
+                "P-07", f"tests/__pycache__/test_f.{sys.implementation.cache_tag}.pyc"), 1),
+            ("P-08 extension à la racine de la suite, hors de tests/", compilee("P-08", "aide.so"), 1),
+            ("P-09 extension dans un dossier lié, hors de la racine (tests/lien)", compilee(
+                "P-09", "tests/lien -> " + AILLEURS), 1),
+            ("P-10 témoin : noms voisins non compilés, lien en boucle (tests/boucle -> ..)", compilee(
+                "P-10", "tests/aide.so.txt", "tests/aide.pyc.md", "tests/aide.pyi", "aide.c", "tests/sopyc",
+                "tests/boucle -> .."), 0)):
+        if os.path.exists(MARQUE_P):
+            os.remove(MARQUE_P)
+        r = v.main([d, *UN])
+        lancee, nomme = os.path.exists(MARQUE_P), "fichier(s) compilé(s)" in trace()
+        cas(nom + (" : refus nommé avant tout lancement, sortie 1" if rc else " : conforme"), [] if (
+            r, lancee, nomme or not rc) == (rc, not rc, True) else [f"code {r}, suite lancée : {lancee} : {trace()}"],
+            None)
+    cas("P-11 compiles : fichiers compilés seuls, liens de dossiers suivis, boucle lue une fois, chemins triés", [] if (
+        v.compiles(compilee("P-11", "a.pyc", "tests/b.pyo", "tests/c.so", "tests/d.abi3.so", "tests/e.pyd",
+                            "tests/f" + EXT, "tests/__pycache__/g.cpython-312.pyc", "tests/h.so.txt", "tests/i.pyi",
+                            "x.c", "tests/lien -> " + AILLEURS, "tests/boucle -> ..")) == [
+            "a.pyc", "tests/__pycache__/g.cpython-312.pyc", "tests/b.pyo", "tests/c.so", "tests/d.abi3.so",
+            "tests/e.pyd", "tests/f" + EXT, "tests/lien/aide.so"]) else ["écart"], None)
+    cas("P-12 COMPILES : .pyc, .pyo, .so nu, .pyd, puis les suffixes d'extension de l'interpréteur", [] if list(
+        v.COMPILES) == [".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES] else [repr(v.COMPILES)],
+        None)
     PAS = ["PLANCHER = 406", "def verdict(*a, **k):"]          # RUNNER-SORTIE-1 : vérificateur rompu pendant V-01
     T = os.path.join(W, "transcript")        # RUNNER-REJEU-1 : canal du vérificateur réel, recopié par R-09a (D7)
     CAPTURE = ["import os, threading", "_r, _w = os.pipe()", "_s = os.dup(1)", "os.dup2(_w, 1)",
@@ -457,16 +528,17 @@ try:
     MARQUE4, D4 = os.path.join(W, "I-04", "marque"), os.path.join(W, "I-04")
     d = factice(os.path.join(W, "I-04", "s"), "    def test_x(self):" + chr(10) + "        self.fail()", n=1)
     shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), D4)
-    for x in ("re", "secrets", "shutil", "subprocess", "tempfile"):
+    for x in ("importlib/__init__", "re", "secrets", "shutil", "subprocess", "tempfile"):     # importlib : OUT-2h
+        m = x.split("/")[0]
         voisin(x + ".py", "import os, sys", f"open({MARQUE4!r}, 'a').close()", "sys.path[:] = [p for p in sys.path if "
-               f"os.path.realpath(p) != os.path.realpath({D4!r})]", f"del sys.modules[{x!r}]", f"import {x}")(D4)
+               f"os.path.realpath(p) != os.path.realpath({D4!r})]", f"del sys.modules[{m!r}]", f"import {m}")(D4)
     # dans une copie (--copie), comme I-01 à I-03 : cas compté, rien de lancé ; le vérificateur copié y est un leurre,
     # ou l'enveloppe de capture de R-09a, qui lève avant toute garde (sous 3.13, l'affichage de son exception, écrit en
     # Python, importe re depuis le dossier du script ; 3.10 à 3.12 non : mesuré)
     p = None if sys.argv[1:] == ["--copie"] else subprocess.run([sys.executable, "-B", os.path.join(
         D4, "verdict-suite-s2.py"), d, *s2bis], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    cas("I-04 re.py, secrets.py, shutil.py, subprocess.py, tempfile.py posés à côté du vérificateur lancé en script "
-        "(suite rouge) : jamais importés", [] if p is None or not os.path.exists(MARQUE4) else [
+    cas("I-04 importlib/, re.py, secrets.py, shutil.py, subprocess.py, tempfile.py posés à côté du vérificateur lancé "
+        "en script (suite rouge) : jamais importés", [] if p is None or not os.path.exists(MARQUE4) else [
             f"importé, sortie {p.returncode}"], None)                               # la sortie n'est pas jugée (E-4)
 finally:
     shutil.rmtree(W)

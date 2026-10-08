@@ -2,10 +2,11 @@
 lot DETTES-B1, docs/adr-0028/G0-lots-DETTES.md) : verdict du job s2-harness-unittest sur la sortie de la suite, et non
 sur le seul code de sortie de unittest, qui reste 0 avec un saut ajouté, un module sorti du motif test*.py ou une
 sortie par os._exit(0) avant le résumé (rejeux R8, MT-5, MT-6, MT-7, MT-9 du lot CI-S2). Lance la suite de s2-harness
-(python3 -B -m unittest discover -s tests -t . -v), SHOGEN_S2_CAMPAGNE_CONTROL retirée de son environnement, recopie
-sa sortie, puis exige : code de sortie 0 ; à la fin du flux de unittest (stderr), le résumé final (tirets, « Ran N
-tests in …s », ligne vide, « OK » ou « OK (skipped=k) ») ; exactement k lignes « … skipped '<motif>' », chaque motif
-nommant SHOGEN_S2_CAMPAGNE_CONTROL (annexe D.4 a) ; N ≥ PLANCHER, plancher committé, sans égalité figée (choix du G0
+par AMORCE (python3 -B -c AMORCE discover -s tests -t . -v, l'équivalent de -m unittest depuis OUT-2e),
+SHOGEN_S2_CAMPAGNE_CONTROL retirée de son environnement, recopie sa sortie, puis exige : code de sortie 0 ; à la fin
+du flux de unittest (stderr), le résumé final (tirets, « Ran N tests in …s », ligne vide, « OK » ou « OK
+(skipped=k) ») ; exactement k lignes « … skipped '<motif>' », chaque motif nommant SHOGEN_S2_CAMPAGNE_CONTROL
+(annexe D.4 a) ; N ≥ PLANCHER, plancher committé, sans égalité figée (choix du G0
 de D8a-3 : plancher, et non manifeste des modules ; journal G1 du lot DETTES-B1). Bibliothèque standard seule (R-8).
 Lot COLLECTE-BIS, CB-0 (G0 docs/adr-0029/g0-collecte/, PROPOSITION §1 pt 6) : `--aucun-saut` refuse tout saut, même
 nommant la variable (suite s2bis) ; `--plancher N` remplace PLANCHER ; sans option, verdict de S2 inchangé. CB-2e
@@ -27,18 +28,26 @@ import ; forme équivalente à -I pour ce dossier, sans -E : PYTHONDEVMODE, PYTH
 (mesuré sous 3.10 à 3.13 : -I les ignore, -X dev et -W error en ligne de commande restent tenus).
 SHOGEN-S2BIS-SUITE-RESUME-FORGE-1 (OUT-2e) : le texte de la suite n'est plus cru seul. AMORCE, code du vérificateur
 passé par -c, fait ce que fait python -B -m unittest discover -s tests -t . -v (racine en tête en chemin absolu,
-sys.argv[0], codes de sortie de unittest), écarte tout .pyc de l'arbre (sys.pycache_prefix vers un dossier vide), puis,
-au retour de unittest.main, écrit dans un fichier neuf du vérificateur le compte de l'objet résultat avec le nonce du
-run (secrets, reçu sur stdin) ; `accord` exige ce compte, ce nonce, et l'accord du résumé (lancés = Ran, sautés = k,
-le reste nul). Limite : AMORCE tourne dans le processus des tests ; un test écrit pour viser ce mécanisme (qui lit le
-nonce et le fichier dans la mémoire du processus, ou réécrit l'objet résultat) forge encore le compte : la lecture
-humaine du diff des tests reste nécessaire.
+sys.argv[0], codes de sortie de unittest), ne lit aucun .pyc de cache, même écrit dans un __pycache__ pendant le run
+(sys.pycache_prefix vers un dossier vide ; F-15), puis, au retour de unittest.main, écrit dans un fichier neuf du
+vérificateur le compte de l'objet résultat avec le nonce du run (secrets, reçu sur stdin) ; `accord` exige ce compte,
+ce nonce, et l'accord du résumé (lancés = Ran, sautés = k, le reste nul). Limite (O-1 de la revue de la vague 2) :
+AMORCE tourne dans le processus des tests ; un test qui altère unittest dans son processus, qu'il vise ce mécanisme ou
+non (objet résultat ou ses méthodes, comme addFailure ; nonce et fichier du compte lus en mémoire), forge encore le
+compte : la lecture humaine du diff des tests reste nécessaire.
+SHOGEN-S2BIS-SUITE-CODE-COMPILE-1 (OUT-2h, C-4 de la revue de la vague 2) : `compiles` ; tout fichier compilé sous la
+racine de la suite (COMPILES : .pyc de cache ou sans source, .pyo, extension .so ou .pyd, suffixes de
+importlib.machinery.EXTENSION_SUFFIXES ; liens de dossiers suivis) est refusé avant tout lancement (sortie 1) : l'import
+le prendrait à la place de la source relue, ou à côté d'elle (LE-11 et LE-13 de la revue). Limite : du code compilé
+chargé autrement (écrit pendant le run hors d'un __pycache__, archive, dossier hors de la racine mis dans sys.path
+par un test) n'est pas vu ; la lecture humaine du diff des tests reste nécessaire.
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage ; le dossier du script
 import sys                  # quitte sys.path avant tout autre import (un subprocess.py posé à côté rendrait conforme)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
     del sys.path[0]
+import importlib.machinery
 import re
 import secrets
 import shutil
@@ -50,13 +59,14 @@ PLANCHER = 413      # tests de la suite après OUT-2f du lot OUT-2 (2026-10-08 ;
                     # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
                     # (--egal) ; l'abaisser desserre la gate : décision datée seulement
 SUITE = ["discover", "-s", "tests", "-t", ".", "-v"]                   # arguments de unittest, lancé par AMORCE
+COMPILES = (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES)    # SUITE-CODE-COMPILE-1 (OUT-2h)
 AMORCE = chr(10).join([                 # SUITE-RESUME-FORGE-1 (OUT-2e) : python -m unittest, plus le compte réel
     "import os, sys",
     "if sys.path[:1] == ['']:",
     "    sys.path[0] = os.getcwd()",                                    # comme -m : la racine en tête, chemin absolu
     "n, t = sys.stdin.buffer.readline().decode('utf-8').rstrip(chr(10)).split(' ', 1)",
     "import unittest",
-    "sys.pycache_prefix = os.path.join(t, 'pyc')",                      # aucun .pyc de l'arbre n'est lu (F-13)
+    "sys.pycache_prefix = os.path.join(t, 'pyc')",                      # aucun .pyc de cache lu, même écrit (F-15)
     "sys.argv[0] = os.path.basename(sys.executable) + ' -m unittest'",
     "",
     "",
@@ -99,6 +109,22 @@ def masques(harnais: str) -> list:
     """Entrées de la racine `harnais` d'une suite au nom d'un module de la bibliothèque standard
     (sys.stdlib_module_names, Python 3.10 et plus ; nom pris avant le premier point), triées ; liste vide : aucune."""
     return sorted(x for x in os.listdir(harnais) if x.split(".")[0] in sys.stdlib_module_names)
+
+
+def compiles(harnais: str) -> list:
+    """SHOGEN-S2BIS-SUITE-CODE-COMPILE-1 (OUT-2h) : fichiers sous la racine `harnais` d'une suite dont le nom finit par
+    un suffixe de COMPILES (.pyc de cache ou sans source, .pyo, extension .so ou .pyd, suffixes de
+    importlib.machinery.EXTENSION_SUFFIXES), chemins relatifs triés ; liste vide : aucun. Les liens de dossiers sont
+    suivis, comme à l'import, et chaque dossier réel n'est lu qu'une fois (un lien en boucle s'arrête)."""
+    vus, trouves = set(), []
+    for d, sous, fichiers in os.walk(harnais, followlinks=True):
+        if os.path.realpath(d) in vus:
+            sous[:] = []
+            continue
+        vus.add(os.path.realpath(d))
+        trouves += [os.path.relpath(os.path.join(d, f), harnais).replace(os.sep, "/") for f in fichiers
+                    if f.endswith(COMPILES)]
+    return sorted(trouves)
 
 
 def accord(texte: str, compte, nonce: str) -> list:
@@ -213,6 +239,12 @@ def main(argv: list) -> int:
     if masque:
         print(f"verdict-suite-s2 : refus : {masque} à la racine de {harnais} masque la bibliothèque standard pour -m "
               "unittest (sys.stdlib_module_names) : suite non lancée", file=sys.stderr)
+        return 1
+    compile_ = compiles(harnais)                # SUITE-CODE-COMPILE-1 (OUT-2h) : refus avant tout lancement de la suite
+    if compile_:
+        print(f"verdict-suite-s2 : refus : {compile_[:5]}{' …' if len(compile_) > 5 else ''} sous {harnais} : "
+              "fichier(s) compilé(s), code que la relecture du diff ne lit pas, importé à la place de la source ou à "
+              "côté d'elle : suite non lancée", file=sys.stderr)
         return 1
     err, out, code, compte, n = lancer(harnais)
     sys.stdout.write(err + out)
