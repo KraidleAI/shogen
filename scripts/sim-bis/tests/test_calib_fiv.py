@@ -614,5 +614,118 @@ class TestCritereE1(unittest.TestCase):
             moy = {x: m(1, 32 if x == h else 2, 4) for x in hotes}
             self.assertLess(abs(calib_fiv.q1(moy, cible, [1, 2, 240], ctx) - ref), EPS, h)
 
+
+HOTES = [h for h, _f in K_["unites"]]                                  # les dix hôtes du format
+P0 = (Fraction(1, 100), Fraction(5), 60)                                  # aucune coordonnée extrême de la grille
+
+
+def cible_bord(gardes=(True, True, True, False)):
+    """F_u = 1, 4, 8, 16 aux ℓ 1, 60, 240, 1 440 pour les dix hôtes ; garde tenue sauf à 1 440 par défaut."""
+    return {h: [{"ell": e, "fiv": Fraction(x), "garde": g}
+                for e, x, g in zip((1, 60, 240, 1440), (1, 4, 8, 16), gardes)] for h in HOTES}
+
+
+def modele_bord(n_bas, **autres):
+    """Moyennes de C1 : les n_bas premiers hôtes sous la cible à ℓ = 60 et 240 (2, 4 ; au-dessus à 1 440 : 32), les
+    autres au-dessus (8, 16) ; ℓ = 1 égal à la cible ; autres : {hôte : FIV par ℓ} imposés."""
+    return {h: m(*autres.get(h, (1, 2, 4, 32) if j < n_bas else (1, 8, 16, 32))) for j, h in enumerate(HOTES)}
+
+
+class TestBordE1(unittest.TestCase):
+    PRM_B = dict(PRM, calibration=dict(K_, ell=[1, 60, 240, 1440]))         # grille scellée : 1/10, 50, 4 320
+
+    def constat(self, point, moy, cible=None):
+        return calib_fiv.bord(self.PRM_B, point, moy, cible or cible_bord(), calib_fiv.contexte(K_))
+
+    def test_parametres_bord(self):
+        """Point (8) : e1.bord = {ell : 60, hotes : 6}, source citant le point (8) et sa précision. Mutations M-15F-01
+        (seuil 5), M-15F-02 (ℓ minimal 30)."""
+        b = PRM["e1"]["bord"]
+        self.assertEqual((b["ell"], b["hotes"]), (60, 6))
+        self.assertTrue(all(x in b["source"] for x in ("point (8)", "précision d'adjudication", "six des dix")))
+
+    def test_bord_par_les_residus(self):
+        """Seconde condition, précision d'adjudication : C1 sans coordonnée extrême ; ℓ retenus ≥ 60 : 60 et 240 (1 440
+        non gardé, 1 hors du seuil) ; 6 hôtes négatifs à 60 et à 240 : au bord ; 5 : non ; 6 dont un négatif à 60
+        seulement (2, 16), un négatif à 240 seulement (8, 4), un nul à 60 (4, 4) : 5 chaque fois, non au bord.
+        Mutations M-15F-03 (au moins un ℓ au lieu de chacun), M-15F-04 (ℓ > 60), M-15F-05 (résidu ≤ 0), M-15F-06
+        (garde ignorée : 1 440 compté), M-15F-07 (ℓ < 60 comptés), M-15F-08 (seuil strict)."""
+        b = self.constat(P0, modele_bord(6))
+        self.assertEqual((b["extremes"], b["ells"], b["hotes"], b["sur"], b["au_bord"]), ([], [60, 240], 6, 10, True))
+        self.assertEqual((self.constat(P0, modele_bord(5))["hotes"], self.constat(P0, modele_bord(5))["au_bord"]),
+                         (5, False))
+        for x in ((1, 2, 16, 32), (1, 8, 4, 32), (1, 4, 4, 32)):
+            b = self.constat(P0, modele_bord(6, **{HOTES[0]: x}))
+            self.assertEqual((b["hotes"], b["au_bord"]), (5, False), x)
+
+    def test_bord_par_les_coordonnees(self):
+        """Première condition : φ = 1/10 ; κ = 50 et τ_D = 4 320 : au bord sans hôte négatif ; plus petites valeurs de
+        la grille (1/100, 5, 60) : non. Mutations M-15F-09 (extrêmes au minimum), M-15F-10 (« et » au lieu de
+        « ou »)."""
+        for point, ext in (((Fraction(1, 10), Fraction(5), 60), [("φ", Fraction(1, 10))]),
+                           ((Fraction(1, 100), Fraction(50), 4320), [("κ", 50), ("τ_D", 4320)]), (P0, [])):
+            b = self.constat(point, modele_bord(0))
+            self.assertEqual((b["extremes"], b["hotes"], b["au_bord"]), (ext, 0, bool(ext)))
+
+    def test_bord_sans_vacuite(self):
+        """Aucun ℓ ≥ 60 gardé : liste vide, aucun hôte ne satisfait la condition (pas de vérité vide : Q-SI-1) ; hôte à
+        F_u indéfini parmi les six négatifs : non compté (Q-SI-2). Mutations M-15F-11 (condition vide tenue),
+        M-15F-12 (F_u indéfini compté)."""
+        b = self.constat(P0, modele_bord(10), cible_bord((True, False, False, False)))
+        self.assertEqual((b["ells"], b["hotes"], b["au_bord"]), ([], 0, False))
+        c = cible_bord()
+        c[HOTES[0]] = [dict(x, fiv=None) for x in c[HOTES[0]]]
+        self.assertEqual(self.constat(P0, modele_bord(6), c)["hotes"], 5)
+
+    def test_ligne_bord(self):
+        """(8)(iv) : ligne nommée, écrite à la main. Mutation M-15F-13 (verdict inversé)."""
+        b = self.constat((Fraction(1, 10), Fraction(50), 60), modele_bord(6))
+        self.assertEqual(calib_fiv.ligne_bord("calme", b),
+                         "[BORD E1] « calme » : C1 = (φ = 1/10, κ = 50, τ_D = 60) ; coordonnées extrêmes : φ = 1/10, "
+                         "κ = 50 ; ℓ retenus ≥ 60 : 60, 240 ; hôtes à résidu négatif à chacun de ces ℓ : 6 sur 10 "
+                         "(seuil 6) ; au bord : OUI")
+        b = self.constat(P0, modele_bord(1), cible_bord((True, False, False, False)))
+        self.assertEqual(calib_fiv.ligne_bord("stress", b),
+                         "[BORD E1] « stress » : C1 = (φ = 1/100, κ = 5, τ_D = 60) ; coordonnées extrêmes : aucune ; "
+                         "ℓ retenus ≥ 60 : aucun ; hôtes à résidu négatif à chacun de ces ℓ : 0 sur 10 (seuil 6) ; au "
+                         "bord : NON")
+
+    def test_bord_dans_selection(self):
+        """(8)(i) : selection rend le constat du point C1 (non de C2), C1 inchangé même au bord (grille réduite : τ_D =
+        60 extrême) ; aucune seconde sélection. Mutations M-15F-14 (bord de C2), M-15F-15 (C1 remplacé au bord)."""
+        u = par_hote(P1={"a": m(1, 4, 4)}, P3={"b": m(1, None, 9)}, P4={"a": m(2, 2, 4)})
+        s = choisir(reduit(), cible3(), {p: m(1, 2, 8) for p in (None, P1, P2, P3, P4)}, moyennes_u=u)["calme"]
+        self.assertEqual((s["C2"], s["C1"], s["bord"]["C1"], s["bord"]["extremes"], s["bord"]["au_bord"]),
+                         (P1, P2, P2, [("κ", 50), ("τ_D", 60)], True))
+
+    def test_bord_derniers_hotes_du_format(self):
+        """C-2 de la G2 de SIM-INTEG : les six hôtes négatifs à 60 et à 240 sont les six derniers du format (okx
+        compris), les quatre premiers au-dessus : 6 sur 10, au bord ; okx remis au-dessus : 5, non. Mutation MR-26 du
+        réviseur (dernier hôte ignoré)."""
+        bas = {h: (1, 2, 4, 32) for h in HOTES[4:]}
+        b = self.constat(P0, modele_bord(0, **bas))
+        self.assertEqual((HOTES[-1], b["hotes"], b["sur"], b["au_bord"]), ("okx", 6, 10, True))
+        b = self.constat(P0, modele_bord(0, **dict(bas, okx=(1, 8, 16, 32))))
+        self.assertEqual((b["hotes"], b["au_bord"]), (5, False))
+
+    def test_bord_selection_grille_scellee(self):
+        """C-3 de la G2 de SIM-INTEG : selection sur la grille scellée (64 points), ℓ 1, 60 et 240 tous gardés, dix
+        hôtes à F_u = 1, 4, 8 ; C2 = (1/10, 5, 60), seul point de critère nul ; C1 = (1/50, 10, 240), six hôtes à
+        moitié de F_u à 60 et à 240 (Q₁ = 12·(ln 2)²), tous les autres points à quatre fois F_u pour les dix hôtes
+        (Q₁ = 80·(ln 2)²) : constat de C1, sans coordonnée extrême, 6 hôtes, au bord ; avec les moyennes de C2 (quatre
+        fois F_u) il ne le serait pas. Mutation MR-10 du réviseur (moyennes de C2 sous l'étiquette C1)."""
+        f, prm = Fraction, dict(PRM, calibration=dict(K_, ell=[1, 60, 240]))
+        g, c1, c2 = calib_fiv.grille(prm), (f(1, 50), f(10), 240), (f(1, 10), f(5), 60)
+        cible = [{"ell": e, "fiv": f(x), "garde": True} for e, x in ((1, 1), (60, 4), (240, 8))]
+        unites = {"calme": {h: [dict(c) for c in cible] for h in HOTES}}
+        moy = {p: m(1, 4, 8) if p == c2 else m(1, 16, 32) for p in [None] + g}
+        u = {p: {"calme": {h: m(1, 2, 4) if p == c1 and h in HOTES[2:8] else m(1, 4, 8) if p == c1 else
+                           m(1, 16, 32) for h in HOTES}} for p in g}
+        s = choisir(prm, cible, moy, unites, u)["calme"]
+        b = s["bord"]
+        self.assertEqual((s["C2"], s["C1"], b["C1"], b["extremes"], b["ells"], b["hotes"], b["au_bord"]),
+                         (c2, c1, c1, [], [60, 240], 6, True))
+
+
 if __name__ == "__main__":
     unittest.main()

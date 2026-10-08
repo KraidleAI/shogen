@@ -9,8 +9,8 @@ grille, critère (logarithmes par Decimal.ln, correctement arrondi, sous le cont
 choix de C2 et de C1. SB-15b (ajout daté du G0 du 2026-10-05 15:05:43 UTC, point (3)) : calendrier d'E1, positions
 présentes = masque mesuré de J28 versé par PLAN-S2BIS-2 ; SB-15c : masque appliqué après la génération ; SB-15e
 (point (1)) : C1 = point de Q₁ minimal sur les FIV_u de fiv_unites.txt (convention du milieu des logs et e1.ell_c1
-retirées, point (7)). Entiers et rationnels seuls, sauf les logarithmes des
-critères : aucun flottant, aucune puissance."""
+retirées, point (7)) ; SB-15f (point (8)) : bord de la grille, constaté par une ligne nommée par strate. Entiers et
+rationnels seuls, sauf les logarithmes des critères : aucun flottant, aucune puissance."""
 import hashlib
 import re
 from decimal import ROUND_HALF_EVEN, Context, Decimal
@@ -261,6 +261,34 @@ def _rang(item) -> tuple:
     return v, kappa, tau, phi
 
 
+def bord(prm: dict, c1, moy: dict, cible: dict, ctx) -> dict:
+    """Bord de la grille dans une strate (point (8), précision d'adjudication comprise) : coordonnées de C1 égales à la
+    valeur extrême de leur grille (plus grands φ, κ, τ_D d'e1 : 1/10, 50, 4 320 au G0) ; ℓ retenus ≥ e1.bord.ell : ℓ de
+    calibration.ell dont la garde de fiv_unites.txt est tenue à toutes les lignes de la strate ; hôtes de `cible`
+    (hôtes du format) à F_u défini et à résidu ln F̄_u,C1(ℓ) − ln F_u(ℓ) < 0 (Decimal.ln, contexte de r1) à chacun de
+    ces ℓ, aucun s'il n'y en a aucun ; au bord si une coordonnée est extrême ou si au moins e1.bord.hotes hôtes
+    satisfont la condition. Constat seul, aucune seconde sélection (8)(i). Rend {"C1", "extremes", "ells", "hotes",
+    "sur", "ell_min", "seuil", "au_bord"}."""
+    e, ells = prm["e1"], prm["calibration"]["ell"]
+    g = (("φ", [Fraction(*x) for x in e["phi"]]), ("κ", [Fraction(x) for x in e["kappa"]]), ("τ_D", e["tau_D"]))
+    ext = [(nom, v) for (nom, xs), v in zip(g, c1) if v == max(xs)]
+    js = [j for j, ell in enumerate(ells) if ell >= e["bord"]["ell"] and all(xs[j]["garde"] for xs in cible.values())]
+    n = sum(1 for h, xs in cible.items() if js and all(
+        xs[j]["fiv"] is not None and ctx.subtract(_ln(moy[h]["fiv"][j], ctx), _ln(xs[j]["fiv"], ctx)) < 0 for j in js))
+    return {"C1": c1, "extremes": ext, "ells": [ells[j] for j in js], "hotes": n, "sur": len(cible),
+            "ell_min": e["bord"]["ell"], "seuil": e["bord"]["hotes"], "au_bord": bool(ext) or n >= e["bord"]["hotes"]}
+
+
+def ligne_bord(strate: str, b: dict) -> str:
+    """Ligne nommée du bord (point (8)(iv)), une par strate, écrite par le script, jamais par une lecture humaine :
+    C1, coordonnées extrêmes, ℓ retenus ≥ e1.bord.ell, nombre d'hôtes qui satisfont la condition, verdict."""
+    return (f"[BORD E1] « {strate} » : C1 = (φ = {b['C1'][0]}, κ = {b['C1'][1]}, τ_D = {b['C1'][2]}) ; coordonnées "
+            "extrêmes : " + (", ".join(f"{n} = {v}" for n, v in b["extremes"]) or "aucune") + f" ; ℓ retenus ≥ "
+            f"{b['ell_min']} : " + (", ".join(str(x) for x in b["ells"]) or "aucun") + " ; hôtes à résidu négatif à "
+            f"chacun de ces ℓ : {b['hotes']} sur {b['sur']} (seuil {b['seuil']}) ; au bord : "
+            + ("OUI" if b["au_bord"] else "NON"))
+
+
 def selection(prm: dict, cible: dict, moyennes: dict, unites: dict, moyennes_u: dict) -> dict:
     """C2 et C1 de chaque strate : cible = {strate : points d'EP du pool e1.pool} ; moyennes = {point de la grille, ou
     None pour C0 (sortie d'E1 complète exigée ; C0 n'entre plus dans C1) : {strate : moyenne() de I_t}} ; unites =
@@ -268,7 +296,8 @@ def selection(prm: dict, cible: dict, moyennes: dict, unites: dict, moyennes_u: 
     {strate : {hôte : moyenne() de D*(u) sur les positions présentes}}}, réplications du point (celles de C2). C2 =
     point de critère minimal (E-S-38, inchangé) ; C1 = point de Q₁ minimal (point (1)) ; égalités : _rang ; point à
     critère indéfini écarté de C2 (Q-T4-10), à Q₁ indéfini écarté de C1. Rend {strate : {"C2", "C1", "criteres" :
-    {point : critère}, "Q1" : {point : Q₁}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés}}. Point absent, C0
+    {point : critère}, "Q1" : {point : Q₁}, "residus" : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés, "bord" : constat
+    de bord(), C1 inchangé}}. Point absent, C0
     compris : E1/point ; strate de la cible sans courbe pour un point ou pour C0, sans FIV_u, ou sans moyennes par hôte
     pour un point : E1/strate (O-7 de la G2 de la tranche 4) ; aucun critère défini, aucun Q₁ défini, ou aucun (u, ℓ)
     retenu dans la strate : E1/indefini."""
@@ -286,6 +315,7 @@ def selection(prm: dict, cible: dict, moyennes: dict, unites: dict, moyennes_u: 
             raise commun.Refus("E1/indefini", f"strate {s} : aucun critère, aucun Q₁ défini, ou aucun (u, ℓ) retenu")
         c2, c1 = min(d2, key=_rang)[1], min(d1, key=_rang)[1]
         out[s] = {"C2": c2, "C1": c1, "criteres": crit, "Q1": q,
+                  "bord": bord(prm, c1, moyennes_u[c1][s], unites[s], ctx),
                   "residus": [ctx.subtract(_ln(x, ctx), _ln(c["fiv"], ctx))
                               for x, c in zip(moyennes[c2][s]["fiv"], cs) if c["garde"]]}
     return out
