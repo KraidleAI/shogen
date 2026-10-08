@@ -29,8 +29,13 @@ PLAGE = (WS[2], WS[4])
 # (P2P ligne à ligne : insertions seules, docs/G1-lot-B-SEG-2-bloc1.md) ; lot A : a4ffc3e5…f649a5 ; puis au
 # sous-lot B-b (blocs 3 et 6 ; avant b054a0f4…69ac01e ; P2P texte : docs/G1-lot-B-sensibilite.md) ; puis au
 # sous-lot POOLEE-b (bloc 3 : famille et strate poolée ; avant 9518d21b…4b62a92 ; P2P texte :
-# docs/G1-lot-POOLEE-strate-poolee.md).
-SHA_BASE_SANS_OPTION = "a3b5f0f80a80c6d3ca1452a05137104a6c82928ecac0dad9e631cf894906f954"
+# docs/G1-lot-POOLEE-strate-poolee.md) ; puis au lot B-DEP-2 (bloc 3 : z_bloc par strate et
+# A(window-dependence) ; avant a3b5f0f8…906f954 ; P2P texte : docs/G1-lot-B-DEP-2-bloc3.md) ; puis au
+# sous-lot CRITERE-a2 (bloc 3 : famille, section règle ; avant aec8409c…c20b6bd ; P2P texte :
+# docs/G1-lot-CRITERE-regle.md) ; puis au sous-lot CRITERE-b2 (bloc 6 : ligne d'entrées du drapeau 2 ;
+# avant 8e01c22f…27cf13b ; même journal) ; puis au sous-lot D5-AMEND-b (bloc 1 : fenêtres sautées ; bloc 3 :
+# traitements de l'annexe D.5 ; avant ac530cec…bcf8 ; P2P texte : docs/G1-lot-D5-AMEND-descriptifs.md).
+SHA_BASE_SANS_OPTION = "a7f5cbfda5295a25e5c4dfa8b1700843af96fc92e3b77dbfc2be632fa72bb544"
 SHA_CONTROL_SCELLE = "351f51b2e4b7421b4ee286c27465cde239124d6edd70c0e550741d22f83366ff"
 HARNESS = os.path.dirname(os.path.dirname(os.path.abspath(report.__file__)))
 

@@ -956,50 +956,42 @@ def cluster_lm_correlations(partition, markers, readings, pool, w, sigma_by_clas
 # ── Le drapeau 2 (§5.6) — tri-état, consomme la matrice de co-écarts M1b ────────
 
 def drapeau_2(r1_out, partition, lm_out) -> dict:
-    """« Co-défaillance observée non expliquée par les axes R2 » (§5.6 / 04 §3).
-    Tri-état : LEVÉ (z ≥ 2,33 ∧ k_eff = k nominal) / ÉTEINT (z publié mais < 2,33 ou
-    k_eff < k nominal) / NON ÉVALUABLE (z non publié par la garde §5.4, ou k_eff non
-    évaluable). Quand LEVÉ, localise l'excès sur les paires INTER-CLUSTERS via la
-    matrice de co-écarts complète de M1b (lm.pair_phi, n11 = co-écarts)."""
-    k_eff = partition["k_eff"]
-    k_nom = partition["k_nominal"]
-
-    # z publié par strate (max sur les strates ; None si aucune ne publie de z)
-    z_by_strate = {}
-    for st, blk in r1_out.get("strates", {}).items():
-        if blk.get("z") is not None:
-            z_by_strate[st] = blk["z"]
-    z_published = len(z_by_strate) > 0
-    z_max = max(z_by_strate.values()) if z_published else None
-    z_signif = z_published and z_max >= SEUIL_Z
-
+    """« Co-défaillance observée non expliquée par les axes R2 » (§5.6 / 04 §3), aligné sur la règle
+    SHOGEN-CRITERE-R1-1 (ADR-0028 §1 bis.1 pt 10) : « R1 discrimine » = r1.regle_critere(r1_out), qui ne lit
+    que r1_out["strates"] (strate poolée hors des entrées). LEVÉ ⇔ VRAI et k_eff = k nominal du segment
+    (hôtes distincts du pool), k_eff qui n'est pas une borne supérieure ; ÉTEINT ⇔ FAUX, ou VRAI avec k_eff
+    < k nominal ; NON ÉVALUABLE ⇔ k_eff non évaluable (contrôlé d'abord, comme en v0 : CV2-35),
+    « R1 discrimine » NON ÉVALUABLE, ou VRAI avec une borne supérieure de k_eff égale à k nominal (égalité
+    non établie, 04 §4.1 ; revue G2, Q-G2-1, option a). Signal sur
+    A(axis-coverage), jamais la règle. Quand VRAI, localise l'excès sur les paires INTER-CLUSTERS via la
+    matrice de co-écarts complète de M1b (lm.pair_phi, n11 = co-écarts). k nominal_s : flux du pool de
+    chaque strate (D1 cas b)."""
+    k_eff, k_nom, rg = partition["k_eff"], partition["k_nominal"], r1.regle_critere(r1_out)
+    d, rej = rg["r1_discrimine"], rg["rejette"]
+    out = {"r1_discrimine": d, "rejette": rej, "k_eff": k_eff, "k_nominal": k_nom,
+           "k_nominal_strates": {st: len(b["per_source"]) for st, b in r1_out.get("strates", {}).items()}}
     if k_eff is None:
-        return {"etat": "non_evaluable", "z_max": z_max, "k_eff": None,
-                "k_nominal": k_nom,
+        return {**out, "etat": "non_evaluable",
                 "raison": "k_eff non évaluable (axe ASN non mesuré/incomplet) — "
                           "le drapeau exige une partition évaluable (§5.6)"}
-    if not z_published:
-        return {"etat": "non_evaluable", "z_max": None, "k_eff": k_eff,
-                "k_nominal": k_nom,
-                "raison": "aucun z de pool publié (garde §5.4 : historique insuffisant) "
-                          "— co-défaillance non testable ; ni levé ni éteint"}
-
-    clean_partition = (k_eff == k_nom)
-    if z_signif and clean_partition:
-        # localisation : paires inter-clusters (ici tout hôte est son propre cluster)
-        loc = _localize_intercluster(partition, lm_out)
-        return {"etat": "leve", "z_max": z_max, "k_eff": k_eff, "k_nominal": k_nom,
-                "raison": (f"z_max={z_max} ≥ {SEUIL_Z} AVEC partition sans recouvrement "
-                           f"(k_eff={k_eff}=k nominal) : les axes R2 ne capturent pas le "
-                           "mode commun (§5.6 / 04 §3) — signal de refus côté politique"),
-                "localisation_inter_clusters": loc}
-    reason = ("z publié mais < 2,33 (pas de co-défaillance significative)"
-              if not z_signif else
-              f"k_eff={k_eff} < k nominal={k_nom} : recouvrement R2 mesuré explique "
-              "au moins en partie la co-défaillance (déclencheur v0 non réuni)")
-    loc = _localize_intercluster(partition, lm_out) if z_signif else None
-    return {"etat": "eteint", "z_max": z_max, "k_eff": k_eff, "k_nominal": k_nom,
-            "raison": reason, "localisation_inter_clusters": loc}
+    if d == "NON ÉVALUABLE":
+        return {**out, "etat": "non_evaluable", "raison": "« R1 discrimine » NON ÉVALUABLE (règle "
+                "SHOGEN-CRITERE-R1-1, bloc 3) — co-défaillance non qualifiable ; ni levé ni éteint"}
+    loc, vrai = (_localize_intercluster(partition, lm_out) if d == "VRAI" else None,
+                 f"« R1 discrimine » VRAI (strate(s) : {', '.join(rej)})")
+    kt = f"≤ {k_eff} (borne supérieure)" if partition.get("k_eff_is_upper_bound") else f"= {k_eff}"
+    if d == "VRAI" and k_eff == k_nom and partition.get("k_eff_is_upper_bound"):     # G2 Q-G2-1, option (a)
+        return {**out, "etat": "non_evaluable", "localisation_inter_clusters": loc, "raison": (
+            f"{vrai} mais k_eff {kt} : l'égalité à k nominal du segment n'est pas établie (hôte(s) non "
+            "attribué(s), 04 §4.1) — ni levé ni éteint")}
+    if d == "VRAI" and k_eff == k_nom:
+        return {**out, "etat": "leve", "localisation_inter_clusters": loc, "raison": (
+            f"{vrai} AVEC k_eff = {k_eff} = k nominal du segment : les axes R2 ne capturent pas le mode "
+            "commun (§5.6 / 04 §3) — signal sur A(axis-coverage), jamais la règle")}
+    return {**out, "etat": "eteint", "localisation_inter_clusters": loc, "raison": (
+        f"{vrai} mais k_eff {kt} < k nominal du segment = {k_nom} : recouvrement R2 mesuré explique au "
+        "moins en partie la co-défaillance" if d == "VRAI" else
+        "« R1 discrimine » FAUX : le modèle d'indépendance n'est rejeté dans aucune strate testée (bloc 3)")}
 
 
 def _cluster_of_flux(partition) -> dict[str, int]:

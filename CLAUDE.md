@@ -1,5 +1,8 @@
 # Shogen — instructions Claude
 
+> **SESSION CLOUD OU NOUVELLE SESSION : lis d'abord `docs/PASSATION-CLOUD.md`** (passation du 2026-10-02 :
+> état exact, où reprendre — la partie 2 de S2 —, règles autosuffisantes, ce qui n'existe que sur le poste local).
+
 ## Référentiel qualité (obligatoire, non discrétionnaire — 2026-08-12)
 Ce dépôt est régi par le corpus « Compliance et ingénierie logicielle et architecturale »
 (C:\Users\KACIMI\compiliance et ingénierie locielle et architecturale\docs\) :
