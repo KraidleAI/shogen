@@ -16,7 +16,10 @@ ligne lance, celui du commit (sha256 consigné dans tree.sha256), doit être cel
 à la lecture ; il est lancé en mode isolé (-I : aucun module posé à côté de lui par le commit n'est importé).
 SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : la commande `suite`, que l'outil lance par -m unittest sans
 le vérificateur, est refusée avant tout run si la racine de sa suite porte une entrée au nom d'un module standard
-(`masques`) ; pour les commandes de JOBS, le vérificateur la refuse lui-même."""
+(`masques`) ; pour les commandes de JOBS, le vérificateur la refuse lui-même. Règle d'usage
+(SHOGEN-S2BIS-ENREG-ANCRE-1, OUT-2c) : `tools/README.md` ; la comparaison des vérificateurs ne vaut que si l'outil
+tourne depuis un arbre dont le vérificateur a été relu, et elle est triviale lancée depuis l'arbre du commit
+enregistré."""
 from __future__ import annotations
 
 import argparse
