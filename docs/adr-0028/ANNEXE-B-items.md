@@ -1276,3 +1276,11 @@ Items **fermés** : SHOGEN-S2BIS-PAIRES-1 (paires lues sur pièce et recomptées
 | SHOGEN-S2BIS-CHAINLINK-PARAMS-1 | unité du seuil de déviation inférée ; `data.chain.link` non lu (429) ; agrégateurs d'USDC et d'USDT récents (≈ 25 tours en phase 4) : paramètres à relire au paquet | orch. | paquet (E-CA-10) | une relecture, refus nommé en cas d'écart [inféré] | PROPOSITION §13 ; AVIS §6 risque 3 |
 | SHOGEN-S2BIS-PJ-BRUIT-1 | bruit de P_j sur des historiques stable/stable non mesuré ; seuil de 0,5 % scellé (l.212) | orch. | G0 de REJEU-DECROCHAGES, à lancer avant le sceau | une mesure au rejeu [inféré] | AVIS Q-CA-12 |
 | SHOGEN-S2BIS-CADENCE-AGREG-1 | cadence des agrégateurs pour ETH et les stables à mesurer (horodatages seuls) par un script séparé, hors du lanceur du lot CA | orch. | avant le sceau | ≈ 40 lignes, une exécution, versement daté [inféré] | AVIS Q-CA-11 |
+
+## B.82 Amendement daté du 2026-10-08 22:42:53 UTC (heure produite par `date -u`) : décision de l'investisseur sur l'usage des sources (INV-1 = A ; question 13 révisée)
+
+Décision verbatim : « option A, on utilise toutes les sources qu'on veut sans restriction, aucune. » Portée : ajout daté du même jour à l'ADR-0029 et au G0 de CALIB-ACTIFS. Items **fermés** : SHOGEN-S2BIS-LICENCES-API-1 (conditions des sources lues et consignées le 2026-10-08 ; aucune source retirée pour ce motif, décision de l'investisseur) ; SHOGEN-S2BIS-SECONDE-VAGUE-1 (option A : aucune seconde vague). SHOGEN-S2BIS-VAGUE2-CALIB-1 n'est pas formé.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-S2BIS-CONDITIONS-DECLAREES-1 | les conditions d'usage lues des sources (restrictions de republication, d'usage commercial, d'indices) ne sont pas suivies à la lettre, par décision de l'investisseur ; ce que le paquet et la publication en disent reste à écrire | orch. ; requis : investisseur | G0 du paquet, avant le sceau | une phrase de limite et une liste datée des conditions lues [inféré] | décision du 2026-10-08 ; synthèse licences et abonnements |

@@ -40,3 +40,5 @@ lieu de guillemets (ce n'est pas une citation bibliographique ; S-G5 lit les gui
 6. **Items** : formés, précisés ou fermés selon le §13 de la proposition et l'avis (annexe B, bloc B.81).
 7. **Réservé à l'investisseur** [INV] : INV-1, INV-2 ; toute dépense (avis juridique, licence) ; aucune place n'est contactée
    sans son accord écrit.
+
+*Ajout daté du 2026-10-08 22:42:53 UTC (décision de l'investisseur, verbatim : « option A, on utilise toutes les sources qu'on veut sans restriction, aucune. »)* : INV-1 = **A** ; aucune source retirée au titre de ses conditions d'usage (question 13 révisée, ajout daté du même jour à l'ADR-0029). L'épinglage et le lancement unique du lot CA n'attendent plus que le code CA-0 à CA-6 et sa G2, le sens des horodatages établi à CB-7 et les ajouts datés déjà versés. La liste des places de calibration est celle de l'option A (six places, SOURCES-HISTORIQUES §1).
