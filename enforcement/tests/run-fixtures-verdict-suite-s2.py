@@ -46,7 +46,10 @@ quitte sys.path avant tout import qu'un fichier posé à côté masquerait (runn
 script) et le serveur exécute la source du vérificateur, jamais un .pyc de son __pycache__ ; I-01 à I-03, copies du
 runner où json.py, secrets.py ou ce .pyc sont posés ; I-04, subprocess.py posé à côté du vérificateur. Sortie : 0 tout
 passe (CAS cas), 1 un cas échoue ou le vérificateur rompt pendant un cas, 3 erreur (vérificateur illisible au
-chargement compris)."""
+chargement compris). SHOGEN-S2BIS-SUITE-RESUME-FORGE-1 (OUT-2e) : F-01 à F-09, `accord` sur des comptes écrits ici ;
+F-10 à F-14, `main` sur des suites qui forgent leur résumé (os._exit(0), flux réécrit et atexit, compte au nonce
+deviné), dont un .pyc non vérifié remplacerait un module de test, ou qui lisent sys.path (comme sous -m unittest) ;
+E-01 à E-05 jugés aussi par `accord`."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage, avant que le dossier du
 import sys                  # script entre dans sys.path ; il en sort ici, avant tout autre import (I-01, I-02)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
@@ -186,7 +189,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 109                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 123                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -236,8 +239,8 @@ def factice(d, corps, nom="test_f.py", n=1):
 W = tempfile.mkdtemp(prefix="verdict_cas_")
 try:
     def e(nom, corps, attendu, plancher=1, fichier="test_f.py", environ=None, n=1):
-        err, _out, code = v.lancer(factice(os.path.join(W, nom[:4]), corps, fichier, n), environ)
-        cas(nom, v.verdict(err, code, plancher), attendu)
+        err, _out, code, compte, nonce = v.lancer(factice(os.path.join(W, nom[:4]), corps, fichier, n), environ)
+        cas(nom, v.verdict(err, code, plancher) + v.accord(err, compte, nonce), attendu)     # OUT-2e : compte réel
     e("E-01 suite factice conforme", "    pass", None)
     e("E-02 os._exit(0) avant le résumé (MT-9)", "    def test_x(self):\n        os._exit(0)", "résumé final absent")
     e("E-03 saut à motif autre (R8)", "    def test_x(self):\n        self.skipTest('autre motif')", "ne nomme pas")
@@ -286,6 +289,62 @@ try:
     cas("M-05 masques : noms de modules standard seuls, pris avant le premier point (json.abi3.so), triés", [] if (
         v.masques(masquee("M-05", "unittest.py", "json.py", "json.abi3.so", "commun.py", "unittest_notes.md",
                           "README.md")) == ["json.abi3.so", "json.py", "unittest.py"]) else ["écart"], None)
+    N, PL = "a" * 32, v.PLANCHER                # SUITE-RESUME-FORGE-1 (OUT-2e) : nonce du run et comptes écrits ici
+    for nom, compte, attendu in (
+            ("F-01 compte réel d'accord avec le résumé (Ran plancher, deux sautés) : conforme", f"{N} {PL} 0 0 2 0 0",
+             None),
+            ("F-02 compte réel absent (programme de test arrêté avant sa fin)", None, "compte réel absent"),
+            ("F-03 compte réel sans le nonce du run (écrit avant lui, ou rejoué)", f"{'b' * 32} {PL} 0 0 2 0 0",
+             "sans le nonce"),
+            ("F-04 compte réel à six champs", f"{N} {PL} 0 0 2 0", "sans le nonce"),
+            ("F-05 désaccord : lancés", f"{N} {PL - 1} 0 0 2 0 0", "désaccord"),
+            ("F-06 désaccord : un échec réel sous un résumé OK", f"{N} {PL} 1 0 2 0 0", "désaccord"),
+            ("F-07 désaccord : une erreur réelle sous un résumé OK", f"{N} {PL} 0 1 2 0 0", "désaccord"),
+            ("F-08 désaccord : sautés", f"{N} {PL} 0 0 1 0 0", "désaccord"),
+            ("F-09 désaccord : échec attendu et succès inattendu", f"{N} {PL} 0 0 2 1 1", "désaccord")):
+        cas(nom, v.accord(sortie(), compte, N), attendu)
+
+    def forgee(rep, *lignes):
+        """Suite factice sous W/rep : un module de test (lignes)."""
+        os.makedirs(os.path.join(W, rep, "tests"))
+        open(os.path.join(W, rep, "tests", "__init__.py"), "w").close()
+        with open(os.path.join(W, rep, "tests", "test_f.py"), "w", encoding="utf-8") as f:
+            f.write(chr(10).join(lignes) + chr(10))
+        return os.path.join(W, rep)
+    ROUGE, DEUX = ["import atexit, os, sys, unittest", "", "", "class T(unittest.TestCase):", "    def test_a(self):",
+                   "        self.fail('rouge')", ""], ["--aucun-saut", "--egal", "--plancher", "2"]
+    FORGE = "sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 2 tests in 0.001s' + chr(10) * 2 + 'OK' + chr(10))"
+    for nom, lignes, motif in (
+            ("F-10 résumé forgé puis os._exit(0) dans un test (RESUME-FORGE-1) : sortie 1, compte réel absent", [
+                *ROUGE, "    def test_z(self):", "        " + FORGE, "        sys.stderr.flush()",
+                "        os._exit(0)"], "compte réel absent"),
+            ("F-11 flux réécrit (FAILED devient OK), sortie forcée à 0 par atexit : sortie 1, désaccord", [
+                *ROUGE, "    def test_z(self):", "        pass", "", "", "class F:", "    def __init__(self, f):",
+                "        self.f = f", "", "    def write(self, s):", "        return self.f.write(s.replace('FAILED', "
+                "'OK').replace(' (failures=1)', ''))", "", "    def flush(self):", "        self.f.flush()", "", "",
+                "sys.stderr = F(sys.stderr)", "atexit.register(os._exit, 0)"], "désaccord"),
+            ("F-12 compte écrit par un test au nonce deviné (0…0), résumé forgé, os._exit(0) : sortie 1, refus", [
+                *ROUGE, "    def test_z(self):", "        with open(os.path.join(__import__('__main__').t, "
+                "'compte'), 'x', encoding='utf-8') as f:", "            f.write('0' * 32 + ' 2 0 0 0 0 0')",
+                "        " + FORGE,
+                "        sys.stderr.flush()", "        os._exit(0)"], "sans le nonce")):
+        r = v.main([forgee(nom[:4], *lignes), *DEUX])
+        cas(nom, [] if (r, motif in trace()) == (1, True) else [f"code {r} : {trace()}"], None)
+    MARQUE_U = os.path.join(W, "F-13-marque")       # F-13 : .pyc non vérifié d'un module de test, vert et marqué
+    d = forgee("F-13", *ROUGE, "    def test_z(self):", "        pass")
+    with open(os.path.join(W, "F-13.py"), "w", encoding="utf-8") as f:
+        f.write(chr(10).join(["import unittest", f"open({MARQUE_U!r}, 'a').close()", "", "",
+                              "class T(unittest.TestCase):", "    def test_a(self):", "        pass", "",
+                              "    def test_z(self):", "        pass", ""]))
+    py_compile.compile(os.path.join(W, "F-13.py"), importlib.util.cache_from_source(os.path.join(d, "tests",
+                       "test_f.py")), doraise=True, invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+    r = v.main([d, *DEUX])
+    cas("F-13 .pyc non vérifié d'un module de test (vert, marqué), source rouge : jamais exécuté, sortie 1", [] if (
+        r, os.path.exists(MARQUE_U)) == (1, False) else [f"code {r}, .pyc exécuté : {os.path.exists(MARQUE_U)}"], None)
+    r = v.main([forgee("F-14", *ROUGE[:5], "        self.assertNotIn('', sys.path)", "", "    def test_z(self):",
+                       "        self.assertEqual(sys.path[0], os.getcwd())"), *DEUX])
+    cas("F-14 racine de la suite en tête de sys.path en chemin absolu, '' absent (comme -m unittest) : conforme",
+        [] if r == 0 else [f"code {r} : {trace()}"], None)
     PAS = ["PLANCHER = 406", "def verdict(*a, **k):"]          # RUNNER-SORTIE-1 : vérificateur rompu pendant V-01
     T = os.path.join(W, "transcript")        # RUNNER-REJEU-1 : canal du vérificateur réel, recopié par R-09a (D7)
     CAPTURE = ["import os, threading", "_r, _w = os.pipe()", "_s = os.dup(1)", "os.dup2(_w, 1)",

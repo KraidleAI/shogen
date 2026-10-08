@@ -25,6 +25,14 @@ découverte, qui met la racine en tête de sys.path (-I ne l'écarte pas).
 SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : lancé en script, le vérificateur retire son dossier de sys.path avant tout
 import ; forme équivalente à -I pour ce dossier, sans -E : PYTHONDEVMODE, PYTHONWARNINGS et PYTHONHASHSEED restent lus
 (mesuré sous 3.10 à 3.13 : -I les ignore, -X dev et -W error en ligne de commande restent tenus).
+SHOGEN-S2BIS-SUITE-RESUME-FORGE-1 (OUT-2e) : le texte de la suite n'est plus cru seul. AMORCE, code du vérificateur
+passé par -c, fait ce que fait python -B -m unittest discover -s tests -t . -v (racine en tête en chemin absolu,
+sys.argv[0], codes de sortie de unittest), écarte tout .pyc de l'arbre (sys.pycache_prefix vers un dossier vide), puis,
+au retour de unittest.main, écrit dans un fichier neuf du vérificateur le compte de l'objet résultat avec le nonce du
+run (secrets, reçu sur stdin) ; `accord` exige ce compte, ce nonce, et l'accord du résumé (lancés = Ran, sautés = k,
+le reste nul). Limite : AMORCE tourne dans le processus des tests ; un test écrit pour viser ce mécanisme (qui lit le
+nonce et le fichier dans la mémoire du processus, ou réécrit l'objet résultat) forge encore le compte : la lecture
+humaine du diff des tests reste nécessaire.
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage ; le dossier du script
@@ -32,13 +40,37 @@ import sys                  # quitte sys.path avant tout autre import (un subpro
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
     del sys.path[0]
 import re
+import secrets
+import shutil
 import subprocess
+import tempfile
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 PLANCHER = 412      # tests de la suite après OUT-2d du lot OUT-2 (2026-10-08 ; 408 après OUT-2b) ; un lot
                     # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
                     # (--egal) ; l'abaisser desserre la gate : décision datée seulement
-SUITE = ["-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]
+SUITE = ["discover", "-s", "tests", "-t", ".", "-v"]                   # arguments de unittest, lancé par AMORCE
+AMORCE = chr(10).join([                 # SUITE-RESUME-FORGE-1 (OUT-2e) : python -m unittest, plus le compte réel
+    "import os, sys",
+    "if sys.path[:1] == ['']:",
+    "    sys.path[0] = os.getcwd()",                                    # comme -m : la racine en tête, chemin absolu
+    "n, t = sys.stdin.buffer.readline().decode('utf-8').rstrip(chr(10)).split(' ', 1)",
+    "import unittest",
+    "sys.pycache_prefix = os.path.join(t, 'pyc')",                      # aucun .pyc de l'arbre n'est lu (F-13)
+    "sys.argv[0] = os.path.basename(sys.executable) + ' -m unittest'",
+    "",
+    "",
+    "class R(unittest.TextTestRunner):",
+    "    def run(self, test):",
+    "        r = super().run(test)",
+    "        with open(os.path.join(t, 'compte'), 'x', encoding='utf-8') as f:",
+    "            f.write(' '.join(map(str, [n, r.testsRun, *map(len, (r.failures, r.errors, r.skipped,",
+    "                                                              r.expectedFailures, r.unexpectedSuccesses))])))",
+    "        return r",
+    "",
+    "",
+    "unittest.main(module=None, testRunner=R)",
+    ""])
 FIN = re.compile(r"\n-{70}\nRan (\d+) tests? in \d+\.\d+s\n\n(OK(?: \(skipped=(\d+)\))?)\n*\Z")
 SAUT = re.compile(r" \.\.\. skipped (['\"])(.*)\1$", re.M)
 
@@ -69,11 +101,36 @@ def masques(harnais: str) -> list:
     return sorted(x for x in os.listdir(harnais) if x.split(".")[0] in sys.stdlib_module_names)
 
 
+def accord(texte: str, compte, nonce: str) -> list:
+    """SUITE-RESUME-FORGE-1 (OUT-2e) : motifs de refus du compte réel `compte` (ligne écrite par AMORCE après le
+    retour du programme de test : nonce, lancés, échecs, erreurs, sautés, échecs attendus, succès inattendus ; None :
+    absente) face au résumé final du flux `texte` ; liste vide : d'accord. Résumé absent : refusé par `verdict`."""
+    if compte is None:
+        return ["compte réel absent : le programme de test n'est pas allé à sa fin (os._exit, signal), le résumé "
+                "n'est pas cru"]
+    x, m = compte.split(" "), FIN.search(texte)
+    if len(x) != 7 or x[0] != nonce or not all(re.fullmatch("[0-9]+", y) for y in x[1:]):
+        return [f"compte réel illisible, ou sans le nonce du run (écrit avant lui, ou forgé) : {compte[:90]!r}"]
+    if m and x[1:] != [m[1], "0", "0", m[3] or "0", "0", "0"]:
+        return [f"résumé en désaccord avec le compte réel (lancés, échecs, erreurs, sautés, échecs attendus, succès "
+                f"inattendus : {' '.join(x[1:])}) : Ran {m[1]}, sautés {m[3] or 0}"]
+    return []
+
+
 def lancer(harnais: str, environ=None) -> tuple:
-    """Suite -v dans `harnais`, environnement `environ` (défaut : os.environ) sans VARIABLE ; (stderr, stdout, code)."""
+    """Suite -v dans `harnais` par AMORCE, environnement `environ` (défaut : os.environ) sans VARIABLE ; (stderr,
+    stdout, code, compte, nonce) : compte, ligne écrite par AMORCE au nonce du run, None si absente."""
     env = {k: x for k, x in (os.environ if environ is None else environ).items() if k != VARIABLE}
-    p = subprocess.run([sys.executable, *SUITE], cwd=harnais, capture_output=True, env=env)
-    return p.stderr.decode("utf-8", "replace"), p.stdout.decode("utf-8", "replace"), p.returncode
+    n, t, compte = secrets.token_hex(16), tempfile.mkdtemp(prefix="verdict_compte_"), None
+    try:
+        p = subprocess.run([sys.executable, "-B", "-c", AMORCE, *SUITE], cwd=harnais, capture_output=True, env=env,
+                           input=f"{n} {t}{chr(10)}".encode("utf-8"))
+        if os.path.isfile(os.path.join(t, "compte")):
+            with open(os.path.join(t, "compte"), encoding="utf-8", errors="replace") as f:
+                compte = f.read()
+    finally:
+        shutil.rmtree(t, ignore_errors=True)
+    return p.stderr.decode("utf-8", "replace"), p.stdout.decode("utf-8", "replace"), p.returncode, compte, n
 
 
 CLE = re.compile("([a-z-]+):(?: (.*))?")
@@ -157,10 +214,10 @@ def main(argv: list) -> int:
         print(f"verdict-suite-s2 : refus : {masque} à la racine de {harnais} masque la bibliothèque standard pour -m "
               "unittest (sys.stdlib_module_names) : suite non lancée", file=sys.stderr)
         return 1
-    err, out, code = lancer(harnais)
+    err, out, code, compte, n = lancer(harnais)
     sys.stdout.write(err + out)
     sys.stdout.flush()
-    refus = verdict(err, code, plancher, variable, egal)
+    refus = verdict(err, code, plancher, variable, egal) + accord(err, compte, n)          # OUT-2e : compte réel
     for r in refus:
         print(f"verdict-suite-s2 : refus : {r}", file=sys.stderr)
     if not refus:
