@@ -34,6 +34,8 @@ _VSPEC = importlib.util.spec_from_file_location("verdict_reference", os.path.joi
 verif = importlib.util.module_from_spec(_VSPEC)         # vérificateur du dépôt, chargé ici : AMORCE de référence
 _VSPEC.loader.exec_module(verif)
 SUITE = [sys.executable, "-B", "-c", verif.AMORCE, "discover", "-s", "tests", "-t", ".", "-v"]     # OUT-2i : AMORCE
+DRAPEAUX = [*["-X", "dev"][:2 * bool(os.environ.get("PYTHONDEVMODE"))], *(x for w in os.environ.get(
+    "PYTHONWARNINGS", "").split(",") if w for x in ("-W", w))]          # OUT-2j : rendus aux enfants -I, écrits ici
 SHA = "ab" * 32
 GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
@@ -366,7 +368,7 @@ class TestOracleRecord(unittest.TestCase):
                                            journaux=os.path.relpath(jx))
             run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
             self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
-                             (0, [sys.executable, "-I", *essai, jx], f"argv {essai[2:] + [jx]}\n"))   # -I : OUT-2d
+                             (0, [sys.executable, "-I", *DRAPEAUX, *essai, jx], f"argv {essai[2:] + [jx]}\n"))
             for commit, arret, noms in ((ko, True, ["suite"]), (ko, False, ["suite", "essai"]),
                                         (ok, True, ["suite", "essai"])):
                 chemin = orc.enregistrer(tempfile.mkdtemp(dir=self.d), "cp-2", "claude-opus-5-5", dep, commit,
@@ -415,8 +417,8 @@ class TestOracleRecord(unittest.TestCase):
                 {**base, ".github/workflows/gates.yml": c4}])
         chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
         rec = json.loads(Path(chemin).read_text(encoding="utf-8"))
-        ligne = [sys.executable, "-I", "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut", "--egal",
-                 "--plancher", "1"]                                 # -I : OUT-1b (lot R-1)
+        ligne = [sys.executable, "-I", *DRAPEAUX, "-B", "enforcement/verdict-suite-s2.py", "{}", "--aucun-saut",
+                 "--egal", "--plancher", "1"]                       # -I : OUT-1b (lot R-1) ; DRAPEAUX : OUT-2j
         self.assertEqual((code, [(r["nom"], r["arbre"], r["commande"], r["exit"]) for r in rec["runs"]]), (0, [
             ("suite-s2bis", ".", [x.format("s2bis") for x in ligne], 0),
             ("suite-sim-bis", ".", [x.format("scripts/sim-bis") for x in ligne], 0)]))
@@ -471,7 +473,8 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(d)), avant)
         c, code = orc.enregistrer(d, "G2", a, dep, cache, ("suite-s2bis",))
         run = json.loads(Path(c).read_text(encoding="utf-8"))["runs"][0]
-        self.assertEqual((code, run["exit"], run["commande"][:4]), (1, 1, [sys.executable, "-I", "-B", cle]))
+        self.assertEqual((code, run["exit"], run["commande"][:4 + len(DRAPEAUX)]),
+                         (1, 1, [sys.executable, "-I", *DRAPEAUX, "-B", cle]))
         p = self.copie(d, chemin, "autre.json", lambda r: r["tree"]["sha256"].update({cle: hashlib.sha256(
             faux).hexdigest()}))
         with self.assertRaisesRegex(ValueError, r"^refus \(vérificateur\) : "):
@@ -540,7 +543,7 @@ class TestOracleRecord(unittest.TestCase):
             chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, isole, ("essai",))
         run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
         self.assertEqual((code, run["commande"], Path(d, run["sortie"]["chemin"]).read_text(encoding="utf-8")),
-                         (0, [sys.executable, "-I", *essai], '["--produire", "essai"]' + nl))
+                         (0, [sys.executable, "-I", *DRAPEAUX, *essai], '["--produire", "essai"]' + nl))
 
     def test_racine_de_s2_harness_masquee_refusee_pour_toute_commande(self):
         """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : la production met la racine s2-harness en tête de sys.path
@@ -687,6 +690,32 @@ class TestOracleRecord(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "absent[.]py.* — refus$"):
                 orc.enregistrer(d, "G2", a, self.depot, self.c1)
         self.assertEqual(sorted(os.listdir(d)), avant)
+
+    def test_drapeaux_de_l_environnement_rendus_aux_enfants_isoles(self):
+        """SHOGEN-S2BIS-ENREG-DRAPEAUX-1 (OUT-2j) : un enfant isolé (-I, donc -E) ignore PYTHONDEVMODE et
+        PYTHONWARNINGS ; l'outil les lui rend en ligne de commande (-X dev si PYTHONDEVMODE n'est pas vide, un -W par
+        filtre de PYTHONWARNINGS, filtres vides omis, dans l'ordre) : l'enfant voit sys.flags.dev_mode et
+        sys.warnoptions comme un enfant non isolé du même environnement (référence lancée ici, sans -I) ; commande
+        consignée écrite à la main. Rougit si : drapeaux absents, PYTHONDEVMODE vide pris pour posé, PYTHONDEVMODE non
+        vide autre que « 1 » (« 0 », que CPython lit comme posé) pris pour absent, filtre vide passé, ordre changé."""
+        d, dep, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-drapeaux"), chr(10)
+        imprime = nl.join(["import sys", "print(sys.flags.dev_mode, sys.warnoptions)", ""])
+        (commit,) = depot(dep, [{**OK, "s2-harness/tools/rendu_unique.py": imprime.encode()}])
+        essai = ["-B", "tools/rendu_unique.py"]
+        for env, drapeaux in (({"PYTHONDEVMODE": "1", "PYTHONWARNINGS": "error,,ignore::ResourceWarning"},
+                               ["-X", "dev", "-W", "error", "-W", "ignore::ResourceWarning"]),
+                              ({"PYTHONDEVMODE": "0", "PYTHONWARNINGS": ""}, ["-X", "dev"]),   # non vide : posé (C-1)
+                              ({"PYTHONDEVMODE": "", "PYTHONWARNINGS": ""}, [])):
+            with mock.patch.dict(os.environ, env), mock.patch.dict(orc.COMMANDES, {"essai": ("s2-harness", essai)}):
+                chemin, code = orc.enregistrer(tempfile.mkdtemp(dir=d), "G2", "claude-opus-5-5", dep, commit,
+                                               ("essai",))
+                reference = subprocess.run([sys.executable, "-B", "-c", imprime], capture_output=True,
+                                           text=True).stdout
+            run = json.loads(Path(chemin).read_text(encoding="utf-8"))["runs"][0]
+            vu = Path(os.path.dirname(chemin), run["sortie"]["chemin"]).read_text(encoding="utf-8")
+            with self.subTest(env=env):
+                self.assertEqual((code, run["commande"], vu, reference.split()[0]),
+                                 (0, [sys.executable, "-I", *drapeaux, *essai], reference, str(bool(drapeaux))))
 
 
 if __name__ == "__main__":

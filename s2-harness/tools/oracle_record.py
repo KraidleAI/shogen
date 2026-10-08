@@ -20,8 +20,9 @@ le vérificateur, est refusée avant tout run si la racine de sa suite porte une
 (SHOGEN-S2BIS-ENREG-ANCRE-1, OUT-2c) : `tools/README.md` ; la comparaison des vérificateurs ne vaut que si l'outil
 tourne depuis un arbre dont le vérificateur a été relu, et elle est triviale lancée depuis l'arbre du commit
 enregistré. SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : toute commande autre que `suite` est lancée en mode isolé (-I) ;
--I implique -E (mesuré sous 3.10 à 3.13) : ces commandes ignorent PYTHONHASHSEED, PYTHONPATH, PYTHONDEVMODE et
-PYTHONWARNINGS de l'environnement consigné, que seule `suite` applique ; racine s2-harness masquée refusée pour toute
+-I implique -E (mesuré sous 3.10 à 3.13) : ces commandes ignorent PYTHONHASHSEED et PYTHONPATH de l'environnement
+consigné, que seule `suite` applique, et PYTHONDEVMODE et PYTHONWARNINGS, qui leur sont rendus en ligne de commande
+depuis OUT-2j (`drapeaux`, SHOGEN-S2BIS-ENREG-DRAPEAUX-1) ; racine s2-harness masquée refusée pour toute
 commande qui y tourne ; bytecode committé (__pycache__, .pyc) refusé ; VERIF exécuté depuis sa source.
 SHOGEN-S2BIS-MASQUES-LECTURE-1 (OUT-2f) : la lecture refuse (masque) un arbre qui porte un masque à la racine de la
 suite d'un run, ou du bytecode, que l'outil qui l'a écrit l'ait vu ou non (E7 de la G2 d'OUT-2).
@@ -101,6 +102,15 @@ def tests_lances(texte: str) -> list:
 def consigne(environ) -> dict:
     """Valeurs des variables consignées, None si non posée."""
     return {k: environ.get(k) for k in ENV}
+
+
+def drapeaux(environ) -> list:
+    """SHOGEN-S2BIS-ENREG-DRAPEAUX-1 (OUT-2j) : drapeaux qui rendent à un enfant isolé (-I, donc -E) ce que
+    l'environnement `environ` demande et que -E ignore : PYTHONDEVMODE non vide, -X dev ; PYTHONWARNINGS, un -W par
+    filtre, dans l'ordre, filtres vides omis (découpe de CPython, Python/initconfig.c). Sans drapeau équivalent
+    (PYTHONHASHSEED, PYTHONIOENCODING…), rien n'est rendu ; PYTHONPATH reste écarté (OUT-2d)."""
+    return [*["-X", "dev"][:2 * bool(environ.get("PYTHONDEVMODE"))],
+            *(x for w in environ.get("PYTHONWARNINGS", "").split(",") if w for x in ("-W", w))]
 
 
 def liste_blanche() -> tuple:
@@ -274,8 +284,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
         verif = charger_verif() if "suite" in commandes else None     # OUT-2i : AMORCE de VERIF, refus avant tout run
         for i, c in enumerate(commandes):
             sous, args = COMMANDES[c][0], lignes.get(c, COMMANDES[c][1])
-            cmd = [sys.executable, *["-I"][:c != "suite"], *(journaux if x == JOURNAUX else verif.AMORCE if x == AMORCE
-                                                             else x for x in args)]
+            cmd = [sys.executable, *(["-I", *drapeaux(os.environ)] if c != "suite" else []), *(
+                journaux if x == JOURNAUX else verif.AMORCE if x == AMORCE else x for x in args)]
             sortie = f"{nom}.{i}-{c}.out"
             n, t = (secrets.token_hex(16), tempfile.mkdtemp(prefix="oracle_compte_")) if c == "suite" else (None, None)
             try:                                     # OUT-2i : nonce et dossier du compte sur stdin, comme le job
