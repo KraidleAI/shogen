@@ -6,7 +6,9 @@ composant vide, barre oblique inverse ni retour chariot ; chemin interdit, *.jso
 DETTES-T4) : l.1-10 et l.12 de sim-niveau, fichiers jamais versés (sorties du lot SIM-NIVEAU restées sur le poste
 local), lignes gardées à la clôture de SHOGEN-SIM-SOMMES-1 (04beacd) parce que le paquet les cite par numéro ; admises
 tant que le fichier manque et que ces lignes jointes par un saut de ligne ont le sha256 écrit ; toute autre ligne
-absente est refusée. Fichier non listé : compté, non refusé (un SHA256SUMS scelle ce qu'il nomme). Usage : python3 -B
+absente est refusée. Fichier non listé : compté, non refusé (un SHA256SUMS scelle ce qu'il nomme). Nom exact
+`SHA256SUMS` seul (L-1, DT4-c) : SHA256SUMS.raw, SHA256SUMS.copies, SHA256SUMS-ECHANTILLONS.txt sont hors du contrôle,
+manifestes de copies dont aucun fichier listé n'a été versé (aucun rejeu possible). Usage : python3 -B
 docs-sha256sums.py <racine> ; 0 conforme, 1 refus (motifs sur stderr), 3 erreur (jamais un refus)."""
 import hashlib
 import os

@@ -41,7 +41,8 @@ class DocsSha256sums(unittest.TestCase):
     def test_conforme(self):
         """Deux modes (espace, *), sous-dossier listé, fichier non listé (compté, non refusé) : conforme."""
         code, out, err = controler(self.arbre({"docs/a/SHA256SUMS": ABC + "  x.md" + NL + VIDE + " *s/v.txt" + NL,
-                                               "docs/a/x.md": "abc", "docs/a/s/v.txt": "", "docs/a/R.md": "n"}))
+                                               "docs/a/x.md": "abc", "docs/a/s/v.txt": "", "docs/a/R.md": "n",
+                                               "docs/c/SHA256SUMS.raw": VIDE + "  absent.md" + NL}))  # L-1 : hors nom
         self.assertTrue(code == 0 and "1 SHA256SUMS, 2 ligne" in out and "1 fichier(s) non listé(s)" in out, err + out)
         self.refuse({"docs/a/SHA256SUMS": VIDE + "  x.md" + NL, "docs/a/x.md": "abc"}, "SHA256SUMS l.1", VIDE, ABC)
 

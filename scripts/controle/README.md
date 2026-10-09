@@ -38,3 +38,11 @@ dépendent des tests du harnais qu'ils importent.
 > 60 caractères consécutifs d'une ligne interdite contient un fragment et est détecté ; un extrait de 40 à 59
 > caractères ne l'est que s'il contient une fenêtre (pas de 20) ou la queue. Nouveau sha256 `4a0b8abc…` ; l'ancien
 > (`886cc676…`) reste celui des contrôles déjà versés, valables pour ce qu'ils ont contrôlé.
+
+> *Ajout daté du 2026-10-09 18:50:07 UTC (`date -u` ; lot DETTES-T4, DT4-c ; SHOGEN-DOCS-SHA256SUMS-GATE-1, annexe B.90,
+> L-1 adjugée)* : `tests/test_docs_sha256sums.py` porte les cas de `enforcement/docs-sha256sums.py` (étape du job
+> `g1-model-pinning`), qui rejoue chaque fichier nommé exactement `SHA256SUMS` sous `docs/`, hors des emplacements
+> interdits. Hors du contrôle par leur nom : `docs/adr-0029/etude-marche/carto/SHA256SUMS.raw` (37 lignes),
+> `docs/adr-0029/etude-marche/hylo/SHA256SUMS.copies` (193) et `docs/adr-0029/calib/SHA256SUMS-ECHANTILLONS.txt` (148),
+> manifestes de copies dont aucun fichier listé n'a été versé : leur rejeu échouerait sur chaque ligne (mesuré à
+> `963eba9`).
