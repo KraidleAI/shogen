@@ -193,8 +193,9 @@ def lire_entree(prm: dict, nom: str, lus=None, environ=None, racine: str = RACIN
 
 def ecrire(chemin: str, octets: bytes) -> None:
     """Fichier écrit en entier ou pas du tout, jamais par-dessus un fichier existant (E-S-48) : partiel voisin
-    « .partiel » créé en exclusif, fsync, lien dur vers `chemin` (refusé si `chemin` existe), partiel retiré ;
-    `.jsonl` refusé (E-S-06)."""
+    « .partiel » créé en exclusif, fsync, lien dur vers `chemin` (refusé si `chemin` existe), fsync du dossier après
+    le lien, partiel retiré ; `.jsonl` refusé (E-S-06). Système de fichiers sans lien dur (os.link lève une autre
+    OSError) : SORTIE/lien, rien d'écrit (SHOGEN-SIM-BIS-ECRITURE-LIEN-1, SB-11a)."""
     if chemin.lower().endswith(".jsonl"):
         raise Refus("SORTIE/jsonl", chemin)
     partiel = chemin + ".partiel"
@@ -211,6 +212,13 @@ def ecrire(chemin: str, octets: bytes) -> None:
             os.link(partiel, chemin)
         except FileExistsError:
             raise Refus("SORTIE/existe", chemin) from None
+        except OSError as e:
+            raise Refus("SORTIE/lien", f"{chemin} : lien dur refusé ({type(e).__name__})") from None
+        d = os.open(os.path.dirname(os.path.abspath(chemin)), os.O_RDONLY)
+        try:
+            os.fsync(d)
+        finally:
+            os.close(d)
     finally:
         os.unlink(partiel)
 

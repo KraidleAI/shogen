@@ -2,9 +2,11 @@
 attendus écrits à la main, empreintes par `sha256sum` ; chaque test nomme les mutations qui le rougissent. La variable
 scellée n'apparaît que dans un mapping fictif, jamais dans l'environnement d'un processus."""
 import decimal
+import errno
 import hashlib
 import json
 import os
+import stat
 import tempfile
 import unittest
 from unittest import mock
@@ -280,11 +282,15 @@ class TestSocle(unittest.TestCase):
     def test_ecrire_atomique_sans_ecrasement(self):
         """En entier, sans partiel restant ; cible existante : SORTIE/existe, contenu intact ; partiel présent :
         SORTIE/partiel-present ; `.jsonl` : SORTIE/jsonl. Mutations M-0-17 (os.replace), M-0-18 (partiel laissé),
-        M-0-19 (partiel sous un autre suffixe), M-0-43 (fsync retiré ; espion : un appel, avant le lien)."""
-        c, fsync = os.path.join(self.r, "s.json"), []
-        with mock.patch.object(os, "fsync", side_effect=lambda fd: fsync.append(os.path.exists(c))):
+        M-0-19 (partiel sous un autre suffixe), M-0-43 (fsync retiré). SB-11a (SHOGEN-SIM-BIS-ECRITURE-LIEN-1) : espion
+        (dossier ?, le dossier de la cible ?, cible présente ?) : le fichier avant le lien, puis le dossier de la cible
+        après le lien. Mutations M-11A-01 (fsync du dossier retiré), M-11A-02 (fsync du dossier avant le lien),
+        M-11A-16 (dossier courant au lieu de celui de la cible)."""
+        c, fsync, ino = os.path.join(self.r, "s.json"), [], os.stat(self.r).st_ino
+        with mock.patch.object(os, "fsync", side_effect=lambda fd: fsync.append(
+                (stat.S_ISDIR(os.fstat(fd).st_mode), os.fstat(fd).st_ino == ino, os.path.exists(c)))):
             commun.ecrire(c, b"un")
-        self.assertEqual(fsync, [False])
+        self.assertEqual(fsync, [(False, False, False), (True, True, True)])
         self.refus("SORTIE/existe", commun.ecrire, c, b"deux")
         with open(c, "rb") as f:
             self.assertEqual((f.read(), sorted(os.listdir(self.r))), (b"un", ["s.json"]))
@@ -292,6 +298,21 @@ class TestSocle(unittest.TestCase):
         self.refus("SORTIE/partiel-present", commun.ecrire, os.path.join(self.r, "t.json"), b"x")
         self.refus("SORTIE/jsonl", commun.ecrire, os.path.join(self.r, "u.jsonl"), b"x")
         self.assertEqual(sorted(os.listdir(self.r)), ["s.json", "t.json.partiel"])
+
+    def test_ecrire_sans_lien_dur(self):
+        """SHOGEN-SIM-BIS-ECRITURE-LIEN-1 (SB-11a) : sur un système de fichiers sans lien dur (os.link lève
+        PermissionError EPERM, ou OSError ENOTSUP), refus nommé SORTIE/lien, ni cible ni partiel restants. Mutations
+        M-11A-03 (seul FileExistsError rattrapé), M-11A-04 (partiel laissé sur refus), M-11A-05 (code de refus)."""
+        for e in (PermissionError(errno.EPERM, "lien"), OSError(errno.ENOTSUP, "lien")):
+            with mock.patch.object(os, "link", side_effect=e):
+                try:
+                    commun.ecrire(os.path.join(self.r, "v.json"), b"x")
+                    code = None
+                except commun.Refus as r:
+                    code = r.code
+                except OSError as r:
+                    code = type(r).__name__
+            self.assertEqual((code, os.listdir(self.r)), ("SORTIE/lien", []), e)
 
     def test_json_canonique(self):
         """Clés triées, séparateurs fixes, UTF-8 sans échappement, saut de ligne final ; flottant, même imbriqué :
