@@ -2156,3 +2156,40 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 316 tests ; plancher du job : 316, égalité exigée (`--egal`).
+
+## CB-15e (2026-10-08) : envoi HTTPS armé par `--envoi`, commande `jeton` (E-C-36)
+
+Objet : envoi de la requête à la TSA (RFC 3161 §3.4 : POST, `application/timestamp-query`, aucune redirection suivie,
+réponse 200 de 65 536 octets au plus) ; commande `jeton`, dont l'envoi n'est armé que par `--envoi` (FORMAT §16.8 ;
+ADR-0029 l.218 : sous le go écrit de l'investisseur). Aucune requête réseau réelle : serveur de boucle locale.
+Correction de la G2 de P2B (2026-10-08) : envoi borné en temps et en octets, éprouvé par une TSA de boucle locale muette
+puis bavarde (G-03, G-04) ; nonce de 64 bits tiré à chaque requête, figé par le test de la commande (G-16, C-5) ;
+contexte TLS du point d'entrée transmis, http refusé (G-17) ; champ `jeton` du `tetes`, reçu de CB-15d (FORMAT §16.5,
+§16.8).
+
+Rouge : `envoyer` et commande d'interface, 2 tests en échec d'assertion. Rouges de la correction (correction retirée du
+code, test gardé ; python3.12 -X dev -W error) : R-G03 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G04 (ROUGE D'ASSERTION
+: FAIL 1, ERROR 0) ; R-G16 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G17 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G18b
+(ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 278 | — |
+| `shogen_s2bis/collecte/entree.py` | 228 | — |
+| `tests/test_tetes.py` | 483 | 22 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (14 de la phase 1, 3 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : type de contenu faux (RFC
+3161 §3.4), réponse HTTP non 200 admise, réponse sans borne, schéma de l'URL non contrôlé, chemin de l'URL perdu, envoi
+armé sans --envoi, refus en sortie 0, jour non contrôlé, règles du descripteur non appliquées, refus du descripteur en
+sortie 1, premier `.tsr` au lieu du dernier (champ `jeton`, porté par CB-15e), `.tsr` d'un autre observateur pris (champ
+`jeton`, porté par CB-15e), `.tsr` illisible : la lecture lève (champ `jeton`, porté par CB-15e), plancher non relevé,
+C-4 : lecture au-delà du plafond, attente du corps, C-5 : nonce de 63 bits, C-4 : point d'entrée sans contexte TLS par
+défaut (http admis).
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 319 tests ; plancher du job : 319, égalité exigée (`--egal`).

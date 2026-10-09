@@ -16,12 +16,15 @@ décodeur (`decodeur`, règle `decodeur-connu`), qui lit le corps de ses lecture
 (E-C-32, E-C-33 ; FORMAT §15) : commande `secondaire`, processus de la carte et du relevé ASN ; `carte.json` contrôlé
 avec `formes.json` du pool (règles croisées : budget de débit partagé par hôte, lectures hors de δ), journal
 `secondaire` sur la grille du pool, sans sondes. CB-15c (E-C-35) : option `--depot` (dépôt des têtes, FORMAT §16) ; nom
-d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt."""
+d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt. CB-15e (E-C-36) : commande `jeton`, jeton RFC 3161 du
+jour ; l'envoi n'est armé que par `--envoi`, URL de la TSA que le déploiement ne pose que sous le go écrit de
+l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé."""
 import argparse
 import collections
 import ipaddress
 import os
 import re
+import secrets
 import sys
 
 from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, tetes
@@ -150,6 +153,26 @@ def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
                              depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync))
 
 
+def _jeton(a, tls, fsync):
+    """Commande `jeton` (CB-15e) : jour UTC de l'horloge, ou `--jour` ; observateur du descripteur scellé."""
+    try:
+        o = config.charger(a.descripteur, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
+        jour = a.jour or journal.jour(horloge() // S)
+        if not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", jour):
+            raise config.RefusConfig("CONFIG/jour", jour)
+    except (config.RefusConfig, OSError) as e:
+        print(f"jeton : refus : {e}", file=sys.stderr)
+        return 2
+    envoi = a.envoi and (lambda tsq: tetes.envoyer(a.envoi, tsq, tls))
+    try:
+        etat, nom, h = tetes.jeton(a.depot, o, jour, secrets.randbits(64), envoi, fsync)
+    except (tetes.RefusJeton, journal.ErreurJournal, OSError, ValueError) as e:
+        print(f"jeton : refus : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)
+        return 1
+    print(f"jeton : {etat} : {nom} : sha256 {h}")
+    return 0
+
+
 def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
     """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
     du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
@@ -175,7 +198,14 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
         c.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
         if nom == "pool":
             c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
+    jeton = commandes.add_parser("jeton", help="jeton RFC 3161 du jour (FORMAT §16)")
+    for option in ("--descripteur", "--depot"):
+        jeton.add_argument(option, required=True)
+    jeton.add_argument("--jour", help="jour UTC, AAAA-MM-JJ (défaut : celui de l'horloge)")
+    jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
     a = p.parse_args(argv)
+    if a.commande == "jeton":
+        return _jeton(a, tls, fsync)
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)

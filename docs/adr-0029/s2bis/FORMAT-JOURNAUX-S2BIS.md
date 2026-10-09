@@ -711,8 +711,10 @@ collecteur.
    chiffres), `TETES/champs` (observateur ou journal autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à
    10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible :
    `TETES/depot`. Champs rendus : `tetes` (têtes valides, les siennes d'abord), `refus` (`[nom, code]`), `ignores`
-   (fichiers au-delà de ces bornes), `export` (échec du dernier export ou null). Toute valeur rendue est admise par
-   l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
+   (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256}` du dernier `<observateur>-<jour>.tsr` du
+   dépôt par ordre des noms, ou null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export
+   ou null). Toute valeur rendue est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
+   (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
 6. **Enregistrement `tetes`** (CB-15c ; E-C-35) : avec un dépôt, la fenêtre qui clôt l'heure ((`ws` + w) multiple de
    3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
    lecture du dépôt (point 5), faite au relevé de l'échéance : les têtes des autres journaux sont consignées dès leur
@@ -726,4 +728,15 @@ collecteur.
    « non armé ». Armé, la réponse dont le statut (point 2) vaut 0 ou 1 et dont le jeton est lié à la requête (point 2,
    liaison) est conservée en `<observateur>-<jour>.tsr` (« émis ») ; un autre statut : refus `JETON/rejet` ; une réponse
    mal formée : `JETON/reponse` ; le jeton d'une autre requête (autre empreinte, autre nonce, sans nonce, autre
-   algorithme) : `JETON/liaison` ; dans ces trois cas, rien n'est conservé et le jour reste à demander.
+   algorithme) : `JETON/liaison` ; dans ces trois cas, rien n'est conservé et le jour reste à demander. Le sha256 du
+   `.tsr` est journalisé par le `tetes` suivant (point 5).
+8. **Commande `jeton` et envoi** (CB-15e ; E-C-36) : `python3 -m shogen_s2bis.collecte jeton --descripteur D --depot
+   DOSSIER [--jour AAAA-MM-JJ] [--envoi URL]` : jour UTC de l'horloge par défaut ; observateur du descripteur (§14.1,
+   contrôlé) ; nonce de 64 bits tiré à chaque requête (`secrets.randbits(64)`, figé par le test de la commande : C-5 de
+   la G2 de P2B ; RFC 3161 §2.4.1, « e.g., a 64 bit integer »). L'envoi n'est armé que par `--envoi`, URL https de la
+   TSA, que le déploiement ne pose que sous le go écrit de l'investisseur (ADR-0029 l.218) ; sans elle, rien ne part.
+   Armé : POST de la requête, `Content-Type: application/timestamp-query` (RFC 3161 §3.4), aucune redirection suivie ;
+   une réponse 200 d'au plus 65 536 octets passe au point 7, un autre code ou une réponse plus longue est le refus
+   `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
+   <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
+   jour refusé.

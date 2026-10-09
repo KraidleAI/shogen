@@ -8,16 +8,22 @@ Octets de référence produits hors du code (journal G1 de CB-15a) : `openssl ts
 `tetes` et export dans la fenêtre qui clôt l'heure (boucle à horloge injectée, journal relu par `chaine`, tête du point
 prise au `prec` qui le suit) ; option `--depot` et nom d'observateur au point d'entrée. CB-15d, E-C-36 : jeton du jour
 (manifeste et requête écrits à la main) ; réponses d'`openssl ts -reply` d'une TSA jetable à requêtes écrites à la main
-(G1 de C-1, clé détruite) : juste, autre empreinte, autre nonce, sans nonce ; ses têtes lues hors borne (C-2)."""
+(G1 de C-1, clé détruite) : juste, autre empreinte, autre nonce, sans nonce ; ses têtes lues hors borne (C-2). CB-15e :
+envoi par HTTP vers un serveur de boucle locale, borné en temps et en octets (G-03, G-04) ; commande `jeton` (G-16,
+G-17) ; dernier `.tsr` au `tetes`."""
 import base64
 import contextlib
 import hashlib
+import http.server
 import io
 import json
 import os
 import pathlib
+import secrets
+import socket
 import stat
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -187,7 +193,7 @@ class Depot(unittest.TestCase):
         export réussi l'efface et remplace le fichier temporaire laissé."""
         dep = tetes.Depot(os.path.join(self.d, "absent"), "o1")
         dep.exporter(WS_H, (12, A))
-        self.assertEqual(dep.lire(), {"tetes": [], "refus": [[".", "TETES/depot"]], "ignores": 0,
+        self.assertEqual(dep.lire(), {"tetes": [], "refus": [[".", "TETES/depot"]], "ignores": 0, "jeton": None,
                                       "export": "FileNotFoundError"})
 
         pannes = [OSError(5, "EIO")]
@@ -220,7 +226,7 @@ class Depot(unittest.TestCase):
         self.assertEqual(tetes.Depot(self.d, "o1").lire(),
                          {"tetes": [tete("o1", "carte", 5), tete("o2")], "refus": [[n, "TETES/" + c] for n, c in
                                                                                    refus.items()],
-                          "ignores": 0, "export": None})
+                          "ignores": 0, "jeton": None, "export": None})
 
     def test_seize_tetes_au_plus_et_enregistrement_admis_par_l_ecrivain(self):
         """Au-delà de 16 fichiers, les premiers par nom sont lus, les autres comptés ; l'enregistrement `tetes` tiré
@@ -260,8 +266,9 @@ class Branchement(Base):
         self.assertEqual([(e["type"], e.get("ws")) for e in enrs], [("ouverture", None)] + [
             (t, m(1)) for t in ("lecture", "tetes", "sante", "marqueur", "point")] + [
             (t, m(2)) for t in ("lecture", "sante", "marqueur")])
-        self.assertEqual({k: enrs[2][k] for k in ("tetes", "refus", "ignores", "export")},
-                         {"tetes": [tete("o2", seq=40, sha=B)], "refus": [], "ignores": 0, "export": None})
+        self.assertEqual({k: v for k, v in enrs[2].items() if k not in ("type", "ws", "seq", "prec")},
+                         {"tetes": [tete("o2", seq=40, sha=B)], "refus": [], "ignores": 0, "jeton": None,
+                          "export": None})
         self.assertEqual(sorted(os.listdir(d.name)), ["o1-pool.tete", "o2-pool.tete"])
         self.assertEqual(pathlib.Path(d.name, "o1-pool.tete").read_bytes(),
                          ligne_tete(tete("o1", seq=enrs[5]["seq"], sha=enrs[6]["prec"], ws=m(1))))
@@ -320,7 +327,7 @@ class Jeton(unittest.TestCase):
     def test_jeton_du_jour_non_arme_puis_emis_une_fois(self):
         """Manifeste des têtes valides du dépôt, la sienne comprise, et requête au nonce donné : octets écrits à la
         main ; sans envoi armé, rien ne part ; armé, la réponse accordée est conservée ; un jeton du jour n'est jamais
-        redemandé."""
+        redemandé ; le `tetes` de la boucle porte le dernier `.tsr` de l'observateur."""
         self.assertEqual(tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708),
                          ("non armé", "o1-2026-10-05.tsq", hashlib.sha256(self.tsq).hexdigest()))
         self.assertEqual((self.lu("o1-2026-10-05.manifeste"), self.lu("o1-2026-10-05.tsq")), (self.manifeste, self.tsq))
@@ -331,7 +338,10 @@ class Jeton(unittest.TestCase):
                          (("émis", "o1-2026-10-05.tsr", hashlib.sha256(juste).hexdigest()), [self.tsq], juste))
         self.assertEqual(tetes.jeton(self.d, "o1", "2026-10-05", 9, lambda q: envois.append(q) or juste),
                          ("déjà émis", "o1-2026-10-05.tsr", hashlib.sha256(juste).hexdigest()))
-        self.assertEqual(len(envois), 1)
+        for nom_ in ("o1-2026-10-04.tsr", "o2-2026-10-07.tsr"):                  # plus ancien ; autre observateur
+            pathlib.Path(self.d, nom_).write_bytes(b"x")
+        self.assertEqual((len(envois), tetes.Depot(self.d, "o1").lire()["jeton"]),
+                         (1, {"fichier": "o1-2026-10-05.tsr", "sha256": hashlib.sha256(juste).hexdigest()}))
 
     def test_jeton_lie_a_la_requete(self):
         """C-1 (RFC 3161 §2.2, §2.4.1) : autre empreinte, autre nonce, sans nonce, autre algorithme (OID de SHA-512
@@ -365,12 +375,108 @@ class Jeton(unittest.TestCase):
 
     def test_jeton_refuse(self):
         """Sans tête de l'observateur au dépôt : JETON/tete, rien n'est écrit ; réponse de rejet : JETON/rejet, aucun
-        `.tsr` ; réponse mal formée : JETON/reponse."""
+        `.tsr` ; réponse mal formée : JETON/reponse ; au `tetes`, un `.tsr` illisible est un refus nommé."""
         self.assertEqual(code(lambda: tetes.jeton(self.d, "o9", "2026-10-05", 1)), "JETON/tete")
         self.assertEqual(sorted(n for n in os.listdir(self.d) if not n.endswith(".tete")), [])
         for reponse, attendu in ((bytes.fromhex(REJET), "JETON/rejet"), (b"<html>", "JETON/reponse")):
             self.assertEqual(code(lambda: tetes.jeton(self.d, "o1", "2026-10-05", 1, lambda q: reponse)), attendu)
         self.assertFalse(os.path.exists(os.path.join(self.d, "o1-2026-10-05.tsr")))
+        os.mkdir(os.path.join(self.d, "o1-2026-10-09.tsr"))                     # `.tsr` illisible : refus nommé
+        self.assertEqual({k: v for k, v in tetes.Depot(self.d, "o1").lire().items() if k in ("jeton", "refus")},
+                         {"jeton": None, "refus": [["o3-pool.tete", "TETES/forme"], ["o1-2026-10-09.tsr",
+                                                                                   "TETES/lecture"]]})
+
+    def test_envoi_http_vers_la_boucle_locale(self):
+        """POST, chemin de l'URL, `Content-Type: application/timestamp-query` (RFC 3161 §3.4), corps : la requête ;
+        réponse 200 rendue ; autre code, réponse de plus de 65 536 octets, schéma inattendu : refus nommés."""
+        recus, reponses = [], [(200, ACCORDEE), (503, b"indisponible"), (302, b""), (200, bytes(65537))]
+
+        class Tsa(http.server.BaseHTTPRequestHandler):
+            def do_POST(self):
+                corps = self.rfile.read(int(self.headers["Content-Length"]))
+                recus.append((self.path, self.headers["Content-Type"], corps))
+                code_http, octets = reponses.pop(0)
+                self.send_response(code_http)
+                self.send_header("Content-Length", str(len(octets)))
+                self.end_headers()
+                self.wfile.write(octets)
+
+            def log_message(self, *a):
+                pass
+        srv = http.server.HTTPServer(("127.0.0.1", 0), Tsa)
+        self.addCleanup(srv.server_close)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        self.addCleanup(srv.shutdown)
+        url = f"http://127.0.0.1:{srv.server_port}/tsr"
+        self.assertEqual(tetes.envoyer(url, self.tsq, None), ACCORDEE)
+        self.assertEqual([code(lambda: tetes.envoyer(url, self.tsq, None)) for _k in range(3)], ["JETON/http"] * 3)
+        self.assertEqual(recus, [("/tsr", "application/timestamp-query", self.tsq)] * 4)
+        self.assertEqual([code(lambda: tetes.envoyer(u, self.tsq, c)) for u, c in ((url, entree.http.CONTEXTE), (
+            "https://127.0.0.1/tsr", None), ("ftp://x/tsr", None))], ["JETON/url"] * 3)
+
+    def test_envoi_borne_en_temps_et_en_octets(self):
+        """G-03 et G-04 de la G2 : une TSA de boucle locale qui accepte et se tait : OSError du délai (0,5 s), rendue
+        avant 2 s ; une réponse annoncée à 10^9 octets, dont 65 537 envoyés puis le silence : JETON/http aussitôt."""
+        srv, ouverts = socket.create_server(("127.0.0.1", 0)), []
+        self.addCleanup(lambda: [c.close() for c in ouverts + [srv]])
+        url = f"http://127.0.0.1:{srv.getsockname()[1]}/tsr"
+
+        def servir():
+            for corps in (b"", b"HTTP/1.1 200 OK\r\nContent-Length: 1000000000\r\n\r\n" + bytes(65537)):
+                ouverts.append(srv.accept()[0])
+                ouverts[-1].recv(4096)
+                ouverts[-1].sendall(corps)
+
+        def appel(sortie):
+            try:
+                sortie.append(code(lambda: tetes.envoyer(url, self.tsq, None, delai=0.5)))
+            except OSError as e:
+                sortie.append(type(e).__name__)
+        threading.Thread(target=servir, daemon=True).start()
+        for attendu in ("TimeoutError", "JETON/http"):
+            sortie = []
+            fil = threading.Thread(target=appel, args=(sortie,), daemon=True)
+            fil.start()
+            fil.join(2)
+            self.assertEqual(sortie, [attendu])
+
+    def test_commande_jeton(self):
+        """`jeton --descripteur D --depot P --jour J [--envoi URL]` : 0 et une ligne sur la sortie, envoi non armé ou
+        jeton émis ; 1 et un refus nommé sur la sortie d'erreur ; 2 pour un descripteur ou un jour refusé. Nonce de 64
+        bits tiré à chaque requête (G-16, C-5) ; sans `tls=`, le contexte TLS du point d'entrée va à l'envoi, et une
+        URL http y est refusée (G-17)."""
+        f, s, o = configurations(port_ferme())
+        pathlib.Path(self.d, "descripteur.json").write_text(json.dumps(o), encoding="utf-8")
+        args = ["jeton", "--descripteur", os.path.join(self.d, "descripteur.json"), "--depot", self.d]
+
+        def lancer(*plus, envoyer=None, defaut=False):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), mock.patch.object(
+                    tetes, "envoyer", envoyer or tetes.envoyer):
+                rc = entree.main(args + list(plus)) if defaut else entree.main(args + list(plus), tls=None)
+            return rc, out.getvalue(), err.getvalue()
+        with mock.patch.object(entree.secrets, "randbits", wraps=secrets.randbits) as tirage:
+            rc, out, err = lancer("--jour", "2026-10-05")
+            self.assertEqual(lancer("--jour", "2026-10-06")[0], 0)
+        self.assertEqual((rc, out.split(" : ")[:3], err, tirage.call_args_list),
+                         (0, ["jeton", "non armé", "o1-2026-10-05.tsq"], "", [mock.call(64)] * 2))
+        self.assertNotEqual(*[self.lu(f"o1-2026-10-0{j}.tsq")[56:-3] for j in (5, 6)])       # nonces tirés (G-16)
+        with mock.patch.object(entree.secrets, "randbits", return_value=0x0102030405060708):
+            rc, out, err = lancer("--jour", "2026-10-05", "--envoi", "http://127.0.0.1:9/tsr", envoyer=lambda u, q, c:
+                                  JETONS["juste"] if (u, c) == ("http://127.0.0.1:9/tsr", None) else b"")
+        self.assertEqual((rc, out, err), (0, "jeton : émis : o1-2026-10-05.tsr : sha256 " + hashlib.sha256(
+            JETONS["juste"]).hexdigest() + "\n", ""))
+        vus = []
+        lancer("--jour", "2026-10-07", "--envoi", "https://x/tsr", envoyer=lambda u, q, c: vus.append(c) or b"",
+               defaut=True)
+        rc, out, err = lancer("--jour", "2026-10-07", "--envoi", "http://127.0.0.1:9/tsr", defaut=True)
+        self.assertEqual((vus, rc, err.split(" : ")[:3]), ([entree.http.CONTEXTE], 1, ["jeton", "refus", "JETON/url"]))
+        rc, out, err = lancer("--jour", "2026-10-06", "--envoi", "http://127.0.0.1:9/tsr",
+                              envoyer=mock.Mock(side_effect=ConnectionRefusedError(111, "refus")))
+        self.assertEqual((rc, out, err.split(" : ")[:3]), (1, "", ["jeton", "refus", "ConnectionRefusedError"]))
+        self.assertEqual([lancer("--jour", j)[0] for j in ("2026-1-05", "05-10-2026")], [2, 2])
+        pathlib.Path(self.d, "descripteur.json").write_text(json.dumps({**o, "observateur": "o-1"}), encoding="utf-8")
+        self.assertEqual(lancer("--jour", "2026-10-05")[:2], (2, ""))
 
 
 if __name__ == "__main__":

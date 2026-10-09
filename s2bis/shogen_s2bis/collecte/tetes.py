@@ -11,11 +11,15 @@ l'écrivain refuserait (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1). CB-15d : jeton du 
 siennes lues d'abord, hors de la borne des autres (C-2), et requête (nonce donné par l'appelant), écrits au dépôt ;
 envoi par la fonction que donne l'appelant, seulement s'il en donne une (E-C-36) ; réponse accordée liée à la requête
 (TSTInfo : algorithme, empreinte, nonce ; RFC 3161 §2.2 ; C-1), puis conservée en `.tsr` ; la signature et le certificat
-de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/verify.sh`)."""
+de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/verify.sh`). CB-15e : envoi par HTTPS
+(RFC 3161 §3.4), armé par le point d'entrée seul, sous le go écrit de l'investisseur ; au `tetes`, le sha256 du dernier
+`.tsr` de l'observateur."""
 import hashlib
+import http.client
 import json
 import os
 import re
+import urllib.parse
 
 from shogen_s2bis.collecte import journal
 
@@ -25,10 +29,12 @@ NOM = re.compile("([a-z0-9]{1,16})-([a-z]{1,16})[.]tete")   # <observateur>-<jou
 CLES, TAILLE, NOMBRE = {"journal", "observateur", "seq", "sha256", "ws"}, 1024, 16   # octets, têtes lues au plus
 BORNES = {"seq": 10 ** 18, "ws": 10 ** 12}                  # entiers d'une tête lue : 0 ≤ v < borne
 SIGNE, TST = bytes.fromhex("2a864886f70d010702"), bytes.fromhex("2a864886f70d0109100104")   # contenus d'OID (G1)
+TSR, PLAFOND = "-[0-9]{4}-[0-9]{2}-[0-9]{2}[.]tsr", 1 << 16   # <observateur>-<jour>.tsr ; octets d'une réponse
 
 
 class RefusJeton(ValueError):
-    """Refus nommé (`code`) : JETON/empreinte, JETON/nonce, JETON/reponse, JETON/tete, JETON/rejet, JETON/liaison."""
+    """Refus nommé (`code`) : JETON/empreinte, JETON/nonce, JETON/reponse, JETON/tete, JETON/rejet, JETON/liaison,
+    JETON/url, JETON/http."""
     def __init__(self, code, detail):
         super().__init__(f"{code} : {detail}")
         self.code = code
@@ -191,13 +197,22 @@ class Depot:
 
     def lire(self):
         """Champs de l'enregistrement `tetes` : `tetes`, `refus`, `ignores` de `lire_tetes`, sauf le fichier de ce
-        journal, les têtes de l'observateur d'abord (C-2) ; `export`, échec du dernier export, ou null."""
-        r = {"tetes": [], "refus": [], "ignores": 0, "export": self.echec}
+        journal, les têtes de l'observateur d'abord (C-2) ; `jeton`, {fichier, sha256} du dernier `.tsr` de
+        l'observateur, ou null ; `export`, échec du dernier export, ou null."""
+        r = {"tetes": [], "refus": [], "ignores": 0, "jeton": None, "export": self.echec}
         try:
             r["tetes"], r["refus"], r["ignores"] = lire_tetes(self.dossier, (self.observateur, self.journal),
                                                                self.observateur)
+            jetons = sorted(n for n in os.listdir(self.dossier) if re.fullmatch(re.escape(self.observateur) + TSR, n))
         except Exception:                                           # attrape-tout : dossier absent ou illisible
             r["refus"].append([".", "TETES/depot"])
+            return r
+        if jetons:
+            try:
+                r["jeton"] = {"fichier": jetons[-1], "sha256": journal._empreinte(os.path.join(self.dossier,
+                                                                                               jetons[-1]))[0]}
+            except Exception:                                       # attrape-tout : `.tsr` illisible
+                r["refus"].append([jetons[-1], "TETES/lecture"])
         return r
 
 
@@ -239,3 +254,25 @@ def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync):
     lier(tsr, emp, nonce)                                   # C-1 : un jeton d'une autre requête n'est jamais gardé
     ecrire(dossier, f"{observateur}-{jour}.tsr", tsr, fsync)
     return "émis", f"{observateur}-{jour}.tsr", hashlib.sha256(tsr).hexdigest()
+
+
+def envoyer(url, octets, contexte, delai=10):
+    """POST de la requête à la TSA, `Content-Type: application/timestamp-query` (RFC 3161 §3.4) ; rend le corps d'une
+    réponse 200 d'au plus PLAFOND octets, sinon JETON/http ; aucune redirection suivie ; URL en https (en http si
+    `contexte` est None : boucle locale des tests), sinon JETON/url ; une OSError (réseau, délai) passe."""
+    u = urllib.parse.urlsplit(url)
+    if u.scheme != ("http" if contexte is None else "https") or not u.hostname:
+        raise RefusJeton("JETON/url", url[:80])
+    c = (http.client.HTTPConnection(u.hostname, u.port or 80, timeout=delai) if contexte is None else
+         http.client.HTTPSConnection(u.hostname, u.port or 443, timeout=delai, context=contexte))
+    try:
+        c.request("POST", u.path or "/", octets, {"Content-Type": "application/timestamp-query"})
+        r = c.getresponse()
+        corps = r.read(PLAFOND + 1)
+    except http.client.HTTPException as e:
+        raise RefusJeton("JETON/http", type(e).__name__) from None
+    finally:
+        c.close()
+    if r.status != 200 or len(corps) > PLAFOND:
+        raise RefusJeton("JETON/http", f"code {r.status}, {len(corps)} octets")
+    return corps
