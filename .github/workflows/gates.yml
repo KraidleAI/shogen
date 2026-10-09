@@ -104,6 +104,11 @@ jobs:
       - name: épinglage des modèles de l'arbre (liste blanche exacte, R-1)
         shell: bash
         run: bash enforcement/lint-model-pinning.sh .
+      # Lot DETTES-T3, DT3-B (SHOGEN-R1-FORME-RESOLUE-1, CH-4) : ligne « Modèle » des journaux G1/G2 nouveaux, égalité
+      # exacte avec la liste blanche (ou suivie de [1m]) ; cas dans la suite du job controle-unittest.
+      - name: ligne « Modèle » des journaux G1/G2 (R-1, CH-4)
+        shell: bash
+        run: python3 -B enforcement/journaux-modele.py .
 
   g3-secrets:
     # Lot D8b (2026-09-30, ADR-0028 D8 ; G0 docs/adr-0028/G0-lot-D8b.md, journal
@@ -287,4 +292,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 9
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 15
