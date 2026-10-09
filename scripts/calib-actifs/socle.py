@@ -77,6 +77,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "kraken_sha256": _par_actif(str) | {"source": str},
           "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
                         "source": str},
+          "sigma": {"facteur": "dec", "rang": [int], "pas_s": int, "source": str,
+                    "planchers_s": {"agregateur": int, "place_horodatee": int}},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 
@@ -217,3 +219,12 @@ def ecrire(dossier: str, nom: str, lignes: list) -> str:
         f.write(NL.join([ETIQUETTE, *lignes]) + NL)
     os.replace(cible + ".partiel", cible)
     return cible
+
+
+def quantile(valeurs, num: int, den: int):
+    """Valeur au rang ⌈num·N/den⌉ (1-indexé, borné à [1, N]) des valeurs triées (rang le plus proche) ; N = 0 : None.
+    Réimplémentation de scripts/plan-s2bis/regles.py l.12-16, jamais importé (Q-CA-13), croisée par le fichier
+    tests/vecteurs_regles.json."""
+    v = sorted(valeurs)
+    return v[min(max((num * len(v) + den - 1) // den, 1), len(v)) - 1] if v else None
+

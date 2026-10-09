@@ -75,6 +75,8 @@
                    ["USDT", ["binance", "bitfinex", "bitstamp", "coinbase", "kraken", "okx"], [10031, 10079, 10080]],
                    ["USDT", ["binance", "bitfinex", "coinbase", "kraken", "okx"], [10025, 10079, 10080]]],
   "source": "SH §4 (l.103-111), 2026-06-08 au 06-15 : actives par place ; minutes à 4, 3, 2 places actives (E-CA-15)"},
+ "sigma": {"facteur": "3", "rang": [99, 100], "pas_s": 60, "planchers_s": {"agregateur": 300, "place_horodatee": 30},
+  "source": "ADR-0029 l.189, ajout daté l.403 (3) ; PROPOSITION §4.6 ; planchers d'ADR-0020 (config_analyse.py l.21)"},
  "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
   "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
 }
