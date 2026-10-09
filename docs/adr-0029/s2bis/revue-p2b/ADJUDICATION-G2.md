@@ -1,0 +1,16 @@
+# Adjudication de l'orchestrateur sur la G2 de P2B (2026-10-08, après 21:59 UTC)
+Pièce d'entrée : `g2/RAPPORT-G2.md` (à lire en entier). Le brief `BRIEF-P2B.md` reste en vigueur ; aucune écriture git ; `date -u` avant toute date ; NOTES.md tenu.
+Base : **c58b997**. Série corrigée sous les mêmes noms (CB-15a … CB-15f, CB-17a … CB-17d) ; ≤ 200 lignes de code ajoutées par diff ; plancher s2bis exact ; METRIQUES à jour.
+Intégration : P2A touche les mêmes fichiers et ajoute aussi un « ## 15. » au FORMAT ; P2A passe en premier. Fais d'abord les corrections sur c58b997 ; l'orchestrateur t'enverra ensuite la série P2A corrigée, sur laquelle tu livreras une variante (tes §15 et §16 deviennent §16 et §17). Pas avant ce message.
+À corriger (liste fermée) :
+- C-1 : avant d'écrire le `.tsr`, contrôle de l'algorithme (SHA-256), de l'empreinte (sha256 du manifeste) et du nonce du TSTInfo (RFC 3161 §2.2, §2.4.1) ; tout écart ou DER illisible : refus nommé, rien conservé ; signature vérifiée hors ligne. Tests sur réponses `openssl ts -reply` (juste, autre empreinte, autre nonce, sans nonce) ; FORMAT §15.2 et §15.7 ; deux mutants.
+- C-2 : fichiers de tête de l'observateur lus d'abord, hors de la borne de 16 ; test « 16 têtes antérieures, la sienne au manifeste » ; mutant. Ferme I-8.
+- C-3 : `ws` ou `suivante` au-delà du jour de son fichier rend la ligne illisible et arrête le fichier ; la grille ne commence jamais avant le jour du premier fichier présent, moins un jour pour un segment de reprise ; tests sur les deux journaux corrompus du réviseur (sortie 0 en moins de 2 s) ; mutant.
+- C-4 : un test nommé par mutant vivant (G-01, G-03, G-04, G-16, G-17).
+- C-5 (Q-5) : nonce de 64 bits figé par le test de G-16 ; sha256 du `.tsq` et du `.manifeste` journalisés dans `tetes`.
+- C-6 (Q-8) : nom d'observateur `[a-z0-9]{1,16}`, refus nommé sinon.
+- C-7 (Q-9, Q-2) : mention « hors D-3 » sur les lignes de compte de `status` ; phrase au FORMAT : le dépôt est un dossier local, synchronisé par une unité séparée (DB-4).
+- Note de l'investisseur (2026-10-08) : l'horodatage du projet se fera chez **Certigna** (horodatage qualifié eIDAS, RFC 3161, compte et authentification) et non FreeTSA ni OpenTimestamps : n'en change pas le code ici, mais rédige l'item SHOGEN-S2BIS-TSA-CERTIGNA-1 (URL, authentification de la requête, identifiants des observateurs, déclencheur : lot 7).
+Questions : Q-1, Q-4, Q-11 adoptées ; Q-3 à DB-0 ; Q-6 par C-1 ; Q-7 : `--envoi` gardé, URL scellée et armement auditable à SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; Q-10 : item pour RB-3 ; Q-12 : au déploiement. Le gel ne précède pas la fermeture de CHRONYC-FORMAT-1. Items à rédiger : DEPOT-LIENS-1, OBSERVATEURS-LISTE-1 (volet restant), STATUS-QUEUES-1, JOURNAL-FICHIER-SPECIAL-1, ENVOI-ECHEANCE-1, l'item RB-3. Écarts E-1 à E-5 admis.
+Preuves : rouge d'assertion par test neuf ; les 30 mutants du réviseur rejoués, cinq vivants tués ; ≥ 2 mutants neufs par correction ; mode strict 3.10 à 3.13 ; runner, jobs s2bis, S2, sim-bis 194 ; xtask ; forme.
+Rendu (valeur de retour), Gate 0 en tête : diffs, tableau C-1 à C-7, mutants, matrice, lignes d'items, écarts ; aussi en section datée à la fin de `RAPPORT-GENERATEUR.md`, `SHA256SUMS` recalculé.
