@@ -13,8 +13,10 @@ S, critère collectif, variante, compte d'événements sur la suite comprimée (
 enregistrements relus d'une cellule (E-S-40, E-S-52), agrégat écrit. SB-11i : lot d'une cellule calculé en un ou
 plusieurs processus (E-S-45). SB-11q : impressions des cellules sur les 200 premières réplications : fenêtres des
 strates, F séparé en propre et hors-enveloppe par (classe, strate, hôte) ; distribution de M_j par strate et taux
-effectifs de F agrégés (SB11-IMPRESSIONS-1). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance,
-aucune fonction de libm."""
+effectifs de F agrégés (SB11-IMPRESSIONS-1). SB-11r : pannes longues rejouées par durée (N4), absences des observateurs
+par durée (N5), sauts réalisés et panne initiale visible par strate selon T_début (N9), et leurs distributions
+(SB11-IMPRESSIONS-1 ; avis Q-T2-5, Q-T3-1, Q-T3-2). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
+puissance, aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -372,7 +374,8 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
     m = calendrier.masques(cal, debut, e["t_max"])
     rep = sources.Replication(p, ep, c["fond"], nom, i, m, e["t_max"])
     etat = rep.etat()
-    q, cons = observateurs.Couche(p, c["couche"], nom, i, e["t_max"]).consolidation(etat, m)
+    cou = observateurs.Couche(p, c["couche"], nom, i, e["t_max"])
+    q, cons = cou.consolidation(etat, m)
     ret = {s: calendrier.retenues(q.evaluables, m[s], e["n"][s]) for s in st}
     pools, graine = dict(sources.classes(p)), aleas.graine_regle(p["aleas"], nom, i)
     n = {s: ret[s]["n"] for s in st}
@@ -394,7 +397,7 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
             "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
             "retraits": {cl: sorted([u, x] for (u, t), x in rt[cl].items() if t == s) for cl in rg["classes"]}}
     if i < IMPRESSIONS:
-        out["impressions"] = impressions(c, rep)
+        out["impressions"] = impressions(c, rep, cou)
     return out
 
 
@@ -464,7 +467,7 @@ def f_separe(c: dict, rep, h: str, k: int, s: str) -> tuple:
     return pr & m, ho & m
 
 
-def impressions(c: dict, rep) -> dict:
+def impressions(c: dict, rep, cou=None) -> dict:
     """Impressions d'une réplication i < IMPRESSIONS (SB11-IMPRESSIONS-1) : fenêtres de chaque strate sur T_max ;
     pour chaque classe de sources.classes, chaque strate et chaque hôte servi, [fenêtres de F propre, fenêtres de F
     hors-enveloppe] (f_separe)."""
@@ -472,7 +475,52 @@ def impressions(c: dict, rep) -> dict:
     out = {"fenetres": {s: rep.masques[s].bit_count() for s in st}, "F": {}}
     for k, (cl, pool) in enumerate(sources.classes(p)):
         out["F"][cl] = {s: {h: [x.bit_count() for x in f_separe(c, rep, h, k, s)] for h in pool} for s in st}
+    hotes, lg, d = [h for h, _f in p["calibration"]["unites"]], p["sources"]["longues"], rep.derives()
+    out["longues"] = {s: _par_duree([x for h in hotes for x in longues(c, rep, h, s)], rep.masques[s], lg) for s in st}
+    out["absences"] = _par_duree([x for o in range(p["observateurs"]["M"]) for x in absences(c, cou, o)], cou.grille,
+                                 [x for x, _n in p["observateurs"]["absences"]])
+    sauts = c["fond"]["derive"] and "sauts" in c["fond"]["derive"]["genres"]
+    out["sauts"] = [[h, x[1] < x[2], x[3]] for h, x in d["specs"].items() if sauts and x[0] == "saut"]
+    ini = (1 << min(p["sources"]["derive"]["initiale"], rep.horizon)) - 1
+    out["initiale"] = d["initiale"] and {"hote": d["initiale"], "visible": {
+        s: (ini & rep.masques[s]).bit_count() for s in st}}
     return out
+
+
+def _par_duree(segs: list, m: int, durees: list) -> dict:
+    """{durée : nombre} des segments [(a, b)] qui ont au moins une fenêtre dans m, par longueur b − a ; longueur hors
+    de `durees` (tronquée par l'horizon, ou reste d'un départ stationnaire) : « autre »."""
+    out = {}
+    for a, b in segs:
+        if (m >> a) & ((1 << (b - a)) - 1):
+            k = str(b - a) if b - a in durees else "autre"
+            out[k] = out.get(k, 0) + 1
+    return out
+
+
+def longues(c: dict, rep, h: str, s: str) -> list:
+    """Pannes longues de l'hôte h dans la strate s (E-S-11 ; N4), rejouées : composante L de
+    sources.Replication.union (taux part·M·f·p_panne, M maximum de la dérive de l'hôte ; loi sources.loi_longues ;
+    flux « longues », emplacement 0), avant l'amincissement d'une dérive ; segments [(a, b)] sur la grille."""
+    p, fo, d = c["prm"], c["fond"], rep.derives()["specs"].get(h)
+    x = (max(d[1], d[2]) if d else 1) * fo["f"] * sources.taux(rep.ep, s, h)[0]
+    r = sources.composantes(x, fo["longues"], sources.regime_valide(fo["regime"][s]))["longues"]
+    if not r:
+        return []
+    loi = sources.loi_longues(p)
+    return sources.alterner(rep.u("longues", h, s), loi, sources.pause(r, loi.moyenne), p["aleas"], rep.horizon)
+
+
+def absences(c: dict, cou, o: int) -> list:
+    """Absences D-1 de l'observateur o (E-S-17, Q-T3-2 ; N5), rejouées : renouvellement de part `absences` de la
+    couche, loi observateurs.absences, flux « obs-absences » d'indice o ; aucune pour l'observateur du repli ni sans
+    absences ; segments [(a, b)] sur la grille."""
+    op, co = c["prm"]["observateurs"], cou.couche
+    if not co["absences"] or (co["repli"] and o == op["repli"]):
+        return []
+    loi = sources.Empirique(op["absences"])
+    return sources.alterner(cou.u("obs-absences", o), loi, sources.pause(co["absences"], loi.moyenne),
+                            c["prm"]["aleas"], cou.horizon)
 
 
 def agreger_impressions(enregistrements: list) -> dict:
@@ -487,4 +535,28 @@ def agreger_impressions(enregistrements: list) -> dict:
         fen = {s: sum(x["fenetres"][s] for x in imp) for s in st}
         out["F"] = {cl: {s: {h: [Fraction(sum(x["F"][cl][s][h][j] for x in imp), fen[s]) for j in (0, 1)]
                              for h in hs} for s, hs in d.items()} for cl, d in imp[0]["F"].items()}
+        out["longues"] = {s: _distribution([x["longues"][s] for x in imp]) for s in st}
+        out["absences"] = _distribution([x["absences"] for x in imp])
+        out["sauts"] = _distribution([{"n": len(x["sauts"])} for x in imp])["n"]
+        out["initiale"] = {}
+        for e in [e for e in enregistrements if "impressions" in e]:
+            x = e["impressions"]["initiale"]
+            j = out["initiale"].setdefault(str(e["jour"]), {"n": 0, "presentes": 0, "visible": dict.fromkeys(st, 0)})
+            j["n"], j["presentes"] = j["n"] + 1, j["presentes"] + bool(x)
+            for s in st:
+                j["visible"][s] += x["visible"][s] if x else 0
+    return out
+
+
+def _distribution(comptes: list) -> dict:
+    """{clé : {nombre : réplications}} sur des comptes {clé : nombre} par réplication, une clé absente valant 0 ; clés
+    vues dans l'ordre d'apparition, nombres en texte (JSON)."""
+    out = {}
+    for c in comptes:
+        for k in c:
+            out.setdefault(k, {})
+    for k in out:
+        for c in comptes:
+            n = str(c.get(k, 0))
+            out[k][n] = out[k].get(n, 0) + 1
     return out
