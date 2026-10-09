@@ -1,20 +1,25 @@
 """Adaptateur d'oracle croisé avec RECALC-BIS, SB-13 première passe (E-S-01, E-S-51 ; SHOGEN-SIM-BIS-CONTRAT-RB6-1).
 SB-13a : épingles du paquet s2bis au commit f458980 égales aux valeurs de `git show f458980:s2bis/<chemin> | sha256sum`
 (rotation.py : 4183fbe6…, l'empreinte que cite le contre-contrôle de la tranche 3), extraction, refus nommés d'une
-épingle fausse et d'un commit absent, frontière d'E-S-01 lue par `ast`. SB-13b : chargement sous shogen_s2bis.
-Chaque test nomme les mutations qui le rougissent."""
+épingle fausse et d'un commit absent, frontière d'E-S-01 lue par `ast`. SB-13b : chargement sous shogen_s2bis. SB-13c
+(E-S-51) : o(r, u) des six vecteurs du contrat RB-6 recalculés par sha256sum et bc (journal de SB-13,
+vecteurs-rb6.txt), K^(r) écrit à la main, 100 séries synthétiques à graine fixe. Chaque test nomme les mutations
+qui le rougissent."""
 import ast
+import functools
 import hashlib
 import json
 import os
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from unittest import mock
 
 import commun
 import oracle_recalc
+import regle
 from tests import test_fitness, test_fitness_tirages
 
 PRM = commun.charger_parametres(environ={})
@@ -171,6 +176,141 @@ class TestChargement(unittest.TestCase):
         p = processus(code)
         self.assertEqual(p.stdout.strip(), "[('config/analyse.json', 'rb'), ('config/analyse.json', 'wb')]",
                          p.stderr[-300:])
+
+
+G6 = "6fce4df75bac7db6ff01817b407f6331e49ec2ebf31f02e6672d3ab8a3bc9688"  # printf %s SHOGEN-RB6-VECTEURS | sha256sum
+# (strate, r, u, n, o, R) : vecteurs du contrat RB-6 (ROTATION-S2BIS.md §5), o par sha256sum et bc ; R : plus petit R
+# de la règle (R + 1 multiple de 100, seuil entier) au moins égal à r.
+VECTEURS = (("calme", 1, "api.binance.com", 109440, 107527, 99),
+            ("stress", 9999, "ethereum-rpc.publicnode.com", 43776, 24225, 9999),
+            ("calme", 4242, "api.kraken.com", 54720, 39743, 4299), ("calme", 1, "api.coinbase.com", 7, 0, 99),
+            ("calme", 7, "api.coinbase.com", 7, 6, 99), ("calme", 1, "api.binance.com", 54720, 52807, 99))
+P = "api-pub.bitfinex.com"                       # unité non décalée des vecteurs (« - » = 0x2D précède « . » = 0x2E)
+HOTES = ("api-pub.bitfinex.com", "api.binance.com", "api.coinbase.com", "api.gemini.com", "api.kraken.com",
+         "ethereum-rpc.publicnode.com", "okx", "www.bitstamp.net")
+HOTES10 = HOTES + ("api.coingecko.com", "api.llama.fi")                   # dix unités par classe (C-4 de la G2)
+
+
+def flux(*cle) -> int:
+    """Entier de 256 bits, SHA-256 big-endian de « SB-13|<clé>|… » : graine fixe, aucun module random."""
+    return int.from_bytes(hashlib.sha256("|".join(map(str, ("SB-13",) + cle)).encode("ascii")).digest(), "big")
+
+
+def synthetique(i: int) -> tuple:
+    """Série synthétique i (0 ≤ i < 100) : (graine, strate, n, classes, première unité, R, n_s). R = 99 (i < 90), 999
+    (i < 98), 9 999 ; n = 1, 2, 3 pour i = 0, 1, 2, puis 4 à 203 (4 à 43 à R = 9 999) ; BTC : 2 à 6 hôtes (2 ou 3 à
+    R = 9 999), ETH, USDC, USDT parmi eux (ETH seul à R = 9 999) ; masques : ET de 1 à 3 tirages, les mêmes pour
+    toutes les unités d'une classe si i % 4 = 1 (séries liées) ; première unité : min du pool BTC (regle.premiere),
+    retirée de BTC si i % 5 = 3 (critère d'absorption), None et BTC vide si i % 5 = 4 ; i % 10 = 5 (dix séries) :
+    les dix hôtes de HOTES10 dans les quatre classes (C-4 de la G2 : m_t ≥ 8, plan de bits 3 de regle.paires) ;
+    n_s = n, sauf i % 6 = 5 : n < n_s ≤ 2n (C-2 de la G2)."""
+    R = 99 if i < 90 else 999 if i < 98 else 9999
+    n = (1, 2, 3)[i] if i < 3 else 4 + flux(i, "n") % (200 if R < 9999 else 40)
+    dix, k = i % 10 == 5, 2 + flux(i, "k") % (5 if R < 9999 else 2)
+    btc = sorted(HOTES10 if dix else sorted(HOTES, key=lambda h: flux(i, "h", h))[:k])
+
+    def masque(c, u):
+        x, u = (1 << n) - 1, "lie" if i % 4 == 1 else u
+        for j in range(1 + flux(i, "d", c, u) % 3):
+            x &= flux(i, "m", c, u, j)
+        return x
+    classes = {"BTC": {u: masque("BTC", u) for u in btc}}
+    for c in ("ETH", "USDC", "USDT") if R < 9999 else ("ETH",):
+        if sous := [u for u in btc if dix or flux(i, "c", c, u) % 3]:
+            classes[c] = {u: masque(c, u) for u in sous}
+    p = regle.premiere(btc)
+    if i % 5 == 3:
+        del classes["BTC"][p]
+    elif i % 5 == 4:
+        p, classes["BTC"] = None, {}
+    ns = n + 1 + flux(i, "ns") % n if i % 6 == 5 else n
+    return format(flux(i, "graine"), "064x"), ("calme", "stress")[i % 2], n, classes, p, R, ns
+
+
+@functools.lru_cache(maxsize=None)
+def croisements() -> tuple:
+    """Les 100 séries synthétiques croisées une fois par processus : ((i, entrée, écarts, réplique, RB-6), …)."""
+    out = []
+    for i in range(100):
+        g, s, n, classes, p, R, ns = e = synthetique(i)
+        out.append((i, e, *oracle_recalc.croiser(PRM, H, g, s, n, ns, classes, p, R)))
+    return tuple(out)
+
+
+class TestCroisement(unittest.TestCase):
+    def test_vecteurs_e_s_51(self):
+        """E-S-51, six vecteurs du contrat RB-6 (cinq exigés, dont o = 0 et o = n − 1) : o(r, u) de la réplique et de
+        RB-6 extrait égaux à sha256sum et bc ; deux unités, P non décalée au bit o, u au bit 0 : la rotation r porte le
+        bit 0 de u en o (sens du contrat §2.2), d'où K^(r) = S^(r) = 1 des deux côtés ; P au bit (o + 1) mod n : 0 ;
+        croiser sans écart sur les R rotations ; la sixième entrée aussi à n′ = 54 720 < n_s = 109 440 (C-2 de la G2).
+        Mutations M-13C-01 (premiere non transmise à RB-6), M-13C-02 (K_r pris dans la loi triée de complet), M-13C-03
+        (sens de rotation inversé dans regle.tourner), M-13C-04 (rotations de regle._entrees à trois séries non nulles
+        au moins), M-G2-02 (n_s transmis à RB-6), M-13C-16 (n et n_s échangés vers la réplique), M-13C-17 (rotations
+        de regle._entrees modulo n_s), M-13C-18 (o de la réplique comparé modulo n_s)."""
+        rot = H["rotation"]
+        for s, r, u, n, o, R in VECTEURS:
+            self.assertEqual((regle.decalage(G6, s, r, u, n), rot.decalage(G6, s, r, u, n)), (o, o), (s, r, u, n))
+            for bit, x in ((o, 1), ((o + 1) % n, 0)):
+                e, a, b = oracle_recalc.croiser(PRM, H, G6, s, n, n, {"BTC": {P: 1 << bit, u: 1}}, P, R)
+                self.assertEqual((e, [(y["BTC"]["K_r"][r - 1], y["BTC"]["S_r"][r - 1]) for y in (a, b)]),
+                                 ([], [(x, x), (x, x)]), (s, r, u, n, bit))
+        s, r, u, n, o, R = VECTEURS[5]
+        e, a, b = oracle_recalc.croiser(PRM, H, G6, s, n, 109440, {"BTC": {P: 1 << o, u: 1}}, P, R)
+        self.assertEqual((e, a["BTC"]["K_r"][r - 1], b["BTC"]["K_r"][r - 1]), ([], 1, 1))
+
+    def test_series_synthetiques_e_s_51(self):
+        """E-S-51, 100 séries synthétiques à graine fixe (synthetique) : aucun écart de croiser (o(r, u) de toute unité
+        décalée, K, S, K^(r), S^(r), C, C1, C_S, K_crit, moyenne, à R complet). Couverture comptée : R = 99, 999,
+        9 999 (90, 8, 2) ; 50 en calme ; première unité None (20) ou absente de BTC (20) ; n = 1 ; au moins une classe
+        à C ≤ seuil et une à C > seuil ; n_s > n (16, C-2 de la G2) ; 40 classes de dix unités, dont 22 à m_t ≥ 8 à une
+        même position (C-4). Mutations M-13C-05 (arrêt anticipé, regle.decider, au lieu de complet), M-13C-06
+        (seuil + 1 transmis à RB-6), M-13C-07 (C1 au seuil k_crit au lieu de k_crit − 1), M-13C-08 (S non suivie par la
+        réplique), M-13C-09 (K_crit de regle.complet décalé d'un rang), M-G2-13 (plan de bits 3 de regle.paires
+        faussé), M-13C-19 (termes croisés du plan 3 omis), M-13C-20 (trois plans de bits)."""
+        tout = croisements()
+        self.assertEqual([(i, e[:12]) for i, _x, e, _a, _b in tout if e], [])
+        R = [x[5] for _i, x, *_ in tout]
+        alpha = PRM["regle"]["alpha"]
+        rejets = [sum(y["C"] <= regle.seuil(x[5], alpha) for y in a.values()) for _i, x, _e, a, _b in tout]
+        self.assertEqual(([R.count(v) for v in (99, 999, 9999)], [x[1] for _i, x, *_ in tout].count("calme"),
+                          sum(x[4] is None for _i, x, *_ in tout),
+                          sum(x[4] is not None and x[4] not in x[3]["BTC"] for _i, x, *_ in tout),
+                          [x[2] for _i, x, *_ in tout].count(1), min(sum(rejets), 1),
+                          min(sum(len(a) - k for (*_r, a, _b), k in zip(tout, rejets)), 1)),
+                         ([90, 8, 2], 50, 20, 20, 1, 1, 1))
+        dix = [max(sum(m >> t & 1 for m in c.values()) for t in range(x[2])) for _i, x, *_ in tout
+               for c in x[3].values() if len(c) == 10]
+        self.assertEqual((sum(x[6] > x[2] for _i, x, *_ in tout), len(dix), sum(v >= 8 for v in dix)), (16, 40, 22))
+
+    def test_croiser_voit_les_ecarts(self):
+        """croiser voit chaque écart : RB-6 altéré en des points connus (o(3, « c.d ») et o(99, « e ») + 1 mod n,
+        R = 99 ; K, S, K^(1), S^(1), C, C_S, K_crit et moyenne + 1 ; C1 + 1 par resume ; classe ZZZ en plus) : écarts
+        exactement (BTC, clé) pour les neuf clés, (ZZZ, clé) pour les neuf, puis (o, 3, c.d) et (o, 99, e). Mutations
+        M-13C-10 (écarts des classes d'un seul côté ignorés), M-13C-11 (dernière unité décalée hors de la comparaison
+        des o), M-13C-12 (dernière rotation hors de la comparaison des o), M-13C-13 (S_r non comparé). C-1 de la G2 :
+        une unité décalée absente de BTC (g.h, en ETH seule), o(7, g.h) altéré : seul écart (o, 7, g.h). Mutations
+        M-G2-01 (o des seules unités de BTC), M-13C-14 (unités de la première classe seule), M-13C-15 (unités de
+        toutes les classes sauf la dernière)."""
+        vrai = H["rotation"]
+
+        def lois(*a):
+            sortie = vrai.lois(*a)
+            x = sortie["BTC"]
+            x.update({k: x[k] + 1 for k in ("K", "S", "C", "C_S", "K_crit", "K_moyen")},
+                     K_r=[x["K_r"][0] + 1] + x["K_r"][1:], S_r=[x["S_r"][0] + 1] + x["S_r"][1:])
+            return dict(sortie, ZZZ=x)
+        faux = types.SimpleNamespace(lois=lois, resume=lambda *a: (vrai.resume(*a)[0] + 1,) + vrai.resume(*a)[1:],
+                                     decalage=lambda g, s, r, u, n: (vrai.decalage(g, s, r, u, n)
+                                                                     + ((r, u) in ((3, "c.d"), (99, "e")))) % n)
+        e, _a, _b = oracle_recalc.croiser(PRM, dict(H, rotation=faux), G6, "calme", 4, 4,
+                                          {"BTC": {"a.b": 11, "c.d": 6, "e": 13}}, "a.b", 99)
+        cles = ("K", "S", "K_r", "S_r", "C", "C1", "C_S", "K_crit", "K_moyen")      # écrites à la main
+        self.assertEqual(e, [("BTC", k) for k in cles] + [("ZZZ", k) for k in cles] + [("o", 3, "c.d"), ("o", 99, "e")])
+        un = types.SimpleNamespace(lois=vrai.lois, resume=vrai.resume, decalage=lambda g, s, r, u, n: (
+            vrai.decalage(g, s, r, u, n) + ((r, u) == (7, "g.h"))) % n)
+        e, _a, _b = oracle_recalc.croiser(PRM, dict(H, rotation=un), G6, "stress", 5, 5,
+                                          {"BTC": {"a.b": 3}, "ETH": {"a.b": 1, "g.h": 5}}, "a.b", 99)
+        self.assertEqual(e, [("o", 7, "g.h")])
 
 
 if __name__ == "__main__":

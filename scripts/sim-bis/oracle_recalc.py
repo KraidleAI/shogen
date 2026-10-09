@@ -4,8 +4,10 @@ du paquet s2bis au commit cité (section « oracle_recalc » de parametres.json 
 son chargeur config_analyse, config/analyse.json et les tests de RB-6, lus comme texte) sont lus dans le dépôt par
 `git archive` (lecture seule, aucun verrou), extraits dans un dossier temporaire sous TMPDIR, contrôlés par sha256
 avant tout chargement (forme d'oracle_r1), puis chargés sous le nom shogen_s2bis sans toucher sys.path ; seuls ces
-fichiers peuvent être chargés. SB-13a : épingle et extraction. SB-13b : chargement. Adaptateur : jamais importé
-par le moteur (E-S-01, tests/test_fitness.py) ; ni puissance, ni hasard, ni libm (tests/test_fitness_tirages.py)."""
+fichiers peuvent être chargés. SB-13a : épingle et extraction. SB-13b : chargement. SB-13c : croiser, lois de rotation
+de la réplique (regle, mode à R complet) contre celles de RB-6 extrait sur la même entrée (E-S-51). Adaptateur :
+jamais importé par le moteur (E-S-01, tests/test_fitness.py) ; ni puissance, ni hasard, ni libm
+(tests/test_fitness_tirages.py)."""
 import atexit
 import hashlib
 import importlib
@@ -20,6 +22,7 @@ import tarfile
 import tempfile
 
 import commun
+import regle
 
 PAQUET = "shogen_s2bis"
 _CHARGE: dict = {}
@@ -89,3 +92,43 @@ def charger(prm: dict) -> dict:
     if _EPINGLE != [epingle(prm)]:
         raise commun.Refus("ORACLE/epingle", "paquet déjà chargé sous une autre épingle dans ce processus")
     return dict(_CHARGE)
+
+
+CLES = ("K", "S", "K_r", "S_r", "C", "C1", "C_S", "K_crit", "K_moyen")
+
+
+def replique(prm: dict, graine: str, strate: str, n: int, n_s: int, classes: dict, premiere, R: int) -> dict:
+    """Lois de la réplique sur l'entrée de lois() de RB-6, par classe triée (clés CLES) : la suite des (K^(r), S^(r)),
+    r = 1 … R, que reçoivent decider et complet (regle._entrees, comme deux_modes), puis le mode à R complet (E-S-29,
+    jamais l'arrêt anticipé, propre à SIM-BIS) : C, C1, C_S, K_crit et moyenne exacte K̄_rot."""
+    out = {}
+    for c in sorted(classes):
+        base, a, ks, S = regle._entrees(classes[c], premiere, graine, strate, n, n_s, prm, R, True)
+        vals = list(ks)
+        f = regle.complet(*a, vals, R, prm, S)
+        out[c] = {"K": base["K"], "S": S, "K_r": [k for k, _s in vals], "S_r": [x for _k, x in vals], "C": f["C"],
+                  "C1": f["C1"], "C_S": f["C_S"], "K_crit": f["K_crit"], "K_moyen": f["moyenne"]}
+    return out
+
+
+def recalcul(prm: dict, h: dict, graine: str, strate: str, n: int, classes: dict, premiere, R: int) -> dict:
+    """Lois de RB-6 extrait (rotation.lois) au seuil de la règle pour R (regle.seuil : SIM-BIS calcule, RB-6 reçoit ;
+    contrat ROTATION-S2BIS.md §8 pt 4) ; C1 = #{r : K^(r) ≥ k_crit − 1} par rotation.resume, k_crit de la garde
+    d'analyse.json ; S_crit et S_moyen non comparés (E-S-32 ne demande que C_S ; P-5 de l'avis de la tranche 3)."""
+    s, g, rot = regle.seuil(R, prm["regle"]["alpha"]), h["analyse"]["gardes"]["k_crit"], h["rotation"]
+    return {c: dict({k: x[k] for k in CLES if k != "C1"}, C1=rot.resume(g - 1, x["K_r"], s)[0])
+            for c, x in rot.lois(graine, strate, n, classes, premiere, R, s).items()}
+
+
+def croiser(prm: dict, h: dict, graine: str, strate: str, n: int, n_s: int, classes: dict, premiere, R: int) -> tuple:
+    """Oracle croisé (E-S-51) sur une entrée {classe: {unité: masque}} : (écarts, réplique, RB-6). Écarts : (classe,
+    clé) dont les valeurs diffèrent (CLES, classes des deux côtés), puis ("o", r, u) pour chaque r = 1 … R et chaque
+    unité décalée dont o(r, u) diffère (regle.decalage contre rotation.decalage). Mêmes noms d'unité (même chaîne
+    hachée), même première unité, même R des deux côtés (contrat §8 ; avis de la tranche 3, §4)."""
+    a, b = replique(prm, graine, strate, n, n_s, classes, premiere, R), recalcul(prm, h, graine, strate, n, classes,
+                                                                                 premiere, R)
+    ecarts = [(c, k) for c in sorted(set(a) | set(b)) for k in CLES if c not in a or c not in b or a[c][k] != b[c][k]]
+    unites, rot = sorted({u for s in classes.values() for u in s} - {premiere}), h["rotation"]
+    ecarts += [("o", r, u) for r in range(1, R + 1) for u in unites
+               if regle.decalage(graine, strate, r, u, n) != rot.decalage(graine, strate, r, u, n)]
+    return ecarts, a, b
