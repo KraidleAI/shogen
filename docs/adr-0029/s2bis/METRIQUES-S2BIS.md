@@ -2221,3 +2221,34 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 324 tests ; plancher du job : 324, égalité exigée (`--egal`).
+
+## CB-17b (2026-10-08) : `status`, état par fenêtre, rapport, strates, commande (E-C-38)
+
+Objet : fenêtres de la première admise au dernier marqueur, D-1 sans marqueur, tête du dernier enregistrement lu ;
+rapport de santé seule (FORMAT §17.3, §17.4), même sortie avec et sans `lecture` ; strates du calendrier ; commande
+`status --journal`. Correction de la G2 de P2B (2026-10-08) : « hors D-3 » sur la ligne du compte local (C-7, Q-9 ;
+FORMAT §17.4).
+
+Rouge : état, rapport et commande d'interface, 4 tests en échec d'assertion (la sortie identique avec et sans lectures
+est verte par construction sur un rapport constant : invariance). Rouges de la correction (correction retirée du code,
+test gardé ; python3.12 -X dev -W error) : R-C7a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 245 | — |
+| `shogen_s2bis/collecte/status.py` | 121 | — |
+| `tests/test_status.py` | 231 | 10 (5 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 16 mutants (15 de la phase 1, 1 neufs de la correction),
+16 tués (15 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : fenêtre sans marqueur valide,
+première fenêtre admise ignorée, tête du premier enregistrement, relevés D-3 non cumulés, santé d'une autre fenêtre,
+strates décalées, dernière fenêtre jugée sur la première, première fenêtre non comptée, disque inversé, nombre de
+fenêtres faux, fenêtres dégradées comptées valides, format de l'heure, tête sans empreinte, refus en sortie 0, plancher
+non relevé, C-7 : compte local sans « hors D-3 ».
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 329 tests ; plancher du job : 329, égalité exigée (`--egal`).

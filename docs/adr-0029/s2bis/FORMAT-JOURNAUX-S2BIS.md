@@ -762,3 +762,17 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    réponse retenue, `rcode` non nul, ou aucune réponse de type 1, A). **D-3 n'est pas jugé** : le format de la sortie
    de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1, ouvert) ; est relevé, à part, un relevé D-3
    absent, en erreur ou de code non nul.
+3. **État par fenêtre** (CB-17b) : sont jugées les fenêtres de w = 60 s (§3.1) de la première que le journal admet
+   (`suivante` de son premier enregistrement) au dernier marqueur ; une fenêtre sans marqueur vaut D-1 ; une fenêtre
+   close prend les codes de sa `sante` (point 2). Une fenêtre est **valide** si elle n'a aucun code. La tête est celle
+   du dernier enregistrement lu hors `lecture`. Limites : seuls les fichiers présents sont lus (la rétention locale de
+   7 jours en retire, ajout daté du 2026-10-04 17:03:38 UTC à l'ADR-0029, point 2) ; la grille est celle de w = 60 s.
+4. **Commande et rapport** (CB-17b) : `python3 -m shogen_s2bis.collecte status --journal DOSSIER` : sortie 0 et le
+   rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal`, ou dossier illisible). Rapport, une ligne par
+   rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC, <n> ; dernier marqueur :
+   <fin> UTC` ; `tête : seq <s>, sha256 <h>` ; `disque : <libre> octets libres sur <total>` (dernière `sante`) ;
+   `dégradations : D-1 <n> ; D-2 <n> ; D-3 non jugé (… ; relevé absent ou en erreur : <n>) ; D-4 <n> ; D-5 <n>` ;
+   `dernière fenêtre : valide` ou `dégradée (<codes>)` ; `fenêtres valides hors D-3 (compte local) : calme <n> ; stress
+   <n>` (strates : stress le samedi et le dimanche UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » : D-3 n'est pas jugé,
+   point 2, tant que SHOGEN-S2BIS-CHRONYC-FORMAT-1 est ouvert ; C-7 de la G2 de P2B, Q-9). Aucun nombre à virgule, aucun
+   statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.

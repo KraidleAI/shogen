@@ -18,7 +18,9 @@ avec `formes.json` du pool (règles croisées : budget de débit partagé par h�
 `secondaire` sur la grille du pool, sans sondes. CB-15c (E-C-35) : option `--depot` (dépôt des têtes, FORMAT §16) ; nom
 d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt. CB-15e (E-C-36) : commande `jeton`, jeton RFC 3161 du
 jour ; l'envoi n'est armé que par `--envoi`, URL de la TSA que le déploiement ne pose que sous le go écrit de
-l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé."""
+l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé.
+CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
+sur la sortie ; 1 et un refus nommé."""
 import argparse
 import collections
 import ipaddress
@@ -27,7 +29,7 @@ import re
 import secrets
 import sys
 
-from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, tetes
+from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
@@ -173,6 +175,17 @@ def _jeton(a, tls, fsync):
     return 0
 
 
+def _status(a):
+    """Commande `status` (CB-17b) : le rapport, ou un refus nommé (journal absent ou illisible)."""
+    try:
+        lignes = status.rapport(a.journal)
+    except (status.RefusStatus, OSError) as e:
+        print(f"status : refus : {e}", file=sys.stderr)
+        return 1
+    print("\n".join(lignes))
+    return 0
+
+
 def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
     """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
     du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
@@ -203,9 +216,13 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
         jeton.add_argument(option, required=True)
     jeton.add_argument("--jour", help="jour UTC, AAAA-MM-JJ (défaut : celui de l'horloge)")
     jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
+    commandes.add_parser("status", help="santé seule, lue au journal du pool, sans rien écrire").add_argument(
+        "--journal", required=True)
     a = p.parse_args(argv)
     if a.commande == "jeton":
         return _jeton(a, tls, fsync)
+    if a.commande == "status":
+        return _status(a)
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)

@@ -2,7 +2,13 @@
 (CB-1, CB-2) ; codes attendus écrits à la main d'après ADR-0029 §2.3 (D-1 sans santé ; D-2 retard de plus de 5 s ou
 lecture non partie, règle Q-C-02 de l'AVIS ; D-4 au moins 2 témoins sans réponse ; D-5 au moins 2 noms témoins non
 résolus ; D-3 non jugé : format de `chronyc` non lu sur pièce, SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; aucune ligne `lecture`
-décodée (PROPOSITION §2.4 « Status »)."""
+décodée (PROPOSITION §2.4 « Status »).
+CB-17b : état par fenêtre et rapport écrits à la main ; tête recalculée sur les octets du fichier ; strates par jour
+UTC (stress : samedi et dimanche, ADR-0029 l.196) ; sortie identique avec et sans `lecture` ; rien d'écrit ;
+commande."""
+import contextlib
+import hashlib
+import io
 import json
 import os
 import pathlib
@@ -10,7 +16,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from shogen_s2bis.collecte import journal, status
+from shogen_s2bis.collecte import entree, journal, status
 from shogen_s2bis.collecte.lecture import S, Lecture
 from tests.test_reprise import m
 
@@ -116,6 +122,109 @@ class Jugement(unittest.TestCase):
         with open(os.path.join(RACINE, "config", "analyse.json"), encoding="utf-8") as f:
             g = json.load(f)["degradation"]
         self.assertEqual((status.D2, status.D4, status.D5), (g["d2_retard_s"] * S, g["d4_echecs"], g["d5_echecs"]))
+
+
+SCENARIO = {1: None, 2: sante(retard=5 * S + 1), 4: sante(d4=[temoin("delai"), None, temoin()],
+            d5=[nom(rcode=3), nom(reponses=(("t.example.", 5, 30, "x.example."),))]),
+            5: sante(non_parties=1, d4=[temoin("reseau"), temoin(), temoin()], d5=[nom("delai"), nom()]),
+            6: "sans sante", 7: sante(retard=5 * S, d3={"erreur": "absente", "debut": 1, "fin": 2}),
+            8: sante(d3={**D3, "code": 1}), 63: sante(retard=6 * S)}
+INVALIDES = {1: ["D-1"], 2: ["D-2"], 4: ["D-4", "D-5"], 5: ["D-2"], 6: ["D-1"], 63: ["D-2"]}       # SCENARIO, à la main
+ATTENDU = ["status : journal « pool », lecture seule",
+           "fenêtres : de 2026-10-04 22:59 à 2026-10-05 00:01 UTC, 63 ; dernier marqueur : 2026-10-05 00:01 UTC",
+           "tête : seq {seq}, sha256 {sha}",
+           "disque : 1000 octets libres sur 5000",
+           "dégradations : D-1 2 ; D-2 3 ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1 ; relevé absent ou en erreur : "
+           "2) ; D-4 1 ; D-5 1",
+           "dernière fenêtre : dégradée (D-2)",
+           "fenêtres valides hors D-3 (compte local) : calme 1 ; stress 56"]
+
+
+def ecrire_journal(d, lectures=True, panne=False):
+    """Fenêtres m(1) à m(63) (22:59 le dimanche 4 octobre à 00:01 le lundi 5, UTC) : lectures (aucune, une `ok`, ou
+    trois en panne), puis `sante` selon SCENARIO (valide hors scénario), puis marqueur, sauf m(1) (aucun
+    enregistrement : trou déclaré au marqueur suivant)."""
+    jl = journal.Journal(d, "pool").ouvrir(m(0))
+    for n in range(2, 64):
+        s = SCENARIO.get(n, sante())
+        for k, lu in enumerate(lectures_de(n, panne) if lectures else []):
+            jl.ecrire("lecture", m(n), forme=f"f{k}", prevu=m(n) * S, **lu.enregistrement())
+        if s != "sans sante":
+            jl.ecrire("sante", m(n), **s)
+        jl.marqueur(m(n))
+    jl.fermer()
+
+
+def tete_du_fichier(d):
+    """(seq, sha256) de la dernière ligne du dernier fichier, sans le code du collecteur."""
+    derniere = pathlib.Path(d, "pool-2026-10-05-0.jsonl").read_bytes().split(b"\n")[-2] + b"\n"
+    return json.loads(derniere)["seq"], hashlib.sha256(derniere).hexdigest()
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d = d.name
+
+    def journal(self, nom_, **k):
+        os.mkdir(chemin := os.path.join(self.d, nom_))
+        ecrire_journal(chemin, **k)
+        return chemin
+
+
+class Etat(Base):
+    def test_jugement_par_fenetre_tete_et_releves_absents(self):
+        """Chaque fenêtre de m(1) à m(63) jugée (codes écrits à la main), y compris m(1), première admise sans
+        marqueur ; dernière santé, tête du dernier enregistrement, deux relevés D-3 absents ou en erreur (m(7),
+        m(8))."""
+        jdir = self.journal("a")
+        grille, derniere, tete, absents = status.etat(jdir)
+        self.assertEqual(grille, {m(n): INVALIDES.get(n, []) for n in range(1, 64)})
+        self.assertEqual((derniere["ws"], derniere["disque"], tete, absents),
+                         (m(63), {"total": 5000, "libre": 1000}, tete_du_fichier(jdir), 2))
+
+
+class Rapport(Base):
+    def test_sante_seule_jugee_et_comptee_par_strate(self):
+        """Rapport écrit à la main : m(1) à m(61) le dimanche (stress), m(62) et m(63) le lundi (calme)."""
+        jdir = self.journal("a")
+        seq, sha = tete_du_fichier(jdir)
+        self.assertEqual(status.rapport(jdir), [x.format(seq=seq, sha=sha) for x in ATTENDU])
+
+    def test_sortie_identique_avec_et_sans_lectures(self):
+        """PROPOSITION §2.4 « Status » : même sortie, hors la ligne de tête, sans lecture, avec une lecture `ok` ou
+        trois en panne par fenêtre."""
+        rapports = [[x for x in status.rapport(self.journal(str(i), lectures=lectures, panne=panne)) if not
+                     x.startswith("tête : ")] for i, (lectures, panne) in enumerate(((False, False), (True, False),
+                                                                                      (True, True)))]
+        self.assertEqual((rapports[1], rapports[2]), (rapports[0], rapports[0]))
+
+    def test_rien_n_est_ecrit_meme_pendant_l_ecriture(self):
+        """Le dossier du journal est le même, octet pour octet, avant et après ; `status` lit pendant que l'écrivain
+        tient le verrou, sans le prendre."""
+        jdir = self.journal("a")
+        avant = {n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}
+        self.assertEqual(status.rapport(jdir)[1], ATTENDU[1])
+        self.assertEqual({n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}, avant)
+        jl = journal.Journal(jdir, "pool").ouvrir(m(70))             # l'écrivain reprend et tient le verrou
+        self.addCleanup(jl.fermer)
+        tenu = {n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}
+        self.assertEqual(status.rapport(jdir)[1], ATTENDU[1])
+        self.assertEqual({n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}, tenu)
+
+    def test_commande_status(self):
+        """`status --journal DOSSIER` : le rapport sur la sortie, code 0 ; dossier sans journal : refus, code 1."""
+        jdir = self.journal("a")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(entree.main(["status", "--journal", jdir]), 0)
+        self.assertEqual(out.getvalue(), "\n".join(status.rapport(jdir)) + "\n")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            self.assertEqual(entree.main(["status", "--journal", self.d]), 1)
+        self.assertEqual((out.getvalue(), err.getvalue()), ("", "status : refus : STATUS/journal : aucun fichier du "
+                                                                "journal « pool »\n"))
 
 
 if __name__ == "__main__":
