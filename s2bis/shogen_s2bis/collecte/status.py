@@ -22,7 +22,7 @@ import os
 import re
 import time
 
-from shogen_s2bis.collecte import journal
+from shogen_s2bis.collecte import journal, tetes
 from shogen_s2bis.collecte.journal import LIMITE
 from shogen_s2bis.collecte.lecture import S
 
@@ -142,8 +142,7 @@ def lire_resume(chemin, observateur, jour):
     RESUME/forme (pas une ligne canonique aux clés exactes), RESUME/champs (observateur ou jour autre que le nom,
     fenêtre hors du jour ou de la grille, codes hors de CODES, en double ou non triés, aucune fenêtre). Les codes
     sont reconnus avant d'être triés : un code qui n'est pas un texte est un refus, jamais une exception."""
-    with open(chemin, "rb") as f:
-        octets = f.read(TAILLE + 1)
+    octets = tetes.lire_borne(chemin, TAILLE)                # fichier ordinaire seul, sans attente (CB-15f)
     if len(octets) > TAILLE:
         return "RESUME/taille"
     try:
@@ -164,9 +163,14 @@ def lire_resume(chemin, observateur, jour):
 def quorum(grille, depot, observateur, maintenant):
     """Lignes du compte à quorum sur les fenêtres de `grille` : résumés des autres observateurs pour les jours de la
     grille, lus strictement ; M_j = 1 si la fenêtre est valide ici, plus un par autre observateur qui la dit valide ;
-    âge (s) de chaque résumé lu, au bout de sa dernière fenêtre, à `maintenant` (µs)."""
+    âge (s) de chaque résumé lu, au bout de sa dernière fenêtre, à `maintenant` (µs). Dépôt illisible : une ligne qui
+    le dit, le compte local reste (CB-15f)."""
     jours, autres, refus = {journal.jour(ws) for ws in grille}, {}, []
-    for n in sorted(os.listdir(depot)):
+    try:
+        noms = sorted(os.listdir(depot))
+    except OSError as e:
+        return [f"quorum : dépôt illisible ({type(e).__name__})"]
+    for n in noms:
         if (x := RESUME.fullmatch(n)) and x[1] != observateur and x[2] in jours:
             try:
                 lu = lire_resume(os.path.join(depot, n), x[1], x[2])

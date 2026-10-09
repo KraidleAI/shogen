@@ -10,7 +10,9 @@ prise au `prec` qui le suit) ; option `--depot` et nom d'observateur au point d'
 (manifeste et requête écrits à la main) ; réponses d'`openssl ts -reply` d'une TSA jetable à requêtes écrites à la main
 (G1 de C-1, clé détruite) : juste, autre empreinte, autre nonce, sans nonce ; ses têtes lues hors borne (C-2). CB-15e :
 envoi par HTTP vers un serveur de boucle locale, borné en temps et en octets (G-03, G-04) ; commande `jeton` (G-16,
-G-17) ; dernier `.tsr` au `tetes`."""
+G-17) ; dernier `.tsr` au `tetes`. CB-15f : tubes nommés et liens posés au dépôt par le test (`os.mkfifo`,
+`os.symlink`) ; un appel bloqué est interrompu par une alarme de 2 s ; sha256 du manifeste et de la requête au `tetes`
+(C-5)."""
 import base64
 import contextlib
 import hashlib
@@ -20,6 +22,7 @@ import json
 import os
 import pathlib
 import secrets
+import signal
 import socket
 import stat
 import tempfile
@@ -327,7 +330,8 @@ class Jeton(unittest.TestCase):
     def test_jeton_du_jour_non_arme_puis_emis_une_fois(self):
         """Manifeste des têtes valides du dépôt, la sienne comprise, et requête au nonce donné : octets écrits à la
         main ; sans envoi armé, rien ne part ; armé, la réponse accordée est conservée ; un jeton du jour n'est jamais
-        redemandé ; le `tetes` de la boucle porte le dernier `.tsr` de l'observateur."""
+        redemandé ; le `tetes` de la boucle porte le dernier `.tsr` de l'observateur, avec les sha256 de son manifeste
+        et de sa requête (C-5), null pour un fichier absent."""
         self.assertEqual(tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708),
                          ("non armé", "o1-2026-10-05.tsq", hashlib.sha256(self.tsq).hexdigest()))
         self.assertEqual((self.lu("o1-2026-10-05.manifeste"), self.lu("o1-2026-10-05.tsq")), (self.manifeste, self.tsq))
@@ -340,8 +344,11 @@ class Jeton(unittest.TestCase):
                          ("déjà émis", "o1-2026-10-05.tsr", hashlib.sha256(juste).hexdigest()))
         for nom_ in ("o1-2026-10-04.tsr", "o2-2026-10-07.tsr"):                  # plus ancien ; autre observateur
             pathlib.Path(self.d, nom_).write_bytes(b"x")
-        self.assertEqual((len(envois), tetes.Depot(self.d, "o1").lire()["jeton"]),
-                         (1, {"fichier": "o1-2026-10-05.tsr", "sha256": hashlib.sha256(juste).hexdigest()}))
+        h = {"fichier": "o1-2026-10-05.tsr", "sha256": hashlib.sha256(juste).hexdigest(),
+             "manifeste": hashlib.sha256(self.manifeste).hexdigest(), "tsq": hashlib.sha256(self.tsq).hexdigest()}
+        self.assertEqual((len(envois), tetes.Depot(self.d, "o1").lire()["jeton"]), (1, h))
+        os.remove(os.path.join(self.d, "o1-2026-10-05.tsq"))
+        self.assertEqual(tetes.Depot(self.d, "o1").lire()["jeton"], {**h, "tsq": None})
 
     def test_jeton_lie_a_la_requete(self):
         """C-1 (RFC 3161 §2.2, §2.4.1) : autre empreinte, autre nonce, sans nonce, autre algorithme (OID de SHA-512
@@ -477,6 +484,86 @@ class Jeton(unittest.TestCase):
         self.assertEqual([lancer("--jour", j)[0] for j in ("2026-1-05", "05-10-2026")], [2, 2])
         pathlib.Path(self.d, "descripteur.json").write_text(json.dumps({**o, "observateur": "o-1"}), encoding="utf-8")
         self.assertEqual(lancer("--jour", "2026-10-05")[:2], (2, ""))
+
+
+class Bloque(BaseException):
+    """Alarme d'un appel bloqué : hors d'`Exception`, aucun attrape-tout du code ne la retient."""
+
+
+def sans_attente(appel):
+    """appel(), ou le nom de son exception ; « bloqué » s'il attend plus de 2 s (l'`open` d'un tube nommé sans
+    écrivain attend sans fin : l'alarme l'interrompt)."""
+    def alarme(_signal, _cadre):
+        raise Bloque()
+    ancien = signal.signal(signal.SIGALRM, alarme)
+    signal.setitimer(signal.ITIMER_REAL, 2)
+    try:
+        return appel()
+    except Bloque:
+        return "bloqué"
+    except Exception as e:                                          # attrape-tout : le nom de l'exception est comparé
+        return type(e).__name__
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, ancien)
+
+
+class FichiersDuDepot(unittest.TestCase):
+    """CB-15f : au dépôt, des fichiers ordinaires seuls, ouverts sans attente ; l'écriture ne suit aucun lien."""
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d = d.name
+
+    def test_lecture_sans_attente_fichiers_ordinaires_seuls(self):
+        """Un tube nommé au nom d'une tête ou du dernier `.tsr` : refus `TETES/lecture`, sans attente ; au nom de sa
+        requête : sha256 null, sans attente (C-5) ; un `.tsr` de 65 536 octets est lu, un de 65 537 refusé ; un dossier
+        au nom d'une tête : refus, aucun descripteur perdu (64 lectures du dépôt, moins de 16 descripteurs de plus :
+        marge pour les fils d'autres tests)."""
+        os.mkfifo(os.path.join(self.d, "o2-pool.tete"))
+        os.mkfifo(os.path.join(self.d, "o1-2026-10-05.tsr"))
+        pathlib.Path(self.d, "o1-2026-10-04.tsr").write_bytes(b"ancien")
+        tube, tsr = ["o2-pool.tete", "TETES/lecture"], ["o1-2026-10-05.tsr", "TETES/lecture"]
+        self.assertEqual(sans_attente(tetes.Depot(self.d, "o1").lire), {"tetes": [], "refus": [tube, tsr],
+                                                                       "ignores": 0, "jeton": None, "export": None})
+        os.remove(os.path.join(self.d, "o1-2026-10-05.tsr"))
+        os.mkfifo(os.path.join(self.d, "o1-2026-10-05.tsq"))
+        for n, jeton, refus in ((65536, {"fichier": tsr[0], "sha256": hashlib.sha256(b"0" * 65536).hexdigest(),
+                                         "manifeste": None, "tsq": None}, [tube]), (65537, None, [tube, tsr])):
+            pathlib.Path(self.d, tsr[0]).write_bytes(b"0" * n)
+            lu = sans_attente(tetes.Depot(self.d, "o1").lire)
+            self.assertEqual((lu["jeton"], lu["refus"]), (jeton, refus))
+        os.mkdir(os.path.join(self.d, "o3-pool.tete"))
+        avant = len(os.listdir("/proc/self/fd"))
+        for _ in range(64):
+            lu = tetes.Depot(self.d, "o1").lire()
+        self.assertEqual((lu["refus"], len(os.listdir("/proc/self/fd")) - avant < 16),
+                         ([tube, ["o3-pool.tete", "TETES/lecture"], tsr], True))
+
+    def test_export_ne_suit_aucun_lien(self):
+        """Un lien posé au nom du fichier temporaire est effacé, jamais suivi : la cible reste intacte, la tête est
+        exportée ; reposé pendant l'écriture (effacement sans effet), la création exclusive échoue : échec noté,
+        cible intacte."""
+        with tempfile.TemporaryDirectory() as ailleurs:
+            cible, lien = pathlib.Path(ailleurs, "cible"), os.path.join(self.d, ".o1-pool.tete.tmp")
+            cible.write_bytes(b"cible\n")
+            os.symlink(cible, lien)
+            dep = tetes.Depot(self.d, "o1")
+            dep.exporter(WS_H, (12, A))
+            self.assertEqual((cible.read_bytes(), os.listdir(self.d), dep.echec), (b"cible\n", ["o1-pool.tete"], None))
+            self.assertEqual(pathlib.Path(self.d, "o1-pool.tete").read_bytes(), ligne_tete(tete("o1")))
+            os.symlink(cible, lien)
+            with mock.patch.object(tetes.os, "unlink", lambda chemin: None):
+                dep.exporter(WS_H + 3600, (73, B))
+            self.assertEqual((cible.read_bytes(), dep.echec, pathlib.Path(self.d, "o1-pool.tete").read_bytes()),
+                             (b"cible\n", "FileExistsError", ligne_tete(tete("o1"))))
+
+    def test_jeton_dont_le_tsr_n_est_pas_un_fichier(self):
+        """Un tube nommé au nom du `.tsr` du jour : erreur du dépôt (OSError), sans attente ; rien n'est écrit."""
+        pathlib.Path(self.d, "o1-pool.tete").write_bytes(ligne_tete(tete("o1")))
+        os.mkfifo(os.path.join(self.d, "o1-2026-10-05.tsr"))
+        self.assertEqual(sans_attente(lambda: tetes.jeton(self.d, "o1", "2026-10-05", 1)), "OSError")
+        self.assertEqual(sorted(os.listdir(self.d)), ["o1-2026-10-05.tsr", "o1-pool.tete"])
 
 
 if __name__ == "__main__":

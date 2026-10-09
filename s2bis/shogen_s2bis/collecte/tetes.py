@@ -13,12 +13,16 @@ envoi par la fonction que donne l'appelant, seulement s'il en donne une (E-C-36)
 (TSTInfo : algorithme, empreinte, nonce ; RFC 3161 §2.2 ; C-1), puis conservée en `.tsr` ; la signature et le certificat
 de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/verify.sh`). CB-15e : envoi par HTTPS
 (RFC 3161 §3.4), armé par le point d'entrée seul, sous le go écrit de l'investisseur ; au `tetes`, le sha256 du dernier
-`.tsr` de l'observateur."""
+`.tsr` de l'observateur. CB-15f : au dépôt, seuls des fichiers ordinaires sont lus, ouverts sans attente (un tube nommé
+ne bloque ni la boucle ni une commande) ; l'écriture ne suit aucun lien ; au `tetes`, avec le `.tsr`, les sha256 de son
+manifeste et de sa requête (C-5)."""
+import contextlib
 import hashlib
 import http.client
 import json
 import os
 import re
+import stat
 import urllib.parse
 
 from shogen_s2bis.collecte import journal
@@ -139,9 +143,12 @@ def manifeste(jour, observateur, tetes):
 
 def ecrire(dossier, nom, octets, fsync=os.fsync):
     """Écriture atomique de `nom` : fichier temporaire « .<nom>.tmp » écrit et synchronisé, renommé, dossier
-    synchronisé ; un lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel."""
+    synchronisé ; un lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel. Le temporaire resté (ou un
+    lien posé à son nom) est effacé, puis créé en exclusif : aucun lien n'est suivi (CB-15f)."""
     tmp = os.path.join(dossier, f".{nom}.tmp")
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o644)
+    with contextlib.suppress(FileNotFoundError):
+        os.unlink(tmp)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     try:
         journal._tout(fd, octets)
         fsync(fd)
@@ -155,12 +162,41 @@ def ecrire(dossier, nom, octets, fsync=os.fsync):
         os.close(fd)
 
 
+def lire_borne(chemin, taille):
+    """Au plus `taille` + 1 octets d'un fichier ordinaire, ouvert sans attente (CB-15f) ; tube nommé, dossier ou
+    périphérique : OSError, comme un fichier absent."""
+    fd = os.open(chemin, os.O_RDONLY | os.O_NONBLOCK)
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise OSError(f"pas un fichier ordinaire : {chemin}")
+        with open(fd, "rb", closefd=False) as f:
+            return f.read(taille + 1)
+    finally:
+        os.close(fd)
+
+
+def empreinte(chemin):
+    """sha256 d'un fichier ordinaire du dépôt (`.tsr`, `.manifeste`, `.tsq`) d'au plus PLAFOND octets ; sinon
+    OSError."""
+    octets = lire_borne(chemin, PLAFOND)
+    if len(octets) > PLAFOND:
+        raise OSError(f"plus de {PLAFOND} octets : {chemin}")
+    return hashlib.sha256(octets).hexdigest()
+
+
+def _sha256(chemin):
+    """sha256 d'un fichier du dépôt, ou None s'il ne se lit pas (C-5)."""
+    try:
+        return empreinte(chemin)
+    except OSError:
+        return None
+
+
 def _lire_tete(chemin, observateur, nom_journal):
     """(tête, None) ou (None, code) : au plus TAILLE octets, ligne canonique aux clés exactes, observateur et journal
     du nom du fichier, `seq` et `ws` entiers sous leurs bornes, `sha256` de 64 chiffres hexadécimaux minuscules."""
     try:
-        with open(chemin, "rb") as f:
-            octets = f.read(TAILLE + 1)
+        octets = lire_borne(chemin, TAILLE)
     except OSError:
         return None, "TETES/lecture"
     if len(octets) > TAILLE:
@@ -197,8 +233,9 @@ class Depot:
 
     def lire(self):
         """Champs de l'enregistrement `tetes` : `tetes`, `refus`, `ignores` de `lire_tetes`, sauf le fichier de ce
-        journal, les têtes de l'observateur d'abord (C-2) ; `jeton`, {fichier, sha256} du dernier `.tsr` de
-        l'observateur, ou null ; `export`, échec du dernier export, ou null."""
+        journal, les têtes de l'observateur d'abord (C-2) ; `jeton`, {fichier, sha256, manifeste, tsq} du dernier
+        `.tsr` de l'observateur : sha256 de ses octets, de son manifeste et de sa requête (C-5 ; null pour un fichier
+        qui ne se lit pas), ou null ; `export`, échec du dernier export, ou null."""
         r = {"tetes": [], "refus": [], "ignores": 0, "jeton": None, "export": self.echec}
         try:
             r["tetes"], r["refus"], r["ignores"] = lire_tetes(self.dossier, (self.observateur, self.journal),
@@ -208,9 +245,10 @@ class Depot:
             r["refus"].append([".", "TETES/depot"])
             return r
         if jetons:
+            base = os.path.join(self.dossier, jetons[-1][:-4])
             try:
-                r["jeton"] = {"fichier": jetons[-1], "sha256": journal._empreinte(os.path.join(self.dossier,
-                                                                                               jetons[-1]))[0]}
+                r["jeton"] = {"fichier": jetons[-1], "sha256": empreinte(base + ".tsr"),
+                              **{k: _sha256(base + "." + k) for k in ("manifeste", "tsq")}}
             except Exception:                                       # attrape-tout : `.tsr` illisible
                 r["refus"].append([jetons[-1], "TETES/lecture"])
         return r
@@ -238,7 +276,7 @@ def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync):
     (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé."""
     nom = os.path.join(dossier, f"{observateur}-{jour}")
     if os.path.exists(nom + ".tsr"):
-        return "déjà émis", f"{observateur}-{jour}.tsr", journal._empreinte(nom + ".tsr")[0]
+        return "déjà émis", f"{observateur}-{jour}.tsr", empreinte(nom + ".tsr")
     lues = lire_tetes(dossier, propre=observateur)[0]
     if not any(t["observateur"] == observateur for t in lues):
         raise RefusJeton("JETON/tete", f"aucune tête de {observateur} au dépôt")

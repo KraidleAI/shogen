@@ -711,9 +711,11 @@ collecteur.
    chiffres), `TETES/champs` (observateur ou journal autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à
    10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible :
    `TETES/depot`. Champs rendus : `tetes` (têtes valides, les siennes d'abord), `refus` (`[nom, code]`), `ignores`
-   (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256}` du dernier `<observateur>-<jour>.tsr` du
-   dépôt par ordre des noms, ou null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export
-   ou null). Toute valeur rendue est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
+   (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256, manifeste, tsq}` : sha256 du dernier
+   `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son manifeste et de sa requête du même jour, null
+   pour un fichier qui ne se lit pas (CB-15f ; C-5 de la G2 de P2B : la chaîne ancre la requête qui a eu le jeton) ; ou
+   null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export ou null). Toute valeur rendue
+   est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
    (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
 6. **Enregistrement `tetes`** (CB-15c ; E-C-35) : avec un dépôt, la fenêtre qui clôt l'heure ((`ws` + w) multiple de
    3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
@@ -740,6 +742,14 @@ collecteur.
    `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
    <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
    jour refusé.
+9. **Fichiers du dépôt** (CB-15f) : toute lecture au dépôt (têtes, `.tsr`, résumés du §17.6) ouvre le fichier sans
+   attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire : un tube nommé, un dossier ou un périphérique au nom
+   d'un fichier attendu ne bloque ni la boucle ni une commande ; il est le refus `TETES/lecture` (`RESUME/lecture`
+   pour un résumé), comme un `.tsr` de plus de 65 536 octets ; pour la commande `jeton`, un `.tsr` du jour qui n'est
+   pas un fichier ordinaire est une erreur du dépôt (sortie 1). L'écriture atomique (point 4) efface d'abord le
+   fichier temporaire resté, ou un lien posé à son nom, puis le crée en exclusif (`O_EXCL`) : aucun lien n'est
+   suivi ; reposé entre l'effacement et la création, il fait échouer l'écriture (échec noté, point 4), la cible
+   intacte.
 
 ## 17. Commande `status` (CB-17 ; E-C-38)
 
@@ -794,7 +804,8 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    jours des fenêtres locales ; un résumé est refusé, un seul code par fichier : `RESUME/taille` (plus de 131 072
    octets), `RESUME/forme` (pas une ligne canonique aux clés exactes), `RESUME/champs` (observateur ou jour autre que
    ceux du nom, fenêtre hors du jour ou de la grille, codes inconnus, non textes compris, en double ou non triés, aucune
-   fenêtre), `RESUME/lecture` ; aucun résumé ne fait échouer `status`. Une fenêtre compte à quorum si M_j ≥ 2 (ADR-0029
-   §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur dont un résumé lu la dit valide.
-   L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans `--descripteur` : refus
-   `CONFIG/options`, sortie 2.
+   fenêtre), `RESUME/lecture` (illisible, ou pas un fichier ordinaire : §16.9) ; aucun résumé ne fait échouer `status`,
+   ni un dépôt illisible : `quorum : dépôt illisible (<exception>)`, après le compte local (CB-15f). Une fenêtre compte
+   à quorum si M_j ≥ 2 (ADR-0029 §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur
+   dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans
+   `--descripteur` : refus `CONFIG/options`, sortie 2.

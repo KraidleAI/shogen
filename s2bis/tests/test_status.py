@@ -26,6 +26,7 @@ from shogen_s2bis.collecte import entree, journal, status
 from shogen_s2bis.collecte.lecture import S, Lecture
 from tests.test_entree import configurations, port_ferme
 from tests.test_reprise import m
+from tests.test_tetes import sans_attente
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D3 = {"sortie": "suivi\n", "code": 0, "debut": 1, "fin": 2}
@@ -339,6 +340,22 @@ class Resumes(Base):
             refus = f"{type(e).__name__} : {e}"
         self.assertEqual(refus, "résumés refusés : " + " ; ".join(f"{o}-2026-10-04.resume (RESUME/{c})" for o, (_x, c)
                                                                     in cas.items()))
+
+    def test_resume_qui_n_est_pas_un_fichier(self):
+        """Un tube nommé au nom d'un résumé : refus `RESUME/lecture`, sans attente (CB-15f)."""
+        os.mkfifo(os.path.join(self.depot, "o2-2026-10-04.resume"))
+        self.assertEqual(sans_attente(lambda: status.rapport(self.jdir, depot=self.depot, observateur="o1",
+                                                             maintenant=NOW)[-2:]),
+                         ["quorum : aucun résumé d'un autre observateur lisible",
+                          "résumés refusés : o2-2026-10-04.resume (RESUME/lecture)"])
+
+    def test_depot_illisible_le_compte_local_reste(self):
+        """Dépôt absent : le rapport local entier, puis `quorum : dépôt illisible (<exception>)` ; le compte local est
+        toujours rendu (AVIS Q-D-03, point 3) (CB-15f)."""
+        local = status.rapport(self.jdir)
+        self.assertEqual(sans_attente(lambda: status.rapport(self.jdir, depot=os.path.join(self.depot, "absent"),
+                                                             observateur="o1", maintenant=NOW)),
+                         local + ["quorum : dépôt illisible (FileNotFoundError)"])
 
     def test_commande_status_avec_depot(self):
         """`status` avec `--depot` et `--descripteur` ajoute le compte à quorum ; `--depot` sans `--descripteur` :

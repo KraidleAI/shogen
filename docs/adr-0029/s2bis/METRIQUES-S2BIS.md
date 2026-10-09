@@ -2321,3 +2321,46 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 335 tests ; plancher du job : 335, égalité exigée (`--egal`).
+
+## CB-15f (2026-10-08) : dépôt, fichiers ordinaires seuls lus sans attente, aucun lien suivi (E-C-35)
+
+Objet : relecture du générateur, après CB-17d. Au dépôt, un tube nommé au nom d'une tête, d'un `.tsr` ou d'un résumé
+bloquait `open` sans fin (la boucle à la fenêtre qui clôt l'heure, `status`, `jeton`) ; un lien posé au nom du fichier
+temporaire faisait écrire la tête dans sa cible. Lecture : fichier ordinaire seul, ouvert sans attente (`O_NONBLOCK`,
+puis `fstat`), refus `TETES/lecture` ou `RESUME/lecture` ; `.tsr` de 65 536 octets au plus. Écriture atomique :
+temporaire effacé, puis créé en exclusif (`O_EXCL`) ; un lien reposé entre les deux fait échouer l'écriture, la cible
+intacte. Un dépôt illisible ne fait plus échouer `status` : le compte local reste, suivi de `quorum : dépôt illisible
+(<exception>)` (AVIS Q-D-03, point 3 : le compte local toujours rendu) (FORMAT §16.9, §17.6). Correction de la G2 de P2B
+(2026-10-08) : au `tetes`, avec le sha256 du dernier `.tsr`, ceux de son manifeste et de sa requête, null pour un
+fichier illisible (C-5, Q-5 ; `empreinte_tsr` devient `empreinte`) (FORMAT §16.5).
+
+Rouge : sur l'état CB-17d, 5 tests en échec d'assertion (trois appels bloqués, interrompus par une alarme de 2 s ; la
+cible du lien écrasée par la tête ; `status` qui lève sur un dépôt absent, l'exception comparée par son nom) ; puis, la
+première forme de la lecture perdant un descripteur à chaque dossier lu (relevé à la relecture : `open` d'un descripteur
+de dossier lève sans le fermer), un échec d'assertion de plus (64 lectures, descripteurs comptés) avant la forme
+`try`/`finally`. Rouges de la correction (correction retirée du code, test gardé ; python3.12 -X dev -W error) : R-C5
+(ROUGE D'ASSERTION : FAIL 2, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 316 | — |
+| `shogen_s2bis/collecte/status.py` | 212 | — |
+| `tests/test_tetes.py` | 570 | 25 (3 de plus) |
+| `tests/test_status.py` | 396 | 18 (2 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (14 de la phase 1, 3 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : ouverture qui attend (tube
+nommé), type du fichier non contrôlé, `.tsr` sans borne, `.tsr` de 65 536 octets refusé, tête lue par `open` (attente),
+dernier `.tsr` lu par `_empreinte`, `.tsr` du jour lu par `_empreinte`, temporaire resté non effacé, création non
+exclusive (lien suivi), résumé lu par `open` (attente), lecture bornée à la taille (dépassement jamais vu), dépôt
+illisible qui fait échouer `status`, descripteur jamais fermé, plancher non relevé, C-5 : sha256 de la requête non
+journalisé, C-5 : fichier illisible noté par une chaîne vide, C-5 : sha256 du `.tsr` au lieu du manifeste et de la
+requête. Les 30 mutants de la G2 (G-01 à G-30), rejoués sur cet état : 30 tués (24 par leur test visé, 6 sans test
+visé), 0 vivant, 0 FATAL ; G-01, G-03, G-04, G-16 et G-17, vivants à la G2, sont tués par leurs tests nommés (C-4).
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 340 tests ; plancher du job : 340, égalité exigée (`--egal`).
