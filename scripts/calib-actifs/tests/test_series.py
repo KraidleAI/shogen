@@ -49,12 +49,12 @@ class TestSeries(unittest.TestCase):
         q = socle.json.loads(socle.json.dumps(P))
         q["oracle_sh"] = {"debut": T0, "fin": T0 + 360, "actives": [["USDC", "binance", 3], ["USDC", "bitfinex", 9]],
                           "concurrences": [["USDC", ["binance", "bitstamp", "kraken"], [0, 1, 2]]]}
-        series = {("USDC", "binance"): s([(0, 1), (1, 1), (2, 1), (9, 1)], [3]),     # 9 : hors semaine (C-5, G07)
+        series = {("USDC", "binance"): s([(-1, 1), (0, 1), (1, 1), (2, 1), (9, 1)], [3]),  # -1 et 9 : hors semaine
                   ("USDC", "kraken"): s([(i, 1) for i in (1, 2, 3, 4)]),
                   ("USDC", "bitstamp"): s([(2, 1)], [0, 1, 3, 4, 5])}
         try:
             lignes = bougies.oracle_sh(q, series)
-        except socle.Refus as e:                                    # rouge d'assertion sous la mutation G07
+        except socle.Refus as e:              # rouge d'assertion sous G07 (minute 9) et X09 (minute -1, R-2)
             lignes = [str(e)]
         self.assertEqual(lignes[0], "oracle de SH §4 : USDC bitfinex non applicable (place hors lecture)")
         trois = ["binance", "bitstamp", "kraken"]
