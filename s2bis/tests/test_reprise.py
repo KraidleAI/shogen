@@ -1,6 +1,8 @@
 """CB-2, E-C-21 : reprise au dernier enregistrement intègre, queue non intègre conservée à l'octet et déclarée dans un
 segment neuf, fenêtre du redémarrage refusée, sommes rattrapées. Queues calculées sur les octets du test. CB-19d
-(C-2 (b) de la relecture d'intégration de P1) : fsync de ce dont la reprise dépend, relevé par l'espion."""
+(C-2 (b) de la relecture d'intégration de P1) : fsync de ce dont la reprise dépend, relevé par l'espion. CB-6d
+(SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1) : niveaux comptés sur les octets avant le décodeur, ligne en UTF-8 strict
+(lignes de NC-1 du contre-contrôle de RB-1), RecursionError jamais un verdict."""
 import errno
 import hashlib
 import json
@@ -122,6 +124,23 @@ class Reprise(AvecJournal):
         with self.assertRaises(j.ErreurJournal) as e:
             self.journal(m(9)).ecrire("lecture", m(10), x=x)
         self.assertEqual(e.exception.code, "JOURNAL/imbrication")          # avant le sérialiseur (C-4)
+
+    def test_niveaux_comptes_sur_les_octets_avant_le_decodeur(self):  # SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1
+        """Ligne de 100 000 niveaux : queue sans que le décodeur la lise ; lignes de NC-1 en UTF-16-LE closes par 00 0A
+        (K = 2 000 et 20 000 crochets) : queues, sans exception ; RecursionError du décodeur sur une ligne intègre :
+        elle remonte, la ligne n'est pas déclarée en queue."""
+        lus, loads = [], json.loads
+        with mock.patch.object(j.json, "loads", lambda t, *a, **k: lus.append(len(t)) or loads(t, *a, **k)):
+            self.queue(lambda s, p: ligne(s, p, type="lecture", ws=m(4), x=0).replace(b'"x":0', b'"x":' + b"[" *
+                                                                                      100000 + b"]" * 100000))
+        self.assertLess(max(lus), 100000)
+        for k in (2000, 20000):
+            self.setUp()
+            self.queue(lambda s, p, k=k: ("{" + '"a' + chr(92) + '"":' + "[" * k + chr(0x0A00)).encode("utf-16-le"))
+        self.setUp()
+        self.preparer()
+        with mock.patch.object(j.json, "loads", side_effect=RecursionError):
+            self.assertRaises(RecursionError, self.journal, m(7))
 
     def segment(self, fabrique):
         """Segment 1 illisible dès sa première ligne : repli sur le segment 0, segment 1 déclaré, segment 2 ouvert."""

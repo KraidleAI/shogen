@@ -44,7 +44,8 @@
   type de `_lire` dits au §7.1 et faits par `_lire`).
 - **Partie P2, tranche A** (2026-10-08 ; sous-lots CB-6, CB-12, CB-13) : le diff CB-6c écrit le contenu de `valeurs`
   (§9.1, relevés des décodeurs de CB-6a et CB-6b) et le champ `decodeur` des formes (§14.1), et ferme pour les
-  décodeurs SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§9.1).
+  décodeurs SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§9.1) ; le diff CB-6d ferme SHOGEN-S2BIS-TARDIVES-BORNE-1 (§13.6),
+  SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 (§8.3) et le volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (§8.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -284,17 +285,23 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    au plus. L'écrivain refuse d'écrire un enregistrement plus profond (`JOURNAL/imbrication`), avant le sérialiseur,
    quel que soit le réglage de l'interpréteur ; sa relecture (`_lire`) et les lecteurs mesurent le niveau et tiennent
    pour non intègre (§7.1) toute ligne qui dépasse N, qu'un décodeur la lise ou lève RecursionError : ils comptent
-   les niveaux eux-mêmes et ne se fient pas à l'exception. Un conteneur que l'enregistrement porte à plusieurs
-   endroits compte à sa plus grande profondeur, celle de la ligne écrite. Motif de N : le plus profond enregistrement
-   du collecteur mesure M = 4 niveaux au test de bout en bout (E-C-24 ; `run_params`, `formes.formes[i]` ;
-   `lecture`, `valeurs[i].extra`, CB-6c), et une
+   les niveaux eux-mêmes et ne se fient pas à l'exception. `_lire` compte, comme les lecteurs, le niveau d'une ligne
+   sur ses octets, avant tout décodeur, après l'avoir lue en UTF-8 strict (CB-6d,
+   SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 : il décodait d'abord, et son verdict venait de RecursionError au-delà
+   du seuil du décodeur) ; une RecursionError n'y est jamais un verdict. Un conteneur que l'enregistrement porte à
+   plusieurs endroits compte à sa plus grande profondeur, celle de la ligne écrite. Motif de N : le plus profond
+   enregistrement du collecteur mesure M = 4 niveaux au test de bout en bout (E-C-24 ; `run_params`,
+   `formes.formes[i]` ; `lecture`, `valeurs[i].extra`, CB-6c), et une
    `sante` dont une sonde D-4 ou D-5 rend une réponse SOA ou TXT en atteint 6 (§12, §13.4) ; le plus petit seuil de
    lecture mesuré sur les décodeurs Python du projet est 988 niveaux (Python 3.10, limite de récursion par défaut ;
    seuils mesurés sous 3.10 et 3.12 seulement, banc de la G2 de RB-18) ; N est très au-dessus du premier et très
    au-dessous du second.
 4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
    le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
-   partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure.
+   partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure. L'écrivain en compte les valeurs
+   une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur un enregistrement de plus de
+   LIMITE valeurs, qui ferait plus de LIMITE octets (`JOURNAL/taille` ; CB-6d, volet graphe de
+   SHOGEN-S2BIS-CORPS-BORNE-1 : `canonique` développait le graphe, en temps exponentiel).
 
 ## 9. Enregistrement `lecture` (CB-3a ; E-C-03, E-C-04, E-C-17)
 
@@ -523,8 +530,9 @@ résolution et sans envoi (ADR-0029 l.109).
      écriture (instants de 17 caractères, écarts de 18, comptes de 19 chiffres, `seq` de 640) ;
    - hypothèse : `tardives` compte au plus 2 × `places` latences. Les lectures abandonnées au relevé précédent tiennent
      chacune une place, sauf celles de la fenêtre précédente finies entre son échéance et son relevé (au plus une par
-     forme, et `places` ≥ formes). Un fil saisi entre la remise de sa place et le rendu de son résultat n'est pas
-     compté ; la marge admet encore 19 530 latences.
+     forme, et `places` ≥ formes). Depuis CB-6d (SHOGEN-S2BIS-TARDIVES-BORNE-1), le résultat d'une lecture est rendu
+     avant sa place : une lecture dont le résultat n'est pas rendu tient sa place, sans exception ; la marge admet
+     encore 19 530 latences.
 
 ## 14. Configurations, descripteur, câblage et point d'entrée (CB-18c, CB-18d ; E-C-02, E-C-16, E-C-23)
 

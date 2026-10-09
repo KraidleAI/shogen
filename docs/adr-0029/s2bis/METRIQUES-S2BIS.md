@@ -1881,3 +1881,33 @@ admis, extra non contrôlé, pannes décodées, corps ou code perdus, lecture no
 `decodeur-connu` retirée, champ `decodeur` hors du schéma, item retiré du §9, plancher non relevé. Corrections : 3
 mutants neufs, 3 tués par leur test visé : majuscule effacée du §9.1, motif ISO sans casse, « t » minuscule admis.
 Suite : 276 tests ; plancher du job : 276, égalité exigée.
+
+## CB-6d (2026-10-08) : trois items de l'annexe B fermés (tardives bornées, niveaux comptés sur les octets, graphe)
+
+Objet :
+- SHOGEN-S2BIS-TARDIVES-BORNE-1 : la boucle rend le résultat d'une lecture avant sa place ; une lecture non rendue tient
+  donc toujours sa place, et `tardives` reste borné par `places` (FORMAT §13.6) ;
+- SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 : `Journal._lire` compte les niveaux sur les octets de la ligne, en UTF-8
+  strict, avant tout décodeur (copie du compte du lecteur du recalcul, gardée identique par un test de fitness) ;
+  RecursionError n'est plus prise pour un verdict (FORMAT §8.3) ;
+- SHOGEN-S2BIS-CORPS-BORNE-1, volet graphe : `canonique` compte les valeurs une fois par occurrence, chaque conteneur
+  partagé développé une seule fois, et refuse au-delà de LIMITE (`JOURNAL/taille`) en temps borné (FORMAT §8.4).
+
+Rouge : sur le code de CB-6c, les 5 tests neufs échouent par assertion (graphe partagé non refusé, niveaux comptés
+après le décodeur, place rendue avant le résultat, copie du compte absente, FORMAT).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 136 | — |
+| `shogen_s2bis/collecte/journal.py` | 430 | — |
+| `tests/test_boucle.py` | 325 | 15 (1 de plus : résultat rendu avant la place) |
+| `tests/test_fitness.py` | 106 | 6 (1 de plus : copie du compte des niveaux identique à celle du recalcul) |
+| `tests/test_format.py` | 217 | 12 (1 de plus : §8.3, §8.4, §13.6 et puce « Partie P2 ») |
+| `tests/test_journal.py` | 316 | 15 (1 de plus : graphe partagé refusé en temps borné) |
+| `tests/test_reprise.py` | 352 | 27 (1 de plus : niveaux comptés sur les octets avant le décodeur) |
+
+Mutants (même commande) : 11 mutants, 11 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état corrigé ; un
+mutant reconnu équivalent avant la campagne (décodage UTF-8 avec remplacement) a été remplacé (copie altérée). Liste :
+place rendue avant le résultat, niveaux non comptés avant le décodeur, RecursionError prise pour un verdict, décodeur
+sur les octets bruts (NC-1), copie altérée (échappement, compte), valeurs non comptées, comptées sans multiplicité,
+borne doublée, §13.6 défait, plancher non relevé. Suite : 281 tests ; plancher du job : 281, égalité exigée.

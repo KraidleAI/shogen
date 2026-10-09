@@ -25,7 +25,11 @@ un segment de reprise prend le jour le plus tardif entre l'horloge et les fichie
 reste celui de la chaîne, k sans zéro de tête, et un nom du préfixe hors de cette grammaire est refusé à l'ouverture
 (JOURNAL/nom, lettre C-5 du FORMAT). La fenêtre du redémarrage, toute fenêtre close et toute fenêtre jusqu'à la
 dernière écrite restent refusées (C-1) ; le marqueur qui suit des fenêtres sans marqueur est précédé d'un `trou`
-(cause `arret`, `horloge_reculee` ou `saut`)."""
+(cause `arret`, `horloge_reculee` ou `saut`). CB-6d : `_lire` lit la ligne en UTF-8 strict et compte ses niveaux sur
+ses octets avant tout décodeur, par la copie du compte du lecteur du recalcul (RB-1j, RB-1l ; texte égal, contrôlé par
+`test_fitness`) : une RecursionError n'est jamais un verdict (SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1) ;
+`canonique` compte les valeurs une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur plus
+de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1)."""
 import fcntl
 import hashlib
 import json
@@ -46,6 +50,8 @@ HEX = re.compile("[0-9a-f]{64}")
 CHIFFRES = 640                     # I-1 : plus petite limite non nulle de conversion des entiers (sys.int_info)
 BORNE = 10 ** CHIFFRES
 NIVEAUX = 64                       # C-4 : niveaux d'imbrication au plus, la racine au niveau 1 (FORMAT §8.3)
+BARRE = bytes([92])                    # barre oblique inverse, écrite par sa valeur
+HORS_CROCHETS = bytes(x for x in range(256) if x not in b"[]{}")      # octets effacés avant le compte des niveaux
 
 
 class ErreurJournal(Exception):
@@ -59,10 +65,11 @@ class JournalOccupe(ErreurJournal):
 
 
 def _parcours(enr):
-    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr`, None sur un cycle), sans
-    récursion. Chaque conteneur n'est développé qu'une fois et sa hauteur est retenue : un conteneur partagé compte à
-    sa plus grande profondeur, sans parcours exponentiel ; un cycle n'arrête pas la recherche des entiers."""
-    long_, cycle, haut, chemin, pile = False, False, {}, set(), [(enr, False)]
+    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr` et nombre de ses valeurs, une
+    fois par occurrence, None sur un cycle), sans récursion. Chaque conteneur n'est développé qu'une fois, sa hauteur
+    et son nombre de valeurs retenus : un conteneur partagé compte à sa plus grande profondeur et autant de fois qu'il
+    figure, sans parcours exponentiel (CB-6d) ; un cycle n'arrête pas la recherche des entiers."""
+    long_, cycle, haut, chemin, pile, n = False, False, {}, set(), [(enr, False)], {}
     while pile:
         v, fin = pile.pop()
         long_ = long_ or isinstance(v, int) and not -BORNE < v < BORNE
@@ -73,12 +80,27 @@ def _parcours(enr):
             chemin.discard(id(v))
             haut[id(v)] = 1 + max([haut.get(id(x), 0) for x in enfants if isinstance(x, (dict, list, tuple))],
                                   default=0)
+            n[id(v)] = 1 + sum(n.get(id(x), 1) if isinstance(x, (dict, list, tuple)) else 1 for x in enfants)
         elif id(v) in chemin:
             cycle = True                                            # le sérialiseur le refusera (JOURNAL/type)
         else:
             chemin.add(id(v))
             pile += [(v, True)] + [(x, False) for x in enfants]
-    return long_, None if cycle else haut[id(enr)]
+    return long_, None if cycle else haut[id(enr)], None if cycle else n[id(enr)]
+
+
+def _trop_profonde(ligne):
+    """Vrai si un conteneur de la ligne passe le niveau NIVEAUX (FORMAT §8.3, lettre C-4 ; la racine au niveau 1).
+    Niveaux comptés sur les octets, sans décodeur, donc sans dépendre de RecursionError ni de la version : échappements
+    retirés (barre doublée, puis barre et guillemet), les guillemets restants bornent les chaînes, et seuls les
+    crochets hors des chaînes comptent."""
+    hors = b"".join(ligne.replace(BARRE * 2, b"").replace(BARRE + b'"', b"").split(b'"')[::2])
+    n = 0
+    for c in hors.translate(None, HORS_CROCHETS):
+        n += 1 if c in b"[{" else -1
+        if n > NIVEAUX:
+            return True
+    return False
 
 
 def _types(e):
@@ -96,11 +118,13 @@ def canonique(enr):
     contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3). Un entier de plus de CHIFFRES chiffres
     (JOURNAL/entier, I-1) et un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication, C-4) sont refusés avant le
     sérialiseur, quel que soit le réglage de l'interpréteur."""
-    long_, niveaux = _parcours(enr)
+    long_, niveaux, valeurs = _parcours(enr)
     if long_:
         raise ErreurJournal("JOURNAL/entier", f"entier de plus de {CHIFFRES} chiffres")
     if niveaux is not None and niveaux > NIVEAUX:
         raise ErreurJournal("JOURNAL/imbrication", f"{niveaux} niveaux, {NIVEAUX} au plus")
+    if valeurs is not None and valeurs > LIMITE:                 # chaque valeur écrit un octet au moins (CB-6d)
+        raise ErreurJournal("JOURNAL/taille", f"{valeurs} valeurs, plus que {LIMITE} octets")
     try:
         octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication
@@ -307,10 +331,10 @@ class Journal:
         etat, pos, h = None, 0, hashlib.sha256()
         with open(os.path.join(self.dossier, n), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
-                try:
-                    e = json.loads(ligne)
-                    intact = _types(e) and canonique(e) == ligne                     # (c), (d), puis (b)
-                except (ValueError, RecursionError, ErreurJournal):
+                try:                                                # UTF-8 strict, niveaux avant le décodeur
+                    texte = ligne.decode("utf-8")                   # (CB-6d) ; puis (c), (d) et (b)
+                    intact = not _trop_profonde(ligne) and _types(e := json.loads(texte)) and canonique(e) == ligne
+                except (ValueError, ErreurJournal):                 # RecursionError : jamais un verdict, elle remonte
                     intact = False
                 if intact:                                                          # (e)
                     intact = (e["seq"], e["prec"]) == (etat["seq"] + 1, etat["prec"]) if etat else e["type"] in (

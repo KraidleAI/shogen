@@ -189,6 +189,17 @@ class Format(unittest.TestCase):
         self.assertEqual([("CB-6c" in p, "ECRIVAIN-REFUS-ARRET-1" in p) for p in puces if p.startswith(
             "**Partie P2, tranche A**")], [(True, True)])
 
+    def test_paragraphes_8_et_13_items_de_cb_6d(self):                # CB-6d : trois items de l'annexe B
+        """§8.3 : niveaux comptés sur les octets avant le décodeur ; §8.4 : valeurs comptées par occurrence ; §13.6 :
+        résultat rendu avant la place ; la puce « Partie P2 » nomme CB-6d et les trois items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        huit, six = sections["8"], sections["13"].split(" 6. ", 1)[-1]
+        attendus = [(huit, "sur ses octets, avant tout décodeur"), (huit, "une fois par occurrence"),
+                    (six, "le résultat d'une lecture est rendu avant sa place")]
+        self.assertEqual([x in s for s, x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("CB-6d", "TARDIVES-BORNE-1", "IMBRICATION-OCTETS-1", "CORPS-BORNE-1"))
+                          for p in puces if p.startswith("**Partie P2, tranche A**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

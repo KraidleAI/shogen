@@ -4,7 +4,8 @@ la G2 de P1-B (CB-11c) : boucle dans un fil joint en temps borné (C-6) ; éché
 mutants MG-11, MG-13, MG-29 (C-7) ; BaseException dans une lecture (O-5). CB-11d : santé complète sans sondes (O-7),
 sondes vivantes comptées (C-5). CB-11e : horloges murale et monotone injectées, recul entre deux fenêtres (C-4).
 CB-18a : journal ouvert et boucle lancée dans le même fil du test (garde d'un seul fil de l'écrivain). CB-18b :
-sommeil jusqu'à l'instant mural malgré un saut de l'horloge, départ monotone dans le suivi, plan câblé."""
+sommeil jusqu'à l'instant mural malgré un saut de l'horloge, départ monotone dans le suivi, plan câblé. CB-6d
+(SHOGEN-S2BIS-TARDIVES-BORNE-1) : résultat rendu avant la place."""
 import concurrent.futures
 import queue
 import threading
@@ -302,6 +303,18 @@ class Boucle(Base):
         enrs = self.tourner({"a": lire("a"), "b": lire("b")}, [(0, "a"), (S, "b")])
         self.assertEqual((vus, [e["type"] for e in enrs]), ({"a": 95 * S, "b": 96 * S},
                                                             ["lecture", "lecture", "sante", "marqueur"]))
+
+    def test_resultat_rendu_avant_la_place(self):                    # SHOGEN-S2BIS-TARDIVES-BORNE-1 (CB-6d)
+        """Le futur d'une lecture rend avant que sa place soit rendue, que la lecture rende ou lève : un fil qui ne
+        tient plus de place a rendu son résultat, d'où la borne de 2 × places de `tardives` (FORMAT §13.6)."""
+        def casse(suivi):
+            raise RuntimeError("défaut imprévu")
+        vus = []
+        for lire in (rapide, casse):
+            futur, b = concurrent.futures.Future(), boucle.Boucle(None, {"a": lire}, [(0, "a")], 1)
+            b.places = types.SimpleNamespace(release=lambda f=futur: vus.append(f.done()))
+            b._lire("a", {"depart": D}, futur)
+        self.assertEqual(vus, [True, True])
 
     def test_nom_du_plan_sans_lecture_refuse_a_la_construction(self):  # CB-18b, SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Un nom du plan sans lecture est refusé à la construction (BOUCLE/plan), avant tout lancement (O-6 : il

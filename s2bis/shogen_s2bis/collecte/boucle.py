@@ -13,7 +13,8 @@ s'attendent sur l'horloge murale, relue au moins chaque seconde (SHOGEN-S2BIS-SO
 lecture est aussi relevé sur l'horloge monotone et porté dans son suivi (limite E-4 levée) ; un nom du plan sans
 lecture est refusé à la construction (SHOGEN-S2BIS-PLAN-CABLAGE-1) ; au relevé, une sonde finie après E vaut
 null, sur l'horloge monotone, et disque et empreinte se relèvent après l'état des futurs
-(SHOGEN-S2BIS-SONDES-ECHEANCE-1)."""
+(SHOGEN-S2BIS-SONDES-ECHEANCE-1). CB-6d (SHOGEN-S2BIS-TARDIVES-BORNE-1) : le résultat d'une lecture est rendu avant sa
+place ; une lecture non rendue tient donc toujours sa place (borne de `tardives`, FORMAT §13.6)."""
 import concurrent.futures
 import threading
 import time
@@ -119,14 +120,17 @@ class Boucle:
         self.journal.marqueur(ws)
 
     def _lire(self, nom, suivi, futur):
-        """Fil d'une lecture. Le futur rend toujours, une `Lecture` : une BaseException suit son cours (O-5)."""
+        """Fil d'une lecture. Le futur rend toujours, une `Lecture`, avant que la place soit rendue (CB-6d) : une
+        BaseException suit son cours (O-5)."""
         lu = None
         try:
             lu = self.lectures[nom](suivi)
         except Exception:                                           # attrape-tout : une lecture ne lève jamais
             pass
         finally:
-            self.places.release()
-            futur.set_result(lu if isinstance(lu, Lecture) else Lecture(
-                "panne_transport", suivi["depart"], self.horloge(), suivi.get("phases"), suivi.get("adresse"),
-                sous_type="autre"))
+            try:
+                futur.set_result(lu if isinstance(lu, Lecture) else Lecture(
+                    "panne_transport", suivi["depart"], self.horloge(), suivi.get("phases"), suivi.get("adresse"),
+                    sous_type="autre"))
+            finally:
+                self.places.release()
