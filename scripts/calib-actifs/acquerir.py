@@ -9,6 +9,7 @@ import hashlib
 import http.client
 import io
 import os
+import sys
 import time
 import urllib.request
 import zipfile
@@ -142,3 +143,72 @@ def kraken(prm: dict, man: Manifeste, nom: str, actif: str) -> None:
     if hashlib.sha256(octets).hexdigest() != prm["kraken_sha256"][actif]:
         raise socle.Refus("CA/kraken", "CSV absent ou de sha256 différent de SH l.156-158", actif, place="kraken")
     man.ajouter(s["url"] + "#" + s["paires"][actif], rel, octets)
+
+
+class Debit:
+    """Débit borné par place (E-CA-13 ; SOURCES-HISTORIQUES §3 : Coinbase 3 requêtes par seconde au plus, Bitfinex 30
+    par minute au plus) : au moins intervalle_ms entre deux requêtes d'une même place."""
+
+    def __init__(self):
+        self.dernier = {}
+
+    def attendre(self, place: str, intervalle_ms: int) -> None:
+        d = self.dernier.get(place)
+        if d is not None and (HORLOGE() - d) * 1000 < intervalle_ms:
+            DORMIR(intervalle_ms / 1000 - (HORLOGE() - d))
+        self.dernier[place] = HORLOGE()
+
+
+def iso(t: int) -> str:
+    return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str, debit: Debit) -> None:
+    """API paginée d'une (place, actif) : pages de `pas` minutes, dernière minute incluse et bornée à la fenêtre
+    (aucune bougie demandée hors fenêtre) ; une page par fichier page-<début>.json ; reprise sur le manifeste."""
+    s, pas = prm["series"][place], prm["series"][place]["pas"]
+    for debut in range(fen["debut"], fen["fin"], 60 * pas):
+        fin = min(debut + 60 * (pas - 1), fen["fin"] - 60)
+        rel = os.path.join(nom, place, actif, f"page-{debut}.json")
+        if man.present(rel):
+            continue
+        url = s["url"].format(s=s["paires"][actif], debut=debut, fin=fin, n=(fin - debut) // 60 + 1,
+                              debut_ms=debut * 1000, fin_ms=fin * 1000, debut_iso=iso(debut), fin_iso=iso(fin))
+        debit.attendre(place, s["intervalle_ms"])
+        man.ajouter(url, rel, lire_url(prm, url))
+
+
+def main(argv=None, env=None) -> int:
+    """python3 acquerir.py --bruts <dossier> [--parametres <fichier>] : chaque (fenêtre, actif, place) de la lecture
+    retenue, fenêtre descriptive sans ses places exclues. Codes : 0 ; 3 variable posée ; 4 acquisition impossible ou
+    refus (CA/acquisition, CA/kraken), nommé sur stderr ; 2 usage."""
+    a = list(sys.argv[1:] if argv is None else argv)
+    if len(a) not in (2, 4) or a[0] != "--bruts" or (len(a) == 4 and a[2] != "--parametres"):
+        print("REFUS CA/usage : acquerir.py --bruts <dossier> [--parametres <fichier>]", file=sys.stderr)
+        return 2
+    try:
+        socle.garde(os.environ if env is None else env)
+        prm = socle.lire(a[3] if len(a) == 4 else socle.PARAMETRES)
+        man, debit, lec = Manifeste(a[1]), Debit(), socle.lecture(prm)
+        for nom, fen in (("principale", prm["fenetre"]), ("descriptive", prm["fenetre_descriptive"])):
+            for actif in socle.ACTIFS:
+                for place in (x for x in lec["places"][actif] if nom == "principale" or x not in fen["sans"]):
+                    acces = prm["series"][place]["acces"]
+                    if acces == "pages":
+                        pages(prm, man, nom, fen, place, actif, debit)
+                    elif acces == "archive":
+                        kraken(prm, man, nom, actif)
+                    else:
+                        mensuels(prm, man, nom, fen, place, actif)
+    except socle.Refus as r:
+        print(r, file=sys.stderr)
+        return 3 if r.code in ("CA/variable", "CA/parametres") else 4
+    except Exception as e:                                          # jamais une trace : refus nommé par le type
+        print(socle.Refus("CA/acquisition", f"acquisition en échec ({type(e).__name__})"), file=sys.stderr)
+        return 4
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+

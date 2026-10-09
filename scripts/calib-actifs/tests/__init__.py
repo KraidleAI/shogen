@@ -2,11 +2,15 @@
 journal), depuis scripts/calib-actifs : env -u SHOGEN_S2_CAMPAGNE_CONTROL python3 -B -m unittest discover -s tests -t .
 Garde réseau posée à l'import du paquet de tests (forme de s2bis/tests/__init__.py) : une connexion, un envoi ou une
 résolution hors de la boucle locale lève ReseauInterdit (BaseException) ; le serveur local des tests d'acquisition
-écoute sur 127.0.0.1."""
+écoute sur 127.0.0.1. Les variables de mandataire sont retirées de l'environnement (et de celui des sous-processus) :
+un mandataire sur la boucle locale (HTTPS_PROXY=127.0.0.1:…) ferait passer toute requête sous la garde."""
 import ipaddress
+import os
 import socket
 
 TENTATIVES = []
+for _v in [k for k in os.environ if k.lower() in ("http_proxy", "https_proxy", "all_proxy")]:
+    del os.environ[_v]
 
 
 class ReseauInterdit(BaseException):

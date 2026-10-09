@@ -43,7 +43,7 @@
                       "sigma_s": {"ETH": 5400, "USDC": 124200, "USDT": 129600},
                       "source": "config_analyse.py l.28-29 ; ADR-0029 l.188 ; DÉC l.36-37"},
  "series": {
-  "binance": {"format": "binance", "acces": "mensuel_checksum", "pas": 0, "intervalle_ms": 200,
+  "binance": {"format": "binance", "acces": "mensuel_checksum", "pas": 0, "intervalle_ms": 0,
    "url": "https://data.binance.vision/data/spot/monthly/klines/{s}/1m/{s}-1m-{m}.zip",
    "paires": {"ETH": "ETHUSDT", "USDC": "USDCUSD", "USDT": "USDTUSD"}},
   "bitfinex": {"format": "bitfinex", "acces": "pages", "pas": 10000, "intervalle_ms": 2100,
@@ -58,7 +58,7 @@
   "kraken": {"format": "kraken", "acces": "archive", "pas": 0, "intervalle_ms": 0,
    "url": "https://assets.kraken.com/marketing/institutions/Kraken_OHLCVT_2026Q2.zip",
    "paires": {"ETH": "ETHUSD_1.csv", "USDC": "USDCUSD_1.csv", "USDT": "USDTUSD_1.csv"}},
-  "okx": {"format": "okx", "acces": "mensuel", "pas": 0, "intervalle_ms": 500,
+  "okx": {"format": "okx", "acces": "mensuel", "pas": 0, "intervalle_ms": 0,
    "url": "https://static.okx.com/cdn/okex/traderecords/candlesticks/monthly/{mm}/{s}-candlesticks-{m}.zip",
    "paires": {"ETH": "ETH-USDT", "USDT": "USDT-USD"}},
   "source": "SOURCES-HISTORIQUES §3.1 à §3.3 (URL, formats, limites) ; E-CA-12, E-CA-13 ; pages bornées, fin incluse"},
