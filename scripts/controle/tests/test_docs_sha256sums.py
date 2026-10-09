@@ -1,5 +1,7 @@
 """Cas de enforcement/docs-sha256sums.py (lot DETTES-T4, DT4-a ; SHOGEN-DOCS-SHA256SUMS-GATE-1). Sommes publiées,
 non recalculées : SHA-256 de « abc » (FIPS 180-2, annexe B.1) et du vide. Arbres temporaires, sauf le dernier cas."""
+import contextlib
+import io
 import os
 import re
 import runpy
@@ -8,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 SCRIPT = os.path.join(RACINE, "enforcement", "docs-sha256sums.py")
@@ -82,6 +85,16 @@ class DocsSha256sums(unittest.TestCase):
         e = self.arbre({"docs/rapports/SHA256SUMS": ABC + "  x.md" + NL, "docs/a/x.md": "abc"})   # SHA256SUMS lien
         os.symlink(os.path.join(e, "docs", "rapports", "SHA256SUMS"), os.path.join(e, "docs", "a", "SHA256SUMS"))
         self.refuse(e, "docs/a/SHA256SUMS : lien")
+        g = self.arbre({"docs/b/S": ABC + "  x.md" + NL, "docs/a/x.md": "abc"})     # hors du dossier, non interdit
+        os.symlink(os.path.join(g, "docs", "b", "S"), os.path.join(g, "docs", "a", "SHA256SUMS"))
+        self.refuse(g, "docs/a/SHA256SUMS : lien")
+        for cible in ("execution/x.md", "a.jsonl"):     # lien vers un interdit sans sortir du dossier (DT4-d, C-1, C-2)
+            f = self.arbre({"docs/adr-0028/SHA256SUMS": ABC + "  l.md" + NL, f"docs/adr-0028/{cible}": "abc"})
+            os.symlink(cible, os.path.join(f, "docs", "adr-0028", "l.md"))
+            self.refuse(f, "l.1 : l.md sous un emplacement interdit")
+            os.replace(os.path.join(f, "docs", "adr-0028", "l.md"), os.path.join(f, "docs", "adr-0028", "SHA256SUMS"))
+            code, _, err = controler(f)     # SHA256SUMS lien vers l'interdit : refusé, son contenu jamais imprimé
+            self.assertEqual((code, "docs/adr-0028/SHA256SUMS : lien" in err, "'abc'" in err), (1, True, False), err)
 
     def test_liste_egale_sg5(self):     # emplacements interdits de S-G5 (xtask/src/sg5.rs) = liste du contrôle (DT4-b)
         self.assertTrue(os.path.isfile(SCRIPT), SCRIPT)
@@ -95,6 +108,18 @@ class DocsSha256sums(unittest.TestCase):
         d = self.arbre({"docs/a/x.md": "abc"})
         os.symlink(os.path.join(d, "docs", "a", "absent"), os.path.join(d, "docs", "a", "SHA256SUMS"))
         self.assertEqual([controler(d, d)[0], controler(os.path.join(d, "docs"))[0], controler(d)[0]], [3, 3, 3])
+
+    def test_dossier_illisible(self):     # C-4 (DT4-d) : dossier que os.walk ne lit pas : sortie 3, jamais un vert
+        d = self.arbre({"docs/a/SHA256SUMS": ABC + "  x.md" + NL, "docs/a/x.md": "abc", "docs/b/c/y.md": ""})
+        vrai, bloque = os.scandir, os.path.join(d, "docs", "b")
+
+        def doublure(chemin="."):       # doublure de os.scandir : PermissionError sur docs/b seul
+            if os.fspath(chemin) == bloque:
+                raise PermissionError(13, "doublure : lecture refusée", chemin)
+            return vrai(chemin)
+        principal = runpy.run_path(SCRIPT)["main"]
+        with mock.patch("os.scandir", doublure), contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(principal([d]), 3, err.getvalue())
 
     def test_arbre_du_depot(self):     # une somme périmée ou un fichier listé absent du dépôt fait rougir ce cas
         code, _, err = controler(RACINE)

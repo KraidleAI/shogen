@@ -46,3 +46,14 @@ dépendent des tests du harnais qu'ils importent.
 > `docs/adr-0029/etude-marche/hylo/SHA256SUMS.copies` (193) et `docs/adr-0029/calib/SHA256SUMS-ECHANTILLONS.txt` (148),
 > manifestes de copies dont aucun fichier listé n'a été versé : leur rejeu échouerait sur chaque ligne (mesuré à
 > `963eba9`).
+
+> *Ajout daté du 2026-10-09 19:28:17 UTC (`date -u` ; lot DETTES-T4, DT4-d ; relecture G2, C-1 à C-4 et Q-G2-1
+> adjugées)* : hors du contrôle par leur nom aussi, `docs/adr-0028/sceau/PAQUET.sha256`, manifeste du sceau (chemin
+> depuis la racine), rejoué par `scripts/sceau/verify.sh` (l.13), et
+> `docs/adr-0028/sceau/premier-2026-10-02/PAQUET.sha256`, archive du premier sceau d'un paquet depuis rescellé (A-8) :
+> son rejeu échoue par construction (mesuré à `6356a94` : sorties 0 et 1). Un `SHA256SUMS` dont le chemin réel est
+> interdit n'est pas ouvert ; un dossier illisible fait sortir le contrôle en 3. **Serrage gardé (Q-G2-1)** : une seule
+> forme de chemin, relative et sans `./` (un `SHA256SUMS` produit par `find . -exec sha256sum` est refusé « ligne hors
+> forme » alors que `sha256sum -c` l'accepte : l'écrire depuis le dossier, `sha256sum <fichiers>`). **Consigne** : un
+> `SHA256SUMS` versé ne nomme que des pièces versées ; une pièce restée hors du dépôt se nomme dans le texte, jamais
+> dans le `SHA256SUMS`.

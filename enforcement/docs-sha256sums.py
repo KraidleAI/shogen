@@ -8,8 +8,11 @@ local), lignes gardées à la clôture de SHOGEN-SIM-SOMMES-1 (04beacd) parce qu
 tant que le fichier manque et que ces lignes jointes par un saut de ligne ont le sha256 écrit ; toute autre ligne
 absente est refusée. Fichier non listé : compté, non refusé (un SHA256SUMS scelle ce qu'il nomme). Nom exact
 `SHA256SUMS` seul (L-1, DT4-c) : SHA256SUMS.raw, SHA256SUMS.copies, SHA256SUMS-ECHANTILLONS.txt sont hors du contrôle,
-manifestes de copies dont aucun fichier listé n'a été versé (aucun rejeu possible). Usage : python3 -B
-docs-sha256sums.py <racine> ; 0 conforme, 1 refus (motifs sur stderr), 3 erreur (jamais un refus)."""
+manifestes de copies dont aucun fichier listé n'a été versé (aucun rejeu possible) ; de même les deux PAQUET.sha256
+de docs/adr-0028/sceau/ (manifestes du sceau, chemin depuis la racine, rejoués par scripts/sceau/verify.sh ; celui de
+premier-2026-10-02/ archive le premier sceau, paquet rescellé depuis : écart par construction). DT4-d (G2) : un
+SHA256SUMS dont le chemin réel est interdit n'est pas ouvert ; un dossier que le parcours ne peut lire fait sortir en 3.
+Usage : python3 -B docs-sha256sums.py <racine> ; 0 conforme, 1 refus (motifs sur stderr), 3 erreur (jamais un refus)."""
 import hashlib
 import os
 import pathlib
@@ -28,8 +31,12 @@ def interdit(relatif: str) -> bool:
     return relatif.startswith(INTERDITS) or relatif.endswith(".jsonl")
 
 
+def lever(erreur: OSError):
+    raise erreur        # C-4 (DT4-d) : dossier illisible = erreur interne (sortie 3), jamais un saut silencieux
+
+
 def parcourir(racine: str, dossier: str, garder):
-    for base, dossiers, fichiers in os.walk(os.path.join(racine, dossier)):
+    for base, dossiers, fichiers in os.walk(os.path.join(racine, dossier), onerror=lever):
         rel = os.path.relpath(base, os.path.join(racine, dossier)).replace(os.sep, "/")
         pre = "" if rel == "." else rel + "/"
         dossiers[:] = sorted(x for x in dossiers
@@ -41,8 +48,9 @@ def verifier(racine: str, somme: str, motifs: list) -> tuple:
     """Rejoue `somme` ; ajoute ses motifs ; rend (lignes, absentes admises, fichiers non listés)."""
     dossier, admis, listes = os.path.dirname(somme), 0, set()
     reel_dossier, reel_racine = os.path.realpath(os.path.join(racine, dossier)), os.path.realpath(racine)
-    if not os.path.realpath(os.path.join(racine, somme)).startswith(reel_dossier + os.sep):
-        motifs.append(f"{somme} : lien hors de son dossier (non ouvert)")
+    reel_somme = os.path.relpath(os.path.realpath(os.path.join(racine, somme)), reel_racine).replace(os.sep, "/")
+    if not reel_somme.startswith(dossier + "/") or interdit(reel_somme):     # C-1 (DT4-d) : jamais ouvert
+        motifs.append(f"{somme} : lien hors de son dossier ou vers un interdit (non ouvert)")
         return 0, 0, 0
     lignes = pathlib.Path(racine, somme).read_bytes().removesuffix(NL).split(NL)
     nums, epingle = ABSENTS_ADMIS.get(somme, ((), ""))
