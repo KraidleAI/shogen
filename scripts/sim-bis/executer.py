@@ -5,8 +5,9 @@ causes de NON ÉVALUABLE, par cause et par combinaison (E-S-52). SB-11b : emprei
 (E-S-44) ; fichiers partiels de lot, un par (cellule, plage de i), relus à la condition que chaque i y soit une fois et
 une seule (E-S-45, E-S-06). SB-11c : tâches dans l'ordre, en un ou plusieurs processus (E-S-42) ; plan de lots de 90 min
 au plus sur le coût mesuré (adjudication 6 du G0). SB-11d : couche d'observateurs d'une cellule (grille
-cellules.couches, O-5 ; perte sur le W de la cellule, L-2). Entiers, rationnels et Decimal seuls : aucun flottant,
-aucune puissance, aucune fonction de libm."""
+cellules.couches, O-5 ; perte sur le W de la cellule, L-2). SB-11e : cellules sous schéma fermé et refus nommés
+(SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2) ; fond des sources d'une cellule. Entiers, rationnels
+et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -19,6 +20,7 @@ import calib_fiv
 import commun
 import observateurs
 import regle
+import sources
 
 VALEURS = ("REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE")
 INSUFFISANTE = ("unites", "k_crit", "runs")         # information insuffisante (E-S-52) ; n_prime compté à part
@@ -174,8 +176,115 @@ def plan(R_rep: int, ns: int, processus: int, borne: int = BORNE) -> list:
     return [(a, min(a + t, R_rep)) for a in range(0, R_rep, t)]
 
 
+CLES = ("nom", "niveau", "f", "longues", "autres", "hors_enveloppe", "derive", "incidents", "faibles", "couche",
+        "regle", "surcharges")
+COUCHE = ("grille", "repli", "chemin", "local", "artefacts", "regionale", "manque")
+REGLE = ("R", "classes", "S", "variante", "evenements", "absorption")
+INCIDENT = {"chacun": ("rho", "duree", "geometrique", "mode", "population", "p"),
+            "parmi": ("rho", "duree", "geometrique", "mode", "population", "k", "imposes")}
+
+
+def _q(v, haut=1, ouvert=False):
+    """Fraction de [num, den] entiers (den > 0, booléens refusés), de valeur dans [0, haut] (haut exclu si ouvert ;
+    haut None : sans borne), sinon None."""
+    if not (type(v) is list and len(v) == 2 and all(type(x) is int for x in v) and v[1] > 0):
+        return None
+    x = Fraction(*v)
+    return x if 0 <= x and (haut is None or (x < haut if ouvert else x <= haut)) else None
+
+
+def _population(prm: dict, nom: str) -> list:
+    """« pool » : les hôtes du pool BTC D1-bis (calibration.unites) ; « as13335 » : sources.as13335."""
+    return [h for h, _f in prm["calibration"]["unites"]] if nom == "pool" else list(prm["sources"]["as13335"])
+
+
+def _schema(prm: dict, c: dict) -> bool:
+    """Clés exactes, types et domaines d'une cellule (CELLULE/schema) ; toute entrée malformée rend False."""
+    try:
+        co, rg, fa, inc, sur = c["couche"], c["regle"], c["faibles"], c["incidents"], c["surcharges"]
+        v, cl = prm["variante"], rg["classes"]
+        return bool(sorted(c) == sorted(CLES) and NOM.fullmatch(c["nom"]) and c["niveau"] in ("C0", "C1", "C2")
+                    and _q(c["f"]) and _q(c["longues"], 1, True) is not None and _q(c["autres"], None) is not None
+                    and _q(c["hors_enveloppe"], 1, True) is not None and type(sur) is dict
+                    and (c["derive"] is None or type(c["derive"]) is list and set(c["derive"]) <= set(sources.GENRES))
+                    and sorted(co) == sorted(COUCHE) and sorted(rg) == sorted(REGLE)
+                    and rg["R"] in (prm["regle"]["R"], prm["regle"]["R_approche"]) and type(cl) is list
+                    and cl == [x for x in sources.CLASSES if x in cl] and cl[0] == "BTC"
+                    and type(rg["S"]) is bool and type(rg["absorption"]) is bool and commun.naturel(rg["evenements"])
+                    and type(rg["variante"]) is list and set(rg["variante"]) <= {v["diviseur"], v["sensibilite"]}
+                    and (fa is None or sorted(fa) == ["L", "k", "p", "type"] and fa["type"] in ("panne", "ecart"))
+                    and (inc is None or type(inc) is dict))
+    except (TypeError, KeyError, AttributeError, IndexError):
+        return False
+
+
+def _valider(prm: dict, c: dict) -> None:
+    """Schéma fermé d'une cellule, puis refus nommés (voir cellule)."""
+    def non(code):
+        raise commun.Refus(code, f"cellule {c.get('nom') if type(c) is dict else c!r}")
+    if not _schema(prm, c):
+        non("CELLULE/schema")
+    co, fa, inc, sur = c["couche"], c["faibles"], c["incidents"], c["surcharges"]
+    ch, cle = co["chemin"], {"reference": "facteur", "fixe": "epsilon"}
+    if (co["grille"] not in prm["cellules"]["couches"] or type(co["repli"]) is not bool or type(ch) is not dict
+            or sorted(ch) != sorted(["mode", cle.get(ch.get("mode"), "mode")]) or _q(ch[cle[ch["mode"]]]) is None
+            or any(co[k] is not None and _q(co[k]) is None for k in ("local", "artefacts"))
+            or _q(co["regionale"]) is None or _q(co["manque"]) is None):
+        non("CELLULE/couche")
+    pop = prm["sources"][prm["sources"]["absorption"]["population"]]
+    if fa is not None:
+        if _q(fa["p"], 1, True) is None:
+            non("CELLULE/faible-p")
+        if type(fa["L"]) is not int or fa["L"] < 1:
+            non("CELLULE/faible-L")
+        if type(fa["k"]) is not int or not 1 <= fa["k"] <= len(pop):
+            non("CELLULE/faible-k")
+    if inc is not None:
+        if inc.get("mode") not in INCIDENT:
+            non("CELLULE/incident-mode")
+        if not _q(inc.get("rho"), None):
+            non("CELLULE/rho")
+        if type(inc.get("duree")) is not int or inc["duree"] < 1:
+            non("CELLULE/incident-duree")
+        if (sorted(inc) != sorted(INCIDENT[inc["mode"]]) or type(inc["geometrique"]) is not bool
+                or inc["population"] not in ("pool", "as13335") or (inc["mode"] == "chacun" and _q(inc["p"]) is None)
+                or (inc["mode"] == "parmi" and not (type(inc["k"]) is int and 1 <= inc["k"] <= len(_population(
+                    prm, inc["population"])) and inc["imposes"] in ("aucun", "faibles" if fa else "aucun")))):
+            non("CELLULE/schema")
+    if sur and not (sorted(sur) == ["longues", "poids_longues"] and len(sur["longues"]) == len(sur["poids_longues"])
+                    and all(commun.positif(x) for x in sur["longues"] + sur["poids_longues"])):
+        non("CELLULE/longues")
+
+
+def fond(prm: dict, cel: dict, points: dict, W: int) -> dict:
+    """Fond de sources.Replication d'une cellule validée : f ; régime de chaque strate au niveau de la cellule (C0 :
+    aucun ; C1, C2 : point d'E1 de la strate, points = {niveau : {strate : (φ, κ, τ_D)}}, sinon CELLULE/niveau) ; part
+    des pannes longues, autres, hors-enveloppe ; dérive sur la durée nominale W·tendance_par_semaine (E-S-13 ; W entier
+    ≥ 1, sinon CELLULE/duree, durée nulle) ; incidents, hôtes au mode de sources.touches (E-S-15) ; unités faibles :
+    les k premiers hôtes de sources.absorption.population (E-S-16, Q-T2-10), partenaire imposé parmi elles."""
+    if type(W) is not int or W < 1:
+        raise commun.Refus("CELLULE/duree", f"W = {W!r} : entier ≥ 1")
+    st, n, fa, inc = prm["calibration"]["strates"], cel["niveau"], cel["faibles"], cel["incidents"]
+    if n != "C0" and sorted(points.get(n, {})) != sorted(st):
+        raise commun.Refus("CELLULE/niveau", f"{cel['nom']} : {n} sans point d'E1 pour chaque strate")
+    hf = fa and prm["sources"][prm["sources"]["absorption"]["population"]][:fa["k"]]
+    out = {"f": Fraction(*cel["f"]), "regime": {s: None if n == "C0" else points[n][s] for s in st},
+           "longues": Fraction(*cel["longues"]), "autres": Fraction(*cel["autres"]),
+           "hors_enveloppe": Fraction(*cel["hors_enveloppe"]), "incidents": None,
+           "derive": cel["derive"] and {"genres": list(cel["derive"]),
+                                        "duree": W * prm["sources"]["derive"]["tendance_par_semaine"]},
+           "faibles": fa and {"hotes": hf, "p": Fraction(*fa["p"]), "L": fa["L"], "type": fa["type"]}}
+    if inc is not None:
+        p = _population(prm, inc["population"])
+        h = (("chacun", p, Fraction(*inc["p"])) if inc["mode"] == "chacun"
+             else ("parmi", p, inc["k"], hf if inc["imposes"] == "faibles" else []))
+        out["incidents"] = {"rho": Fraction(*inc["rho"]), "duree": inc["duree"], "geometrique": inc["geometrique"],
+                            "hotes": h}
+    return out
+
+
 def couche(prm: dict, ep: dict, cel: dict, W: int) -> dict:
-    """Couche d'observateurs.Couche d'une cellule : grille cellules.couches[grille] de parametres.json (O-5) ;
+    """Couche d'observateurs.Couche d'une cellule validée : grille cellules.couches[grille] de parametres.json (O-5) ;
     perte tirée sur la durée nominale W de la cellule, celle passée à calendrier.echelle, jamais sur T_max (L-2 ;
     Q-T3-7) ; chemin : référence (1 − f)·p̂ (observateurs.chemin_reference, Q-S-12) × facteur, ou ε fixe ; repli,
     pannes régionales et manques de la cellule ; défaut local et artefacts : ceux de la cellule, ou, à None, ceux de
@@ -190,3 +299,17 @@ def couche(prm: dict, ep: dict, cel: dict, W: int) -> dict:
             "paires": Fraction(*g["paires"]), "perte": W if g["perte"] else None, "repli": c["repli"], "chemin": eps,
             "local": Fraction(*(c["local"] or g["local"])), "artefacts": Fraction(*(c["artefacts"] or g["artefacts"])),
             "regionale": Fraction(*c["regionale"]), "manque": Fraction(*c["manque"])}
+
+
+def cellule(prm: dict, ep: dict, cel: dict, points: dict, W: int) -> dict:
+    """Cellule sous schéma fermé (SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2), puis ses entrées :
+    {"nom", "prm" (surcharges de sources.longues et sources.poids_longues appliquées à une copie), "fond", "couche",
+    "regle"}. Refus nommés : clés, types et domaines (CELLULE/schema) ; grille, chemin et taux de la couche
+    (CELLULE/couche) ; unité faible à p ≥ 1 (CELLULE/faible-p), à L < 1 (CELLULE/faible-L), à k hors de 1..|population|
+    (CELLULE/faible-k) ; incident de mode inconnu (CELLULE/incident-mode), à ρ nul (CELLULE/rho), de durée nulle
+    (CELLULE/incident-duree) ; surcharge de longues sans poids_longues, ou l'inverse (CELLULE/longues) ; W nul
+    (CELLULE/duree) ; niveau sans point d'E1 (CELLULE/niveau)."""
+    _valider(prm, cel)
+    p = dict(prm, sources=dict(prm["sources"], **cel["surcharges"]))
+    return {"nom": cel["nom"], "prm": p, "fond": fond(p, cel, points, W), "couche": couche(p, ep, cel, W),
+            "regle": cel["regle"]}

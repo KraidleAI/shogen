@@ -1,5 +1,6 @@
-"""Cellules SB-11d (SHOGEN-SIM-BIS-SB11-BRIEF-1, L-2 et O-5) : attendus écrits à la main depuis la PROPOSITION, l'AVIS
-et EP ; chaque test nomme les mutations qui le rougissent."""
+"""Cellules SB-11d et SB-11e (SHOGEN-SIM-BIS-SB11-BRIEF-1, L-2 et O-5 ; SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1, schéma
+fermé et refus nommés) : attendus écrits à la main depuis la PROPOSITION, l'AVIS et EP ; chaque test nomme les
+mutations qui le rougissent."""
 import copy
 import unittest
 from fractions import Fraction
@@ -11,6 +12,9 @@ import executer
 PRM = commun.charger_parametres(environ={})
 EP = calibration.charger(PRM, environ={})["episodes"]
 F = Fraction
+AS = ["bitfinex", "chainlink", "coinbase", "coingecko", "defillama", "kraken", "okx"]
+POINTS = {"C1": {"calme": (F(1, 100), F(5), 60), "stress": (F(1, 50), F(10), 240)},
+          "C2": {"calme": (F(1, 10), F(50), 4320), "stress": (F(1, 10), F(50), 1440)}}
 N1 = {"nom": "N1", "niveau": "C1", "f": [3, 10], "longues": [0, 1], "autres": [1, 1], "hors_enveloppe": [1, 4000],
       "derive": None, "incidents": None, "faibles": None,
       "couche": {"grille": "nominale", "repli": False, "chemin": {"mode": "reference", "facteur": [1, 1]},
@@ -31,6 +35,16 @@ def cel(**k):
             c[a] = v
     return c
 
+
+def code_de(f, *a):
+    """Code du refus nommé levé par f(*a), nom de l'exception sinon, None sans exception (rouge d'assertion)."""
+    try:
+        f(*a)
+    except commun.Refus as e:
+        return e.code
+    except Exception as e:                                          # noqa: BLE001 (rouge d'assertion, jamais d'erreur)
+        return type(e).__name__
+    return None
 
 
 class TestCellules(unittest.TestCase):
@@ -71,6 +85,58 @@ class TestCellules(unittest.TestCase):
         self.assertEqual(set(c["chemin"].values()), {F(3, 10000)})
         self.assertEqual((c["repli"], c["local"], c["artefacts"], c["regionale"], c["manque"]),
                          (True, F(1, 1000), F(1, 20), F(1, 5), F(1, 4)))
+
+    def test_fond(self):
+        """Fond de sources.Replication : N1 à C1 (régime de la strate, points d'E1), f 3/10, hors-enveloppe 1/4 000 ;
+        C0 : aucun régime ; cible (ρ = 1/10, D = 20 fixe, chacun des 7 hôtes AS13335 à 7/10) ; tendances sur W = 16
+        semaines (161 280 fenêtres) ; deux unités faibles à 2/5, L = 1, panne : les deux premiers hôtes AS13335 ;
+        partenaire imposé parmi elles. Mutations M-11D-07 (durée de dérive sur T_max), M-11D-08 (régime de C2 pour
+        C1), M-11D-09 (unités faibles prises au pool)."""
+        f = executer.fond(PRM, N1, POINTS, 16)
+        self.assertEqual(f, {"f": F(3, 10), "regime": POINTS["C1"], "longues": 0, "autres": 1,
+                             "hors_enveloppe": F(1, 4000), "derive": None, "incidents": None, "faibles": None})
+        self.assertEqual(executer.fond(PRM, cel(niveau="C0"), {}, 16)["regime"], {"calme": None, "stress": None})
+        inc = {"rho": [1, 10], "duree": 20, "geometrique": False, "mode": "chacun", "population": "as13335",
+               "p": [7, 10]}
+        f = executer.fond(PRM, cel(incidents=inc, derive=["tendances"]), POINTS, 16)
+        self.assertEqual((f["incidents"], f["derive"]), (
+            {"rho": F(1, 10), "duree": 20, "geometrique": False, "hotes": ("chacun", AS, F(7, 10))},
+            {"genres": ["tendances"], "duree": 161280}))
+        inc = dict(inc, mode="parmi", k=2, imposes="faibles")
+        del inc["p"]
+        f = executer.fond(PRM, cel(incidents=inc, faibles={"k": 2, "p": [2, 5], "L": 1, "type": "panne"}), POINTS, 16)
+        self.assertEqual((f["faibles"], f["incidents"]["hotes"]), (
+            {"hotes": AS[:2], "p": F(2, 5), "L": 1, "type": "panne"}, ("parmi", AS, 2, AS[:2])))
+
+    def test_refus_nommes_o_1(self):
+        """O-1 de la G2 de la tranche 2 (SB11-IMPRESSIONS-1) : unité faible à p = 1 ou L = 0, incident à ρ = 0, de mode
+        inconnu ou de durée nulle, W nul (durée de dérive nulle), surcharge de longues sans poids_longues, clé en trop,
+        niveau inconnu, C1 absent des points d'E1, grille de couche inconnue : refus nommés, jamais une autre
+        exception. Mutations M-11D-10 (p = 1 admis), M-11D-11 (L = 0 admis), M-11D-12 (ρ = 0 admis), M-11D-13 (mode
+        inconnu admis), M-11D-14 (longues sans poids admis)."""
+        fa = {"k": 1, "p": [1, 1], "L": 1, "type": "panne"}
+        inc = {"rho": [0, 1], "duree": 20, "geometrique": False, "mode": "chacun", "population": "as13335",
+               "p": [7, 10]}
+        cas = [(cel(faibles=fa), 16, "CELLULE/faible-p"),
+               (cel(faibles=dict(fa, p=[2, 5], L=0)), 16, "CELLULE/faible-L"),
+               (cel(incidents=inc), 16, "CELLULE/rho"), (cel(incidents=dict(inc, rho=[1, 10], mode="trois")), 16,
+                                                         "CELLULE/incident-mode"),
+               (cel(incidents=dict(inc, rho=[1, 10], duree=0)), 16, "CELLULE/incident-duree"),
+               (cel(derive=["tendances"]), 0, "CELLULE/duree"),
+               (cel(surcharges={"longues": [60, 1440]}), 16, "CELLULE/longues"),
+               (dict(N1, autre=1), 16, "CELLULE/schema"), (cel(niveau="C3"), 16, "CELLULE/schema"),
+               (cel(couche__grille="moyenne"), 16, "CELLULE/couche")]
+        for c, w, code in cas:
+            self.assertEqual(code_de(executer.cellule, PRM, EP, c, POINTS, w), code, code)
+        self.assertEqual(code_de(executer.cellule, PRM, EP, N1, {"C2": POINTS["C2"]}, 16), "CELLULE/niveau")
+
+    def test_surcharges_longues(self):
+        """SB11-IMPRESSIONS-1 : une surcharge de sources.longues surcharge sources.poids_longues ; le prm de la cellule
+        les porte, celui du lot reste intact. Mutation M-11D-15 (surcharge appliquée au prm du lot)."""
+        s = {"longues": [60, 1440], "poids_longues": [2, 1]}
+        p = executer.cellule(PRM, EP, cel(surcharges=s), POINTS, 16)["prm"]
+        self.assertEqual((p["sources"]["longues"], p["sources"]["poids_longues"]), ([60, 1440], [2, 1]))
+        self.assertEqual((PRM["sources"]["longues"], PRM["sources"]["poids_longues"]), ([60, 1440, 4320], [1, 1, 1]))
 
 
 if __name__ == "__main__":
