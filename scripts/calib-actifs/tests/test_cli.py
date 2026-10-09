@@ -105,17 +105,101 @@ class TestCli(unittest.TestCase):
     def test_borne_valeur(self):
         """C-13 (O-1) : refus CA/borne au calcul (borne haute abaissée à 0,0015) : valeur calculée de la règle sur une
         ligne à part de calib_actifs.txt, nommée et descriptive, après le refus, égale à la règle du calcul direct sous
-        la borne scellée ; refus et fragment JSON sans valeur (§5.7). Mutations : ligne omise ; valeur d'une autre
-        règle."""
+        la borne scellée ; refus et fragment JSON sans valeur (§5.7). SHOGEN-CALIB-BORNE-MULTI-1 : les trois actifs
+        touchent cette borne, une ligne chacun dans l'ordre des actifs. Mutations : ligne omise ; valeur d'une autre
+        règle ; calcul arrêté au premier refus."""
         argv, d = banc(self, lambda p: p["tau"].update(borne_haute_exclue="0.0015"))
         self.assertEqual(tau.main(argv, {}), 1)
         texte, frag = lire(d)
         p = socle.lire()
-        regle = tau.calcul_actif(p, "ETH", sy.series(p, "ETH"), sy.FEN, sy.BTC)["places"]["regle"]
         refus = "REFUS CA/borne : τ des places à la borne haute exclue ou au-delà ; actif ETH"
-        valeur = ("descriptif hors refus (jamais décisif) : valeur calculée de la règle, τ des places : "
-                  f"{regle} ; actif ETH")
-        self.assertEqual((texte[1:], frag["refus"]), ([refus, valeur, ""], refus))
+        valeurs = [("descriptif hors refus (jamais décisif) : valeur calculée de la règle, τ des places : "
+                    f"{tau.calcul_actif(p, a, sy.series(p, a), sy.FEN, sy.BTC)['places']['regle']} ; actif {a}")
+                   for a in socle.ACTIFS]
+        self.assertEqual((texte[1:], frag["refus"]), ([refus, *valeurs, ""], refus))
+
+    def test_borne_plusieurs(self):
+        """SHOGEN-CALIB-BORNE-MULTI-1 (O-CC-2), sous la borne scellée (0,0285). ETH et USDT au prix 100 sur cinq places
+        et 102 ou 103 sur okx (ou 100), toutes minutes actives : seule okx s'écarte de la médiane leave-one-out (100),
+        de 0,02 ou 0,03 ; P99,9 = maximum ; règle 1,5 × 0,02 = 0,0300 et 1,5 × 0,03 = 0,0450 (valeurs à la main),
+        au-delà de 0,0285 ; six places à 100 : sous la borne basse, aucun refus. USDC (séries synthétiques) passe.
+        Par passe : le refus du premier actif refusé dans les deux sorties, une ligne de valeur par actif à la borne
+        dans l'ordre des actifs, puis une ligne par refus suivant sans valeur (C-B4 de la G2 de DETTES-T1 : exception
+        non nommée en CA/calcul, type seul), aucun fragment. Passes : deux à la borne ; USDC en exception non nommée ;
+        ordre des actifs contraire à l'ordre des valeurs (C-B3) ; un seul actif refusé (C-B1) ; premier refus sans
+        valeur (CA/population injecté) puis CA/borne (C-B2) ; CA/borne puis CA/population (C-B4) ; deux refus suivants,
+        dans l'ordre des actifs (C-B6) ; exception non nommée au premier actif : refus écrit sans actif (C-B7) ; refus
+        global aux paramètres (plancher d'oracle d'USDT faux : CA/chainlink à chaque actif, levé au calcul de σ) ou
+        injecté identique sur USDC et USDT : une ligne de refus suivant par texte, aucune qui répète le refus écrit
+        (C-B8). Mutations : arrêt au premier refus ; refus unique non levé (MB03) ; lignes seulement si le refus écrit
+        porte une valeur (MB01) ; lignes triées par valeur (MB10) ; refus suivants non imprimés, imprimés avec le
+        premier refus, réduits au premier (NB2) ou inversés (NB3) ; actif au refus écrit CA/calcul (NB4) ; refus
+        suivants répétés. C-B9 (R-4) : passe « même motif » (CA/population en strate calme pour ETH et USDC, celui
+        d'ETH répété par USDT) : le refus d'USDC gardé, celui d'ETH jamais répété ; mutations ND1 (dédoublonnage par
+        code et motif, actif ignoré) et ND2 (dédoublonnage contre le dernier texte seul)."""
+        orig = tau.calcul_actif
+
+        def injecte(vise, exc, suite=None):
+            def f(prm, actif, *x):
+                if actif == vise:
+                    raise exc
+                return (suite or orig)(prm, actif, *x)
+            return f
+        p = socle.lire()
+        borne = "REFUS CA/borne : τ des places à la borne haute exclue ou au-delà ; actif "
+        pop = "REFUS CA/population : aucune cellule à N_min places définies ; actif "
+        hors = "descriptif hors refus (jamais décisif) : valeur calculée de la règle, τ des places : "
+        suivant = "descriptif hors refus (jamais décisif) : refus suivant : "
+        calcul = "REFUS CA/calcul : calcul en échec (ZeroDivisionError)"
+        chainlink = ("REFUS CA/chainlink : plancher d'oracle différent de la valeur attendue ; actif USDT ; classe "
+                     "oracle_chainlink")
+
+        def pop_de(actif):
+            return socle.Refus("CA/population", "aucune cellule à N_min places définies", actif, strate="calme")
+
+        def faux(q):
+            q["oracles_attendus"]["tau"]["USDT"] = "0.9"
+        globale = socle.Refus("CA/chainlink", "plancher d'oracle différent de la valeur attendue", "USDT",
+                              "oracle_chainlink")
+        cas = [("deux", orig, 102, 103, borne + "ETH", [hors + "0.0300 ; actif ETH", hors + "0.0450 ; actif USDT"]),
+               ("exception", injecte("USDC", ZeroDivisionError()), 102, 103, borne + "ETH",
+                [hors + "0.0300 ; actif ETH", hors + "0.0450 ; actif USDT",
+                 suivant + "REFUS CA/calcul : calcul en échec (ZeroDivisionError) ; actif USDC"]),
+               ("ordre", orig, 103, 102, borne + "ETH", [hors + "0.0450 ; actif ETH", hors + "0.0300 ; actif USDT"]),
+               ("seul", orig, 100, 103, borne + "USDT", [hors + "0.0450 ; actif USDT"]),
+               ("sans valeur", injecte("ETH", socle.Refus("CA/population", "aucune cellule à N_min places définies",
+                                                          "ETH", strate="calme")), 102, 103,
+                pop + "ETH ; strate calme", [hors + "0.0450 ; actif USDT"]),
+               ("suivant", injecte("USDT", socle.Refus("CA/population", "aucune cellule à N_min places définies",
+                                                       "USDT", strate="stress")), 102, 103, borne + "ETH",
+                [hors + "0.0300 ; actif ETH", suivant + pop + "USDT ; strate stress"]),
+               ("deux suivants", injecte("USDC", ZeroDivisionError(), injecte("USDT", socle.Refus(
+                   "CA/population", "aucune cellule à N_min places définies", "USDT", strate="stress"))), 102, 103,
+                borne + "ETH", [hors + "0.0300 ; actif ETH", suivant + calcul + " ; actif USDC",
+                                suivant + pop + "USDT ; strate stress"]),
+               ("exception premier", injecte("ETH", ZeroDivisionError()), 102, 103, calcul,
+                [hors + "0.0450 ; actif USDT"]),
+               ("doublon", injecte("USDC", globale, injecte("USDT", globale)), 102, 103, borne + "ETH",
+                [hors + "0.0300 ; actif ETH", suivant + chainlink]),
+               ("global", orig, 100, 100, chainlink, [], faux),
+               ("même motif", injecte("ETH", pop_de("ETH"), injecte("USDC", pop_de("USDC"), injecte(
+                   "USDT", pop_de("ETH")))), 102, 103, pop + "ETH ; strate calme",
+                [suivant + pop + "USDC ; strate calme"])]
+        for nom, calcul_, eth, usdt, refus, lignes, *modif in cas:
+            with self.subTest(nom):
+                argv, d = banc(self, *modif)
+                for actif, okx in (("ETH", eth), ("USDT", usdt)):
+                    for x in socle.lecture(p)["places"][actif]:
+                        s = {t: (socle.Decimal(okx if x == "okx" else 100), True) for t in socle.minutes(sy.FEN)}
+                        with open(os.path.join(argv[1], "principale", x, actif, "f.dat"), "wb") as f:
+                            f.write(sy.octets(p["series"][x]["format"], s))
+                tau.calcul_actif = calcul_
+                try:
+                    code = tau.main(argv, {})
+                finally:
+                    tau.calcul_actif = orig
+                self.assertEqual((code, *lire(d)), (1, [socle.ETIQUETTE, refus, *lignes, ""],
+                                                    {"etiquette": socle.ETIQUETTE, "refus": refus}))
 
 
 if __name__ == "__main__":
