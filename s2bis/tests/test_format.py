@@ -200,6 +200,15 @@ class Format(unittest.TestCase):
         self.assertEqual([all(x in p for x in ("CB-6d", "TARDIVES-BORNE-1", "IMBRICATION-OCTETS-1", "CORPS-BORNE-1"))
                           for p in puces if p.startswith("**Partie P2, tranche A**")], [True])
 
+    def test_paragraphe_12_troncature_et_identifiant(self):         # CB-12a : deux items de l'annexe B
+        """§12 : `reponses` null quand le drapeau TC est posé, aucun repli en TCP (choix du lot) ; identifiant hors de
+        16 bits en refus nommé ; la puce « Partie P2 » nomme CB-12a et les deux items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("null quand le drapeau TC est posé", "aucun repli en TCP", "requête DNS invalide")
+        self.assertEqual([x in sections["12"] for x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("CB-12a", "DNS-TC-1", "DNS-ID-16BITS-1")) for p in puces if
+                          p.startswith("**Partie P2, tranche A**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

@@ -45,7 +45,8 @@
 - **Partie P2, tranche A** (2026-10-08 ; sous-lots CB-6, CB-12, CB-13) : le diff CB-6c écrit le contenu de `valeurs`
   (§9.1, relevés des décodeurs de CB-6a et CB-6b) et le champ `decodeur` des formes (§14.1), et ferme pour les
   décodeurs SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§9.1) ; le diff CB-6d ferme SHOGEN-S2BIS-TARDIVES-BORNE-1 (§13.6),
-  SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 (§8.3) et le volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (§8.4).
+  SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 (§8.3) et le volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (§8.4) ; le
+  diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -463,7 +464,8 @@ champs :
 - `reponses` : liste de la section réponse, chaque élément `[nom, type, ttl, données]` : `nom` en texte terminé par
   un point ; `type` entier (1 A, 6 SOA, 16 TXT) ; `ttl` entier en secondes ; `données` : pour A, l'adresse en
   notation pointée ; pour TXT, la liste des chaînes (octets lus en latin-1) ; pour SOA, `[mname, rname, serial,
-  refresh, retry, expire, minimum]` ; pour tout autre type, null. Null sans réponse retenue ;
+  refresh, retry, expire, minimum]` ; pour tout autre type, null. Null sans réponse retenue, et null quand le drapeau
+  TC est posé (ci-dessous) ;
 - `debut`, `fin` : instants de l'envoi et de la fin de l'attente, en microsecondes, sur l'horloge murale ; le délai se
   compte sur l'horloge monotone (C-4).
 
@@ -485,6 +487,14 @@ court) est ignoré, et l'attente continue jusqu'au délai (C-2). La requête ne 
 est une IPv4 littérale **canonique** (quatre entiers décimaux pointés, sans zéro de tête : forme rendue par
 `ipaddress`) ; toute autre valeur (nom, forme abrégée comme « 127.1 », null) donne `forme`, sans exception, sans
 résolution et sans envoi (ADR-0029 l.109).
+**Troncature** (CB-12a, SHOGEN-S2BIS-DNS-TC-1 ; O-4 de la G2 de la tranche B) : une réponse appariée au drapeau TC est
+retenue, `statut` `reponse`, `rcode` lu, `tc` vrai ; sa section réponse, coupée par définition (RFC 1035 §4.2.1, cité
+plus haut), n'est pas lue : `reponses` null. Avant CB-12a, une réponse coupée au milieu d'un enregistrement donnait
+`forme`, drapeau perdu. Le client ne fait aucun repli en TCP (choix du lot, admis pour D-4 et D-5 par la G2 de la
+tranche B) : le drapeau se lit au recalcul, et le relevé ASN (CB-12b) tient une résolution tronquée pour une adresse non
+obtenue. **Identifiant** (CB-12a, SHOGEN-S2BIS-DNS-ID-16BITS-1 ; O-10) : entier de 0 à 65 535 ; tout autre
+identifiant (injecté par un test, booléen compris) est un refus nommé de la requête (`requête DNS invalide :
+identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : `struct.error`, non nommé).
 
 ## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
 

@@ -3,7 +3,8 @@ libellés par od) ; réponses servies en boucle locale à c-ares (Node 22), qui 
 CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7). CB-11f : datagramme non apparié ignoré,
 adresse non littérale refusée sans envoi (C-2) ; MG-18, MG-19, MG-21, MG-24 (C-7). CB-19a (C-1 (a) de la relecture
 d'intégration de P1) : réponse appariée de plus de 512 octets en `forme` (RFC 1035 §2.3.4, §4.2.1), tailles écrites à
-la main."""
+la main. CB-12a : drapeau TC gardé, section réponse non lue, aucun repli en TCP (SHOGEN-S2BIS-DNS-TC-1) ; identifiant
+hors de 16 bits refusé et nommé (SHOGEN-S2BIS-DNS-ID-16BITS-1)."""
 import socket
 import struct
 import threading
@@ -49,6 +50,15 @@ def udp(comportement):
     t = threading.Thread(target=fil, daemon=True)
     t.start()
     return srv.getsockname()[1], recues, t
+
+
+def essai(fonction, *args, **kw):
+    """Ce que rend `fonction`, ou « Type : message » de l'exception qu'elle lève (rouge par assertion, jamais par
+    erreur)."""
+    try:
+        return fonction(*args, **kw)
+    except Exception as e:
+        return f"{type(e).__name__} : {e}"
 
 
 class Messages(unittest.TestCase):
@@ -214,6 +224,37 @@ class Interroger(unittest.TestCase):
         r = dns.interroger("127.0.0.1", ".", "SOA", recursion=False, delai=S, port=port)
         fil.join(5)
         self.assertEqual((r["statut"], r["rcode"], r["reponses"]), ("forme", None, None))
+
+    def test_drapeau_tc_garde_section_reponse_non_lue(self):      # SHOGEN-S2BIS-DNS-TC-1 (CB-12a, O-4 de la G2)
+        """Réponse appariée au drapeau TC (octet 2 : 0x82, RFC 1035 §4.1.1), coupée au milieu d'un enregistrement (O-4 :
+        elle donnait `forme`, drapeau perdu) ou entière : `reponse`, `tc` vrai, `reponses` null, rcode lu ; aucune
+        connexion TCP n'est tentée (seul l'UDP du serveur reçoit)."""
+        tc = R_A[:2] + bytes([0x82]) + R_A[3:]
+        self.assertEqual([essai(dns.analyser, m, Q_A) for m in (tc, tc[:-6])],
+                         [{"rcode": 0, "tc": True, "reponses": None}] * 2)
+        resultats = []
+        for m in (tc[:-6], tc[:3] + bytes([0x83]) + tc[4:]):                 # coupée ; rcode 3 (NXDOMAIN)
+            port, recues, fil = udp(lambda srv, requete, client, m=m: srv.sendto(requete[:2] + m[2:], client))
+            with socket.create_server(("127.0.0.1", port)) as tcp:          # même port en TCP : rien n'y arrive
+                tcp.setblocking(False)
+                resultats.append(dns.interroger("127.0.0.1", WE, "A", delai=S, port=port))
+                self.assertRaises(BlockingIOError, tcp.accept)
+            fil.join(5)
+        self.assertEqual([(r["statut"], r["rcode"], r["tc"], r["reponses"]) for r in resultats],
+                         [("reponse", 0, True, None), ("reponse", 3, True, None)])
+
+    def test_identifiant_hors_de_16_bits_refus_nomme(self):          # SHOGEN-S2BIS-DNS-ID-16BITS-1 (CB-12a, O-10)
+        """0 et 65 535 admis ; 65 536, -1, un booléen ou un flottant : refus nommé (« requête DNS invalide »), jamais
+        `struct.error` ; `interroger` rend `forme` sans rien envoyer et sans lever."""
+        self.assertEqual([dns.requete(i, WE, "A")[:2] for i in (0, 0xFFFF)], [bytes(2), bytes([0xFF, 0xFF])])
+        self.assertEqual([str(essai(dns.requete, i, WE, "A"))[:41] for i in (1 << 16, -1, True, 1.0)],
+                         ["ValueError : requête DNS invalide : ident"] * 4)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as srv:
+            srv.bind(("127.0.0.1", 0))
+            r = essai(dns.interroger, "127.0.0.1", WE, "A", delai=S // 10, port=srv.getsockname()[1], ident=1 << 16)
+            srv.setblocking(False)
+            self.assertRaises(BlockingIOError, srv.recvfrom, 4096)
+        self.assertEqual((r["statut"], r["rcode"], r["tc"]), ("forme", None, None))
 
     def test_identifiant_tire_sur_16_bits(self):
         """MG-24 : l'identifiant est tiré par `secrets.randbelow(65536)` et porté tel quel par la requête."""

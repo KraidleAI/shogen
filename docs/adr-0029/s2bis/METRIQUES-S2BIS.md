@@ -1911,3 +1911,24 @@ mutant reconnu équivalent avant la campagne (décodage UTF-8 avec remplacement)
 place rendue avant le résultat, niveaux non comptés avant le décodeur, RecursionError prise pour un verdict, décodeur
 sur les octets bruts (NC-1), copie altérée (échappement, compte), valeurs non comptées, comptées sans multiplicité,
 borne doublée, §13.6 défait, plancher non relevé. Suite : 281 tests ; plancher du job : 281, égalité exigée.
+
+## CB-12a (2026-10-08) : drapeau TC et identifiant sur 16 bits du client DNS (SHOGEN-S2BIS-DNS-TC-1, -DNS-ID-16BITS-1)
+
+Objet : une réponse appariée au drapeau TC est retenue, `tc` vrai, `rcode` lu, section réponse non lue (`reponses`
+null), sans repli en TCP (choix du lot) ; un identifiant hors de 0 à 65 535, booléen compris, est un refus nommé de
+`requete`, donc `forme` pour `interroger` (avant : `struct.error`, non nommé). FORMAT §12.
+
+Rouge : sur le code de CB-6d, les 3 tests neufs échouent par assertion (réponse coupée lue, drapeau perdu ;
+`struct.error` ; §12).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/dns.py` | 130 | — |
+| `tests/test_dns.py` | 265 | 17 (2 de plus : drapeau TC, section non lue ; identifiant hors de 16 bits) |
+| `tests/test_format.py` | 226 | 13 (1 de plus : §12 et puce « Partie P2 ») |
+
+Mutants (même commande) : 11 mutants, 11 tués par leur test visé (0 vivant, 0 FATAL) au second passage, rejoués sur
+l'état corrigé ; au premier, « bit RD pris pour TC » était tué par un autre test que le visé : le test du drapeau
+emploie désormais 0x82 (TC sans RD), campagne relancée. Liste : section lue malgré TC, drapeau perdu, rcode non lu sous
+TC, bit RD pris pour TC, identifiant non contrôlé, 65 536, booléen ou −1 admis, refus non rattrapé par `interroger`, §12
+défait, plancher non relevé. Suite : 284 tests ; plancher du job : 284, égalité exigée.
