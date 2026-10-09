@@ -2087,3 +2087,36 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 308 tests ; plancher du job : 308, égalité exigée (`--egal`).
+
+## CB-15c (2026-10-08) : enregistrement `tetes` et export dans la boucle, `--depot` (E-C-35)
+
+Objet : avec un dépôt, la fenêtre qui clôt l'heure porte `tetes` avant sa `sante` (têtes des autres journaux consignées
+dès leur lecture), et la tête de son point de contrôle est exportée après le marqueur (FORMAT §2, §11.5, §14.1, §14.3,
+§16.6) ; option `--depot` du point d'entrée ; nom d'observateur `[a-z0-9]{1,16}` (règle `observateur-nom`, il nomme ses
+fichiers au dépôt). Correction de la G2 de P2B (2026-10-08) : nom d'observateur `[a-z0-9]{1,16}` au descripteur (C-6,
+Q-8) : « O1 » est refusé.
+
+Rouge : boucle et point d'entrée qui ignorent le dépôt, 3 tests en échec d'assertion (le quatrième, sans dépôt, est vert
+par construction : non-régression). Rouges de la correction (correction retirée du code, test gardé ; python3.12 -X dev
+-W error) : R-C6b (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G18a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 146 | — |
+| `shogen_s2bis/collecte/entree.py` | 198 | — |
+| `tests/test_tetes.py` | 272 | 15 (4 de plus) |
+| `tests/test_entree.py` | 274 | 10 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 14 mutants (13 de la phase 1, 1 neufs de la correction),
+14 tués (13 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : `tetes` jamais écrit, `tetes`
+et export à chaque fenêtre, tête jamais exportée, tête exportée qui n'est pas celle du point, fenêtre exportée décalée,
+sans dépôt, la boucle casse à l'heure, champs de la lecture du dépôt perdus, dépôt non câblé, journal du dépôt mal
+nommé, nom d'observateur non contrôlé, nom d'observateur relâché, option --depot sans effet, plancher non relevé, C-6 :
+nom en majuscules admis au descripteur.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 312 tests ; plancher du job : 312, égalité exigée (`--egal`).

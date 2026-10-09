@@ -81,7 +81,7 @@
 | `cloture` | `jour` : jour UTC du fichier qu'il clôt | l'écrivain : dernier enregistrement d'un fichier quotidien (§6) |
 | `reprise` | `ws` (fenêtre de l'horloge au redémarrage), `suivante`, `queue` | l'écrivain, au redémarrage (§7) |
 | `trou` | `de`, `a`, `cause` | l'écrivain, juste avant le marqueur qui suit des fenêtres sans marqueur (§7) |
-| tout autre type (`lecture`, `sante`, `run_params`…) | `ws` ; champs de son sous-lot | `ecrire(type, ws, …)` |
+| tout autre type (`lecture`, `sante`, `run_params`, `tetes`…) | `ws` ; champs de son sous-lot | `ecrire(type, ws, …)` |
 
 Les types `ouverture`, `marqueur`, `point`, `cloture`, `reprise` et `trou` sont réservés à l'écrivain. Un champ nommé
 `seq` ou `prec` est refusé.
@@ -411,7 +411,8 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    l'exception suit son cours, le résultat est rendu), ou ne rend pas une lecture, est `panne_transport` de sous-type
    `autre`.
 5. **Ordre des enregistrements de la fenêtre** : les `lecture` dans l'ordre du plan (décalage, puis nom de forme),
-   puis `sante`, puis (`trou` s'il y a lieu, §8) `marqueur`. Dans la première fenêtre admise d'une exécution,
+   puis, dans la fenêtre qui clôt l'heure et si un dépôt des têtes est configuré, `tetes` (§16.6), puis `sante`,
+   puis (`trou` s'il y a lieu, §8) `marqueur`. Dans la première fenêtre admise d'une exécution,
    `run_params` (§14.4) suit immédiatement l'`ouverture` ou la `reprise` du démarrage, ou, si cette fenêtre ouvre un
    jour nouveau, `run_params` suit l'`ouverture` de la bascule qu'il déclenche (C-4 (b) de la relecture d'intégration
    de P1 : `reprise` et `cloture` au fichier repris, `ouverture` et `run_params` au fichier du jour), et précède
@@ -570,7 +571,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
      littérales canoniques, sept au plus), `noms` (D-5, noms DNS valides, sept au plus ; bornes du §13.6), `delai`
      (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ;
-   - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur`, `fournisseur`,
+   - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur` (de forme
+     `[a-z0-9]{1,16}`, règle `observateur-nom`, CB-15c : il nomme ses fichiers au dépôt, §16.4 ; minuscules seules,
+     C-6 de la G2 de P2B : un jumeau de casse n'est pas un autre observateur), `fournisseur`,
      `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
      configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256
      de la configuration déployée, 64 chiffres hexadécimaux minuscules).
@@ -583,7 +586,8 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    au journal du processus secondaire, §15.3).
 3. **Commande** (CB-18d) : `python3 -m shogen_s2bis.collecte pool --formes F --sante S --descripteur D --journal
    DOSSIER --commit SHA` (code de référence : `s2bis/shogen_s2bis/collecte/entree.py`). `--fenetres N` arrête après N
-   fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. Un refus de configuration donne la sortie 2
+   fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. `--depot DOSSIER` (CB-15c) : dépôt des
+   têtes (§16) ; sans elle, ni enregistrement `tetes` ni export. Un refus de configuration donne la sortie 2
    et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
    `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
@@ -700,3 +704,8 @@ collecteur.
    valides), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de 16), `export` (échec du dernier export ou null).
    Toute valeur rendue est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
    (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
+6. **Enregistrement `tetes`** (CB-15c ; E-C-35) : avec un dépôt, la fenêtre qui clôt l'heure ((`ws` + w) multiple de
+   3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
+   lecture du dépôt (point 5), faite au relevé de l'échéance : les têtes des autres journaux sont consignées dès leur
+   lecture. Après le marqueur et le point de contrôle, la tête du point, celle que rend l'écrivain, est exportée
+   (point 4). Sans dépôt, ni l'un ni l'autre.

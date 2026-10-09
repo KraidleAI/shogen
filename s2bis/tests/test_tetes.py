@@ -4,16 +4,25 @@ Octets de référence produits hors du code (journal G1 de CB-15a) : `openssl ts
 `openssl ts -query -in … -text` ; entiers et longueurs DER par `openssl asn1parse` ; réponse de rejet produite par
 `openssl ts -reply` d'une TSA jetable (clés détruites) ; autres réponses écrites à la main d'après RFC 3161 §2.4.2
 (forme DER des longueurs : X.690, non détenue) ; manifeste écrit à la main. CB-15b, E-C-35 : fichiers de tête du dépôt
-(AVIS Q-D-03), écrits à la main par le test ; export atomique relevé par un espion de fsync."""
+(AVIS Q-D-03), écrits à la main par le test ; export atomique relevé par un espion de fsync. CB-15c : enregistrement
+`tetes` et export dans la fenêtre qui clôt l'heure (boucle à horloge injectée, journal relu par `chaine`, tête du point
+prise au `prec` qui le suit) ; option `--depot` et nom d'observateur au point d'entrée."""
+import contextlib
+import io
 import json
 import os
 import pathlib
 import stat
 import tempfile
 import unittest
+from unittest import mock
 
-from shogen_s2bis.collecte import journal, tetes
-from tests.test_journal import chaine
+from shogen_s2bis.collecte import boucle, entree, journal, tetes
+from shogen_s2bis.collecte.lecture import S
+from tests.test_boucle import Temps, borne, rapide
+from tests.test_entree import COMMIT, configurations, port_ferme
+from tests.test_journal import FICHIER, Base, chaine
+from tests.test_reprise import m
 
 EMPREINTE = bytes.fromhex("7527d85120a51adc70645317ff05c72f6ad103fa864f3d74b9be3ff1beeba2f0")   # sha256 du fichier
 SANS_NONCE = ("30390201013031300d0609608648016503040201050004207527d85120a51adc70645317ff05c72f6ad103fa864f3d74b9be3ff1"
@@ -199,6 +208,64 @@ class Depot(unittest.TestCase):
             octets = pathlib.Path(d, "pool-2026-10-04-0.jsonl").read_bytes()
         self.assertEqual(({k: v for k, v in chaine(octets)[2][1].items() if k not in ("seq", "prec")}, lu["ignores"]),
                          ({"type": "tetes", "ws": WS_H, **lu}, 6))
+
+
+class Branchement(Base):
+    def tourner(self, depot, n):
+        """`n` fenêtres depuis 22:59 UTC (fenêtre qui clôt l'heure de 23:00), journal ouvert à 22:58:05 ; lecture `a`
+        rapide ; rend les enregistrements relus par `chaine`."""
+        temps = Temps(m(0) * S + 5 * S)
+        jl = borne(self, self.journal, m(0))
+        b = boucle.Boucle(jl, {"a": rapide}, [(0, "a")], 4, horloge=temps, dormir=temps.dormir,
+                          attendre=temps.attendre, monotone=temps.monotone, depot=depot)
+        borne(self, b.tourner, n)
+        return chaine(self.etat()[FICHIER])[2]
+
+    def test_tetes_avant_la_sante_puis_export_de_la_tete_du_point(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        pathlib.Path(d.name, "o2-pool.tete").write_bytes(ligne_tete(tete("o2", seq=40, sha=B)))
+        enrs = self.tourner(tetes.Depot(d.name, "o1"), 2)
+        self.assertEqual([(e["type"], e.get("ws")) for e in enrs], [("ouverture", None)] + [
+            (t, m(1)) for t in ("lecture", "tetes", "sante", "marqueur", "point")] + [
+            (t, m(2)) for t in ("lecture", "sante", "marqueur")])
+        self.assertEqual({k: enrs[2][k] for k in ("tetes", "refus", "ignores", "export")},
+                         {"tetes": [tete("o2", seq=40, sha=B)], "refus": [], "ignores": 0, "export": None})
+        self.assertEqual(sorted(os.listdir(d.name)), ["o1-pool.tete", "o2-pool.tete"])
+        self.assertEqual(pathlib.Path(d.name, "o1-pool.tete").read_bytes(),
+                         ligne_tete(tete("o1", seq=enrs[5]["seq"], sha=enrs[6]["prec"], ws=m(1))))
+
+    def test_sans_depot_ni_tetes_ni_export(self):
+        self.assertEqual([e["type"] for e in self.tourner(None, 1)], ["ouverture", "lecture", "sante", "marqueur",
+                                                                      "point"])
+
+    def test_depot_absent_la_boucle_continue(self):
+        enrs = self.tourner(tetes.Depot(os.path.join(self.d, "absent"), "o1"), 2)
+        self.assertEqual([(e["type"], e.get("refus")) for e in enrs if e["type"] in ("tetes", "marqueur")],
+                         [("tetes", [[".", "TETES/depot"]]), ("marqueur", None), ("marqueur", None)])
+
+    def test_point_d_entree_depot_et_nom_d_observateur(self):
+        """`--depot` câble un dépôt au nom de l'observateur du descripteur, journal `pool` ; sans lui, aucun ; un nom
+        d'observateur hors de `[a-z0-9]{1,16}` est refusé avant l'ouverture du journal (sortie 2)."""
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        f, s, o = configurations(port_ferme())
+        os.mkdir(jdir := os.path.join(d.name, "journal"))
+
+        def lancer(observateur, *depot):
+            args = ["pool", "--commit", COMMIT, "--journal", jdir, *depot]
+            for nom, donnees in (("formes", f), ("sante", s), ("descripteur", {**o, "observateur": observateur})):
+                pathlib.Path(d.name, nom + ".json").write_text(json.dumps(donnees), encoding="utf-8")
+                args += [f"--{nom}", os.path.join(d.name, nom + ".json")]
+            vus, err = [], io.StringIO()
+            with mock.patch.object(boucle.Boucle, "tourner", lambda b, n: vus.append(b.depot)), \
+                    contextlib.redirect_stderr(err):
+                return entree.main(args), [x and (x.dossier, x.observateur, x.journal) for x in vus], err.getvalue()
+        self.assertEqual(lancer("o1", "--depot", d.name), (0, [(d.name, "o1", "pool")], ""))
+        self.assertEqual(lancer("o1"), (0, [None], ""))
+        for nom in ("O1", "o-1", "o/1", "Ö1", "o1 "):
+            self.assertEqual(lancer(nom, "--depot", d.name),
+                             (2, [], "collecte : refus : CONFIG/incoherent : observateur-nom\n"), nom)
 
 
 if __name__ == "__main__":

@@ -15,7 +15,8 @@ bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13
 décodeur (`decodeur`, règle `decodeur-connu`), qui lit le corps de ses lectures `ok` (FORMAT §9.1, §14.1). CB-13b
 (E-C-32, E-C-33 ; FORMAT §15) : commande `secondaire`, processus de la carte et du relevé ASN ; `carte.json` contrôlé
 avec `formes.json` du pool (règles croisées : budget de débit partagé par hôte, lectures hors de δ), journal
-`secondaire` sur la grille du pool, sans sondes."""
+`secondaire` sur la grille du pool, sans sondes. CB-15c (E-C-35) : option `--depot` (dépôt des têtes, FORMAT §16) ; nom
+d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt."""
 import argparse
 import collections
 import ipaddress
@@ -23,7 +24,7 @@ import os
 import re
 import sys
 
-from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire
+from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, tetes
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
@@ -77,7 +78,8 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"]))),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
-             "descripteur": (("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),
+             "descripteur": (("observateur-nom", lambda d: re.fullmatch("[a-z0-9]{1,16}", d["observateur"])),
+                             ("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),
                              ("empreinte-hex", lambda d: re.fullmatch("[0-9a-f]{64}", d["empreinte"]) is not None))}
 COHERENCE_CARTE = tuple(r for r in COHERENCE["formes"] if r[0] not in ("w-divise-l-heure", "marge-delta-fenetre",
                                                                         "budget"))     # sans grille ni δ propres
@@ -136,14 +138,16 @@ def _lecteur(x, delai, tls):
     return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
 
 
-def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
+def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
     """(écrivain non ouvert, boucle) câblés depuis les configurations : une lecture par forme, plan par hôte, sondes
-    de `sante.json` vers le résolveur du descripteur, disque du dossier du journal (PLAN-CABLAGE-1)."""
+    de `sante.json` vers le résolveur du descripteur, disque du dossier du journal (PLAN-CABLAGE-1) ; dépôt des têtes
+    au nom de l'observateur, journal `pool`, si `depot` (CB-15c)."""
     sondes = sante.Sondes(s["commande"], s["temoins"], s["noms"], d["resolveur"], dossier, d["config_resolveur"],
                           s["delai"])
     jl = journal.Journal(dossier, "pool", w=f["w"], fsync=fsync)
     return jl, boucle.Boucle(jl, {x["nom"]: _lecteur(x, f["delai"], tls) for x in f["formes"]}, _plan(f), f["places"],
-                             w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes)
+                             w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes,
+                             depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync))
 
 
 def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
@@ -169,12 +173,15 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
         for option in FICHIERS[nom] + ("journal", "commit"):
             c.add_argument("--" + option, required=True)
         c.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
+        if nom == "pool":
+            c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
     a = p.parse_args(argv)
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
         f = lus["formes"][0]
-        jl, b = (construire if pool else construire_secondaire)(*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
+        args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
+        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2

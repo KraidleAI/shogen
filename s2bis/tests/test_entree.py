@@ -56,7 +56,7 @@ def configurations(port):
              "formes": [{**forme, "nom": "a", "chemin": "/a"}, {**forme, "nom": "b", "chemin": "/b"}]},
             {"commande": [sys.executable, "-c", "print('suivi')"], "temoins": ["127.0.9.1", "127.0.9.2", "127.0.9.3"],
              "noms": ["a.example.", "b.example."], "delai": S // 10},
-            {"observateur": "O1", "fournisseur": "essai", "region": "boucle-locale", "asn": 64512,
+            {"observateur": "o1", "fournisseur": "essai", "region": "boucle-locale", "asn": 64512,
              "resolveur": "127.0.9.53", "config_resolveur": "resolv.conf", "versions": ["python3 essai"],
              "empreinte": "e" * 64})
 
