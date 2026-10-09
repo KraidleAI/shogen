@@ -221,17 +221,23 @@ class TestRegleCellule(unittest.TestCase):
         self.assertEqual(P99["sources"]["longues"], [60, 1440, 4320])
 
     def test_r_de_la_cellule(self):
-        """C-8 de la G2 de SB-11 (Q-S-06, complément 1) : une cellule à R = 999 (R_approche) sous un prm à R = 99
-        transmet 999 à regle.oracle, à variante.deux_modes et à regle.loi_evenements (deux strates, une classe), jamais
-        le R du prm. Mutants G-11 (R du prm passé à la règle), M-11V-04 (à la variante), M-11V-05 (au compte
-        d'événements)."""
-        c = cel2(regle=dict(CEL["regle"], R=999, classes=["BTC"], variante=[4], evenements=1))
-        with mock.patch.object(regle, "oracle", wraps=regle.oracle) as o, mock.patch.object(
-                variante, "deux_modes", wraps=variante.deux_modes) as d, mock.patch.object(
-                regle, "loi_evenements", wraps=regle.loi_evenements) as ev:
-            executer.replication(P99, EP, c, POINTS, 1, 0)
-        self.assertEqual(([x.args[7] for x in o.call_args_list], [x.args[7] for x in d.call_args_list],
-                          [x.args[5] for x in ev.call_args_list]), ([999] * 2, [999] * 2, [999] * 2))
+        """C-8 de la G2 de SB-11 (Q-S-06, complément 1) et C-12 du contre-contrôle : une cellule à R = 999 (R_approche),
+        critère collectif actif, sous un prm à R = 99, deux strates, une classe ; i = 0 : 999 à regle.oracle (valeur
+        sans, puis « avec », par strate : 4 appels), à variante.deux_modes et à regle.loi_evenements (2 chacun) ;
+        i = 200 : 999 à regle.tester (4 appels) et à variante.tester (2) ; jamais le R du prm. Mutants G-11 (R du prm
+        passé à la règle), M-11V-04 (à la variante), M-11V-05 (au compte d'événements), M-CC-03 (au calcul « avec »),
+        M-CC-04 (à variante.tester)."""
+        c = cel2(regle=dict(CEL["regle"], R=999, classes=["BTC"], variante=[4], evenements=1, absorption=True))
+        vus = {}
+        for i in (0, 200):
+            with mock.patch.object(regle, "oracle", wraps=regle.oracle) as o, mock.patch.object(
+                    regle, "tester", wraps=regle.tester) as t, mock.patch.object(
+                    variante, "deux_modes", wraps=variante.deux_modes) as d, mock.patch.object(
+                    variante, "tester", wraps=variante.tester) as v, mock.patch.object(
+                    regle, "loi_evenements", wraps=regle.loi_evenements) as ev:
+                executer.replication(P99, EP, c, POINTS, 1, i)
+            vus[i] = tuple([x.args[k] for x in f.call_args_list] for f, k in ((o, 7), (t, 7), (d, 7), (v, 7), (ev, 5)))
+        self.assertEqual(vus, {0: ([999] * 4, [], [999] * 2, [], [999] * 2), 200: ([], [999] * 4, [], [999] * 2, [])})
 
 
 if __name__ == "__main__":

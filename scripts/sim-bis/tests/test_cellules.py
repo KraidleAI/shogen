@@ -133,22 +133,26 @@ class TestCellules(unittest.TestCase):
     def test_l_2_au_site_d_appel(self):
         """C-4 de la G2 de SB-11 (L-2 au site d'appel) : executer.cellule passe à la couche le W de la cellule, celui de
         calendrier.echelle : perte 16 à W = 16 (T_max : 24 semaines), 2 à W = 2 ; chacun distinct de ⌊(W + 1)/2⌋ (8 et
-        1). Mutant G-06 (⌊(W + 1)/2⌋ passé à la couche par cellule)."""
-        for w in (16, 2):
-            self.assertEqual(executer.cellule(PRM, EP, cel(couche__grille="degradee"), POINTS, w)["couche"]["perte"], w)
+        1). C-13 du contre-contrôle (E-S-13) : le même W passé au fond, durée de dérive W·tendance_par_semaine,
+        161 280 fenêtres à W = 16 (test_fond), 20 160 à W = 2. Mutants G-06 (⌊(W + 1)/2⌋ passé à la couche par
+        cellule), M-CC-05 (⌊(W + 1)/2⌋ passé au fond : 80 640 et 10 080)."""
+        for w, duree in ((16, 161280), (2, 20160)):
+            c = executer.cellule(PRM, EP, cel(couche__grille="degradee", derive=["tendances"]), POINTS, w)
+            self.assertEqual((c["couche"]["perte"], c["fond"]["derive"]["duree"]), (w, duree))
 
     def test_schema_ferme_c_5(self):
         """C-5 de la G2 de SB-11 : sous PRM, où N1 passe le schéma (garde : None), et l'incident « parmi » à imposés
         « faibles » aussi quand la cellule a ses unités faibles : imposés « faibles » sans unité faible, classes sans
-        BTC en tête ([ETH]) ou hors de l'ordre ([ETH, BTC]), f nul : CELLULE/schema. Mutants G-07 (imposés « faibles »
-        admis sans unité faible), G-08 (BTC en tête non exigé), G-19 (f nul admis)."""
+        BTC en tête ([ETH]) ou hors de l'ordre ([ETH, BTC] ; [BTC, USDT, ETH], BTC en tête, ordre seul en défaut, quand
+        [BTC, ETH, USDT] passe : C-11 du contre-contrôle), f nul : CELLULE/schema. Mutants G-07 (imposés « faibles »
+        admis sans unité faible), G-08 (BTC en tête non exigé), G-19 (f nul admis), M-CC-09 (ordre non exigé)."""
         inc = {"rho": [1, 10], "duree": 20, "geometrique": False, "mode": "parmi", "population": "as13335", "k": 2,
                "imposes": "faibles"}
         fa = {"k": 2, "p": [2, 5], "L": 1, "type": "panne"}
-        for c in (N1, cel(incidents=inc, faibles=fa)):
+        for c in (N1, cel(incidents=inc, faibles=fa), cel(regle__classes=["BTC", "ETH", "USDT"])):
             self.assertIsNone(code_de(executer.cellule, PRM, EP, c, POINTS, 16))
         for c in (cel(incidents=inc), cel(regle__classes=["ETH"]), cel(regle__classes=["ETH", "BTC"]),
-                  cel(f=[0, 1])):
+                  cel(regle__classes=["BTC", "USDT", "ETH"]), cel(f=[0, 1])):
             self.assertEqual(code_de(executer.cellule, PRM, EP, c, POINTS, 16), "CELLULE/schema", (c["f"], c["regle"]))
 
     def test_surcharges_longues(self):
