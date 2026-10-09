@@ -214,12 +214,12 @@ def oracles(prm: dict) -> dict:
     return out
 
 
-def ecrire(dossier: str, nom: str, lignes: list) -> str:
-    """Sortie `nom` : étiquette mot pour mot en première ligne (E-CA-04), puis lignes ; écrite en .partiel puis
-    renommée (E-CA-05). Rend le chemin."""
+def ecrire(dossier: str, nom: str, lignes: list, etiquette: bool = True) -> str:
+    """Sortie `nom` : étiquette mot pour mot en première ligne (E-CA-04 ; sans elle : la sortie la porte déjà, comme le
+    JSON du fragment, en clé « etiquette »), puis lignes ; écrite en .partiel puis renommée (E-CA-05)."""
     cible = os.path.join(dossier, nom)
     with open(cible + ".partiel", "w", encoding="utf-8", newline=NL) as f:
-        f.write(NL.join([ETIQUETTE, *lignes]) + NL)
+        f.write(NL.join([ETIQUETTE, *lignes] if etiquette else lignes) + NL)
     os.replace(cible + ".partiel", cible)
     return cible
 

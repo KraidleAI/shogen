@@ -6,8 +6,10 @@ des autres places définies (moyenne des deux du milieu pour un nombre pair) ; m
 (Fraction), jamais de flottant (E-CA-18)."""
 from __future__ import annotations
 
+import json
 import math
 import os
+import sys
 from decimal import Context, Decimal, localcontext
 from fractions import Fraction
 
@@ -195,6 +197,9 @@ def descriptifs(prm: dict, actif: str, r: dict) -> list:
     return out
 
 
+SORTIES = ("calib_actifs.txt", "fragment_analyse.json")
+
+
 def corps(prm: dict, res: dict) -> list:
     """Valeurs décisives et leurs termes, par actif et par classe (E-CA-22)."""
     out = []
@@ -224,3 +229,46 @@ def septembre(prm: dict, bruts: str, btc: dict) -> list:
         except socle.Refus as e:
             out.append(f"[{a}] septembre : {e}")
     return out
+
+
+def main(argv=None, env=None) -> int:
+    """python3 tau.py --bruts <dossier> --sortie <dossier> [--parametres <fichier>] : épingle de tau_sigma.txt,
+    séries, oracle de SH §4, puis σ, τ et oracles par actif, fragment contrôlé ; sorties en .partiel puis renommées.
+    Codes : 0 ; 1 refus nommé (dans les deux sorties) ; 2 usage. Aucune exception non nommée (type seul)."""
+    a = list(sys.argv[1:] if argv is None else argv)
+    if len(a) not in (4, 6) or a[0::2] != ["--bruts", "--sortie", "--parametres"][:len(a) // 2]:
+        print("REFUS CA/usage : tau.py --bruts <dossier> --sortie <dossier> [--parametres <fichier>]", file=sys.stderr)
+        return 2
+    try:
+        socle.garde(os.environ if env is None else env)
+        prm = socle.lire(a[5] if len(a) == 6 else socle.PARAMETRES)
+        ts = socle.tau_sigma(prm)
+        btc, lec = socle.valeurs_btc(ts), socle.lecture(prm)
+        series = {(x, p): bougies.charger(prm, a[1], "principale", p, x, prm["fenetre"])
+                  for x in socle.ACTIFS for p in lec["places"][x]}
+        oracle = bougies.oracle_sh(prm, series)
+        res = {x: calcul_actif(prm, x, {p: series[x, p] for p in lec["places"][x]}, prm["fenetre"], btc)
+               for x in socle.ACTIFS}
+        frag = fragment(prm, res)
+        controle_fragment(prm, frag, btc)
+        fichiers = [__file__, socle.__file__, bougies.__file__, sigma.__file__,
+                    a[5] if len(a) == 6 else socle.PARAMETRES, ts, os.path.join(a[1], "manifeste.tsv")]
+        tete = ["sha256 : " + " ; ".join(f"{os.path.basename(f)} {socle.empreinte(f) if os.path.isfile(f) else '-'}"
+                                         for f in fichiers),
+                f"lecture {prm['lecture']} ; fenêtre {prm['fenetre']['debut']} à {prm['fenetre']['fin']} exclu",
+                *oracle, "[VALEURS]", *corps(prm, res), "[DESCRIPTIFS]"]
+        lignes = tete + [y for x in socle.ACTIFS for y in descriptifs(prm, x, res[x])] + septembre(prm, a[1], btc)
+        sorties, code = {"calib_actifs.txt": lignes, "fragment_analyse.json": frag}, 0
+    except Exception as e:                                          # jamais une trace : refus nommé, type seul
+        r = e if isinstance(e, socle.Refus) else socle.Refus("CA/calcul", f"calcul en échec ({type(e).__name__})")
+        sorties, code = {"calib_actifs.txt": [str(r)], "fragment_analyse.json": {"refus": str(r)}}, 1
+    os.makedirs(a[3], exist_ok=True)
+    socle.ecrire(a[3], SORTIES[0], sorties[SORTIES[0]])
+    socle.ecrire(a[3], SORTIES[1], [json.dumps({"etiquette": socle.ETIQUETTE} | sorties[SORTIES[1]], sort_keys=True,
+                                               ensure_ascii=False, indent=1)], etiquette=False)
+    return code
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
