@@ -1531,3 +1531,16 @@ Fermetures (règle « aucune dette », B.87) :
 **Règle des ajouts datés** (C-13, décision de l'orchestrateur) : un ajout daté porte l'heure (`date -u`) de la dernière écriture de son texte.
 
 Aucun item formé.
+
+## B.90 Amendement daté du 2026-10-09 18:27:52 UTC (heure produite par `date -u`) : SIM-BIS NPRIME-NUL-1 commis (SB-11x, SB-11y, SB-11z)
+
+Trois commits, `9418db8` (SB-11x), `aff8c3b` (SB-11y), `2f32432` (SB-11z) : avis d'un advisor (`claude-fable-5-1`, effort `medium` ; option (b) adoptée), générateur-correcteur, réviseur G2 neuf de SB-11x (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-7), contre-contrôleur neuf en trois passes (R-1 à R-5 puis R-6, corrigées par C-8 à C-13 ; verdict final CONFORME), `claude-opus-5-5`. Avant chaque commit : xtask VERT, runner, jobs s2bis, S2, sim-bis (plancher 279), calib-actifs, `controle-unittest` et contrôle des journaux. Pièces : `docs/adr-0029/g0-sim/revue-nprime/`.
+
+- SHOGEN-SIM-BIS-NPRIME-NUL-1 **fermé** : à n′_s = 0, `executer.replication` rend un enregistrement dégénéré par classe, égal en octets à ce que `regle.tester` rend sur séries vides (n_s ∈ {3, 4, 7, 2 736}) ; `regle` (SB-7), le contrat RB-6 et l'oracle croisé SB-13 sont intacts ; `agreger` imprime par strate le nombre de réplications à n′_s = 0 et le nombre de comparaisons effectives d'oracle (E-S-29). Ajout daté au G0 de SIM-BIS (`G0-AJOUT.md`, 13:49:50 UTC) et ses trois épingles (`parametres.json`, `test_provenance_c_5`, `docs/adr-0029/g0-sim/SHA256SUMS`) dans `2f32432`.
+- **Écart de l'orchestrateur, déclaré** : l'appel qui a lancé l'advisor portait le champ `model` à la valeur nue `fable` (énumération de l'outil), contraire à la règle de CLAUDE.md §7 ; le modèle résolu est bien `claude-fable-5-1` (Gate 0 sur le transcript), la fiche `shogen-advisor` l'épingle. Règle d'application : le champ `model` de l'outil n'est plus renseigné ; l'épinglage vient de la fiche, et la Gate 0 le contrôle.
+
+Item formé (lot futur nommé) :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-DOCS-SHA256SUMS-GATE-1 | aucune gate ne vérifie les `SHA256SUMS` des dossiers de `docs/` (seule occurrence : `sg9.rs` l.489, liste de noms qui ne vérifie rien) ; une somme périmée (l.4 de `docs/adr-0029/g0-sim/SHA256SUMS`, corrigée par SB-11z) n'a été vue que par un contre-contrôleur | orch. | lot de dettes DETTES-T4, lancé après ce versement | une gate (xtask ou job) qui rejoue `sha256sum -c` de chaque `SHA256SUMS` de `docs/` hors des dossiers interdits, et ses tests [inféré] | contre-contrôle de NPRIME, passe 2, E-12 |
