@@ -1,6 +1,7 @@
 """Exécution SB-11 (E-S-40 à E-S-48, E-S-52) : attendus écrits à la main ou produits par un outil distinct (`bc -l`,
 `sha256sum`) ; chaque test nomme les mutations qui le rougissent."""
 import hashlib
+import json
 import os
 import tempfile
 import time
@@ -189,6 +190,71 @@ class TestProcessus(unittest.TestCase):
         self.assertEqual(executer.plan(200, 30 * s, 2), [(0, 200)])
         self.assertEqual(executer.plan(400, 30 * s, 2), [(0, 360), (360, 400)])
         self.assertEqual(code_de(executer.plan, 10, 5401 * s, 4), "EXEC/plan")
+
+
+def rv(v, *c):
+    return {"valeur": v, "causes": list(c)}
+
+
+class TestAgregat(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.r = d.name
+
+    def test_agreger(self):
+        """Cinq enregistrements écrits à la main (strate « calme », BTC et ETH, valeurs « avec », variante aux
+        diviseurs 4 et 8) : BTC 2 REJETTE, 2 NE REJETTE PAS, 1 NON ÉVALUABLE (k_crit, runs) ; ETH testé sans condition
+        2 REJETTE ; familial 2 sur 5 ; séquence BTC puis ETH 1 (le second rejet de BTC est suivi d'ETH NE REJETTE PAS) ;
+        « avec » et variante (5 NE REJETTE PAS au diviseur 8) comptés à part ; r̂ = 2/5 et SE = √(6/125) (bc -l :
+        sqrt(6/125), à 10⁻⁵⁰ près) ; aucun enregistrement : EXEC/agreger ; empreinte = executer.empreinte des cinq,
+        dans l'ordre. Mutations M-11H-02
+        (familial inversé), M-11H-03 (séquence lue sur BTC), M-11H-04 (« avec » pris aux valeurs sans), M-11H-05 (un
+        diviseur pour tous), M-11H-06 (R faux), M-11H-09 (empreinte à rebours), M-11H-10 (précision 28), M-11H-11
+        (aucun enregistrement admis)."""
+        x = [(rv("REJETTE"), rv("REJETTE"), True, "REJETTE", rv("REJETTE"), rv("NE REJETTE PAS")),
+             (rv("NE REJETTE PAS"), rv("REJETTE"), False, "NON TESTÉ (séquence)", rv("NE REJETTE PAS"),
+              rv("NON ÉVALUABLE", "runs")),
+             (rv("NON ÉVALUABLE", "k_crit", "runs"), rv("NE REJETTE PAS"), False, "NON TESTÉ (séquence)",
+              rv("NON ÉVALUABLE", "unites", "k_crit", "runs"), rv("NON ÉVALUABLE", "k_crit", "runs")),
+             (rv("REJETTE"), rv("NE REJETTE PAS"), True, "NE REJETTE PAS", rv("REJETTE"), rv("NE REJETTE PAS")),
+             (rv("NE REJETTE PAS"), rv("NE REJETTE PAS"), False, "NON TESTÉ (séquence)", rv("NE REJETTE PAS"),
+              rv("NE REJETTE PAS"))]
+        h = rv("NE REJETTE PAS")
+        recs = [{"i": i, "strates": {"calme": {"classes": {"BTC": dict(b, avec=a, variante={"4": v, "8": h}),
+                                                           "ETH": dict(e, avec=a, variante={"4": v, "8": h})},
+                                               "valeurs": {"familial": f, "ETH": {"valeur": s}}}}}
+                for i, (b, e, f, s, a, v) in enumerate(x)]
+        g = executer.agreger(K_, recs)
+        self.assertEqual(sorted(g), ["R", "empreinte", "strates"])
+        c = g["strates"]["calme"]
+        b = c["classes"]["BTC"]
+        self.assertEqual((g["R"], g["empreinte"], c["familial"]["x"], c["sequence_eth"]["x"]),
+                         (5, executer.empreinte(recs), 2, 1))
+        self.assertEqual((b["frequences"]["valeurs"], c["classes"]["ETH"]["frequences"]["valeurs"]),
+                         ({"REJETTE": 2, "NE REJETTE PAS": 2, "NON ÉVALUABLE": 1},
+                          {"REJETTE": 2, "NE REJETTE PAS": 3, "NON ÉVALUABLE": 0}))
+        v = b["variante"]
+        self.assertEqual((b["avec"]["frequences"]["combinaisons"], v["4"]["frequences"]["combinaisons"],
+                          v["8"]["frequences"]["valeurs"]["NE REJETTE PAS"]),
+                         ({"unites+k_crit+runs": 1}, {"runs": 1, "k_crit+runs": 1}, 5))
+        t = b["taux"]["REJETTE"]
+        se = Decimal("0.219089023002066445382787913120320853581097877999193301690757")
+        self.assertEqual((t["r"], t["R"]), (Fraction(2, 5), 5))
+        self.assertLess(abs(t["SE"] - se), Decimal("1E-50"))
+        self.assertEqual(code_de(executer.agreger, K_, []), "EXEC/agreger")
+
+    def test_ecrire_agrege(self):
+        """Agrégat « <cellule>.agrege.json » : JSON canonique d'une ligne, entête en tête de laquelle l'étiquette
+        (E-S-05), cellule, agrégat ; nom de cellule à « / » : LOT/nom. Mutations M-11H-07 (nom non contrôlé),
+        M-11H-08 (entête omise)."""
+        c = executer.ecrire_agrege(self.r, "N1", {"R": 1}, [commun.ETIQUETTE, "sha256 x y"])
+        self.assertTrue(os.path.isfile(c), c)
+        with open(c, "rb") as f:
+            o = f.read()
+        self.assertEqual((os.path.basename(c), o.count(b"{"), json.loads(o)), (
+            "N1.agrege.json", 1, {"R": 1, "cellule": "N1", "entete": [commun.ETIQUETTE, "sha256 x y"]}))
+        self.assertEqual(code_de(executer.ecrire_agrege, self.r, "E1/x", {"R": 1}, []), "LOT/nom")
 
 
 if __name__ == "__main__":

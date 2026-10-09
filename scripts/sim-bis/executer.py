@@ -9,8 +9,9 @@ cellules.couches, O-5 ; perte sur le W de la cellule, L-2). SB-11e : cellules so
 (SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2) ; fond des sources d'une cellule. SB-11f :
 réplication d'une cellule, chaîne entière (T_début, sources, observateurs, fenêtres retenues, retraits, première unité,
 règle par classe et par strate). SB-11g : oracle d'E-S-29 sur les 200 premières réplications (variante comprise, O-4),
-S, critère collectif, variante, compte d'événements sur la suite comprimée (P-3). Entiers, rationnels et Decimal seuls :
-aucun flottant, aucune puissance, aucune fonction de libm."""
+S, critère collectif, variante, compte d'événements sur la suite comprimée (P-3). SB-11h : agrégation exacte des
+enregistrements relus d'une cellule (E-S-40, E-S-52), agrégat écrit. Entiers, rationnels et Decimal seuls : aucun
+flottant, aucune puissance, aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -389,3 +390,42 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
             "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
             "retraits": {cl: sorted([u, x] for (u, t), x in rt[cl].items() if t == s) for cl in rg["classes"]}}
     return out
+
+
+def agreger(k: dict, enregistrements: list) -> dict:
+    """Agrégation exacte d'une cellule sur ses R réplications, dans l'ordre (E-S-40, E-S-42, E-S-52), enregistrements
+    relus de ses lots (lire_lots) : R, empreinte (E-S-44) ; par strate et par classe, fréquences des valeurs et des
+    causes (frequences) et taux de chaque valeur (taux, contexte de `k`), de même pour les valeurs « avec » (E-S-35) et
+    pour la variante à chaque diviseur (E-S-33) ; par strate, taux du rejet familial et, ETH présent, de la séquence BTC
+    puis ETH (E-S-30). Aucun enregistrement : EXEC/agreger."""
+    R = len(enregistrements)
+    if R < 1:
+        raise commun.Refus("EXEC/agreger", "aucun enregistrement")
+
+    def bloc(rs):
+        f = frequences(rs)
+        return {"frequences": f, "taux": {v: taux(x, R, k) for v, x in f["valeurs"].items()}}
+    out = {"R": R, "empreinte": empreinte(enregistrements), "strates": {}}
+    for s, x0 in enregistrements[0]["strates"].items():
+        es = [e["strates"][s] for e in enregistrements]
+        d = {"classes": {}, "familial": taux(sum(1 for e in es if e["valeurs"]["familial"]), R, k)}
+        if "ETH" in x0["valeurs"]:
+            d["sequence_eth"] = taux(sum(1 for e in es if e["valeurs"]["ETH"]["valeur"] == "REJETTE"), R, k)
+        for cl, y0 in x0["classes"].items():
+            cs = [e["classes"][cl] for e in es]
+            d["classes"][cl] = bloc(cs)
+            if "avec" in y0:
+                d["classes"][cl]["avec"] = bloc([c["avec"] for c in cs])
+            if "variante" in y0:
+                d["classes"][cl]["variante"] = {dv: bloc([c["variante"][dv] for c in cs]) for dv in y0["variante"]}
+        out["strates"][s] = d
+    return out
+
+
+def ecrire_agrege(dossier: str, cellule: str, agrege: dict, entete: list) -> str:
+    """Agrégat d'une cellule « <cellule>.agrege.json » (cellule de NOM, sinon LOT/nom) : JSON canonique de {entete
+    (l'étiquette en tête, E-S-05), cellule, agrégat}, écrit par commun.ecrire (atomique, jamais par-dessus) ; rend le
+    chemin."""
+    chemin = os.path.join(dossier, nom_lot(cellule, 0, 1).split(".")[0] + ".agrege.json")
+    commun.ecrire(chemin, commun.json_canonique(jsonable(dict(agrege, entete=entete, cellule=cellule))))
+    return chemin
