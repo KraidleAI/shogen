@@ -657,3 +657,26 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 6. **Commande** (CB-13b) : `python3 -m shogen_s2bis.collecte secondaire --formes F --carte C --descripteur D --journal
    DOSSIER --commit SHA` ; `--fenetres`, sorties, refus et fermeture comme aux §14.3 et §14.5 ; `run_params` comme au
    §14.4, `sha256` et contenus `{formes, carte, descripteur}`.
+
+## 16. Têtes, dépôt et jeton quotidien (CB-15 ; E-C-35, E-C-36)
+
+Rattachement : ADR-0029 l.218 et l.240 (jeton RFC 3161 quotidien, échange des têtes), AVIS du G0, Q-D-03 (chaque
+observateur horodate chaque jour sa propre tête, et celles des autres quand elles sont lisibles ; le « dépôt » est un
+dossier, lisible ou non). Code de référence : `s2bis/shogen_s2bis/collecte/tetes.py`. RFC 3161 lue au fichier du
+registre (`biblio/ietf-rfc3161-time-stamp-protocol-2026-10-04.txt`, sha256 `39fd1764…8240`) ; les règles DER
+(X.690) et l'identifiant de SHA-256 ne sont pas détenus : leurs octets sont ceux d'OpenSSL 3.0.13, mesurés.
+
+1. **Requête d'horodatage** (CB-15a ; RFC 3161 §2.4.1) : `TimeStampReq` en DER : `version` 1 ; `messageImprint` :
+   algorithme SHA-256 (OID 2.16.840.1.101.3.4.2.1, paramètres NULL), empreinte de 32 octets ; `nonce`, entier de 0 à
+   2^64 − 1, s'il est donné ; `certReq` vrai ; ni `reqPolicy` ni `extensions`. Sans nonce, les octets sont ceux de
+   `openssl ts -query -data <fichier> -sha256 -cert -no_nonce` (`test_tetes`). Une empreinte qui n'a pas 32 octets,
+   un nonce hors de ces bornes : refus nommés `JETON/empreinte`, `JETON/nonce`.
+2. **Statut d'une réponse** (RFC 3161 §2.4.2) : la réponse est une SEQUENCE qui couvre ses octets ; son premier
+   élément, `PKIStatusInfo`, une SEQUENCE, commence par `PKIStatus`, INTEGER d'un octet de 0 à 5 ; le jeton
+   (`TimeStampToken`, une SEQUENCE qui finit la réponse) est présent si et seulement si le statut vaut 0 ou 1.
+   Longueurs : forme courte sous 128 octets, forme longue minimale de 1 à 4 octets au-delà. Tout autre cas est le refus
+   `JETON/reponse`. Rien d'autre n'est lu : la signature, l'empreinte et le nonce du jeton se contrôlent hors ligne
+   (`openssl ts -verify`, comme `scripts/sceau/verify.sh`).
+3. **Manifeste du jour** : ligne JSON canonique (§1.2) `{jour, observateur, tetes}` : `jour`, jour UTC (AAAA-MM-JJ) ;
+   `observateur` ; `tetes` : les têtes lues au dépôt, triées par observateur puis journal. Son sha256 est l'empreinte
+   de la requête.

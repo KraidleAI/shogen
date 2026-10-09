@@ -2025,3 +2025,33 @@ secondaire dans le désordre, renvoi du §12 perdu, plancher non relevé. Correc
 visé (`periode` de 86 401 s admise). Les 26 mutants de la G2 de P2A, rejoués sur cet état : 26 tués, dont les six
 vivants de la G2 (G01, G02, G03, G14, G17, G20), chacun par le cas neuf qui le vise. Suite : 297 tests ; plancher du
 job : 297, égalité exigée.
+
+## CB-15a (2026-10-08) : requête RFC 3161, statut d'une réponse, manifeste (E-C-36)
+
+Objet : premier sous-lot de CB-15 (PROPOSITION l.223 ; FORMAT §16.1 à §16.3). Requête d'horodatage en DER, construite en
+bibliothèque standard, égale aux octets d'`openssl ts -query -sha256 -cert -no_nonce` (PROPOSITION §2.4 « Jeton ») et,
+avec nonce, aux octets d'openssl pour le nonce qu'il a tiré ; statut d'une réponse lu sans plus (signature contrôlée
+hors ligne, `openssl ts -verify`) ; manifeste des têtes en ligne canonique. RFC 3161 lue au fichier du registre ; X.690
+non détenue : octets de référence d'OpenSSL 3.0.13.
+
+Rouge : squelette d'interface (fonctions qui rendent une valeur fausse), 7 tests en échec d'assertion.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 79 | — |
+| `tests/test_tetes.py` | 98 | 7 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 19 mutants (19 de la phase 1, 0 neufs de la correction),
+19 tués (18 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : certReq absent (PROPOSITION
+§2.4), certReq faux, identifiant d'algorithme faux (sha384) (PROPOSITION §2.4), paramètres NULL absents, version 2,
+INTEGER sans zéro de tête, forme courte jusqu'à 255, forme longue non minimale, empreinte courte admise, nonce sans
+borne haute, nonce booléen admis, présence du jeton non contrôlée, statut 6 admis, octets en trop admis, longueur longue
+non minimale admise, jeton hors SEQUENCE admis, statut sur plusieurs octets admis, manifeste non trié, plancher non
+relevé.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 304 tests ; plancher du job : 304, égalité exigée (`--egal`).
