@@ -1,12 +1,13 @@
 """Adaptateur d'oracle croisé avec RECALC-BIS, SB-13 première passe (E-S-01, E-S-51 ; SHOGEN-SIM-BIS-CONTRAT-RB6-1).
 SB-13a : épingles du paquet s2bis au commit f458980 égales aux valeurs de `git show f458980:s2bis/<chemin> | sha256sum`
 (rotation.py : 4183fbe6…, l'empreinte que cite le contre-contrôle de la tranche 3), extraction, refus nommés d'une
-épingle fausse et d'un commit absent, frontière d'E-S-01 lue par `ast`. Chaque test nomme les mutations qui le
-rougissent."""
+épingle fausse et d'un commit absent, frontière d'E-S-01 lue par `ast`. SB-13b : chargement sous shogen_s2bis.
+Chaque test nomme les mutations qui le rougissent."""
 import ast
 import hashlib
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -94,6 +95,82 @@ class TestExtraction(unittest.TestCase):
         moteur = {x[:-3] for x in os.listdir(commun.ICI) if x.endswith(".py") and x not in test_fitness.ORACLES}
         self.assertEqual(sorted(x for x in noms if x not in sys.stdlib_module_names and x not in moteur), [])
         self.assertNotEqual(test_fitness.refus_imports("import oracle_recalc", moteur | {"oracle_recalc"}), [])
+
+
+H = oracle_recalc.charger(PRM)
+
+
+def processus(lignes: list, tmpdir=None) -> subprocess.CompletedProcess:
+    """Processus neuf lancé depuis le dossier du lot, sans la variable de campagne (TMPDIR donné le cas échéant)."""
+    env = {k: v for k, v in os.environ.items() if k != commun.VARIABLE}
+    if tmpdir:
+        env["TMPDIR"] = tmpdir
+    return subprocess.run([sys.executable, "-B", "-c", chr(10).join(lignes)], cwd=commun.ICI, env=env,
+                          capture_output=True, text=True, timeout=120)
+
+
+class TestChargement(unittest.TestCase):
+    def test_modules_charges(self):
+        """charger rend rotation et config_analyse, chargés sous shogen_s2bis.recalc depuis un dossier
+        « oracle_recalc_… » de TMPDIR, et analyse.json lu (bloc rotations R = 9 999, seuil = 99, lu à la main).
+        Mutations M-13B-01 (modules chargés sous un autre nom), M-13B-02 (analyse.json non lu)."""
+        d = os.path.join(tempfile.gettempdir(), "oracle_recalc_")
+        self.assertEqual((sorted(H), H["rotation"].__name__, H["config_analyse"].__name__, H["analyse"]["rotations"],
+                          [H[m].__file__.startswith(d) for m in ("rotation", "config_analyse")]),
+                         (["analyse", "config_analyse", "rotation"], "shogen_s2bis.recalc.rotation",
+                          "shogen_s2bis.recalc.config_analyse", {"R": 9999, "seuil": 99}, [True, True]))
+
+    def test_nettoyage_du_dossier(self):
+        """Dans un processus neuf, à TMPDIR vide (E-S-06) : un seul dossier « oracle_recalc_… », d'où rotation est
+        chargée, retiré à la sortie du processus. Mutation M-13B-03 (dossier jamais retiré)."""
+        code = ["import os, tempfile, commun, oracle_recalc",
+                "h = oracle_recalc.charger(commun.charger_parametres(environ={}))",
+                "d = tempfile.gettempdir()",
+                "print(sorted(x[:14] for x in os.listdir(d)), h['rotation'].__file__.startswith(d))"]
+        with tempfile.TemporaryDirectory() as d:
+            p = processus(code, d)
+            self.assertEqual((p.stdout.strip(), os.listdir(d)), ("['oracle_recalc_'] True", []), p.stderr[-300:])
+
+    def test_cache_indexe_sur_l_epingle(self):
+        """Même épingle (source changée), mêmes modules sans nouvelle extraction ; autre commit, autre dossier ou autre
+        empreinte : ORACLE/epingle. Mutations M-13B-04 (épingle non comparée), M-13B-05 (empreintes hors de
+        l'épingle), M-13B-06 (source dans l'épingle), M-13B-07 (extraction refaite à chaque appel)."""
+        o = PRM["oracle_recalc"]
+        self.assertIs(oracle_recalc.charger(dict(PRM, oracle_recalc=dict(o, source="autre")))["rotation"],
+                      H["rotation"])
+        for faux in (dict(o, commit="0" * 40), dict(o, dossier="ailleurs"),
+                     dict(o, fichiers=dict(o["fichiers"], **{"shogen_s2bis/recalc/rotation.py": "0" * 64}))):
+            with self.assertRaises(commun.Refus) as c:
+                oracle_recalc.charger(dict(PRM, oracle_recalc=faux))
+            self.assertEqual(c.exception.code, "ORACLE/epingle")
+
+    def test_modules_hors_epingles(self):
+        """Dans un processus neuf : un shogen_s2bis déjà chargé d'ailleurs, ou un module shogen_s2bis.* hors des
+        fichiers épinglés : ORACLE/modules. Mutations M-13B-08 (contrôle des modules chargés retiré), M-13B-09
+        (shogen_s2bis déjà chargé admis), M-13B-10 (modules chargés comptés sur le seul paquet de tête)."""
+        for intrus in ("shogen_s2bis", "shogen_s2bis.intrus"):
+            code = ["import sys, types", f"m = types.ModuleType({intrus!r})", "m.__file__ = '/hors/x.py'",
+                    f"sys.modules[{intrus!r}] = m", "import commun, oracle_recalc", "try:",
+                    "    oracle_recalc.charger(commun.charger_parametres(environ={}))",
+                    "except commun.Refus as e:", "    print(e.code)"]
+            p = processus(code)
+            self.assertEqual(p.stdout.strip(), "ORACLE/modules", (intrus, p.stderr[-300:]))
+
+    def test_analyse_lu_dans_l_extraction(self):
+        """C-6 de la G2 (O-1) : dans un processus neuf, config/analyse.json est écrit puis lu en octets dans le dossier
+        s2bis extrait du commit épinglé, jamais dans l'arbre de travail (dont les octets sont aujourd'hui les mêmes) :
+        fichiers ouverts par builtins.open pendant charger, relevés avec leur mode. Mutations M-G2-12 (lu sous
+        commun.RACINE), M-13B-13 (lu par un chemin tiré de commun.ICI), M-13B-14 (arbre de travail préféré s'il
+        existe)."""
+        code = ["import builtins, os, commun, oracle_recalc", "lus, vrai = [], builtins.open",
+                "def ouvrir(f, mode='r', *a, **k):", "    lus.append((os.path.realpath(f), mode))",
+                "    return vrai(f, mode, *a, **k)", "builtins.open = ouvrir",
+                "h = oracle_recalc.charger(commun.charger_parametres(environ={}))", "builtins.open = vrai",
+                "s2bis = os.path.realpath(os.path.join(os.path.dirname(h['rotation'].__file__), '..', '..'))",
+                "print(sorted((os.path.relpath(f, s2bis), m) for f, m in lus if f.endswith('analyse.json')))"]
+        p = processus(code)
+        self.assertEqual(p.stdout.strip(), "[('config/analyse.json', 'rb'), ('config/analyse.json', 'wb')]",
+                         p.stderr[-300:])
 
 
 if __name__ == "__main__":
