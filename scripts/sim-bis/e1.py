@@ -6,8 +6,11 @@ indéfinies par hôte, variance exacte et écart-type des FIV de I_t). SB-11k : 
 FIV_u par calibration.charger_unites, Q-SI-8 (b)), lignes [BORD E1] et phrases (8)(ii) et (iii) (Q-SI-8 (c)),
 impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). SB-11m :
 loi des pauses d'une série sur le masque, définitions d'EP (point (6)). SB-11n : loi des pauses du modèle à C1,
-rejouée, à côté d'intervalles.txt (point (6)). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
-puissance, aucune fonction de libm."""
+rejouée, à côté d'intervalles.txt (point (6)). SB-11o : lots d'E1 par point, reprenables (E-S-45), et écriture
+des sorties calibration_e1.{json,txt} (E-S-05, E-S-48). Entiers, rationnels et Decimal seuls : aucun flottant,
+aucune puissance, aucune fonction de libm."""
+import hashlib
+import os
 from decimal import Decimal
 from fractions import Fraction
 
@@ -208,4 +211,46 @@ def lignes_pauses(prm: dict, pz: dict, c1: dict, R: int, texte: str) -> list:
                     "    histogramme des pauses (longueur×nombre) : "
                     + (" ".join(f"{k}×{nb}" for k, nb in sorted(x["completes"].items())) or "aucune pause"),
                     f"    S2 (intervalles.txt l.{js[0] + 1}) : {lignes[js[0]].strip()}"]
+    return out
+
+
+def calculer_e1(prm: dict, ep: dict, cal: dict, dossier: str, processus: int, ns: int, entete: list,
+                borne: int = executer.BORNE) -> tuple:
+    """Lots d'E1 (E-S-38, E-S-45) : pour C0, puis chaque point de la grille dans son ordre, plages de executer.plan
+    (e1.replications réplications, coût mesuré ns par réplication, `processus`, borne de 90 min par défaut) ; un lot
+    dont le fichier est présent n'est pas refait (reprise : il est relu et contrôlé avec les autres), un lot absent
+    (perdu, ou jamais calculé) est calculé (lot_e1 : mêmes octets qu'au premier calcul) ; puis tous les lots du point
+    relus (executer.lire_lots : chaque i une fois et une seule, entête égale) et moyennes_point. Rend ({point (None :
+    C0) : moyennes}, [(chemin, sha256)] des lots calculés, à consigner au journal d'exécution)."""
+    R, journal, moy = prm["e1"]["replications"], [], {}
+    for p in [None] + calib_fiv.grille(prm):
+        c = calib_fiv.cellule(prm, p)
+        for a, b in executer.plan(R, ns, processus, borne):
+            if not os.path.exists(os.path.join(dossier, executer.nom_lot(c, a, b))):
+                journal.append(lot_e1(prm, ep, cal, p, (a, b), processus, dossier, entete))
+        moy[p] = moyennes_point(executer.lire_lots(dossier, c, R, entete), prm["calibration"])
+    return moy, journal
+
+
+SORTIES_E1 = ("calibration_e1.json", "calibration_e1.txt")
+
+
+def ecrire_e1(dossier: str, obj: dict, lignes: list, oracles: dict) -> list:
+    """Sorties d'E1 (E-S-48) : calibration_e1.json (JSON canonique de obj, executer.jsonable) et calibration_e1.txt
+    (lignes jointes, saut de ligne final), écrites seulement si tous les oracles internes passent (oracles = {nom :
+    bool}, non vide, tous vrais ; sinon SORTIE/oracle), si l'étiquette est la première ligne du texte et de l'entête
+    (E-S-05 ; sinon SORTIE/etiquette) et si aucun des deux fichiers n'existe (SORTIE/existe, rien d'écrit) ;
+    commun.ecrire (atomique, jamais par-dessus). Rend [(chemin, sha256 des octets écrits)]."""
+    if not oracles or not all(v is True for v in oracles.values()):
+        raise commun.Refus("SORTIE/oracle", f"oracles internes : {oracles!r}")
+    if lignes[:1] != [commun.ETIQUETTE] or obj.get("entete", [None])[:1] != [commun.ETIQUETTE]:
+        raise commun.Refus("SORTIE/etiquette", "première ligne du texte et de l'entête : l'étiquette (E-S-05)")
+    chemins = [os.path.join(dossier, x) for x in SORTIES_E1]
+    if any(os.path.exists(c) for c in chemins):
+        raise commun.Refus("SORTIE/existe", f"{dossier} : {SORTIES_E1} (jamais par-dessus, E-S-48)")
+    out = []
+    for c, octets in zip(chemins, (commun.json_canonique(executer.jsonable(obj)),
+                                   (commun.NL.join(lignes) + commun.NL).encode("utf-8"))):
+        commun.ecrire(c, octets)
+        out.append((c, hashlib.sha256(octets).hexdigest()))
     return out
