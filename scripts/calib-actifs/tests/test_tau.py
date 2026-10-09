@@ -4,7 +4,10 @@ import unittest
 from decimal import Decimal
 from fractions import Fraction as F
 
+import socle
 import tau
+
+P = socle.lire()
 
 PLACES = ("bitfinex", "bitstamp", "coinbase", "kraken", "okx")
 
@@ -54,6 +57,37 @@ class TestTau(unittest.TestCase):
         self.assertEqual((r.exception.code, str(r.exception).endswith("strate calme ; place bitfinex")),
                          ("CA/mediane", True))
         self.assertEqual(tau.rationnels([Decimal("0.1"), None, Decimal("0.1")]), [F(1, 10), None, F(1, 10)])
+
+    def test_places(self):
+        """τ des places : P99,9 par strate (rang ⌈999·N/1000⌉), maximum sur les strates : calme 1..1000 /100 000 (P99,9
+        = 0,00999), stress 1..10 /10 000 (0,0010) : 1,5 × 0,00999 = 0,014985, soit 0,0150 ; strate vide :
+        CA/population ; règle ≥ 2,85 % : CA/borne. Mutations : maximum pris sur la première strate ; strate vide
+        admise ; borne haute non refusée."""
+        cel = {"calme": ([F(i, 100000) for i in range(1, 1001)], [], []),
+               "stress": ([F(i, 10000) for i in range(1, 11)], [], [])}
+        r = tau.places(P, "ETH", cel)
+        self.assertEqual((r["tau"], r["p999"], r["strates"]["stress"][:2]),
+                         (F(15, 1000), F(999, 100000), (10, F(1, 1000))))
+        for ecarts, code in ((([], [], []), "CA/population"), (([F(2, 100)], [], []), "CA/borne")):
+            with self.assertRaises(tau.socle.Refus) as e:
+                tau.places(P, "USDC", cel | {"stress": ecarts})
+            self.assertEqual(e.exception.code, code)
+
+    def test_agregateurs(self):
+        """T-CA-AGR-1 (valeurs synthétiques) : τ_places 0,0010, τ_agr_BTC 0,0265, classes de places de BTC 0,0045 et
+        0,0050 : dénominateur 0,0050, produit 0,0053, τ_agr 0,0055 ; avec le minimum, 0,0060 (imprimé) ; τ_agr ≥
+        τ_places : pas de drapeau ; drapeau descriptif si τ_agr < τ_places (Q-CA-06), aucun à l'égalité ; τ de BTC
+        absent : CA/btc. Mutations M-CA-15 : minimum des deux classes ; drapeau à l'égalité."""
+        btc = {("tau", "agregateur"): Decimal("0.0265"), ("tau", "place_horodatee"): Decimal("0.0045"),
+               ("tau", "sans_horodatage"): Decimal("0.0050")}
+        r = tau.agregateurs(P, "ETH", Decimal("0.0010"), btc)
+        self.assertEqual((r["tau"], r["autres"]["minimum"], r["sous_places"]), (F(55, 10000), F(60, 10000), False))
+        drapeaux = [tau.agregateurs(P, "ETH", Decimal("0.0100"), btc | {("tau", "agregateur"): Decimal(x)})
+                    ["sous_places"] for x in ("0.0020", "0.0050")]
+        self.assertEqual(drapeaux, [True, False])               # 0,0040 < 0,0100 ; à l'égalité (0,0100), aucun drapeau
+        with self.assertRaises(tau.socle.Refus) as e:
+            tau.agregateurs(P, "ETH", Decimal("0.0010"), {k: v for k, v in btc.items() if k[1] != "sans_horodatage"})
+        self.assertEqual(e.exception.code, "CA/btc")
 
 
 if __name__ == "__main__":

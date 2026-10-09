@@ -23,6 +23,20 @@ class TestRegles(unittest.TestCase):
             attendu = None if v["attendu"] is None else Fraction(v["attendu"])
             self.assertEqual(socle.quantile(valeurs(v), v["num"], v["den"]), attendu, v)
 
+    def test_regle(self):
+        """T-CA-G-1 : 1,5 × 0,00123 = 0,001845 donne 0,0020 ; 1,5 × 0,0002 donne 0,0005 sans drapeau ; borne basse
+        exacte (1,5 × 1/3000 = 0,0005) sans drapeau ; 0 donne 0,0005 avec drapeau ; multiple exact 0,0045 ; 0,003 +
+        1E-60 donne 0,0050 ; 1/3 % : 0,0035 (facteur 1), 0,0050 (facteur 1,5) ; 0,0280 donne 0,0280 ; 0,02801 et 0,0285
+        : refus, valeur de la règle 0,0285. Mutations M-CA-13 : arrondi au plus proche ; M-CA-14 : borne haute incluse ;
+        produit en Decimal arrondi."""
+        for v in V["regle"]:
+            x = None if v["x"] is None else sum(Fraction(y) for y in v["x"].split(" + "))
+            tau, drapeau, valeur = socle.regle(v["facteur"], x, "0.0005", "0.0005", "0.0285")
+            attendus = tuple(None if y is None else Fraction(y) for y in (v["tau"], v["valeur"]))
+            self.assertEqual((tau, valeur), attendus, v)
+            self.assertEqual(None if drapeau is None else drapeau[:len(v["drapeau"])].lower(),
+                             None if v["drapeau"] is None else v["drapeau"].lower(), v)
+
 
 if __name__ == "__main__":
     unittest.main()

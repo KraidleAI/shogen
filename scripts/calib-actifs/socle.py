@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 from decimal import Decimal
@@ -77,6 +78,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "kraken_sha256": _par_actif(str) | {"source": str},
           "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
                         "source": str},
+          "tau": dict.fromkeys(("facteur", "pas", "borne_basse", "borne_haute_exclue", "planchers_seuls"), "dec")
+          | {"rang": [int], "source": str},
           "sigma": {"facteur": "dec", "rang": [int], "pas_s": int, "source": str,
                     "planchers_s": {"agregateur": int, "place_horodatee": int}},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
@@ -227,4 +230,22 @@ def quantile(valeurs, num: int, den: int):
     tests/vecteurs_regles.json."""
     v = sorted(valeurs)
     return v[min(max((num * len(v) + den - 1) // den, 1), len(v)) - 1] if v else None
+
+
+def regle(facteur, x, pas, basse, haute) -> tuple:
+    """(τ ou None, drapeau ou None, valeur de la règle) : τ = grid-ceil(facteur × x, pas) en rationnels, contraint par
+    basse ≤ τ < haute (ADR-0029 l.181, l.183) ; sous la borne basse, premier multiple qui l'atteint, avec drapeau ; à
+    ou au-delà de la borne haute, aucun τ (refus nommé à l'usage, jamais d'écrêtage) ; x None : « aucune cellule ».
+    Réimplémentation de scripts/plan-s2bis/regles.py l.19-36 (Q-CA-13), croisée par tests/vecteurs_regles.json."""
+    if x is None:
+        return None, "aucune cellule", None
+    p = Fraction(pas)
+    k = math.ceil(Fraction(facteur) * Fraction(x) / p)
+    k_bas, k_haut = math.ceil(Fraction(basse) / p), math.ceil(Fraction(haute) / p) - 1
+    valeur = Decimal(k) * Decimal(pas)
+    if k > k_haut:
+        return None, f"REFUS : valeur de la règle à la borne haute exclue {haute} ou au-delà", valeur
+    if k < k_bas:
+        return Decimal(k_bas) * Decimal(pas), "borne basse appliquée", valeur
+    return valeur, None, valeur
 

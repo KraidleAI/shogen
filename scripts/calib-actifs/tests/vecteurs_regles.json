@@ -12,5 +12,19 @@
   {"valeurs": ["1/3", "1/4", "1/2"], "num": 99, "den": 100, "attendu": "1/2"},
   {"valeurs": ["7"], "num": 999, "den": 1000, "attendu": "7"},
   {"valeurs": [], "num": 99, "den": 100, "attendu": null}
+ ],
+ "regle": [
+  {"facteur": "1.5", "x": "0.00123", "tau": "0.0020", "drapeau": null, "valeur": "0.0020"},
+  {"facteur": "1.5", "x": "0.0002", "tau": "0.0005", "drapeau": null, "valeur": "0.0005"},
+  {"facteur": "1.5", "x": "1/3000", "tau": "0.0005", "drapeau": null, "valeur": "0.0005"},
+  {"facteur": "1.5", "x": "0", "tau": "0.0005", "drapeau": "borne basse", "valeur": "0"},
+  {"facteur": "1.5", "x": "0.003", "tau": "0.0045", "drapeau": null, "valeur": "0.0045"},
+  {"facteur": "1.5", "x": "3/1000 + 1E-60", "tau": "0.0050", "drapeau": null, "valeur": "0.0050"},
+  {"facteur": "1.5", "x": "1/300", "tau": "0.0050", "drapeau": null, "valeur": "0.0050"},
+  {"facteur": "1", "x": "1/300", "tau": "0.0035", "drapeau": null, "valeur": "0.0035"},
+  {"facteur": "1", "x": "0.0280", "tau": "0.0280", "drapeau": null, "valeur": "0.0280"},
+  {"facteur": "1", "x": "0.02801", "tau": null, "drapeau": "REFUS", "valeur": "0.0285"},
+  {"facteur": "1", "x": "0.0285", "tau": null, "drapeau": "REFUS", "valeur": "0.0285"},
+  {"facteur": "1.5", "x": null, "tau": null, "drapeau": "aucune cellule", "valeur": null}
  ]
 }
