@@ -246,4 +246,24 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 210
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 268
+
+  calib-actifs-unittest:
+    # Lot CALIB-ACTIFS, CA-0a (2026-10-09 ; G0 docs/adr-0029/g0-calib/, E-CA-33) : suite de scripts/calib-actifs, patron
+    # du job sim-bis (aucun saut, Ran = plancher, --egal, relevé à chaque sous-lot) ; aucun cas K du runner ne le lit.
+    name: calib-actifs-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas du vérificateur de la suite (câblage des jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de scripts/calib-actifs, jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 64

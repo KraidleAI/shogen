@@ -1,0 +1,30 @@
+{
+ "source": ["Q-CA-13 : vecteurs calculés à la main, relus par tests/test_regles.py (réimplémentation du lot)",
+            "et, hors du lot, par scripts/plan-s2bis/regles.py (passage du réviseur G2) ;",
+            "valeurs en chaînes rationnelles ; plage [a, b] = entiers de a à b"],
+ "quantile": [
+  {"plage": [1, 1000], "num": 999, "den": 1000, "attendu": "999"},
+  {"plage": [1, 1001], "num": 999, "den": 1000, "attendu": "1000"},
+  {"plage": [1, 1000], "num": 99, "den": 100, "attendu": "990"},
+  {"valeurs": ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"], "num": 90, "den": 100, "attendu": "9"},
+  {"valeurs": ["10", "9", "8", "7", "6", "5", "4", "3", "2", "1"], "num": 50, "den": 100, "attendu": "5"},
+  {"valeurs": ["3", "1", "2", "2"], "num": 50, "den": 100, "attendu": "2"},
+  {"valeurs": ["1/3", "1/4", "1/2"], "num": 99, "den": 100, "attendu": "1/2"},
+  {"valeurs": ["7"], "num": 999, "den": 1000, "attendu": "7"},
+  {"valeurs": [], "num": 99, "den": 100, "attendu": null}
+ ],
+ "regle": [
+  {"facteur": "1.5", "x": "0.00123", "tau": "0.0020", "drapeau": null, "valeur": "0.0020"},
+  {"facteur": "1.5", "x": "0.0002", "tau": "0.0005", "drapeau": null, "valeur": "0.0005"},
+  {"facteur": "1.5", "x": "1/3000", "tau": "0.0005", "drapeau": null, "valeur": "0.0005"},
+  {"facteur": "1.5", "x": "0", "tau": "0.0005", "drapeau": "borne basse", "valeur": "0"},
+  {"facteur": "1.5", "x": "0.003", "tau": "0.0045", "drapeau": null, "valeur": "0.0045"},
+  {"facteur": "1.5", "x": "3/1000 + 1E-60", "tau": "0.0050", "drapeau": null, "valeur": "0.0050"},
+  {"facteur": "1.5", "x": "1/300", "tau": "0.0050", "drapeau": null, "valeur": "0.0050"},
+  {"facteur": "1", "x": "1/300", "tau": "0.0035", "drapeau": null, "valeur": "0.0035"},
+  {"facteur": "1", "x": "0.0280", "tau": "0.0280", "drapeau": null, "valeur": "0.0280"},
+  {"facteur": "1", "x": "0.02801", "tau": null, "drapeau": "REFUS", "valeur": "0.0285"},
+  {"facteur": "1", "x": "0.0285", "tau": null, "drapeau": "REFUS", "valeur": "0.0285"},
+  {"facteur": "1.5", "x": null, "tau": null, "drapeau": "aucune cellule", "valeur": null}
+ ]
+}

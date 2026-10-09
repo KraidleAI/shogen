@@ -49,6 +49,10 @@ def naturel(v) -> bool:
     return type(v) is int and v >= 0
 
 
+def booleen(v) -> bool:
+    return type(v) is bool
+
+
 def question(v) -> bool:
     """Valeur adjugée d'une question de la tranche 3 (P-2 de ses corrections G2) : texte qui cite ses lignes de
     l'avis AVIS-SIM-T3.md et de la PROPOSITION."""
@@ -59,6 +63,12 @@ def question_t4(v) -> bool:
     """Valeur adjugée d'une question de la tranche 4 (corrections G2 de la tranche 4, forme P-2 de la tranche 3) :
     texte qui cite ses lignes de l'avis AVIS-SIM-T4.md et de la PROPOSITION."""
     return texte(v) and "AVIS-SIM-T4.md l." in v and "PROPOSITION l." in v
+
+
+def nommee(v) -> bool:
+    """Cellule de la table : objet à nom textuel ; son schéma fermé et ses refus nommés sont ceux de executer.cellule
+    (SB-11e), contrôlés à chaque usage et par tests/test_table.py."""
+    return type(v) is dict and texte(v.get("nom"))
 
 
 ENTREE = {"chemin": texte, "sha256": hex64}
@@ -97,6 +107,10 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                  "fond": {"f": (positif, positif), "longues": (naturel, positif), "autres": (positif, positif),
                           "hors_enveloppe": (naturel, positif), "classe": texte, "source": texte},
                  "questions": {f"Q-T4-{n}": question_t4 for n in (5, 6, 7, 8, 9, 10, 13)}},
+          "cellules": {"couches": {g: {"absences": (naturel, positif), "degradations": (naturel, positif),
+                                       "paires": (naturel, positif), "perte": booleen, "local": (naturel, positif),
+                                       "artefacts": (naturel, positif)} for g in ("nominale", "degradee", "large")},
+                       "nulles": [nommee], "source": texte},
           "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
                         "fichiers": {f"shogen_s2/{m}.py": hex64
                                      for m in ("__init__", "model", "records", "window", "r1")},
@@ -193,8 +207,9 @@ def lire_entree(prm: dict, nom: str, lus=None, environ=None, racine: str = RACIN
 
 def ecrire(chemin: str, octets: bytes) -> None:
     """Fichier écrit en entier ou pas du tout, jamais par-dessus un fichier existant (E-S-48) : partiel voisin
-    « .partiel » créé en exclusif, fsync, lien dur vers `chemin` (refusé si `chemin` existe), partiel retiré ;
-    `.jsonl` refusé (E-S-06)."""
+    « .partiel » créé en exclusif, fsync, lien dur vers `chemin` (refusé si `chemin` existe), fsync du dossier après
+    le lien, partiel retiré ; `.jsonl` refusé (E-S-06). Système de fichiers sans lien dur (os.link lève une autre
+    OSError) : SORTIE/lien, rien d'écrit (SHOGEN-SIM-BIS-ECRITURE-LIEN-1, SB-11a)."""
     if chemin.lower().endswith(".jsonl"):
         raise Refus("SORTIE/jsonl", chemin)
     partiel = chemin + ".partiel"
@@ -211,6 +226,13 @@ def ecrire(chemin: str, octets: bytes) -> None:
             os.link(partiel, chemin)
         except FileExistsError:
             raise Refus("SORTIE/existe", chemin) from None
+        except OSError as e:
+            raise Refus("SORTIE/lien", f"{chemin} : lien dur refusé ({type(e).__name__})") from None
+        d = os.open(os.path.dirname(os.path.abspath(chemin)), os.O_RDONLY)
+        try:
+            os.fsync(d)
+        finally:
+            os.close(d)
     finally:
         os.unlink(partiel)
 

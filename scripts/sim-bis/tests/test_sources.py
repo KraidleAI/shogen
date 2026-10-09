@@ -56,12 +56,13 @@ class TestSources(unittest.TestCase):
         self.assertEqual(c.exception.code, code)
 
     def test_parametres_et_flux(self):
-        """Composants de flux pré-déclarés (Q-4) et strate à loi regroupée (E-S-10) ; flux = aleas.flux du composant ;
+        """Composants de flux pré-déclarés (Q-4 ; « debut », T_début des cellules, ajouté par SB-11f) et strate à loi
+        regroupée (E-S-10) ; flux = aleas.flux du composant ;
         composant non déclaré : SOURCES/composant. Mutation M-3B-01 : contrôle du composant retiré."""
         s = PRM["sources"]
         self.assertEqual(s["composants"], ["regime", "panne", "panne-regime", "longues", "ecart", "ecart-regime",
                                            "hors-enveloppe", "derive", "derive-episodes", "incidents",
-                                           "incidents-hotes", "faibles"])
+                                           "incidents-hotes", "faibles", "debut"])
         self.assertEqual(s["regroupees"], ["stress"])
         self.assertEqual(sources.flux(PRM, "N1", 0, "panne", 3)(), aleas.flux(A, "N1", 0, "panne", 3)())
         self.refus("SOURCES/composant", sources.flux, PRM, "N1", 0, "inconnu", 0)
