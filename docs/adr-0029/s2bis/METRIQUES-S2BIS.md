@@ -1963,3 +1963,30 @@ ou 2^32 admis, borne des valeurs relâchée ou doublée, types des champs non co
 filtre de type, dernier champ du TXT, bases interrogées sans adresse, plancher non relevé. Corrections : 2 mutants
 neufs, 2 tués par leur test visé : AS 0 refusé, seconde chaîne du TXT. Suite : 289 tests ; plancher du job : 289,
 égalité exigée.
+
+## CB-13a (2026-10-08) : processus secondaire, relevé ASN hors du fil qui écrit (E-C-30 à E-C-32 ; Q-C-04)
+
+Objet : module `collecte/secondaire.py`, classe `Secondaire`, sous-classe de la boucle du pool : lectures de la carte
+au départ ws + w − δ, sans sondes ; relevé ASN dû à la première fenêtre de l'exécution, puis à la première fenêtre lue
+qui suit un instant de la cadence scellée (ws mod `periode` = `decalage`) : un instant sauté (fenêtre sautée, arrêt)
+est rattrapé, en mémoire seule, sans relecture du journal (E-C-15 ; C-4 de la G2 de P2A, Q-2 adoptée) ; noté par
+`releve_asn` (`hotes`, `lance`), lancé sur un fil démon si le précédent a rendu (un fil de relevé au plus) ; chaque hôte
+relevé est remis par une file au fil de la boucle, seul écrivain, qui l'écrit en `asn` en tête de la fenêtre suivante ;
+un défaut imprévu d'un hôte s'écrit `asn` à `a` null, et le relevé continue. FORMAT §15.3 et §15.4 (CB-13b).
+
+Rouge : sur un bouchon (boucle de la carte sans relevé), 2 des 3 tests d'origine échouent par assertion ; le troisième
+(départ à ws + 5 s sans sondes) passe sur ce bouchon, comportement hérité de la boucle : M13a-04 le fait échouer. C-4 :
+sur le code de CB-13a d'avant la G2 (relevé aux seuls instants de la cadence), le test neuf échoue par assertion (un
+seul `releve_asn`, à m(6), au lieu de m(3), m(5) et m(6)).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/secondaire.py` | 46 | — |
+| `tests/test_secondaire.py` | 86 | 4 (neuf : départ à ws + 5 s sans sondes ; relevé hors du fil qui écrit, jamais relancé en double ; cadence, défaut noté sans arrêt ; relevé au démarrage, instant sauté rattrapé) |
+
+Mutants (même commande) : 11 mutants du sous-lot, 11 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : relevé sur le fil de la boucle, écriture depuis le fil du relevé, relevé relancé malgré le précédent vivant,
+cadence ou décalage ignorés, hôtes dans l'ordre de la configuration, défaut imprévu qui arrête le relevé, hôte perdu sur
+défaut, relevés jamais écrits, résolveur de l'observateur perdu, plancher non relevé. Corrections : 3 mutants neufs, 3
+tués par leur test visé : aucun relevé au démarrage, instant sauté non rattrapé, mémoire de la dernière fenêtre non
+tenue. Suite : 293 tests ; plancher du job : 293, égalité exigée.
