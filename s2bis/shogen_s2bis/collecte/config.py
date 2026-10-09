@@ -3,7 +3,7 @@ ces octets entre au paquet et à `run_params` ; contrôle par schéma (champs ex
 règles de cohérence. Tout écart lève RefusConfig, dont `code` nomme le refus ; ni défaut, ni écrêtage ; un nombre à
 virgule est refusé (valeurs exactes : décimal en chaîne). Schéma : dict = objet aux champs exacts ; [s] = liste non
 vide d'éléments de schéma s ; [s, n] : de plus, n éléments au plus (CB-19b, C-1 (b) de la relecture d'intégration de
-P1) ; (type, min, max) = feuille (bornes sur la longueur pour str ; None, None pour bool)."""
+P1) ; [s, n, 0] : vide admise ; (type, min, max) = feuille (bornes sur la longueur pour str ; None, None pour bool)."""
 import hashlib
 import json
 
@@ -59,8 +59,8 @@ def controler(v, schema, ou="$"):
         for k, s in schema.items():
             controler(v[k], s, f"{ou}.{k}")
     elif isinstance(schema, list):
-        if type(v) is not list or not v:
-            _refus("CONFIG/type", f"{ou} : liste non vide attendue")
+        if type(v) is not list or not v and schema[2:] != [0]:
+            _refus("CONFIG/type", f"{ou} : liste {'' if schema[2:] == [0] else 'non vide '}attendue")
         if len(schema) > 1 and len(v) > schema[1]:
             _refus("CONFIG/borne", f"{ou} : {len(v)} éléments, {schema[1]} au plus")
         for i, x in enumerate(v):

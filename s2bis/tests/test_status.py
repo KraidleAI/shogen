@@ -1,0 +1,396 @@
+"""CB-17a, E-C-38 : lecture du journal et jugement d'une `sante` pour `status`. Journaux écrits par l'écrivain
+(CB-1, CB-2) ; codes attendus écrits à la main d'après ADR-0029 §2.3 (D-1 sans santé ; D-2 retard de plus de 5 s ou
+lecture non partie, règle Q-C-02 de l'AVIS ; D-4 au moins 2 témoins sans réponse ; D-5 au moins 2 noms témoins non
+résolus ; D-3 non jugé : format de `chronyc` non lu sur pièce, SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; aucune ligne `lecture`
+décodée (PROPOSITION §2.4 « Status »).
+CB-17b : état par fenêtre et rapport écrits à la main ; tête recalculée sur les octets du fichier ; strates par jour
+UTC (stress : samedi et dimanche, ADR-0029 l.196) ; sortie identique avec et sans `lecture` ; rien d'écrit ;
+commande.
+CB-17c (AVIS Q-D-03, point 2) : résumés par jour écrits à la main d'après le scénario, liste blanche de leurs clés ;
+commande `resume` ; grille bornée (C-3) : journaux corrompus de la G2, `status` en sous-processus borné en mémoire.
+CB-17d (point 3) : compte à quorum et âges calculés à la main ; résumés hostiles refusés."""
+import contextlib
+import hashlib
+import io
+import json
+import os
+import pathlib
+import subprocess
+import sys
+import tempfile
+import time
+import unittest
+from unittest import mock
+
+from shogen_s2bis.collecte import entree, journal, status
+from shogen_s2bis.collecte.lecture import S, Lecture
+from tests.test_entree import configurations, port_ferme
+from tests.test_reprise import m
+from tests.test_tetes import sans_attente
+
+RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+D3 = {"sortie": "suivi\n", "code": 0, "debut": 1, "fin": 2}
+
+
+def temoin(statut="reponse"):
+    """Résultat D-4 (FORMAT §12, §13.4) : réponse retenue, ou `delai`."""
+    ok = statut == "reponse"
+    return {"adresse": "192.0.2.1", "statut": statut, "rcode": 0 if ok else None, "tc": False if ok else None,
+            "reponses": [[".", 6, 86400, ["a.", "b.", 1, 2, 3, 4, 5]]] if ok else None, "debut": 1, "fin": 2}
+
+
+def nom(statut="reponse", rcode=0, reponses=(("t.example.", 1, 30, "192.0.2.7"),)):
+    """Résultat D-5 : nom résolu (réponse A), rcode non nul, réponse sans A, ou aucune réponse."""
+    ok = statut == "reponse"
+    return {"nom": "t.example.", "statut": statut, "rcode": rcode if ok else None, "tc": False if ok else None,
+            "reponses": [list(r) for r in reponses] if ok else None, "debut": 1, "fin": 2}
+
+
+def sante(retard=0, non_parties=0, d4=None, d5=None, d3=D3):
+    return {"d2": {"retard_max": retard, "non_parties": non_parties}, "fils": {"abandonnes": 0, "tardives": [],
+            "sondes": 0}, "horloges": None, "d3": d3, "d4": d4 or [temoin()] * 3, "d5": d5 or [nom()] * 2,
+            "disque": {"total": 5000, "libre": 1000}, "resolveur": "c" * 64}
+
+
+def lectures_de(n, panne):
+    """Lectures d'une fenêtre : `ok` ; ou, en panne, la k-ième en `panne_transport:dns` (adresse null), en
+    `panne_http` (503) ou en `panne_decode`."""
+    t = m(n) * S
+    if not panne:
+        return [Lecture("ok", t + 1, t + 2, {"dns": t + 1}, "192.0.2.9:443", code=200, octets=b"x", valeurs={"prix":
+                                                                                                           "1.5"})]
+    return [Lecture("panne_transport", t + 1, t + 2, {}, None, sous_type="dns"),
+            Lecture("panne_http", t + 1, t + 2, {"dns": t + 1}, "192.0.2.9:443", code=503, octets=b"indisponible"),
+            Lecture("panne_decode", t + 1, t + 2, {"dns": t + 1}, "192.0.2.9:443", code=200, octets=b"{")]
+
+
+class LectureDuJournal(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d = d.name
+
+    def petit_journal(self):
+        """m(1) : une lecture `ok` ; m(2) : trois lectures en panne ; m(3) : aucune ; chacune suivie de `sante` et du
+        marqueur."""
+        jl = journal.Journal(self.d, "pool").ouvrir(m(0))
+        for n, lus in ((1, lectures_de(1, False)), (2, lectures_de(2, True)), (3, [])):
+            for k, lu in enumerate(lus):
+                jl.ecrire("lecture", m(n), forme=f"f{k}", prevu=m(n) * S, **lu.enregistrement())
+            jl.ecrire("sante", m(n), **sante())
+            jl.marqueur(m(n))
+        jl.fermer()
+
+    def test_aucune_lecture_decodee(self):
+        """Les lignes `lecture` (`ok`, en panne, adresse null) ne passent jamais par le décodeur JSON ; les autres sont
+        rendues dans l'ordre de la chaîne (PROPOSITION §2.4 « Status »)."""
+        self.petit_journal()
+        vus, charger = [], json.loads
+        with mock.patch.object(status.json, "loads", side_effect=lambda x: vus.append(x) or charger(x)):
+            types = [e["type"] for e, _ligne in status.enregistrements(self.d)]
+        self.assertEqual((types, [x for x in vus if b'"type":"lecture"' in x], len(vus)),
+                         (["ouverture", "sante", "marqueur", "point"] + ["sante", "marqueur"] * 2, [], 8))
+
+    def test_ligne_illisible_arrete_le_fichier(self):
+        """Comme la lecture d'un fichier au FORMAT §7.1, la première ligne illisible (JSON coupé, objet sans `seq`,
+        liste) arrête le fichier : un marqueur écrit après elle n'est pas lu ; une dernière ligne sans saut de ligne
+        non plus."""
+        self.petit_journal()
+        sain = pathlib.Path(self.d, "pool-2026-10-04-0.jsonl").read_bytes()
+        suite = b'{"prec":"' + b"0" * 64 + b'","seq":999,"type":"marqueur","ws":1791154920}\n{"prec"'
+        for illisible in (b'{"x":', b'{"type":"marqueur","ws":60}', b"[1]"):
+            pathlib.Path(self.d, "pool-2026-10-04-0.jsonl").write_bytes(sain + illisible + b"\n" + suite)
+            self.assertEqual([e.get("ws") for e, _l in status.enregistrements(self.d)][-1], m(3), illisible)
+
+    def test_journal_absent(self):
+        with self.assertRaises(status.RefusStatus) as r:
+            list(status.enregistrements(self.d))
+        self.assertEqual((r.exception.code, str(r.exception)), ("STATUS/journal", "STATUS/journal : aucun fichier du "
+                                                                "journal « pool »"))
+
+
+class Jugement(unittest.TestCase):
+    def test_codes_d_une_sante(self):
+        """(codes, relevé D-3 absent ou en erreur) écrits à la main, un défaut par cas ; sans santé lisible, D-1."""
+        cas = [(sante(), [], False), (sante(retard=5 * S), [], False), (sante(retard=5 * S + 1), ["D-2"], False),
+               (sante(retard=None), [], False), (sante(retard=-S), [], False), (sante(non_parties=1), ["D-2"], False),
+               (sante(d4=[temoin("delai"), None, temoin()]), ["D-4"], False),
+               (sante(d4=[temoin("reseau"), temoin(), temoin()]), [], False),
+               (sante(d5=[nom(rcode=3), nom(reponses=(("t.example.", 5, 30, "x.example."),))]), ["D-5"], False),
+               (sante(d5=[nom("delai"), nom()]), [], False), (sante(d5=[nom(reponses=()), nom(rcode=2)]), ["D-5"],
+                                                              False),
+               (sante(d3=None), [], True), (sante(d3={"erreur": "delai", "debut": 1, "fin": 2}), [], True),
+               (sante(d3={**D3, "code": 1}), [], True),
+               (sante(retard=6 * S, non_parties=2, d4=[None] * 3, d5=[None] * 2), ["D-2", "D-4", "D-5"], False),
+               (None, ["D-1"], False), ({"d2": {}}, ["D-1"], False), ("x", ["D-1"], False)]
+        self.assertEqual([status.juger(s) for s, _c, _a in cas], [(c, a) for _s, c, a in cas])
+
+    def test_seuils_egaux_a_ceux_du_recalcul(self):
+        """Seuils de `status` égaux à ceux de `s2bis/config/analyse.json` (bloc `degradation`, lu en JSON brut)."""
+        with open(os.path.join(RACINE, "config", "analyse.json"), encoding="utf-8") as f:
+            g = json.load(f)["degradation"]
+        self.assertEqual((status.D2, status.D4, status.D5), (g["d2_retard_s"] * S, g["d4_echecs"], g["d5_echecs"]))
+
+
+SCENARIO = {1: None, 2: sante(retard=5 * S + 1), 4: sante(d4=[temoin("delai"), None, temoin()],
+            d5=[nom(rcode=3), nom(reponses=(("t.example.", 5, 30, "x.example."),))]),
+            5: sante(non_parties=1, d4=[temoin("reseau"), temoin(), temoin()], d5=[nom("delai"), nom()]),
+            6: "sans sante", 7: sante(retard=5 * S, d3={"erreur": "absente", "debut": 1, "fin": 2}),
+            8: sante(d3={**D3, "code": 1}), 63: sante(retard=6 * S)}
+INVALIDES = {1: ["D-1"], 2: ["D-2"], 4: ["D-4", "D-5"], 5: ["D-2"], 6: ["D-1"], 63: ["D-2"]}       # SCENARIO, à la main
+NOW = (m(63) + 60 + 120) * S                                       # deux minutes après la fin de la dernière fenêtre
+VEN = 1791589800                                                  # vendredi 9 octobre 2026, 23:50 UTC (G2)
+ATTENDU = ["status : journal « pool », lecture seule",
+           "fenêtres : de 2026-10-04 22:59 à 2026-10-05 00:01 UTC, 63 ; dernier marqueur : 2026-10-05 00:01 UTC",
+           "tête : seq {seq}, sha256 {sha}",
+           "disque : 1000 octets libres sur 5000",
+           "dégradations : D-1 2 ; D-2 3 ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1 ; relevé absent ou en erreur : "
+           "2) ; D-4 1 ; D-5 1",
+           "dernière fenêtre : dégradée (D-2)",
+           "fenêtres valides hors D-3 (compte local) : calme 1 ; stress 56"]
+
+
+def ecrire_journal(d, lectures=True, panne=False):
+    """Fenêtres m(1) à m(63) (22:59 le dimanche 4 octobre à 00:01 le lundi 5, UTC) : lectures (aucune, une `ok`, ou
+    trois en panne), puis `sante` selon SCENARIO (valide hors scénario), puis marqueur, sauf m(1) (aucun
+    enregistrement : trou déclaré au marqueur suivant)."""
+    jl = journal.Journal(d, "pool").ouvrir(m(0))
+    for n in range(2, 64):
+        s = SCENARIO.get(n, sante())
+        for k, lu in enumerate(lectures_de(n, panne) if lectures else []):
+            jl.ecrire("lecture", m(n), forme=f"f{k}", prevu=m(n) * S, **lu.enregistrement())
+        if s != "sans sante":
+            jl.ecrire("sante", m(n), **s)
+        jl.marqueur(m(n))
+    jl.fermer()
+
+
+def tete_du_fichier(d):
+    """(seq, sha256) de la dernière ligne du dernier fichier, sans le code du collecteur."""
+    derniere = pathlib.Path(d, "pool-2026-10-05-0.jsonl").read_bytes().split(b"\n")[-2] + b"\n"
+    return json.loads(derniere)["seq"], hashlib.sha256(derniere).hexdigest()
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d = d.name
+
+    def journal(self, nom_, **k):
+        os.mkdir(chemin := os.path.join(self.d, nom_))
+        ecrire_journal(chemin, **k)
+        return chemin
+
+
+class Etat(Base):
+    def test_jugement_par_fenetre_tete_et_releves_absents(self):
+        """Chaque fenêtre de m(1) à m(63) jugée (codes écrits à la main), y compris m(1), première admise sans
+        marqueur ; dernière santé, tête du dernier enregistrement, deux relevés D-3 absents ou en erreur (m(7),
+        m(8))."""
+        jdir = self.journal("a")
+        grille, derniere, tete, absents = status.etat(jdir)
+        self.assertEqual(grille, {m(n): INVALIDES.get(n, []) for n in range(1, 64)})
+        self.assertEqual((derniere["ws"], derniere["disque"], tete, absents),
+                         (m(63), {"total": 5000, "libre": 1000}, tete_du_fichier(jdir), 2))
+
+    def test_grille_bornee_par_le_jour_des_fichiers(self):
+        """C-3, journaux d'un chiffre corrompu (JSON valide) de la G2 : `ws` d'un marqueur ou `suivante` portés en
+        2280 (2 → 9) : la ligne est illisible, le fichier s'arrête ; `suivante` ramenée en 2001 : la grille part du jour
+        du premier fichier, moins un jour (2 876 fenêtres, comptées à la main) ; un fichier au 30 février n'est pas lu.
+        `status` en sous-processus, espace d'adressage borné à 512 Mio : sortie 0 en moins de 2 s."""
+        borne = ("import resource, sys; resource.setrlimit(resource.RLIMIT_AS, (1 << 29, 1 << 29)); from "
+                 "shogen_s2bis.collecte import entree; raise SystemExit(entree.main(sys.argv[1:]))")
+        for i, (avant, apres, attendu) in enumerate((
+                (b'"type":"marqueur","ws":17915', b'"type":"marqueur","ws":97915', "fenêtres : aucune fenêtre close"),
+                (b'"suivante":1791589860', b'"suivante":9791589860', "fenêtres : aucune fenêtre close"),
+                (b'"suivante":1791589860', b'"suivante":1000000080', "fenêtres : de 2026-10-08 00:00 à 2026-10-09 "
+                 "23:55 UTC, 2876 ; dernier marqueur : 2026-10-09 23:55 UTC"))):
+            os.mkdir(d := os.path.join(self.d, str(i)))
+            jl = journal.Journal(d, "pool").ouvrir(VEN)
+            for n in range(1, 6):
+                jl.ecrire("sante", VEN + 60 * n, **sante())
+                jl.marqueur(VEN + 60 * n)
+            jl.fermer()
+            p = pathlib.Path(d, "pool-2026-10-09-0.jsonl")
+            p.write_bytes(p.read_bytes().replace(avant, apres, 1))
+            pathlib.Path(d, "pool-2026-02-30-0.jsonl").write_bytes(b"")
+            debut = time.monotonic()
+            r = subprocess.run([sys.executable, "-B", "-c", borne, "status", "--journal", d], cwd=RACINE,
+                               capture_output=True, text=True, timeout=60)
+            self.assertEqual((r.returncode, r.stdout.splitlines()[1:2], r.stderr), (0, [attendu], ""))
+            self.assertLess(time.monotonic() - debut, 2)
+
+
+class Rapport(Base):
+    def test_sante_seule_jugee_et_comptee_par_strate(self):
+        """Rapport écrit à la main : m(1) à m(61) le dimanche (stress), m(62) et m(63) le lundi (calme)."""
+        jdir = self.journal("a")
+        seq, sha = tete_du_fichier(jdir)
+        self.assertEqual(status.rapport(jdir), [x.format(seq=seq, sha=sha) for x in ATTENDU])
+
+    def test_sortie_identique_avec_et_sans_lectures(self):
+        """PROPOSITION §2.4 « Status » : même sortie, hors la ligne de tête, sans lecture, avec une lecture `ok` ou
+        trois en panne par fenêtre."""
+        rapports = [[x for x in status.rapport(self.journal(str(i), lectures=lectures, panne=panne)) if not
+                     x.startswith("tête : ")] for i, (lectures, panne) in enumerate(((False, False), (True, False),
+                                                                                      (True, True)))]
+        self.assertEqual((rapports[1], rapports[2]), (rapports[0], rapports[0]))
+
+    def test_rien_n_est_ecrit_meme_pendant_l_ecriture(self):
+        """Le dossier du journal est le même, octet pour octet, avant et après ; `status` lit pendant que l'écrivain
+        tient le verrou, sans le prendre."""
+        jdir = self.journal("a")
+        avant = {n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}
+        self.assertEqual(status.rapport(jdir)[1], ATTENDU[1])
+        self.assertEqual({n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}, avant)
+        jl = journal.Journal(jdir, "pool").ouvrir(m(70))             # l'écrivain reprend et tient le verrou
+        self.addCleanup(jl.fermer)
+        tenu = {n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}
+        self.assertEqual(status.rapport(jdir)[1], ATTENDU[1])
+        self.assertEqual({n: pathlib.Path(jdir, n).read_bytes() for n in sorted(os.listdir(jdir))}, tenu)
+
+    def test_commande_status(self):
+        """`status --journal DOSSIER` : le rapport sur la sortie, code 0 ; dossier sans journal : refus, code 1."""
+        jdir = self.journal("a")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(entree.main(["status", "--journal", jdir]), 0)
+        self.assertEqual(out.getvalue(), "\n".join(status.rapport(jdir)) + "\n")
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            self.assertEqual(entree.main(["status", "--journal", self.d]), 1)
+        self.assertEqual((out.getvalue(), err.getvalue()), ("", "status : refus : STATUS/journal : aucun fichier du "
+                                                                "journal « pool »\n"))
+
+
+def ligne(r):
+    return json.dumps(r, sort_keys=True, separators=(",", ":")).encode() + b"\n"
+
+
+class Resumes(Base):
+    def setUp(self):
+        super().setUp()
+        self.jdir = self.journal("journal")
+        os.mkdir(depot := os.path.join(self.d, "depot"))
+        self.depot = depot
+
+    def test_resume_par_jour_et_liste_blanche(self):
+        """Un résumé par jour UTC, ligne canonique {jour, observateur, fenetres}, chaque fenêtre [ws, codes] : clés
+        fermées, aucune donnée de lecture (AVIS Q-D-03, risque : liste blanche)."""
+        attendu = {"o1-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o1", "fenetres": [
+            [m(n), INVALIDES.get(n, [])] for n in range(1, 62)]}, "o1-2026-10-05.resume": {
+            "jour": "2026-10-05", "observateur": "o1", "fenetres": [[m(62), []], [m(63), ["D-2"]]]}}
+        r = status.resumes(self.jdir, "o1")
+        self.assertEqual(r, {n: ligne(x) for n, x in attendu.items()})
+        for octets in r.values():
+            x = json.loads(octets)
+            self.assertEqual((sorted(x), {type(w) for w, _c in x["fenetres"]}, {c for _w, cs in x["fenetres"] for c in
+                                                                                cs} <= set(status.CODES)),
+                             (["fenetres", "jour", "observateur"], {int}, True))
+
+    def poser(self, fichiers):
+        for nom_, contenu in fichiers.items():
+            pathlib.Path(self.depot, nom_).write_bytes(contenu if type(contenu) is bytes else ligne(contenu))
+
+    def test_compte_a_quorum_ages_et_refus(self):
+        """M_j ≥ 2 (ADR-0029 §2.2, pt 5) avec o2 valide hors m(10), o3 valide en m(2) et m(4) seulement ; son propre
+        résumé ignoré ; un résumé hors liste blanche refusé ; âges au bout de la dernière fenêtre lue."""
+        self.poser({"o2-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o2", "fenetres": [
+            [m(n), ["D-1"] if n == 10 else []] for n in range(1, 62)]}, "o2-2026-10-05.resume": {
+            "jour": "2026-10-05", "observateur": "o2", "fenetres": [[m(62), []], [m(63), []]]},
+            "o3-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o3", "fenetres": [
+                [m(2), []], [m(3), ["D-4"]], [m(4), []]]},
+            "o4-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o4", "fenetres": [], "x": 1},
+            "o1-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o1", "fenetres": [[m(1), []]]}})
+        self.assertEqual(status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[7:], [
+            "quorum hors D-3 (au moins 2 observateurs valides) : calme 1 ; stress 57",
+            "résumés lus : o2 jusqu'à 2026-10-05 00:01 UTC (âge 120 s) ; o3 jusqu'à 2026-10-04 23:02 UTC (âge 3660 s)",
+            "résumés refusés : o4-2026-10-04.resume (RESUME/forme)"])
+        for n in ("o2-2026-10-04.resume", "o2-2026-10-05.resume", "o3-2026-10-04.resume"):
+            os.remove(os.path.join(self.depot, n))
+        self.assertEqual(status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[7:], [
+            "quorum : aucun résumé d'un autre observateur lisible",
+            "résumés refusés : o4-2026-10-04.resume (RESUME/forme)"])
+
+    def test_resumes_hostiles_refuses(self):
+        """Un défaut par fichier : taille, forme non canonique, clé en trop, observateur autre que le nom, ws hors du
+        jour ou hors grille, booléen, code inconnu ou en double, code qui n'est pas un texte, fenêtres vides ; un jour
+        hors du journal local, ou un nom en majuscules (C-6), est ignoré. Aucun résumé ne fait lever : chacun est un
+        refus nommé."""
+        b = {"jour": "2026-10-04", "observateur": "p1", "fenetres": [[m(2), []]]}
+        cas = {"p1": (ligne(b)[:-1] + b" " * (1 << 17) + b"\n", "taille"),
+               "p2": (json.dumps({**b, "observateur": "p2"}).encode() + b"\n", "forme"),
+               "p3": ({**b, "observateur": "p3", "y": 0}, "forme"), "p4": ({**b, "observateur": "p5"}, "champs"),
+               "p5": ({**b, "observateur": "p5", "fenetres": [[m(62), []]]}, "champs"),
+               "p6": ({**b, "observateur": "p6", "fenetres": [[m(2) + 1, []]]}, "champs"),
+               "p7": ({**b, "observateur": "p7", "fenetres": [[True, []]]}, "champs"),
+               "p8": ({**b, "observateur": "p8", "fenetres": [[m(2), ["D-6"]]]}, "champs"),
+               "p9": ({**b, "observateur": "p9", "fenetres": [[m(2), ["D-2", "D-2"]]]}, "champs"),
+               "q1": ({**b, "observateur": "q1", "fenetres": []}, "champs"),
+               "q3": ({**b, "observateur": "q3", "fenetres": [[m(2), [["D-1"]]]]}, "champs"),
+               "q4": ({**b, "observateur": "q4", "fenetres": [[m(2), ["D-1", 1]]]}, "champs"),
+               "q5": ({**b, "observateur": "q5", "fenetres": [[m(2), [{}]]]}, "champs")}
+        self.poser({f"{o}-2026-10-04.resume": x for o, (x, _c) in cas.items()})
+        self.poser({"q2-2026-10-99.resume": {**b, "observateur": "q2", "jour": "2026-10-99"},
+                    "P2-2026-10-04.resume": {**b, "observateur": "P2", "fenetres": []}})   # lu, il serait refusé
+        try:
+            refus = status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[-1]
+        except Exception as e:                                      # attrape-tout : une exception est un échec ici
+            refus = f"{type(e).__name__} : {e}"
+        self.assertEqual(refus, "résumés refusés : " + " ; ".join(f"{o}-2026-10-04.resume (RESUME/{c})" for o, (_x, c)
+                                                                    in cas.items()))
+
+    def test_resume_qui_n_est_pas_un_fichier(self):
+        """Un tube nommé au nom d'un résumé : refus `RESUME/lecture`, sans attente (CB-15f)."""
+        os.mkfifo(os.path.join(self.depot, "o2-2026-10-04.resume"))
+        self.assertEqual(sans_attente(lambda: status.rapport(self.jdir, depot=self.depot, observateur="o1",
+                                                             maintenant=NOW)[-2:]),
+                         ["quorum : aucun résumé d'un autre observateur lisible",
+                          "résumés refusés : o2-2026-10-04.resume (RESUME/lecture)"])
+
+    def test_depot_illisible_le_compte_local_reste(self):
+        """Dépôt absent : le rapport local entier, puis `quorum : dépôt illisible (<exception>)` ; le compte local est
+        toujours rendu (AVIS Q-D-03, point 3) (CB-15f)."""
+        local = status.rapport(self.jdir)
+        self.assertEqual(sans_attente(lambda: status.rapport(self.jdir, depot=os.path.join(self.depot, "absent"),
+                                                             observateur="o1", maintenant=NOW)),
+                         local + ["quorum : dépôt illisible (FileNotFoundError)"])
+
+    def test_commande_status_avec_depot(self):
+        """`status` avec `--depot` et `--descripteur` ajoute le compte à quorum ; `--depot` sans `--descripteur` :
+        refus, sortie 2."""
+        _f, _s, o = configurations(port_ferme())
+        pathlib.Path(desc := os.path.join(self.d, "descripteur.json")).write_text(json.dumps(o), encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot, "--descripteur",
+                                          desc]), 0)
+        self.assertEqual(out.getvalue().split("\n")[7:], ["quorum : aucun résumé d'un autre observateur lisible", ""])
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot]), 2)
+        self.assertEqual(err.getvalue(), "status : refus : CONFIG/options : --depot exige --descripteur\n")
+
+    def test_commande_resume(self):
+        """`resume --journal J --depot D --descripteur F` écrit les résumés du journal, sortie 0 ; descripteur refusé :
+        sortie 2 ; journal absent : sortie 1."""
+        _f, _s, o = configurations(port_ferme())
+        desc = os.path.join(self.d, "descripteur.json")
+        pathlib.Path(desc).write_text(json.dumps(o), encoding="utf-8")
+
+        def lancer(jdir):
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                rc = entree.main(["resume", "--journal", jdir, "--depot", self.depot, "--descripteur", desc])
+            return rc, out.getvalue(), err.getvalue()
+        self.assertEqual(lancer(self.jdir), (0, "resume : o1-2026-10-04.resume, o1-2026-10-05.resume\n", ""))
+        self.assertEqual({n: pathlib.Path(self.depot, n).read_bytes() for n in os.listdir(self.depot)},
+                         status.resumes(self.jdir, "o1"))
+        self.assertEqual(lancer(self.depot)[0], 1)
+        pathlib.Path(desc).write_text(json.dumps({**o, "observateur": "o-1"}), encoding="utf-8")
+        self.assertEqual(lancer(self.jdir), (2, "", "resume : refus : CONFIG/incoherent : observateur-nom\n"))
+
+
+if __name__ == "__main__":
+    unittest.main()

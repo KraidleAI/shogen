@@ -6,7 +6,8 @@ où rien n'écoute (délai de 0,1 s). CB-18g (C-1 de la G2 de la tranche C) : to
 budget de l'ADR-0029 l.233-234 à la borne, valeurs prises au texte de l'ADR. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) :
 places du pool, forme de l'hôte (règle `[a-z0-9.-]{1,253}` de Q-RB-13 du recalcul) et du chemin, commit en minuscules,
 délai des sondes à la borne. CB-19f (C-3 (c) et (d) de la relecture d'intégration de P1) : point d'entrée à w = 60,
-journal ouvert sur la grille ; délai et places de `formes.json` jusqu'à la boucle."""
+journal ouvert sur la grille ; délai et places de `formes.json` jusqu'à la boucle. CB-6c : `decodeur` de chaque forme,
+connu du code, et lecture décodée par lui (valeurs écrites à la main d'après binance.bin)."""
 import contextlib
 import errno
 import fcntl
@@ -24,7 +25,7 @@ import unittest
 from unittest import mock
 
 from shogen_s2bis.collecte import entree, journal
-from shogen_s2bis.collecte.lecture import S
+from shogen_s2bis.collecte.lecture import S, Lecture
 from tests.test_boucle import borne
 from tests.test_journal import chaine
 
@@ -49,12 +50,13 @@ def port_ferme():
 
 def configurations(port):
     """(formes, sante, descripteur) de test ; w = 1 s, δ = 0,6 s, tolérance 0,05 s, délai 0,3 s, marge 0,2 s."""
-    forme = {"hote": "127.0.0.1", "port": port, "methode": "GET", "corps": "", "espace": False}
+    forme = {"hote": "127.0.0.1", "port": port, "methode": "GET", "corps": "", "espace": False,
+             "decodeur": "binance_btc"}
     return ({"w": 1, "delta": 6 * S // 10, "tolerance": S // 20, "delai": 3 * S // 10, "marge": S // 5, "places": 4,
              "formes": [{**forme, "nom": "a", "chemin": "/a"}, {**forme, "nom": "b", "chemin": "/b"}]},
             {"commande": [sys.executable, "-c", "print('suivi')"], "temoins": ["127.0.9.1", "127.0.9.2", "127.0.9.3"],
              "noms": ["a.example.", "b.example."], "delai": S // 10},
-            {"observateur": "O1", "fournisseur": "essai", "region": "boucle-locale", "asn": 64512,
+            {"observateur": "o1", "fournisseur": "essai", "region": "boucle-locale", "asn": 64512,
              "resolveur": "127.0.9.53", "config_resolveur": "resolv.conf", "versions": ["python3 essai"],
              "empreinte": "e" * 64})
 
@@ -91,6 +93,8 @@ class Entree(unittest.TestCase):
                ("CONFIG/incoherent : chemin-forme", {**f, "formes": [x, {**y, "chemin": "b"}]}, s, d),
                ("CONFIG/incoherent : places-formes", {**f, "places": 1}, s, d),
                ("CONFIG/incoherent : espace-par-hote", {**f, "formes": [x, {**y, "espace": True}]}, s, d),
+               ("CONFIG/incoherent : decodeur-connu", {**f, "formes": [x, {**y, "decodeur": "binance"}]}, s, d),
+               ("CONFIG/champ-absent", {**f, "formes": [x, {k: v for k, v in y.items() if k != "decodeur"}]}, s, d),
                ("CONFIG/incoherent : empreinte-hex", f, s, {**d, "empreinte": "E" * 64}),
                ("CONFIG/incoherent : temoins-ipv4", f, {**s, "temoins": ["127.0.9.01"]}, d),
                ("CONFIG/incoherent : noms-dns", f, {**s, "noms": ["a..b"]}, d),
@@ -183,6 +187,17 @@ class Entree(unittest.TestCase):
             b.lectures["a"]({})
         places = [b.places.acquire(blocking=False) for _ in range(5)]
         self.assertEqual((lire.call_args.kwargs.get("delai"), places), (3 * S // 10, [True] * 4 + [False]))
+
+    def test_lecture_decodee_par_le_decodeur_de_sa_forme(self):     # CB-6c (FORMAT §9.1, §14.1)
+        """Corps de binance.bin servi aux deux formes : « a » (binance_btc) le décode, « b » (coinbase_btc), non."""
+        f, s, d = configurations(1)
+        f["formes"][1]["decodeur"] = "coinbase_btc"
+        corps = pathlib.Path(RACINE, "tests", "fixtures", "btc", "binance.bin").read_bytes()
+        with mock.patch.object(entree.http, "lire", return_value=Lecture("ok", 1, 2, code=200, octets=corps)):
+            a, b = (entree.construire(f, s, d, self.journal)[1].lectures[n]({}) for n in "ab")
+        self.assertEqual((a.statut, a.valeurs, b.statut, b.valeurs, b.octets), ("ok", [
+            {"actif": "BTC", "classe": "sans_horodatage", "devise": "USDT", "extra": {}, "prix": "64529.50000000",
+             "ts_source": None}], "panne_decode", None, corps))
 
     def test_cablage_des_sondes_et_de_la_boucle(self):                  # SHOGEN-S2BIS-PLAN-CABLAGE-1
         """Les sondes reçoivent la commande, les témoins, les noms et le délai de `sante.json`, le résolveur et sa

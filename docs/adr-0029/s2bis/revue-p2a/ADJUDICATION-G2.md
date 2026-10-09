@@ -1,0 +1,12 @@
+# Adjudication de l'orchestrateur sur la G2 de P2A (2026-10-08, après 21:55 UTC)
+Pièce d'entrée : `g2/RAPPORT-G2.md` (à lire en entier). Le brief `BRIEF-P2A.md` reste en vigueur ; aucune écriture git ; `date -u` avant toute date ; NOTES.md tenu.
+Base : **c58b997** (sur tes chemins, seule la ligne de plancher sim-bis de `gates.yml` diffère de 5cfe746, à 194). Série corrigée sous les mêmes noms (CB-6a … CB-13b), un diff neuf seulement si nécessaire ; ≤ 200 lignes de code ajoutées par diff ; plancher s2bis exact à chaque diff ; METRIQUES à jour. Cette série passe en premier : la tranche B sera recalée dessus ; garder la numérotation (§15 = processus secondaire).
+À corriger (liste fermée) :
+- C-1 (bloquante) : borne avant toute conversion Decimal → entier aux cinq sites de `decodeurs.py` (OKX, DefiLlama, Bitstamp, Gemini, CoinGecko), par une aide unique (refus si `x.adjusted()` dépasse une borne écrite et motivée) ; un test par champ d'horodatage (`1E+1000000`, entier de 10^6 chiffres) avec `panne_decode` en moins de 0,1 s ; mutant « borne retirée ». Le prototype du réviseur est une donnée.
+- C-2 : les six cas du tableau C-2 (G01, G02, G03, G14, G17, G20), chacun tuant son mutant.
+- C-3 : déclarer l'absence des formes BTC versées ; item neuf SHOGEN-S2BIS-FORMES-BTC-1, déclencheur CB-8 (rédiger sa ligne).
+- C-4 (Q-2 adoptée) : relevé ASN au démarrage, plus rattrapage en mémoire d'un instant de cadence sauté ; test et mutant ; si > 200 lignes ou hors lot, rédiger l'item.
+- C-5 (I-1) : la restriction du motif ISO (« T » et « Z » majuscules) écrite au FORMAT §9.1, avec la raison.
+Questions : Q-1 adoptée (5 lectures par hôte et par fenêtre, pool et carte ensemble, règle scellée). Q-3 : aucun repli TCP pour D-4/D-5 ; ASN : taux de troncature mesuré au rodage, item SHOGEN-S2BIS-ASN-TRONCATURE-1. Items à rédiger (constat, propriétaire, déclencheur, prix, origine) : I-2 RIPESTAT-FIXTURE-1, I-3 RFC-REGISTRE-1, I-4/I-5 pour le G0 de RB-2, O-1, O-2, O-4, O-5, O-6, O-7 ; O-3 précise SHOGEN-S2BIS-NOMS-HOTE-RFC1123-1. Écarts E-2 à E-7 admis.
+Preuves : rouge d'assertion par test neuf ; les 26 mutants du réviseur rejoués, six vivants tués ; ≥ 2 mutants neufs par correction ; mode strict 3.10 à 3.13 ; runner, jobs s2bis, S2 (3.10 : SHOGEN-S2-PY310-1 connu), sim-bis 194 ; xtask ; forme.
+Rendu (valeur de retour), Gate 0 en tête : diffs, tableau C-1 à C-5, mutants, matrice, lignes d'items, écarts ; aussi en section datée à la fin de `RAPPORT-GENERATEUR.md`, `SHA256SUMS` recalculé.

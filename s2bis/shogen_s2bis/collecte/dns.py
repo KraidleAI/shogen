@@ -6,7 +6,9 @@ en UDP vers une adresse IPv4 littérale canonique, sans aucune résolution (autr
 identifiant tiré au hasard ; un datagramme qui ne vient pas de cette adresse et de ce port ou qui ne répond pas à la
 requête est ignoré, l'attente continue ; `forme` est réservé à une réponse appariée mal formée (C-2 de la G2 de P1-B) ;
 ne lève jamais (instants en microsecondes). CB-19a (C-1 (a) de la relecture d'intégration de P1) : une réponse appariée
-de plus de UDP = 512 octets est `forme` (RFC 1035 §2.3.4, §4.2.1) ; `analyser` ne porte pas cette borne de l'UDP."""
+de plus de UDP = 512 octets est `forme` (RFC 1035 §2.3.4, §4.2.1) ; `analyser` ne porte pas cette borne de l'UDP.
+CB-12a : identifiant hors de 16 bits, refus nommé (SHOGEN-S2BIS-DNS-ID-16BITS-1) ; drapeau TC gardé, section réponse
+non lue, aucun repli en TCP (SHOGEN-S2BIS-DNS-TC-1 ; FORMAT §12)."""
 import ipaddress
 import secrets
 import socket
@@ -27,6 +29,8 @@ def requete(ident, nom, qtype, recursion=True):
     etiquettes = [] if nom == "." else [e.encode("ascii") for e in nom.removesuffix(".").split(".")]
     if qtype not in TYPES or not all(0 < len(e) < 64 for e in etiquettes) or sum(len(e) + 1 for e in etiquettes) > 254:
         raise ValueError(f"requête DNS invalide : {nom!r}, {qtype!r}")
+    if type(ident) is not int or not 0 <= ident < 1 << 16:
+        raise ValueError(f"requête DNS invalide : identifiant {ident!r}")
     return (struct.pack(">6H", ident, 0x0100 if recursion else 0, 1, 0, 0, 0) +
             b"".join(bytes([len(e)]) + e for e in etiquettes) + bytes(1) + struct.pack(">2H", TYPES[qtype], 1))
 
@@ -75,11 +79,14 @@ def repond(m, q):
 
 
 def analyser(m, q):
-    """{rcode, tc, reponses : [nom, type, ttl, données]} ; Forme si `m` est mal formé ou ne répond pas à `q`."""
+    """{rcode, tc, reponses : [nom, type, ttl, données]} ; Forme si `m` est mal formé ou ne répond pas à `q`. Drapeau
+    TC (CB-12a) : section réponse coupée, non lue, `reponses` None."""
     if not repond(m, q):
         raise Forme("pas une réponse à la requête")
     try:
         drapeaux, an = struct.unpack(">2xH2xH", m[:8])
+        if drapeaux & 0x0200:
+            return {"rcode": drapeaux & 0x0F, "tc": True, "reponses": None}
         reponses, i = [], len(q)
         for _ in range(an):
             nom, i = _nom(m, i)

@@ -82,6 +82,16 @@ class Fitness(unittest.TestCase):
         self.assertEqual((len(copie), [p.replace("CONFIG/", "ANALYSE/").replace("RefusConfig", "RefusAnalyse")
                                        for p in source]), (5, copie))
 
+    def test_copie_du_compte_des_niveaux(self):        # CB-6d : écrivain et lecteur du recalcul (RB-1j), texte égal
+        def pieces(chemin):
+            with open(os.path.join(RACINE, chemin), encoding="utf-8") as f:
+                source = f.read()
+            return [ast.get_source_segment(source, n) for n in ast.parse(source).body if isinstance(
+                n, ast.FunctionDef) and n.name == "_trop_profonde" or isinstance(n, ast.Assign) and getattr(
+                n.targets[0], "id", None) in ("BARRE", "HORS_CROCHETS", "NIVEAUX")]
+        ecrivain = pieces("shogen_s2bis/collecte/journal.py")
+        self.assertEqual((len(ecrivain), ecrivain), (4, pieces("shogen_s2bis/recalc/lecteur.py")))
+
     def test_memes_octets_sous_cinq_graines(self):
         code = ("from shogen_s2bis.collecte import config as c\ntry: c.controler({'a': 1, 'zz': 2, 'yy': 3, 'xx': 4},"
                 " {'a': (int, 0, 9)})\nexcept c.RefusConfig as e: print(e)")

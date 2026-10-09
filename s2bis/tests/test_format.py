@@ -16,7 +16,7 @@ import pathlib
 import tempfile
 import unittest
 
-from shogen_s2bis.collecte import journal
+from shogen_s2bis.collecte import entree, journal
 
 NL = chr(10)
 FORMAT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs",
@@ -176,6 +176,49 @@ class Format(unittest.TestCase):
                     "comme reprises déclarées que les `reprise` intègres, au lien juste, à déclaration exacte.",
                     "Les lecteurs appliquent le §7.1 avant le §7.4.")
         self.assertEqual([x in point4 for x in attendus], [True] * 3)
+
+    def test_paragraphes_9_et_14_valeurs_et_decodeur(self):        # CB-6c, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1
+        """§9.1 : clés exactes d'un relevé, borne de 2 097 152 octets, item nommé ; §14.1 : `decodeur` et sa règle ;
+        puce « Partie P2 » : CB-6c et l'item."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = [(sections["9"], "`actif`, `classe`, `devise`, `prix`, `ts_source` et `extra`"),
+                    (sections["9"], "borne de 2 097 152 octets de JSON canonique"),
+                    (sections["9"], "SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1"), (sections["14"], "règle `decodeur-connu`"),
+                    (sections["9"], "« T » majuscule"), (sections["9"], "ne lit pas la même chose de 3.10 à 3.13")]
+        self.assertEqual([x in s for s, x in attendus], [True] * 6)          # deux derniers : C-5 de la G2 de P2A
+        self.assertEqual([("CB-6c" in p, "ECRIVAIN-REFUS-ARRET-1" in p) for p in puces if p.startswith(
+            "**Partie P2, tranche A**")], [(True, True)])
+
+    def test_paragraphes_8_et_13_items_de_cb_6d(self):                # CB-6d : trois items de l'annexe B
+        """§8.3 : niveaux comptés sur les octets avant le décodeur ; §8.4 : valeurs comptées par occurrence ; §13.6 :
+        résultat rendu avant la place ; la puce « Partie P2 » nomme CB-6d et les trois items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        huit, six = sections["8"], sections["13"].split(" 6. ", 1)[-1]
+        attendus = [(huit, "sur ses octets, avant tout décodeur"), (huit, "une fois par occurrence"),
+                    (six, "le résultat d'une lecture est rendu avant sa place")]
+        self.assertEqual([x in s for s, x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("CB-6d", "TARDIVES-BORNE-1", "IMBRICATION-OCTETS-1", "CORPS-BORNE-1"))
+                          for p in puces if p.startswith("**Partie P2, tranche A**")], [True])
+
+    def test_paragraphe_12_troncature_et_identifiant(self):         # CB-12a : deux items de l'annexe B
+        """§12 : `reponses` null quand le drapeau TC est posé, aucun repli en TCP (choix du lot) ; identifiant hors de
+        16 bits en refus nommé ; la puce « Partie P2 » nomme CB-12a et les deux items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("null quand le drapeau TC est posé", "aucun repli en TCP", "requête DNS invalide")
+        self.assertEqual([x in sections["12"] for x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("CB-12a", "DNS-TC-1", "DNS-ID-16BITS-1")) for p in puces if
+                          p.startswith("**Partie P2, tranche A**")], [True])
+
+    def test_paragraphe_15_processus_secondaire(self):              # CB-13b (CB-12b, CB-13a ; E-C-30 à E-C-33)
+        """§15 : journal au préfixe `secondaire`, `carte.json`, chaque règle croisée du code nommée, champs de
+        `releve_asn` et de `asn`, commande ; le §12 renvoie au §15 ; la puce « Partie P2 » nomme CB-13b."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        quinze = sections.get("15", "")
+        attendus = ["préfixe `secondaire`", "`carte.json`", "`releve_asn`", "`hotes`, `lance`", "`hote`", "`ripestat`",
+                    "`cymru`", "secondaire --formes F --carte C --descripteur D"]
+        self.assertEqual([x in quinze for x in attendus + [f"`{n}`" for n, _r in entree.CROISEES]], [True] * 13)
+        self.assertEqual(("relevé ASN (§15.4)" in sections["12"], [("CB-13b" in p) for p in puces if p.startswith(
+            "**Partie P2, tranche A**")]), (True, [True]))
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et

@@ -4,7 +4,8 @@ CB-2d, CB-2e (C-2, C-3, C-5 de la G2 de P1) : écrivain inutilisable après une 
 CB-18a (SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : garde d'un seul fil, refus nommés de l'écrivain neuf, fermé ou déjà ouvert,
 garde `_terminal` sur toute méthode publique d'écriture (contrôle mécanique). SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1 de
 la G2 du recalcul) : entiers de 640 chiffres au plus. CB-18n (lettre C-4 du FORMAT, avis sur le banc de concordance) :
-64 niveaux d'imbrication au plus, la racine au niveau 1 (`JOURNAL/imbrication`)."""
+64 niveaux d'imbrication au plus, la racine au niveau 1 (`JOURNAL/imbrication`). CB-6d (volet graphe de
+SHOGEN-S2BIS-CORPS-BORNE-1) : valeurs comptées une fois par occurrence, sans développer le graphe."""
 import errno
 import fcntl
 import hashlib
@@ -14,6 +15,7 @@ import stat
 import sys
 import tempfile
 import threading
+import time
 import unittest
 
 from shogen_s2bis.collecte import journal as j
@@ -207,6 +209,26 @@ class Ecrivain(Base):
         t.join(5)
         self.assertEqual((res, [self.etat()]), (["JOURNAL/type"] * 2, avant))
         self.assertEqual(j.canonique({"a": partage, "b": partage}), b'{"a":[1],"b":[1]}\n')   # partage sans cycle
+
+    def test_graphe_partage_refuse_en_temps_borne(self):            # SHOGEN-S2BIS-CORPS-BORNE-1, volet graphe (CB-6d)
+        """x2 = [x1] × 5, x1 = [x0] × 1 000, x0 = [0] × 1 000 : {"x": x2} porte 1 + 1 + 5 × (1 + 1 000 × 1 001)
+        = 5 005 007 valeurs (calcul à la main), plus que LIMITE = 4 194 304 : refus JOURNAL/taille avant le
+        sérialiseur, et à l'écriture sans rien écrire ; 2^61 valeurs (60 niveaux de [x, x]) : même refus, en moins
+        d'une seconde. Partage sous la borne : admis, écrit en entier (x1 : 1 000 × 2 001 + 999 + 2 = 2 002 001
+        octets ; [x1, x1] dans {"x": …}, saut de ligne compris : 2 × 2 002 001 + 3 + 6 + 1 = 4 004 012)."""
+        x0 = [0] * 1000
+        x1, x = [x0] * 1000, [0]
+        for _i in range(60):
+            x = [x, x]
+        jl = self.journal()
+        avant = self.etat()
+        self.assertEqual([code(lambda: j.canonique({"x": [x1] * 5})), code(lambda: jl.ecrire("lecture", WS + 60,
+                                                                                             x=[x1] * 5))],
+                         ["JOURNAL/taille"] * 2)
+        t = time.monotonic()
+        self.assertEqual((code(lambda: j.canonique({"x": x})), self.etat()), ("JOURNAL/taille", avant))
+        self.assertLess(time.monotonic() - t, 1)
+        self.assertEqual(len(j.canonique({"x": [x1] * 2})), 4004012)
 
     def test_entiers_de_640_chiffres_au_plus(self):                    # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
         """640 chiffres, signe non compté, plus petite limite non nulle de conversion des entiers de l'interpréteur :

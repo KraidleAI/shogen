@@ -11,20 +11,33 @@ tolérance de départ de D-2 (`tolerance`, 5 s en production) ; la règle `budge
 tolérance + plus grand décalage + délai + marge ≤ δ. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) : places du pool au moins
 égales au nombre de formes, hôte en minuscules (HOTE, règle de Q-RB-13 du recalcul), chemin en « / » puis ASCII
 imprimable sans espace. CB-19b (C-1 (b) de la relecture d'intégration de P1) : sept témoins et sept noms au plus,
-bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13.6)."""
+bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13.6). CB-6c : chaque forme nomme son
+décodeur (`decodeur`, règle `decodeur-connu`), qui lit le corps de ses lectures `ok` (FORMAT §9.1, §14.1). CB-13b
+(E-C-32, E-C-33 ; FORMAT §15) : commande `secondaire`, processus de la carte et du relevé ASN ; `carte.json` contrôlé
+avec `formes.json` du pool (règles croisées : budget de débit partagé par hôte, lectures hors de δ), journal
+`secondaire` sur la grille du pool, sans sondes. CB-15c (E-C-35) : option `--depot` (dépôt des têtes, FORMAT §16) ; nom
+d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt. CB-15e (E-C-36) : commande `jeton`, jeton RFC 3161 du
+jour ; l'envoi n'est armé que par `--envoi`, URL de la TSA que le déploiement ne pose que sous le go écrit de
+l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé.
+CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
+sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
+journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
+quorum ; `--depot` sans `--descripteur` : sortie 2."""
 import argparse
+import collections
 import ipaddress
 import os
 import re
+import secrets
 import sys
 
-from shogen_s2bis.collecte import boucle, config, dns, http, journal, sante
+from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
 HOTE = "[a-z0-9.-]{1,253}"            # nom d'hôte ou IPv4 : même règle que le recalcul (Q-RB-13 de sa tranche 1)
 FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "chemin": (str, 1, 2048),
-         "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None)}
+         "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None), "decodeur": (str, 1, 64)}
 SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": (int, 1, MAX), "delai": (int, 1, MAX),
                       "marge": (int, 1, MAX), "places": (int, 1, 4096), "formes": [FORME]},
            "sante": {"commande": [(str, 1, 4096)], "temoins": [(str, 7, 15), 7], "noms": [(str, 1, 253), 7],
@@ -32,6 +45,9 @@ SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": 
            "descripteur": {"observateur": (str, 1, 16), "fournisseur": (str, 1, 64), "region": (str, 1, 64),
                            "asn": (int, 1, 4294967295), "resolveur": (str, 7, 15), "config_resolveur": (str, 1, 4096),
                            "versions": [(str, 1, 256)], "empreinte": (str, 64, 64)}}
+CARTE = {"depart": (int, 0, MAX), "delai": (int, 1, MAX), "marge": (int, 1, MAX), "places": (int, 1, 4096),
+         "asn": {"periode": (int, 1, 86400), "decalage": (int, 0, 86399)},       # relevé au moins quotidien (E-C-30)
+         "formes": [FORME, 4096, 0]}                                # vide admise : le relevé ASN tourne sans carte
 
 
 def _ipv4(a):
@@ -65,11 +81,40 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("espace-par-hote", lambda f: len({(x["hote"], x["espace"]) for x in f["formes"]}) == len(
                             {x["hote"] for x in f["formes"]})),
                         ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"]),
-                        ("places-formes", lambda f: f["places"] >= len(f["formes"]))),
+                        ("places-formes", lambda f: f["places"] >= len(f["formes"])),
+                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"]))),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
-             "descripteur": (("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),
+             "descripteur": (("observateur-nom", lambda d: re.fullmatch("[a-z0-9]{1,16}", d["observateur"])),
+                             ("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),
                              ("empreinte-hex", lambda d: re.fullmatch("[0-9a-f]{64}", d["empreinte"]) is not None))}
+COHERENCE_CARTE = tuple(r for r in COHERENCE["formes"] if r[0] not in ("w-divise-l-heure", "marge-delta-fenetre",
+                                                                        "budget"))     # sans grille ni δ propres
+
+
+def _par_hote(*configurations):
+    """{hôte : lectures par fenêtre}, toutes configurations ensemble."""
+    return collections.Counter(x["hote"] for c in configurations for x in c["formes"])
+
+
+def _fin(c):
+    """Plus grand décalage du plan de `c` ; 0 sans forme."""
+    return max((d for d, _n in _plan(c)), default=0)
+
+
+CROISEES = (("budget-partage", lambda f, c: max(_par_hote(f, c).values()) <= boucle.PAR_HOTE),       # E-C-33
+            ("espace-partage", lambda f, c: len({(x["hote"], x["espace"]) for x in f["formes"] + c["formes"]}) == len(
+                _par_hote(f, c))),
+            ("hors-delta", lambda f, c: c["depart"] + _fin(c) + c["delai"] <= f["w"] * S - f["delta"]),   # E-C-32
+            ("marge-carte", lambda f, c: c["depart"] + _fin(c) + c["delai"] + c["marge"] <= f["w"] * S),
+            ("cadence", lambda f, c: c["asn"]["decalage"] < c["asn"]["periode"] and not (
+                c["asn"]["periode"] % f["w"] or c["asn"]["decalage"] % f["w"])))
+
+
+def _commit(commit):
+    """Commit scellé de l'archive déployée : 40 chiffres hexadécimaux minuscules, sinon CONFIG/commit."""
+    if not re.fullmatch("[0-9a-f]{40}", commit):
+        raise config.RefusConfig("CONFIG/commit", commit)
 
 
 def configurer(chemins, commit):
@@ -77,39 +122,137 @@ def configurer(chemins, commit):
     chiffres hexadécimaux minuscules) et le délai des sondes (joint avant l'échéance) ; refus nommé au premier écart
     (RefusConfig, RefusBoucle) ; un fichier illisible lève OSError (E-C-02)."""
     lus = {n: config.charger(chemins[n], SCHEMAS[n], COHERENCE[n]) for n in SCHEMAS}
-    if not re.fullmatch("[0-9a-f]{40}", commit):
-        raise config.RefusConfig("CONFIG/commit", commit)
+    _commit(commit)
     if lus["sante"][0]["delai"] + lus["formes"][0]["marge"] > lus["formes"][0]["delta"]:
         raise config.RefusConfig("CONFIG/incoherent", "delai-sondes")
     return lus
 
 
+def configurer_secondaire(chemins, commit):
+    """Comme `configurer`, pour le processus secondaire (CB-13b) : `formes.json` du pool (grille et hôtes), `carte.json`
+    (CARTE, règles de forme du pool) et le descripteur, le commit, puis les règles croisées (CROISEES, FORMAT §15.2)."""
+    lus = {n: config.charger(chemins[n], SCHEMAS[n], COHERENCE[n]) for n in ("formes", "descripteur")}
+    lus["carte"] = config.charger(chemins["carte"], CARTE, COHERENCE_CARTE)
+    _commit(commit)
+    for nom, regle in CROISEES:
+        if not regle(lus["formes"][0], lus["carte"][0]):
+            raise config.RefusConfig("CONFIG/incoherent", nom)
+    return lus
+
+
 def _lecteur(x, delai, tls):
     req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
-    return lambda suivi: http.lire(req, suivi, delai=delai, tls=tls)
+    return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
 
 
-def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
+def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
     """(écrivain non ouvert, boucle) câblés depuis les configurations : une lecture par forme, plan par hôte, sondes
-    de `sante.json` vers le résolveur du descripteur, disque du dossier du journal (PLAN-CABLAGE-1)."""
+    de `sante.json` vers le résolveur du descripteur, disque du dossier du journal (PLAN-CABLAGE-1) ; dépôt des têtes
+    au nom de l'observateur, journal `pool`, si `depot` (CB-15c)."""
     sondes = sante.Sondes(s["commande"], s["temoins"], s["noms"], d["resolveur"], dossier, d["config_resolveur"],
                           s["delai"])
     jl = journal.Journal(dossier, "pool", w=f["w"], fsync=fsync)
     return jl, boucle.Boucle(jl, {x["nom"]: _lecteur(x, f["delai"], tls) for x in f["formes"]}, _plan(f), f["places"],
-                             w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes)
+                             w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes,
+                             depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync))
+
+
+def _observateur(chemin):
+    """Nom de l'observateur du descripteur scellé, contrôlé (schéma et règles) ; RefusConfig ou OSError sinon."""
+    return config.charger(chemin, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
+
+
+def _jeton(a, tls, fsync):
+    """Commande `jeton` (CB-15e) : jour UTC de l'horloge, ou `--jour` ; observateur du descripteur scellé."""
+    try:
+        o = _observateur(a.descripteur)
+        jour = a.jour or journal.jour(horloge() // S)
+        if not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", jour):
+            raise config.RefusConfig("CONFIG/jour", jour)
+    except (config.RefusConfig, OSError) as e:
+        print(f"jeton : refus : {e}", file=sys.stderr)
+        return 2
+    envoi = a.envoi and (lambda tsq: tetes.envoyer(a.envoi, tsq, tls))
+    try:
+        etat, nom, h = tetes.jeton(a.depot, o, jour, secrets.randbits(64), envoi, fsync)
+    except (tetes.RefusJeton, journal.ErreurJournal, OSError, ValueError) as e:
+        print(f"jeton : refus : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)
+        return 1
+    print(f"jeton : {etat} : {nom} : sha256 {h}")
+    return 0
+
+
+def _status(a, fsync):
+    """Commandes `status` (CB-17b ; compte à quorum avec `--depot`, CB-17d) et `resume` (CB-17c) : 0 ; 1 refus du
+    journal ou du dépôt ; 2 refus du descripteur, ou `--depot` sans `--descripteur`."""
+    try:
+        if a.depot and not a.descripteur:
+            raise config.RefusConfig("CONFIG/options", "--depot exige --descripteur")
+        o = a.descripteur and _observateur(a.descripteur)
+    except (config.RefusConfig, OSError) as e:
+        print(f"{a.commande} : refus : {e}", file=sys.stderr)
+        return 2
+    try:
+        if a.commande == "status":
+            print("\n".join(status.rapport(a.journal, depot=a.depot, observateur=o, maintenant=horloge())))
+            return 0
+        noms = status.resumes(a.journal, o)
+        for nom, octets in noms.items():
+            tetes.ecrire(a.depot, nom, octets, fsync)
+    except (status.RefusStatus, journal.ErreurJournal, OSError) as e:
+        print(f"{a.commande} : refus : {e}", file=sys.stderr)
+        return 1
+    print(f"resume : {', '.join(noms)}")
+    return 0
+
+
+def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
+    """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
+    du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
+    échéance ws + w − `marge`, places de la carte, sans sondes ; relevé ASN des hôtes du pool et de la carte au
+    résolveur du descripteur, à la cadence de `asn`."""
+    jl = journal.Journal(dossier, "secondaire", w=f["w"], fsync=fsync)
+    return jl, secondaire.Secondaire(
+        jl, {x["nom"]: _lecteur(x, c["delai"], tls) for x in c["formes"]}, _plan(c), c["places"], _par_hote(f, c),
+        d["resolveur"], c["asn"]["periode"], c["asn"]["decalage"], w=f["w"], delta=f["w"] * S - c["depart"],
+        marge=c["marge"])
+
+
+FICHIERS = {"pool": ("formes", "sante", "descripteur"), "secondaire": ("formes", "carte", "descripteur")}
 
 
 def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
     p = argparse.ArgumentParser(prog="python3 -m shogen_s2bis.collecte", description="collecteur de S2-bis")
-    pool = p.add_subparsers(dest="commande", required=True).add_parser("pool", help="processus du pool")
-    for option in ("--formes", "--sante", "--descripteur", "--journal", "--commit"):
-        pool.add_argument(option, required=True)
-    pool.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
+    commandes = p.add_subparsers(dest="commande", required=True)
+    for nom, aide in (("pool", "processus du pool"), ("secondaire", "processus secondaire : carte et relevé ASN")):
+        c = commandes.add_parser(nom, help=aide)
+        for option in FICHIERS[nom] + ("journal", "commit"):
+            c.add_argument("--" + option, required=True)
+        c.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
+        if nom == "pool":
+            c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
+    jeton = commandes.add_parser("jeton", help="jeton RFC 3161 du jour (FORMAT §16)")
+    for option in ("--descripteur", "--depot"):
+        jeton.add_argument(option, required=True)
+    jeton.add_argument("--jour", help="jour UTC, AAAA-MM-JJ (défaut : celui de l'horloge)")
+    jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
+    st = commandes.add_parser("status", help="santé seule, lue au journal du pool, sans rien écrire")
+    re_ = commandes.add_parser("resume", help="résumés par jour (valide ou codes D) publiés au dépôt")
+    for commande, requis in ((st, False), (re_, True)):
+        commande.add_argument("--journal", required=True)
+        for option in ("--depot", "--descripteur"):
+            commande.add_argument(option, required=requis)
     a = p.parse_args(argv)
+    if a.commande == "jeton":
+        return _jeton(a, tls, fsync)
+    if a.commande in ("status", "resume"):
+        return _status(a, fsync)
+    pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
-        lus = configurer({n: getattr(a, n) for n in SCHEMAS}, a.commit)
+        lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
         f = lus["formes"][0]
-        jl, b = construire(f, lus["sante"][0], lus["descripteur"][0], a.journal, tls, fsync)
+        args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
+        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2

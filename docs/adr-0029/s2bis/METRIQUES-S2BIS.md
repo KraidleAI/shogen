@@ -1780,3 +1780,587 @@ Rouge : sur le code d'avant, 4 échecs d'assertion sous 3.10 (les deux lignes de
 rétabli sur les octets bruts (NC-1) ; décodage non strict (remplacement), en latin-1, ou avec retrait du BOM ; erreur de
 décodage non rattrapée ; cause de l'octet invalide mal nommée. Suite : 255 tests ; plancher du job : 255, égalité exigée
 (`--egal`).
+
+## CB-6a (2026-10-08) : décodeurs BTC des huit places repris de S2, finitude (E-C-06, E-C-08)
+
+Objet (partie P2, tranche A ; sous-lot CB-6 de la PROPOSITION) : module `collecte/decodeurs.py`, un décodeur par
+(hôte, actif) pour les huit places BTC de S2 (Binance, Coinbase, Kraken, OKX ticker et index, Bitstamp, Gemini,
+Bitfinex), repris par copie de `s2-harness/shogen_s2/sources.py` (l.84-218) avec leurs pièges (Bitfinex position 6,
+Kraken clé rendue et liste d'erreurs, code d'OKX) ; fixtures de S2 copiées octet pour octet (`tests/fixtures/btc/`,
+sha256 comparés aux originaux par le test ; pièce G6). Écarts à S2, nommés : aucun flottant (prix : texte du Decimal
+lu ; instant de la source en microsecondes entières, de 0 à 2^53 exclu) ; prix fini, > 0, exposant dans les bornes du
+contexte nommé, copie de celui de S2 (r1.py l.62-68) ; instant ISO lu par un motif (`fromisoformat` lit autrement de
+3.10 à 3.13 : essai du worker) ; `decoder` ne lève jamais (`panne_decode`). Valeurs attendues hors du code :
+`s2-harness/tests/expected.json`, lu en Decimal depuis son texte.
+
+Rouge : sur un bouchon qui rend toujours `panne_decode`, 6 des 8 tests neufs échouent par assertion ; les deux autres
+(fixtures identiques à celles de S2 ; corps illisible, vide ou trop profond en panne) passent sur ce bouchon par
+construction.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 91 | — |
+| `tests/test_decodeurs.py` | 108 | 8 (neuf : reprise des fixtures et des valeurs de S2 ; pièges ; finitude ; corps illisible) |
+| `tests/fixtures/btc/` (huit fichiers `.bin`, copies) | — | — |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin vert) : 20 mutants, 20 tués par leur test visé (0 vivant, 0 FATAL) : finitude
+retirée, prix nul admis, exposant non borné, Bitfinex au dernier élément ou à moins de 10 champs, Kraken à la clé
+demandée ou sans sa liste d'erreurs, code d'OKX ignoré, champ ou devise d'OKX échangés, classe de Coinbase,
+millisecondes de Gemini lues en secondes, fraction ISO non tronquée, décalage ignoré, 2^53 ou instant négatif admis,
+attrape-tout réduit, motif ISO partiel, instant sans décalage lu hors UTC, plancher non relevé. Suite : 263 tests ;
+plancher du job : 263, égalité exigée (`--egal`).
+
+## CB-6b (2026-10-08) : agrégateurs et Chainlink BTC de S2, contexte nommé, instants bornés (E-C-06, E-C-07, E-C-11)
+
+Objet : décodeurs CoinGecko, DefiLlama (`confidence` en extra) et Chainlink (`latestRoundData` : cinq mots en
+hexadécimal strict, réponse signée au mot 2, instant `updatedAt` au mot 4, `roundId` en extra ; prix construit
+exactement, mantisse et exposant −8, sans division), fixtures copiées ; tout décodage sous le contexte nommé, jamais
+celui du fil (Q-C-14). Correction C-1 de la G2 de P2A : les cinq instants convertis par `int()` (OKX `ts`, DefiLlama
+`timestamp`, Bitstamp `timestamp`, Gemini `volume.timestamp`, CoinGecko `last_updated_at`) passent par une aide unique,
+`_entier`, qui refuse avant la conversion un Decimal fini d'exposant ajusté de 16 ou plus (10^16 > 2^53 : aucun instant
+recevable n'est refusé) et un texte de plus de 4 300 caractères : `int()` d'un Decimal à grand exposant est quadratique
+et tient le GIL (1E+1000000 : 10,5 s, mesuré), ce qui faisait manquer l'échéance du pool (E-C-11, E-C-12).
+Corrections C-2 (G01 à G03) : six mots de Chainlink, réponse égale à 2^255 (négative) et décalage ISO négatif figés par
+un cas de test chacun.
+
+Rouge : sur le code de CB-6a, le test de Chainlink et la reprise des valeurs de S2 (onze décodeurs attendus)
+échouent par assertion ; le test du contexte nommé passe sur ce code, qui portait déjà le contexte : ses trois mutants
+(contexte du fil, précision 28, Overflow non piégé) le font échouer. C-1 : sur le code de CB-6b d'avant la G2, les
+cinq tests de `Bornes` échouent par assertion (un par champ : `panne_decode`, mais après plus de 0,1 s). C-2 : le code
+d'avant était juste ; chaque cas neuf échoue sous le mutant du réviseur qu'il vise (G01, G02, G03).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 128 | — |
+| `tests/test_decodeurs.py` | 172 | 15 (7 de plus : Chainlink, cas hostiles tirés de la réponse valide ; contexte nommé sous un contexte de fil hostile ; un test de `Bornes` par champ d'instant, cinq) |
+| `tests/fixtures/btc/` (trois fichiers `.bin` de plus, copies) | — | — |
+
+Mutants (même commande) : 12 mutants du sous-lot, 12 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé ; au premier passage d'origine, « hexadécimal non strict » vivait (cas hostiles tous à réponse nulle) : test
+corrigé, campagne relancée. Liste : `startedAt` au lieu d'`updatedAt`, réponse non signée, hexadécimal non strict, six
+décimales, `roundId` au mot 3, `confidence` perdue, secondes de CoinGecko lues en millisecondes, classe agrégateur pour
+Chainlink, contexte du fil, précision 28, Overflow non piégé, plancher non relevé. Corrections : 10 mutants neufs, 10
+tués par leur test visé : borne d'exposant retirée (« borne retirée »), borne de texte retirée, l'une ou l'autre
+relâchée, OKX, Gemini ou DefiLlama sans l'aide, borne serrée qui refuse le témoin, six mots admis, 2^255 lu positif.
+Suite : 270 tests ; plancher du job : 270, égalité exigée.
+
+## CB-6c (2026-10-08) : lecture décodée, valeurs refusées par l'écrivain jamais rendues (E-C-06, E-C-17)
+
+Objet : chaque forme de `formes.json` nomme son décodeur (`decodeur`, règle `decodeur-connu`) ; `decodeurs.appliquer`
+décode le corps de chaque lecture `ok`, dans le fil de la lecture (`valeurs` : liste de relevés, FORMAT §9.1, §14.1).
+Des valeurs que l'écrivain refuserait (types, `journal.canonique`) ou de plus de 2 097 152 octets canoniques ne sont
+jamais rendues : la lecture est `panne_decode`, la boucle continue ; l'item SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 est
+fermé pour les décodeurs. Témoin : la plus longue ligne de lecture (corps de 1 048 576 octets, valeurs à leur borne)
+mesure 3 496 800 octets, sous LIMITE (4 194 304). Correction C-5 de la G2 de P2A : la restriction du motif ISO
+(« T » et « Z » majuscules ; « t », « z », l'espace et `+hhmm` refusés) est écrite au §9.1 avec sa raison (même
+lecture de 3.10 à 3.13), écart à S2 et à la RFC 3339 §5.6 nommé ; deux cas de casse ajoutés au test de l'instant ISO.
+
+Formes BTC (C-3 de la G2 de P2A, écart déclaré) : ce diff ne verse aucune forme de requête BTC (aucune donnée sous
+`s2bis/config/`) ; les décodeurs et les fixtures de S2 sont versés, pas les requêtes. Les formes viennent avec CB-8
+(regroupement de CoinGecko, DefiLlama et Bitfinex, E-C-09 ; plan d'OKX), chacune comparée aux octets de la requête de
+S2 : item SHOGEN-S2BIS-FORMES-BTC-1, déclencheur CB-8.
+
+Rouge : sur le code de CB-6b, les tests neufs échouent par assertion ; les tests existants dont la configuration de
+test porte désormais `decodeur` échouent aussi (refus `CONFIG/champ-inconnu` du schéma d'avant), trois d'entre eux en
+erreur (configuration refusée avant l'assertion). Puis le §9.1 et le §14.1 du FORMAT, absents : échec d'assertion.
+C-5 : sur le FORMAT d'avant la G2, le test des §9 et §14 échoue par assertion (restriction et raison absentes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 146 | — |
+| `shogen_s2bis/collecte/entree.py` | 128 | — |
+| `tests/test_bout_en_bout.py` | 218 | 1 (corps de `binance.bin` servi ; `valeurs` contrôlées contre le §9.1) |
+| `tests/test_decodeurs.py` | 239 | 19 (4 de plus : valeurs refusées jamais rendues ; panne HTTP inchangée ; boucle continue ; plus longue ligne) |
+| `tests/test_entree.py` | 274 | 10 (1 de plus : lecture décodée par le décodeur de sa forme) |
+| `tests/test_format.py` | 206 | 11 (1 de plus : §9.1, dont la restriction ISO, §14.1 et puce « Partie P2 ») |
+
+Mutants (même commande) : 16 mutants du sous-lot, 16 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : garde de l'écrivain retirée, borne de taille retirée, exclue ou doublée, prix flottant admis, instant booléen
+admis, extra non contrôlé, pannes décodées, corps ou code perdus, lecture non décodée, décodeur d'une autre forme, règle
+`decodeur-connu` retirée, champ `decodeur` hors du schéma, item retiré du §9, plancher non relevé. Corrections : 3
+mutants neufs, 3 tués par leur test visé : majuscule effacée du §9.1, motif ISO sans casse, « t » minuscule admis.
+Suite : 276 tests ; plancher du job : 276, égalité exigée.
+
+## CB-6d (2026-10-08) : trois items de l'annexe B fermés (tardives bornées, niveaux comptés sur les octets, graphe)
+
+Objet :
+- SHOGEN-S2BIS-TARDIVES-BORNE-1 : la boucle rend le résultat d'une lecture avant sa place ; une lecture non rendue tient
+  donc toujours sa place, et `tardives` reste borné par `places` (FORMAT §13.6) ;
+- SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 : `Journal._lire` compte les niveaux sur les octets de la ligne, en UTF-8
+  strict, avant tout décodeur (copie du compte du lecteur du recalcul, gardée identique par un test de fitness) ;
+  RecursionError n'est plus prise pour un verdict (FORMAT §8.3) ;
+- SHOGEN-S2BIS-CORPS-BORNE-1, volet graphe : `canonique` compte les valeurs une fois par occurrence, chaque conteneur
+  partagé développé une seule fois, et refuse au-delà de LIMITE (`JOURNAL/taille`) en temps borné (FORMAT §8.4).
+
+Rouge : sur le code de CB-6c, les 5 tests neufs échouent par assertion (graphe partagé non refusé, niveaux comptés
+après le décodeur, place rendue avant le résultat, copie du compte absente, FORMAT).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 136 | — |
+| `shogen_s2bis/collecte/journal.py` | 430 | — |
+| `tests/test_boucle.py` | 325 | 15 (1 de plus : résultat rendu avant la place) |
+| `tests/test_fitness.py` | 106 | 6 (1 de plus : copie du compte des niveaux identique à celle du recalcul) |
+| `tests/test_format.py` | 217 | 12 (1 de plus : §8.3, §8.4, §13.6 et puce « Partie P2 ») |
+| `tests/test_journal.py` | 316 | 15 (1 de plus : graphe partagé refusé en temps borné) |
+| `tests/test_reprise.py` | 352 | 27 (1 de plus : niveaux comptés sur les octets avant le décodeur) |
+
+Mutants (même commande) : 11 mutants, 11 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état corrigé ; un
+mutant reconnu équivalent avant la campagne (décodage UTF-8 avec remplacement) a été remplacé (copie altérée). Liste :
+place rendue avant le résultat, niveaux non comptés avant le décodeur, RecursionError prise pour un verdict, décodeur
+sur les octets bruts (NC-1), copie altérée (échappement, compte), valeurs non comptées, comptées sans multiplicité,
+borne doublée, §13.6 défait, plancher non relevé. Suite : 281 tests ; plancher du job : 281, égalité exigée.
+
+## CB-12a (2026-10-08) : drapeau TC et identifiant sur 16 bits du client DNS (SHOGEN-S2BIS-DNS-TC-1, -DNS-ID-16BITS-1)
+
+Objet : une réponse appariée au drapeau TC est retenue, `tc` vrai, `rcode` lu, section réponse non lue (`reponses`
+null), sans repli en TCP (choix du lot) ; un identifiant hors de 0 à 65 535, booléen compris, est un refus nommé de
+`requete`, donc `forme` pour `interroger` (avant : `struct.error`, non nommé). FORMAT §12.
+
+Rouge : sur le code de CB-6d, les 3 tests neufs échouent par assertion (réponse coupée lue, drapeau perdu ;
+`struct.error` ; §12).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/dns.py` | 130 | — |
+| `tests/test_dns.py` | 265 | 17 (2 de plus : drapeau TC, section non lue ; identifiant hors de 16 bits) |
+| `tests/test_format.py` | 226 | 13 (1 de plus : §12 et puce « Partie P2 ») |
+
+Mutants (même commande) : 11 mutants, 11 tués par leur test visé (0 vivant, 0 FATAL) au second passage, rejoués sur
+l'état corrigé ; au premier, « bit RD pris pour TC » était tué par un autre test que le visé : le test du drapeau
+emploie désormais 0x82 (TC sans RD), campagne relancée. Liste : section lue malgré TC, drapeau perdu, rcode non lu sous
+TC, bit RD pris pour TC, identifiant non contrôlé, 65 536, booléen ou −1 admis, refus non rattrapé par `interroger`, §12
+défait, plancher non relevé. Suite : 284 tests ; plancher du job : 284, égalité exigée.
+
+## CB-12b (2026-10-08) : relevé ASN d'un hôte : A propre, RIPEstat, Team Cymru (E-C-30)
+
+Objet : module `collecte/asn.py`, `releve(hote, resolveur)` : A de l'hôte au résolveur de l'observateur (client DNS de
+CB-10, récursion demandée), première adresse de type A ; RIPEstat prefix-overview sur cette adresse (client HTTPS de
+CB-3 ; forme de S2, `r2._ripestat_asn` : `data.asns[0].asn` et `.holder`, `data.resource`) ; TXT de Team Cymru au même
+résolveur (forme de S2, `_cymru_asn`). Chaque partie journalisée à part, brute et décodée ; échec typé, sans jugement ;
+sans adresse (NXDOMAIN, CNAME seul, drapeau TC), RIPEstat et Cymru non interrogés ; ne lève jamais. Corps RIPEstat
+synthétique, sans capture ni réseau (AS de documentation 64500, préfixe 192.0.2.0/24). FORMAT §15.4 (CB-13b).
+Corrections C-2 de la G2 de P2A (G14, G17) : l'AS 0, admis par le FORMAT §15.4 (de 0 à 2³² exclu), et la première
+chaîne d'un TXT à deux chaînes, figés par un cas de test chacun (RIPEstat `asn` 0 et TXT « 0 | x » : 0 ; TXT
+« 64500 | x », « 64501 | y » : 64500).
+
+Rouge (refait sur les tests finals ; bouchon sans effet : constantes de CB-12b, fonctions qui ne lisent rien) : 4 des 5
+tests échouent par assertion (7 échecs, sous-tests compris) ; le témoin de taille passe sur ce bouchon par construction.
+Le premier rouge, pris en cours de sous-lot, finissait sur une erreur après trois échecs d'assertion du même test. C-2 :
+le code d'avant était juste ; chaque cas neuf échoue sous le mutant du réviseur qu'il vise (G14, G17).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/asn.py` | 68 | — |
+| `tests/test_asn.py` | 129 | 5 (neuf : relevé complet ; échecs typés ; RIPEstat, bornes et base muette ; Cymru ; plus grand relevé sous LIMITE) |
+
+Mutants (même commande) : 17 mutants du sous-lot, 17 tués (0 vivant, 0 FATAL), 16 par leur test visé, rejoués sur l'état
+corrigé ; « borne doublée » l'est par le test de RIPEstat (détenteur de 4 096 caractères admis), le témoin de taille,
+visé, se calculant sur la borne. Liste : dernière adresse au lieu de la première, A sans filtre de type, RIPEstat sans
+l'adresse, nom de Cymru non inversé, RIPEstat non décodé, indécodable gardé `ok`, dernier AS au lieu du premier, booléen
+ou 2^32 admis, borne des valeurs relâchée ou doublée, types des champs non contrôlés, premier TXT seulement, TXT sans
+filtre de type, dernier champ du TXT, bases interrogées sans adresse, plancher non relevé. Corrections : 2 mutants
+neufs, 2 tués par leur test visé : AS 0 refusé, seconde chaîne du TXT. Suite : 289 tests ; plancher du job : 289,
+égalité exigée.
+
+## CB-13a (2026-10-08) : processus secondaire, relevé ASN hors du fil qui écrit (E-C-30 à E-C-32 ; Q-C-04)
+
+Objet : module `collecte/secondaire.py`, classe `Secondaire`, sous-classe de la boucle du pool : lectures de la carte
+au départ ws + w − δ, sans sondes ; relevé ASN dû à la première fenêtre de l'exécution, puis à la première fenêtre lue
+qui suit un instant de la cadence scellée (ws mod `periode` = `decalage`) : un instant sauté (fenêtre sautée, arrêt)
+est rattrapé, en mémoire seule, sans relecture du journal (E-C-15 ; C-4 de la G2 de P2A, Q-2 adoptée) ; noté par
+`releve_asn` (`hotes`, `lance`), lancé sur un fil démon si le précédent a rendu (un fil de relevé au plus) ; chaque hôte
+relevé est remis par une file au fil de la boucle, seul écrivain, qui l'écrit en `asn` en tête de la fenêtre suivante ;
+un défaut imprévu d'un hôte s'écrit `asn` à `a` null, et le relevé continue. FORMAT §15.3 et §15.4 (CB-13b).
+
+Rouge : sur un bouchon (boucle de la carte sans relevé), 2 des 3 tests d'origine échouent par assertion ; le troisième
+(départ à ws + 5 s sans sondes) passe sur ce bouchon, comportement hérité de la boucle : M13a-04 le fait échouer. C-4 :
+sur le code de CB-13a d'avant la G2 (relevé aux seuls instants de la cadence), le test neuf échoue par assertion (un
+seul `releve_asn`, à m(6), au lieu de m(3), m(5) et m(6)).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/secondaire.py` | 46 | — |
+| `tests/test_secondaire.py` | 86 | 4 (neuf : départ à ws + 5 s sans sondes ; relevé hors du fil qui écrit, jamais relancé en double ; cadence, défaut noté sans arrêt ; relevé au démarrage, instant sauté rattrapé) |
+
+Mutants (même commande) : 11 mutants du sous-lot, 11 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : relevé sur le fil de la boucle, écriture depuis le fil du relevé, relevé relancé malgré le précédent vivant,
+cadence ou décalage ignorés, hôtes dans l'ordre de la configuration, défaut imprévu qui arrête le relevé, hôte perdu sur
+défaut, relevés jamais écrits, résolveur de l'observateur perdu, plancher non relevé. Corrections : 3 mutants neufs, 3
+tués par leur test visé : aucun relevé au démarrage, instant sauté non rattrapé, mémoire de la dernière fenêtre non
+tenue. Suite : 293 tests ; plancher du job : 293, égalité exigée.
+
+## CB-13b (2026-10-08) : `carte.json`, budget de débit partagé, commande `secondaire`, isolement (E-C-32, E-C-33)
+
+Objet : `carte.json` scellé (`depart`, `delai`, `marge`, `places`, cadence `asn`, `formes`, liste vide admise : forme
+de schéma `[s, n, 0]` neuve dans `config.controler`) ; règles de forme du pool appliquées aux formes de la carte ; cinq
+règles croisées avec `formes.json` du pool, refus nommés : `budget-partage` (E-C-33 : lectures du pool et de la carte,
+ensemble, au plus 5 par hôte et par fenêtre ; règle scellée, Q-1 de la G2 de P2A adoptée : plafond que le G0 de la
+carte peut serrer hôte par hôte), `espace-partage`, `hors-delta` (E-C-32 : toute lecture de la carte finit avant le
+départ du pool), `marge-carte`, `cadence` ; `construire_secondaire` (journal `secondaire` sur la grille du pool, départ
+ws + `depart`, hôtes du pool et de la carte relevés au résolveur du descripteur) ; commande `secondaire`. FORMAT §15
+écrit (processus secondaire, relevé ASN de CB-12b et CB-13a, dont le relevé au démarrage et le rattrapage de C-4) ;
+§12, §13.1 et §14.2 retouchés (§12 : aucun repli en TCP pour le relevé ASN non plus, Q-3 adjugée, taux de troncature
+au rodage, SHOGEN-S2BIS-ASN-TRONCATURE-1). Correction C-2 de la G2 de P2A (G20) : `periode` de 86 401 s refusée
+(`CONFIG/borne`), figée par un cas de test.
+
+Rouge : sur des bouchons (aucune règle croisée, câblage du pool, pas de commande `secondaire`), les 4 tests neufs
+échouent par assertion (12 échecs, sous-tests compris). C-2 : le code d'avant était juste ; le cas neuf échoue sous le
+mutant du réviseur qu'il vise (G20).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/config.py` | 73 | — |
+| `shogen_s2bis/collecte/entree.py` | 191 | — |
+| `tests/test_format.py` | 237 | 14 (1 de plus : §15, règles croisées du code nommées, renvoi du §12, puce « Partie P2 ») |
+| `tests/test_secondaire.py` | 195 | 7 (3 de plus : règles croisées à la borne ; construction ; pool et secondaires ensemble, carte pendue, carte refusée) |
+
+Mutants (même commande) : 21 mutants du sous-lot, 21 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : budget relâché d'une lecture ou compté sur la carte seule, espace de la carte seule, `hors-delta` sans les
+décalages, sans égalité ou sans le δ du pool, marge ignorée, décalage hors de la période ou période hors de la grille
+admis, règles de forme non appliquées à la carte, délai, départ, places ou préfixe du journal pris au pool, hôtes du
+pool non relevés, budget non contrôlé à la commande, carte vide refusée, liste vide admise partout, fichiers du
+secondaire dans le désordre, renvoi du §12 perdu, plancher non relevé. Corrections : 1 mutant neuf, tué par son test
+visé (`periode` de 86 401 s admise). Les 26 mutants de la G2 de P2A, rejoués sur cet état : 26 tués, dont les six
+vivants de la G2 (G01, G02, G03, G14, G17, G20), chacun par le cas neuf qui le vise. Suite : 297 tests ; plancher du
+job : 297, égalité exigée.
+
+## CB-15a (2026-10-08) : requête RFC 3161, statut d'une réponse, manifeste (E-C-36)
+
+Objet : premier sous-lot de CB-15 (PROPOSITION l.223 ; FORMAT §16.1 à §16.3). Requête d'horodatage en DER, construite en
+bibliothèque standard, égale aux octets d'`openssl ts -query -sha256 -cert -no_nonce` (PROPOSITION §2.4 « Jeton ») et,
+avec nonce, aux octets d'openssl pour le nonce qu'il a tiré ; statut d'une réponse lu sans plus (signature contrôlée
+hors ligne, `openssl ts -verify`) ; manifeste des têtes en ligne canonique. RFC 3161 lue au fichier du registre ; X.690
+non détenue : octets de référence d'OpenSSL 3.0.13.
+
+Rouge : squelette d'interface (fonctions qui rendent une valeur fausse), 7 tests en échec d'assertion.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 79 | — |
+| `tests/test_tetes.py` | 98 | 7 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 19 mutants (19 de la phase 1, 0 neufs de la correction),
+19 tués (18 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : certReq absent (PROPOSITION
+§2.4), certReq faux, identifiant d'algorithme faux (sha384) (PROPOSITION §2.4), paramètres NULL absents, version 2,
+INTEGER sans zéro de tête, forme courte jusqu'à 255, forme longue non minimale, empreinte courte admise, nonce sans
+borne haute, nonce booléen admis, présence du jeton non contrôlée, statut 6 admis, octets en trop admis, longueur longue
+non minimale admise, jeton hors SEQUENCE admis, statut sur plusieurs octets admis, manifeste non trié, plancher non
+relevé.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 304 tests ; plancher du job : 304, égalité exigée (`--egal`).
+
+## CB-15b (2026-10-08) : fichiers de tête, export atomique, lecture stricte du dépôt (E-C-35)
+
+Objet : dépôt des têtes (AVIS du G0, Q-D-03 : un dossier, lisible ou non ; FORMAT §16.4, §16.5). Export de la tête du
+point de contrôle par écriture atomique (fichier temporaire synchronisé, renommé, dossier synchronisé), sans jamais
+lever ; lecture des fichiers de tête des autres journaux, 16 au plus, 1 024 octets au plus, refus nommés `TETES/…` ;
+aucune valeur lue n'est un entier que l'écrivain refuserait (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1). Correction de la G2
+de P2B (2026-10-08) : noms d'observateur en minuscules seules au dépôt (C-6 : un jumeau de casse est ignoré) ; FORMAT
+§16 : le dépôt est un dossier local, synchronisé par une unité séparée (C-7, Q-2 ; DB-4).
+
+Rouge : `Depot` d'interface, 4 tests en échec d'assertion. Rouges de la correction (correction retirée du code, test
+gardé ; python3.12 -X dev -W error) : R-C6a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 166 | — |
+| `tests/test_tetes.py` | 205 | 11 (4 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 20 mutants (19 de la phase 1, 1 neufs de la correction),
+20 tués (19 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : écriture sur place, non
+atomique, fichier temporaire non synchronisé, dossier non synchronisé, un échec d'export lève dans la boucle, échec
+jamais effacé, sa propre tête relue, tête de son autre journal exclue, taille non bornée, forme canonique non contrôlée,
+clés exactes non contrôlées, nom et contenu non comparés, booléen admis comme entier, entiers sans borne haute,
+empreinte non contrôlée, nombre de têtes non borné, têtes ignorées non comptées, dossier illisible : la lecture lève,
+grammaire des noms relâchée, plancher non relevé, C-6 : jumeau de casse lu au dépôt.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 308 tests ; plancher du job : 308, égalité exigée (`--egal`).
+
+## CB-15c (2026-10-08) : enregistrement `tetes` et export dans la boucle, `--depot` (E-C-35)
+
+Objet : avec un dépôt, la fenêtre qui clôt l'heure porte `tetes` avant sa `sante` (têtes des autres journaux consignées
+dès leur lecture), et la tête de son point de contrôle est exportée après le marqueur (FORMAT §2, §11.5, §14.1, §14.3,
+§16.6) ; option `--depot` du point d'entrée ; nom d'observateur `[a-z0-9]{1,16}` (règle `observateur-nom`, il nomme ses
+fichiers au dépôt). Correction de la G2 de P2B (2026-10-08) : nom d'observateur `[a-z0-9]{1,16}` au descripteur (C-6,
+Q-8) : « O1 » est refusé.
+
+Rouge : boucle et point d'entrée qui ignorent le dépôt, 3 tests en échec d'assertion (le quatrième, sans dépôt, est vert
+par construction : non-régression). Rouges de la correction (correction retirée du code, test gardé ; python3.12 -X dev
+-W error) : R-C6b (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G18a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 146 | — |
+| `shogen_s2bis/collecte/entree.py` | 198 | — |
+| `tests/test_tetes.py` | 272 | 15 (4 de plus) |
+| `tests/test_entree.py` | 274 | 10 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 14 mutants (13 de la phase 1, 1 neufs de la correction),
+14 tués (13 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : `tetes` jamais écrit, `tetes`
+et export à chaque fenêtre, tête jamais exportée, tête exportée qui n'est pas celle du point, fenêtre exportée décalée,
+sans dépôt, la boucle casse à l'heure, champs de la lecture du dépôt perdus, dépôt non câblé, journal du dépôt mal
+nommé, nom d'observateur non contrôlé, nom d'observateur relâché, option --depot sans effet, plancher non relevé, C-6 :
+nom en majuscules admis au descripteur.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 312 tests ; plancher du job : 312, égalité exigée (`--egal`).
+
+## CB-15d (2026-10-08) : jeton du jour, `.tsr` conservé et journalisé (E-C-36)
+
+Objet : jeton du jour (AVIS Q-D-03, point 1 ; FORMAT §16.5, §16.7) : manifeste des têtes valides du dépôt, dont au moins
+une de l'observateur, et requête au nonce donné, écrits au dépôt ; envoi seulement par une fonction donnée ; réponse
+accordée conservée en `.tsr`, jamais redemandée le même jour ; ses têtes lues d'abord. Correction de la G2 de P2B
+(2026-10-08) : la réponse accordée est liée à la requête avant d'être conservée (C-1 ; RFC 3161 §2.2 : contenus
+SignedData et TSTInfo ; au TSTInfo, algorithme SHA-256, empreinte du manifeste, nonce ; refus `JETON/liaison` ou
+`JETON/reponse`, rien de conservé ; signature et certificat contrôlés hors ligne, limite déclarée), éprouvée sur des
+réponses d'`openssl ts -reply` d'une TSA jetable à clé détruite (juste, autre empreinte, autre nonce, sans nonce) ; une
+réponse au statut 1 est conservée (G-01) ; les têtes de l'observateur sont lues d'abord, hors de la borne des autres
+(C-2) ; le champ `jeton` du `tetes` passe à CB-15e (R-25) (FORMAT §16.2, §16.5, §16.7).
+
+Rouge : `lire_tetes` et `jeton` d'interface, 5 tests en échec d'assertion. Rouges de la correction (correction retirée
+du code, test gardé ; python3.12 -X dev -W error) : R-C1 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-C2 (ROUGE D'ASSERTION
+: FAIL 1, ERROR 0) ; R-G01 (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 241 | — |
+| `tests/test_tetes.py` | 377 | 19 (4 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 18 mutants (9 de la phase 1, 9 neufs de la correction),
+18 tués (17 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : jeton du jour redemandé,
+jeton sans tête de l'observateur, sa tête exclue du manifeste, requête non écrite, rejet conservé, réponse non
+contrôlée, nonce omis, armement inversé, plancher non relevé, C-1 : empreinte du TSTInfo non contrôlée, C-1 : nonce du
+TSTInfo non contrôlé, C-1 : algorithme du TSTInfo non contrôlé, C-1 : types de contenu (SignedData, TSTInfo) non
+contrôlés, C-1 : liaison au nonce absent, C-1 : écart de liaison sous le code d'une réponse mal formée, C-2 : la borne
+des autres appliquée à ses têtes, C-2 : ses têtes non lues d'abord, C-2 : têtes ignorées comptées sous une seule borne.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 316 tests ; plancher du job : 316, égalité exigée (`--egal`).
+
+## CB-15e (2026-10-08) : envoi HTTPS armé par `--envoi`, commande `jeton` (E-C-36)
+
+Objet : envoi de la requête à la TSA (RFC 3161 §3.4 : POST, `application/timestamp-query`, aucune redirection suivie,
+réponse 200 de 65 536 octets au plus) ; commande `jeton`, dont l'envoi n'est armé que par `--envoi` (FORMAT §16.8 ;
+ADR-0029 l.218 : sous le go écrit de l'investisseur). Aucune requête réseau réelle : serveur de boucle locale.
+Correction de la G2 de P2B (2026-10-08) : envoi borné en temps et en octets, éprouvé par une TSA de boucle locale muette
+puis bavarde (G-03, G-04) ; nonce de 64 bits tiré à chaque requête, figé par le test de la commande (G-16, C-5) ;
+contexte TLS du point d'entrée transmis, http refusé (G-17) ; champ `jeton` du `tetes`, reçu de CB-15d (FORMAT §16.5,
+§16.8).
+
+Rouge : `envoyer` et commande d'interface, 2 tests en échec d'assertion. Rouges de la correction (correction retirée du
+code, test gardé ; python3.12 -X dev -W error) : R-G03 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G04 (ROUGE D'ASSERTION
+: FAIL 1, ERROR 0) ; R-G16 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G17 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-G18b
+(ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 278 | — |
+| `shogen_s2bis/collecte/entree.py` | 228 | — |
+| `tests/test_tetes.py` | 483 | 22 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (14 de la phase 1, 3 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : type de contenu faux (RFC
+3161 §3.4), réponse HTTP non 200 admise, réponse sans borne, schéma de l'URL non contrôlé, chemin de l'URL perdu, envoi
+armé sans --envoi, refus en sortie 0, jour non contrôlé, règles du descripteur non appliquées, refus du descripteur en
+sortie 1, premier `.tsr` au lieu du dernier (champ `jeton`, porté par CB-15e), `.tsr` d'un autre observateur pris (champ
+`jeton`, porté par CB-15e), `.tsr` illisible : la lecture lève (champ `jeton`, porté par CB-15e), plancher non relevé,
+C-4 : lecture au-delà du plafond, attente du corps, C-5 : nonce de 63 bits, C-4 : point d'entrée sans contexte TLS par
+défaut (http admis).
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 319 tests ; plancher du job : 319, égalité exigée (`--egal`).
+
+## CB-17a (2026-10-08) : `status`, lecture du journal et jugement d'une santé (E-C-38)
+
+Objet : lecture du journal du pool sans rien écrire ni prendre le verrou, une ligne `lecture` reconnue à ses premiers
+octets et jamais décodée (PROPOSITION §2.4 « Status ») ; jugement d'une `sante` aux seuils de l'ADR-0029 §2.3, égaux au
+bloc `degradation` d'`analyse.json` (test croisé) ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; FORMAT §17.1, §17.2.
+
+Rouge : lecture et jugement d'interface, 5 tests en échec d'assertion.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 69 | — |
+| `tests/test_status.py` | 122 | 5 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (17 de la phase 1, 0 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : `status` décode les lectures
+(PROPOSITION §2.4 « Status »), `status` lit les lectures en panne, lecture à adresse null décodée, ligne illisible
+sautée, fichier poursuivi, objet sans `seq` admis, journal absent sans refus, D-2 à 5 s tout juste, lecture non partie
+ignorée (Q-C-02), retard null non admis, D-4 à 3 témoins, sonde nulle comptée répondue, rcode non nul compté résolu,
+réponse sans A comptée résolue, santé illisible valide, relevé D-3 de code non nul non compté, seuil D-5 autre que celui
+du recalcul, plancher non relevé.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 324 tests ; plancher du job : 324, égalité exigée (`--egal`).
+
+## CB-17b (2026-10-08) : `status`, état par fenêtre, rapport, strates, commande (E-C-38)
+
+Objet : fenêtres de la première admise au dernier marqueur, D-1 sans marqueur, tête du dernier enregistrement lu ;
+rapport de santé seule (FORMAT §17.3, §17.4), même sortie avec et sans `lecture` ; strates du calendrier ; commande
+`status --journal`. Correction de la G2 de P2B (2026-10-08) : « hors D-3 » sur la ligne du compte local (C-7, Q-9 ;
+FORMAT §17.4).
+
+Rouge : état, rapport et commande d'interface, 4 tests en échec d'assertion (la sortie identique avec et sans lectures
+est verte par construction sur un rapport constant : invariance). Rouges de la correction (correction retirée du code,
+test gardé ; python3.12 -X dev -W error) : R-C7a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 245 | — |
+| `shogen_s2bis/collecte/status.py` | 121 | — |
+| `tests/test_status.py` | 231 | 10 (5 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 16 mutants (15 de la phase 1, 1 neufs de la correction),
+16 tués (15 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : fenêtre sans marqueur valide,
+première fenêtre admise ignorée, tête du premier enregistrement, relevés D-3 non cumulés, santé d'une autre fenêtre,
+strates décalées, dernière fenêtre jugée sur la première, première fenêtre non comptée, disque inversé, nombre de
+fenêtres faux, fenêtres dégradées comptées valides, format de l'heure, tête sans empreinte, refus en sortie 0, plancher
+non relevé, C-7 : compte local sans « hors D-3 ».
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 329 tests ; plancher du job : 329, égalité exigée (`--egal`).
+
+## CB-17c (2026-10-08) : résumés par jour, liste blanche, commande `resume` (AVIS Q-D-03, point 2)
+
+Objet : un résumé par jour UTC, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande `resume` (FORMAT §17.5)
+: clés fermées, aucun statut de source ; projection du journal, recalculable. Correction de la G2 de P2B (2026-10-08) :
+C-3, portée ici (R-25 : CB-17b, où naît la grille, est à 183 lignes ; `resume` publie la grille jour par jour) : un `ws`
+à la fin du jour de son fichier ou au-delà, ou une `suivante` au-delà, rend la ligne illisible et arrête le fichier ; un
+fichier au jour hors du calendrier n'est pas lu ; la grille ne commence jamais avant le jour du premier fichier présent,
+moins un jour (FORMAT §6.1, §17.1, §17.3). Les journaux corrompus de la G2 (MemoryError à 1,5 Gio) rendent la sortie 0
+en moins de 2 s, espace d'adressage borné à 512 Mio.
+
+Rouge : `resumes` et commande d'interface, 2 tests en échec d'assertion. Rouges de la correction (correction retirée du
+code, test gardé ; python3.12 -X dev -W error) : R-C3 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-C3b (ROUGE D'ASSERTION :
+FAIL 1, ERROR 0) ; R-G18c (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 265 | — |
+| `shogen_s2bis/collecte/status.py` | 155 | — |
+| `tests/test_status.py` | 310 | 13 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (12 de la phase 1, 5 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : clé hors liste blanche,
+fenêtres valides omises du résumé, fenêtre rangée au jour suivant, observateur faux au résumé, nom de fichier faux,
+résumé non canonique, codes admis amputés, `resume` n'écrit rien, refus du descripteur en sortie 1, refus du journal en
+sortie 0, règles du descripteur non appliquées, plancher non relevé, C-3 : jour du fichier non contrôlé, C-3 : grille
+sans plancher, C-3 : plancher sans le jour de reprise, C-3 : jour hors du calendrier : exception, C-3 : `suivante` au-
+delà du jour admise.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 332 tests ; plancher du job : 332, égalité exigée (`--egal`).
+
+## CB-17d (2026-10-08) : compte à quorum sur les résumés des autres (AVIS Q-D-03, point 3)
+
+Objet : `status --depot --descripteur` ajoute le compte à quorum (M_j ≥ 2, ADR-0029 §2.2 pt 5) sur les résumés lisibles
+des autres observateurs, lus strictement (`RESUME/…`), avec leur âge (FORMAT §17.6). Correction de la G2 de P2B
+(2026-10-08) : « hors D-3 » sur la ligne du quorum (C-7 ; FORMAT §17.6) ; le résumé d'un nom en majuscules est ignoré
+(C-6).
+
+Rouge : rapport et commande qui ignorent le dépôt, 3 tests en échec d'assertion ; puis, à la relecture du générateur, un
+résumé aux codes non textes faisait lever `status` (tri avant reconnaissance) : trois cas ajoutés au test des résumés
+hostiles, l'exception comparée par son nom (échec d'assertion), puis codes reconnus avant le tri. Rouges de la
+correction (correction retirée du code, test gardé ; python3.12 -X dev -W error) : R-C6c (ROUGE D'ASSERTION : FAIL 1,
+ERROR 0) ; R-C7b (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 269 | — |
+| `shogen_s2bis/collecte/status.py` | 208 | — |
+| `tests/test_status.py` | 379 | 16 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 20 mutants (18 de la phase 1, 2 neufs de la correction),
+20 tués (19 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : son propre résumé compté,
+quorum à 1, sa validité non comptée, jours hors du journal local lus, taille non bornée, forme canonique non contrôlée,
+clés exactes non contrôlées, nom et contenu non comparés, fenêtre hors du jour admise, fenêtre hors grille admise, code
+inconnu admis, code en double admis, résumé sans fenêtre admis, âge au début de la fenêtre, --depot sans --descripteur
+admis, quorum sans dépôt, codes triés avant d'être reconnus : un code non texte fait lever, plancher non relevé, C-6 :
+résumé d'un nom en majuscules lu, C-7 : quorum sans « hors D-3 ».
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 335 tests ; plancher du job : 335, égalité exigée (`--egal`).
+
+## CB-15f (2026-10-08) : dépôt, fichiers ordinaires seuls lus sans attente, aucun lien suivi (E-C-35)
+
+Objet : relecture du générateur, après CB-17d. Au dépôt, un tube nommé au nom d'une tête, d'un `.tsr` ou d'un résumé
+bloquait `open` sans fin (la boucle à la fenêtre qui clôt l'heure, `status`, `jeton`) ; un lien posé au nom du fichier
+temporaire faisait écrire la tête dans sa cible. Lecture : fichier ordinaire seul, ouvert sans attente (`O_NONBLOCK`,
+puis `fstat`), refus `TETES/lecture` ou `RESUME/lecture` ; `.tsr` de 65 536 octets au plus. Écriture atomique :
+temporaire effacé, puis créé en exclusif (`O_EXCL`) ; un lien reposé entre les deux fait échouer l'écriture, la cible
+intacte. Un dépôt illisible ne fait plus échouer `status` : le compte local reste, suivi de `quorum : dépôt illisible
+(<exception>)` (AVIS Q-D-03, point 3 : le compte local toujours rendu) (FORMAT §16.9, §17.6). Correction de la G2 de P2B
+(2026-10-08) : au `tetes`, avec le sha256 du dernier `.tsr`, ceux de son manifeste et de sa requête, null pour un
+fichier illisible (C-5, Q-5 ; `empreinte_tsr` devient `empreinte`) (FORMAT §16.5).
+
+Rouge : sur l'état CB-17d, 5 tests en échec d'assertion (trois appels bloqués, interrompus par une alarme de 2 s ; la
+cible du lien écrasée par la tête ; `status` qui lève sur un dépôt absent, l'exception comparée par son nom) ; puis, la
+première forme de la lecture perdant un descripteur à chaque dossier lu (relevé à la relecture : `open` d'un descripteur
+de dossier lève sans le fermer), un échec d'assertion de plus (64 lectures, descripteurs comptés) avant la forme
+`try`/`finally`. Rouges de la correction (correction retirée du code, test gardé ; python3.12 -X dev -W error) : R-C5
+(ROUGE D'ASSERTION : FAIL 2, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 316 | — |
+| `shogen_s2bis/collecte/status.py` | 212 | — |
+| `tests/test_tetes.py` | 570 | 25 (3 de plus) |
+| `tests/test_status.py` | 396 | 18 (2 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (14 de la phase 1, 3 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : ouverture qui attend (tube
+nommé), type du fichier non contrôlé, `.tsr` sans borne, `.tsr` de 65 536 octets refusé, tête lue par `open` (attente),
+dernier `.tsr` lu par `_empreinte`, `.tsr` du jour lu par `_empreinte`, temporaire resté non effacé, création non
+exclusive (lien suivi), résumé lu par `open` (attente), lecture bornée à la taille (dépassement jamais vu), dépôt
+illisible qui fait échouer `status`, descripteur jamais fermé, plancher non relevé, C-5 : sha256 de la requête non
+journalisé, C-5 : fichier illisible noté par une chaîne vide, C-5 : sha256 du `.tsr` au lieu du manifeste et de la
+requête. Les 30 mutants de la G2 (G-01 à G-30), rejoués sur cet état : 30 tués (24 par leur test visé, 6 sans test
+visé), 0 vivant, 0 FATAL ; G-01, G-03, G-04, G-16 et G-17, vivants à la G2, sont tués par leurs tests nommés (C-4).
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 340 tests ; plancher du job : 340, égalité exigée (`--egal`).
