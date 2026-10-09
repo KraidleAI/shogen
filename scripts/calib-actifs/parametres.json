@@ -31,5 +31,8 @@
              "place_horodatee": ["bitstamp", "coinbase", "gemini", "okx"],
              "sans_horodatage": ["binance", "bitfinex", "kraken"],
              "source": "classe de S2 par hôte (sources.py l.305-313 ; PROPOSITION §2.2)"},
- "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1, "source": "E-CA-21 ; forme d'E-P2-18"}
+ "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1, "source": "E-CA-21 ; forme d'E-P2-18"},
+ "plan_s2bis": {"tau_sigma": "docs/adr-0029/plan-s2bis/tau_sigma.txt",
+  "sha256": "409b2a5e873ffa1ba09db9396953ca68eafb834ccea55bcc2e7d50d6f222e6d9",
+  "source": "commit c11fc82, SHA256SUMS versé ; E-CA-02 : sha256 seul relevé, fichier jamais ouvert par un agent"}
 }
