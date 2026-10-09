@@ -230,7 +230,7 @@ class TestAgregat(unittest.TestCase):
         2 REJETTE ; familial 2 sur 5 ; séquence BTC puis ETH 1 (le second rejet de BTC est suivi d'ETH NE REJETTE PAS) ;
         « avec » et variante (5 NE REJETTE PAS au diviseur 8) comptés à part ; r̂ = 2/5 et SE = √(6/125) (bc -l :
         sqrt(6/125), à 10⁻⁵⁰ près) ; aucun enregistrement : EXEC/agreger ; empreinte = executer.empreinte des cinq,
-        dans l'ordre. Mutations M-11H-02
+        dans l'ordre ; n′ = i % 3 : 2 réplications à n′ nul, 3 comparaisons d'oracle (C-7). Mutations M-11H-02
         (familial inversé), M-11H-03 (séquence lue sur BTC), M-11H-04 (« avec » pris aux valeurs sans), M-11H-05 (un
         diviseur pour tous), M-11H-06 (R faux), M-11H-09 (empreinte à rebours), M-11H-10 (précision 28), M-11H-11
         (aucun enregistrement admis)."""
@@ -245,14 +245,15 @@ class TestAgregat(unittest.TestCase):
         h = rv("NE REJETTE PAS")
         recs = [{"i": i, "strates": {"calme": {"classes": {"BTC": dict(b, avec=a, variante={"4": v, "8": h}),
                                                            "ETH": dict(e, avec=a, variante={"4": v, "8": h})},
-                                               "valeurs": {"familial": f, "ETH": {"valeur": s}}}}}
+                                               "valeurs": {"familial": f, "ETH": {"valeur": s}}, "n": i % 3}}}
                 for i, (b, e, f, s, a, v) in enumerate(x)]
         g = executer.agreger(K_, recs)
-        self.assertEqual(sorted(g), ["R", "empreinte", "strates"])
+        self.assertEqual(sorted(g), ["R", "empreinte", "oracle", "strates"])
         c = g["strates"]["calme"]
         b = c["classes"]["BTC"]
         self.assertEqual((g["R"], g["empreinte"], c["familial"]["x"], c["sequence_eth"]["x"]),
                          (5, executer.empreinte(recs), 2, 1))
+        self.assertEqual((c["n_prime_nul"], c["oracle"], g["oracle"]), (2, 3, 3))      # n′ = i % 3 (C-7, SB-11y)
         self.assertEqual((b["frequences"]["valeurs"], c["classes"]["ETH"]["frequences"]["valeurs"]),
                          ({"REJETTE": 2, "NE REJETTE PAS": 2, "NON ÉVALUABLE": 1},
                           {"REJETTE": 2, "NE REJETTE PAS": 3, "NON ÉVALUABLE": 0}))

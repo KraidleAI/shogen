@@ -75,3 +75,13 @@ commande qui porte un regex, une campagne de mutants, une tâche longue ou un sc
   Sortie 1 : mutant tué ; sortie 0 : vivant ; sortie 3, ou toute sortie hors du contrat : FATAL,
   run invalide, jamais compté tué ; la campagne se relance après correction (écart E-10 du G1 de
   D8c).
+- **Enregistrement du rôle G2 sur le chemin S2** (ajout daté du 2026-10-09 16:58:59 UTC, lot DETTES-T3, DT3-C ;
+  SHOGEN-G2-ENREG-ROLE-1, ADR-0028 D6 (viii)) : toute relecture G2 d'un lot du chemin S2 (dossier soumis au cp-2)
+  enregistre son rôle, sur sa copie, par
+  `env -u SHOGEN_S2_CAMPAGNE_CONTROL PYTHONDONTWRITEBYTECODE=1 python3 -B s2-harness/tools/oracle_record.py --role G2 --commit <commit relu> --auteur <modèle résolu> --depot <copie> --sortie <dossier G2>`
+  (forme de `docs/adr-0028/CP2-S2.md` l.36-37 ; règle d'usage de `s2-harness/tools/README.md`), et cite
+  l'enregistrement (chemin, sha256) dans son rapport. Sur des diffs non commis, `<commit relu>` est la tête de la
+  copie (base où s'appliquent les diffs) et le rapport G2 écrit l'empreinte des diffs relus (sha256 de leur
+  concaténation dans l'ordre de la série) : `oracle_record.py` refuse `--paquet-sha256` hors du rôle `rendu`.
+  L'enregistrement atteste alors la base et la suite lancée sur elle, non les diffs : il se vérifie à
+  `<commit relu>`, et seul le rapport G2 le relie aux diffs.

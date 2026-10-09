@@ -1516,3 +1516,31 @@ Fermetures (règle « aucune dette », B.87) :
 - Constat O-6 de la G2 (sans item, corrigé dans le lot) : `s2bis/tests/test_dns.py::test_drapeau_tc_garde_section_reponse_non_lue` ne dépend plus d'un port UDP éphémère réutilisé en TCP (EADDRINUSE, 1 échec sur 33) ; le port TCP est pris puis partagé, et le test vérifie ce partage (C-A2, C-A3).
 
 Aucun item formé.
+
+## B.89 Amendement daté du 2026-10-09 18:07:35 UTC (heure produite par `date -u`) : lot de dettes DETTES-T3 commis (dettes de procédure)
+
+Six commits, `07730bd` (DT3-A), `bf2d079` (DT3-E), `0781a68` (DT3-B), `c4fd0a3` (DT3-C), `621f7dd` (DT3-D), `6f8bfd8` (DT3-F) : générateur-correcteur, réviseur G2 neuf (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-9), contre-contrôleur neuf (passe 1 : R-1 à R-4, corrigées par C-10 à C-13 ; passe 2 : CONFORME), tous `claude-opus-5-5`, réseau coupé. Avant chaque commit : xtask VERT, runner, jobs s2bis, S2, sim-bis, calib-actifs, `controle-unittest` (plancher 18) et contrôle des journaux. Pièces : `docs/adr-0028/revue-dettes3/`.
+
+Fermetures (règle « aucune dette », B.87) :
+- SHOGEN-FM11-VERIFIABLE-1 **fermé** par `07730bd` et `bf2d079` : témoin automatique `scripts/controle/tests/test_fm11.py` (transcriptions synthétiques, doublures des lignes de D.2), job `controle-unittest` lu par le cas K-04 du runner ; `scripts/controle/SHA256SUMS` couvre le script et chaque sortie (28 lignes ajoutées ; elles attestent les octets versés à 0cfbe3e).
+- **Défaut de fm11.py corrigé** (L-1 du générateur) par `bf2d079` : la dernière fenêtre de 40 caractères d'une ligne interdite n'était pas toujours dans les fragments ; elle l'est (sha256 `886cc676…` → `4a0b8abc…`, l'ancien cité au README) ; garantie écrite : tout extrait d'au moins 60 caractères est détecté (sonde du contre-contrôleur : 77 787 extraits, 0 écart). Le fm11 corrigé a été rejoué par l'orchestrateur sur les 180 transcripts d'agents de la session : 0 fragment ; les contrôles FM-1.1 déjà versés gardent leur valeur.
+- SHOGEN-R1-FORME-RESOLUE-1 **fermé** par `0781a68` et `6f8bfd8` : `enforcement/journaux-modele.py`, étape du job `g1-model-pinning` : tout journal `docs/G1-*.md` ou `docs/G2-*.md` nouveau porte exactement une ligne `- **Modèle** : \`<id>\``, `<id>` égal à un identifiant de la liste blanche du lint R-1 ou suivi de `[1m]` ; les 52 journaux déjà versés sont exemptés par nom et sha256 (un journal exempté retouché perd son exemption ; procédure de retouche dans la docstring) ; toute erreur interne sort en 3.
+- SHOGEN-G2-ENREG-ROLE-1 **fermé** par `c4fd0a3` : consigne datée au bloc de gabarit de `.claude/agents/shogen-worker.md` (commande `oracle_record.py --role G2`, sous `env -u SHOGEN_S2_CAMPAGNE_CONTROL`, vérifiée par l'analyseur réel de l'outil) ; **procédure** : une G2 sur diffs non commis enregistre la tête de sa copie, et son rapport porte l'empreinte des diffs relus (l'enregistrement atteste la base et la suite lancée sur elle, non les diffs ; `--paquet-sha256` est réservé au rôle `rendu`).
+- SHOGEN-S2BIS-P1-ESTIMATION-1 **fermé** par `621f7dd` : règle d'estimation (ajout daté au point 4 de `G0-COLLECTE-RECALC-DEPLOI.md`) : toute taille [inféré] de S2-bis entre au calendrier multipliée par 2 à 3, jalon sur la borne haute, le rapport mesuré d'une partie close remplaçant ensuite le facteur ; l'investisseur en a été informé au point d'étape du 2026-10-09 (après 16:22 UTC).
+
+**Règle des ajouts datés** (C-13, décision de l'orchestrateur) : un ajout daté porte l'heure (`date -u`) de la dernière écriture de son texte.
+
+Aucun item formé.
+
+## B.90 Amendement daté du 2026-10-09 18:27:52 UTC (heure produite par `date -u`) : SIM-BIS NPRIME-NUL-1 commis (SB-11x, SB-11y, SB-11z)
+
+Trois commits, `9418db8` (SB-11x), `aff8c3b` (SB-11y), `2f32432` (SB-11z) : avis d'un advisor (`claude-fable-5-1`, effort `medium` ; option (b) adoptée), générateur-correcteur, réviseur G2 neuf de SB-11x (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-7), contre-contrôleur neuf en trois passes (R-1 à R-5 puis R-6, corrigées par C-8 à C-13 ; verdict final CONFORME), `claude-opus-5-5`. Avant chaque commit : xtask VERT, runner, jobs s2bis, S2, sim-bis (plancher 279), calib-actifs, `controle-unittest` et contrôle des journaux. Pièces : `docs/adr-0029/g0-sim/revue-nprime/`.
+
+- SHOGEN-SIM-BIS-NPRIME-NUL-1 **fermé** : à n′_s = 0, `executer.replication` rend un enregistrement dégénéré par classe, égal en octets à ce que `regle.tester` rend sur séries vides (n_s ∈ {3, 4, 7, 2 736}) ; `regle` (SB-7), le contrat RB-6 et l'oracle croisé SB-13 sont intacts ; `agreger` imprime par strate le nombre de réplications à n′_s = 0 et le nombre de comparaisons effectives d'oracle (E-S-29). Ajout daté au G0 de SIM-BIS (`G0-AJOUT.md`, 13:49:50 UTC) et ses trois épingles (`parametres.json`, `test_provenance_c_5`, `docs/adr-0029/g0-sim/SHA256SUMS`) dans `2f32432`.
+- **Écart de l'orchestrateur, déclaré** : l'appel qui a lancé l'advisor portait le champ `model` à la valeur nue `fable` (énumération de l'outil), contraire à la règle de CLAUDE.md §7 ; le modèle résolu est bien `claude-fable-5-1` (Gate 0 sur le transcript), la fiche `shogen-advisor` l'épingle. Règle d'application : le champ `model` de l'outil n'est plus renseigné ; l'épinglage vient de la fiche, et la Gate 0 le contrôle.
+
+Item formé (lot futur nommé) :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-DOCS-SHA256SUMS-GATE-1 | aucune gate ne vérifie les `SHA256SUMS` des dossiers de `docs/` (seule occurrence : `sg9.rs` l.489, liste de noms qui ne vérifie rien) ; une somme périmée (l.4 de `docs/adr-0029/g0-sim/SHA256SUMS`, corrigée par SB-11z) n'a été vue que par un contre-contrôleur | orch. | lot de dettes DETTES-T4, lancé après ce versement | une gate (xtask ou job) qui rejoue `sha256sum -c` de chaque `SHA256SUMS` de `docs/` hors des dossiers interdits, et ses tests [inféré] | contre-contrôle de NPRIME, passe 2, E-12 |

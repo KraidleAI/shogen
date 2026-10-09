@@ -1,0 +1,24 @@
+# Adjudication de l'orchestrateur sur SHOGEN-SIM-BIS-NPRIME-NUL-1 (2026-10-09, après 11:37:47 UTC)
+
+Pièce d'entrée : `AVIS.md` (advisor, Fable 5.1, effort medium). Recommandation adoptée : **option (b)**.
+
+1. Lieu : `executer.replication` (SB-11) ; `regle` (SB-7) reste intact, et avec lui le contrat RB-6 (SHOGEN-SIM-BIS-CONTRAT-RB6-1) et l'oracle croisé SB-13 : `regle.tester(…, n=0)` lève toujours REGLE/entier.
+2. À n′_s = 0 pour une strate : enregistrement dégénéré par classe, égal à ce que la règle rend sur séries vides : valeur NON ÉVALUABLE, `causes = list(regle.CAUSES)` (comptées en information insuffisante et en n_prime, E-S-28, E-S-52 ; option b′ écartée), K = 0, S = 0 si suivie sinon None, runs = 0, unites = 0, C = R, C1 = 0, C_S = R si suivie sinon None, r = R ; sous-blocs `avec` et `variante[d]` de même forme qu'un enregistrement normal ; branche `loi_evenements` sautée pour cette strate ; aucune comparaison d'oracle E-S-29 pour cette strate (écrit).
+3. Tests : les six de l'avis (reproduction, forme et `agreger`, équivalence avec `regle.tester` sur séries vides à n_s ≥ 3, non-régression de `regle` et d'`oracle_recalc`, déterminisme E-S-44, mutants).
+4. Texte : un ajout daté au G0 de SIM-BIS sous E-S-28 et E-S-52 (rédigé par l'orchestrateur au versement), et l'item NPRIME-NUL-1 fermé par le lot.
+
+## Ajout daté du 2026-10-09 (après 13:49:50 UTC) : adjudication de la G2 de SB-11x (ACCEPTE-AVEC-CORRECTIONS) ; règle « aucune dette »
+SB-11x reste tel quel. Deux diffs neufs, dans l'ordre :
+- **SB-11y** : C-1 à C-6 du rapport de G2 (fixtures à étiquettes croisées et égalité en octets ; R de la cellule ≠ R_approche ; source de « vide » : n′ partiel et `premiere` None ; plancher exact ; phrase retirée du rapport du générateur), preuves : G2-M01, M03, M04, M05, M06, M08, M12, M13 tués ; plus **C-7** (I-3, aucune dette) : impression, par cellule et par strate, du nombre de réplications à n′_s = 0 (et du nombre de comparaisons effectives d'oracle E-S-29 par cellule, I-2), test et mutant.
+- **SB-11z** : l'ajout daté au G0 (`G0-AJOUT.md`, texte de l'orchestrateur, à recopier mot pour mot à la fin de `docs/adr-0029/g0-sim/G0-SIM-BIS.md`) et, dans le même diff, la mise à jour des épingles selon la procédure de `g2/outils/epingles_g0.py` (parametres.json `rattachement`, tests/test_commun.py `test_provenance_c_5`), avec la preuve : ancienne épingle remise = FAIL, G0 augmenté d'un octet = FAIL.
+
+## Ajout daté du 2026-10-09 15:26:10 UTC (`date -u`) : adjudication du contre-contrôle de SB-11y et SB-11z (CONFORME-AVEC-RÉSERVES, R-1 à R-5)
+Pièce : `g2/cc/RAPPORT-CC.md` (contre-contrôleur neuf, `claude-opus-5-5`, FM-1.1 : 0 fragment). R-1 vérifié par l'orchestrateur sur le dépôt (`docs/adr-0029/g0-sim/SHA256SUMS` l.4 porte encore `a216a953…`). Règle « aucune dette » : les cinq réserves sont corrigées dans le lot.
+- C-8 (R-1) dans **SB-11z** : la ligne de `G0-SIM-BIS.md` dans `docs/adr-0029/g0-sim/SHA256SUMS` passe à `c6c8e692…` (forme du commit 12ce67f) ; preuve : `sha256sum -c` du dossier OK après z ; et, si un test lit ce fichier, son rouge sous l'ancienne somme.
+- C-9 (R-2) dans **SB-11y** : `test_equivalence_regle` compare `octets(…)` (JSON canonique) et non l'égalité Python, pour n_s ∈ {3, 4, 7} et 2 736 ; le texte de G0-AJOUT (« vérifiée en octets … à plusieurs n_s ») devient vrai sans le retoucher.
+- C-10 (R-3) : au §10 de `RAPPORT-GENERATEUR.md`, la phrase sur la refonte du tableau README est retirée et remplacée par une marque datée (forme de C-6) ; O-4 sans item ni réserve (aucune règle ne borne une rangée Markdown ; format préexistant).
+- C-11 (R-4) et C-12 (R-5) dans **SB-11y** : `test_n_prime_partiel_resultat` (espion sur `executer._tester` à i = 65 : l'enregistrement de stress est celui rendu par la règle) et `test_compte_premiere_absente` (`regle.premiere` None aux réplications 0 et 1 ; n′ nul [0, 1], oracle [2, 1], cellule 3), sur la forme de `g2/cc/propositions/test_nprime_cc.py` (donnée, pas diff à livrer) ; preuves : rouges par AssertionError sous M-CC-01, M-CC-03, M-CC-04 ; plancher sim-bis exact 279.
+- xtask ROUGE sur la copie à exclusions (E-2 du CC) : neutre, le lot est jugé par xtask sur le dépôt réel à la chaîne de commits.
+
+## Ajout daté du 2026-10-09 16:48:15 UTC (`date -u`) : adjudication de la passe 2 du contre-contrôle (CONFORME-AVEC-RÉSERVES, R-6)
+R-1, R-2, R-3, R-5 levées ; R-4 levée pour M-CC-01. **C-13 (R-6)** dans SB-11y : l'espion de `test_n_prime_partiel_resultat` fige `octets(r)` au moment de l'appel et l'assertion compare `octets(r["classes"]["BTC"])` à ces octets ; preuve : M-CC-01 et M-CC-06 rouges par AssertionError ; plancher 279 inchangé. E-12 (aucune gate ne vérifie les `SHA256SUMS` des dossiers de `docs/`) : hors de ce lot ; **lot de dettes DETTES-T4 nommé** (item SHOGEN-DOCS-SHA256SUMS-GATE-1, formé au versement, déclencheur : DETTES-T4, lancé après NPRIME). Écart du commentaire de `gates_p2.sh` : noté.
