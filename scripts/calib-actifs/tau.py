@@ -238,8 +238,12 @@ def septembre(prm: dict, bruts: str, btc: dict) -> list:
 def main(argv=None, env=None) -> int:
     """python3 tau.py --bruts <dossier> --sortie <dossier> [--parametres <fichier>] : épingle de tau_sigma.txt,
     séries, oracle de SH §4, puis σ, τ et oracles par actif, fragment contrôlé ; sorties en .partiel puis renommées.
-    Codes : 0 ; 1 refus nommé (dans les deux sorties) ; 2 usage. Aucune exception non nommée (type seul)."""
-    a = list(sys.argv[1:] if argv is None else argv)
+    Codes : 0 ; 1 refus nommé (dans les deux sorties) ; 2 usage. Aucune exception non nommée (type seul).
+    SHOGEN-CALIB-BORNE-MULTI-1 : le calcul va au bout pour chaque actif ; le refus écrit est le premier dans l'ordre
+    des actifs (celui d'un arrêt au premier), puis une ligne descriptive par refus qui porte une valeur (CA/borne),
+    puis une par refus suivant sans valeur (exception non nommée : CA/calcul, type seul ; C-B4 de la G2), chaque texte
+    une fois, et jamais celui du refus écrit (C-B8 : refus global aux paramètres, levé à chaque actif)."""
+    a, refus = list(sys.argv[1:] if argv is None else argv), []
     if len(a) not in (4, 6) or a[0::2] != ["--bruts", "--sortie", "--parametres"][:len(a) // 2]:
         print("REFUS CA/usage : tau.py --bruts <dossier> --sortie <dossier> [--parametres <fichier>]", file=sys.stderr)
         return 2
@@ -251,8 +255,14 @@ def main(argv=None, env=None) -> int:
         series = {(x, p): bougies.charger(prm, a[1], "principale", p, x, prm["fenetre"])
                   for x in socle.ACTIFS for p in lec["places"][x]}
         oracle = bougies.oracle_sh(prm, series)
-        res = {x: calcul_actif(prm, x, {p: series[x, p] for p in lec["places"][x]}, prm["fenetre"], btc)
-               for x in socle.ACTIFS}
+        res = {}
+        for x in socle.ACTIFS:                                      # jusqu'au bout, même après un refus
+            try:
+                res[x] = calcul_actif(prm, x, {p: series[x, p] for p in lec["places"][x]}, prm["fenetre"], btc)
+            except Exception as e:
+                refus.append((x, e))
+        if refus:
+            raise refus[0][1]
         frag = fragment(prm, res)
         controle_fragment(prm, frag, btc)
         fichiers = [__file__, socle.__file__, bougies.__file__, sigma.__file__,
@@ -265,8 +275,16 @@ def main(argv=None, env=None) -> int:
         sorties, code = {"calib_actifs.txt": lignes, "fragment_analyse.json": frag}, 0
     except Exception as e:                                          # jamais une trace : refus nommé, type seul
         r = e if isinstance(e, socle.Refus) else socle.Refus("CA/calcul", f"calcul en échec ({type(e).__name__})")
-        hors = [] if r.valeur is None else [f"descriptif hors refus (jamais décisif) : valeur calculée de la règle, "
-                                            f"{r.valeur[0]} : {r.valeur[1]} ; {r.lieu}"]      # C-13 : ligne à part
+        hors = [f"descriptif hors refus (jamais décisif) : valeur calculée de la règle, {y.valeur[0]} : "
+                f"{y.valeur[1]} ; {y.lieu}" for _x, y in refus if getattr(y, "valeur", None) is not None]  # C-13
+        vus = [str(r)]                                              # C-B8 : un texte une fois, refus écrit compris
+        for x, y in refus[1:]:
+            nomme = y if isinstance(y, socle.Refus) else socle.Refus(
+                "CA/calcul", f"calcul en échec ({type(y).__name__})", x)
+            s = str(nomme)
+            if getattr(y, "valeur", None) is None and s not in vus:
+                vus.append(s)
+                hors.append("descriptif hors refus (jamais décisif) : refus suivant : " + s)
         sorties, code = {"calib_actifs.txt": [str(r), *hors], "fragment_analyse.json": {"refus": str(r)}}, 1
     os.makedirs(a[3], exist_ok=True)
     socle.ecrire(a[3], SORTIES[0], sorties[SORTIES[0]])

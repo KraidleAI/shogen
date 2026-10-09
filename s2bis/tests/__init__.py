@@ -1,11 +1,17 @@
 """Suite de s2bis (CB-0 ; E-C-40) : garde réseau posée à l'import du paquet de tests, avant tout module de test. Une
 connexion, un envoi ou une résolution hors de la boucle locale (127.0.0.0/8, ::1, « localhost » ; AF_UNIX permis) lève
 ReseauInterdit et s'inscrit dans TENTATIVES. ReseauInterdit dérive de BaseException : un `except Exception` du code
-testé ne la masque pas. Un sous-processus pose la garde par `import tests`. Limite : un appel direct à `_socket`."""
+testé ne la masque pas. Un sous-processus pose la garde par `import tests`. Limite : un appel direct à `_socket`.
+SHOGEN-TESTS-GARDE-MANDATAIRE-1 : les variables de mandataire (http_proxy, https_proxy, all_proxy, toutes casses) sont
+retirées de l'environnement, et de celui des sous-processus, avant la garde : un mandataire sur la boucle locale
+(HTTPS_PROXY=http://127.0.0.1:…) ferait sortir urllib par la boucle locale, que la garde admet."""
 import ipaddress
+import os
 import socket
 
 TENTATIVES = []
+for _v in [k for k in os.environ if k.lower() in ("http_proxy", "https_proxy", "all_proxy")]:
+    del os.environ[_v]
 
 
 class ReseauInterdit(BaseException):

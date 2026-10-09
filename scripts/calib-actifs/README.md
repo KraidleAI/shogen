@@ -44,6 +44,11 @@ tourne sous l'interpréteur de la suite et chaque `python3.10` à `python3.13` p
    du dépôt (référence : URL, taille, sha256 du manifeste). Le fragment entre à `s2bis/config/analyse.json` au lot du
    paquet, avec les valeurs de BTC (E-CA-29). Sous un refus CA/borne, une ligne descriptive suit le refus dans
    `calib_actifs.txt` : la valeur calculée de la règle, nommée, jamais décisive (le refus et le JSON n'en portent pas).
+   Le calcul va au bout pour chaque actif (SHOGEN-CALIB-BORNE-MULTI-1) : le refus écrit est celui du premier actif
+   refusé ; chaque actif à la borne a sa ligne de valeur, dans l'ordre des actifs, puis chaque refus suivant sans
+   valeur a sa ligne `descriptif hors refus (jamais décisif) : refus suivant : <refus>` (exception non nommée :
+   CA/calcul, type seul), chaque texte une fois et jamais celui du refus écrit (un refus global aux paramètres se
+   lève à chaque actif) ; le JSON ne porte que le refus.
 
 ## Relevé de cadence (séparé, avant le sceau)
 

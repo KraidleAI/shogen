@@ -4,7 +4,9 @@ CB-11e (C-4 de la G2 de P1-B) : délai sur l'horloge monotone ; MG-23 (C-7). CB-
 adresse non littérale refusée sans envoi (C-2) ; MG-18, MG-19, MG-21, MG-24 (C-7). CB-19a (C-1 (a) de la relecture
 d'intégration de P1) : réponse appariée de plus de 512 octets en `forme` (RFC 1035 §2.3.4, §4.2.1), tailles écrites à
 la main. CB-12a : drapeau TC gardé, section réponse non lue, aucun repli en TCP (SHOGEN-S2BIS-DNS-TC-1) ; identifiant
-hors de 16 bits refusé et nommé (SHOGEN-S2BIS-DNS-ID-16BITS-1)."""
+hors de 16 bits refusé et nommé (SHOGEN-S2BIS-DNS-ID-16BITS-1). DETTES-T1 (C-A2 de sa G2,
+SHOGEN-S2BIS-TEST-DNS-PORT-1) : port du test TC pris libre en TCP par le noyau, puis lié en UDP (`tcp_et_udp`)."""
+import errno
 import socket
 import struct
 import threading
@@ -33,10 +35,15 @@ WE = "witness.example."
 A2 = [[WE, 1, 60, "192.0.2.1"], [WE, 1, 300, "192.0.2.2"]]
 
 
-def udp(comportement):
-    """Serveur UDP sur 127.0.0.1 : reçoit une requête, la consigne, puis `comportement(srv, requete, client)`."""
+def udp(comportement, port=0):
+    """Serveur UDP sur 127.0.0.1 (port 0 : choisi par le noyau) : reçoit une requête, la consigne, puis
+    `comportement(srv, requete, client)`."""
     srv, recues = socket.socket(socket.AF_INET, socket.SOCK_DGRAM), []
-    srv.bind(("127.0.0.1", 0))
+    try:
+        srv.bind(("127.0.0.1", port))
+    except OSError:
+        srv.close()
+        raise
     srv.settimeout(5)
 
     def fil():
@@ -50,6 +57,21 @@ def udp(comportement):
     t = threading.Thread(target=fil, daemon=True)
     t.start()
     return srv.getsockname()[1], recues, t
+
+
+def tcp_et_udp(comportement, essais=50):
+    """(serveur TCP à l'écoute, port, requêtes reçues, fil du serveur UDP) sur un même port libre dans les deux
+    protocoles : port pris libre en TCP par le noyau, puis lié en UDP ; un numéro déjà tenu en UDP fait reprendre un
+    port neuf. Remplace le bind TCP du numéro d'un port UDP éphémère, qu'une socket TCP pouvait tenir (EADDRINUSE)."""
+    for _ in range(essais):
+        tcp = socket.create_server(("127.0.0.1", 0))
+        try:
+            return (tcp, *udp(comportement, tcp.getsockname()[1]))
+        except OSError as e:
+            tcp.close()
+            if e.errno != errno.EADDRINUSE:
+                raise
+    raise AssertionError(f"aucun port libre en TCP et en UDP en {essais} essais")
 
 
 def essai(fonction, *args, **kw):
@@ -234,8 +256,10 @@ class Interroger(unittest.TestCase):
                          [{"rcode": 0, "tc": True, "reponses": None}] * 2)
         resultats = []
         for m in (tc[:-6], tc[:3] + bytes([0x83]) + tc[4:]):                 # coupée ; rcode 3 (NXDOMAIN)
-            port, recues, fil = udp(lambda srv, requete, client, m=m: srv.sendto(requete[:2] + m[2:], client))
-            with socket.create_server(("127.0.0.1", port)) as tcp:          # même port en TCP : rien n'y arrive
+            tcp, port, recues, fil = tcp_et_udp(lambda srv, requete, client, m=m: srv.sendto(requete[:2] + m[2:],
+                                                                                             client))
+            with tcp:                                                       # même port en TCP : rien n'y arrive
+                self.assertEqual(tcp.getsockname()[1], port)                # C-A3 : prémisse du même port figée
                 tcp.setblocking(False)
                 resultats.append(dns.interroger("127.0.0.1", WE, "A", delai=S, port=port))
                 self.assertRaises(BlockingIOError, tcp.accept)
