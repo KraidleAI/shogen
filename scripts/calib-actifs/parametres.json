@@ -34,5 +34,12 @@
  "passes": {"variable": "PYTHONHASHSEED", "A": 0, "B": 1, "source": "E-CA-21 ; forme d'E-P2-18"},
  "plan_s2bis": {"tau_sigma": "docs/adr-0029/plan-s2bis/tau_sigma.txt",
   "sha256": "409b2a5e873ffa1ba09db9396953ca68eafb834ccea55bcc2e7d50d6f222e6d9",
-  "source": "commit c11fc82, SHA256SUMS versé ; E-CA-02 : sha256 seul relevé, fichier jamais ouvert par un agent"}
+  "source": "commit c11fc82, SHA256SUMS versé ; E-CA-02 : sha256 seul relevé, fichier jamais ouvert par un agent"},
+ "chainlink": {"ETH": {"proxy": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419", "seuil": "0.005", "heartbeat_s": 3600},
+               "USDC": {"proxy": "0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6", "seuil": "0.0025", "heartbeat_s": 82800},
+               "USDT": {"proxy": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D", "seuil": "0.0025", "heartbeat_s": 86400},
+               "facteur": "1.5", "source": "PROPOSITION §2.4 (proxies principaux, Q-CA-08) ; ADR-0029 l.188"},
+ "oracles_attendus": {"tau": {"ETH": "0.0075", "USDC": "0.00375", "USDT": "0.00375"},
+                      "sigma_s": {"ETH": 5400, "USDC": 124200, "USDT": 129600},
+                      "source": "config_analyse.py l.28-29 ; ADR-0029 l.188 ; DÉC l.36-37"}
 }
