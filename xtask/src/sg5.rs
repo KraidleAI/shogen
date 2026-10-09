@@ -40,7 +40,8 @@
 //! `chemin:ligne` seul, en note comme en violation, jamais par son texte.
 //! Verdict et comptes n'en dépendent pas. Limites : le masque ne couvre que
 //! S-G5 (S-G4 imprime encore la ligne en extrait) ; un emplacement absent de
-//! la liste, ou atteint par un lien symbolique, imprime son texte.
+//! la liste, ou atteint par un lien symbolique, imprime son texte. Casse pliée
+//! et composants `.jsonl` : DT4-f (DETTES-T4).
 
 use crate::documents::{
     compte_declare_en_tete, fichiers_du_repertoire, fichiers_markdown, normaliser_pour_recherche,
@@ -80,7 +81,8 @@ const EXTENSIONS_TEXTE: &[&str] = &[
 /// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
 /// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
 /// séparateur `/` (invariant 1 d'ADR-0013). `docs/15-` et `docs/16-` couvrent
-/// fichier ou dossier ; les autres finissent par `/`.
+/// fichier ou dossier ; les autres finissent par `/`. `docs/adr-0028/execution/`
+/// ajouté par DETTES-T4 (DT4-b, adjudication Q-3) : interdit par les briefs de ce lot.
 pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
     "docs/15-",
     "docs/16-",
@@ -88,14 +90,22 @@ pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
     "docs/rapports/",
     "docs/adr-0025/",
     "docs/adr-0028/monark-m009a/",
+    "docs/adr-0028/execution/",
 ];
 
 /// Vrai si `relatif` (chemin relatif, séparateur `/`) est sous un emplacement
-/// interdit : ses citations se rapportent par `chemin:ligne` seul.
+/// interdit : ses citations se rapportent par `chemin:ligne` seul. DT4-f
+/// (DETTES-T4, C-9) : comparaison sur le chemin plié en casse (majuscules puis
+/// minuscules, au plus près d'un système de fichiers insensible à la casse), et
+/// tout composant qui finit en `.jsonl`, dossier compris, est interdit.
 pub(crate) fn emplacement_interdit(relatif: &str) -> bool {
+    let plie = relatif.to_uppercase().to_lowercase();
     EMPLACEMENTS_INTERDITS
         .iter()
-        .any(|prefixe| relatif.starts_with(prefixe))
+        .any(|prefixe| plie.starts_with(prefixe))
+        || plie
+            .split('/')
+            .any(|composant| composant.ends_with(".jsonl"))
 }
 
 pub fn executer(racine: &Path) -> Rapport {

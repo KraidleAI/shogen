@@ -742,16 +742,18 @@ fn mutant_sg8_ligne_de_table_entierement_vide() {
 // ADR-0028 annexe B.51) : une citation introuvable située dans un emplacement interdit ne
 // s'imprime que par `chemin:ligne`, jamais par son texte, et le verdict ne change pas. La sortie
 // contrôlée est celle du binaire (`xtask gates`), pas un champ du rapport. Les six emplacements
-// sont recopiés de la liste des briefs, indépendamment du code.
+// sont recopiés de la liste des briefs, indépendamment du code ; le septième, `docs/adr-0028/execution/`,
+// ajouté par DETTES-T4 (DT4-b, adjudication Q-3 : liste des briefs de ce lot).
 // ---------------------------------------------------------------------------
 
-const FACTICES_INTERDITS: [&str; 6] = [
+const FACTICES_INTERDITS: [&str; 7] = [
     "docs/15-factice.md",
     "docs/16-factice.md",
     "docs/pocket-report/factice.md",
     "docs/rapports/factice.md",
     "docs/adr-0025/factice.md",
     "docs/adr-0028/monark-m009a/factice.md",
+    "docs/adr-0028/execution/factice.md",
 ];
 
 /// Écrit, ligne 3 de `relatif`, une citation anglaise introuvable au corpus, portant `marque`.
@@ -762,7 +764,7 @@ fn citation_factice(racine: &Path, relatif: &str, marque: &str) {
     ecrire(racine, relatif, &texte);
 }
 
-/// L'arbre augmenté des six fixtures interdites, marquées `zorglub0` à `zorglub5`.
+/// L'arbre augmenté des sept fixtures interdites, marquées `zorglub0` à `zorglub6`.
 fn avec_factices_interdits(racine: PathBuf) -> PathBuf {
     for (rang, relatif) in FACTICES_INTERDITS.iter().enumerate() {
         citation_factice(&racine, relatif, &format!("zorglub{rang}"));
@@ -820,13 +822,13 @@ fn mutant_sg5_interdits_complet_chemin_ligne_sans_texte() {
         "docs/rapports/factice.md",
         "\n« this quotation is present in the corpus and it is checked by the gate ».\n",
     );
-    // Verdict inchangé : ROUGE, six violations, une par fixture, ligne 3.
+    // Verdict inchangé : ROUGE, sept violations, une par fixture, ligne 3.
     let rapport = xtask::sg5::executer(&racine);
     let motifs = motifs(&rapport);
     assert_eq!(
         rapport.violations.len(),
-        6,
-        "six violations attendues :\n{motifs}"
+        7,
+        "sept violations attendues :\n{motifs}"
     );
     for relatif in FACTICES_INTERDITS {
         let attendu = format!("{relatif}:3 citation introuvable");
@@ -837,22 +839,22 @@ fn mutant_sg5_interdits_complet_chemin_ligne_sans_texte() {
     }
     exiger_chemin_ligne_sans_texte(&sortie_du_binaire(&racine), "VIOLATION ", " — ");
     let notes = rapport.notes.join("\n");
-    assert!(notes.contains(&format!(": 6 {NOTE_MASQUES}")), "{notes}");
+    assert!(notes.contains(&format!(": 7 {NOTE_MASQUES}")), "{notes}");
 }
 
 #[test]
 fn mutant_sg5_interdits_incomplet_chemin_ligne_sans_texte() {
     let racine = avec_factices_interdits(arbre_documentaire_sans_octets("sg5-interdits-partiel"));
-    // Verdict inchangé : VERT, huit fragments non contrôlés (deux de l'arbre, six factices).
+    // Verdict inchangé : VERT, neuf fragments non contrôlés (deux de l'arbre, sept factices).
     let rapport = xtask::sg5::executer(&racine);
     let notes = rapport.notes.join("\n");
     assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
-    assert!(notes.contains(": 8 fragment(s) NON contrôlé(s)"), "{notes}");
+    assert!(notes.contains(": 9 fragment(s) NON contrôlé(s)"), "{notes}");
     exiger_chemin_ligne_sans_texte(&sortie_du_binaire(&racine), "non contrôlé : ", "\n");
-    assert!(notes.contains(&format!(": 6 {NOTE_MASQUES}")), "{notes}");
+    assert!(notes.contains(&format!(": 7 {NOTE_MASQUES}")), "{notes}");
 }
 
-/// Témoin des bornes (préfixes exacts) : hors des six emplacements, le texte reste imprimé.
+/// Témoin des bornes (préfixes exacts) : hors des sept emplacements, le texte reste imprimé.
 #[test]
 fn temoin_sg5_interdits_voisins_gardent_le_texte() {
     let racine = arbre_documentaire("sg5-interdits-voisins");
@@ -864,6 +866,8 @@ fn temoin_sg5_interdits_voisins_gardent_le_texte() {
         "docs/adr-00250/voisin.md",
         "docs/adr-0028/voisin.md",
         "docs/adr-0028/monark-m009ab/voisin.md",
+        "docs/adr-0028/execution-bis/voisin.md",
+        "docs/b.jsonlx/voisin.md",
         "s2-harness/docs/rapports/voisin.md",
     ];
     for relatif in voisins {
@@ -875,6 +879,36 @@ fn temoin_sg5_interdits_voisins_gardent_le_texte() {
     for relatif in voisins {
         let attendu = format!(
             "{relatif}:3 citation introuvable dans le registre et les octets détenus : « the visible sentence of this file is not in the corpus »"
+        );
+        assert!(
+            motifs.contains(&attendu),
+            "« {attendu} » absent :\n{motifs}"
+        );
+    }
+}
+
+/// DT4-f (DETTES-T4, C-9 du contre-contrôle) : casse pliée (majuscules puis minuscules, `ſ` compris) et tout
+/// composant en `.jsonl`, dossier compris : la citation se rapporte par `chemin:ligne` seul, verdict inchangé.
+#[test]
+fn mutant_sg5_interdits_casse_et_jsonl() {
+    let racine = arbre_documentaire("sg5-interdits-casse");
+    let factices = [
+        "docs/Rapports/factice.md",
+        "docs/adr-0028/EXECUTION/factice.md",
+        "docs/rapport\u{17F}/factice.md",
+        "docs/b.jsonl/factice.md",
+        "docs/x/Y.JSONL/factice.md",
+    ];
+    for (rang, relatif) in factices.iter().enumerate() {
+        citation_factice(&racine, relatif, &format!("zorglub{rang}"));
+    }
+    let rapport = xtask::sg5::executer(&racine);
+    let motifs = motifs(&rapport);
+    assert_eq!(rapport.violations.len(), factices.len(), "{motifs}");
+    assert!(!motifs.contains("zorglub"), "texte imprimé :\n{motifs}");
+    for relatif in factices {
+        let attendu = format!(
+            "{relatif}:3 citation introuvable dans le registre et les octets détenus (emplacement interdit"
         );
         assert!(
             motifs.contains(&attendu),

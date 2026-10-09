@@ -109,6 +109,11 @@ jobs:
       - name: ligne « Modèle » des journaux G1/G2 (R-1, CH-4)
         shell: bash
         run: python3 -B enforcement/journaux-modele.py .
+      # Lot DETTES-T5 (2026-10-09) : « cas : » (deux-points suivi d'une espace) rendait ce nom invalide en YAML (scalaire
+      # simple) et le workflow entier illisible pour la forge ; nom retouché, sens inchangé.
+      - name: SHA256SUMS de docs/ hors interdits (DT4-a, SHOGEN-DOCS-SHA256SUMS-GATE-1 ; cas dans controle-unittest)
+        shell: bash
+        run: python3 -B enforcement/docs-sha256sums.py .
 
   g3-secrets:
     # Lot D8b (2026-09-30, ADR-0028 D8 ; G0 docs/adr-0028/G0-lot-D8b.md, journal
@@ -292,4 +297,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 18
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 26
