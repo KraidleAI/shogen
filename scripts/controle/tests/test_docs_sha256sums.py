@@ -81,6 +81,9 @@ class DocsSha256sums(unittest.TestCase):
             "rapports", "15-x", "16-y.d", "adr-0028/execution", "adr-0028/monark-m009a", "adr-0025", "pocket-report",
             "b/z.jsonl", "Rapports", "adr-0028/EXECUTION", "ADR-0025", "b/Z.Jsonl", "rapport" + chr(0x17F))}))  # s long
         self.assertEqual((code, "0 SHA256SUMS" in out), (0, True), err)
+        voisins = ("rapportsX", "adr-0028/Execution-bis", "b.jsonlx", "ADR-00250")     # R-4 (CC, passe 2) : témoin
+        self.refuse(self.arbre({f"docs/{x}/SHA256SUMS": faux for x in voisins}),     # voisins lus : aucun faux interdit
+                    *(f"docs/{x}/SHA256SUMS l.1 : x.md absent" for x in voisins))
         for chemin in ("monark-m009a/x.md", "execution/x.md", "a/x.jsonl", "z.jsonl/x.md", "Monark-M009A/x.md",
                        "Execution/x.md", "a/x.JSONL", "Z.jsonL/x.md"):
             self.refuse({"docs/adr-0028/SHA256SUMS": f"{ABC}  {chemin}", f"docs/adr-0028/{chemin}": "abc"}, "interdit")
