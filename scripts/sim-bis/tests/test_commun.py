@@ -56,15 +56,19 @@ class TestSocle(unittest.TestCase):
         """C-5 de la G2 de la tranche 2 (E-S-03), mis à jour par SB-14H : rattachement à l'empreinte du G0 figé (ajout
         daté PLAN-S2BIS-2 du 2026-10-05 15:05:43 UTC compris), qui cite les précédentes : d9cffc0a… avant cet ajout,
         eeaceb6b… avant celui du 2026-10-05 01:45:03 UTC ; sources.source cite ce dernier (points 2 et 3), sans
-        l'adjudication provisoire. Mutations M-C5-01 (ancienne empreinte remise), M-14H-01, M-14H-02."""
+        l'adjudication provisoire. SB-11z : ajout daté NPRIME-NUL-1 du 2026-10-09 13:49:50 UTC compris, a216a953…
+        cité avant lui. Mutations M-C5-01 (ancienne empreinte remise), M-14H-01, M-14H-02, M-Z-01 (épingle a216a953…
+        remise)."""
         prm = commun.charger_parametres(environ={})
         g0 = ("G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md (sha256 "
-              "a216a953ba2be088868967e8b11a89c17e3882cee9da581700f88d3b70d0e11e")
+              "c6c8e692645a59b0d9c67452157c0b46303cb8b9646738d8c232684e545a6210")
         self.assertTrue(prm["rattachement"].startswith(g0), prm["rattachement"][:100])
         self.assertEqual([x in prm["rattachement"] for x in (
+            "avant l'ajout daté NPRIME-NUL-1 du 2026-10-09 13:49:50 UTC : "
+            "a216a953ba2be088868967e8b11a89c17e3882cee9da581700f88d3b70d0e11e",
             "avant l'ajout daté PLAN-S2BIS-2 du 2026-10-05 15:05:43 UTC : "
             "d9cffc0aec3634138f58ba33b9a9679484f2532460b3e5177c0c5ae194648034",
-            "avant cet ajout : eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39")], [True, True])
+            "avant cet ajout : eeaceb6bb15fd1a98bd65ab80e4326609a612596f954991ad7455b5ab2c41c39")], [True, True, True])
         s = prm["sources"]["source"]
         self.assertEqual([x in s for x in ("ajout daté du G0 du 2026-10-05 01:45:03 UTC, point 3",
                                            "même ajout daté, point 2", "adjudication provisoire")], [True, True, False])
