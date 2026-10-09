@@ -49,6 +49,15 @@ def _par_actif(s):
     return dict.fromkeys(ACTIFS, s)
 
 
+def _actives(x) -> bool:
+    return type(x) is list and len(x) == 3 and x[0] in ACTIFS and conforme(x[1], "hote") and type(x[2]) is int
+
+
+def _concurrences(x) -> bool:
+    return (type(x) is list and len(x) == 3 and x[0] in ACTIFS and conforme(x[1], ["hote"])
+            and type(x[2]) is list and len(x[2]) == 3 and all(type(n) is int for n in x[2]))
+
+
 LECTURE = {"places": _par_actif(["hote"]), "n_min": _par_actif(int), "modes": _par_actif("mode"),
            "derniere_transaction": _par_actif(["hote", "vide admise"])}
 SCHEMA = {"lot": str, "rattachement": str,
@@ -66,6 +75,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "intervalle_ms": int,
                                          "url": str, "paires": "paires"}) | {"source": str},
           "kraken_sha256": _par_actif(str) | {"source": str},
+          "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
+                        "source": str},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 
@@ -86,7 +97,7 @@ def conforme(x, s) -> bool:
         return x in ("archive", "mensuel", "mensuel_checksum", "pages")
     if s == "mode":
         return x in ("calibre", "planchers_seuls")
-    return type(x) is s
+    return type(x) is s if isinstance(s, type) else s(x)
 
 
 def _trie(xs) -> bool:

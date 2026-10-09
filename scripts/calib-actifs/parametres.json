@@ -66,6 +66,15 @@
                    "USDC": "e649464516c86381aa58a2a83f6ce91560394231cfff3213965c93068409cb3c",
                    "USDT": "db584f24c7f0d4783fbdac82e88c9a089c7930945fc052b8fbdc9694374e2104",
                    "source": "SOURCES-HISTORIQUES §7 (l.156-158) ; E-CA-14"},
+ "oracle_sh": {"debut": 1780876800, "fin": 1781481600,
+  "actives": [["USDC", "binance", 9998], ["USDC", "bitfinex", 1098], ["USDC", "bitstamp", 693],
+              ["USDC", "kraken", 9551], ["USDT", "bitstamp", 1542]],
+  "concurrences": [["ETH", ["bitfinex", "bitstamp", "coinbase", "kraken"], [9799, 10075, 10080]],
+                   ["ETH", ["binance", "bitfinex", "bitstamp", "coinbase", "kraken", "okx"], [10080, 10080, 10080]],
+                   ["USDC", ["binance", "bitfinex", "bitstamp", "kraken"], [76, 1626, 9565]],
+                   ["USDT", ["binance", "bitfinex", "bitstamp", "coinbase", "kraken", "okx"], [10031, 10079, 10080]],
+                   ["USDT", ["binance", "bitfinex", "coinbase", "kraken", "okx"], [10025, 10079, 10080]]],
+  "source": "SH §4 (l.103-111), 2026-06-08 au 06-15 : actives par place ; minutes à 4, 3, 2 places actives (E-CA-15)"},
  "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
   "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
 }

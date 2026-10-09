@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import zipfile
 from decimal import Decimal, InvalidOperation
 
@@ -109,3 +110,59 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None) -> di
     except (ValueError, KeyError, IndexError, TypeError, InvalidOperation, zipfile.BadZipFile) as e:
         raise _refus(f"ligne illisible ({type(e).__name__})", place, actif) from None
     return out
+
+
+def derniers(s: dict, fen: dict) -> tuple:
+    """(c, a) sur la grille des minutes de la fenêtre (§4.2) : c[i] clôture de la dernière minute active au plus tard
+    en t_i, a[i] minutes écoulées depuis elle (0 si t_i est active) ; None avant la première minute active de la
+    fenêtre (pas de préchauffe)."""
+    c, a, cour, age = [], [], None, None
+    for t in socle.minutes(fen):
+        x = s.get(t)
+        if x is not None and x[1]:
+            cour, age = x[0], 0
+        elif age is not None:
+            age += 1
+        c.append(cour)
+        a.append(age)
+    return c, a
+
+
+def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) -> dict:
+    """Série d'une (place, actif) depuis <bruts>/<nom>/<place>/<actif>/ (fichiers de l'acquisition, triés, .partiel
+    exclus) ; dossier absent ou vide : CA/format."""
+    d = os.path.join(bruts, nom, place, actif)
+    noms = sorted(x for x in os.listdir(d) if not x.endswith(".partiel")) if os.path.isdir(d) else []
+    if not noms:
+        raise _refus("aucun fichier acquis", place, actif)
+    fichiers = []
+    for x in noms:
+        with open(os.path.join(d, x), "rb") as f:
+            fichiers.append(f.read())
+    return serie(prm["series"][place]["format"], fichiers, fen, place, actif)
+
+
+def oracle_sh(prm: dict, series: dict) -> list:
+    """E-CA-15, avant toute valeur : minutes actives de la semaine de SH §4 recomptées sur les séries {(actif, place) :
+    série}, par place et à au moins 4, 3 et 2 places actives ; un écart : CA/oracle-sh ; un contrôle dont une place
+    manque à la lecture : « non applicable », imprimé. Rend les lignes du compte rendu."""
+    o, lignes = prm["oracle_sh"], []
+    semaine = socle.minutes(o)
+
+    def actives(a, p):
+        return {t for t in semaine if series[a, p].get(t, (0, False))[1]}
+    for a, p, n in o["actives"]:
+        if (a, p) not in series:
+            lignes.append(f"oracle de SH §4 : {a} {p} non applicable (place hors lecture)")
+        elif len(actives(a, p)) != n:
+            raise socle.Refus("CA/oracle-sh", "minutes actives différentes de SH §4", a, place=p)
+    for a, places, comptes in o["concurrences"]:
+        if any((a, p) not in series for p in places):
+            lignes.append(f"oracle de SH §4 : {a} ({', '.join(places)}) non applicable (place hors lecture)")
+            continue
+        ens = [actives(a, p) for p in places]
+        if [sum(sum(t in e for e in ens) >= k for t in semaine) for k in (4, 3, 2)] != comptes:
+            raise socle.Refus("CA/oracle-sh", "concurrence différente de SH §4 (" + ", ".join(places) + ")", a)
+    return lignes + [f"oracle de SH §4 : {len(o['actives'])} comptes par place et {len(o['concurrences'])} "
+                     "concurrences contrôlés, égaux ou non applicables"]
+

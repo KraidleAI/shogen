@@ -52,11 +52,12 @@ class TestSocle(unittest.TestCase):
         self.assertEqual([len(p["unites"][a]) for a in socle.ACTIFS], [10, 8, 10])
 
     def test_parametres_schema(self):
-        """Clé en trop, booléen pour un entier, clé absente, accès inconnu : CA/parametres ; flottant et clé dupliquée
-        refusés dès la lecture (illisible). Mutations : schéma retiré ; type non contrôlé ; clé en trop admise ;
-        flottant admis ; clé dupliquée admise ; accès non contrôlé."""
+        """Clé en trop, booléen pour un entier, clé absente, accès inconnu, compte d'oracle sans nombre : CA/parametres
+        ; flottant et clé dupliquée refusés dès la lecture (illisible). Mutations : schéma retiré ; type non contrôlé ;
+        clé en trop admise ; flottant admis ; clé dupliquée admise ; accès non contrôlé ; prédicat de forme ignoré."""
         for modif in (lambda p: p.update(inconnu=1), lambda p: p["passes"].update(A=False), lambda p: p.pop("lot"),
-                      lambda p: p["series"]["okx"].update(acces="ftp")):
+                      lambda p: p["series"]["okx"].update(acces="ftp"),
+                      lambda p: p["oracle_sh"]["actives"].append(["USDC", "binance"])):
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
         for texte in ('{"lot": 0.5}', '{"lot": "x", "lot": "x"}'):
             self.assertIn("illisible", self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, len, texte)))
