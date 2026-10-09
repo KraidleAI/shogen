@@ -4,6 +4,7 @@ aleas.flux ; fixtures réduites (W = 1 semaine, R = 99) ; chaque test nomme les 
 import copy
 import unittest
 from fractions import Fraction
+from unittest import mock
 
 import aleas
 import calendrier
@@ -13,6 +14,7 @@ import executer
 import observateurs
 import regle
 import sources
+import variante
 
 PRM = commun.charger_parametres(environ={})
 P99 = dict(PRM, regle=dict(PRM["regle"], R=99))
@@ -41,7 +43,8 @@ def chaine(prm, cel, W, i, ep=EP):
     """Réplication écrite à la main : spécification (executer.cellule, SB-11d et SB-11e), T_début par le flux
     « debut » d'indice 0 (aleas.flux), masques de strate, état vrai, couche, quorum ; par strate, fenêtres retenues,
     retraits par classe (ok consolidé sur les retenues), première unité BTC après retraits, séries D comprimées,
-    regle.tester. Rend {strate : (n, première, {classe : (retraits, résultat)})} et le jour tiré."""
+    regle.tester (S suivie selon la cellule). Rend {strate : (n, première, {classe : (retraits, résultat, séries,
+    n_s)})}, le jour tiré et la graine de règle."""
     c, nom = executer.cellule(prm, ep, cel, POINTS, W), cel["nom"]
     cal = prm["calendrier"]
     e = calendrier.echelle(cal, W)
@@ -62,22 +65,23 @@ def chaine(prm, cel, W, i, ep=EP):
         for cl in cel["regle"]["classes"]:
             series = {u: calendrier.comprimer(cons[u, cl][0], segs) for u in pools[cl] if (u, s) not in rt[cl]}
             res[cl] = (sorted([u, x] for (u, t), x in rt[cl].items() if t == s),
-                       regle.tester(series, prem, graine, s, n[s], e["n"][s], prm, 99))
+                       regle.tester(series, prem, graine, s, n[s], e["n"][s], prm, 99, cel["regle"]["S"]), series,
+                       e["n"][s])
         out[s] = (n[s], prem, res)
-    return out, (debut - cal["lundi_reference"]) // 86400
+    return out, (debut - cal["lundi_reference"]) // 86400, graine
 
 
 class TestReplication(unittest.TestCase):
     def egal(self, prm, cel, i, ep=EP):
         """Enregistrement de executer.replication égal à la chaîne écrite à la main ; rendu."""
         r = executer.replication(prm, ep, cel, POINTS, 1, i)
-        attendu, jour = chaine(prm, cel, 1, i, ep)
+        attendu, jour, _g = chaine(prm, cel, 1, i, ep)
         self.assertEqual((r["i"], r["jour"], sorted(r["strates"])), (i, jour, sorted(attendu)))
         cles = ("valeur", "causes", "C", "C1", "K", "runs", "unites")
         for s, (n, prem, res) in attendu.items():
             x = r["strates"][s]
             self.assertEqual((x["n"], x["premiere"]), (n, prem), (i, s))
-            for cl, (rt, t) in res.items():
+            for cl, (rt, t, _x, _n) in res.items():
                 self.assertEqual((x["retraits"][cl], [x["classes"][cl][k] for k in cles]), (rt, [t[k] for k in cles]),
                                  (i, s, cl))
             self.assertEqual(x["valeurs"], regle.strate({cl: v[1] for cl, v in res.items()}), (i, s))
@@ -129,6 +133,63 @@ class TestReplication(unittest.TestCase):
         with self.assertRaises(commun.Refus) as c:
             executer.replication(p, EP, CEL, POINTS, 1, 0)
         self.assertEqual(c.exception.code, "SOURCES/composant")
+
+
+COURT = ("valeur", "causes", "C", "C1", "C_S", "r", "K", "S", "runs", "unites")
+
+
+class TestRegleCellule(unittest.TestCase):
+    def test_absorption_s_variante_evenements(self):
+        """Cellule à deux unités faibles (2/5, L = 1, panne), S suivie, critère collectif, variante aux diviseurs 4 et
+        8, compte d'événements sur la première réplication : sur les séries comprimées de la chaîne écrite à la main,
+        « avec » = regle.tester des séries restées après regle.filtrer (retirées, indice), variante = variante.tester,
+        événements = regle.loi_evenements (suite comprimée, P-3), C_S de regle.tester. Mutations M-11G-01 (« avec »
+        sur toutes les séries), M-11G-02 (diviseur ignoré), M-11G-03 (« g sur la grille », P-3), M-11G-04 (S non
+        suivie)."""
+        cel = copy.deepcopy(CEL)
+        cel.update(nom="T-3", faibles={"k": 2, "p": [2, 5], "L": 1, "type": "panne"},
+                   regle=dict(CEL["regle"], S=True, absorption=True, variante=[4, 8], evenements=1))
+        r = executer.replication(P99, EP, cel, POINTS, 1, 0)
+        attendu, _j, g = chaine(P99, cel, 1, 0)
+        for s, (n, prem, res) in attendu.items():
+            for cl, (_rt, t, series, ns) in res.items():
+                y = r["strates"][s]["classes"][cl]
+                reste, ret, ind = regle.filtrer(series, n, P99)
+                a = regle.tester(reste, prem, g, s, n, ns, P99, 99, True)
+                self.assertEqual(y.get("avec"), dict({k: a[k] for k in COURT}, retirees=ret, indice=ind), (s, cl))
+                for d in (4, 8):
+                    v = variante.tester(series, prem, g, s, n, ns, P99, 99, d)
+                    self.assertEqual(y.get("variante", {}).get(str(d)), dict({k: v[k] for k in COURT if k in v},
+                                                                              N=v["N"]), (s, cl, d))
+                ev = regle.loi_evenements(series, prem, g, s, n, 99, P99)
+                self.assertEqual((y.get("evenements"), y["C_S"]), ({str(k): x for k, x in ev.items()}, t["C_S"]))
+        self.assertIsNotNone(r["strates"]["calme"]["classes"]["BTC"]["C_S"])
+        self.assertNotIn("evenements", executer.replication(P99, EP, cel, POINTS, 1, 1)["strates"]["calme"]["classes"][
+            "BTC"])
+
+    def test_oracle_e_s_29(self):
+        """E-S-29 et O-4 de la G2 de la tranche 4 : les 200 premières réplications d'une cellule passent par
+        regle.oracle (huit appels : quatre classes, deux strates) et la variante par variante.deux_modes ; i = 200 :
+        regle.tester et variante.tester ; variante dont les deux modes diffèrent : VARIANTE/oracle. Mutations
+        M-11G-05 (oracle sur la seule première réplication), M-11G-06 (variante sans oracle), M-11G-07 (écart des
+        deux modes de la variante admis)."""
+        cel = copy.deepcopy(CEL)
+        cel["regle"]["variante"] = [4]
+        for i, attendu in ((0, (8, 0, 8, 0)), (199, (8, 0, 8, 0)), (200, (0, 8, 0, 8))):
+            with mock.patch.object(regle, "oracle", wraps=regle.oracle) as o, mock.patch.object(
+                    regle, "tester", wraps=regle.tester) as t, mock.patch.object(
+                    variante, "deux_modes", wraps=variante.deux_modes) as d, mock.patch.object(
+                    variante, "tester", wraps=variante.tester) as v:
+                executer.replication(P99, EP, cel, POINTS, 1, i)
+            self.assertEqual((o.call_count, t.call_count, d.call_count, v.call_count), attendu, i)
+        faux = ({"valeur": "REJETTE", "causes": [], "N": 1}, {"valeur": "NE REJETTE PAS", "causes": [], "N": 1})
+        with mock.patch.object(variante, "deux_modes", return_value=faux):
+            try:
+                executer.replication(P99, EP, cel, POINTS, 1, 0)
+                code = None
+            except commun.Refus as e:
+                code = e.code
+        self.assertEqual(code, "VARIANTE/oracle")
 
 
 if __name__ == "__main__":

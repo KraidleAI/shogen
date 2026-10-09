@@ -8,8 +8,9 @@ au plus sur le coût mesuré (adjudication 6 du G0). SB-11d : couche d'observate
 cellules.couches, O-5 ; perte sur le W de la cellule, L-2). SB-11e : cellules sous schéma fermé et refus nommés
 (SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2) ; fond des sources d'une cellule. SB-11f :
 réplication d'une cellule, chaîne entière (T_début, sources, observateurs, fenêtres retenues, retraits, première unité,
-règle par classe et par strate). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune
-fonction de libm."""
+règle par classe et par strate). SB-11g : oracle d'E-S-29 sur les 200 premières réplications (variante comprise, O-4),
+S, critère collectif, variante, compte d'événements sur la suite comprimée (P-3). Entiers, rationnels et Decimal seuls :
+aucun flottant, aucune puissance, aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -25,6 +26,7 @@ import commun
 import observateurs
 import regle
 import sources
+import variante
 
 VALEURS = ("REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE")
 INSUFFISANTE = ("unites", "k_crit", "runs")         # information insuffisante (E-S-52) ; n_prime compté à part
@@ -324,13 +326,41 @@ def _court(r: dict) -> dict:
     return {k: r[k] for k in ("valeur", "causes", "C", "C1", "C_S", "r", "K", "S", "runs", "unites") if k in r}
 
 
+ORACLE = 200                # E-S-29 : sous-ensemble pré-déclaré, les 200 premières réplications de chaque cellule
+
+
+def _tester(p: dict, rg: dict, i: int, a: tuple) -> dict:
+    """R1-2 d'une classe dans une strate, a = (séries comprimées, première unité, graine, strate, n, n_s) :
+    regle.tester, S suivie si regle.S (E-S-32) ; i < ORACLE : regle.oracle, classification exigée égale à celle du mode
+    à R complet (E-S-29) ; critère collectif d'absorption, valeurs « avec » sur les séries restées de regle.filtrer,
+    retirées et indice final (E-S-35) ; variante non enroulée à chaque diviseur de regle.variante (variante.tester ;
+    i < ORACLE : variante.deux_modes, même valeur et mêmes causes exigées, sinon VARIANTE/oracle : O-4 de la G2 de la
+    tranche 4)."""
+    f, (series, prem, graine, s, n, n_s) = regle.oracle if i < ORACLE else regle.tester, a
+    out = _court(f(*a, p, rg["R"], rg["S"]))
+    if rg["absorption"]:
+        reste, ret, ind = regle.filtrer(series, n, p)
+        out["avec"] = dict(_court(f(reste, prem, graine, s, n, n_s, p, rg["R"], rg["S"])), retirees=ret, indice=ind)
+    for d in rg["variante"]:
+        if i < ORACLE:
+            v, c = variante.deux_modes(*a, p, rg["R"], d)
+            if (v["valeur"], v["causes"]) != (c["valeur"], c["causes"]):
+                raise commun.Refus("VARIANTE/oracle", f"{s}, diviseur {d} : {v['valeur']}, complet {c['valeur']}")
+        else:
+            v = variante.tester(*a, p, rg["R"], d)
+        out.setdefault("variante", {})[str(d)] = dict(_court(v), N=v["N"])
+    return out
+
+
 def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) -> dict:
     """Réplication i ≥ 0 d'une cellule (cellule ; W semaines, échelle de calendrier.echelle) : T_début tiré sur le flux
     « debut » d'indice 0 (E-S-14, Q-S-08 ; E-S-41) ; masques de strate sur T_max ; état vrai (sources.Replication),
     couche et quorum (observateurs.Couche) ; par strate, fenêtres retenues (n_s premières évaluables, ou n′_s) ;
     retraits D1-bis et presque mort par classe sur l'ok consolidé des retenues (E-S-24) ; première unité : premier hôte
     BTC de la strate après retraits (Q-T3-15) ; séries D comprimées et R1-2 (regle.tester) par classe ; valeurs de la
-    strate (regle.strate) ; impression de M_j : fenêtres de la strate à M_j = 0..M (ADR-0029 l.97 a)."""
+    strate (regle.strate) ; impression de M_j : fenêtres de la strate à M_j = 0..M (ADR-0029 l.97 a). SB-11g : _tester
+    (oracle d'E-S-29, S, critère collectif, variante) ; compte d'événements sur la suite comprimée des i < evenements
+    premières réplications (E-S-34 ; P-3)."""
     c = cellule(prm, ep, cel, points, W)
     p, nom, rg, cal, st = c["prm"], c["nom"], c["regle"], prm["calendrier"], prm["calibration"]["strates"]
     e = calendrier.echelle(cal, W)
@@ -350,7 +380,10 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
         res = {}
         for cl in rg["classes"]:
             series = {u: calendrier.comprimer(cons[u, cl][0], segs) for u in pools[cl] if (u, s) not in rt[cl]}
-            res[cl] = _court(regle.tester(series, prem, graine, s, n[s], e["n"][s], p, rg["R"], rg["S"]))
+            res[cl] = _tester(p, rg, i, (series, prem, graine, s, n[s], e["n"][s]))
+            if i < rg["evenements"]:
+                ev = regle.loi_evenements(series, prem, graine, s, n[s], rg["R"], p)
+                res[cl]["evenements"] = {str(g): x for g, x in ev.items()}
         out["strates"][s] = {
             "n": n[s], "atteinte": ret[s]["atteinte"], "suffisant": ret[s]["suffisant"], "premiere": prem,
             "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
