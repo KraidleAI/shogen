@@ -4,11 +4,13 @@ SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1). SB-11j : réplication d'E1 (courbes de I_t e
 issues d'un même appel de calib_fiv.replication), lot d'un point, agrégation d'un point (moyennes exactes, réplications
 indéfinies par hôte, variance exacte et écart-type des FIV de I_t). SB-11k : choix de C1 et de C2 (calib_fiv.selection,
 FIV_u par calibration.charger_unites, Q-SI-8 (b)), lignes [BORD E1] et phrases (8)(ii) et (iii) (Q-SI-8 (c)),
-impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). Entiers,
+impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). SB-11m :
+loi des pauses d'une série sur le masque, définitions d'EP (point (6)). Entiers,
 rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
 from decimal import Decimal
 from fractions import Fraction
 
+import calendrier
 import calib_fiv
 import calibration
 import executer
@@ -120,4 +122,26 @@ def calibrer(prm: dict, cal: dict, moy: dict, lus=None, environ=None) -> dict:
             h: _par_hote(prm, moy, s, h, fu, sel[s]["C1"], ctx) for h, fu in unites[s].items()})
     out["faisabilite"] = {n: faisabilite(prm, e["episodes"], {s: sel[s][n] for s in st}, Fraction(*fe["f"]),
                                          Fraction(*fe["longues"])) for n in ("C1", "C2")}
+    return out
+
+
+def pauses(m: int, d: int) -> dict:
+    """Loi des pauses de la série d sur les positions présentes m (point (6) ; définitions d'EP : forme
+    d'episodes.episodes de PLAN-S2BIS et d'intervalles.py de PLAN-S2BIS-2) : épisode = suite maximale de positions
+    présentes consécutives où d vaut 1, pause = où d vaut 0 ; censure au début (à la fin) : position voisine avant
+    (après) absente du masque ; pause complète : aucune censure ; pause de bord : une au moins ; segment sans épisode :
+    les deux. Rend {"completes", "bord", "complets" : {longueur : nombre}, "episodes", "vides", "segments"}."""
+    out = {"completes": {}, "bord": {}, "complets": {}, "episodes": 0, "vides": 0,
+           "segments": len(calendrier.segments(m))}
+
+    def suites(x):
+        return [(b - a, a == 0 or not (m >> (a - 1)) & 1, not (m >> b) & 1) for a, b in calendrier.segments(x)]
+    for lg, g, f in suites(d & m):
+        out["episodes"] += 1
+        if not (g or f):
+            out["complets"][lg] = out["complets"].get(lg, 0) + 1
+    for lg, g, f in suites(m & ~d):
+        cle = "bord" if g or f else "completes"
+        out[cle][lg] = out[cle].get(lg, 0) + 1
+        out["vides"] += g and f
     return out
