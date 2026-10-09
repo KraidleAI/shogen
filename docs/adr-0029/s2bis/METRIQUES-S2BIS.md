@@ -2193,3 +2193,31 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 319 tests ; plancher du job : 319, égalité exigée (`--egal`).
+
+## CB-17a (2026-10-08) : `status`, lecture du journal et jugement d'une santé (E-C-38)
+
+Objet : lecture du journal du pool sans rien écrire ni prendre le verrou, une ligne `lecture` reconnue à ses premiers
+octets et jamais décodée (PROPOSITION §2.4 « Status ») ; jugement d'une `sante` aux seuils de l'ADR-0029 §2.3, égaux au
+bloc `degradation` d'`analyse.json` (test croisé) ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; FORMAT §17.1, §17.2.
+
+Rouge : lecture et jugement d'interface, 5 tests en échec d'assertion.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 69 | — |
+| `tests/test_status.py` | 122 | 5 |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (17 de la phase 1, 0 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : `status` décode les lectures
+(PROPOSITION §2.4 « Status »), `status` lit les lectures en panne, lecture à adresse null décodée, ligne illisible
+sautée, fichier poursuivi, objet sans `seq` admis, journal absent sans refus, D-2 à 5 s tout juste, lecture non partie
+ignorée (Q-C-02), retard null non admis, D-4 à 3 témoins, sonde nulle comptée répondue, rcode non nul compté résolu,
+réponse sans A comptée résolue, santé illisible valide, relevé D-3 de code non nul non compté, seuil D-5 autre que celui
+du recalcul, plancher non relevé.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 324 tests ; plancher du job : 324, égalité exigée (`--egal`).

@@ -740,3 +740,25 @@ collecteur.
    `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
    <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
    jour refusé.
+
+## 17. Commande `status` (CB-17 ; E-C-38)
+
+Rattachement : ADR-0029 l.244 (« une commande `status` scellée n'imprime que la santé (D-1 à D-5, dernier marqueur,
+tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun statut de source, aucun prix »), §2.3
+(critères D-1 à D-5) ; PROPOSITION E-C-26, E-C-38 ; AVIS du G0, Q-D-03, points 2 et 3. Code de référence :
+`s2bis/shogen_s2bis/collecte/status.py`.
+
+1. **Lecture** (CB-17a) : le journal du pool est lu sans rien écrire ni prendre le verrou de l'écrivain (§5) : la
+   lecture peut se faire pendant la collecte. Fichiers dans l'ordre (jour, k entier) de la grammaire du §6.1 ; aucun :
+   refus `STATUS/journal`. Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme
+   canonique (§1.2, §9.1, §11.2) et d'aucun autre type, est une `lecture` : elle n'est jamais décodée, et rien d'une
+   lecture n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée,
+   illisible, ou sans `type` chaîne ni `seq` entier. La chaîne n'est pas contrôlée : l'intégrité se juge au recalcul
+   (RB-1, RB-18).
+2. **Jugement d'une santé** (CB-17a ; ADR-0029 §2.3 ; seuils égaux au bloc `degradation` de
+   `s2bis/config/analyse.json`, contrôlé par un test) : D-1, aucune `sante` lisible ; D-2, `d2.non_parties` non nul ou
+   `d2.retard_max` au-delà de 5 s (règle Q-C-02 de l'AVIS, §11.6) ; D-4, au moins 2 témoins dont le résultat n'est pas
+   une réponse retenue (`statut` autre que `reponse`, ou null) ; D-5, au moins 2 noms témoins non résolus (pas de
+   réponse retenue, `rcode` non nul, ou aucune réponse de type 1, A). **D-3 n'est pas jugé** : le format de la sortie
+   de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1, ouvert) ; est relevé, à part, un relevé D-3
+   absent, en erreur ou de code non nul.
