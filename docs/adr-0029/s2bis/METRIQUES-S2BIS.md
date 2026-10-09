@@ -2287,3 +2287,37 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 332 tests ; plancher du job : 332, égalité exigée (`--egal`).
+
+## CB-17d (2026-10-08) : compte à quorum sur les résumés des autres (AVIS Q-D-03, point 3)
+
+Objet : `status --depot --descripteur` ajoute le compte à quorum (M_j ≥ 2, ADR-0029 §2.2 pt 5) sur les résumés lisibles
+des autres observateurs, lus strictement (`RESUME/…`), avec leur âge (FORMAT §17.6). Correction de la G2 de P2B
+(2026-10-08) : « hors D-3 » sur la ligne du quorum (C-7 ; FORMAT §17.6) ; le résumé d'un nom en majuscules est ignoré
+(C-6).
+
+Rouge : rapport et commande qui ignorent le dépôt, 3 tests en échec d'assertion ; puis, à la relecture du générateur, un
+résumé aux codes non textes faisait lever `status` (tri avant reconnaissance) : trois cas ajoutés au test des résumés
+hostiles, l'exception comparée par son nom (échec d'assertion), puis codes reconnus avant le tri. Rouges de la
+correction (correction retirée du code, test gardé ; python3.12 -X dev -W error) : R-C6c (ROUGE D'ASSERTION : FAIL 1,
+ERROR 0) ; R-C7b (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 269 | — |
+| `shogen_s2bis/collecte/status.py` | 208 | — |
+| `tests/test_status.py` | 379 | 16 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 20 mutants (18 de la phase 1, 2 neufs de la correction),
+20 tués (19 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : son propre résumé compté,
+quorum à 1, sa validité non comptée, jours hors du journal local lus, taille non bornée, forme canonique non contrôlée,
+clés exactes non contrôlées, nom et contenu non comparés, fenêtre hors du jour admise, fenêtre hors grille admise, code
+inconnu admis, code en double admis, résumé sans fenêtre admis, âge au début de la fenêtre, --depot sans --descripteur
+admis, quorum sans dépôt, codes triés avant d'être reconnus : un code non texte fait lever, plancher non relevé, C-6 :
+résumé d'un nom en majuscules lu, C-7 : quorum sans « hors D-3 ».
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 335 tests ; plancher du job : 335, égalité exigée (`--egal`).

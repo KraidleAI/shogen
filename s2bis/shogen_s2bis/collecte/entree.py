@@ -21,7 +21,8 @@ jour ; l'envoi n'est armé que par `--envoi`, URL de la TSA que le déploiement 
 l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé.
 CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
 sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
-journal ou du dépôt ; 2 refus du descripteur."""
+journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
+quorum ; `--depot` sans `--descripteur` : sortie 2."""
 import argparse
 import collections
 import ipaddress
@@ -182,16 +183,18 @@ def _jeton(a, tls, fsync):
 
 
 def _status(a, fsync):
-    """Commandes `status` (CB-17b) et `resume` (CB-17c) : 0 ; 1 refus du journal ou du dépôt ; 2 refus du
-    descripteur."""
+    """Commandes `status` (CB-17b ; compte à quorum avec `--depot`, CB-17d) et `resume` (CB-17c) : 0 ; 1 refus du
+    journal ou du dépôt ; 2 refus du descripteur, ou `--depot` sans `--descripteur`."""
     try:
-        o = getattr(a, "descripteur", None) and _observateur(a.descripteur)
+        if a.depot and not a.descripteur:
+            raise config.RefusConfig("CONFIG/options", "--depot exige --descripteur")
+        o = a.descripteur and _observateur(a.descripteur)
     except (config.RefusConfig, OSError) as e:
         print(f"{a.commande} : refus : {e}", file=sys.stderr)
         return 2
     try:
         if a.commande == "status":
-            print("\n".join(status.rapport(a.journal)))
+            print("\n".join(status.rapport(a.journal, depot=a.depot, observateur=o, maintenant=horloge())))
             return 0
         noms = status.resumes(a.journal, o)
         for nom, octets in noms.items():
@@ -233,11 +236,12 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
         jeton.add_argument(option, required=True)
     jeton.add_argument("--jour", help="jour UTC, AAAA-MM-JJ (défaut : celui de l'horloge)")
     jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
-    commandes.add_parser("status", help="santé seule, lue au journal du pool, sans rien écrire").add_argument(
-        "--journal", required=True)
+    st = commandes.add_parser("status", help="santé seule, lue au journal du pool, sans rien écrire")
     re_ = commandes.add_parser("resume", help="résumés par jour (valide ou codes D) publiés au dépôt")
-    for option in ("--journal", "--depot", "--descripteur"):
-        re_.add_argument(option, required=True)
+    for commande, requis in ((st, False), (re_, True)):
+        commande.add_argument("--journal", required=True)
+        for option in ("--depot", "--descripteur"):
+            commande.add_argument(option, required=requis)
     a = p.parse_args(argv)
     if a.commande == "jeton":
         return _jeton(a, tls, fsync)

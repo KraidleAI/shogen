@@ -7,7 +7,8 @@ CB-17b : état par fenêtre et rapport écrits à la main ; tête recalculée su
 UTC (stress : samedi et dimanche, ADR-0029 l.196) ; sortie identique avec et sans `lecture` ; rien d'écrit ;
 commande.
 CB-17c (AVIS Q-D-03, point 2) : résumés par jour écrits à la main d'après le scénario, liste blanche de leurs clés ;
-commande `resume` ; grille bornée (C-3) : journaux corrompus de la G2, `status` en sous-processus borné en mémoire."""
+commande `resume` ; grille bornée (C-3) : journaux corrompus de la G2, `status` en sous-processus borné en mémoire.
+CB-17d (point 3) : compte à quorum et âges calculés à la main ; résumés hostiles refusés."""
 import contextlib
 import hashlib
 import io
@@ -136,6 +137,7 @@ SCENARIO = {1: None, 2: sante(retard=5 * S + 1), 4: sante(d4=[temoin("delai"), N
             6: "sans sante", 7: sante(retard=5 * S, d3={"erreur": "absente", "debut": 1, "fin": 2}),
             8: sante(d3={**D3, "code": 1}), 63: sante(retard=6 * S)}
 INVALIDES = {1: ["D-1"], 2: ["D-2"], 4: ["D-4", "D-5"], 5: ["D-2"], 6: ["D-1"], 63: ["D-2"]}       # SCENARIO, à la main
+NOW = (m(63) + 60 + 120) * S                                       # deux minutes après la fin de la dernière fenêtre
 VEN = 1791589800                                                  # vendredi 9 octobre 2026, 23:50 UTC (G2)
 ATTENDU = ["status : journal « pool », lecture seule",
            "fenêtres : de 2026-10-04 22:59 à 2026-10-05 00:01 UTC, 63 ; dernier marqueur : 2026-10-05 00:01 UTC",
@@ -285,6 +287,73 @@ class Resumes(Base):
             self.assertEqual((sorted(x), {type(w) for w, _c in x["fenetres"]}, {c for _w, cs in x["fenetres"] for c in
                                                                                 cs} <= set(status.CODES)),
                              (["fenetres", "jour", "observateur"], {int}, True))
+
+    def poser(self, fichiers):
+        for nom_, contenu in fichiers.items():
+            pathlib.Path(self.depot, nom_).write_bytes(contenu if type(contenu) is bytes else ligne(contenu))
+
+    def test_compte_a_quorum_ages_et_refus(self):
+        """M_j ≥ 2 (ADR-0029 §2.2, pt 5) avec o2 valide hors m(10), o3 valide en m(2) et m(4) seulement ; son propre
+        résumé ignoré ; un résumé hors liste blanche refusé ; âges au bout de la dernière fenêtre lue."""
+        self.poser({"o2-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o2", "fenetres": [
+            [m(n), ["D-1"] if n == 10 else []] for n in range(1, 62)]}, "o2-2026-10-05.resume": {
+            "jour": "2026-10-05", "observateur": "o2", "fenetres": [[m(62), []], [m(63), []]]},
+            "o3-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o3", "fenetres": [
+                [m(2), []], [m(3), ["D-4"]], [m(4), []]]},
+            "o4-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o4", "fenetres": [], "x": 1},
+            "o1-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o1", "fenetres": [[m(1), []]]}})
+        self.assertEqual(status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[7:], [
+            "quorum hors D-3 (au moins 2 observateurs valides) : calme 1 ; stress 57",
+            "résumés lus : o2 jusqu'à 2026-10-05 00:01 UTC (âge 120 s) ; o3 jusqu'à 2026-10-04 23:02 UTC (âge 3660 s)",
+            "résumés refusés : o4-2026-10-04.resume (RESUME/forme)"])
+        for n in ("o2-2026-10-04.resume", "o2-2026-10-05.resume", "o3-2026-10-04.resume"):
+            os.remove(os.path.join(self.depot, n))
+        self.assertEqual(status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[7:], [
+            "quorum : aucun résumé d'un autre observateur lisible",
+            "résumés refusés : o4-2026-10-04.resume (RESUME/forme)"])
+
+    def test_resumes_hostiles_refuses(self):
+        """Un défaut par fichier : taille, forme non canonique, clé en trop, observateur autre que le nom, ws hors du
+        jour ou hors grille, booléen, code inconnu ou en double, code qui n'est pas un texte, fenêtres vides ; un jour
+        hors du journal local, ou un nom en majuscules (C-6), est ignoré. Aucun résumé ne fait lever : chacun est un
+        refus nommé."""
+        b = {"jour": "2026-10-04", "observateur": "p1", "fenetres": [[m(2), []]]}
+        cas = {"p1": (ligne(b)[:-1] + b" " * (1 << 17) + b"\n", "taille"),
+               "p2": (json.dumps({**b, "observateur": "p2"}).encode() + b"\n", "forme"),
+               "p3": ({**b, "observateur": "p3", "y": 0}, "forme"), "p4": ({**b, "observateur": "p5"}, "champs"),
+               "p5": ({**b, "observateur": "p5", "fenetres": [[m(62), []]]}, "champs"),
+               "p6": ({**b, "observateur": "p6", "fenetres": [[m(2) + 1, []]]}, "champs"),
+               "p7": ({**b, "observateur": "p7", "fenetres": [[True, []]]}, "champs"),
+               "p8": ({**b, "observateur": "p8", "fenetres": [[m(2), ["D-6"]]]}, "champs"),
+               "p9": ({**b, "observateur": "p9", "fenetres": [[m(2), ["D-2", "D-2"]]]}, "champs"),
+               "q1": ({**b, "observateur": "q1", "fenetres": []}, "champs"),
+               "q3": ({**b, "observateur": "q3", "fenetres": [[m(2), [["D-1"]]]]}, "champs"),
+               "q4": ({**b, "observateur": "q4", "fenetres": [[m(2), ["D-1", 1]]]}, "champs"),
+               "q5": ({**b, "observateur": "q5", "fenetres": [[m(2), [{}]]]}, "champs")}
+        self.poser({f"{o}-2026-10-04.resume": x for o, (x, _c) in cas.items()})
+        self.poser({"q2-2026-10-99.resume": {**b, "observateur": "q2", "jour": "2026-10-99"},
+                    "P2-2026-10-04.resume": {**b, "observateur": "P2", "fenetres": []}})   # lu, il serait refusé
+        try:
+            refus = status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW)[-1]
+        except Exception as e:                                      # attrape-tout : une exception est un échec ici
+            refus = f"{type(e).__name__} : {e}"
+        self.assertEqual(refus, "résumés refusés : " + " ; ".join(f"{o}-2026-10-04.resume (RESUME/{c})" for o, (_x, c)
+                                                                    in cas.items()))
+
+    def test_commande_status_avec_depot(self):
+        """`status` avec `--depot` et `--descripteur` ajoute le compte à quorum ; `--depot` sans `--descripteur` :
+        refus, sortie 2."""
+        _f, _s, o = configurations(port_ferme())
+        pathlib.Path(desc := os.path.join(self.d, "descripteur.json")).write_text(json.dumps(o), encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot, "--descripteur",
+                                          desc]), 0)
+        self.assertEqual(out.getvalue().split("\n")[7:], ["quorum : aucun résumé d'un autre observateur lisible", ""])
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot]), 2)
+        self.assertEqual(err.getvalue(), "status : refus : CONFIG/options : --depot exige --descripteur\n")
 
     def test_commande_resume(self):
         """`resume --journal J --depot D --descripteur F` écrit les résumés du journal, sortie 0 ; descripteur refusé :

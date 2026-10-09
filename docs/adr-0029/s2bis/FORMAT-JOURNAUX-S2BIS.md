@@ -787,3 +787,14 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    c'est la liste blanche du résumé, que l'orchestrateur peut lire au rodage (lectures admises, ADR-0029 l.221) ;
    aucun statut de source. Le résumé est une projection des enregistrements du journal : il se recalcule sur le
    journal. Sortie 0 et `resume : <fichiers>` ; 1 refus du journal ou du dépôt ; 2 refus du descripteur.
+6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F` ajoute au
+   rapport, après le compte local : `quorum hors D-3 (au moins 2 observateurs valides) : calme <n> ; stress <n>` et
+   `résumés lus : <o> jusqu'à <heure> UTC (âge <n> s) ; …`, ou `quorum : aucun résumé d'un autre observateur lisible` ;
+   puis, s'il y en a, `résumés refusés : <fichier> (<code>) ; …`. Sont lus les résumés des autres observateurs pour les
+   jours des fenêtres locales ; un résumé est refusé, un seul code par fichier : `RESUME/taille` (plus de 131 072
+   octets), `RESUME/forme` (pas une ligne canonique aux clés exactes), `RESUME/champs` (observateur ou jour autre que
+   ceux du nom, fenêtre hors du jour ou de la grille, codes inconnus, non textes compris, en double ou non triés, aucune
+   fenêtre), `RESUME/lecture` ; aucun résumé ne fait échouer `status`. Une fenêtre compte à quorum si M_j ≥ 2 (ADR-0029
+   §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur dont un résumé lu la dit valide.
+   L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans `--descripteur` : refus
+   `CONFIG/options`, sortie 2.

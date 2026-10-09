@@ -12,7 +12,9 @@ CB-17b : état par fenêtre (w = 60 s, FORMAT §3.1), de la première que le jou
 fichiers présents (la rétention locale peut en avoir retiré) ; rapport (santé seule, aucun nombre à virgule) ;
 strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196).
 CB-17c (AVIS Q-D-03, point 2) : résumé par jour, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande
-`resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3)."""
+`resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3).
+CB-17d (AVIS Q-D-03, point 3) : avec un dépôt, `status` ajoute le compte à quorum (au moins deux observateurs
+valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge."""
 import calendar
 import hashlib
 import json
@@ -26,7 +28,8 @@ from shogen_s2bis.collecte.lecture import S
 
 LECTURE, W = b'{"adresse":', 60                      # première clé d'une `lecture` canonique ; largeur des fenêtres
 D2, D4, D5 = 5 * S, 2, 2                             # retard (µs), témoins sans réponse, noms non résolus
-CODES = ("D-1", "D-2", "D-3", "D-4", "D-5")                                  # codes admis dans un résumé
+CODES, TAILLE = ("D-1", "D-2", "D-3", "D-4", "D-5"), 1 << 17                 # codes d'un résumé ; octets au plus
+RESUME = re.compile("([a-z0-9]{1,16})-([0-9]{4}-[0-9]{2}-[0-9]{2})[.]resume")    # <observateur>-<jour>.resume
 
 
 class RefusStatus(ValueError):
@@ -134,8 +137,57 @@ def resumes(dossier, observateur, prefixe="pool"):
             for j, f in jours.items()}
 
 
-def rapport(dossier, prefixe="pool"):
-    """Lignes du rapport : fenêtres, tête, disque, dégradations par code, dernière fenêtre, valides par strate."""
+def lire_resume(chemin, observateur, jour):
+    """{ws : valide} du résumé d'un autre observateur, ou le code de son refus : RESUME/taille (plus de TAILLE octets),
+    RESUME/forme (pas une ligne canonique aux clés exactes), RESUME/champs (observateur ou jour autre que le nom,
+    fenêtre hors du jour ou de la grille, codes hors de CODES, en double ou non triés, aucune fenêtre). Les codes
+    sont reconnus avant d'être triés : un code qui n'est pas un texte est un refus, jamais une exception."""
+    with open(chemin, "rb") as f:
+        octets = f.read(TAILLE + 1)
+    if len(octets) > TAILLE:
+        return "RESUME/taille"
+    try:
+        r = json.loads(octets)
+        if type(r) is not dict or set(r) != {"fenetres", "jour", "observateur"} or journal.canonique(r) != octets:
+            return "RESUME/forme"
+        debut = calendar.timegm(time.strptime(jour, "%Y-%m-%d"))
+    except (ValueError, RecursionError, journal.ErreurJournal):
+        return "RESUME/forme"
+    f = r["fenetres"]
+    if (r["jour"], r["observateur"]) != (jour, observateur) or type(f) is not list or not f or not all(
+            type(x) is list and len(x) == 2 and type(x[0]) is int and debut <= x[0] < debut + 86400 and x[0] % W == 0
+            and type(x[1]) is list and all(c in CODES for c in x[1]) and x[1] == sorted(set(x[1])) for x in f):
+        return "RESUME/champs"
+    return {x[0]: not x[1] for x in f}
+
+
+def quorum(grille, depot, observateur, maintenant):
+    """Lignes du compte à quorum sur les fenêtres de `grille` : résumés des autres observateurs pour les jours de la
+    grille, lus strictement ; M_j = 1 si la fenêtre est valide ici, plus un par autre observateur qui la dit valide ;
+    âge (s) de chaque résumé lu, au bout de sa dernière fenêtre, à `maintenant` (µs)."""
+    jours, autres, refus = {journal.jour(ws) for ws in grille}, {}, []
+    for n in sorted(os.listdir(depot)):
+        if (x := RESUME.fullmatch(n)) and x[1] != observateur and x[2] in jours:
+            try:
+                lu = lire_resume(os.path.join(depot, n), x[1], x[2])
+            except OSError:
+                lu = "RESUME/lecture"
+            refus.append(f"{n} ({lu})") if type(lu) is str else autres.setdefault(x[1], {}).update(lu)
+    lignes = ["quorum : aucun résumé d'un autre observateur lisible"]
+    if autres:
+        compte = {"calme": 0, "stress": 0}
+        for ws, codes in grille.items():
+            compte[strate(ws)] += (not codes) + sum(v.get(ws, False) for v in autres.values()) >= 2
+        lignes = [f"quorum hors D-3 (au moins 2 observateurs valides) : calme {compte['calme']} ; stress "
+                  f"{compte['stress']}",
+                  "résumés lus : " + " ; ".join(f"{o} jusqu'à {heure(max(v))} UTC (âge {maintenant // S - max(v) - W}"
+                                                f" s)" for o, v in sorted(autres.items()))]
+    return lignes + (["résumés refusés : " + " ; ".join(refus)] if refus else [])
+
+
+def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=None):
+    """Lignes du rapport : fenêtres, tête, disque, dégradations par code, dernière fenêtre, valides par strate ; avec
+    un dépôt, le compte à quorum (`quorum`)."""
     grille, sante, tete, absents = etat(dossier, prefixe)
     lignes = [f"status : journal « {prefixe} », lecture seule"]
     if not grille:
@@ -152,4 +204,5 @@ def rapport(dossier, prefixe="pool"):
         f"dégradations : D-1 {compte['D-1']} ; D-2 {compte['D-2']} ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1 ; "
         f"relevé absent ou en erreur : {absents}) ; D-4 {compte['D-4']} ; D-5 {compte['D-5']}",
         "dernière fenêtre : " + (f"dégradée ({', '.join(grille[fin])})" if grille[fin] else "valide"),
-        f"fenêtres valides hors D-3 (compte local) : calme {strates['calme']} ; stress {strates['stress']}"]
+        f"fenêtres valides hors D-3 (compte local) : calme {strates['calme']} ; stress {strates['stress']}"] + (
+        quorum(grille, depot, observateur, maintenant) if depot else [])
