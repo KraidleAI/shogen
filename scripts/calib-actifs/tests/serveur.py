@@ -1,13 +1,15 @@
 """Serveur local de fichiers synthétiques des tests d'acquisition (127.0.0.1, port libre) : GET d'un chemin
 (requête comprise) servi depuis le dict `fichiers` ; en-tête Range « bytes=a-b » servi en 206 ; `pannes[chemin]`
-réponses 500 avant de servir ; chaque requête notée dans `vus`. Aucun accès hors de la boucle locale."""
+réponses 500 avant de servir ; `sans_plage` : 200 et tout le corps ; `longs[chemin]` : un octet de trop sous ce
+rang ; requêtes notées dans `vus`. Aucun accès hors de la boucle locale."""
 import http.server
 import threading
 
 
 class Serveur:
-    def __init__(self, fichiers: dict, pannes=None):
-        self.fichiers, self.pannes, self.vus = fichiers, dict(pannes or {}), []
+    def __init__(self, fichiers: dict, pannes=None, sans_plage=(), longs=None):
+        self.fichiers, self.pannes, self.vus, self.sans_plage = fichiers, dict(pannes or {}), [], sans_plage
+        self.octets, self.longs = 0, longs or {}
         serveur = self
 
         class Gestion(http.server.BaseHTTPRequestHandler):
@@ -21,23 +23,25 @@ class Serveur:
                     self.send_header("Content-Length", "0")
                     self.end_headers()
                     return
-                plage = self.headers.get("Range")
+                plage, total = self.headers.get("Range"), len(corps)
                 if plage:
                     a, b = (int(x) for x in plage.split("=")[1].split("-"))
-                    corps, code = corps[a:b + 1], 206
-                    self.send_response(code)
-                    total = len(serveur.fichiers[self.path])
+                    entier, trop = self.path in serveur.sans_plage, b"x" * (a < serveur.longs.get(self.path, 0))
+                    corps = corps if entier else corps[a:b + 1] + trop
+                    self.send_response(200 if entier else 206)
                     self.send_header("Content-Range", f"bytes {a}-{a + len(corps) - 1}/{total}")
                 else:
                     self.send_response(200)
                 self.send_header("Content-Length", str(len(corps)))
                 self.end_headers()
+                serveur.octets += len(corps)
                 self.wfile.write(corps)
 
             def log_message(self, *_a):
                 pass
 
         self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Gestion)
+        self.httpd.handle_error = lambda *_a: None        # client parti avant la fin du corps : attendu
         self.base = f"http://127.0.0.1:{self.httpd.server_address[1]}"
         self.fil = threading.Thread(target=self.httpd.serve_forever, daemon=True)
 

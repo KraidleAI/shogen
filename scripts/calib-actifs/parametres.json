@@ -62,6 +62,10 @@
    "url": "https://static.okx.com/cdn/okex/traderecords/candlesticks/monthly/{mm}/{s}-candlesticks-{m}.zip",
    "paires": {"ETH": "ETH-USDT", "USDT": "USDT-USD"}},
   "source": "SOURCES-HISTORIQUES §3.1 à §3.3 (URL, formats, limites) ; E-CA-12, E-CA-13 ; pages bornées, fin incluse"},
+ "kraken_sha256": {"ETH": "652981209f6c2aa151dafb65aa219506ba34c71df012e6f69e801f2f81fcdd76",
+                   "USDC": "e649464516c86381aa58a2a83f6ce91560394231cfff3213965c93068409cb3c",
+                   "USDT": "db584f24c7f0d4783fbdac82e88c9a089c7930945fc052b8fbdc9694374e2104",
+                   "source": "SOURCES-HISTORIQUES §7 (l.156-158) ; E-CA-14"},
  "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
   "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
 }

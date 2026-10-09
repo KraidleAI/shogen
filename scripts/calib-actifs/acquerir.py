@@ -7,9 +7,11 @@ from __future__ import annotations
 import datetime
 import hashlib
 import http.client
+import io
 import os
 import time
 import urllib.request
+import zipfile
 
 import socle
 
@@ -52,9 +54,10 @@ class Manifeste:
         self.vus[rel] = sha
 
 
-def lire_url(prm: dict, url: str, plage=None) -> bytes:
-    """Corps de la réponse à GET url (plage d'octets (a, b) éventuelle, réponse 206 exigée) ; essais et pauses de
-    parametres.json ; échec persistant : CA/acquisition, nommé par le type de l'erreur, jamais par l'URL."""
+def lire_url(prm: dict, url: str, plage=None, total=False):
+    """Corps de la réponse à GET url (plage d'octets (a, b) éventuelle, réponse 206 exigée ; total : (corps, taille
+    du fichier lue dans Content-Range)) ; essais et pauses de parametres.json ; échec persistant : CA/acquisition,
+    nommé par le type de l'erreur, jamais par l'URL."""
     r, entetes = prm["reseau"], {"User-Agent": prm["reseau"]["agent"]}
     if plage:
         entetes["Range"] = f"bytes={plage[0]}-{plage[1]}"
@@ -63,8 +66,9 @@ def lire_url(prm: dict, url: str, plage=None) -> bytes:
             with urllib.request.urlopen(urllib.request.Request(url, headers=entetes), timeout=r["delai_s"]) as rep:
                 if plage and rep.status != 206:
                     raise OSError("plage d'octets non servie")
-                return rep.read()
-        except (OSError, http.client.HTTPException) as e:
+                corps = rep.read()
+                return (corps, int((rep.headers.get("Content-Range") or "/").rsplit("/", 1)[1])) if total else corps
+        except (OSError, ValueError, http.client.HTTPException) as e:
             erreur = type(e).__name__
             if essai + 1 < r["essais"]:
                 DORMIR(r["pause_s"])
@@ -92,3 +96,49 @@ def mensuels(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: 
             if somme != hashlib.sha256(octets).hexdigest():
                 raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
         man.ajouter(url, rel, octets)
+
+
+class Plages(io.RawIOBase):
+    """Fichier distant lu par plages d'octets (Range, 206 exigée), pour zipfile : seuls le répertoire central et les
+    membres demandés de l'archive de Kraken sont transférés (E-CA-13 ; SOURCES-HISTORIQUES §3.1)."""
+
+    def __init__(self, prm: dict, url: str):
+        super().__init__()
+        self.prm, self.url, self.pos = prm, url, 0
+        self.taille = lire_url(prm, url, (0, 0), total=True)[1]
+
+    def readable(self):
+        return True
+
+    def seekable(self):
+        return True
+
+    def seek(self, n, depuis=0):
+        self.pos = (n, self.pos + n, self.taille + n)[depuis]
+        return self.pos
+
+    def readinto(self, b):
+        n = min(len(b), self.taille - self.pos)
+        octets = lire_url(self.prm, self.url, (self.pos, self.pos + n - 1)) if n > 0 else b""
+        if len(octets) != max(n, 0):
+            raise OSError("plage incomplète")
+        b[:len(octets)] = octets
+        self.pos += len(octets)
+        return len(octets)
+
+
+def kraken(prm: dict, man: Manifeste, nom: str, actif: str) -> None:
+    """CSV d'une paire, membre de l'archive trimestrielle lue par plages ; sha256 différent de SOURCES-HISTORIQUES
+    l.156-158 : CA/kraken (E-CA-14) ; membre absent ou répété, archive illisible : CA/kraken."""
+    s, rel = prm["series"]["kraken"], os.path.join(nom, "kraken", actif, prm["series"]["kraken"]["paires"][actif])
+    if man.present(rel):
+        return
+    try:
+        with zipfile.ZipFile(io.BufferedReader(Plages(prm, s["url"]), 1 << 20)) as z:
+            noms = [x for x in z.namelist() if x.rsplit("/", 1)[-1] == s["paires"][actif]]
+            octets = z.read(noms[0]) if len(noms) == 1 else b""
+    except (zipfile.BadZipFile, OSError, EOFError) as e:
+        raise socle.Refus("CA/kraken", f"archive illisible ({type(e).__name__})", actif, place="kraken") from None
+    if hashlib.sha256(octets).hexdigest() != prm["kraken_sha256"][actif]:
+        raise socle.Refus("CA/kraken", "CSV absent ou de sha256 différent de SH l.156-158", actif, place="kraken")
+    man.ajouter(s["url"] + "#" + s["paires"][actif], rel, octets)

@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import zipfile
 
 import acquerir
 import socle
@@ -115,6 +116,59 @@ class TestAcquerir(unittest.TestCase):
             for _ in range(2):
                 acquerir.mensuels(prm, acquerir.Manifeste(d), "principale", P["fenetre"], "okx", "ETH")
         self.assertEqual(s.vus, [f"/o/2026{m:02d}/ETH-USDT-2026-{m:02d}.zip" for m in (4, 5, 6)])
+
+
+    def test_kraken_plages(self):
+        """T-CA-KRA-1 : archive synthétique (membre incompressible de 4 Mo, puis Kraken/ETHUSD_1.csv) lue par plages :
+        CSV égal, sha256 de sha256sum, moins du quart de l'archive transféré, manifeste url#membre ; octet altéré :
+        CA/kraken ; serveur sans plages : CA/acquisition ; un octet de trop : CA/kraken ; reprise sans requête.
+        Mutations M-CA-21 : contrôle retiré ; 206 non exigée ; longueur de plage non contrôlée ; reprise ignorée."""
+        d = tempfile.mkdtemp(prefix="ca_kra_")
+        self.addCleanup(shutil.rmtree, d, True)
+        csv = "".join(f"{1775001600 + 60 * i},1,2,0.5,1.5,{i % 3},{i % 2}" + socle.NL for i in range(500)).encode()
+        with open(os.path.join(d, "ETHUSD_1.csv"), "wb") as f:
+            f.write(csv)
+        ref = subprocess.run(["sha256sum", f.name], capture_output=True, text=True).stdout.split(" ")[0]
+        archives = {}
+        for nom, contenu in (("/k.zip", csv), ("/x.zip", csv[:-2] + b"9" + csv[-1:])):
+            with zipfile.ZipFile(os.path.join(d, "a.zip"), "w", zipfile.ZIP_DEFLATED) as z:
+                z.writestr("Kraken/BRUIT_1.csv", b"".join(hashlib.sha256(i.to_bytes(3, "big")).digest()
+                                                           for i in range(131072)))
+                z.writestr("Kraken/ETHUSD_1.csv", contenu)
+            with open(z.filename, "rb") as f:
+                archives[nom] = f.read()
+        with Serveur(archives, sans_plage=("/n.zip",), longs={"/l.zip": len(archives["/k.zip"]) - 1000}) as s:
+            s.fichiers["/n.zip"] = s.fichiers["/l.zip"] = archives["/k.zip"]
+            prm, b, _p = local(self, s.base)
+            prm["kraken_sha256"]["ETH"], prm["series"]["kraken"]["url"] = ref, s.base + "/k.zip"
+            acquerir.kraken(prm, acquerir.Manifeste(b), "principale", "ETH")
+            self.assertLess(s.octets * 4, len(archives["/k.zip"]))
+            plages = acquerir.Plages(prm, prm["series"]["kraken"]["url"])
+            taille = len(archives["/k.zip"])
+            self.assertEqual([plages.seek(-2, 2), plages.seek(1, 1), plages.seek(3)], [taille - 2, taille - 1, 3])
+            n, _r = len(s.vus), acquerir.kraken(prm, acquerir.Manifeste(b), "principale", "ETH")
+            self.assertEqual(len(s.vus), n)
+            for url, code in (("/x.zip", "CA/kraken"), ("/n.zip", "CA/acquisition"), ("/l.zip", "CA/kraken")):
+                prm["series"]["kraken"]["url"] = s.base + url
+                with self.assertRaises(socle.Refus) as r:
+                    acquerir.kraken(prm, acquerir.Manifeste(b), "descriptive", "ETH")
+                self.assertEqual(r.exception.code, code)
+        with open(os.path.join(b, "principale", "kraken", "ETH", "ETHUSD_1.csv"), "rb") as f:
+            self.assertEqual(f.read(), csv)
+        with open(os.path.join(b, "manifeste.tsv"), encoding="utf-8") as f:
+            ligne = f.read().split(socle.NL)[1].split(chr(9))
+        self.assertEqual((ligne[0], ligne[3]), (s.base + "/k.zip#ETHUSD_1.csv", ref))
+
+
+    def test_kraken_sommes_de_sh(self):
+        """Sommes des trois CSV de Kraken égales à celles de SOURCES-HISTORIQUES §7 (l.156-158, lues sur la pièce :
+        une ligne par CSV). Mutation : somme altérée dans parametres.json."""
+        with open(os.path.join(socle.RACINE, "docs", "adr-0029", "calib", "SOURCES-HISTORIQUES.md"),
+                  encoding="utf-8") as f:
+            sh = f.read().split(socle.NL)
+        for actif, membre in P["series"]["kraken"]["paires"].items():
+            lignes = [x for x in sh if x.startswith(f"| kraken-Q2-2026-{membre} |")]
+            self.assertEqual((len(lignes), lignes[0].split("`")[1]), (1, P["kraken_sha256"][actif]))
 
 
 if __name__ == "__main__":

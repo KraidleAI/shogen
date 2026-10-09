@@ -65,6 +65,7 @@ SCHEMA = {"lot": str, "rattachement": str,
           "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
           "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "intervalle_ms": int,
                                          "url": str, "paires": "paires"}) | {"source": str},
+          "kraken_sha256": _par_actif(str) | {"source": str},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 
