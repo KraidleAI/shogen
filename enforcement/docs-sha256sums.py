@@ -1,5 +1,5 @@
 """Shōgen, lot DETTES-T4, DT4-a (SHOGEN-DOCS-SHA256SUMS-GATE-1 ; ADR-0028 annexe B, B.90, B.87). Chaque SHA256SUMS de
-docs/ hors d'INTERDITS (S-G5, xtask/src/sg5.rs, plus docs/adr-0028/execution/ ; jamais lus) se rejoue comme
+docs/ hors d'INTERDITS (liste de S-G5, xtask/src/sg5.rs, égalité exigée par un cas ; jamais lus) se rejoue comme
 `sha256sum --strict -c` : ligne « <64 hex minuscules> <espace ou *><chemin relatif sous le dossier> », sans `.`, `..`,
 composant vide, barre oblique inverse ni retour chariot ; chemin interdit, *.jsonl, ou hors du dossier par un lien
 (SHA256SUMS compris) : refusé sans ouverture ; fichier présent, de sha256 égal. ABSENTS_ADMIS (adjudication Q-1 de

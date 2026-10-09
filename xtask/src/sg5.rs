@@ -80,7 +80,8 @@ const EXTENSIONS_TEXTE: &[&str] = &[
 /// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
 /// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
 /// séparateur `/` (invariant 1 d'ADR-0013). `docs/15-` et `docs/16-` couvrent
-/// fichier ou dossier ; les autres finissent par `/`.
+/// fichier ou dossier ; les autres finissent par `/`. `docs/adr-0028/execution/`
+/// ajouté par DETTES-T4 (DT4-b, adjudication Q-3) : interdit par les briefs de ce lot.
 pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
     "docs/15-",
     "docs/16-",
@@ -88,6 +89,7 @@ pub(crate) const EMPLACEMENTS_INTERDITS: &[&str] = &[
     "docs/rapports/",
     "docs/adr-0025/",
     "docs/adr-0028/monark-m009a/",
+    "docs/adr-0028/execution/",
 ];
 
 /// Vrai si `relatif` (chemin relatif, séparateur `/`) est sous un emplacement

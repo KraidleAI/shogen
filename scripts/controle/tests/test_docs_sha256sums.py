@@ -82,12 +82,12 @@ class DocsSha256sums(unittest.TestCase):
         os.symlink(os.path.join(e, "docs", "rapports", "SHA256SUMS"), os.path.join(e, "docs", "a", "SHA256SUMS"))
         self.refuse(e, "docs/a/SHA256SUMS : lien")
 
-    def test_liste_couvre_sg5(self):     # emplacements interdits de S-G5 (xtask/src/sg5.rs) tous dans le contrôle
+    def test_liste_egale_sg5(self):     # emplacements interdits de S-G5 (xtask/src/sg5.rs) = liste du contrôle (DT4-b)
         self.assertTrue(os.path.isfile(SCRIPT), SCRIPT)
         interdits = runpy.run_path(SCRIPT)["INTERDITS"]
         with open(os.path.join(RACINE, "xtask", "src", "sg5.rs"), encoding="utf-8") as f:
             sg5 = re.findall('"([^"]+)"', f.read().split("EMPLACEMENTS_INTERDITS: &[&str] = &[", 1)[1].split("];")[0])
-        self.assertEqual((len(sg5) >= 6, set(sg5) - set(interdits)), (True, set()), sg5)
+        self.assertEqual(sorted(sg5), sorted(interdits))
 
     def test_erreur(self):
         """Deux racines, racine sans docs/, SHA256SUMS illisible (lien cassé dans son dossier) : sortie 3, jamais 1."""
