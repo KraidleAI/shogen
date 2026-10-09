@@ -3,8 +3,8 @@ SB-13a : épingles du paquet s2bis au commit f458980 égales aux valeurs de `git
 (rotation.py : 4183fbe6…, l'empreinte que cite le contre-contrôle de la tranche 3), extraction, refus nommés d'une
 épingle fausse et d'un commit absent, frontière d'E-S-01 lue par `ast`. SB-13b : chargement sous shogen_s2bis. SB-13c
 (E-S-51) : o(r, u) des six vecteurs du contrat RB-6 recalculés par sha256sum et bc (journal de SB-13,
-vecteurs-rb6.txt), K^(r) écrit à la main, 100 séries synthétiques à graine fixe. Chaque test nomme les mutations
-qui le rougissent."""
+vecteurs-rb6.txt), K^(r) écrit à la main, 100 séries synthétiques à graine fixe. SB-13d (CONTRAT-RB6-1) : règles de
+noms, de seuils et de vecteurs des deux textes liées. Chaque test nomme les mutations qui le rougissent."""
 import ast
 import functools
 import hashlib
@@ -311,6 +311,118 @@ class TestCroisement(unittest.TestCase):
         e, _a, _b = oracle_recalc.croiser(PRM, dict(H, rotation=un), G6, "stress", 5, 5,
                                           {"BTC": {"a.b": 3}, "ETH": {"a.b": 1, "g.h": 5}}, "a.b", 99)
         self.assertEqual(e, [("o", 7, "g.h")])
+
+
+# sha256sum de « <graine>:<strate>:<r>:<u> » des vecteurs (contrat §5 ; journal de SB-13, vecteurs-rb6.txt)
+EMPREINTES = ("d7916cde6fb849bd1c4b44da609ecc6dc266f916228d974ec2d4c9354c235a07",
+              "d4930a57b959d5b5551b5b74f7aeeb723cd829af5450a097f5e241e201eefba1",
+              "e8e92c3a1c9ab48898bf83759e04ae158eb5eea32f952b1e652b08d520c64b7f",
+              "c6c0e4bc41e6eb4637c15e222e4d568d07f525e8d08e090c3d5395b9bc05c1a0",
+              "55a70a48e10570c44642dc4cc76ae8f059c5c8eac1c5d3e03ea9d23d5234d47e",
+              "d7916cde6fb849bd1c4b44da609ecc6dc266f916228d974ec2d4c9354c235a07")
+
+
+def vecteurs_du_texte(source: str, fonction: str) -> tuple:
+    """(graine, vecteurs) d'un fichier de tests, lus par ast sans exécution : le tuple littéral de la première boucle
+    for de `fonction` et la constante de module passée en premier argument au decalage de cette boucle."""
+    arbre = ast.parse(source)
+    f = next(n for n in ast.walk(arbre) if isinstance(n, ast.FunctionDef) and n.name == fonction)
+    boucle = next(n for n in ast.walk(f) if isinstance(n, ast.For))
+    nom = next(n for n in ast.walk(boucle) if isinstance(n, ast.Call) and getattr(n.func, "attr", "") == "decalage")
+    graine = [ast.literal_eval(n.value) for n in arbre.body if isinstance(n, ast.Assign)
+              and [getattr(x, "id", None) for x in n.targets] == [nom.args[0].id]]
+    return graine, ast.literal_eval(boucle.iter)
+
+
+class TestContratRB6(unittest.TestCase):
+    def test_noms(self):
+        """Règle des noms : HOTE de RB-6 extrait = « [a-z0-9.-]{1,253} » (contrat §1 pt 6, écrit à la main) ; sur les
+        1 114 112 points de code, les caractères admis par HOTE sont ceux de regle.NOM_UNITE (38), borne 253 des deux
+        côtés ; decalage des deux côtés : mêmes admis (même o) et mêmes refus (REGLE/libelle, ROTATION/unite) sur les
+        128 caractères ASCII, six hors ASCII (dont le signe kelvin et le s long, voisins de k et s par la casse), les
+        noms courts du pool, HOTES, 253 et 254 caractères, vide, « a:b », majuscule, octets et None : 57 admis ; ordre
+        des noms : regle.premiere suit l'ordre strict des points de code exigé par config_analyse (« api-x » avant
+        « api.y »). Mutations M-13D-01 (« _ » dans NOM_UNITE), M-13D-02 (borne 254 dans _libelle), M-13D-03
+        (majuscules admises par _libelle), M-13D-04 (premiere par max)."""
+        rot, ca = H["rotation"], H["config_analyse"]
+        tous = [chr(c) for c in range(0x110000)]
+        self.assertEqual((rot.HOTE.pattern, [c for c in tous if rot.HOTE.fullmatch(c)], len(regle.NOM_UNITE)),
+                         ("[a-z0-9.-]{1,253}", [c for c in tous if c in regle.NOM_UNITE], 38))
+
+        def code(f, refus, u):
+            try:
+                return f(G6, "calme", 1, u, 7)
+            except refus as e:
+                return e.code
+        noms = (tous[:128] + [chr(c) for c in (0xE9, 0x131, 0x17F, 0x212A, 0xFF41, 0x10FFFF)] + list(HOTES)
+                + [h for h, _f in PRM["calibration"]["unites"]]
+                + ["a" * 253, "a" * 254, "", "a:b", "Okx", b"okx", None])
+        sim = [code(regle.decalage, commun.Refus, u) for u in noms]
+        rb6 = [code(rot.decalage, rot.RefusRotation, u) for u in noms]
+        self.assertEqual(([x if type(x) is int else x == "REGLE/libelle" for x in sim],
+                          sum(type(x) is int for x in sim)),
+                         ([x if type(x) is int else x == "ROTATION/unite" for x in rb6], 57))
+        self.assertEqual((regle.premiere(["api.y", "api-x"]), ca._croissante(["api-x", "api.y"]),
+                          ca._croissante(["api.y", "api-x"])), ("api-x", True, False))
+
+    def test_seuils(self):
+        """Règle des seuils (P-6 de l'avis de la tranche 3) : regle.seuil vaut 99 à R = 9 999 et 9 à R = 999 (à la
+        main) ; à R = 9 999, (R, seuil) de la réplique = bloc rotations d'analyse.json, admis par le schéma exact de
+        config_analyse ; à chaque R de 1 à 9 999, seuil de la réplique défini si et seulement si la cohérence alpha de
+        config_analyse en admet un, et le même (100 R) ; R = 9 998 refusé des deux côtés (REGLE/seuil ; ANALYSE/borne,
+        aucun seuil cohérent), R de 10 000 à 10 099 aussi (REGLE/seuil ; ROTATION/R de lois) ; gardes unités, K_crit,
+        runs et n′ ≥ n/diviseur_n égales à celles d'analyse.json ; C1 > seuil ⇔ K_crit ≥ k_crit des deux côtés sur les
+        100 séries synthétiques. Mutations M-13D-05 (α = 1/50 dans parametres.json), M-13D-06 (seuil arrondi par défaut
+        au lieu du refus), M-13D-07 (garde k_crit = 3), M-13D-08 (n′ ≥ n/3 dans regle._entrees), M-13D-11 (borne
+        R_MAX de seuil retirée, forme de SB-7b)."""
+        ca, an, alpha, rg = H["config_analyse"], H["analyse"], PRM["regle"]["alpha"], PRM["regle"]
+        coherent = dict(ca.COHERENCE)["alpha"]
+
+        def sim(r):
+            try:
+                return regle.seuil(r, alpha)
+            except commun.Refus as e:
+                self.assertEqual(e.code, "REGLE/seuil")
+                return None
+        self.assertEqual((sim(rg["R"]), sim(rg["R_approche"]), an["rotations"]), (99, 9, {"R": rg["R"], "seuil": 99}))
+        ca.controler(an["rotations"], ca.SCHEMA["rotations"])
+        rb6 = [next((s for s in range(max(0, (r + 1) // 100 - 2), (r + 1) // 100 + 2)
+                     if coherent({"rotations": {"R": r, "seuil": s}})), None) for r in range(1, 10000)]
+        self.assertEqual(([sim(r) for r in range(1, 10000)], sum(x is not None for x in rb6)), (rb6, 100))
+        for b in ({"R": 9998, "seuil": 98}, {"R": 9998, "seuil": 99}):
+            with self.assertRaises(ca.RefusAnalyse) as c:
+                ca.controler(b, ca.SCHEMA["rotations"])
+            self.assertEqual(c.exception.code, "ANALYSE/borne")
+        self.assertEqual((sim(9998), [s for s in range(9999) if coherent({"rotations": {"R": 9998, "seuil": s}})]),
+                         (None, []))
+        for r in range(10000, 10100):                     # au-delà de 9 999 (R = 10 099, seuil 100, compris)
+            with self.assertRaises(H["rotation"].RefusRotation) as c:
+                H["rotation"].lois(G6, "calme", 1, {}, None, r, 0)
+            self.assertEqual((c.exception.code, sim(r)), ("ROTATION/R", None))
+        g = an["gardes"]
+        self.assertEqual(rg["garde"], {k: g[k] for k in ("unites", "k_crit", "runs")})
+        self.assertEqual([regle._entrees({"a": 1}, None, G6, "calme", n, m, PRM, 1, False)[1][3] for n, m in
+                          ((5, 10), (4, 10), (5, 11), (6, 11))], [g["diviseur_n"] * n >= m for n, m in
+                                                                   ((5, 10), (4, 10), (5, 11), (6, 11))])
+        for _i, x, _e, a, b in croisements():
+            for y, k in ((a, rg["garde"]["k_crit"]), (b, g["k_crit"])):
+                self.assertEqual([c["C1"] > sim(x[5]) for c in y.values()], [c["K_crit"] >= k for c in y.values()])
+
+    def test_vecteurs(self):
+        """Règle des vecteurs : les vecteurs du test de RB-6 (tests/test_rotation.py extrait au commit épinglé, sous
+        son empreinte) et ceux du test de la réplique (tests/test_regle.py, TestContratRB6), lus par ast, sont les
+        mêmes, sous la même graine G6, égaux à VECTEURS ; même chaîne hachée des deux côtés : à n = 2^256, o(r, u) de
+        la réplique et de RB-6 = l'empreinte entière de sha256sum (contrat §5). Mutations M-13D-09 (sixième vecteur
+        retiré de test_regle.py), M-13D-10 (séparateur de regle.SEP changé)."""
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(oracle_recalc.extraire(PRM, d), "tests", "test_rotation.py"), encoding="utf-8") as f:
+                rb6 = vecteurs_du_texte(f.read(), "test_vecteurs_calcules_hors_du_code")
+        with open(os.path.join(commun.ICI, "tests", "test_regle.py"), encoding="utf-8") as f:
+            sim = vecteurs_du_texte(f.read(), "test_vecteurs_du_contrat_rb6")
+        self.assertEqual((sim, rb6), (([G6], tuple(v[:5] for v in VECTEURS)),) * 2)
+        rot = H["rotation"]
+        self.assertEqual([(regle.decalage(G6, s, r, u, 1 << 256), rot.decalage(G6, s, r, u, 1 << 256))
+                          for s, r, u, _n, _o, _R in VECTEURS], [(int(h, 16), int(h, 16)) for h in EMPREINTES])
 
 
 if __name__ == "__main__":
