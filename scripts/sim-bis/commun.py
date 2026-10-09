@@ -100,7 +100,13 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
                         "fichiers": {f"shogen_s2/{m}.py": hex64
                                      for m in ("__init__", "model", "records", "window", "r1")},
-                        "questions": {f"Q-T4-{n}": question_t4 for n in (11, 12)}}}
+                        "questions": {f"Q-T4-{n}": question_t4 for n in (11, 12)}},
+          "oracle_recalc": {"commit": hex40, "dossier": texte, "source": texte,
+                            "fichiers": {f: hex64 for f in ("config/analyse.json", "shogen_s2bis/__init__.py",
+                                                            "shogen_s2bis/recalc/__init__.py",
+                                                            "shogen_s2bis/recalc/config_analyse.py",
+                                                            "shogen_s2bis/recalc/rotation.py",
+                                                            "tests/test_rotation.py")}}}
 
 
 def controler(v, s, ou: str = "parametres") -> None:
