@@ -439,7 +439,9 @@ def agreger(k: dict, enregistrements: list) -> dict:
     relus de ses lots (lire_lots) : R, empreinte (E-S-44) ; par strate et par classe, fréquences des valeurs et des
     causes (frequences) et taux de chaque valeur (taux, contexte de `k`), de même pour les valeurs « avec » (E-S-35) et
     pour la variante à chaque diviseur (E-S-33) ; par strate, taux du rejet familial et, ETH présent, de la séquence BTC
-    puis ETH (E-S-30). Aucun enregistrement : EXEC/agreger."""
+    puis ETH (E-S-30). SB-11y (C-7 de la G2 de SB-11x ; NPRIME-NUL-1) : par strate, réplications à n′_s = 0
+    (« n_prime_nul ») et comparaisons effectives de l'oracle d'E-S-29 (« oracle » : réplications i < ORACLE à
+    n′_s > 0) ; par cellule, leur somme (« oracle »). Aucun enregistrement : EXEC/agreger."""
     R = len(enregistrements)
     if R < 1:
         raise commun.Refus("EXEC/agreger", "aucun enregistrement")
@@ -447,10 +449,13 @@ def agreger(k: dict, enregistrements: list) -> dict:
     def bloc(rs):
         f = frequences(rs)
         return {"frequences": f, "taux": {v: taux(x, R, k) for v, x in f["valeurs"].items()}}
-    out = {"R": R, "empreinte": empreinte(enregistrements), "strates": {}}
+    out = {"R": R, "empreinte": empreinte(enregistrements), "strates": {}, "oracle": 0}
     for s, x0 in enregistrements[0]["strates"].items():
         es = [e["strates"][s] for e in enregistrements]
-        d = {"classes": {}, "familial": taux(sum(1 for e in es if e["valeurs"]["familial"]), R, k)}
+        d = {"classes": {}, "familial": taux(sum(1 for e in es if e["valeurs"]["familial"]), R, k),
+             "n_prime_nul": sum(1 for e in es if e["n"] == 0),
+             "oracle": sum(1 for e, x in zip(enregistrements, es) if e["i"] < ORACLE and x["n"] > 0)}
+        out["oracle"] += d["oracle"]
         if "ETH" in x0["valeurs"]:
             d["sequence_eth"] = taux(sum(1 for e in es if e["valeurs"]["ETH"]["valeur"] == "REJETTE"), R, k)
         for cl, y0 in x0["classes"].items():
