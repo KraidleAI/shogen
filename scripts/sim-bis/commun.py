@@ -65,6 +65,12 @@ def question_t4(v) -> bool:
     return texte(v) and "AVIS-SIM-T4.md l." in v and "PROPOSITION l." in v
 
 
+def nommee(v) -> bool:
+    """Cellule de la table : objet à nom textuel ; son schéma fermé et ses refus nommés sont ceux de executer.cellule
+    (SB-11e), contrôlés à chaque usage et par tests/test_table.py."""
+    return type(v) is dict and texte(v.get("nom"))
+
+
 ENTREE = {"chemin": texte, "sha256": hex64}
 SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "entrees": {**{k: ENTREE for k in ("sommes", "episodes", "sommes_plan2", "masque_j28", "fiv_unites",
@@ -104,7 +110,7 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
           "cellules": {"couches": {g: {"absences": (naturel, positif), "degradations": (naturel, positif),
                                        "paires": (naturel, positif), "perte": booleen, "local": (naturel, positif),
                                        "artefacts": (naturel, positif)} for g in ("nominale", "degradee", "large")},
-                       "source": texte},
+                       "nulles": [nommee], "source": texte},
           "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
                         "fichiers": {f"shogen_s2/{m}.py": hex64
                                      for m in ("__init__", "model", "records", "window", "r1")},
