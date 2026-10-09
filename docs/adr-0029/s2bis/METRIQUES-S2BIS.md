@@ -1780,3 +1780,33 @@ Rouge : sur le code d'avant, 4 échecs d'assertion sous 3.10 (les deux lignes de
 rétabli sur les octets bruts (NC-1) ; décodage non strict (remplacement), en latin-1, ou avec retrait du BOM ; erreur de
 décodage non rattrapée ; cause de l'octet invalide mal nommée. Suite : 255 tests ; plancher du job : 255, égalité exigée
 (`--egal`).
+
+## CB-6a (2026-10-08) : décodeurs BTC des huit places repris de S2, finitude (E-C-06, E-C-08)
+
+Objet (partie P2, tranche A ; sous-lot CB-6 de la PROPOSITION) : module `collecte/decodeurs.py`, un décodeur par
+(hôte, actif) pour les huit places BTC de S2 (Binance, Coinbase, Kraken, OKX ticker et index, Bitstamp, Gemini,
+Bitfinex), repris par copie de `s2-harness/shogen_s2/sources.py` (l.84-218) avec leurs pièges (Bitfinex position 6,
+Kraken clé rendue et liste d'erreurs, code d'OKX) ; fixtures de S2 copiées octet pour octet (`tests/fixtures/btc/`,
+sha256 comparés aux originaux par le test ; pièce G6). Écarts à S2, nommés : aucun flottant (prix : texte du Decimal
+lu ; instant de la source en microsecondes entières, de 0 à 2^53 exclu) ; prix fini, > 0, exposant dans les bornes du
+contexte nommé, copie de celui de S2 (r1.py l.62-68) ; instant ISO lu par un motif (`fromisoformat` lit autrement de
+3.10 à 3.13 : essai du worker) ; `decoder` ne lève jamais (`panne_decode`). Valeurs attendues hors du code :
+`s2-harness/tests/expected.json`, lu en Decimal depuis son texte.
+
+Rouge : sur un bouchon qui rend toujours `panne_decode`, 6 des 8 tests neufs échouent par assertion ; les deux autres
+(fixtures identiques à celles de S2 ; corps illisible, vide ou trop profond en panne) passent sur ce bouchon par
+construction.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 91 | — |
+| `tests/test_decodeurs.py` | 108 | 8 (neuf : reprise des fixtures et des valeurs de S2 ; pièges ; finitude ; corps illisible) |
+| `tests/fixtures/btc/` (huit fichiers `.bin`, copies) | — | — |
+
+Mutants (commande du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12, `-X dev
+-W error` ; réseau isolé ; témoin vert) : 20 mutants, 20 tués par leur test visé (0 vivant, 0 FATAL) : finitude
+retirée, prix nul admis, exposant non borné, Bitfinex au dernier élément ou à moins de 10 champs, Kraken à la clé
+demandée ou sans sa liste d'erreurs, code d'OKX ignoré, champ ou devise d'OKX échangés, classe de Coinbase,
+millisecondes de Gemini lues en secondes, fraction ISO non tronquée, décalage ignoré, 2^53 ou instant négatif admis,
+attrape-tout réduit, motif ISO partiel, instant sans décalage lu hors UTC, plancher non relevé. Suite : 263 tests ;
+plancher du job : 263, égalité exigée (`--egal`).
