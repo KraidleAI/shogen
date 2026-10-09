@@ -20,7 +20,8 @@ d'observateur `[a-z0-9]{1,16}`, qui nomme ses fichiers au dépôt. CB-15e (E-C-3
 jour ; l'envoi n'est armé que par `--envoi`, URL de la TSA que le déploiement ne pose que sous le go écrit de
 l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec de l'envoi ; 2 descripteur ou jour refusé.
 CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
-sur la sortie ; 1 et un refus nommé."""
+sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
+journal ou du dépôt ; 2 refus du descripteur."""
 import argparse
 import collections
 import ipaddress
@@ -155,10 +156,15 @@ def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
                              depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync))
 
 
+def _observateur(chemin):
+    """Nom de l'observateur du descripteur scellé, contrôlé (schéma et règles) ; RefusConfig ou OSError sinon."""
+    return config.charger(chemin, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
+
+
 def _jeton(a, tls, fsync):
     """Commande `jeton` (CB-15e) : jour UTC de l'horloge, ou `--jour` ; observateur du descripteur scellé."""
     try:
-        o = config.charger(a.descripteur, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
+        o = _observateur(a.descripteur)
         jour = a.jour or journal.jour(horloge() // S)
         if not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", jour):
             raise config.RefusConfig("CONFIG/jour", jour)
@@ -175,14 +181,25 @@ def _jeton(a, tls, fsync):
     return 0
 
 
-def _status(a):
-    """Commande `status` (CB-17b) : le rapport, ou un refus nommé (journal absent ou illisible)."""
+def _status(a, fsync):
+    """Commandes `status` (CB-17b) et `resume` (CB-17c) : 0 ; 1 refus du journal ou du dépôt ; 2 refus du
+    descripteur."""
     try:
-        lignes = status.rapport(a.journal)
-    except (status.RefusStatus, OSError) as e:
-        print(f"status : refus : {e}", file=sys.stderr)
+        o = getattr(a, "descripteur", None) and _observateur(a.descripteur)
+    except (config.RefusConfig, OSError) as e:
+        print(f"{a.commande} : refus : {e}", file=sys.stderr)
+        return 2
+    try:
+        if a.commande == "status":
+            print("\n".join(status.rapport(a.journal)))
+            return 0
+        noms = status.resumes(a.journal, o)
+        for nom, octets in noms.items():
+            tetes.ecrire(a.depot, nom, octets, fsync)
+    except (status.RefusStatus, journal.ErreurJournal, OSError) as e:
+        print(f"{a.commande} : refus : {e}", file=sys.stderr)
         return 1
-    print("\n".join(lignes))
+    print(f"resume : {', '.join(noms)}")
     return 0
 
 
@@ -218,11 +235,14 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
     jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
     commandes.add_parser("status", help="santé seule, lue au journal du pool, sans rien écrire").add_argument(
         "--journal", required=True)
+    re_ = commandes.add_parser("resume", help="résumés par jour (valide ou codes D) publiés au dépôt")
+    for option in ("--journal", "--depot", "--descripteur"):
+        re_.add_argument(option, required=True)
     a = p.parse_args(argv)
     if a.commande == "jeton":
         return _jeton(a, tls, fsync)
-    if a.commande == "status":
-        return _status(a)
+    if a.commande in ("status", "resume"):
+        return _status(a, fsync)
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)

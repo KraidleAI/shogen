@@ -10,18 +10,23 @@ pas jugé : le format de la sortie de `chronyc` n'est pas lu sur pièce (SHOGEN-
 relevés absents ou en erreur sont comptés.
 CB-17b : état par fenêtre (w = 60 s, FORMAT §3.1), de la première que le journal admet au dernier marqueur, sur les
 fichiers présents (la rétention locale peut en avoir retiré) ; rapport (santé seule, aucun nombre à virgule) ;
-strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196)."""
+strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196).
+CB-17c (AVIS Q-D-03, point 2) : résumé par jour, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande
+`resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3)."""
+import calendar
 import hashlib
 import json
 import os
 import re
 import time
 
+from shogen_s2bis.collecte import journal
 from shogen_s2bis.collecte.journal import LIMITE
 from shogen_s2bis.collecte.lecture import S
 
 LECTURE, W = b'{"adresse":', 60                      # première clé d'une `lecture` canonique ; largeur des fenêtres
 D2, D4, D5 = 5 * S, 2, 2                             # retard (µs), témoins sans réponse, noms non résolus
+CODES = ("D-1", "D-2", "D-3", "D-4", "D-5")                                  # codes admis dans un résumé
 
 
 class RefusStatus(ValueError):
@@ -31,14 +36,31 @@ class RefusStatus(ValueError):
         self.code = code
 
 
-def enregistrements(dossier, prefixe="pool"):
-    """(enregistrement, ligne) hors `lecture`, fichiers dans l'ordre (jour, k entier) de la grammaire du FORMAT §6.1 ;
-    un fichier s'arrête à sa première ligne coupée, illisible ou sans `type` ni `seq`."""
-    motif = re.compile(re.escape(prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl")
-    fichiers = sorted((x[1], int(x[2]), n) for n in os.listdir(dossier) if (x := motif.fullmatch(n)))
-    if not fichiers:
+def fichiers(dossier, prefixe="pool"):
+    """[(début du jour UTC, k, nom)] des fichiers du journal, dans l'ordre (jour, k entier) de la grammaire du FORMAT
+    §6.1 ; un nom dont le jour n'est pas au calendrier est écarté (C-3) ; aucun fichier : STATUS/journal."""
+    motif, r = re.compile(re.escape(prefixe) + "-([0-9]{4}-[0-9]{2}-[0-9]{2})-(0|[1-9][0-9]*)[.]jsonl"), []
+    for n in os.listdir(dossier):
+        try:
+            if x := motif.fullmatch(n):
+                r.append((calendar.timegm(time.strptime(x[1], "%Y-%m-%d")), int(x[2]), n))
+        except ValueError:
+            continue
+    if not r:
         raise RefusStatus("STATUS/journal", f"aucun fichier du journal « {prefixe} »")
-    for _j, _k, n in fichiers:
+    return sorted(r)
+
+
+def _au_dela(e, fin):
+    """Enregistrement d'un jour postérieur à celui de son fichier (FORMAT §6.1 ; C-3) : `ws` à la fin du jour `fin`
+    ou au-delà, ou `suivante` au-delà de `fin`."""
+    return type(e.get("ws")) is int and e["ws"] >= fin or type(e.get("suivante")) is int and e["suivante"] > fin
+
+
+def enregistrements(dossier, prefixe="pool"):
+    """(enregistrement, ligne) hors `lecture`, dans l'ordre de `fichiers` ; un fichier s'arrête à sa première ligne
+    coupée, illisible, sans `type` ni `seq`, ou d'un jour postérieur au sien (`_au_dela`)."""
+    for debut, _k, n in fichiers(dossier, prefixe):
         with open(os.path.join(dossier, n), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 if ligne.startswith(LECTURE):
@@ -47,7 +69,8 @@ def enregistrements(dossier, prefixe="pool"):
                     e = json.loads(ligne)
                 except (ValueError, RecursionError):
                     break
-                if type(e) is not dict or type(e.get("type")) is not str or type(e.get("seq")) is not int:
+                if type(e) is not dict or type(e.get("type")) is not str or type(e.get("seq")) is not int or _au_dela(
+                        e, debut + 86400):
                     break
                 yield e, ligne
 
@@ -77,6 +100,7 @@ def juger(sante):
 def etat(dossier, prefixe="pool"):
     """{ws : codes} des fenêtres de la première admise au dernier marqueur, dernière `sante`, tête (seq, sha256) du
     dernier enregistrement lu, nombre de relevés D-3 absents ou en erreur."""
+    plancher = fichiers(dossier, prefixe)[0][0] - 86400       # C-3 : jour du premier fichier, moins un jour (§6.1)
     premiere, en_cours, juges, derniere, tete, absents = None, {}, {}, None, None, 0
     for e, ligne in enregistrements(dossier, prefixe):
         tete = e["seq"], hashlib.sha256(ligne).hexdigest()
@@ -87,7 +111,7 @@ def etat(dossier, prefixe="pool"):
         elif e["type"] == "marqueur" and type(e.get("ws")) is int:
             juges[e["ws"]], absent = juger(en_cours.pop(e["ws"], None))
             absents += absent
-    debut = min([x for x in (premiere,) if x is not None] + list(juges), default=None)
+    debut = max(min([x for x in (premiere,) if x is not None] + list(juges), default=0), plancher)
     grille = {ws: juges.get(ws, ["D-1"]) for ws in range(debut, max(juges) + W, W)} if juges else {}
     return grille, derniere, tete, absents
 
@@ -98,6 +122,16 @@ def heure(ws):
 
 def strate(ws):
     return "stress" if time.gmtime(ws).tm_wday in (5, 6) else "calme"
+
+
+def resumes(dossier, observateur, prefixe="pool"):
+    """{nom : octets} des résumés du journal, un par jour UTC : ligne canonique {jour, observateur, fenetres}, où
+    `fenetres` liste [ws, codes] de chaque fenêtre du jour (codes vides : fenêtre valide)."""
+    jours = {}
+    for ws, codes in sorted(etat(dossier, prefixe)[0].items()):
+        jours.setdefault(journal.jour(ws), []).append([ws, codes])
+    return {f"{observateur}-{j}.resume": journal.canonique({"jour": j, "observateur": observateur, "fenetres": f})
+            for j, f in jours.items()}
 
 
 def rapport(dossier, prefixe="pool"):

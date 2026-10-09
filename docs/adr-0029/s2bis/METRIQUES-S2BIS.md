@@ -2252,3 +2252,38 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 329 tests ; plancher du job : 329, égalité exigée (`--egal`).
+
+## CB-17c (2026-10-08) : résumés par jour, liste blanche, commande `resume` (AVIS Q-D-03, point 2)
+
+Objet : un résumé par jour UTC, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande `resume` (FORMAT §17.5)
+: clés fermées, aucun statut de source ; projection du journal, recalculable. Correction de la G2 de P2B (2026-10-08) :
+C-3, portée ici (R-25 : CB-17b, où naît la grille, est à 183 lignes ; `resume` publie la grille jour par jour) : un `ws`
+à la fin du jour de son fichier ou au-delà, ou une `suivante` au-delà, rend la ligne illisible et arrête le fichier ; un
+fichier au jour hors du calendrier n'est pas lu ; la grille ne commence jamais avant le jour du premier fichier présent,
+moins un jour (FORMAT §6.1, §17.1, §17.3). Les journaux corrompus de la G2 (MemoryError à 1,5 Gio) rendent la sortie 0
+en moins de 2 s, espace d'adressage borné à 512 Mio.
+
+Rouge : `resumes` et commande d'interface, 2 tests en échec d'assertion. Rouges de la correction (correction retirée du
+code, test gardé ; python3.12 -X dev -W error) : R-C3 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-C3b (ROUGE D'ASSERTION :
+FAIL 1, ERROR 0) ; R-G18c (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 265 | — |
+| `shogen_s2bis/collecte/status.py` | 155 | — |
+| `tests/test_status.py` | 310 | 13 (3 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 17 mutants (12 de la phase 1, 5 neufs de la correction),
+17 tués (16 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : clé hors liste blanche,
+fenêtres valides omises du résumé, fenêtre rangée au jour suivant, observateur faux au résumé, nom de fichier faux,
+résumé non canonique, codes admis amputés, `resume` n'écrit rien, refus du descripteur en sortie 1, refus du journal en
+sortie 0, règles du descripteur non appliquées, plancher non relevé, C-3 : jour du fichier non contrôlé, C-3 : grille
+sans plancher, C-3 : plancher sans le jour de reprise, C-3 : jour hors du calendrier : exception, C-3 : `suivante` au-
+delà du jour admise.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 332 tests ; plancher du job : 332, égalité exigée (`--egal`).

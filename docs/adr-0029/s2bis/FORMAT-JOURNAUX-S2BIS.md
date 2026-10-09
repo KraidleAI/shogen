@@ -750,11 +750,13 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
 
 1. **Lecture** (CB-17a) : le journal du pool est lu sans rien écrire ni prendre le verrou de l'écrivain (§5) : la
    lecture peut se faire pendant la collecte. Fichiers dans l'ordre (jour, k entier) de la grammaire du §6.1 ; aucun :
-   refus `STATUS/journal`. Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme
-   canonique (§1.2, §9.1, §11.2) et d'aucun autre type, est une `lecture` : elle n'est jamais décodée, et rien d'une
-   lecture n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée,
-   illisible, ou sans `type` chaîne ni `seq` entier. La chaîne n'est pas contrôlée : l'intégrité se juge au recalcul
-   (RB-1, RB-18).
+   refus `STATUS/journal`. Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme canonique
+   (§1.2, §9.1, §11.2) et d'aucun autre type, est une `lecture` : elle n'est jamais décodée, et rien d'une lecture
+   n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée, illisible,
+   sans `type` chaîne ni `seq` entier, ou d'un jour postérieur à celui de son fichier : `ws` à la fin du jour du nom du
+   fichier ou au-delà, `suivante` au-delà (§6.1 : aucune fenêtre n'est d'un jour postérieur à celui de son fichier ;
+   CB-17c, C-3 de la G2 de P2B). Un fichier dont le jour n'est pas au calendrier n'est pas lu. La chaîne n'est pas
+   contrôlée : l'intégrité se juge au recalcul (RB-1, RB-18).
 2. **Jugement d'une santé** (CB-17a ; ADR-0029 §2.3 ; seuils égaux au bloc `degradation` de
    `s2bis/config/analyse.json`, contrôlé par un test) : D-1, aucune `sante` lisible ; D-2, `d2.non_parties` non nul ou
    `d2.retard_max` au-delà de 5 s (règle Q-C-02 de l'AVIS, §11.6) ; D-4, au moins 2 témoins dont le résultat n'est pas
@@ -763,10 +765,12 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1, ouvert) ; est relevé, à part, un relevé D-3
    absent, en erreur ou de code non nul.
 3. **État par fenêtre** (CB-17b) : sont jugées les fenêtres de w = 60 s (§3.1) de la première que le journal admet
-   (`suivante` de son premier enregistrement) au dernier marqueur ; une fenêtre sans marqueur vaut D-1 ; une fenêtre
-   close prend les codes de sa `sante` (point 2). Une fenêtre est **valide** si elle n'a aucun code. La tête est celle
-   du dernier enregistrement lu hors `lecture`. Limites : seuls les fichiers présents sont lus (la rétention locale de
-   7 jours en retire, ajout daté du 2026-10-04 17:03:38 UTC à l'ADR-0029, point 2) ; la grille est celle de w = 60 s.
+   (`suivante` de son premier enregistrement), jamais avant le jour du premier fichier présent moins un jour (segment de
+   reprise, §6.1 ; CB-17c, C-3 : un chiffre corrompu ne gonfle pas la grille), au dernier marqueur ; une fenêtre sans
+   marqueur vaut D-1 ; une fenêtre close prend les codes de sa `sante` (point 2). Une fenêtre est **valide** si elle n'a
+   aucun code. La tête est celle du dernier enregistrement lu hors `lecture`. Limites : seuls les fichiers présents sont
+   lus (la rétention locale de 7 jours en retire, ajout daté du 2026-10-04 17:03:38 UTC à l'ADR-0029, point 2) ; la
+   grille est celle de w = 60 s.
 4. **Commande et rapport** (CB-17b) : `python3 -m shogen_s2bis.collecte status --journal DOSSIER` : sortie 0 et le
    rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal`, ou dossier illisible). Rapport, une ligne par
    rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC, <n> ; dernier marqueur :
@@ -776,3 +780,10 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    <n>` (strates : stress le samedi et le dimanche UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » : D-3 n'est pas jugé,
    point 2, tant que SHOGEN-S2BIS-CHRONYC-FORMAT-1 est ouvert ; C-7 de la G2 de P2B, Q-9). Aucun nombre à virgule, aucun
    statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
+5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
+   DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
+   `<observateur>-<jour>.resume` au dépôt (écriture atomique, §16.4), une ligne canonique `{jour, observateur,
+   fenetres}`, `fenetres` : `[ws, codes]` de chaque fenêtre du jour (codes vides : fenêtre valide). Aucune autre clé :
+   c'est la liste blanche du résumé, que l'orchestrateur peut lire au rodage (lectures admises, ADR-0029 l.221) ;
+   aucun statut de source. Le résumé est une projection des enregistrements du journal : il se recalcule sur le
+   journal. Sortie 0 et `resume : <fichiers>` ; 1 refus du journal ou du dépôt ; 2 refus du descripteur.
