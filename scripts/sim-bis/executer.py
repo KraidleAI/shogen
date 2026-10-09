@@ -15,13 +15,15 @@ plusieurs processus (E-S-45). SB-11q : impressions des cellules sur les 200 prem
 strates, F séparé en propre et hors-enveloppe par (classe, strate, hôte) ; distribution de M_j par strate et taux
 effectifs de F agrégés (SB11-IMPRESSIONS-1). SB-11r : pannes longues rejouées par durée (N4), absences des observateurs
 par durée (N5), sauts réalisés et panne initiale visible par strate selon T_début (N9), et leurs distributions
-(SB11-IMPRESSIONS-1 ; avis Q-T2-5, Q-T3-1, Q-T3-2). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
-puissance, aucune fonction de libm."""
+(SB11-IMPRESSIONS-1 ; avis Q-T2-5, Q-T3-1, Q-T3-2). SB-11t : budget mesuré (E-S-46) : durée de chaque réplication en ns,
+coût retenu, plan de lots et durée estimée. Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance,
+aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
 import os
 import re
+import time
 from decimal import Decimal
 from fractions import Fraction
 
@@ -560,3 +562,26 @@ def _distribution(comptes: list) -> dict:
             n = str(c.get(k, 0))
             out[k][n] = out[k].get(n, 0) + 1
     return out
+
+
+def chronometrer(fonction, taches: list) -> tuple:
+    """Budget mesuré (E-S-46) : [fonction(*t) pour t de taches], dans l'ordre, en ce processus, et la durée de chaque
+    appel en ns (time.perf_counter_ns lu avant et après l'appel ; entiers, aucun flottant) ; durées pour le journal
+    d'exécution et le plan de lots, jamais dans une sortie (E-S-43). Rend (résultats, durées)."""
+    out, ns = [], []
+    for t in taches:
+        t0 = time.perf_counter_ns()
+        out.append(fonction(*t))
+        ns.append(time.perf_counter_ns() - t0)
+    return out, ns
+
+
+def budget(ns: list, R: int, processus: int, borne: int = BORNE) -> dict:
+    """Budget d'une cellule (E-S-46 ; SHOGEN-SIM-BIS-C1-COUT-1) sur les durées mesurées par réplication (chronometrer,
+    ns) : coût retenu = la plus longue mesurée ; plan de lots de R réplications en `processus` processus, chacun sous
+    la borne (plan, 90 min par défaut) ; durée estimée ⌈R·coût/processus⌉ ns. Aucune mesure : EXEC/budget."""
+    if not ns:
+        raise commun.Refus("EXEC/budget", "aucune durée mesurée")
+    m = max(ns)
+    return {"ns_max": m, "ns_total": sum(ns), "mesures": len(ns), "plages": plan(R, m, processus, borne),
+            "duree_ns": -(-R * m // processus)}
