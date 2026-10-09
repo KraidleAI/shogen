@@ -1,11 +1,14 @@
-"""CB-6a (E-C-06, E-C-08 ; ADR-0029 l.231 ; PROPOSITION §2.4) : décodeurs BTC repris de S2. Valeurs hors du code :
-`s2-harness/tests/expected.json` (capturé et décodé par S2), lu en Decimal depuis son texte ; fixtures copiées octet
-pour octet ; classes de S2 (`sources.py` l.305-313) ; instants par date -u -d, 2^53 par bc (journal G1)."""
+"""CB-6a, CB-6b (E-C-06 à E-C-08 ; ADR-0029 l.231 ; PROPOSITION §2.4) : décodeurs BTC repris de S2. Valeurs hors du
+code : `s2-harness/tests/expected.json` (capturé et décodé par S2), lu en Decimal depuis son texte ; fixtures copiées
+octet pour octet ; classes de S2 (`sources.py` l.305-313) ; instants par date -u -d, mots de Chainlink par printf, 2^53
+et roundId par bc ; contexte de S2 par lecture de r1.py l.62-68 (journal G1)."""
 import hashlib
 import json
 import os
+import sys
+import time
 import unittest
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 
 from shogen_s2bis.collecte import decodeurs
 
@@ -13,7 +16,8 @@ RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 S2, FIX = os.path.join(os.path.dirname(RACINE), "s2-harness", "tests"), os.path.join(RACINE, "tests", "fixtures", "btc")
 FLUX = {"binance": "sans_horodatage", "coinbase": "place_horodatee", "kraken": "sans_horodatage",
         "okx_ticker": "place_horodatee", "okx_index": "place_horodatee", "bitstamp": "place_horodatee",
-        "gemini": "place_horodatee", "bitfinex": "sans_horodatage"}
+        "gemini": "place_horodatee", "bitfinex": "sans_horodatage", "coingecko": "agregateur",
+        "defillama": "agregateur", "chainlink": "oracle_chainlink"}
 PANNE = ("panne_decode", None)
 
 
@@ -50,6 +54,10 @@ class Reprise(unittest.TestCase):
                      "ts_source": ts}]))
         # écrit à la main : 2026-08-05T16:11:21Z = 1785946281 (date -u -d), fraction de 9 chiffres tronquée comme en S2
         self.assertEqual(prix("coinbase_btc", lire(FIX, "coinbase.bin")), ("64475.75", 1785946281674372))
+        # Chainlink : réponse 0x5dc890a9908 = 6444750117128 et updatedAt 0x6a735457 = 1785943127 (printf), roundId (bc)
+        statut, (r,) = decodeurs.decoder("chainlink_btc", lire(FIX, "chainlink.bin"))
+        self.assertEqual((r["prix"], r["ts_source"], r["extra"]),
+                         ("64447.50117128", 1785943127 * 10 ** 6, {"round_id": "129127208515966884399"}))
 
 
 class Pieges(unittest.TestCase):                                  # S2, tests/test_sources.py, TestQuirks
@@ -63,6 +71,19 @@ class Pieges(unittest.TestCase):                                  # S2, tests/te
         for corps in (b'{"error":["EQuery:Unknown"],"result":{"X":{"c":["1"]}}}', b'[]',
                       b'{"error":[],"result":{"A":{"c":["1"]},"B":{"c":["1"]}}}'):
             self.assertEqual(decodeurs.decoder("kraken_btc", corps), PANNE)
+
+    def test_chainlink_reponse_mot_2_instant_mot_4(self):
+        def w(x):
+            return f"{x:064x}"
+        ok = "0x" + w(7) + w(6403392226348) + w(1785927700) + w(1785927743) + w(7)
+        self.assertEqual(prix("chainlink_btc", json.dumps({"result": ok}).encode()),
+                         ("64033.92226348", 1785927743000000))
+        moins_un = "0x" + w(7) + w((1 << 256) - 1) + w(1) + w(1) + w(7)                       # int256 : -1
+        deux_255 = "0x" + w(7) + w(1 << 255) + ok[130:]                    # int256 : 2^255 est négatif (C-2, G02)
+        for r in ("0xabcd", ok[:2] + " " + ok[3:], ok[:2] + "-" + ok[3:], ok[:3] + "_" + ok[4:], moins_un, deux_255,
+                  ok + w(7)):                                     # six mots (C-2, G01) ; S2 : len(h) != 5*64
+            with self.subTest(r=r[:8]):           # hexadécimal strict : int(…, 16) de S2 admet blanc, souligné, signe
+                self.assertEqual(decodeurs.decoder("chainlink_btc", json.dumps({"result": r}).encode()), PANNE)
 
 
 class Finitude(unittest.TestCase):                               # E-C-06 ; analogue de SHOGEN-PRIX-NON-FINI-1
@@ -89,10 +110,53 @@ class Finitude(unittest.TestCase):                               # E-C-06 ; anal
         cas = [("2026-08-05T16:11:21Z", ("1", 1785946281000000)),
                ("2026-08-05T16:11:21.6743Z", ("1", 1785946281674300)),
                ("2026-08-05T18:11:21.674372+02:00", ("1", 1785946281674372)),
+               ("2026-08-05T11:11:21-05:00", ("1", 1785946281000000)),            # signe du décalage (C-2, G03)
                ("2026-08-05T16:11:21.674372", ("1", 1785946281674372)), ("2026-08-05 16:11:21Z", "panne_decode"),
                ("2026-08-05T16:11:21+0000", "panne_decode"), ("1969-12-31T23:59:59Z", "panne_decode"),
                ("2255-06-05T23:47:34.740991Z", ("1", (1 << 53) - 1)), ("2255-06-05T23:47:34.740992Z", "panne_decode")]
         self.assertEqual([coinbase(t) for t, _a in cas], [a for _t, a in cas])     # 2^53 µs : 2255-06-05T23:47:34Z
+
+    def test_contexte_nomme_jamais_celui_du_fil(self):                # E-C-07, Q-C-14 ; r1.py l.62-68 (valeurs)
+        c = decodeurs.CONTEXTE
+        self.assertEqual((c.prec, c.rounding, c.Emin, c.Emax, c.capitals, c.clamp, sorted(t.__name__ for t in c.traps
+                                                                                          if c.traps[t])),
+                         (50, "ROUND_HALF_EVEN", -999999, 999999, 1, 0, ["DivisionByZero", "InvalidOperation",
+                                                                         "Overflow"]))
+        with localcontext(Context(prec=3, capitals=0, traps=[])):     # contexte du fil hostile : rien ne change
+            self.assertEqual(prix("binance_btc", b'{"price":"1E+999999"}'), ("1E+999999", None))
+
+
+class Bornes(unittest.TestCase):          # C-1 de la G2 de P2A : un test par champ d'instant converti par int()
+    def champ(self, gabarits, temoin):
+        """Nombre JSON 1E+1000000, entier de 10^6 chiffres (positif, négatif), texte de 10^6 chiffres, limite de
+        l'interpréteur levée : `panne_decode` en moins de 0,1 s (sans la borne, 1E+1000000 coûte 10 s : mesuré) ;
+        témoin (valeur de la fixture, écrite à la main) : relevé ok. Le premier écart arrête le test (un seul
+        décodage lent par champ sous un mutant)."""
+        self.addCleanup(sys.set_int_max_str_digits, sys.get_int_max_str_digits())
+        sys.set_int_max_str_digits(0)
+        for nom, g in gabarits.items():
+            for v in ("1E+1000000", "1" * 10 ** 6, "-" + "1" * 10 ** 6, '"' + "1" * 10 ** 6 + '"'):
+                t = time.monotonic()
+                r = decodeurs.decoder(nom, (g % v).encode())
+                self.assertEqual((nom, v[:12], r, time.monotonic() - t < 0.1), (nom, v[:12], PANNE, True))
+            self.assertEqual(prix(nom, (g % temoin[0]).encode()), ("1", temoin[1]))
+
+    def test_okx_ts(self):
+        self.champ({n: '{"code":"0","data":[{"' + c + '":"1","ts":%s}]}' for n, c in (
+            ("okx_ticker_btc", "last"), ("okx_index_btc", "idxPx"))}, ('"1785946282963"', 1785946282963000))
+
+    def test_bitstamp_timestamp(self):
+        self.champ({"bitstamp_btc": '{"last":"1","timestamp":%s}'}, ('"1785946282"', 1785946282000000))
+
+    def test_gemini_volume_timestamp(self):
+        self.champ({"gemini_btc": '{"last":"1","volume":{"timestamp":%s}}'}, ("1785946260000", 1785946260000000))
+
+    def test_coingecko_last_updated_at(self):
+        self.champ({"coingecko_btc": '{"bitcoin":{"usd":1,"last_updated_at":%s}}'}, ("1785946180", 1785946180000000))
+
+    def test_defillama_timestamp(self):
+        self.champ({"defillama_btc": '{"coins":{"coingecko:bitcoin":{"price":1,"timestamp":%s}}}'},
+                   ("1785946190", 1785946190000000))
 
 
 class Illisible(unittest.TestCase):

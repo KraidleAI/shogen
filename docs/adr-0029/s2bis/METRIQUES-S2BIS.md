@@ -1810,3 +1810,37 @@ demandée ou sans sa liste d'erreurs, code d'OKX ignoré, champ ou devise d'OKX 
 millisecondes de Gemini lues en secondes, fraction ISO non tronquée, décalage ignoré, 2^53 ou instant négatif admis,
 attrape-tout réduit, motif ISO partiel, instant sans décalage lu hors UTC, plancher non relevé. Suite : 263 tests ;
 plancher du job : 263, égalité exigée (`--egal`).
+
+## CB-6b (2026-10-08) : agrégateurs et Chainlink BTC de S2, contexte nommé, instants bornés (E-C-06, E-C-07, E-C-11)
+
+Objet : décodeurs CoinGecko, DefiLlama (`confidence` en extra) et Chainlink (`latestRoundData` : cinq mots en
+hexadécimal strict, réponse signée au mot 2, instant `updatedAt` au mot 4, `roundId` en extra ; prix construit
+exactement, mantisse et exposant −8, sans division), fixtures copiées ; tout décodage sous le contexte nommé, jamais
+celui du fil (Q-C-14). Correction C-1 de la G2 de P2A : les cinq instants convertis par `int()` (OKX `ts`, DefiLlama
+`timestamp`, Bitstamp `timestamp`, Gemini `volume.timestamp`, CoinGecko `last_updated_at`) passent par une aide unique,
+`_entier`, qui refuse avant la conversion un Decimal fini d'exposant ajusté de 16 ou plus (10^16 > 2^53 : aucun instant
+recevable n'est refusé) et un texte de plus de 4 300 caractères : `int()` d'un Decimal à grand exposant est quadratique
+et tient le GIL (1E+1000000 : 10,5 s, mesuré), ce qui faisait manquer l'échéance du pool (E-C-11, E-C-12).
+Corrections C-2 (G01 à G03) : six mots de Chainlink, réponse égale à 2^255 (négative) et décalage ISO négatif figés par
+un cas de test chacun.
+
+Rouge : sur le code de CB-6a, le test de Chainlink et la reprise des valeurs de S2 (onze décodeurs attendus)
+échouent par assertion ; le test du contexte nommé passe sur ce code, qui portait déjà le contexte : ses trois mutants
+(contexte du fil, précision 28, Overflow non piégé) le font échouer. C-1 : sur le code de CB-6b d'avant la G2, les
+cinq tests de `Bornes` échouent par assertion (un par champ : `panne_decode`, mais après plus de 0,1 s). C-2 : le code
+d'avant était juste ; chaque cas neuf échoue sous le mutant du réviseur qu'il vise (G01, G02, G03).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 128 | — |
+| `tests/test_decodeurs.py` | 172 | 15 (7 de plus : Chainlink, cas hostiles tirés de la réponse valide ; contexte nommé sous un contexte de fil hostile ; un test de `Bornes` par champ d'instant, cinq) |
+| `tests/fixtures/btc/` (trois fichiers `.bin` de plus, copies) | — | — |
+
+Mutants (même commande) : 12 mutants du sous-lot, 12 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé ; au premier passage d'origine, « hexadécimal non strict » vivait (cas hostiles tous à réponse nulle) : test
+corrigé, campagne relancée. Liste : `startedAt` au lieu d'`updatedAt`, réponse non signée, hexadécimal non strict, six
+décimales, `roundId` au mot 3, `confidence` perdue, secondes de CoinGecko lues en millisecondes, classe agrégateur pour
+Chainlink, contexte du fil, précision 28, Overflow non piégé, plancher non relevé. Corrections : 10 mutants neufs, 10
+tués par leur test visé : borne d'exposant retirée (« borne retirée »), borne de texte retirée, l'une ou l'autre
+relâchée, OKX, Gemini ou DefiLlama sans l'aide, borne serrée qui refuse le témoin, six mots admis, 2^255 lu positif.
+Suite : 270 tests ; plancher du job : 270, égalité exigée.
