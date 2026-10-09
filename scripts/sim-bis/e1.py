@@ -4,14 +4,15 @@ SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1). SB-11j : réplication d'E1 (courbes de I_t e
 issues d'un même appel de calib_fiv.replication), lot d'un point, agrégation d'un point (moyennes exactes, réplications
 indéfinies par hôte, variance exacte et écart-type des FIV de I_t). SB-11k : choix de C1 et de C2 (calib_fiv.selection,
 FIV_u par calibration.charger_unites, Q-SI-8 (b)), lignes [BORD E1] et phrases (8)(ii) et (iii) (Q-SI-8 (c)),
-impressions par hôte du point (6). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune
-fonction de libm."""
+impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). Entiers,
+rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
 from decimal import Decimal
 from fractions import Fraction
 
 import calib_fiv
 import calibration
 import executer
+import sources
 
 PHRASE_II = ("dans la strate {s}, la famille E1 n'atteint pas les FIV_u mesurés ; C1 y est une borne basse de la "
              "mesure, et « borne haute » ne s'applique pas")
@@ -72,6 +73,20 @@ def phrases_bord(sel: dict) -> list:
     return out + (["[BORD E1] (8)(iii) : " + PHRASE_III] if sel.get("calme", {}).get("bord", {}).get("au_bord") else [])
 
 
+def faisabilite(prm: dict, ep: dict, points: dict, f, part) -> dict:
+    """REGIME-FAISABILITE-1 : par strate, au point de la strate (points = {strate : (φ, κ, τ_D)}), r′ de la
+    composante E′ du régime (sources.composantes) de la panne (part des pannes longues `part`) et de l'écart propre de
+    chaque hôte du format, à la part f·p d'EP ; faisable ⇔ r′ < 1 ⇔ p_A < φ + (1 − φ)/κ. Rend {strate : {"max", "ou",
+    "faisable"}}, « ou » = [hôte, type] du premier maximum."""
+    out = {}
+    for s, pt in points.items():
+        r = [(sources.composantes(f * sources.taux(ep, s, h)[j], part if j == 0 else 0 * part, pt)["regime"], h, ty)
+             for h, _f in prm["calibration"]["unites"] for j, ty in enumerate(("panne", "ecart"))]
+        m = max(r, key=lambda x: x[0])
+        out[s] = {"max": m[0], "ou": [m[1], m[2]], "faisable": m[0] < 1}
+    return out
+
+
 def _par_hote(prm: dict, moy: dict, s: str, h: str, fu: list, c1, ctx) -> dict:
     """Impressions du point (6) pour l'hôte h de la strate s : résidus ln F̄_u,C1(ℓ) − ln F_u(ℓ) aux ℓ retenus (garde
     de fiv_unites.txt tenue, F_u défini ; None si F̄ indéfini) ; point qui minimiserait Q₁ pour cet hôte seul
@@ -91,15 +106,18 @@ def calibrer(prm: dict, cal: dict, moy: dict, lus=None, environ=None) -> dict:
     pour C0 : moyennes_point}) : EP sous ses deux épingles (calibration.charger) ; cible = courbe FIV_série du pool
     e1.pool ; FIV_u de fiv_unites.txt par calibration.charger_unites(prm, cal["presentes"], ep), contrôlés contre le
     masque et EP (Q-SI-9 ; Q-SI-8 (b) : jamais analyser_unites) ; calib_fiv.selection ; par strate, ligne [BORD E1]
-    (calib_fiv.ligne_bord) et impressions par hôte (_par_hote) ; phrases du point (8) (phrases_bord)."""
+    (calib_fiv.ligne_bord) et impressions par hôte (_par_hote) ; phrases du point (8) (phrases_bord) ; faisabilité du
+    régime à C1 et à C2 sous le fond d'E1 (e1.fond : f, part des pannes longues)."""
     e, st = calibration.charger(prm, lus, environ), prm["calibration"]["strates"]
     ctx = calib_fiv.contexte(prm["calibration"])
     unites = calibration.charger_unites(prm, cal["presentes"], e["episodes"], lus, environ)
     sel = calib_fiv.selection(prm, {s: e["fiv"][prm["e1"]["pool"], s] for s in st},
                               {p: {s: m[s]["I"] for s in m} for p, m in moy.items()}, unites,
                               {p: {s: m[s]["unites"] for s in m} for p, m in moy.items() if p is not None})
-    out = {"strates": {}, "phrases": phrases_bord(sel)}
+    out, fe = {"strates": {}, "phrases": phrases_bord(sel)}, prm["e1"]["fond"]
     for s in st:
         out["strates"][s] = dict(sel[s], ligne_bord=calib_fiv.ligne_bord(s, sel[s]["bord"]), unites={
             h: _par_hote(prm, moy, s, h, fu, sel[s]["C1"], ctx) for h, fu in unites[s].items()})
+    out["faisabilite"] = {n: faisabilite(prm, e["episodes"], {s: sel[s][n] for s in st}, Fraction(*fe["f"]),
+                                         Fraction(*fe["longues"])) for n in ("C1", "C2")}
     return out

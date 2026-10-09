@@ -246,7 +246,7 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 242
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 244
 
   calib-actifs-unittest:
     # Lot CALIB-ACTIFS, CA-0a (2026-10-09 ; G0 docs/adr-0029/g0-calib/, E-CA-33) : suite de scripts/calib-actifs, patron

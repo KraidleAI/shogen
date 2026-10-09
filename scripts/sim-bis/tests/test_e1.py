@@ -1,6 +1,6 @@
-"""E1 câblée, SB-11j et SB-11k (E-S-38 ; Q-SI-8 (a) à (e) de SIM-INTEG ; points (6) et (8) de l'ajout daté du G0 du
-2026-10-05 15:05:43 UTC) : attendus écrits à la main, produits par `bc -l`, ou recalculés ici depuis un seul appel de
-calib_fiv.replication ; chaque test nomme les mutations qui le rougissent."""
+"""E1 câblée, SB-11j à SB-11l (E-S-38 ; Q-SI-8 (a) à (e) de SIM-INTEG ; points (6) et (8) de l'ajout daté du G0 du
+2026-10-05 15:05:43 UTC ; REGIME-FAISABILITE-1) : attendus écrits à la main, produits par `bc -l`, ou recalculés ici
+depuis un seul appel de calib_fiv.replication ; chaque test nomme les mutations qui le rougissent."""
 import copy
 import functools
 import json
@@ -55,6 +55,22 @@ def code_de(f, *a):
     except Exception as e:                                          # noqa: BLE001 (rouge d'assertion, jamais d'erreur)
         return type(e).__name__
     return None
+
+
+def attendu(ep: dict, s: str, pt: tuple, f: Fraction, part: Fraction) -> dict:
+    """REGIME-FAISABILITE-1 écrit ici à la main, hôte par hôte du format : panne, part x = f·p de la ligne « panne »
+    d'ep, r_L = part·x, p_A = (x − r_L)/(1 − r_L) ; écart propre, p_A = f·(cellules d'écart − cellules de panne)/n_s ;
+    r_E = p_A/(1 − φ + φκ), r′ = r_E(κ − 1)/(1 − r_E) ; maximum, [hôte, type] du premier maximum, verdict r′ < 1."""
+    (phi, kappa, _t), rs = pt, []
+    for h in HOTES:
+        pa, ea = ep[s, h, "panne"], ep[s, h, "ecart"]
+        x = f * Fraction(pa["cellules"], pa["n_s"])
+        rl = part * x
+        for j, pA in enumerate(((x - rl) / (1 - rl), f * Fraction(ea["cellules"] - pa["cellules"], pa["n_s"]))):
+            re_ = pA / (1 - phi + phi * kappa)
+            rs.append((re_ * (kappa - 1) / (1 - re_), h, ("panne", "ecart")[j]))
+    m = max(rs, key=lambda y: y[0])
+    return {"max": m[0], "ou": [m[1], m[2]], "faisable": m[0] < 1}
 
 
 def forcee(*a):
@@ -195,6 +211,32 @@ class TestCalibrer(unittest.TestCase):
         m2[P]["calme"]["unites"]["okx"]["indefinies"] = 7
         x = e1.calibrer(E1R, cal, m2, None, {})["strates"]["calme"]["unites"]["okx"]["indefinies"]
         self.assertEqual(x["E1-essai-1_10-5-60"], 7)
+
+    def test_faisabilite_c1_c2(self):
+        """REGIME-FAISABILITE-1 à C1 et à C2 sous le fond d'E1 (f = 1, aucune panne longue : e1.fond) et EP, sélection
+        enveloppée (forcee : C1 = (1/100, 5, 60) et C2 = (1/10, 5, 60) en calme, l'inverse en stress) ; attendus de
+        attendu(). Mutations M-11L-01 (point de C2 sous l'étiquette C1), M-11L-02 (f et part des pannes longues
+        permutés au site d'appel), M-11L-07 (point d'une autre strate)."""
+        with mock.patch.object(calib_fiv, "selection", side_effect=forcee):
+            r = e1.calibrer(E1R, cal_e1(), fixture_e1(), None, {})
+        for n, s, pt in (("C1", "calme", P0), ("C2", "calme", P), ("C1", "stress", P), ("C2", "stress", P0)):
+            self.assertEqual(r["faisabilite"][n][s], attendu(EP, s, pt, Fraction(1), Fraction(0)), (n, s))
+
+    def test_faisabilite_f_et_part(self):
+        """REGIME-FAISABILITE-1 hors du fond d'E1 (f = 3/10, part des pannes longues 1/2), sur une EP synthétique de
+        n_s = 1000 : en calme, l'hôte de rang k du format à 10 + k cellules de panne et une d'écart propre (la panne
+        domine), au point (1/10, 5, 60) : faisable ; en stress, une cellule de panne et 120 + k d'écart propre (l'écart
+        domine), au point (1/100, 50, 60) de la grille : p_A = 3/10 · 129/1000 au-dessus du seuil φ + (1 − φ)/κ =
+        149/5000, infaisable ; attendus de attendu(). Mutations M-11L-03 (f ignoré), M-11L-04 (part longue appliquée à
+        l'écart), M-11L-05 (part longue ignorée), M-11L-06 (verdict toujours faisable), M-11L-08 (types permutés),
+        M-11L-09 (taux de panne pour l'écart), M-11L-10 (minimum au lieu du maximum)."""
+        ep, f, part, q = {}, Fraction(3, 10), Fraction(1, 2), (Fraction(1, 100), Fraction(50), 60)
+        for k, h in enumerate(HOTES):
+            for s, pa, ec in (("calme", 10 + k, 11 + k), ("stress", 1, 121 + k)):
+                ep[s, h, "panne"], ep[s, h, "ecart"] = {"cellules": pa, "n_s": 1000}, {"cellules": ec, "n_s": 1000}
+        r = e1.faisabilite(PRM, ep, {"calme": P, "stress": q}, f, part)
+        self.assertEqual(r, {"calme": attendu(ep, "calme", P, f, part), "stress": attendu(ep, "stress", q, f, part)})
+        self.assertEqual([r[s]["faisable"] for s in ("calme", "stress")], [True, False])
 
 
 if __name__ == "__main__":
