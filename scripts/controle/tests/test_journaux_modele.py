@@ -32,7 +32,10 @@ class JournauxModele(unittest.TestCase):
         """Identifiant de la liste blanche, ou suivi de [1m], suivi ou non d'un texte : conforme."""
         code, err = controler(self.arbre({
             "G1-lot-NEUF.md": "# G1" + NL + "- **Modèle** : `claude-opus-5-5` (identifiant exact), effort max" + NL,
-            "G2-lot-NEUF.md": "# G2" + NL + "- **Modèle** : `claude-opus-5-5[1m]`" + NL}))
+            "G2-lot-NEUF.md": "# G2" + NL + "- **Modèle** : `claude-opus-5-5[1m]`" + NL,
+            "G1-lot-NEUF2.md": "- **Modèle** : `claude-sonnet-5-5`" + NL,
+            "G2-lot-NEUF3.md": "- **Modèle** : `claude-fable-5-1`" + NL,
+            "G2-lot-NEUF4.md": "- **Modèle** : `claude-haiku-5-5`" + NL}))
         self.assertEqual(code, 0, err)
 
     def test_g2_sans_ligne_refuse(self):
@@ -60,12 +63,26 @@ class JournauxModele(unittest.TestCase):
             texte = f.read()
         self.assertEqual(controler(self.arbre({"G1-lot-CORR.md": texte}))[0], 0)
         self.assertEqual(controler(self.arbre({"G1-lot-NEUF.md": texte}))[0], 1)      # mêmes octets, nom neuf
+        self.assertEqual(controler(self.arbre({"G1-lot-D8a.md": texte}))[0], 1)       # mêmes octets, autre exempté
         code, err = controler(self.arbre({"G1-lot-CORR.md": texte + "ajout" + NL}))
         self.assertEqual(code, 1, err)
         self.assertIn("G1-lot-CORR.md : 0 ligne(s)", err)
 
     def test_racine_illisible(self):
         self.assertEqual(controler(os.path.join(tempfile.gettempdir(), "absente-journaux-modele"))[0], 3)
+        d = self.arbre({"G1-lot-NEUF.md": "- **Modèle** : `claude-opus-5-5`" + NL})
+        self.assertEqual(subprocess.run([sys.executable, "-B", SCRIPT, d, d], capture_output=True,
+                                        timeout=60).returncode, 3)                    # deux racines : erreur
+        for outil in ("", "def auteur_admis(:" + NL, "import module_absent_de_journaux_modele" + NL):
+            with self.subTest(outil=outil):       # DT3-F : outil vide, en erreur de syntaxe, à import manquant
+                d = self.arbre({"G1-lot-NEUF.md": "- **Modèle** : `claude-opus-5-5`" + NL})
+                os.makedirs(os.path.join(d, "s2-harness", "tools"))
+                os.makedirs(os.path.join(d, "enforcement"))
+                shutil.copy(SCRIPT, os.path.join(d, "enforcement"))
+                with open(os.path.join(d, "s2-harness", "tools", "oracle_record.py"), "w", encoding="utf-8") as f:
+                    f.write(outil)
+                self.assertEqual(subprocess.run([sys.executable, "-B", os.path.join(d, "enforcement",
+                                 "journaux-modele.py"), d], capture_output=True, timeout=60).returncode, 3)
 
     def test_arbre_du_depot(self):
         """Journaux du dépôt : conformes (un journal nouveau sans la ligne fait rougir ce cas)."""

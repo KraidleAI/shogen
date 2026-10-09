@@ -3,8 +3,12 @@ annexe B, B.87 ; adjudication Q-B1 du 2026-10-09) : ligne « Modèle » des jour
 docs/G2-*.md hors d'EXEMPTES porte exactement une ligne qui commence par TETE, de la forme « - **Modèle** : `<id>` »,
 fin de ligne ou espace ensuite, où <id> est un identifiant de la liste blanche du lint R-1 ou cet identifiant suivi de
 [1m], par égalité exacte (`auteur_admis` de s2-harness/tools/oracle_record.py, jamais un test de préfixe). EXEMPTES :
-les 52 journaux versés à 0cfbe3e, nom et sha256 ; un journal exempté puis modifié ne l'est plus. Bibliothèque standard
-seule. Usage : python3 -B journaux-modele.py <racine> ; sortie 0 conforme, 1 refus (motifs sur stderr), 3 erreur."""
+les 52 journaux versés à 0cfbe3e, nom et sha256 ; un journal exempté puis modifié ne l'est plus : le commit qui le
+modifie lui ajoute la ligne s'il n'en porte aucune (ajout daté, identifiant de son auteur ; 16 la portent déjà
+dans la forme : une seconde les ferait refuser) ; G1-lot-DETTES-B2.md et G2-lot-DETTES-B2.md, qui portent une ligne de
+cette tête hors forme, ne se modifient qu'avec leur sha256 changé ici, par un lot (texte de DT3-F).
+Bibliothèque standard seule. Usage : python3 -B journaux-modele.py <racine> ; sortie 0 conforme, 1 refus (motifs sur
+stderr), 3 erreur, toute exception comprise (DT3-F : une erreur n'est jamais un refus)."""
 import glob
 import hashlib
 import importlib.util
@@ -100,7 +104,7 @@ def main(argv: list) -> int:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         motifs = refus(argv[0], module.auteur_admis)
-    except (OSError, ValueError) as e:
+    except Exception as e:      # DT3-F (C-4 de la G2) : sortie 3, jamais 1
         print(f"journaux-modele : erreur : {e}", file=sys.stderr)
         return 3
     for m in motifs:
