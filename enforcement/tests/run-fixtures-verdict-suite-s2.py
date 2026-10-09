@@ -55,7 +55,8 @@ E-01 à E-05 jugés aussi par `accord` ; F-15, .pyc écrit pendant le run dans u
 SHOGEN-S2BIS-SUITE-CODE-COMPILE-1 (OUT-2h, C-4 de la revue de la vague 2) : P-01 à P-09, fichier compilé sous la
 racine d'une suite (.pyc sans source importé, extension .so nue, .abi3.so ou au suffixe complet, .pyo, .pyd, .pyc de
 cache, hors de tests/, dans un dossier lié hors de la racine) : refus nommé avant tout lancement ; P-10, témoin (noms
-voisins, lien en boucle) ; P-11 et P-12, `compiles` et COMPILES."""
+voisins, lien en boucle) ; P-11 et P-12, `compiles` et COMPILES. Lot DETTES-T3 (DT3-A, SHOGEN-FM11-VERIFIABLE-1) : K-04,
+étapes du job controle-unittest (suite de scripts/controle, témoin de fm11.py), au gabarit de K-02."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage, avant que le dossier du
 import sys                  # script entre dans sys.path ; il en sort ici, avant tout autre import (I-01, I-02)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
@@ -196,7 +197,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 136                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 137                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -613,7 +614,8 @@ APPEL = "python3 -B enforcement/verdict-suite-s2[.]py s2bis --aucun-saut --egal 
 APPEL_S2 = "python3 -B enforcement/verdict-suite-s2[.]py --egal"          # CB-18m : Ran = PLANCHER du vérificateur
 for nom, appel in (("K-01 s2-harness-unittest", APPEL_S2),
                    ("K-02 s2bis-unittest", APPEL),
-                   ("K-03 sim-bis-unittest", APPEL.replace(" s2bis ", " scripts/sim-bis "))):
+                   ("K-03 sim-bis-unittest", APPEL.replace(" s2bis ", " scripts/sim-bis ")),
+                   ("K-04 controle-unittest", APPEL.replace(" s2bis ", " scripts/controle "))):
     bon = cable(GYT, nom[5:], appel)
     cas(f"{nom} : étapes du job lues dans gates.yml (runner, puis vérificateur)", [] if bon else [
         f"{job(GYT, nom[5:])!r}"], None)

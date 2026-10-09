@@ -23,3 +23,9 @@ détectée) ; son témoin positif (fragment de la l.51 injecté dans un résulta
 dépendent des tests du harnais qu'ils importent.
 
 > *Ajout daté du 2026-10-03 01:43:15 UTC (relecture G2 de la partie 4, `docs/G2-partie-4.md`, K-8 ; B-5)* : sorties FM-1.1 des contrôles de la partie 4 versées : `advisor-seuil.json` (B.39), `lecteur-inventaire.json` (B.40), `rattrapage-r-c.json` (B.41), `rattrapage-r-b.json` (B.42 ; 637 événements, égal au compte écrit en B.42), `rattrapage-r-a.json` (B.43), `g2-corr-interrompu.json` (première relecture G2 du lot CORR, interrompue), `g2-partie-4.json` (relecture G2 de la partie 4) ; sha256 dans `SHA256SUMS`.
+
+> *Ajout daté du 2026-10-09 (lot DETTES-T3, DT3-A ; SHOGEN-FM11-VERIFIABLE-1, annexe B.35 et B.87)* : témoin automatique
+> versé, `tests/test_fm11.py` (job `controle-unittest`, cas K-04 du runner) : `fm11.py` tel que versé, sur transcriptions
+> synthétiques, lignes de D.2 jamais lues (doublures). `SHA256SUMS` couvre toutes les sorties ; les 28 sommes ajoutées
+> attestent les octets versés à `0cfbe3e`, non l'égalité avec les sorties d'origine. Le témoin ne prouve pas que les
+> vraies lignes de D.2 sont trouvées : chaque exécution réelle le dit, en sortant sur « contrôle impossible » sinon.

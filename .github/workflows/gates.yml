@@ -7,7 +7,8 @@
 # (g3-secrets, plancher de motifs) et le G3 du chemin de recalcul S2
 # (s2-harness-unittest) ; s2bis-unittest ajouté le 2026-10-04 (lot COLLECTE-BIS, CB-0 :
 # paquet s2bis/ d'ADR-0029) ; sim-bis-unittest ajouté le 2026-10-05 (lot SIM-BIS, SB-0 :
-# scripts/sim-bis/ d'ADR-0029 §6 lot 4). Les gates de forge du code Rust vivent dans squelette.yml,
+# scripts/sim-bis/ d'ADR-0029 §6 lot 4) ; controle-unittest ajouté le 2026-10-09 (lot DETTES-T3, DT3-A :
+# témoin de scripts/controle/fm11.py). Les gates de forge du code Rust vivent dans squelette.yml,
 # mutation.yml, fuzz.yml, reproductibilite.yml, compagnon.yml et temoignage.yml.
 # s2-harness a deux périmètres (ADR-0028 D6 (i)) :
 #   - chemin de recalcul : records (hors append_asn), window, r1, lm, r2 (hors
@@ -267,3 +268,23 @@ jobs:
         run: |
           python3 --version
           python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 65
+
+  controle-unittest:
+    # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et
+    # sommes de scripts/controle ; patron du job calib-actifs (aucun saut, Ran = plancher, --egal) ; cas K-04 du runner.
+    name: controle-unittest
+    # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
+        with:
+          persist-credentials: false
+      - name: cas du vérificateur de la suite (câblage des jobs unittest compris)
+        shell: bash
+        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py
+      - name: suite unittest de scripts/controle, jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 6
