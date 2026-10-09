@@ -165,4 +165,3 @@ def oracle_sh(prm: dict, series: dict) -> list:
             raise socle.Refus("CA/oracle-sh", "concurrence différente de SH §4 (" + ", ".join(places) + ")", a)
     return lignes + [f"oracle de SH §4 : {len(o['actives'])} comptes par place et {len(o['concurrences'])} "
                      "concurrences contrôlés, égaux ou non applicables"]
-

@@ -129,6 +129,7 @@ def coherent(p: dict) -> bool:
             ok = ok and set(lec["derniere_transaction"][a]) <= set(pl) & set(p["classes"]["place_horodatee"])
             ok = ok and (lec["modes"][a] == "calibre" or a in F3)
             ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
+    ok = ok and all(x in p["fenetre_descriptive"]["sans"] for x in PLACES if p["series"][x]["acces"] == "archive")
     return ok
 
 
@@ -251,4 +252,3 @@ def regle(facteur, x, pas, basse, haute) -> tuple:
     if k < k_bas:
         return Decimal(k_bas) * Decimal(pas), "borne basse appliquée", valeur
     return valeur, None, valeur
-

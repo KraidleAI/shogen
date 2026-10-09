@@ -41,6 +41,8 @@ class TestEcriture(unittest.TestCase):
         lignes = tau.corps(P, res)
         self.assertEqual(len(lignes), 15)
         self.assertIn(f"[USDT] τ des places {res['USDT']['places']['tau']} ;", lignes[12])
+        self.assertIn("(troisième terme absent, P99 des âges par strate calme N 0 P99 - min ; stress N 0 P99 - min)",
+                      lignes[6])                                    # USDC : aucune place à dernière transaction
         q = dict(P, fenetre_descriptive=DESC)
         sy.ecrire_bruts(q, self.d, "descriptive", DESC)
         sep = tau.septembre(q, self.d, sy.BTC)

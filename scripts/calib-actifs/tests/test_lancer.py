@@ -22,7 +22,8 @@ ACQ = NL.join(TETE + ["b = a[a.index('--bruts') + 1]", "os.makedirs(b, exist_ok=
 TAU = NL.join(TETE + ["s = a[a.index('--sortie') + 1]", "os.makedirs(s, exist_ok=True)",
                       "g = os.environ['PYTHONHASHSEED'] if f.get('graine') else ''",
                       "for n in ('calib_actifs.txt', 'fragment_analyse.json'):",
-                      "    open(os.path.join(s, n), 'w').write(n + g + ' '.join(sorted(os.environ)))",
+                      "    open(os.path.join(s, n), 'w').write(n + g + ' '.join(sorted(os.environ)) + ' bruts='"
+                      " + a[a.index('--bruts') + 1])",
                       "sys.exit(f.get('tau', 0))", ""])
 
 
@@ -68,8 +69,8 @@ class TestLancer(unittest.TestCase):
             env = f.read().split(" ")
         with open(os.path.join(self.s, "manifeste.tsv"), encoding="utf-8") as f:
             reseau = f.read().split(" ")
-        self.assertEqual((env[0], "AUTRE" in env, "HTTPS_PROXY" in env, "PYTHONHASHSEED" in env),
-                         ("calib_actifs.txtLC_ALL", False, False, True))
+        self.assertEqual((env[0], "AUTRE" in env, "HTTPS_PROXY" in env, "PYTHONHASHSEED" in env, "TMPDIR" in env,
+                          env[-1]), ("calib_actifs.txtLC_ALL", False, False, True, True, "bruts=" + self.b))
         self.assertEqual(("AUTRE" in reseau, "HTTPS_PROXY" in reseau, "PYTHONHASHSEED" in reseau), (False, True, False))
 
     def test_epingle(self):

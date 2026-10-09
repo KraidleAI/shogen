@@ -56,9 +56,10 @@ def lire(d):
 
 class TestCli(unittest.TestCase):
     def test_succes(self):
-        """Code 0 ; texte à l'étiquette mot pour mot, blocs [VALEURS] et [DESCRIPTIFS], septembre par actif (USDC
-        refusé : trois places sans kraken, sous N_min) ; fragment JSON à la clé « etiquette », égal au fragment calculé
-        directement ; aucun .partiel. Mutations : oracle non appelé ; septembre omis ; étiquette absente du JSON."""
+        """Code 0 ; texte à l'étiquette mot pour mot, blocs [VALEURS] et [DESCRIPTIFS], septembre par actif (USDC refusé
+        : trois places sans kraken, sous N_min) ; bloc [VALEURS] égal au calcul direct sur les séries de chaque actif ;
+        fragment JSON à la clé « etiquette », égal au fragment calculé directement ; aucun .partiel. Mutations : oracle
+        non appelé ; septembre omis ; étiquette absente du JSON ; séries ou valeurs de BTC d'une autre source."""
         argv, d = banc(self)
         self.assertEqual(tau.main(argv, {}), 0)
         texte, frag = lire(d)
@@ -68,6 +69,10 @@ class TestCli(unittest.TestCase):
         self.assertEqual([x.split(" : ")[1][:12] for x in texte if " septembre : " in x],
                          ["τ des places", "REFUS CA/pop", "τ des places"])
         self.assertEqual(sorted(os.listdir(os.path.join(d, "s"))), list(tau.SORTIES))
+        with open(argv[5], encoding="utf-8") as f:
+            prm = json.load(f)
+        direct = {a: tau.calcul_actif(prm, a, sy.series(prm, a), sy.FEN, sy.BTC) for a in socle.ACTIFS}
+        self.assertEqual(texte[texte.index("[VALEURS]") + 1:texte.index("[DESCRIPTIFS]")], tau.corps(prm, direct))
 
     def test_refus(self):
         """Code 1 et le même refus dans les deux sorties : compte de l'oracle faux (CA/oracle-sh), variable posée,

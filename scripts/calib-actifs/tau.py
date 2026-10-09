@@ -206,8 +206,10 @@ def corps(prm: dict, res: dict) -> list:
     for a, r in res.items():
         s, tp, ag, d = r["sigma"], r["places"], r["agregateurs"], r["detail_terme"]
         out += [f"[{a}] mode {r['mode']} ; places {', '.join(r['closes'])} ; N_min {socle.lecture(prm)['n_min'][a]}",
-                f"[{a}] σ : place_horodatee {s['place_horodatee']} s (troisième terme {r['terme']}, P99 des âges par "
-                "strate " + " ; ".join(f"{st} N {n} P99 {p99} min" for st, (n, p99, _x) in d.items()) + ") ; "
+                f"[{a}] σ : place_horodatee {s['place_horodatee']} s (troisième terme "
+                f"{'absent' if r['terme'] is None else str(r['terme']) + ' s'}, P99 des âges par strate "
+                + " ; ".join(f"{st} N {n} P99 {'-' if p99 is None else p99} min" for st, (n, p99, _x) in d.items())
+                + ") ; "
                 f"sans_horodatage aucun ; agregateur {s['agregateur']} s ; oracle_chainlink {s['oracle_chainlink']} s",
                 f"[{a}] τ des places {tp['tau']} ; drapeau {tp['drapeau'] or 'aucun'}" + "".join(
                     f" ; {st} N {n} P99,9 {affiche(q)} P99 {affiche(q99)}" for st, (n, q, q99, _m) in
@@ -271,4 +273,3 @@ def main(argv=None, env=None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

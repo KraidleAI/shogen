@@ -74,7 +74,7 @@ class TestSocle(unittest.TestCase):
                a("places", "USDC", ["binance", "bitfinex", "bitstamp", "gemini", "kraken"]),
                a("modes", "ETH", "planchers_seuls"),
                lambda p: p.update(lecture="B"), lambda p: p["fenetre"].update(debut=1775001601),
-               lambda p: p["strates"].update(stress=[5])]
+               lambda p: p["strates"].update(stress=[5]), lambda p: p["fenetre_descriptive"].update(sans=["okx"])]
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
 

@@ -11,10 +11,10 @@
 #      hors 0 arrête tout ; 5. SHA256SUMS des deux sorties de A et de B comparés à l'octet (E-CA-21) ;
 #   6. sorties de A, manifeste des bruts et leur SHA256SUMS copiés dans <sortie>.
 # Scripts en python3 -S -B sous env -i : PATH, LC_ALL, PYTHONDONTWRITEBYTECODE, PYTHONPYCACHEPREFIX vers <travail>/pyc,
-# PYTHONHASHSEED de la passe ; l'étape réseau garde en plus les seules variables de mandataire et de certificats
-# présentes (liste fermée). Codes : 0 ; 2 usage ; 3 refus avant tout lancement ; 4 acquisition impossible ; 5 calcul
-# hors 0, A ≠ B ou écriture impossible. L'écran ne porte que des noms, des codes et des sha256 ; messages des scripts
-# dans <travail>/lancer.log. Aucune barre oblique inverse dans ce fichier.
+# TMPDIR vers <travail>/tmp (E-CA-05), PYTHONHASHSEED de la passe ; l'étape réseau garde en plus les seules variables de
+# mandataire et de certificats présentes (liste fermée). Codes : 0 ; 2 usage ; 3 refus avant tout lancement ; 4
+# acquisition impossible ; 5 calcul hors 0, A ≠ B ou écriture impossible. L'écran ne porte que des noms, des codes et
+# des sha256 ; messages des scripts dans <travail>/lancer.log. Aucune barre oblique inverse dans ce fichier.
 set -u -o pipefail
 export LC_ALL=C
 ICI="$(cd "$(dirname "$0")" && pwd)"
@@ -36,9 +36,9 @@ read -r GA GB < <(python3 -I -S -B -c 'import json, sys
 p = json.load(open(sys.argv[1], encoding="utf-8"))["passes"]
 print(p["A"], p["B"])' "$ICI/parametres.json" 2> /dev/null)
 [[ "${GA:-}" =~ ^[0-9]+$ && "${GB:-}" =~ ^[0-9]+$ ]] || refus CA/parametres "passes illisibles dans parametres.json" 3
-mkdir -p "$T/pyc" "$B" 2> /dev/null || refus CA/sortie "dossier de travail ou des bruts impossible" 3
+mkdir -p "$T/pyc" "$T/tmp" "$B" 2> /dev/null || refus CA/sortie "dossier de travail ou des bruts impossible" 3
 PYC="$(cd "$T/pyc" && pwd)"
-PY=(env -i PATH="$PATH" LC_ALL=C PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$PYC")
+PY=(env -i PATH="$PATH" LC_ALL=C PYTHONDONTWRITEBYTECODE=1 PYTHONPYCACHEPREFIX="$PYC" TMPDIR="$(cd "$T/tmp" && pwd)")
 RESEAU=()
 for v in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy NO_PROXY no_proxy SSL_CERT_FILE SSL_CERT_DIR; do
   [ -z "${!v+x}" ] || RESEAU+=("$v=${!v}")

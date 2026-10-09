@@ -60,4 +60,3 @@ def ecrire_bruts(prm: dict, bruts: str, nom: str, fen=FEN) -> None:
                 os.makedirs(os.path.join(bruts, nom, p, actif), exist_ok=True)
                 with open(os.path.join(bruts, nom, p, actif, "f.dat"), "wb") as f:
                     f.write(octets(prm["series"][p]["format"], s))
-

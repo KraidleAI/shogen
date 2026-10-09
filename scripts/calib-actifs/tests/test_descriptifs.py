@@ -50,6 +50,17 @@ class TestDescriptifs(unittest.TestCase):
         lignes = tau.descriptifs(q, "USDT", tau.calcul_actif(q, "USDT", sy.series(q, "USDT"), sy.FEN, sy.BTC))
         self.assertEqual([x.split(" : ")[1][:15] for x in lignes], ["troisième terme", "τ des agrégateu"])
 
+    def test_variante_minutes_actives(self):
+        """Kraken n'échange qu'à la première minute (100,2), les trois autres places à chaque minute (100) : population
+        retenue (dernier prix connu) : τ = grid-ceil(1,5 × 0,002) = 0,0030 ; variante minutes actives seules : trois
+        places définies après la première minute, sous N_min, strate de stress vide : CA/population, imprimé. Mutation :
+        variante calculée sur la population retenue."""
+        series = {p: {t: (Decimal("100.2" if p == "kraken" else 100), p != "kraken" or i == 0)
+                      for i, t in enumerate(socle.minutes(sy.FEN))} for p in socle.lecture(P)["places"]["USDC"]}
+        r = tau.calcul_actif(P, "USDC", series, sy.FEN, sy.BTC)
+        ligne = [x for x in tau.descriptifs(P, "USDC", r) if "variante" in x][0]
+        self.assertEqual((r["places"]["tau"], ligne.split(" : ")[2][:19]), (Decimal("0.0030"), "REFUS CA/population"))
+
 
 if __name__ == "__main__":
     unittest.main()
