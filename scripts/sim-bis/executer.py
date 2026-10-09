@@ -10,8 +10,9 @@ cellules.couches, O-5 ; perte sur le W de la cellule, L-2). SB-11e : cellules so
 réplication d'une cellule, chaîne entière (T_début, sources, observateurs, fenêtres retenues, retraits, première unité,
 règle par classe et par strate). SB-11g : oracle d'E-S-29 sur les 200 premières réplications (variante comprise, O-4),
 S, critère collectif, variante, compte d'événements sur la suite comprimée (P-3). SB-11h : agrégation exacte des
-enregistrements relus d'une cellule (E-S-40, E-S-52), agrégat écrit. Entiers, rationnels et Decimal seuls : aucun
-flottant, aucune puissance, aucune fonction de libm."""
+enregistrements relus d'une cellule (E-S-40, E-S-52), agrégat écrit. SB-11i : lot d'une cellule calculé en un ou
+plusieurs processus (E-S-45). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction
+de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -390,6 +391,16 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
             "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
             "retraits": {cl: sorted([u, x] for (u, t), x in rt[cl].items() if t == s) for cl in rg["classes"]}}
     return out
+
+
+def calculer_lot(prm: dict, ep: dict, cel: dict, points: dict, W: int, plage, processus: int, dossier: str,
+                 entete: list) -> tuple:
+    """Lot (cellule, [a, b)) (E-S-45) : réplications i = a à b − 1 (replication ; flux et graine de règle par i, jamais
+    par la position de la tâche : E-S-41), en `processus` processus dans l'ordre (appliquer, E-S-42), écrites en un
+    fichier partiel (ecrire_lot) ; rend (chemin, sha256), à consigner au journal d'exécution."""
+    a, b = plage
+    recs = appliquer(replication, [(prm, ep, cel, points, W, i) for i in range(a, b)], processus)
+    return ecrire_lot(dossier, cel["nom"], a, b, recs, entete)
 
 
 def agreger(k: dict, enregistrements: list) -> dict:
