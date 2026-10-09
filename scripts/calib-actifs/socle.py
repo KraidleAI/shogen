@@ -82,6 +82,9 @@ SCHEMA = {"lot": str, "rattachement": str,
           | {"rang": [int], "source": str},
           "sigma": {"facteur": "dec", "rang": [int], "pas_s": int, "source": str,
                     "planchers_s": {"agregateur": int, "place_horodatee": int}},
+          "cadence": {"lectures": int, "pas_s": int, "source": str,
+                      **dict.fromkeys(("coingecko", "defillama"), {"url": str, "options": str,
+                                                                  "ids": dict.fromkeys(ACTIFS + ("BTC",), str)})},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 

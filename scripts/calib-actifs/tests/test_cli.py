@@ -1,6 +1,8 @@
 """Point d'entrée du calcul (tau.py ; E-CA-04, E-CA-17, E-CA-19, E-CA-22) sur bruts synthétiques aux six formats et un
 tau_sigma.txt synthétique (jamais le vrai) ; comptes de l'oracle réduits à la fenêtre synthétique, calculés à la main :
 binance actif 9 minutes sur 10 ; USDC à au moins 4, 3, 2 places actives : 3, 10, 10. Chaque test nomme sa mutation."""
+import contextlib
+import io
 import json
 import os
 import shutil
@@ -91,7 +93,9 @@ class TestCli(unittest.TestCase):
             refus = lire(d)[1]["refus"]
             self.assertEqual((refus.split(" : ")[0], refus.endswith("(ZeroDivisionError)")),
                              ("REFUS " + code, code == "CA/calcul"))
-        self.assertEqual([tau.main(x, {}) for x in (["--bruts", d], argv[:4] + ["--x", argv[5]])], [2, 2])
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual([tau.main(x, {}) for x in (["--bruts", d], argv[:4] + ["--x", argv[5]])], [2, 2])
+        self.assertEqual(err.getvalue().count("REFUS CA/usage"), 2)
 
 
 if __name__ == "__main__":

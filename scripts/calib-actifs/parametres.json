@@ -80,6 +80,14 @@
   "source": "ADR-0029 l.181, l.183, l.187, l.189, l.191 ; PROPOSITION §4.3, §4.4, §4.7"},
  "sigma": {"facteur": "3", "rang": [99, 100], "pas_s": 60, "planchers_s": {"agregateur": 300, "place_horodatee": 30},
   "source": "ADR-0029 l.189, ajout daté l.403 (3) ; PROPOSITION §4.6 ; planchers d'ADR-0020 (config_analyse.py l.21)"},
+ "cadence": {"lectures": 120, "pas_s": 60,
+  "coingecko": {"url": "https://api.coingecko.com/api/v3/simple/price?ids={ids}&{options}",
+                "options": "vs_currencies=usd&include_last_updated_at=true",
+                "ids": {"BTC": "bitcoin", "ETH": "ethereum", "USDC": "usd-coin", "USDT": "tether"}},
+  "defillama": {"url": "https://coins.llama.fi/prices/current/{ids}", "options": "",
+                "ids": {"BTC": "coingecko:bitcoin", "ETH": "coingecko:ethereum", "USDC": "coingecko:usd-coin",
+                        "USDT": "coingecko:tether"}},
+  "source": "AVIS Q-CA-11 modifiée : relevé séparé, hors de lancer.sh, horodatages seuls ; PROPOSITION §2.2 (formes)"},
  "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
   "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
 }
