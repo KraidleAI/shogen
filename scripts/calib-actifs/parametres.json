@@ -41,5 +41,7 @@
                "facteur": "1.5", "source": "PROPOSITION §2.4 (proxies principaux, Q-CA-08) ; ADR-0029 l.188"},
  "oracles_attendus": {"tau": {"ETH": "0.0075", "USDC": "0.00375", "USDT": "0.00375"},
                       "sigma_s": {"ETH": 5400, "USDC": 124200, "USDT": 129600},
-                      "source": "config_analyse.py l.28-29 ; ADR-0029 l.188 ; DÉC l.36-37"}
+                      "source": "config_analyse.py l.28-29 ; ADR-0029 l.188 ; DÉC l.36-37"},
+ "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
+  "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
 }

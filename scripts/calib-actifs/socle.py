@@ -61,7 +61,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "plan_s2bis": {"tau_sigma": str, "sha256": str, "source": str},
           "chainlink": _par_actif({"proxy": str, "seuil": "dec", "heartbeat_s": int})
           | {"facteur": "dec", "source": str},
-          "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str}}
+          "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
+          "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 
 def conforme(x, s) -> bool:
