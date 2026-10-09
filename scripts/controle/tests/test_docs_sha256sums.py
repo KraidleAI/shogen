@@ -67,26 +67,31 @@ class DocsSha256sums(unittest.TestCase):
     def test_formes_refusees(self):
         for texte in ("", NL, ABC.upper() + "  x.md" + NL, ABC + " x.md" + NL, ABC[1:] + "  x.md" + NL,
                       "SHA256 (x.md) = " + ABC + NL, ABC + "  /etc/hostname" + NL, ABC + "  ../b/x.md" + NL,
-                      ABC + "  ./x.md" + NL, ABC + "  x.md" + NL + NL, ABC + "  x.md" + chr(13) + NL):
+                      ABC + "  ./x.md" + NL, ABC + "  x.md" + NL + NL, ABC + "  x.md" + chr(13) + NL,
+                      ABC + "  x" + chr(92) + "y.md" + NL):     # C-7 (DT4-e) : barre oblique inverse
             with self.subTest(texte=texte):
-                self.refuse({"docs/a/SHA256SUMS": texte, "docs/a/x.md": "abc", "docs/b/x.md": "abc"}, "a/SHA256SUMS")
+                self.refuse({"docs/a/SHA256SUMS": texte, "docs/a/x.md": "abc", "docs/b/x.md": "abc"}, "a/SHA256SUMS",
+                            "hors forme")     # C-7 : le motif, pas seulement le refus
 
     def test_interdits(self):
-        """SHA256SUMS interdit : jamais lu ; chemin vers un interdit, un *.jsonl ou hors du dossier : refusé."""
+        """SHA256SUMS interdit : jamais lu ; chemin vers un interdit, un *.jsonl ou hors du dossier : refusé. C-5, C-8
+        (DT4-e) : tout composant en *.jsonl ; comparaison aussi en casse pliée (système insensible à la casse)."""
         faux = VIDE + "  x.md" + NL
         code, out, err = controler(self.arbre({f"docs/{x}/SHA256SUMS": faux for x in (
-            "rapports", "15-x", "16-y.d", "adr-0028/execution", "adr-0028/monark-m009a", "adr-0025", "pocket-report")}))
+            "rapports", "15-x", "16-y.d", "adr-0028/execution", "adr-0028/monark-m009a", "adr-0025", "pocket-report",
+            "b/z.jsonl", "Rapports", "adr-0028/EXECUTION", "ADR-0025", "b/Z.Jsonl", "rapport" + chr(0x17F))}))  # s long
         self.assertEqual((code, "0 SHA256SUMS" in out), (0, True), err)
-        for chemin in ("monark-m009a/x.md", "execution/x.md", "a/x.jsonl"):
+        for chemin in ("monark-m009a/x.md", "execution/x.md", "a/x.jsonl", "z.jsonl/x.md", "Monark-M009A/x.md",
+                       "Execution/x.md", "a/x.JSONL", "Z.jsonL/x.md"):
             self.refuse({"docs/adr-0028/SHA256SUMS": f"{ABC}  {chemin}", f"docs/adr-0028/{chemin}": "abc"}, "interdit")
-        d = self.arbre({"docs/a/SHA256SUMS": ABC + "  l.md" + NL, "docs/b/x.md": "abc"})
-        os.symlink(os.path.join(d, "docs", "b", "x.md"), os.path.join(d, "docs", "a", "l.md"))
+        d = self.arbre({"docs/a/SHA256SUMS": ABC + "  l.md" + NL, "docs/ab/x.md": "abc"})    # C-6 : voisin de préfixe
+        os.symlink(os.path.join(d, "docs", "ab", "x.md"), os.path.join(d, "docs", "a", "l.md"))
         self.refuse(d, "docs/a/SHA256SUMS l.1", "lien")
         e = self.arbre({"docs/rapports/SHA256SUMS": ABC + "  x.md" + NL, "docs/a/x.md": "abc"})   # SHA256SUMS lien
         os.symlink(os.path.join(e, "docs", "rapports", "SHA256SUMS"), os.path.join(e, "docs", "a", "SHA256SUMS"))
         self.refuse(e, "docs/a/SHA256SUMS : lien")
-        g = self.arbre({"docs/b/S": ABC + "  x.md" + NL, "docs/a/x.md": "abc"})     # hors du dossier, non interdit
-        os.symlink(os.path.join(g, "docs", "b", "S"), os.path.join(g, "docs", "a", "SHA256SUMS"))
+        g = self.arbre({"docs/ab/S": ABC + "  x.md" + NL, "docs/a/x.md": "abc"})     # hors du dossier, voisin (C-6)
+        os.symlink(os.path.join(g, "docs", "ab", "S"), os.path.join(g, "docs", "a", "SHA256SUMS"))
         self.refuse(g, "docs/a/SHA256SUMS : lien")
         for cible in ("execution/x.md", "a.jsonl"):     # lien vers un interdit sans sortir du dossier (DT4-d, C-1, C-2)
             f = self.arbre({"docs/adr-0028/SHA256SUMS": ABC + "  l.md" + NL, f"docs/adr-0028/{cible}": "abc"})

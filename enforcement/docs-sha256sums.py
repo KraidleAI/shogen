@@ -12,6 +12,7 @@ manifestes de copies dont aucun fichier listé n'a été versé (aucun rejeu pos
 de docs/adr-0028/sceau/ (manifestes du sceau, chemin depuis la racine, rejoués par scripts/sceau/verify.sh ; celui de
 premier-2026-10-02/ archive le premier sceau, paquet rescellé depuis : écart par construction). DT4-d (G2) : un
 SHA256SUMS dont le chemin réel est interdit n'est pas ouvert ; un dossier que le parcours ne peut lire fait sortir en 3.
+DT4-e (contre-contrôle) : interdit aussi tout chemin dont un composant finit en .jsonl ; comparaison en casse pliée.
 Usage : python3 -B docs-sha256sums.py <racine> ; 0 conforme, 1 refus (motifs sur stderr), 3 erreur (jamais un refus)."""
 import hashlib
 import os
@@ -28,7 +29,8 @@ ABSENTS_ADMIS = {"docs/adr-0028/sim-niveau/SHA256SUMS": (
 
 
 def interdit(relatif: str) -> bool:
-    return relatif.startswith(INTERDITS) or relatif.endswith(".jsonl")
+    plie = relatif.casefold()       # C-8 (DT4-e) : casse pliée ; C-5 : tout composant en *.jsonl, dossier compris
+    return plie.startswith(INTERDITS) or any(p.endswith(".jsonl") for p in plie.split("/"))
 
 
 def lever(erreur: OSError):
