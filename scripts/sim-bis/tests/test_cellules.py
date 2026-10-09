@@ -130,6 +130,27 @@ class TestCellules(unittest.TestCase):
             self.assertEqual(code_de(executer.cellule, PRM, EP, c, POINTS, w), code, code)
         self.assertEqual(code_de(executer.cellule, PRM, EP, N1, {"C2": POINTS["C2"]}, 16), "CELLULE/niveau")
 
+    def test_l_2_au_site_d_appel(self):
+        """C-4 de la G2 de SB-11 (L-2 au site d'appel) : executer.cellule passe à la couche le W de la cellule, celui de
+        calendrier.echelle : perte 16 à W = 16 (T_max : 24 semaines), 2 à W = 2 ; chacun distinct de ⌊(W + 1)/2⌋ (8 et
+        1). Mutant G-06 (⌊(W + 1)/2⌋ passé à la couche par cellule)."""
+        for w in (16, 2):
+            self.assertEqual(executer.cellule(PRM, EP, cel(couche__grille="degradee"), POINTS, w)["couche"]["perte"], w)
+
+    def test_schema_ferme_c_5(self):
+        """C-5 de la G2 de SB-11 : sous PRM, où N1 passe le schéma (garde : None), et l'incident « parmi » à imposés
+        « faibles » aussi quand la cellule a ses unités faibles : imposés « faibles » sans unité faible, classes sans
+        BTC en tête ([ETH]) ou hors de l'ordre ([ETH, BTC]), f nul : CELLULE/schema. Mutants G-07 (imposés « faibles »
+        admis sans unité faible), G-08 (BTC en tête non exigé), G-19 (f nul admis)."""
+        inc = {"rho": [1, 10], "duree": 20, "geometrique": False, "mode": "parmi", "population": "as13335", "k": 2,
+               "imposes": "faibles"}
+        fa = {"k": 2, "p": [2, 5], "L": 1, "type": "panne"}
+        for c in (N1, cel(incidents=inc, faibles=fa)):
+            self.assertIsNone(code_de(executer.cellule, PRM, EP, c, POINTS, 16))
+        for c in (cel(incidents=inc), cel(regle__classes=["ETH"]), cel(regle__classes=["ETH", "BTC"]),
+                  cel(f=[0, 1])):
+            self.assertEqual(code_de(executer.cellule, PRM, EP, c, POINTS, 16), "CELLULE/schema", (c["f"], c["regle"]))
+
     def test_surcharges_longues(self):
         """SB11-IMPRESSIONS-1 : une surcharge de sources.longues surcharge sources.poids_longues ; le prm de la cellule
         les porte, celui du lot reste intact. Mutation M-11D-15 (surcharge appliquée au prm du lot)."""

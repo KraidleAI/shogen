@@ -181,12 +181,13 @@ def appliquer(fonction, taches: list, processus: int) -> list:
 
 
 def plan(R_rep: int, ns: int, processus: int, borne: int = BORNE) -> list:
-    """Plages [(a, b)] de [0, R_rep), dans l'ordre, de T = borne·processus // ns réplications (la dernière au plus) :
-    durée d'un lot (b − a)·ns/processus ≤ borne, sur le coût mesuré ns par réplication (en ns ; adjudication 6 du G0,
-    90 min ; SHOGEN-SIM-BIS-C1-COUT-1) ; une réplication plus longue que la borne : EXEC/plan."""
+    """Plages [(a, b)] de [0, R_rep), dans l'ordre, de T = (borne // ns)·processus réplications (la dernière au plus) :
+    un lot tourne en ⌈(b − a)/processus⌉ ≤ borne // ns tours de ns, soit au plus la borne en temps de mur, sur le coût
+    mesuré ns par réplication (en ns ; adjudication 6 du G0, 90 min ; SHOGEN-SIM-BIS-C1-COUT-1 ; C-1 de la G2 de
+    SB-11) ; une réplication plus longue que la borne : EXEC/plan."""
     if not all(type(v) is int and v >= 1 for v in (R_rep, ns, processus, borne)) or ns > borne:
         raise commun.Refus("EXEC/plan", f"R = {R_rep!r}, {ns!r} ns par réplication, borne {borne!r} ns")
-    t = borne * processus // ns
+    t = borne // ns * processus
     return [(a, min(a + t, R_rep)) for a in range(0, R_rep, t)]
 
 

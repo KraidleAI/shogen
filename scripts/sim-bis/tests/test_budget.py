@@ -22,12 +22,14 @@ class TestBudget(unittest.TestCase):
         self.assertEqual(vus, [1, 3])
 
     def test_budget(self):
-        """Durées 5 et 12 ns, R = 10, deux processus, borne 30 ns : coût retenu = le maximum mesuré, 12 ; lots de
-        ⌊30·2/12⌋ = 5 réplications : (0, 5), (5, 10) ; durée estimée ⌈10·12/2⌉ = 60 ns ; aucune durée : EXEC/budget.
-        Mutations M-11T-04 (moyenne au lieu du maximum), M-11T-05 (processus ignorés dans la durée), M-11T-06 (borne
-        par défaut), M-11T-07 (aucune mesure admise)."""
-        self.assertEqual(executer.budget([5, 12], 10, 2, 30), {"ns_max": 12, "ns_total": 17, "mesures": 2,
-                                                               "plages": [(0, 5), (5, 10)], "duree_ns": 60})
+        """Durées 12 puis 5 ns (le maximum en premier), R = 10, deux processus, borne 30 ns : coût retenu = le maximum
+        mesuré, 12 ; lots de ⌊30/12⌋·2 = 4 réplications, deux tours de 12 ns chacun, 24 ≤ 30 (C-1 de la G2 de SB-11) :
+        (0, 4), (4, 8), (8, 10) ; durée estimée ⌈10·12/2⌉ = 60 ns ; aucune durée : EXEC/budget. Mutations M-11T-04
+        (moyenne au lieu du maximum), M-11T-05 (processus ignorés dans la durée), M-11T-06 (borne par défaut),
+        M-11T-07 (aucune mesure admise), G-22 (dernière durée au lieu du maximum), M-11V-01 (⌊borne·processus/ns⌋),
+        M-11V-03 (processus ignorés dans le plan)."""
+        self.assertEqual(executer.budget([12, 5], 10, 2, 30), {"ns_max": 12, "ns_total": 17, "mesures": 2,
+                                                               "plages": [(0, 4), (4, 8), (8, 10)], "duree_ns": 60})
         self.assertEqual(executer.budget([7], 3, 2, 30)["duree_ns"], 11)
         with self.assertRaises(commun.Refus) as r:
             executer.budget([], 10, 2, 30)

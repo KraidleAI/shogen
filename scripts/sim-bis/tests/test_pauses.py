@@ -101,6 +101,15 @@ class TestPauses(unittest.TestCase):
                     z["episodes"], z["vides"] = z["episodes"] + y["episodes"], z["vides"] + y["vides"]
             self.assertEqual(r[s], ref, s)
 
+    def test_meme_c1_dans_les_deux_strates(self):
+        """C-9 de la G2 de SB-11 : C1 = (1/10, 5, 60) en calme et en stress (point partagé) : pauses_c1 rend les deux
+        strates, chacune égale à celle de l'appel où ce point n'est C1 que de cette strate (l'autre strate à
+        (1/100, 5, 60)). Mutant G-16 (première strate seule pour un point partagé)."""
+        cal = cal_e1()
+        r = e1.pauses_c1(E1R, EP, cal, {"calme": P, "stress": P}, 1)
+        q = e1.pauses_c1(E1R, EP, cal, {"calme": P, "stress": P0}, 1)["calme"]
+        self.assertEqual(r, {"calme": q, "stress": e1.pauses_c1(E1R, EP, cal, {"calme": P0, "stress": P}, 1)["stress"]})
+
     def test_lignes_a_cote_d_intervalles(self):
         """Lignes du modèle à C1, puis la ligne « ecart » d'intervalles.txt de l'hôte et de la strate, recopiée avec
         son numéro (format à deux hôtes, texte synthétique) ; moyenne sous le contexte de r1, quantiles au rang le

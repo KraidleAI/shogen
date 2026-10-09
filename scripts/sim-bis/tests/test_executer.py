@@ -73,12 +73,18 @@ class TestFrequences(unittest.TestCase):
         exclusives) unites 1, k_crit 3, runs 3, n_prime 1 ; information insuffisante (unites, k_crit ou runs) 3 ;
         combinaisons « unites+k_crit+runs » 1, « k_crit+runs » 2, « n_prime » 1, de somme 4, le compte de NON
         ÉVALUABLE. Mutations M-11A-12 (combinaisons omises), M-11A-13 (n_prime compté en information insuffisante),
-        M-11A-14 (première cause seule comptée)."""
+        M-11A-14 (première cause seule comptée). C-2 de la G2 de SB-11 : une NON ÉVALUABLE de causes unites, k_crit,
+        runs et n_prime (regle.tester à n′_s = 1) compte en information insuffisante : 4 sur 7. Mutant G-01 (toutes
+        les causes exigées parmi unites, k_crit, runs)."""
         f = executer.frequences(self.R6)
         self.assertEqual(f, {"valeurs": {"REJETTE": 1, "NE REJETTE PAS": 1, "NON ÉVALUABLE": 4},
                              "causes": {"unites": 1, "k_crit": 3, "runs": 3, "n_prime": 1}, "insuffisante": 3,
                              "combinaisons": {"unites+k_crit+runs": 1, "k_crit+runs": 2, "n_prime": 1}})
         self.assertEqual(sum(f["combinaisons"].values()), f["valeurs"]["NON ÉVALUABLE"])
+        mixte = {"valeur": "NON ÉVALUABLE", "causes": ["unites", "k_crit", "runs", "n_prime"]}
+        f = executer.frequences(self.R6 + [mixte])
+        self.assertEqual((f["insuffisante"], f["causes"]["n_prime"], f["combinaisons"]["unites+k_crit+runs+n_prime"]),
+                         (4, 2, 1))
 
     def test_frequences_refus(self):
         """« NON TESTÉ (séquence) » (présentation de regle.strate, non une valeur du moteur), cause inconnue, causes
@@ -154,7 +160,8 @@ class TestLots(unittest.TestCase):
         """Entête différente : LOT/entete ; enregistrement retouché (empreinte), étiquette retouchée, JSON non
         canonique : LOT/forme ; i hors de la plage, plage vide, nom de cellule à « / » ou à « . » : LOT/indices ou
         LOT/nom. Mutations M-11B-08 (empreinte non recalculée), M-11B-09 (entête non comparée), M-11B-10 (forme
-        canonique non exigée)."""
+        canonique non exigée). C-3 de la G2 de SB-11 : lot dont les i sont permutés, empreinte recalculée sur
+        l'ordre permuté, JSON canonique : LOT/forme. Mutant G-03 (i des enregistrements non contrôlés)."""
         c, _h = executer.ecrire_lot(self.r, "N1", 0, 1, [{"i": 0, "v": 1}], ["e"])
         self.assertEqual(code_de(executer.lire_lots, self.r, "N1", 1, ["autre"]), "LOT/entete")
         with open(c, "rb") as f:
@@ -163,6 +170,15 @@ class TestLots(unittest.TestCase):
             with open(c, "wb") as f:
                 f.write(o.replace(avant, apres))
             self.assertEqual(code_de(executer.lire_lots, self.r, "N1", 1, ["e"]), "LOT/forme", apres)
+        c, _h = executer.ecrire_lot(self.r, "N3", 0, 2, [{"i": 0, "v": 0}, {"i": 1, "v": 1}], ["e"])
+        with open(c, "rb") as f:
+            tete, nl, corps = f.read().partition(commun.NL.encode("utf-8"))
+        o = json.loads(corps)
+        o["enregistrements"] = [{"i": 1, "v": 0}, {"i": 0, "v": 1}]
+        o["empreinte"] = executer.empreinte(o["enregistrements"])
+        with open(c, "wb") as f:
+            f.write(tete + nl + commun.json_canonique(o))
+        self.assertEqual(code_de(executer.lire_lots, self.r, "N3", 2, ["e"]), "LOT/forme")
         for cel, a, b, e, code in (("N2", 0, 1, [{"i": 1}], "LOT/indices"), ("N2", 1, 1, [], "LOT/nom"),
                                    ("E1/1", 0, 1, [{"i": 0}], "LOT/nom"), ("N1.x", 0, 1, [{"i": 0}], "LOT/nom")):
             self.assertEqual(code_de(executer.ecrire_lot, self.r, cel, a, b, e, ["e"]), code, cel)
@@ -182,14 +198,20 @@ class TestProcessus(unittest.TestCase):
     def test_plan_90_min(self):
         """Adjudication 6 du G0 (lots de 90 min au plus), C1-COUT-1 : 1 000 réplications de 60 s, un processus : lots de
         90 (5 400 s), le dernier de 10 ; 200 réplications de 30 s, deux processus : un lot ; 400 : 360 et 40 ; 10
-        réplications de 5 401 s : EXEC/plan. Mutations M-11C-02 (processus ignorés), M-11C-03 (borne dépassée d'une
-        réplication)."""
+        réplications de 5 401 s : EXEC/plan. C-1 de la G2 de SB-11, compte non multiple du nombre de processus : 10⁴
+        réplications de 41 s, quatre processus : ⌊5 400/41⌋ = 131 tours (5 371 s ; 132 en feraient 5 412), lots de
+        131·4 = 524, 20 lots, le dernier (9 956, 10 000) ; chaque lot en ⌈(b − a)/4⌉·41 s ≤ 5 400 s. Mutations
+        M-11C-02 (processus ignorés), M-11C-03 (borne dépassée d'une réplication), M-11V-01 (⌊borne·processus/ns⌋ :
+        lots de 526, 132 tours), M-11V-03 (processus ignorés dans le plan corrigé)."""
         s = 10 ** 9
         p = executer.plan(1000, 60 * s, 1)
         self.assertEqual((len(p), p[:1], p[-2:]), (12, [(0, 90)], [(900, 990), (990, 1000)]))
         self.assertEqual(executer.plan(200, 30 * s, 2), [(0, 200)])
         self.assertEqual(executer.plan(400, 30 * s, 2), [(0, 360), (360, 400)])
         self.assertEqual(code_de(executer.plan, 10, 5401 * s, 4), "EXEC/plan")
+        p = executer.plan(10000, 41 * s, 4)
+        self.assertEqual((len(p), p[:2], p[-1]), (20, [(0, 524), (524, 1048)], (9956, 10000)))
+        self.assertEqual(max(-(-(b - a) // 4) for a, b in p) * 41, 5371)
 
 
 def rv(v, *c):

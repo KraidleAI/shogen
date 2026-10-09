@@ -191,6 +191,48 @@ class TestRegleCellule(unittest.TestCase):
                 code = e.code
         self.assertEqual(code, "VARIANTE/oracle")
 
+    def test_n_prime_aux_sites_d_appel(self):
+        """C-6 de la G2 de SB-11 (E-S-24, E-S-35) : fixture de test_chaine_a_la_main où n′_s < n_s (n_s de calme porté
+        à 12 000, couche dégradée au repli ; garde : n′ de calme < 12 000), critère collectif actif : regle.retraits
+        reçoit les n′_s retenus des deux strates à chaque classe, regle.filtrer le n′_s de sa strate, jamais n_s.
+        Mutants G-09 (n_s aux retraits), G-12 (n_s au critère collectif)."""
+        p = dict(P99, calendrier=dict(P99["calendrier"], n_par_semaine={"calme": 12000, "stress": 2736}))
+        c = cel2(couche__grille="degradee", couche__repli=True, regle=dict(CEL["regle"], classes=["BTC", "ETH"],
+                                                                           absorption=True))
+        with mock.patch.object(regle, "retraits", wraps=regle.retraits) as rt, mock.patch.object(
+                regle, "filtrer", wraps=regle.filtrer) as fl:
+            r = executer.replication(p, EP, c, POINTS, 1, 0)
+        n = {s: r["strates"][s]["n"] for s in ("calme", "stress")}
+        self.assertLess(n["calme"], 12000)
+        self.assertEqual([x.args[1] for x in rt.call_args_list], [n, n])
+        self.assertEqual([x.args[1] for x in fl.call_args_list], [n["calme"]] * 2 + [n["stress"]] * 2)
+
+    def test_surcharges_jusqu_aux_sources(self):
+        """C-7 de la G2 de SB-11 (source des données) : la surcharge {longues : [60], poids_longues : [1]} de la cellule
+        (PRM : [60, 1 440, 4 320] et [1, 1, 1]) atteint sources.Replication et observateurs.Couche lors d'une
+        réplication ; le prm du lot reste intact. Mutant G-10 (sources.Replication sur le prm du lot), M-11V-02
+        (observateurs.Couche sur le prm du lot)."""
+        s = {"longues": [60], "poids_longues": [1]}
+        with mock.patch.object(sources, "Replication", wraps=sources.Replication) as rp, mock.patch.object(
+                observateurs, "Couche", wraps=observateurs.Couche) as co:
+            executer.replication(P99, EP, cel2(surcharges=s, regle=dict(CEL["regle"], classes=["BTC"])), POINTS, 1, 200)
+        self.assertEqual([{k: x.args[0]["sources"][k] for k in s} for x in rp.call_args_list + co.call_args_list],
+                         [s, s])
+        self.assertEqual(P99["sources"]["longues"], [60, 1440, 4320])
+
+    def test_r_de_la_cellule(self):
+        """C-8 de la G2 de SB-11 (Q-S-06, complément 1) : une cellule à R = 999 (R_approche) sous un prm à R = 99
+        transmet 999 à regle.oracle, à variante.deux_modes et à regle.loi_evenements (deux strates, une classe), jamais
+        le R du prm. Mutants G-11 (R du prm passé à la règle), M-11V-04 (à la variante), M-11V-05 (au compte
+        d'événements)."""
+        c = cel2(regle=dict(CEL["regle"], R=999, classes=["BTC"], variante=[4], evenements=1))
+        with mock.patch.object(regle, "oracle", wraps=regle.oracle) as o, mock.patch.object(
+                variante, "deux_modes", wraps=variante.deux_modes) as d, mock.patch.object(
+                regle, "loi_evenements", wraps=regle.loi_evenements) as ev:
+            executer.replication(P99, EP, c, POINTS, 1, 0)
+        self.assertEqual(([x.args[7] for x in o.call_args_list], [x.args[7] for x in d.call_args_list],
+                          [x.args[5] for x in ev.call_args_list]), ([999] * 2, [999] * 2, [999] * 2))
+
 
 if __name__ == "__main__":
     unittest.main()
