@@ -7,6 +7,7 @@ des autres places définies (moyenne des deux du milieu pour un nombre pair) ; m
 from __future__ import annotations
 
 import math
+import os
 from decimal import Context, Decimal, localcontext
 from fractions import Fraction
 
@@ -193,3 +194,33 @@ def descriptifs(prm: dict, actif: str, r: dict) -> list:
         + f" ; τ_agr < τ_places : {'oui' if ag['sous_places'] else 'non'}")
     return out
 
+
+def corps(prm: dict, res: dict) -> list:
+    """Valeurs décisives et leurs termes, par actif et par classe (E-CA-22)."""
+    out = []
+    for a, r in res.items():
+        s, tp, ag, d = r["sigma"], r["places"], r["agregateurs"], r["detail_terme"]
+        out += [f"[{a}] mode {r['mode']} ; places {', '.join(r['closes'])} ; N_min {socle.lecture(prm)['n_min'][a]}",
+                f"[{a}] σ : place_horodatee {s['place_horodatee']} s (troisième terme {r['terme']}, P99 des âges par "
+                "strate " + " ; ".join(f"{st} N {n} P99 {p99} min" for st, (n, p99, _x) in d.items()) + ") ; "
+                f"sans_horodatage aucun ; agregateur {s['agregateur']} s ; oracle_chainlink {s['oracle_chainlink']} s",
+                f"[{a}] τ des places {tp['tau']} ; drapeau {tp['drapeau'] or 'aucun'}" + "".join(
+                    f" ; {st} N {n} P99,9 {affiche(q)} P99 {affiche(q99)}" for st, (n, q, q99, _m) in
+                    tp.get("strates", {}).items()),
+                f"[{a}] τ des agrégateurs {ag['tau']} (règle {ag['regle']}) ; drapeau {ag['drapeau'] or 'aucun'}",
+                f"[{a}] τ des oracles {r['oracle'][0]}"]
+    return out
+
+
+def septembre(prm: dict, bruts: str, btc: dict) -> list:
+    """Fenêtre descriptive (septembre 2026, sans ses places exclues), jamais décisive : τ, σ ou le refus, par actif."""
+    out, fen = [], prm["fenetre_descriptive"]
+    for a in socle.ACTIFS:
+        try:
+            pl = [p for p in socle.lecture(prm)["places"][a] if p not in fen["sans"]]
+            r = calcul_actif(prm, a, {p: bougies.charger(prm, bruts, "descriptive", p, a, fen) for p in pl}, fen, btc)
+            out.append(f"[{a}] septembre : τ des places {r['places']['tau']} ; σ des places horodatées "
+                       f"{r['sigma']['place_horodatee']} s ; τ des agrégateurs {r['agregateurs']['tau']}")
+        except socle.Refus as e:
+            out.append(f"[{a}] septembre : {e}")
+    return out
