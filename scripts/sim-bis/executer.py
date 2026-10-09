@@ -16,8 +16,9 @@ strates, F séparé en propre et hors-enveloppe par (classe, strate, hôte) ; di
 effectifs de F agrégés (SB11-IMPRESSIONS-1). SB-11r : pannes longues rejouées par durée (N4), absences des observateurs
 par durée (N5), sauts réalisés et panne initiale visible par strate selon T_début (N9), et leurs distributions
 (SB11-IMPRESSIONS-1 ; avis Q-T2-5, Q-T3-1, Q-T3-2). SB-11t : budget mesuré (E-S-46) : durée de chaque réplication en ns,
-coût retenu, plan de lots et durée estimée. Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance,
-aucune fonction de libm."""
+coût retenu, plan de lots et durée estimée. SB-11x : strate à n′_s = 0, enregistrement de séries vides sans appel à la
+règle (SHOGEN-SIM-BIS-NPRIME-NUL-1). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune
+fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -361,6 +362,24 @@ def _tester(p: dict, rg: dict, i: int, a: tuple) -> dict:
     return out
 
 
+def _vide(p: dict, rg: dict) -> dict:
+    """Classe d'une strate à n′_s = 0, aucune fenêtre retenue (SB-11x ; SHOGEN-SIM-BIS-NPRIME-NUL-1, option (b)
+    adjugée le 2026-10-09 ; E-S-28, E-S-52) : ce que regle.tester rend sur des séries vides, sans appel à la règle
+    (n ≥ 1 y reste exigé, REGLE/entier, contrat RB-6 §4) : NON ÉVALUABLE, causes list(regle.CAUSES) (0 unité en écart,
+    C1 = 0 ≤ seuil, 0 run, 2·0 < n_s), K, runs, unites nuls, S nul si suivie (sinon None), aucun arrêt anticipé
+    (C = r = R de la cellule, C1 = 0, C_S = R si S suivie, sinon None) ; « avec » : rien de retiré, indice 0 ;
+    variante à chaque diviseur : mêmes valeurs sans S, C_S None, N = variante.demi(0, d) = 0."""
+    def bloc(suivie):
+        return {"valeur": VALEURS[2], "causes": list(regle.CAUSES), "C": rg["R"], "C1": 0,
+                "C_S": rg["R"] if suivie else None, "r": rg["R"], "K": 0, "runs": 0, "unites": 0}
+    out = dict(bloc(rg["S"]), S=0 if rg["S"] else None)
+    if rg["absorption"]:
+        out["avec"] = dict(bloc(rg["S"]), S=out["S"], retirees=[], indice=Fraction(0))
+    for d in rg["variante"]:
+        out.setdefault("variante", {})[str(d)] = dict(bloc(False), N=variante.demi(0, d, p))
+    return out
+
+
 def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) -> dict:
     """Réplication i ≥ 0 d'une cellule (cellule ; W semaines, échelle de calendrier.echelle) : T_début tiré sur le flux
     « debut » d'indice 0 (E-S-14, Q-S-08 ; E-S-41) ; masques de strate sur T_max ; état vrai (sources.Replication),
@@ -369,7 +388,8 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
     BTC de la strate après retraits (Q-T3-15) ; séries D comprimées et R1-2 (regle.tester) par classe ; valeurs de la
     strate (regle.strate) ; impression de M_j : fenêtres de la strate à M_j = 0..M (ADR-0029 l.97 a). SB-11g : _tester
     (oracle d'E-S-29, S, critère collectif, variante) ; compte d'événements sur la suite comprimée des i < evenements
-    premières réplications (E-S-34 ; P-3)."""
+    premières réplications (E-S-34 ; P-3). SB-11x : strate à n′_s = 0, _vide par classe, ni oracle d'E-S-29 ni
+    compte d'événements dans cette strate (NPRIME-NUL-1)."""
     c = cellule(prm, ep, cel, points, W)
     p, nom, rg, cal, st = c["prm"], c["nom"], c["regle"], prm["calendrier"], prm["calibration"]["strates"]
     e = calendrier.echelle(cal, W)
@@ -388,11 +408,11 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
     for s in st:
         prem = regle.premiere([u for u in pools["BTC"] if (u, s) not in rt["BTC"]])
         segs = calendrier.segments(ret[s]["masque"])
-        res = {}
+        res, vide = {}, n[s] == 0        # n′_s = 0 : _vide, ni règle, ni variante, ni événements (NPRIME-NUL-1)
         for cl in rg["classes"]:
             series = {u: calendrier.comprimer(cons[u, cl][0], segs) for u in pools[cl] if (u, s) not in rt[cl]}
-            res[cl] = _tester(p, rg, i, (series, prem, graine, s, n[s], e["n"][s]))
-            if i < rg["evenements"]:
+            res[cl] = _vide(p, rg) if vide else _tester(p, rg, i, (series, prem, graine, s, n[s], e["n"][s]))
+            if i < rg["evenements"] and not vide:
                 ev = regle.loi_evenements(series, prem, graine, s, n[s], rg["R"], p)
                 res[cl]["evenements"] = {str(g): x for g, x in ev.items()}
         out["strates"][s] = {
