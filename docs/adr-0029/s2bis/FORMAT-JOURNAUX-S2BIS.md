@@ -680,12 +680,20 @@ collecteur.
    2^64 − 1, s'il est donné ; `certReq` vrai ; ni `reqPolicy` ni `extensions`. Sans nonce, les octets sont ceux de
    `openssl ts -query -data <fichier> -sha256 -cert -no_nonce` (`test_tetes`). Une empreinte qui n'a pas 32 octets,
    un nonce hors de ces bornes : refus nommés `JETON/empreinte`, `JETON/nonce`.
-2. **Statut d'une réponse** (RFC 3161 §2.4.2) : la réponse est une SEQUENCE qui couvre ses octets ; son premier
-   élément, `PKIStatusInfo`, une SEQUENCE, commence par `PKIStatus`, INTEGER d'un octet de 0 à 5 ; le jeton
-   (`TimeStampToken`, une SEQUENCE qui finit la réponse) est présent si et seulement si le statut vaut 0 ou 1.
-   Longueurs : forme courte sous 128 octets, forme longue minimale de 1 à 4 octets au-delà. Tout autre cas est le refus
-   `JETON/reponse`. Rien d'autre n'est lu : la signature, l'empreinte et le nonce du jeton se contrôlent hors ligne
-   (`openssl ts -verify`, comme `scripts/sceau/verify.sh`).
+2. **Statut d'une réponse** (RFC 3161 §2.4.2) : la réponse est une SEQUENCE qui couvre ses octets ; son premier élément,
+   `PKIStatusInfo`, une SEQUENCE, commence par `PKIStatus`, INTEGER d'un octet de 0 à 5 ; le jeton (`TimeStampToken`,
+   une SEQUENCE qui finit la réponse) est présent si et seulement si le statut vaut 0 ou 1. Longueurs : forme courte
+   sous 128 octets, forme longue minimale de 1 à 4 octets au-delà. Tout autre cas est le refus `JETON/reponse`.
+   **Liaison du jeton à la requête** (CB-15d ; C-1 de la G2 de P2B ; RFC 3161 §2.2 : « If any of the verifications above
+   fails, the TimeStampToken SHALL be rejected » ; §2.4.1, §2.4.2) : le jeton est un `ContentInfo` de type id-signedData
+   (1.2.840.113549.1.7.2) dont le `SignedData` encapsule un contenu de type id-ct-TSTInfo (1.2.840.113549.1.9.16.1.4)
+   (octets des deux identifiants relevés par `openssl asn1parse`) ; au `TSTInfo`, l'algorithme du `messageImprint` est
+   SHA-256 aux paramètres NULL et son empreinte celle de la requête (sha256 du manifeste, point 3) ; son `nonce` est
+   celui de la requête, absent si la requête n'en porte pas (plus strict que la RFC, qui ne l'interdit pas). Un chemin
+   DER illisible est le refus `JETON/reponse`, un écart le refus `JETON/liaison`. Ne sont pas contrôlés ici, limite
+   déclarée : la signature et le certificat de la TSA (aucune vérification RSA ni ECDSA en bibliothèque standard ; ils
+   se contrôlent hors ligne, `openssl ts -verify -queryfile`, comme `scripts/sceau/verify.sh`) ; le `genTime` (le nonce
+   porte la fraîcheur, RFC 3161 §2.2).
 3. **Manifeste du jour** : ligne JSON canonique (§1.2) `{jour, observateur, tetes}` : `jour`, jour UTC (AAAA-MM-JJ) ;
    `observateur` ; `tetes` : les têtes lues au dépôt, triées par observateur puis journal. Son sha256 est l'empreinte
    de la requête.
@@ -695,17 +703,27 @@ collecteur.
    par écriture atomique : fichier temporaire `.<nom>.tmp` écrit et synchronisé, renommé, dossier synchronisé ; un
    lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel. Un échec de l'export ne lève pas : il est
    noté par le nom de son exception et porté par l'enregistrement `tetes` suivant (point 5).
-5. **Lecture du dépôt** (CB-15b) : les fichiers de tête dont le nom suit la grammaire du point 4, sauf celui du
-   journal qui lit, sont lus dans l'ordre des noms, 16 au plus ; chacun est une tête valide ou un refus nommé, un seul
-   par fichier : `TETES/lecture` (fichier illisible), `TETES/taille` (plus de 1 024 octets), `TETES/forme` (pas une
-   ligne JSON canonique aux clés exactes, ou entier de plus de 640 chiffres), `TETES/champs` (observateur ou journal
-   autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à 10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui
-   n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible : `TETES/depot`. Champs rendus : `tetes` (têtes
-   valides), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de 16), `export` (échec du dernier export ou null).
-   Toute valeur rendue est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
-   (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
+5. **Lecture du dépôt** (CB-15b) : les fichiers de tête dont le nom suit la grammaire du point 4, sauf celui du journal
+   qui lit, sont lus dans l'ordre des noms : ceux de l'observateur qui lit d'abord, 16 au plus, puis ceux des autres, 16
+   au plus (CB-15d, C-2 de la G2 de P2B : sa tête est ancrée quoi qu'il arrive au dépôt, AVIS Q-D-03, point 1) ; chacun
+   est une tête valide ou un refus nommé, un seul par fichier : `TETES/lecture` (fichier illisible), `TETES/taille`
+   (plus de 1 024 octets), `TETES/forme` (pas une ligne JSON canonique aux clés exactes, ou entier de plus de 640
+   chiffres), `TETES/champs` (observateur ou journal autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à
+   10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible :
+   `TETES/depot`. Champs rendus : `tetes` (têtes valides, les siennes d'abord), `refus` (`[nom, code]`), `ignores`
+   (fichiers au-delà de ces bornes), `export` (échec du dernier export ou null). Toute valeur rendue est admise par
+   l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).
 6. **Enregistrement `tetes`** (CB-15c ; E-C-35) : avec un dépôt, la fenêtre qui clôt l'heure ((`ws` + w) multiple de
    3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
    lecture du dépôt (point 5), faite au relevé de l'échéance : les têtes des autres journaux sont consignées dès leur
    lecture. Après le marqueur et le point de contrôle, la tête du point, celle que rend l'écrivain, est exportée
    (point 4). Sans dépôt, ni l'un ni l'autre.
+7. **Jeton du jour** (CB-15d ; E-C-36 ; AVIS Q-D-03, point 1) : un `<observateur>-<jour>.tsr` présent au dépôt : « déjà
+   émis », rien n'est redemandé. Sinon : manifeste (point 3) des têtes valides du dépôt (point 5, les siennes d'abord,
+   hors de la borne des autres ; aucune exclue ; sans tête de l'observateur, refus `JETON/tete`, rien n'est écrit),
+   écrit en `<observateur>-<jour>.manifeste`, puis requête (point 1, au nonce donné) en `<observateur>-<jour>.tsq`, par
+   écriture atomique (point 4). L'envoi ne part que si une fonction d'envoi est donnée (armement : point 8) ; sans elle,
+   « non armé ». Armé, la réponse dont le statut (point 2) vaut 0 ou 1 et dont le jeton est lié à la requête (point 2,
+   liaison) est conservée en `<observateur>-<jour>.tsr` (« émis ») ; un autre statut : refus `JETON/rejet` ; une réponse
+   mal formée : `JETON/reponse` ; le jeton d'une autre requête (autre empreinte, autre nonce, sans nonce, autre
+   algorithme) : `JETON/liaison` ; dans ces trois cas, rien n'est conservé et le jour reste à demander.

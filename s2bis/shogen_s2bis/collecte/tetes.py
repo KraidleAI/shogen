@@ -7,7 +7,12 @@ JSON canonique du journal (FORMAT §1.2), dont le sha256 est l'empreinte horodat
 lisible ou non) ; à chaque point de contrôle, la tête du journal y est exportée par écriture atomique ; les fichiers de
 tête des autres journaux y sont lus, strictement, bornés en nombre et en taille, pour l'enregistrement `tetes`. Ni
 l'export ni la lecture ne lèvent : le dépôt ne casse jamais la boucle, et aucune valeur lue n'est un entier que
-l'écrivain refuserait (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1)."""
+l'écrivain refuserait (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1). CB-15d : jeton du jour : manifeste des têtes du dépôt, les
+siennes lues d'abord, hors de la borne des autres (C-2), et requête (nonce donné par l'appelant), écrits au dépôt ;
+envoi par la fonction que donne l'appelant, seulement s'il en donne une (E-C-36) ; réponse accordée liée à la requête
+(TSTInfo : algorithme, empreinte, nonce ; RFC 3161 §2.2 ; C-1), puis conservée en `.tsr` ; la signature et le certificat
+de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/verify.sh`)."""
+import hashlib
 import json
 import os
 import re
@@ -19,10 +24,11 @@ SEQUENCE, INTEGER, BOOLEEN, OCTETS, NUL = 0x30, 0x02, 0x01, 0x04, 0x05
 NOM = re.compile("([a-z0-9]{1,16})-([a-z]{1,16})[.]tete")   # <observateur>-<journal>.tete
 CLES, TAILLE, NOMBRE = {"journal", "observateur", "seq", "sha256", "ws"}, 1024, 16   # octets, têtes lues au plus
 BORNES = {"seq": 10 ** 18, "ws": 10 ** 12}                  # entiers d'une tête lue : 0 ≤ v < borne
+SIGNE, TST = bytes.fromhex("2a864886f70d010702"), bytes.fromhex("2a864886f70d0109100104")   # contenus d'OID (G1)
 
 
 class RefusJeton(ValueError):
-    """Refus nommé (`code`) : JETON/empreinte, JETON/nonce, JETON/reponse."""
+    """Refus nommé (`code`) : JETON/empreinte, JETON/nonce, JETON/reponse, JETON/tete, JETON/rejet, JETON/liaison."""
     def __init__(self, code, detail):
         super().__init__(f"{code} : {detail}")
         self.code = code
@@ -81,6 +87,41 @@ def statut(tsr):
     if s not in range(6) or (f < fin) != (s in (0, 1)) or f < fin and _element(tsr, f, fin)[::2] != (SEQUENCE, fin):
         raise RefusJeton("JETON/reponse", f"statut {s}, jeton {'présent' if f < fin else 'absent'}")
     return s
+
+
+def _sous(o, x, etiquette):
+    """Éléments qui couvrent le contenu de l'élément `x` (étiquette, début, fin), d'étiquette `etiquette` ; sinon
+    JETON/reponse."""
+    if x[0] != etiquette:
+        raise RefusJeton("JETON/reponse", f"étiquette {x[0]:#04x} en {x[1]}, {etiquette:#04x} attendue")
+    r, i = [], x[1]
+    while i < x[2]:
+        r.append(_element(o, i, x[2]))
+        i = r[-1][2]
+    return r
+
+
+def lier(tsr, empreinte, nonce):
+    """Liaison d'une réponse accordée à la requête (RFC 3161 §2.2 ; §2.4.1, §2.4.2) : jeton ContentInfo id-signedData,
+    SignedData, eContent id-ct-TSTInfo ; au TSTInfo, algorithme SHA-256 (paramètres NULL), empreinte `empreinte`,
+    nonce `nonce` (absent si None). Chemin DER illisible : JETON/reponse ; écart : JETON/liaison. La signature et le
+    certificat de la TSA se contrôlent hors ligne (`openssl ts -verify`)."""
+    try:
+        ci = _sous(tsr, _sous(tsr, _element(tsr, 0, len(tsr)), SEQUENCE)[1], SEQUENCE)
+        eci = _sous(tsr, _sous(tsr, _sous(tsr, ci[1], 0xA0)[0], SEQUENCE)[2], SEQUENCE)
+        tst = _sous(tsr, _sous(tsr, _sous(tsr, eci[1], 0xA0)[0], OCTETS)[0], SEQUENCE)
+        alg, h = _sous(tsr, tst[2], SEQUENCE)
+    except (IndexError, ValueError):
+        raise RefusJeton("JETON/reponse", "jeton incomplet") from None
+    v = lambda x: (x[0], tsr[x[1]:x[2]])                     # étiquette et contenu d'un élément
+    if (v(ci[0]), v(eci[0])) != ((6, SIGNE), (6, TST)):
+        raise RefusJeton("JETON/reponse", "jeton hors SignedData ou hors TSTInfo")
+    for champ, ecart in (("algorithme", v(alg) != (SEQUENCE, SHA256 + _der(NUL, b""))),
+                         ("empreinte", v(h) != (OCTETS, empreinte)),
+                         ("nonce", [v(x) for x in tst[5:] if x[0] == INTEGER] != (
+                             [] if nonce is None else [(INTEGER, _entier(nonce)[2:])]))):
+        if ecart:
+            raise RefusJeton("JETON/liaison", f"{champ} du TSTInfo autre que celui de la requête")
 
 
 def manifeste(jour, observateur, tetes):
@@ -149,18 +190,52 @@ class Depot:
             self.echec = type(e).__name__
 
     def lire(self):
-        """Champs de l'enregistrement `tetes` : `tetes`, têtes valides des fichiers de tête du dépôt, sauf celui de ce
-        journal, NOMBRE au plus dans l'ordre des noms ; `refus`, [nom, code] des autres ; `ignores`, fichiers au-delà
-        de NOMBRE ; `export`, échec du dernier export ou null."""
+        """Champs de l'enregistrement `tetes` : `tetes`, `refus`, `ignores` de `lire_tetes`, sauf le fichier de ce
+        journal, les têtes de l'observateur d'abord (C-2) ; `export`, échec du dernier export, ou null."""
         r = {"tetes": [], "refus": [], "ignores": 0, "export": self.echec}
         try:
-            noms = [(n, m) for n in sorted(os.listdir(self.dossier)) if (m := NOM.fullmatch(n)) and
-                    m.groups() != (self.observateur, self.journal)]
+            r["tetes"], r["refus"], r["ignores"] = lire_tetes(self.dossier, (self.observateur, self.journal),
+                                                               self.observateur)
         except Exception:                                           # attrape-tout : dossier absent ou illisible
             r["refus"].append([".", "TETES/depot"])
-            return r
-        r["ignores"] = max(0, len(noms) - NOMBRE)
-        for n, m in noms[:NOMBRE]:
-            t, code = _lire_tete(os.path.join(self.dossier, n), *m.groups())
-            r["tetes"].append(t) if t else r["refus"].append([n, code])
         return r
+
+
+def lire_tetes(dossier, exclure=None, propre=None):
+    """(têtes valides, refus [nom, code], fichiers au-delà des bornes) des fichiers de tête de `dossier`, sauf celui de
+    `exclure` (observateur, journal), dans l'ordre des noms : ceux de l'observateur `propre` d'abord, hors de la borne
+    des autres (C-2 ; AVIS Q-D-03 (1) : sa tête est ancrée quoi qu'il arrive au dépôt), NOMBRE au plus de chaque
+    sorte ; dossier illisible : OSError."""
+    noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure]
+    siens, autres = [x for x in noms if x[1][1] == propre], [x for x in noms if x[1][1] != propre]
+    tetes, refus = [], []
+    for n, m in siens[:NOMBRE] + autres[:NOMBRE]:
+        t, code = _lire_tete(os.path.join(dossier, n), *m.groups())
+        tetes.append(t) if t else refus.append([n, code])
+    return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE)
+
+
+def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync):
+    """Jeton du jour (AVIS Q-D-03, point 1) ; rend (état, fichier, sha256 de ses octets). Un `.tsr` du jour présent :
+    « déjà émis », rien n'est redemandé. Sinon manifeste des têtes valides du dépôt, les siennes d'abord (JETON/tete
+    sans tête de l'observateur) et requête au `nonce`, écrits au dépôt ; sans `envoyer`, « non armé » ; armé,
+    `envoyer(requête)` rend la réponse : conservée si son statut vaut 0 ou 1 et qu'elle est liée à la requête
+    (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé."""
+    nom = os.path.join(dossier, f"{observateur}-{jour}")
+    if os.path.exists(nom + ".tsr"):
+        return "déjà émis", f"{observateur}-{jour}.tsr", journal._empreinte(nom + ".tsr")[0]
+    lues = lire_tetes(dossier, propre=observateur)[0]
+    if not any(t["observateur"] == observateur for t in lues):
+        raise RefusJeton("JETON/tete", f"aucune tête de {observateur} au dépôt")
+    m = manifeste(jour, observateur, lues)
+    tsq = requete(emp := hashlib.sha256(m).digest(), nonce)
+    for suffixe, octets in ((".manifeste", m), (".tsq", tsq)):
+        ecrire(dossier, f"{observateur}-{jour}{suffixe}", octets, fsync)
+    if envoyer is None:
+        return "non armé", f"{observateur}-{jour}.tsq", hashlib.sha256(tsq).hexdigest()
+    tsr = envoyer(tsq)
+    if (s := statut(tsr)) not in (0, 1):
+        raise RefusJeton("JETON/rejet", f"statut {s}")
+    lier(tsr, emp, nonce)                                   # C-1 : un jeton d'une autre requête n'est jamais gardé
+    ecrire(dossier, f"{observateur}-{jour}.tsr", tsr, fsync)
+    return "émis", f"{observateur}-{jour}.tsr", hashlib.sha256(tsr).hexdigest()

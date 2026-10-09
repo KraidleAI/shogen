@@ -2120,3 +2120,39 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 312 tests ; plancher du job : 312, égalité exigée (`--egal`).
+
+## CB-15d (2026-10-08) : jeton du jour, `.tsr` conservé et journalisé (E-C-36)
+
+Objet : jeton du jour (AVIS Q-D-03, point 1 ; FORMAT §16.5, §16.7) : manifeste des têtes valides du dépôt, dont au moins
+une de l'observateur, et requête au nonce donné, écrits au dépôt ; envoi seulement par une fonction donnée ; réponse
+accordée conservée en `.tsr`, jamais redemandée le même jour ; ses têtes lues d'abord. Correction de la G2 de P2B
+(2026-10-08) : la réponse accordée est liée à la requête avant d'être conservée (C-1 ; RFC 3161 §2.2 : contenus
+SignedData et TSTInfo ; au TSTInfo, algorithme SHA-256, empreinte du manifeste, nonce ; refus `JETON/liaison` ou
+`JETON/reponse`, rien de conservé ; signature et certificat contrôlés hors ligne, limite déclarée), éprouvée sur des
+réponses d'`openssl ts -reply` d'une TSA jetable à clé détruite (juste, autre empreinte, autre nonce, sans nonce) ; une
+réponse au statut 1 est conservée (G-01) ; les têtes de l'observateur sont lues d'abord, hors de la borne des autres
+(C-2) ; le champ `jeton` du `tetes` passe à CB-15e (R-25) (FORMAT §16.2, §16.5, §16.7).
+
+Rouge : `lire_tetes` et `jeton` d'interface, 5 tests en échec d'assertion. Rouges de la correction (correction retirée
+du code, test gardé ; python3.12 -X dev -W error) : R-C1 (ROUGE D'ASSERTION : FAIL 1, ERROR 0) ; R-C2 (ROUGE D'ASSERTION
+: FAIL 1, ERROR 0) ; R-G01 (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 241 | — |
+| `tests/test_tetes.py` | 377 | 19 (4 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 18 mutants (9 de la phase 1, 9 neufs de la correction),
+18 tués (17 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : jeton du jour redemandé,
+jeton sans tête de l'observateur, sa tête exclue du manifeste, requête non écrite, rejet conservé, réponse non
+contrôlée, nonce omis, armement inversé, plancher non relevé, C-1 : empreinte du TSTInfo non contrôlée, C-1 : nonce du
+TSTInfo non contrôlé, C-1 : algorithme du TSTInfo non contrôlé, C-1 : types de contenu (SignedData, TSTInfo) non
+contrôlés, C-1 : liaison au nonce absent, C-1 : écart de liaison sous le code d'une réponse mal formée, C-2 : la borne
+des autres appliquée à ses têtes, C-2 : ses têtes non lues d'abord, C-2 : têtes ignorées comptées sous une seule borne.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 316 tests ; plancher du job : 316, égalité exigée (`--egal`).

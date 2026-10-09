@@ -6,8 +6,12 @@ Octets de référence produits hors du code (journal G1 de CB-15a) : `openssl ts
 (forme DER des longueurs : X.690, non détenue) ; manifeste écrit à la main. CB-15b, E-C-35 : fichiers de tête du dépôt
 (AVIS Q-D-03), écrits à la main par le test ; export atomique relevé par un espion de fsync. CB-15c : enregistrement
 `tetes` et export dans la fenêtre qui clôt l'heure (boucle à horloge injectée, journal relu par `chaine`, tête du point
-prise au `prec` qui le suit) ; option `--depot` et nom d'observateur au point d'entrée."""
+prise au `prec` qui le suit) ; option `--depot` et nom d'observateur au point d'entrée. CB-15d, E-C-36 : jeton du jour
+(manifeste et requête écrits à la main) ; réponses d'`openssl ts -reply` d'une TSA jetable à requêtes écrites à la main
+(G1 de C-1, clé détruite) : juste, autre empreinte, autre nonce, sans nonce ; ses têtes lues hors borne (C-2)."""
+import base64
 import contextlib
+import hashlib
 import io
 import json
 import os
@@ -111,6 +115,33 @@ class Manifeste(unittest.TestCase):
 
 
 WS_H, A, B = 1791154740, "a" * 64, "b" * 64                  # 2026-10-04 22:59 UTC : fenêtre qui clôt l'heure de 23:00
+ACCORDEE = bytes.fromhex("3082010a3003020100" + JETON)                  # réponse accordée, jeton factice
+SHA512 = bytes.fromhex("0609608648016503040203")                        # OID de SHA-512 (openssl asn1parse, G1)
+JETONS = {n: base64.b64decode("".join(t.split())) for n, t in (           # openssl ts -reply : G1 de C-1
+    ("juste", """MIIB6zADAgEAMIIB4gYJKoZIhvcNAQcCoIIB0zCCAc8CAQMxDzANBglghkgBZQMEAgEFADBtBgsqhkiG9w0BCRABBKBeBFwwWgIBAQY
+    EKgMEATAxMA0GCWCGSAFlAwQCAQUABCCJCbMpU6pOXgNLsbZgT55f+rVJC2BqgVzbZlZEPInTfQIBAhgPMjAyNjEwMDgyMjI0MzBaAggBAgMEBQYHCDG
+    CAUgwggFEAgEBMDQwLzEtMCsGA1UEAwwkVFNBIGVzc2FpIEMtMSAoZml4dHVyZSwgc2FucyB2YWxldXIpAgEBMA0GCWCGSAFlAwQCAQUAoIGkMBoGCSq
+    GSIb3DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG9w0BCQUxDxcNMjYxMDA4MjIyNDMwWjAvBgkqhkiG9w0BCQQxIgQgIJXSLMnb1wo3NZT5KEprGBp
+    Xbt/Z+wbNFFroAA1LepAwNwYLKoZIhvcNAQkQAi8xKDAmMCQwIgQgLLoUu7Ebd32j2a3fHpimKxtviOVBE1LKMKrX3HV4ZdMwCgYIKoZIzj0EAwIERzB
+    FAiAwhA+Ez8QkzzALUJsp8CFMzYLAcUjo6VOE1v3CvhvzygIhAPoemxbE3AZCMoXvu/UUhtdpKvYSp1AlAktjilL309AX"""),
+    ("autre_empreinte", """MIIB6zADAgEAMIIB4gYJKoZIhvcNAQcCoIIB0zCCAc8CAQMxDzANBglghkgBZQMEAgEFADBtBgsqhkiG9w0BCRABBKBeB
+    FwwWgIBAQYEKgMEATAxMA0GCWCGSAFlAwQCAQUABCATI79W8nflfKLsNCl9YUARxNrb32wvncbQ1YchyQq/bwIBAxgPMjAyNjEwMDgyMjI0MzBaAggBA
+    gMEBQYHCDGCAUgwggFEAgEBMDQwLzEtMCsGA1UEAwwkVFNBIGVzc2FpIEMtMSAoZml4dHVyZSwgc2FucyB2YWxldXIpAgEBMA0GCWCGSAFlAwQCAQUAo
+    IGkMBoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG9w0BCQUxDxcNMjYxMDA4MjIyNDMwWjAvBgkqhkiG9w0BCQQxIgQgM90ogQO2caQ0N
+    SCzuqEN3+bA/7BIb1HpCRAL1vJx2CEwNwYLKoZIhvcNAQkQAi8xKDAmMCQwIgQgLLoUu7Ebd32j2a3fHpimKxtviOVBE1LKMKrX3HV4ZdMwCgYIKoZIz
+    j0EAwIERzBFAiBvKmqCQ0jVqNAkP1L7VJspNq4knWeV6+hGX+1ttXjegQIhAPz0YyfD7Vpw71kmUiHNl8N+dXGWyVqrvMWYmwj4+BFz"""),
+    ("autre_nonce", """MIIB6zADAgEAMIIB4gYJKoZIhvcNAQcCoIIB0zCCAc8CAQMxDzANBglghkgBZQMEAgEFADBtBgsqhkiG9w0BCRABBKBeBFwwW
+    gIBAQYEKgMEATAxMA0GCWCGSAFlAwQCAQUABCCJCbMpU6pOXgNLsbZgT55f+rVJC2BqgVzbZlZEPInTfQIBBBgPMjAyNjEwMDgyMjI0MzBaAggBAgMEB
+    QYHCTGCAUgwggFEAgEBMDQwLzEtMCsGA1UEAwwkVFNBIGVzc2FpIEMtMSAoZml4dHVyZSwgc2FucyB2YWxldXIpAgEBMA0GCWCGSAFlAwQCAQUAoIGkM
+    BoGCSqGSIb3DQEJAzENBgsqhkiG9w0BCRABBDAcBgkqhkiG9w0BCQUxDxcNMjYxMDA4MjIyNDMwWjAvBgkqhkiG9w0BCQQxIgQgJYw6/rJ86BOymlBAr
+    aedE5dO8fzzwdMl7+gON4ehQLwwNwYLKoZIhvcNAQkQAi8xKDAmMCQwIgQgLLoUu7Ebd32j2a3fHpimKxtviOVBE1LKMKrX3HV4ZdMwCgYIKoZIzj0EA
+    wIERzBFAiEAnesbzXYAAJT2wjS8sxbHhJ8f4bQw+wBklADpJgPDyt4CIEvuBCm1MnC8vGYWyQHkaOT2eBqLuEC8ro15ZlMtyOQN"""),
+    ("sans_nonce", """MIIB4jADAgEAMIIB2QYJKoZIhvcNAQcCoIIByjCCAcYCAQMxDzANBglghkgBZQMEAgEFADBjBgsqhkiG9w0BCRABBKBUBFIwUA
+    IBAQYEKgMEATAxMA0GCWCGSAFlAwQCAQUABCCJCbMpU6pOXgNLsbZgT55f+rVJC2BqgVzbZlZEPInTfQIBBRgPMjAyNjEwMDgyMjI0MzBaMYIBSTCCAU
+    UCAQEwNDAvMS0wKwYDVQQDDCRUU0EgZXNzYWkgQy0xIChmaXh0dXJlLCBzYW5zIHZhbGV1cikCAQEwDQYJYIZIAWUDBAIBBQCggaQwGgYJKoZIhvcNAQ
+    kDMQ0GCyqGSIb3DQEJEAEEMBwGCSqGSIb3DQEJBTEPFw0yNjEwMDgyMjI0MzBaMC8GCSqGSIb3DQEJBDEiBCBtKa2m14zsRD8M3e561es3rcLq0eCWcP
+    P+A+bXJyOt7DA3BgsqhkiG9w0BCRACLzEoMCYwJDAiBCAsuhS7sRt3faPZrd8emKYrG2+I5UETUsowqtfcdXhl0zAKBggqhkjOPQQDAgRIMEYCIQCwpl
+    WdXrDGdX1rwt3pi7IWYwZjjlKx6OouAzmcswP9VAIhAKz04GgpseHrf8lZWPklU95N08YsLfa7Gsu4KxkAqZqR"""))}
 
 
 def tete(o, jl="pool", seq=12, sha=A, ws=WS_H, **autres):
@@ -266,6 +297,80 @@ class Branchement(Base):
         for nom in ("O1", "o-1", "o/1", "Ö1", "o1 "):
             self.assertEqual(lancer(nom, "--depot", d.name),
                              (2, [], "collecte : refus : CONFIG/incoherent : observateur-nom\n"), nom)
+
+
+class Jeton(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d = d.name
+        for nom, t in (("o1-pool.tete", tete("o1")), ("o1-carte.tete", tete("o1", "carte", 5)),
+                       ("o2-pool.tete", tete("o2", seq=40, sha=B))):
+            pathlib.Path(self.d, nom).write_bytes(ligne_tete(t))
+        pathlib.Path(self.d, "o3-pool.tete").write_bytes(b"illisible")
+        self.manifeste = ('{"jour":"2026-10-05","observateur":"o1","tetes":[' + ",".join(
+            ligne_tete(t).decode()[:-1] for t in (tete("o1", "carte", 5), tete("o1"), tete("o2", seq=40, sha=B))) +
+            ']}\n').encode()
+        self.tsq = bytes.fromhex("3043020101" + SANS_NONCE[10:48] + hashlib.sha256(self.manifeste).hexdigest() +
+                                 "02080102030405060708" + "0101ff")
+
+    def lu(self, nom):
+        return pathlib.Path(self.d, nom).read_bytes()
+
+    def test_jeton_du_jour_non_arme_puis_emis_une_fois(self):
+        """Manifeste des têtes valides du dépôt, la sienne comprise, et requête au nonce donné : octets écrits à la
+        main ; sans envoi armé, rien ne part ; armé, la réponse accordée est conservée ; un jeton du jour n'est jamais
+        redemandé."""
+        self.assertEqual(tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708),
+                         ("non armé", "o1-2026-10-05.tsq", hashlib.sha256(self.tsq).hexdigest()))
+        self.assertEqual((self.lu("o1-2026-10-05.manifeste"), self.lu("o1-2026-10-05.tsq")), (self.manifeste, self.tsq))
+        envois = []
+        juste = JETONS["juste"]
+        r = tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708, lambda q: envois.append(q) or juste)
+        self.assertEqual((r, envois, self.lu("o1-2026-10-05.tsr")),
+                         (("émis", "o1-2026-10-05.tsr", hashlib.sha256(juste).hexdigest()), [self.tsq], juste))
+        self.assertEqual(tetes.jeton(self.d, "o1", "2026-10-05", 9, lambda q: envois.append(q) or juste),
+                         ("déjà émis", "o1-2026-10-05.tsr", hashlib.sha256(juste).hexdigest()))
+        self.assertEqual(len(envois), 1)
+
+    def test_jeton_lie_a_la_requete(self):
+        """C-1 (RFC 3161 §2.2, §2.4.1) : autre empreinte, autre nonce, sans nonce, autre algorithme (OID de SHA-512
+        posé à la seconde occurrence de celui de SHA-256, au TSTInfo) : JETON/liaison ; jeton factice, contenu autre que
+        SignedData (id-data) ou que TSTInfo : JETON/reponse ; rien de conservé ; la réponse juste au statut 1
+        (grantedWithMods) est conservée (G-01 de la G2)."""
+        n, juste = 0x0102030405060708, JETONS["juste"]
+        p = juste.index(SHA512[:-1] + b"\x01", juste.index(SHA512[:-1] + b"\x01") + 1)
+        cas = [(JETONS["autre_empreinte"], "JETON/liaison"), (JETONS["autre_nonce"], "JETON/liaison"),
+               (JETONS["sans_nonce"], "JETON/liaison"), (juste[:p] + SHA512 + juste[p + 11:], "JETON/liaison"),
+               (ACCORDEE, "JETON/reponse"), (juste.replace(tetes.SIGNE, tetes.SIGNE[:-1] + b"\x01", 1),
+                                             "JETON/reponse"),
+               (juste.replace(tetes.TST, tetes.TST[:-1] + b"\x05", 1), "JETON/reponse")]
+        self.assertEqual([code(lambda: tetes.jeton(self.d, "o1", "2026-10-05", n, lambda q: r)) for r, _c in cas],
+                         [c for _r, c in cas])
+        self.assertFalse(os.path.exists(os.path.join(self.d, "o1-2026-10-05.tsr")))
+        modifiee = juste.replace(bytes.fromhex("3003020100"), bytes.fromhex("3003020101"), 1)     # statut 1
+        self.assertEqual(code(lambda: tetes.jeton(self.d, "o1", "2026-10-05", n, lambda q: modifiee)), None)
+        self.assertEqual(self.lu("o1-2026-10-05.tsr"), modifiee)
+
+    def test_sa_tete_toujours_au_manifeste(self):
+        """C-2 : dix-sept têtes de noms antérieurs au sien : les siennes sont lues hors de la borne et vont au manifeste
+        avec les seize premières ; au `tetes`, les autres au-delà de seize sont comptées."""
+        for k in range(17):
+            pathlib.Path(self.d, f"a{k:02d}-pool.tete").write_bytes(ligne_tete(tete(f"a{k:02d}")))
+        self.assertIsNone(code(lambda: tetes.jeton(self.d, "o1", "2026-10-05", 1)))           # pas de JETON/tete
+        self.assertEqual([(t["observateur"], t["journal"]) for t in json.loads(self.lu("o1-2026-10-05.manifeste"))[
+            "tetes"]], [(f"a{k:02d}", "pool") for k in range(16)] + [("o1", "carte"), ("o1", "pool")])
+        lu = tetes.Depot(self.d, "o1").lire()
+        self.assertEqual((lu["tetes"][0], len(lu["tetes"]), lu["ignores"]), (tete("o1", "carte", 5), 17, 3))
+
+    def test_jeton_refuse(self):
+        """Sans tête de l'observateur au dépôt : JETON/tete, rien n'est écrit ; réponse de rejet : JETON/rejet, aucun
+        `.tsr` ; réponse mal formée : JETON/reponse."""
+        self.assertEqual(code(lambda: tetes.jeton(self.d, "o9", "2026-10-05", 1)), "JETON/tete")
+        self.assertEqual(sorted(n for n in os.listdir(self.d) if not n.endswith(".tete")), [])
+        for reponse, attendu in ((bytes.fromhex(REJET), "JETON/rejet"), (b"<html>", "JETON/reponse")):
+            self.assertEqual(code(lambda: tetes.jeton(self.d, "o1", "2026-10-05", 1, lambda q: reponse)), attendu)
+        self.assertFalse(os.path.exists(os.path.join(self.d, "o1-2026-10-05.tsr")))
 
 
 if __name__ == "__main__":
