@@ -5,14 +5,16 @@ issues d'un même appel de calib_fiv.replication), lot d'un point, agrégation d
 indéfinies par hôte, variance exacte et écart-type des FIV de I_t). SB-11k : choix de C1 et de C2 (calib_fiv.selection,
 FIV_u par calibration.charger_unites, Q-SI-8 (b)), lignes [BORD E1] et phrases (8)(ii) et (iii) (Q-SI-8 (c)),
 impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). SB-11m :
-loi des pauses d'une série sur le masque, définitions d'EP (point (6)). Entiers,
-rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
+loi des pauses d'une série sur le masque, définitions d'EP (point (6)). SB-11n : loi des pauses du modèle à C1,
+rejouée, à côté d'intervalles.txt (point (6)). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
+puissance, aucune fonction de libm."""
 from decimal import Decimal
 from fractions import Fraction
 
 import calendrier
 import calib_fiv
 import calibration
+import commun
 import executer
 import sources
 
@@ -144,4 +146,66 @@ def pauses(m: int, d: int) -> dict:
         cle = "bord" if g or f else "completes"
         out[cle][lg] = out[cle].get(lg, 0) + 1
         out["vides"] += g and f
+    return out
+
+
+def _pauses_rep(prm: dict, ep: dict, cal: dict, point, i: int) -> dict:
+    """Pauses de la réplication i du point, rejouée par calib_fiv.replication (flux de la cellule du point)."""
+    r = calib_fiv.replication(prm, ep, cal, point, calib_fiv.cellule(prm, point), i)
+    return {s: {h: pauses(cal["presentes"][s], d) for h, d in hs.items()} for s, hs in r["unites"].items()}
+
+
+def pauses_c1(prm: dict, ep: dict, cal: dict, c1: dict, processus: int) -> dict:
+    """Point (6) : loi des pauses du modèle à C1 sur le masque, par strate (c1 = {strate : point}) et par hôte du
+    format, série D*(u) (celle de Q₁ : type « ecart » d'intervalles.txt), cumulée sur les réplications i = 0 à
+    e1.replications − 1 du point, rejouées (mêmes flux que ses lots, E-S-41) en `processus` processus dans l'ordre
+    (executer.appliquer) ; segments : ceux du masque, comptés une fois."""
+    out, pts = {}, [p for j, p in enumerate(c1.values()) if p not in list(c1.values())[:j]]
+    for pt in pts:
+        recs = executer.appliquer(_pauses_rep, [(prm, ep, cal, pt, i) for i in range(prm["e1"]["replications"])],
+                                  processus)
+        for s in [s for s, p in c1.items() if p == pt]:
+            out[s] = {}
+            for h in recs[0][s]:
+                z = out[s][h] = dict(recs[0][s][h], **{k: dict(recs[0][s][h][k]) for k in CLES_PAUSES})
+                for r in recs[1:]:
+                    for k in CLES_PAUSES:
+                        for lg, nb in r[s][h][k].items():
+                            z[k][lg] = z[k].get(lg, 0) + nb
+                    z["episodes"], z["vides"] = z["episodes"] + r[s][h]["episodes"], z["vides"] + r[s][h]["vides"]
+    return out
+
+
+CLES_PAUSES = ("completes", "bord", "complets")
+TETE_PAUSES = ("[PAUSES À C1] point (6) : loi des pauses du modèle à C1 sur le masque, série D*(u) de chaque hôte du "
+               "format (type « ecart » d'intervalles.txt), définitions d'EP, cumulée sur les réplications de C1 ; à "
+               "côté, la ligne d'intervalles.txt de l'hôte et de la strate")
+
+
+def lignes_pauses(prm: dict, pz: dict, c1: dict, R: int, texte: str) -> list:
+    """Section [PAUSES À C1] : par strate et par hôte du format, résumé du modèle (pauses complètes, segments du
+    masque, épisodes, moyenne des pauses complètes sous le contexte de r1, maximum, quantiles calibration.quantiles au
+    rang le plus proche ⌈q·N/100⌉, pauses de bord, segments sans épisode ; « - » sans pause) et histogramme des pauses
+    complètes, puis la ligne « ecart » d'intervalles.txt de l'hôte et de la strate, recopiée avec son numéro ; ligne
+    absente ou en double : E1/intervalles."""
+    ctx, lignes, out = calib_fiv.contexte(prm["calibration"]), texte.split(commun.NL), [TETE_PAUSES]
+    for s in [s for s in prm["calibration"]["strates"] if s in pz]:
+        for h, f in prm["calibration"]["unites"]:
+            x, tete = pz[s][h], f"  « {s} » {f} (hôte {h}) ecart : "
+            js = [j for j, y in enumerate(lignes) if y.startswith(tete)]
+            if len(js) != 1:
+                raise commun.Refus("E1/intervalles", f"« {s} » {h} : {len(js)} lignes « ecart » dans intervalles.txt")
+            lg = [k for k, nb in sorted(x["completes"].items()) for _j in range(nb)]
+            q = [lg[min(max((a * len(lg) + 99) // 100, 1), len(lg)) - 1] if lg else "-"
+                 for a in prm["calibration"]["quantiles"]]
+            moy = ctx.divide(Decimal(sum(lg)), Decimal(len(lg))) if lg else "-"
+            out += [f"  modèle à C1 (φ = {c1[s][0]}, κ = {c1[s][1]}, τ_D = {c1[s][2]}), « {s} » {f} (hôte {h}), {R} "
+                    f"réplications : pauses complètes = {len(lg)} ; segments = {x['segments']} ; épisodes = "
+                    f"{x['episodes']} (complets {sum(x['complets'].values())}) ; moyenne = {moy} ; max = "
+                    f"{lg[-1] if lg else '-'} ; " + " ; ".join(f"P{a} = {v}" for a, v in
+                                                              zip(prm["calibration"]["quantiles"], q))
+                    + f" ; pauses de bord = {sum(x['bord'].values())} (dont segments sans épisode {x['vides']})",
+                    "    histogramme des pauses (longueur×nombre) : "
+                    + (" ".join(f"{k}×{nb}" for k, nb in sorted(x["completes"].items())) or "aucune pause"),
+                    f"    S2 (intervalles.txt l.{js[0] + 1}) : {lignes[js[0]].strip()}"]
     return out
