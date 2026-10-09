@@ -2055,3 +2055,35 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 304 tests ; plancher du job : 304, égalité exigée (`--egal`).
+
+## CB-15b (2026-10-08) : fichiers de tête, export atomique, lecture stricte du dépôt (E-C-35)
+
+Objet : dépôt des têtes (AVIS du G0, Q-D-03 : un dossier, lisible ou non ; FORMAT §16.4, §16.5). Export de la tête du
+point de contrôle par écriture atomique (fichier temporaire synchronisé, renommé, dossier synchronisé), sans jamais
+lever ; lecture des fichiers de tête des autres journaux, 16 au plus, 1 024 octets au plus, refus nommés `TETES/…` ;
+aucune valeur lue n'est un entier que l'écrivain refuserait (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1). Correction de la G2
+de P2B (2026-10-08) : noms d'observateur en minuscules seules au dépôt (C-6 : un jumeau de casse est ignoré) ; FORMAT
+§16 : le dépôt est un dossier local, synchronisé par une unité séparée (C-7, Q-2 ; DB-4).
+
+Rouge : `Depot` d'interface, 4 tests en échec d'assertion. Rouges de la correction (correction retirée du code, test
+gardé ; python3.12 -X dev -W error) : R-C6a (ROUGE D'ASSERTION : FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/tetes.py` | 166 | — |
+| `tests/test_tetes.py` | 205 | 11 (4 de plus) |
+
+Mutants (campagne refaite sur l'état corrigé ; commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml`
+; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : 20 mutants (19 de la phase 1, 1 neufs de la correction),
+20 tués (19 par leur test visé, 1 par la ligne du job sans test visé), 0 vivant, 0 FATAL : écriture sur place, non
+atomique, fichier temporaire non synchronisé, dossier non synchronisé, un échec d'export lève dans la boucle, échec
+jamais effacé, sa propre tête relue, tête de son autre journal exclue, taille non bornée, forme canonique non contrôlée,
+clés exactes non contrôlées, nom et contenu non comparés, booléen admis comme entier, entiers sans borne haute,
+empreinte non contrôlée, nombre de têtes non borné, têtes ignorées non comptées, dossier illisible : la lecture lève,
+grammaire des noms relâchée, plancher non relevé, C-6 : jumeau de casse lu au dépôt.
+
+Variante sur c58b997 et la série P2A corrigée (FORMAT : ces paragraphes deviennent §16 et §17) : mutants de la campagne
+de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des fusions de `boucle.py` et `entree.py`), non
+rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
+
+Suite : 308 tests ; plancher du job : 308, égalité exigée (`--egal`).

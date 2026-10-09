@@ -666,6 +666,11 @@ dossier, lisible ou non). Code de référence : `s2bis/shogen_s2bis/collecte/tet
 registre (`biblio/ietf-rfc3161-time-stamp-protocol-2026-10-04.txt`, sha256 `39fd1764…8240`) ; les règles DER
 (X.690) et l'identifiant de SHA-256 ne sont pas détenus : leurs octets sont ceux d'OpenSSL 3.0.13, mesurés.
 
+Le dépôt est un dossier **local** de l'observateur (C-7 de la G2 de P2B ; Q-2) : la boucle y lit et y écrit sur son fil
+(lecture des têtes, export), et un montage réseau pendu l'y bloquerait, ce qu'E-C-15 interdit ; l'échange avec les
+autres observateurs (têtes, jetons, résumés) est le fait d'une unité séparée qui synchronise ce dossier (DB-4), hors du
+collecteur.
+
 1. **Requête d'horodatage** (CB-15a ; RFC 3161 §2.4.1) : `TimeStampReq` en DER : `version` 1 ; `messageImprint` :
    algorithme SHA-256 (OID 2.16.840.1.101.3.4.2.1, paramètres NULL), empreinte de 32 octets ; `nonce`, entier de 0 à
    2^64 − 1, s'il est donné ; `certReq` vrai ; ni `reqPolicy` ni `extensions`. Sans nonce, les octets sont ceux de
@@ -680,3 +685,18 @@ registre (`biblio/ietf-rfc3161-time-stamp-protocol-2026-10-04.txt`, sha256 `39fd
 3. **Manifeste du jour** : ligne JSON canonique (§1.2) `{jour, observateur, tetes}` : `jour`, jour UTC (AAAA-MM-JJ) ;
    `observateur` ; `tetes` : les têtes lues au dépôt, triées par observateur puis journal. Son sha256 est l'empreinte
    de la requête.
+4. **Fichier de tête** (CB-15b ; E-C-35) : au dépôt, `<observateur>-<journal>.tete` (observateur `[a-z0-9]{1,16}`,
+   journal `[a-z]{1,16}`, préfixe du journal), une ligne JSON canonique `{journal, observateur, seq, sha256, ws}` :
+   la tête (§1.4) du point de contrôle (`point`, §2) de la fenêtre `ws`. Elle est écrite à chaque point de contrôle,
+   par écriture atomique : fichier temporaire `.<nom>.tmp` écrit et synchronisé, renommé, dossier synchronisé ; un
+   lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel. Un échec de l'export ne lève pas : il est
+   noté par le nom de son exception et porté par l'enregistrement `tetes` suivant (point 5).
+5. **Lecture du dépôt** (CB-15b) : les fichiers de tête dont le nom suit la grammaire du point 4, sauf celui du
+   journal qui lit, sont lus dans l'ordre des noms, 16 au plus ; chacun est une tête valide ou un refus nommé, un seul
+   par fichier : `TETES/lecture` (fichier illisible), `TETES/taille` (plus de 1 024 octets), `TETES/forme` (pas une
+   ligne JSON canonique aux clés exactes, ou entier de plus de 640 chiffres), `TETES/champs` (observateur ou journal
+   autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à 10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui
+   n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible : `TETES/depot`. Champs rendus : `tetes` (têtes
+   valides), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de 16), `export` (échec du dernier export ou null).
+   Toute valeur rendue est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
+   (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1).

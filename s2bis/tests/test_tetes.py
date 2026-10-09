@@ -3,10 +3,17 @@ Octets de référence produits hors du code (journal G1 de CB-15a) : `openssl ts
 -no_nonce` (OpenSSL 3.0.13, PROPOSITION §2.4 « Jeton »), puis la même commande avec nonce, dont la valeur est lue par
 `openssl ts -query -in … -text` ; entiers et longueurs DER par `openssl asn1parse` ; réponse de rejet produite par
 `openssl ts -reply` d'une TSA jetable (clés détruites) ; autres réponses écrites à la main d'après RFC 3161 §2.4.2
-(forme DER des longueurs : X.690, non détenue) ; manifeste écrit à la main."""
+(forme DER des longueurs : X.690, non détenue) ; manifeste écrit à la main. CB-15b, E-C-35 : fichiers de tête du dépôt
+(AVIS Q-D-03), écrits à la main par le test ; export atomique relevé par un espion de fsync."""
+import json
+import os
+import pathlib
+import stat
+import tempfile
 import unittest
 
-from shogen_s2bis.collecte import tetes
+from shogen_s2bis.collecte import journal, tetes
+from tests.test_journal import chaine
 
 EMPREINTE = bytes.fromhex("7527d85120a51adc70645317ff05c72f6ad103fa864f3d74b9be3ff1beeba2f0")   # sha256 du fichier
 SANS_NONCE = ("30390201013031300d0609608648016503040201050004207527d85120a51adc70645317ff05c72f6ad103fa864f3d74b9be3ff1"
@@ -92,6 +99,106 @@ class Manifeste(unittest.TestCase):
                    '"sha256":"' + "b" * 64 + '","ws":1791158340},{"journal":"pool","observateur":"o2","seq":9,'
                    '"sha256":"' + "b" * 64 + '","ws":1791158340}]}\n').encode()
         self.assertEqual(tetes.manifeste("2026-10-05", "o1", [t3, t1, t2]), attendu)
+
+
+WS_H, A, B = 1791154740, "a" * 64, "b" * 64                  # 2026-10-04 22:59 UTC : fenêtre qui clôt l'heure de 23:00
+
+
+def tete(o, jl="pool", seq=12, sha=A, ws=WS_H, **autres):
+    return {"journal": jl, "observateur": o, "seq": seq, "sha256": sha, "ws": ws, **autres}
+
+
+def ligne_tete(t, sep=(",", ":")):
+    """Fichier de tête écrit par le test, sans le code : objet JSON, clés triées, saut de ligne final."""
+    return json.dumps(t, sort_keys=True, separators=sep).encode() + b"\n"
+
+
+class Depot(unittest.TestCase):
+    def setUp(self):
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        self.d, self.sync = d.name, []
+
+    def espion(self, fd):
+        """fsync relevé : (« dossier », noms) ou (« fichier », taille, noms présents)."""
+        st, noms = os.fstat(fd), sorted(os.listdir(self.d))
+        self.sync.append(("dossier", noms) if stat.S_ISDIR(st.st_mode) else ("fichier", st.st_size, noms))
+
+    def poser(self, fichiers):
+        for nom, contenu in fichiers.items():
+            p = pathlib.Path(self.d, nom)
+            p.mkdir() if contenu is None else p.write_bytes(contenu if type(contenu) is bytes else ligne_tete(contenu))
+
+    def test_export_atomique_a_chaque_point(self):
+        """Ligne canonique {journal, observateur, seq, sha256, ws} (octets écrits à la main), écrite dans un fichier
+        temporaire synchronisé, renommée, puis dossier synchronisé ; un export suivant remplace le fichier."""
+        dep = tetes.Depot(self.d, "o1", fsync=self.espion)
+        dep.exporter(WS_H, (12, A))
+        attendu = ('{"journal":"pool","observateur":"o1","seq":12,"sha256":"' + A + '","ws":1791154740}\n').encode()
+        self.assertEqual((os.listdir(self.d), self.sync), (["o1-pool.tete"], [
+            ("fichier", len(attendu), [".o1-pool.tete.tmp"]), ("dossier", ["o1-pool.tete"])]))
+        self.assertEqual(pathlib.Path(self.d, "o1-pool.tete").read_bytes(), attendu)
+        dep.exporter(WS_H + 3600, (73, B))
+        self.assertEqual((os.listdir(self.d), pathlib.Path(self.d, "o1-pool.tete").read_bytes(), dep.echec),
+                         (["o1-pool.tete"], ligne_tete(tete("o1", seq=73, sha=B, ws=WS_H + 3600)), None))
+
+    def test_export_en_echec_ne_leve_jamais(self):
+        """Dossier absent, fsync en panne : aucune exception ; l'échec, nommé par son type, va au `tetes` suivant ; un
+        export réussi l'efface et remplace le fichier temporaire laissé."""
+        dep = tetes.Depot(os.path.join(self.d, "absent"), "o1")
+        dep.exporter(WS_H, (12, A))
+        self.assertEqual(dep.lire(), {"tetes": [], "refus": [[".", "TETES/depot"]], "ignores": 0,
+                                      "export": "FileNotFoundError"})
+
+        pannes = [OSError(5, "EIO")]
+
+        def panne(fd):
+            if pannes:
+                raise pannes.pop()
+        dep = tetes.Depot(self.d, "o1", fsync=panne)
+        dep.exporter(WS_H, (12, A))
+        self.assertEqual((dep.lire()["export"], os.listdir(self.d)), ("OSError", [".o1-pool.tete.tmp"]))
+        dep.exporter(WS_H, (12, A))                                 # l'export suivant réussit : échec effacé
+        self.assertEqual((dep.lire()["export"], os.listdir(self.d)), (None, ["o1-pool.tete"]))
+
+    def test_lecture_du_depot_et_refus_nommes(self):
+        """Têtes valides des autres fichiers (la sienne exclue, celle de son autre journal comprise), dans l'ordre des
+        noms ; un défaut par fichier, refus nommé ; noms hors grammaire ignorés, jumeau en majuscules compris (C-6)."""
+        self.poser({"o1-pool.tete": b"illisible", "o1-carte.tete": tete("o1", "carte", 5), "o2-pool.tete": tete("o2"),
+                    "o2-carte.tete": ligne_tete(tete("o2", "carte"))[:-1] + b" " * 1024 + b"\n",
+                    "o3-pool.tete": ligne_tete(tete("o3"), (", ", ": ")), "o3-carte.tete": tete("o3", "carte", x=1),
+                    "o4-pool.tete": tete("o5"), "o4-carte.tete": tete("o4", "carte", True),
+                    "o5-pool.tete": tete("o5", seq=10 ** 18), "o5-carte.tete": tete("o5", "carte", 10 ** 700),
+                    "o6-pool.tete": tete("o6", sha=A.upper()), "o6-carte.tete": tete("o6", "carte", ws=-60),
+                    "o7-pool.tete": b"[1]\n", "o7-carte.tete": None, "o8_pool.tete": tete("o8"),
+                    ".o2-pool.tete.tmp": tete("o2"), "o2-Pool.tete": tete("o2", "Pool"),
+                    "o2-pool.tete.tmp": tete("o2"), "O2-pool.tete": tete("O2")})
+        refus = {"o2-carte.tete": "taille", "o3-carte.tete": "forme", "o3-pool.tete": "forme",
+                 "o4-carte.tete": "champs", "o4-pool.tete": "champs", "o5-carte.tete": "forme",
+                 "o5-pool.tete": "champs", "o6-carte.tete": "champs", "o6-pool.tete": "champs",
+                 "o7-carte.tete": "lecture", "o7-pool.tete": "forme"}
+        self.assertEqual(tetes.Depot(self.d, "o1").lire(),
+                         {"tetes": [tete("o1", "carte", 5), tete("o2")], "refus": [[n, "TETES/" + c] for n, c in
+                                                                                   refus.items()],
+                          "ignores": 0, "export": None})
+
+    def test_seize_tetes_au_plus_et_enregistrement_admis_par_l_ecrivain(self):
+        """Au-delà de 16 fichiers, les premiers par nom sont lus, les autres comptés ; l'enregistrement `tetes` tiré
+        d'un dépôt hostile s'écrit sans refus de l'écrivain (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1)."""
+        self.poser({f"p{k:02d}-pool.tete": tete(f"p{k:02d}", seq=k) for k in range(20)})
+        lu = tetes.Depot(self.d, "o1").lire()
+        self.assertEqual((lu["tetes"], lu["ignores"]), ([tete(f"p{k:02d}", seq=k) for k in range(16)], 4))
+        self.poser({"a99-pool.tete": tete("a99", seq=10 ** 700), "a98-pool.tete": tete("a98", ws=10 ** 12)})
+        lu = tetes.Depot(self.d, "o1").lire()
+        self.assertEqual((lu["refus"], len(lu["tetes"])), ([["a98-pool.tete", "TETES/champs"], ["a99-pool.tete",
+                                                                                            "TETES/forme"]], 14))
+        with tempfile.TemporaryDirectory() as d:
+            jl = journal.Journal(d, "pool").ouvrir(WS_H - 120)
+            jl.ecrire("tetes", WS_H, **lu)
+            jl.fermer()
+            octets = pathlib.Path(d, "pool-2026-10-04-0.jsonl").read_bytes()
+        self.assertEqual(({k: v for k, v in chaine(octets)[2][1].items() if k not in ("seq", "prec")}, lu["ignores"]),
+                         ({"type": "tetes", "ws": WS_H, **lu}, 6))
 
 
 if __name__ == "__main__":
