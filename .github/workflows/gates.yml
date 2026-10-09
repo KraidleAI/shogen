@@ -287,4 +287,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 6
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 9

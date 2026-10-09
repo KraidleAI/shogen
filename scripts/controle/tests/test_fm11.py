@@ -14,7 +14,7 @@ import unittest
 
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # scripts/controle
 FM11 = os.path.join(ICI, "fm11.py")
-SHA_FM11 = "886cc676874e70e3fe49a259fda6cfc8591882d511a29edded5c651860c1e254"   # README, SHA256SUMS, annexe B.35
+SHA_FM11 = "4a0b8abcc0b249034eb2e73397334e85f35d19a957ac4f8a9ddcf3efdda958b5"   # DT3-E ; avant : 886cc676… (B.35)
 SHA51 = "5cc89b563f73d213e38021165a360c3bf2e297e36be467786a007021c71db358"      # fm11.py l.12 (cartographie l.51)
 SHA14 = "0fe88f1a3810244ecce91b31c1f4e2117f397a7c65d381a75afdbf0b9954b71f"      # fm11.py l.13 (ADR-0025 l.14)
 CARTO = "".join(f"c{i:02d}|" for i in range(25))           # 100 caractères ; fragments aux rangs 0, 20 et 40
@@ -47,7 +47,7 @@ DOUBLURE = chr(10).join([
     ""])
 
 
-def lancer(evenements, mode="servies", chemin=None):
+def lancer(evenements, mode="servies", chemin=None, lignes=(CARTO, ADR)):
     """fm11.py sous DOUBLURE sur la transcription `evenements` (objets JSON, un par ligne) : (code, stdout, stderr)."""
     with tempfile.TemporaryDirectory() as d:
         t = chemin or os.path.join(d, "transcription-synthetique.txt")
@@ -55,7 +55,7 @@ def lancer(evenements, mode="servies", chemin=None):
             with open(t, "w", encoding="utf-8") as f:
                 f.write("".join(json.dumps(e, ensure_ascii=False) + chr(10) for e in evenements))
         env = {k: v for k, v in os.environ.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}
-        p = subprocess.run([sys.executable, "-I", "-B", "-c", DOUBLURE, FM11, t, CARTO, ADR, SHA51, SHA14, mode],
+        p = subprocess.run([sys.executable, "-I", "-B", "-c", DOUBLURE, FM11, t, *lignes, SHA51, SHA14, mode],
                            capture_output=True, text=True, cwd=d, env=env, timeout=120)
     return p.returncode, p.stdout, p.stderr
 
@@ -69,8 +69,8 @@ def resultat(contenu):
 
 
 class Temoin(unittest.TestCase):
-    def compter(self, evenements):
-        code, sortie, err = lancer(evenements)
+    def compter(self, evenements, lignes=(CARTO, ADR)):
+        code, sortie, err = lancer(evenements, lignes=lignes)
         self.assertEqual(code, 0, f"fm11.py sorti en {code} : {err[-400:]}")
         try:
             return json.loads(sortie)
@@ -78,9 +78,10 @@ class Temoin(unittest.TestCase):
             self.fail(f"sortie de fm11.py illisible en JSON : {sortie[:200]!r}")
 
     def test_entree_propre_zero_fragment(self):
-        """Sans fragment ni motif, dont les 39 premiers caractères de chaque ligne : 0 fragment, aucun motif."""
+        """Sans fragment ni motif, dont 39 premiers et 39 derniers caractères de lignes : 0 fragment, aucun motif."""
         res = self.compter([texte("bonjour"), resultat("c00|c01|c02|c03|c04|c05|c06|c07|c08|c0"),
-                            texte("a00|a01|a02|a03|a04|a05|a06|a07|a08|a0 ; cartographie sans date", "assistant")])
+                            texte("a00|a01|a02|a03|a04|a05|a06|a07|a08|a0 ; 15|c16|c17|c18|c19|c20|c21|c22|c23|c24|",
+                                  "assistant")])
         self.assertEqual(res, {"evenements": 3, "resultats": {}, "entrees": {},
                                "fragments_l51_l14": {"resultats": 0, "entrees": 0}})
 
@@ -102,6 +103,33 @@ class Temoin(unittest.TestCase):
             "resultats": {"FRAGMENT:adr0025_l14": [1], "measure-M009a": [[3, 2]], "baseline_step0": [[3, 1]]},
             "entrees": {"FRAGMENT:carto_l51": [0, 2], "FRAGMENT:adr0025_l14": [2], "shogen-j28": [[3, 1]]},
             "fragments_l51_l14": {"resultats": 1, "entrees": 3}})
+
+    def test_fragment_en_queue(self):
+        """DT3-E : les 40 derniers caractères de chaque ligne (hors des fenêtres 0, 20, 40) sont un fragment."""
+        res = self.compter([texte("x c15|c16|c17|c18|c19|c20|c21|c22|c23|c24| y"),
+                            resultat("a15|a16|a17|a18|a19|a20|a21|a22|a23|a24|")])
+        self.assertEqual(res["fragments_l51_l14"], {"resultats": 1, "entrees": 1})
+        self.assertEqual((res["entrees"], res["resultats"]),
+                         ({"FRAGMENT:carto_l51": [0]}, {"FRAGMENT:adr0025_l14": [1]}))
+
+    def test_ligne_courte_fragment_entier(self):
+        """DT3-E : une ligne de moins de 40 caractères est un fragment entier."""
+        res = self.compter([texte("avant c00|c01| après")], lignes=("c00|c01|", ADR))
+        self.assertEqual((res["entrees"], res["fragments_l51_l14"]["entrees"]), ({"FRAGMENT:carto_l51": [0]}, 1))
+
+    def test_queue_aux_longueurs_limites(self):
+        """DT3-E, C-1 de la G2 et C-11 : fenêtres 0, 20, ... < n - 40 et queue, aux longueurs 39, 40, 41, 59, 60, 61
+        et 121 (fenêtres 60 et 80 ; caractères distincts) : (début, fin) de l'extrait, détecté ou non, à la main."""
+        attendus = {39: [(0, 39, 1), (1, 39, 0)], 40: [(0, 40, 1), (1, 40, 0)],
+                    41: [(1, 41, 1), (0, 40, 1), (2, 41, 0)], 59: [(19, 59, 1), (0, 40, 1), (10, 50, 0)],
+                    60: [(20, 60, 1), (21, 60, 0), (10, 50, 0)], 61: [(21, 61, 1), (20, 60, 1), (22, 61, 0)],
+                    121: [(60, 100, 1), (80, 120, 1), (61, 101, 0), (81, 121, 1)]}
+        for n, extraits in attendus.items():
+            v = "".join(chr(0x100 + i) for i in range(n))
+            with self.subTest(longueur=n):
+                res = self.compter([texte("x " + v[a:b] + " y") for a, b, _d in extraits], lignes=(v, ADR))
+                self.assertEqual(res["entrees"].get("FRAGMENT:carto_l51", []),
+                                 [k for k, (_a, _b, d) in enumerate(extraits) if d])
 
     def test_ligne_introuvable_controle_impossible(self):
         """Lignes de D.2 introuvables par leur sha256 : sortie non nulle, motif nommé, aucun compte imprimé."""

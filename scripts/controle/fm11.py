@@ -15,8 +15,9 @@ interdites = {'carto_l51': ligne_par_sha('docs/rapports/cartographie-2026-09-29.
               'adr0025_l14': ligne_par_sha('docs/adr-0025/ADR-0025-periode-doublee-S2.md', SHA14, '7f8b5cc')}
 for k,v in interdites.items():
     if v is None: sys.exit(f'ligne {k} introuvable par sha : contrôle impossible')
-# fragments : tous les segments de 40 caractères (pas 20) de chaque ligne interdite
-frags = {k: {v[i:i+40] for i in range(0, max(1,len(v)-40), 20)} for k,v in interdites.items()}
+# fragments : tous les segments de 40 caractères (pas 20) de chaque ligne interdite, et toujours les 40 derniers
+# (lot DETTES-T3, DT3-E : la queue n'était dans aucun fragment) ; une ligne de moins de 40 caractères est un fragment
+frags = {k: {v[i:i+40] for i in range(0, max(1,len(v)-40), 20)} | {v[-40:]} for k,v in interdites.items()}
 motifs = [r'cartographie-2026-09-29', r'CARTOGRAPHIE-2026-09-29', r'adr-0025', r'ADR-0025\.md', r'shogen-carto',
           r'shogen-j28', r'campagne-copie', r'shogen-campagne', r'measure-M009a', r'lot-m009', r'ADR-M002',
           r'PAROXYSME-Shogen', r'paroxysme-2026-09-27', r'session_013dvmub', r'7ba84933-ba6d', r'shogen-g2-lotA',
