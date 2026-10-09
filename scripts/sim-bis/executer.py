@@ -11,8 +11,10 @@ réplication d'une cellule, chaîne entière (T_début, sources, observateurs, f
 règle par classe et par strate). SB-11g : oracle d'E-S-29 sur les 200 premières réplications (variante comprise, O-4),
 S, critère collectif, variante, compte d'événements sur la suite comprimée (P-3). SB-11h : agrégation exacte des
 enregistrements relus d'une cellule (E-S-40, E-S-52), agrégat écrit. SB-11i : lot d'une cellule calculé en un ou
-plusieurs processus (E-S-45). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction
-de libm."""
+plusieurs processus (E-S-45). SB-11q : impressions des cellules sur les 200 premières réplications : fenêtres des
+strates, F séparé en propre et hors-enveloppe par (classe, strate, hôte) ; distribution de M_j par strate et taux
+effectifs de F agrégés (SB11-IMPRESSIONS-1). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance,
+aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -368,7 +370,8 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
     e = calendrier.echelle(cal, W)
     debut = calendrier.t_debut(cal, sources.flux(p, nom, i, "debut", 0))
     m = calendrier.masques(cal, debut, e["t_max"])
-    etat = sources.Replication(p, ep, c["fond"], nom, i, m, e["t_max"]).etat()
+    rep = sources.Replication(p, ep, c["fond"], nom, i, m, e["t_max"])
+    etat = rep.etat()
     q, cons = observateurs.Couche(p, c["couche"], nom, i, e["t_max"]).consolidation(etat, m)
     ret = {s: calendrier.retenues(q.evaluables, m[s], e["n"][s]) for s in st}
     pools, graine = dict(sources.classes(p)), aleas.graine_regle(p["aleas"], nom, i)
@@ -390,6 +393,8 @@ def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) ->
             "n": n[s], "atteinte": ret[s]["atteinte"], "suffisant": ret[s]["suffisant"], "premiere": prem,
             "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
             "retraits": {cl: sorted([u, x] for (u, t), x in rt[cl].items() if t == s) for cl in rg["classes"]}}
+    if i < IMPRESSIONS:
+        out["impressions"] = impressions(c, rep)
     return out
 
 
@@ -440,3 +445,46 @@ def ecrire_agrege(dossier: str, cellule: str, agrege: dict, entete: list) -> str
     chemin = os.path.join(dossier, nom_lot(cellule, 0, 1).split(".")[0] + ".agrege.json")
     commun.ecrire(chemin, commun.json_canonique(jsonable(dict(agrege, entete=entete, cellule=cellule))))
     return chemin
+
+
+IMPRESSIONS = ORACLE        # SB11-IMPRESSIONS-1 : impressions sur le sous-ensemble pré-déclaré d'E-S-29 (Q-SB11-6)
+
+
+def f_separe(c: dict, rep, h: str, k: int, s: str) -> tuple:
+    """F(h, classe de rang k) dans les fenêtres de la strate s, séparé (SB11-IMPRESSIONS-1 ; avis Q-T2-4 de la tranche
+    2) : propre = sources.Replication.union rejouée (taux f·p_écart_propre, × autres hors de BTC ; loi « ecart » ;
+    flux « ecart », « ecart-regime », emplacement 1 + k) ; hors-enveloppe = épisodes d'une fenêtre de part τ rejoués
+    (flux « hors-enveloppe », même emplacement) ; leur union est F vu dans s (sources.Replication.ecarts : tests).
+    Rend (propre, hors-enveloppe), masques dans les fenêtres de s."""
+    p, fo, m = c["prm"], c["fond"], rep.masques[s]
+    x = fo["f"] * sources.taux(rep.ep, s, h)[1] * (1 if k == 0 else fo["autres"])
+    pr = rep.union(h, s, 1 + k, x, sources.loi_longueurs(p, rep.ep, s, h, "ecart"), ("ecart", "ecart-regime", None))
+    ho = sources.masque(sources.alterner(rep.u("hors-enveloppe", h, s, 1 + k), sources.Empirique([(1, 1)]),
+                                         sources.pause(fo["hors_enveloppe"], 1), p["aleas"], rep.horizon))
+    return pr & m, ho & m
+
+
+def impressions(c: dict, rep) -> dict:
+    """Impressions d'une réplication i < IMPRESSIONS (SB11-IMPRESSIONS-1) : fenêtres de chaque strate sur T_max ;
+    pour chaque classe de sources.classes, chaque strate et chaque hôte servi, [fenêtres de F propre, fenêtres de F
+    hors-enveloppe] (f_separe)."""
+    p, st = c["prm"], c["prm"]["calibration"]["strates"]
+    out = {"fenetres": {s: rep.masques[s].bit_count() for s in st}, "F": {}}
+    for k, (cl, pool) in enumerate(sources.classes(p)):
+        out["F"][cl] = {s: {h: [x.bit_count() for x in f_separe(c, rep, h, k, s)] for h in pool} for s in st}
+    return out
+
+
+def agreger_impressions(enregistrements: list) -> dict:
+    """Sur les enregistrements d'une cellule, dans l'ordre : distribution de M_j par strate (fenêtres à M_j = 0..M),
+    sommée sur toutes les réplications (ADR-0029 l.97 a ; avis Q-T3-2) ; nombre de réplications à impressions et,
+    s'il y en a, taux effectifs exacts de F par (classe, strate, hôte), [propre, hors-enveloppe] = fenêtres sommées
+    / fenêtres de la strate sommées (SB11-IMPRESSIONS-1)."""
+    st, imp = list(enregistrements[0]["strates"]), [e["impressions"] for e in enregistrements if "impressions" in e]
+    out = {"M": {s: [sum(x) for x in zip(*(e["strates"][s]["M"] for e in enregistrements))] for s in st},
+           "impressions": len(imp)}
+    if imp:
+        fen = {s: sum(x["fenetres"][s] for x in imp) for s in st}
+        out["F"] = {cl: {s: {h: [Fraction(sum(x["F"][cl][s][h][j] for x in imp), fen[s]) for j in (0, 1)]
+                             for h in hs} for s, hs in d.items()} for cl, d in imp[0]["F"].items()}
+    return out
