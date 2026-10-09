@@ -3,7 +3,8 @@ collecteur entier tourne en sous-processus, garde réseau posée par `import tes
 journal est validé contre le FORMAT (docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md) par `anomalies`, écrit d'après le
 texte, sans rien importer du collecteur. Exécution A : `entree.main` sans TLS, vers un serveur en clair de boucle
 locale, trois fenêtres. Exécution B : le point d'entrée `python3 -m shogen_s2bis.collecte` tel quel (contexte TLS
-d'urllib : poignée refusée par ce serveur), qui reprend le même journal, deux fenêtres."""
+d'urllib : poignée refusée par ce serveur), qui reprend le même journal, deux fenêtres. CB-6c : corps servi =
+binance.bin, décodé (relevé écrit à la main) ; `valeurs` contrôlées selon le §9.1."""
 import base64
 import hashlib
 import json
@@ -21,7 +22,10 @@ from tests.test_entree import COMMIT, configurations, port_ferme
 from tests.test_journal import chaine
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIN, CRLF, CORPS, S = bytes([13, 10, 13, 10]), bytes([13, 10]), b'{"x":1}', 1_000_000
+FIN, CRLF, S = bytes([13, 10, 13, 10]), bytes([13, 10]), 1_000_000
+CORPS = pathlib.Path(RACINE, "tests", "fixtures", "btc", "binance.bin").read_bytes()
+RELEVE = {"actif": "BTC", "classe": "sans_horodatage", "devise": "USDT", "extra": {}, "prix": "64529.50000000",
+          "ts_source": None}
 HARNAIS = """
 import runpy, sys, tests
 from shogen_s2bis.collecte import entree
@@ -65,6 +69,16 @@ def brut_intact(e):
         return False
 
 
+def releves(e):
+    """§9.1 : null hors du statut ok ; sinon liste non vide de relevés aux clés exactes et aux types du texte."""
+    v, cles = e["valeurs"], {"actif", "classe", "devise", "prix", "ts_source", "extra"}
+    return v is None if e["statut"] != "ok" else type(v) is list and v != [] and all(
+        type(r) is dict and set(r) == cles and r["actif"] in ("BTC", "ETH", "USDC", "USDT") and r["classe"] in (
+            "place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink") and type(r["devise"]) is str and
+        type(r["prix"]) is str and (r["ts_source"] is None or entiers(r["ts_source"]) and 0 <= r["ts_source"] < 1 << 53)
+        and type(r["extra"]) is dict and all(type(k) is str is type(x) for k, x in r["extra"].items()) for r in v)
+
+
 def anomalies(enrs, f, s):
     """Écarts au FORMAT des enregistrements relus par `chaine` (§1 : JSON canonique, `seq` et `prec` chaînés) ; [] :
     conforme. `f`, `s` : contenus de `formes.json` et `sante.json` (grille, départ, échéance, sondes)."""
@@ -103,7 +117,7 @@ def anomalies(enrs, f, s):
             exige(set(p) <= set(PHASES) and entiers(*p.values()) and [p[x] for x in PHASES if x in p] == sorted(
                 p.values()) and (e["adresse"] is None) == ("dns" not in p), "phases")                         # §10.1
             exige(e["adresse"] is None or re.fullmatch("([0-9]{1,3}[.]){3}[0-9]{1,3}:[0-9]+", e["adresse"]), "ip")
-            exige(brut_intact(e) and e["valeurs"] is None and (e["code"] is None or entiers(e["code"])), "corps")
+            exige(brut_intact(e) and releves(e) and (e["code"] is None or entiers(e["code"])), "corps")
             fenetre.append(e)
         elif t == "sante":
             exige(all(x["type"] == "lecture" and x["ws"] == e["ws"] for x in fenetre) and [(x["prevu"], x["forme"])
@@ -191,6 +205,7 @@ class BoutEnBout(unittest.TestCase):
                                         ("c", "panne_transport", "connexion", None)] * 2)
         self.assertEqual({base64.b64decode(e["brut"]) for e in enrs if e["type"] == "lecture" and e["code"]}, {
             CORPS, b"indisponible"})
+        self.assertEqual([e["valeurs"] for e in enrs if e["type"] == "lecture" and e["statut"] == "ok"], [[RELEVE]] * 3)
         self.assertEqual([{k: e[k] for k in ("commit", "sha256", "formes", "sante", "descripteur")} for e in enrs if
                           e["type"] == "run_params"], [{"commit": COMMIT, "sha256": sha, "formes": f, "sante": s,
                                                         "descripteur": o}] * 2)

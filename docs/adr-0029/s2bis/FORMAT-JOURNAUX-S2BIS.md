@@ -42,6 +42,9 @@
   I-2, par ses tests nommés (`s2bis/tests/test_format.py` : la citation du §7.3, la marque « choix du lot » de la
   règle de source, CB-11h dans la puce « Corrections », valeurs prises au texte de l'item ; puis les contrôles de
   type de `_lire` dits au §7.1 et faits par `_lire`).
+- **Partie P2, tranche A** (2026-10-08 ; sous-lots CB-6, CB-12, CB-13) : le diff CB-6c écrit le contenu de `valeurs`
+  (§9.1, relevés des décodeurs de CB-6a et CB-6b) et le champ `decodeur` des formes (§14.1), et ferme pour les
+  décodeurs SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -283,7 +286,8 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    pour non intègre (§7.1) toute ligne qui dépasse N, qu'un décodeur la lise ou lève RecursionError : ils comptent
    les niveaux eux-mêmes et ne se fient pas à l'exception. Un conteneur que l'enregistrement porte à plusieurs
    endroits compte à sa plus grande profondeur, celle de la ligne écrite. Motif de N : le plus profond enregistrement
-   du collecteur mesure M = 4 niveaux au test de bout en bout (E-C-24 ; `run_params`, `formes.formes[i]`), et une
+   du collecteur mesure M = 4 niveaux au test de bout en bout (E-C-24 ; `run_params`, `formes.formes[i]` ;
+   `lecture`, `valeurs[i].extra`, CB-6c), et une
    `sante` dont une sonde D-4 ou D-5 rend une réponse SOA ou TXT en atteint 6 (§12, §13.4) ; le plus petit seuil de
    lecture mesuré sur les décodeurs Python du projet est 988 niveaux (Python 3.10, limite de récursion par défaut ;
    seuils mesurés sous 3.10 et 3.12 seulement, banc de la G2 de RB-18) ; N est très au-dessus du premier et très
@@ -307,7 +311,30 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      d'intégration de P1, diff CB-19g ; §10.1) ;
    - `brut` : octets du corps de la réponse, en base64 (alphabet standard, avec remplissage) ; `sha256` : leur
      empreinte, en 64 chiffres hexadécimaux minuscules ;
-   - `valeurs` : valeurs décodées par le décodeur de la forme (sous-lots CB-6 et suivants) ; null avant décodage.
+   - `valeurs` (CB-6c) : null, sauf pour le statut `ok` : liste des relevés que rend le décodeur de la forme
+     (`decodeur` de `formes.json`, §14.1), un par actif que la réponse porte ; chaque relevé est un objet aux clés
+     exactes `actif`, `classe`, `devise`, `prix`, `ts_source` et `extra` : `actif`, l'un de `BTC`, `ETH`, `USDC`,
+     `USDT` ; `classe`, la classe de source, l'un de `place_horodatee`, `sans_horodatage`, `agregateur`,
+     `oracle_chainlink` (noms d'`analyse.json`) ; `devise`, la devise de cotation (`USD`, `USDT`) ; `prix`, décimal en
+     chaîne, texte d'un Decimal fini et strictement positif ; `ts_source`, l'instant que porte la source, en
+     microsecondes entières de 0 à 2^53 exclu, null pour une source sans horodatage ; `extra`, objet de chaînes propre
+     à la source. Un corps que le décodeur ne lit pas, ou dont le prix n'est pas fini, est nul ou négatif, donne
+     `panne_decode`, `code` et `brut` gardés, `valeurs` null.
+   - **Instant ISO-8601** (C-5 de la G2 de P2A) : un instant de source écrit en ISO-8601 (Coinbase, champ `time`) est
+     lu par un motif fixe : date `AAAA-MM-JJ`, « T » majuscule, heure `hh:mm:ss`, fraction de chiffres facultative
+     (tronquée à la microseconde, comme en S2), puis « Z » majuscule, `±hh:mm` ou rien (instant lu en UTC). « t »,
+     « z », un espace entre la date et l'heure ou `+hhmm` donnent `panne_decode`. Raison : `datetime.fromisoformat`,
+     que lisait S2 (`_iso_to_epoch`), ne lit pas la même chose de 3.10 à 3.13 (sous 3.10, il refuse une fraction de
+     quatre chiffres, « Z » et `+0000`, que 3.11 admet : mesuré) ; un motif fixe lit pareil sous chaque version. C'est
+     un écart à S2, qui admettait « t », l'espace et, de 3.11 à 3.13, `+0000` (mesuré), et à la RFC 3339 §5.6, qui
+     admet « t » et « z » minuscules ; Coinbase écrit « T » et « Z » (fixture de S2).
+   - **Valeurs refusées par l'écrivain** (CB-6c, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : les valeurs d'un décodeur
+     passent, avant d'être rendues, le contrôle de l'écrivain (`canonique` : aucun flottant, entiers de 640 chiffres au
+     plus, 64 niveaux au plus, texte encodable en UTF-8) et une borne de 2 097 152 octets de JSON canonique, saut de
+     ligne compris ; sinon la lecture est `panne_decode`, `valeurs` null. Aucune valeur que l'écrivain refuserait ne
+     l'atteint : son refus (`JOURNAL/…`) arrêterait le processus, que systemd relancerait avec un trou à chaque
+     fenêtre. Avec un corps de 1 048 576 octets (point 4) et des valeurs à leur borne, une `lecture` fait moins de
+     3 500 000 octets, sous LIMITE (§7.1).
 2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
    restent sous 2^53 : tout lecteur JSON les lit exactement.
 3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un
@@ -505,8 +532,10 @@ résolution et sans envoi (ADR-0029 l.109).
    types, bornes, puis règles de cohérence nommées) :
    - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `tolerance`, `delai`,
      `marge` (µs ; `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port,
-     chemin, methode, corps, espace}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai : la limite
-     de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte).
+     chemin, methode, corps, espace, decodeur}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
+     la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
+     `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
+     chaque lecture `ok` de la forme, §9.1).
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +

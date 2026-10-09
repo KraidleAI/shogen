@@ -8,16 +8,23 @@ texte du Decimal lu, comme `expected.json` de S2 ; instant de la source en micro
 flottantes ; extra en chaînes) ; finitude (prix fini, > 0, exposant dans les bornes de CONTEXTE ; instant de 0 à
 2^53 µs exclu, FORMAT §9.2) ; ISO lu par un motif, `fromisoformat` changeant de 3.10 à 3.13 ; mots de Chainlink en
 hexadécimal strict, prix construit exactement (mantisse, exposant -8), sans division ; `decoder` ne lève jamais (S2
-laissait sortir AttributeError) ; sous CONTEXTE, recopie du contexte nommé de S2 (r1.py l.62-68 ; Q-C-14)."""
+laissait sortir AttributeError) ; sous CONTEXTE, recopie du contexte nommé de S2 (r1.py l.62-68 ; Q-C-14). CB-6c
+(SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 ; FORMAT §9.1) : des valeurs que l'écrivain refuserait (`journal.canonique`) ou
+de plus de VALEURS octets canoniques ne sont jamais rendues : la lecture est `panne_decode` ; `appliquer` décode le
+corps d'une lecture `ok` dans le fil de la lecture."""
 import datetime
 import decimal
 import json
 import re
 from decimal import Decimal
 
+from shogen_s2bis.collecte import journal
+from shogen_s2bis.collecte.lecture import Lecture
+
 CONTEXTE = decimal.Context(prec=50, rounding=decimal.ROUND_HALF_EVEN, Emin=-999999, Emax=999999, capitals=1, clamp=0,
                            flags=[], traps=[decimal.InvalidOperation, decimal.DivisionByZero, decimal.Overflow])
 S = 1_000_000                                                       # microsecondes par seconde
+VALEURS = 1 << 21                   # octets canoniques des valeurs au plus, saut de ligne compris (FORMAT §9.1)
 ISO = re.compile("([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})([.][0-9]+)?"
                  "(Z|[+-][0-9]{2}:[0-9]{2})?")                    # date, heure, fraction, décalage (RFC 3339 §5.6)
 EPOQUE = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
@@ -122,7 +129,18 @@ def decoder(nom, octets):
     try:
         with decimal.localcontext(CONTEXTE):
             actif, devise, classe, lire = DECODEURS[nom]
-            return "ok", [_releve(actif, devise, classe, *lire(json.loads(octets, parse_float=Decimal,
-                                                                          parse_int=Decimal)))]
+            valeurs = [_releve(actif, devise, classe, *lire(json.loads(octets, parse_float=Decimal,
+                                                                       parse_int=Decimal)))]
+        if len(journal.canonique(valeurs)) <= VALEURS:              # règles de l'écrivain, avant lui (REFUS-ARRET-1)
+            return "ok", valeurs
     except Exception:                                               # attrape-tout : un indécodable est une panne
-        return "panne_decode", None
+        pass
+    return "panne_decode", None
+
+
+def appliquer(nom, lu):
+    """La lecture `lu` décodée par le décodeur `nom` si elle est `ok` (valeurs, ou `panne_decode`), sinon `lu`."""
+    if lu.statut != "ok":
+        return lu
+    statut, valeurs = decoder(nom, lu.octets)
+    return Lecture(statut, lu.depart, lu.fin, lu.phases, lu.adresse, code=lu.code, octets=lu.octets, valeurs=valeurs)

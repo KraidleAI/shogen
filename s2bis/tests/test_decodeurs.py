@@ -1,7 +1,8 @@
 """CB-6a, CB-6b (E-C-06 à E-C-08 ; ADR-0029 l.231 ; PROPOSITION §2.4) : décodeurs BTC repris de S2. Valeurs hors du
 code : `s2-harness/tests/expected.json` (capturé et décodé par S2), lu en Decimal depuis son texte ; fixtures copiées
 octet pour octet ; classes de S2 (`sources.py` l.305-313) ; instants par date -u -d, mots de Chainlink par printf, 2^53
-et roundId par bc ; contexte de S2 par lecture de r1.py l.62-68 (journal G1)."""
+et roundId par bc ; contexte de S2 par lecture de r1.py l.62-68 (journal G1). CB-6c : lecture décodée, valeurs
+refusées par l'écrivain jamais rendues (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1), tailles comptées par `json.dumps`."""
 import hashlib
 import json
 import os
@@ -9,8 +10,13 @@ import sys
 import time
 import unittest
 from decimal import Context, Decimal, localcontext
+from unittest import mock
 
-from shogen_s2bis.collecte import decodeurs
+from shogen_s2bis.collecte import boucle, decodeurs, journal
+from shogen_s2bis.collecte.lecture import S, Lecture
+from tests.test_boucle import Temps, borne
+from tests.test_journal import FICHIER, Base, chaine
+from tests.test_reprise import m
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 S2, FIX = os.path.join(os.path.dirname(RACINE), "s2-harness", "tests"), os.path.join(RACINE, "tests", "fixtures", "btc")
@@ -113,6 +119,7 @@ class Finitude(unittest.TestCase):                               # E-C-06 ; anal
                ("2026-08-05T11:11:21-05:00", ("1", 1785946281000000)),            # signe du décalage (C-2, G03)
                ("2026-08-05T16:11:21.674372", ("1", 1785946281674372)), ("2026-08-05 16:11:21Z", "panne_decode"),
                ("2026-08-05T16:11:21+0000", "panne_decode"), ("1969-12-31T23:59:59Z", "panne_decode"),
+               ("2026-08-05t16:11:21Z", "panne_decode"), ("2026-08-05T16:11:21z", "panne_decode"),    # casse (C-5)
                ("2255-06-05T23:47:34.740991Z", ("1", (1 << 53) - 1)), ("2255-06-05T23:47:34.740992Z", "panne_decode")]
         self.assertEqual([coinbase(t) for t, _a in cas], [a for _t, a in cas])     # 2^53 µs : 2255-06-05T23:47:34Z
 
@@ -166,6 +173,66 @@ class Illisible(unittest.TestCase):
                 with self.subTest(nom=nom, corps=corps[:8]):
                     self.assertEqual(decodeurs.decoder(nom, corps), PANNE)
         self.assertEqual(decodeurs.decoder("inconnu", lire(FIX, "binance.bin")), PANNE)
+
+
+def hostile(prix="1", ts=None, extra=None):
+    """Décodeur injecté « hostile » qui rend (prix, ts, extra) quel que soit le corps."""
+    return mock.patch.dict(decodeurs.DECODEURS, hostile=("BTC", "USD", "agregateur", lambda j: (prix, ts, extra or {})))
+
+
+def lu(statut="ok", corps=b"{}", code=200):
+    return Lecture(statut, 10, 20, {"dns": 11}, "127.0.0.1:443", code=code, octets=corps)
+
+
+class Politique(Base):                                            # SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (CB-6c)
+    def test_valeurs_refusees_par_l_ecrivain_jamais_rendues(self):
+        """Flottant (prix, instant, extra), booléen, entier hors de l'extra, demi-codet UTF-16 seul (UnicodeEncodeError
+        de l'écrivain), extra au-delà de la borne : `panne_decode`, valeurs null. Borne : 2 097 152 octets de JSON
+        canonique, saut de ligne compris (`json.dumps`) : à la borne, rendu ; un octet de plus, refusé."""
+        for p, ts, extra in ((1.5, None, {}), ("1", 1.0, {}), ("1", True, {}), ("1", None, {"x": 1}),
+                             ("1", None, {"x": chr(0xD800)}), ("1", None, {"x": "a" * (1 << 21)})):
+            with self.subTest(prix=p, ts=ts, extra=str(extra)[:20]), hostile(p, ts, extra):
+                self.assertEqual(decodeurs.decoder("hostile", b"{}"), PANNE)
+        base = len(json.dumps([{"actif": "BTC", "classe": "agregateur", "devise": "USD", "extra": {"x": ""},
+                                "prix": "1", "ts_source": None}], sort_keys=True, separators=(",", ":"))) + 1
+        for n, statut in ((2097152 - base, "ok"), (2097153 - base, "panne_decode")):
+            with hostile(extra={"x": "a" * n}):
+                self.assertEqual(decodeurs.decoder("hostile", b"{}")[0], statut)
+
+    def test_lecture_decodee_panne_http_inchangee(self):
+        statut, valeurs = decodeurs.decoder("binance_btc", lire(FIX, "binance.bin"))
+        a = decodeurs.appliquer("binance_btc", lu(corps=lire(FIX, "binance.bin")))
+        self.assertEqual((a.statut, a.code, a.valeurs, a.octets, a.fin), ("ok", 200, valeurs, lire(FIX, "binance.bin"),
+                                                                         20))
+        b = decodeurs.appliquer("coinbase_btc", lu(corps=lire(FIX, "binance.bin")))
+        self.assertEqual(b.enregistrement(), {**lu(corps=lire(FIX, "binance.bin")).enregistrement(),
+                                              "statut": "panne_decode"})
+        for x in (lu("panne_http", code=503), Lecture("panne_transport", 10, 20, sous_type="delai")):
+            self.assertIs(decodeurs.appliquer("binance_btc", x), x)
+
+    def test_boucle_continue_quand_un_decodeur_rend_une_valeur_refusee(self):
+        """Écrivain réel : la lecture est `panne_decode`, la boucle écrit santé et marqueur à chaque fenêtre ; sans la
+        politique, `JOURNAL/type` arrêterait le processus à la première lecture."""
+        temps = Temps(m(2) * S + 5 * S)
+        jl = borne(self, self.journal, m(2))
+        b = boucle.Boucle(jl, {"a": lambda suivi: decodeurs.appliquer("hostile", lu())}, [(0, "a")], 4,
+                          horloge=temps, dormir=temps.dormir, attendre=temps.attendre, monotone=temps.monotone)
+        with hostile(extra={"x": chr(0xD800)}):
+            borne(self, b.tourner, 2)
+        self.assertEqual([(e["type"], e.get("statut"), e.get("valeurs", 0)) for e in chaine(self.etat()[FICHIER])[2]
+                          [1:]], [("lecture", "panne_decode", None), ("sante", None, 0), ("marqueur", None, 0)] * 2)
+
+    def test_ligne_de_lecture_la_plus_longue_sous_limite(self):
+        """Corps JSON de 1 048 576 octets (borne de réception, FORMAT §9.4) et valeurs à leur borne : la `lecture`
+        s'écrit, en moins de 3 500 000 octets (LIMITE : 4 194 304)."""
+        n = 2097152 - len(json.dumps([{"actif": "BTC", "classe": "agregateur", "devise": "USD", "extra": {"x": ""},
+                                       "prix": "1", "ts_source": None}], sort_keys=True, separators=(",", ":"))) - 1
+        with hostile(extra={"x": "a" * n}):
+            x = decodeurs.appliquer("hostile", lu(corps=b'"' + b"a" * ((1 << 20) - 2) + b'"'))
+        jl = self.journal(m(2))
+        jl.ecrire("lecture", m(3), forme="f" * 64, prevu=10, **x.enregistrement())
+        jl.marqueur(m(3))
+        self.assertTrue(x.statut == "ok" and 3000000 < len(self.etat()[FICHIER].split(bytes([10]))[1]) < 3500000)
 
 
 if __name__ == "__main__":

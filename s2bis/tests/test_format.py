@@ -177,6 +177,18 @@ class Format(unittest.TestCase):
                     "Les lecteurs appliquent le §7.1 avant le §7.4.")
         self.assertEqual([x in point4 for x in attendus], [True] * 3)
 
+    def test_paragraphes_9_et_14_valeurs_et_decodeur(self):        # CB-6c, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1
+        """§9.1 : clés exactes d'un relevé, borne de 2 097 152 octets, item nommé ; §14.1 : `decodeur` et sa règle ;
+        puce « Partie P2 » : CB-6c et l'item."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = [(sections["9"], "`actif`, `classe`, `devise`, `prix`, `ts_source` et `extra`"),
+                    (sections["9"], "borne de 2 097 152 octets de JSON canonique"),
+                    (sections["9"], "SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1"), (sections["14"], "règle `decodeur-connu`"),
+                    (sections["9"], "« T » majuscule"), (sections["9"], "ne lit pas la même chose de 3.10 à 3.13")]
+        self.assertEqual([x in s for s, x in attendus], [True] * 6)          # deux derniers : C-5 de la G2 de P2A
+        self.assertEqual([("CB-6c" in p, "ECRIVAIN-REFUS-ARRET-1" in p) for p in puces if p.startswith(
+            "**Partie P2, tranche A**")], [(True, True)])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

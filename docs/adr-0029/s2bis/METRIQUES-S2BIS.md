@@ -1844,3 +1844,40 @@ Chainlink, contexte du fil, précision 28, Overflow non piégé, plancher non re
 tués par leur test visé : borne d'exposant retirée (« borne retirée »), borne de texte retirée, l'une ou l'autre
 relâchée, OKX, Gemini ou DefiLlama sans l'aide, borne serrée qui refuse le témoin, six mots admis, 2^255 lu positif.
 Suite : 270 tests ; plancher du job : 270, égalité exigée.
+
+## CB-6c (2026-10-08) : lecture décodée, valeurs refusées par l'écrivain jamais rendues (E-C-06, E-C-17)
+
+Objet : chaque forme de `formes.json` nomme son décodeur (`decodeur`, règle `decodeur-connu`) ; `decodeurs.appliquer`
+décode le corps de chaque lecture `ok`, dans le fil de la lecture (`valeurs` : liste de relevés, FORMAT §9.1, §14.1).
+Des valeurs que l'écrivain refuserait (types, `journal.canonique`) ou de plus de 2 097 152 octets canoniques ne sont
+jamais rendues : la lecture est `panne_decode`, la boucle continue ; l'item SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 est
+fermé pour les décodeurs. Témoin : la plus longue ligne de lecture (corps de 1 048 576 octets, valeurs à leur borne)
+mesure 3 496 800 octets, sous LIMITE (4 194 304). Correction C-5 de la G2 de P2A : la restriction du motif ISO
+(« T » et « Z » majuscules ; « t », « z », l'espace et `+hhmm` refusés) est écrite au §9.1 avec sa raison (même
+lecture de 3.10 à 3.13), écart à S2 et à la RFC 3339 §5.6 nommé ; deux cas de casse ajoutés au test de l'instant ISO.
+
+Formes BTC (C-3 de la G2 de P2A, écart déclaré) : ce diff ne verse aucune forme de requête BTC (aucune donnée sous
+`s2bis/config/`) ; les décodeurs et les fixtures de S2 sont versés, pas les requêtes. Les formes viennent avec CB-8
+(regroupement de CoinGecko, DefiLlama et Bitfinex, E-C-09 ; plan d'OKX), chacune comparée aux octets de la requête de
+S2 : item SHOGEN-S2BIS-FORMES-BTC-1, déclencheur CB-8.
+
+Rouge : sur le code de CB-6b, les tests neufs échouent par assertion ; les tests existants dont la configuration de
+test porte désormais `decodeur` échouent aussi (refus `CONFIG/champ-inconnu` du schéma d'avant), trois d'entre eux en
+erreur (configuration refusée avant l'assertion). Puis le §9.1 et le §14.1 du FORMAT, absents : échec d'assertion.
+C-5 : sur le FORMAT d'avant la G2, le test des §9 et §14 échoue par assertion (restriction et raison absentes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 146 | — |
+| `shogen_s2bis/collecte/entree.py` | 128 | — |
+| `tests/test_bout_en_bout.py` | 218 | 1 (corps de `binance.bin` servi ; `valeurs` contrôlées contre le §9.1) |
+| `tests/test_decodeurs.py` | 239 | 19 (4 de plus : valeurs refusées jamais rendues ; panne HTTP inchangée ; boucle continue ; plus longue ligne) |
+| `tests/test_entree.py` | 274 | 10 (1 de plus : lecture décodée par le décodeur de sa forme) |
+| `tests/test_format.py` | 206 | 11 (1 de plus : §9.1, dont la restriction ISO, §14.1 et puce « Partie P2 ») |
+
+Mutants (même commande) : 16 mutants du sous-lot, 16 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : garde de l'écrivain retirée, borne de taille retirée, exclue ou doublée, prix flottant admis, instant booléen
+admis, extra non contrôlé, pannes décodées, corps ou code perdus, lecture non décodée, décodeur d'une autre forme, règle
+`decodeur-connu` retirée, champ `decodeur` hors du schéma, item retiré du §9, plancher non relevé. Corrections : 3
+mutants neufs, 3 tués par leur test visé : majuscule effacée du §9.1, motif ISO sans casse, « t » minuscule admis.
+Suite : 276 tests ; plancher du job : 276, égalité exigée.

@@ -11,20 +11,21 @@ tolérance de départ de D-2 (`tolerance`, 5 s en production) ; la règle `budge
 tolérance + plus grand décalage + délai + marge ≤ δ. CB-18h (SHOGEN-S2BIS-CONFIG-REGLES-1) : places du pool au moins
 égales au nombre de formes, hôte en minuscules (HOTE, règle de Q-RB-13 du recalcul), chemin en « / » puis ASCII
 imprimable sans espace. CB-19b (C-1 (b) de la relecture d'intégration de P1) : sept témoins et sept noms au plus,
-bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13.6)."""
+bornes calculées pour que la plus grande `sante` reste sous LIMITE (FORMAT §13.6). CB-6c : chaque forme nomme son
+décodeur (`decodeur`, règle `decodeur-connu`), qui lit le corps de ses lectures `ok` (FORMAT §9.1, §14.1)."""
 import argparse
 import ipaddress
 import os
 import re
 import sys
 
-from shogen_s2bis.collecte import boucle, config, dns, http, journal, sante
+from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
 HOTE = "[a-z0-9.-]{1,253}"            # nom d'hôte ou IPv4 : même règle que le recalcul (Q-RB-13 de sa tranche 1)
 FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "chemin": (str, 1, 2048),
-         "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None)}
+         "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None), "decodeur": (str, 1, 64)}
 SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": (int, 1, MAX), "delai": (int, 1, MAX),
                       "marge": (int, 1, MAX), "places": (int, 1, 4096), "formes": [FORME]},
            "sante": {"commande": [(str, 1, 4096)], "temoins": [(str, 7, 15), 7], "noms": [(str, 1, 253), 7],
@@ -65,7 +66,8 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("espace-par-hote", lambda f: len({(x["hote"], x["espace"]) for x in f["formes"]}) == len(
                             {x["hote"] for x in f["formes"]})),
                         ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"]),
-                        ("places-formes", lambda f: f["places"] >= len(f["formes"]))),
+                        ("places-formes", lambda f: f["places"] >= len(f["formes"])),
+                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"]))),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
              "descripteur": (("resolveur-ipv4", lambda d: _ipv4(d["resolveur"])),
@@ -86,7 +88,7 @@ def configurer(chemins, commit):
 
 def _lecteur(x, delai, tls):
     req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
-    return lambda suivi: http.lire(req, suivi, delai=delai, tls=tls)
+    return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
 
 
 def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
