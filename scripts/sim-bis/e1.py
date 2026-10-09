@@ -7,8 +7,8 @@ FIV_u par calibration.charger_unites, Q-SI-8 (b)), lignes [BORD E1] et phrases (
 impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à C2 (REGIME-FAISABILITE-1). SB-11m :
 loi des pauses d'une série sur le masque, définitions d'EP (point (6)). SB-11n : loi des pauses du modèle à C1,
 rejouée, à côté d'intervalles.txt (point (6)). SB-11o : lots d'E1 par point, reprenables (E-S-45), et écriture
-des sorties calibration_e1.{json,txt} (E-S-05, E-S-48). Entiers, rationnels et Decimal seuls : aucun flottant,
-aucune puissance, aucune fonction de libm."""
+des sorties calibration_e1.{json,txt} (E-S-05, E-S-48). SB-11p : contenu des sorties et E1 entière (lancer_e1).
+Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
 import hashlib
 import os
 from decimal import Decimal
@@ -254,3 +254,72 @@ def ecrire_e1(dossier: str, obj: dict, lignes: list, oracles: dict) -> list:
         commun.ecrire(c, octets)
         out.append((c, hashlib.sha256(octets).hexdigest()))
     return out
+
+
+def _pt(p) -> str:
+    return f"(φ = {p[0]}, κ = {p[1]}, τ_D = {p[2]})"
+
+
+def _vals(ells, xs) -> str:
+    return " ; ".join(f"ℓ = {e} : {'-' if v is None else v}" for e, v in zip(ells, xs))
+
+
+def rendu_e1(prm: dict, moy: dict, res: dict, pz: dict, entete: list, texte: str, cible: dict) -> tuple:
+    """Contenu des sorties d'E1 (E-S-48) : texte = entête (l'étiquette en tête, E-S-05), ligne de schéma, puis par
+    strate [E1] (C2, C1), [RÉSIDUS C2] ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés de la cible d'EP (SB11-IMPRESSIONS-1),
+    ligne [BORD E1] (Q-SI-8 (c)) et une ligne par hôte (point (6), Q-SI-8 (d)) ; [ÉCART-TYPE I_t] par point et par
+    strate (point (6)) ; [FAISABILITÉ] à C1 et à C2 (REGIME-FAISABILITE-1) ; phrases du bord ((8)(ii), (iii)) ; pauses
+    de C1 (lignes_pauses). JSON : schéma, entête, réplications, constats par strate (critères et Q₁ sous les noms de
+    cellule), phrases, faisabilité, moyennes de chaque point sous son nom de cellule (Q-SI-8 (a)), pauses. Rend (obj,
+    lignes)."""
+    st, R, g = prm["calibration"]["strates"], prm["e1"]["replications"], [None] + calib_fiv.grille(prm)
+    c1, ells = {s: res["strates"][s]["C1"] for s in st}, {s: [c["ell"] for c in cible[s] if c["garde"]] for s in st}
+    lignes = list(entete) + [f"schéma {prm['schema']} ; sortie calibration_e1 (E1, E-S-38 ; ajout daté du G0 du "
+                             f"2026-10-05 15:05:43 UTC) ; {R} réplications par point ; C0 et {len(g) - 1} points de la "
+                             "grille"]
+    for s in st:
+        x = res["strates"][s]
+        lignes += [f"[E1] « {s} » : C2 = {_pt(x['C2'])} ; C1 = {_pt(x['C1'])}", f"[RÉSIDUS C2] « {s} » : ln F_C2(ℓ) − "
+                   f"ln F_EP(ℓ) aux ℓ gardés d'EP : " + _vals(ells[s], x["residus"]), x["ligne_bord"]]
+        lignes += [f"  « {s} » hôte {h} : résidus ln F̄_u,C1(ℓ) − ln F_u(ℓ) : " + (_vals(*zip(*u["residus_C1"])) if
+                   u["residus_C1"] else "aucun ℓ retenu") + " ; point de Q₁ minimal pour cet hôte seul (diagnostic, "
+                   "jamais candidat) : " + (_pt(u["point_Q1"]) if u["point_Q1"] else "aucun") + " ; réplications à "
+                   "FIV indéfini : " + ", ".join(f"{c} {n}" for c, n in u["indefinies"].items())
+                   for h, u in x["unites"].items()]
+    lignes += [f"[ÉCART-TYPE I_t] {calib_fiv.cellule(prm, p)} « {s} » : {moy[p][s]['I']['definies']} réplications "
+               f"définies, {moy[p][s]['I']['indefinies']} indéfinies ; "
+               + _vals(prm["calibration"]["ell"], moy[p][s]["ecart_type"]) for p in g for s in st]
+    lignes += [f"[FAISABILITÉ {n}] « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, {f['ou'][1]}) : "
+               + ("faisable, r′ < 1" if f["faisable"] else "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)")
+               for n in ("C1", "C2") for s in st for f in [res["faisabilite"][n][s]]]
+    lignes += res["phrases"] + lignes_pauses(prm, pz, c1, R, texte)
+    obj = {"schema": prm["schema"], "sortie": "calibration_e1", "entete": entete, "replications": R,
+           "phrases": res["phrases"], "faisabilite": res["faisabilite"],
+           "points": {calib_fiv.cellule(prm, p): moy[p] for p in g},
+           "pauses": {s: {h: {k: sorted([a, b] for a, b in v.items()) if k in CLES_PAUSES else v for k, v in x.items()}
+                          for h, x in hs.items()} for s, hs in pz.items()},
+           "strates": {s: dict(res["strates"][s], ell_residus=ells[s], **{k: {
+               calib_fiv.cellule(prm, p): v for p, v in res["strates"][s][k].items()} for k in ("criteres", "Q1")})
+                       for s in st}}
+    return obj, lignes
+
+
+def lancer_e1(prm: dict, lots: str, sorties: str, processus: int, ns: int, oracles: dict, lus: dict,
+              environ=None) -> tuple:
+    """E1 entière (E-S-38 ; point (3) à (8) de l'ajout daté du G0) : EP, calendrier d'E1 (masque), fiv_unites.txt et
+    intervalles.txt lus sous leurs épingles et inscrits dans `lus` (parametres.json compris si chargé avec lus) avant
+    l'entête des lots ; lots de chaque point (calculer_e1, reprenables) ; calibrer ; pauses de C1 (pauses_c1) ; entête
+    inchangée exigée (modules et entrées, sinon E1/entete) ; rendu_e1 ; ecrire_e1 (oracles internes, E-S-48). Rend
+    ([(chemin, sha256)] des sorties, [(chemin, sha256)] des lots calculés)."""
+    e, st = calibration.charger(prm, lus, environ), prm["calibration"]["strates"]
+    cal = calib_fiv.calendrier_e1(prm, lus, environ)
+    calibration.charger_unites(prm, cal["presentes"], e["episodes"], lus, environ)
+    texte = commun.lire_entree(prm, "intervalles", lus, environ, sommes="sommes_plan2").decode("utf-8")
+    entete = commun.entete(lus)
+    moy, journal = calculer_e1(prm, e["episodes"], cal, lots, processus, ns, entete)
+    res = calibrer(prm, cal, moy, lus, environ)
+    pz = pauses_c1(prm, e["episodes"], cal, {s: res["strates"][s]["C1"] for s in st}, processus)
+    if commun.entete(lus) != entete:
+        raise commun.Refus("E1/entete", "modules ou entrées changés pendant E1")
+    obj, lignes = rendu_e1(prm, moy, res, pz, entete, texte, {s: e["fiv"][prm["e1"]["pool"], s] for s in st})
+    return ecrire_e1(sorties, obj, lignes, oracles), journal

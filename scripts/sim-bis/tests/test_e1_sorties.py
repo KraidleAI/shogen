@@ -7,6 +7,7 @@ import os
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 from fractions import Fraction
 
 import calib_fiv
@@ -91,6 +92,110 @@ class TestEcrireE1(unittest.TestCase):
                 e1.ecrire_e1(d, obj, lignes, ok)
             self.assertEqual((c.exception.code, sorted(os.listdir(d))), ("SORTIE/existe", ["calibration_e1." + x]))
 
+
+
+P = (Fraction(1, 10), Fraction(5), 60)
+P0 = (Fraction(1, 100), Fraction(5), 60)
+VRAIE = calib_fiv.selection
+
+
+def forcee(*a):
+    """calib_fiv.selection enveloppée : C1 = P0 et C2 = P en calme, l'inverse en stress (C1 ≠ C2)."""
+    x = VRAIE(*a)
+    x["calme"].update(C1=P0, C2=P)
+    x["stress"].update(C1=P, C2=P0)
+    return x
+
+
+def pt(p):
+    return f"(φ = {p[0]}, κ = {p[1]}, τ_D = {p[2]})"
+
+
+class TestRenduE1(unittest.TestCase):
+    def test_sections_et_lancer(self):
+        """E1 de la grille réduite lancée entière (lancer_e1 : lots, moyennes, calibrer, pauses de C1, rendu, écriture),
+        sélection enveloppée (C1 ≠ C2) : texte écrit = entête (étiquette en tête), ligne de schéma (à la main), par
+        strate [E1] (C2, C1), [RÉSIDUS C2] aux ℓ gardés d'EP, ligne [BORD E1], une ligne par hôte (résidus à C1, point
+        de Q₁ de l'hôte seul, réplications indéfinies par point), [ÉCART-TYPE I_t] par point et par strate,
+        [FAISABILITÉ] à C1 et à C2, phrases du bord, puis la section des pauses de C1 ; chaque section recomposée ici
+        depuis calibrer et pauses_c1 appelés à part sur les lots relus ; entête des lots = entête des sorties ; JSON :
+        mêmes entête, phrases, points sous leurs noms de cellule. Mutations M-11P-01 (pauses rejouées à C2),
+        M-11P-02 (entête prise avant fiv_unites.txt : E1/entete), M-11P-03 (résidus de C2 sous des ℓ non gardés),
+        M-11P-04 (écart-type d'un autre point), M-11P-05 (faisabilité de C2 sous l'étiquette C1), M-11P-06 (phrases
+        omises), M-11P-07 (hôtes d'une autre strate), M-11P-09 (moyennes de C0 sous chaque nom), M-11P-11 (nombre
+        de points de la ligne de schéma), M-11P-13 (entête d'une autre lecture dans les sorties)."""
+        lots, sorties, cal = dossier(self), dossier(self), cal_e1()
+        lus = {}
+        ok = {"suite sim-bis conforme": True}
+        with unittest.mock.patch.object(calib_fiv, "selection", side_effect=forcee):
+            r, journal = e1.lancer_e1(E1R, lots, sorties, 1, 1, ok, lus, {})
+            self.assertEqual(len(journal), 3)
+            moy = {p: e1.moyennes_point(executer.lire_lots(lots, calib_fiv.cellule(E1R, p), 2, commun.entete(lus)),
+                                        E1R["calibration"]) for p in [None] + calib_fiv.grille(E1R)}
+            res = e1.calibrer(E1R, cal, moy, None, {})
+        with open(r[1][0], encoding="utf-8") as f:
+            lignes = f.read().split(commun.NL)
+        with open(r[0][0], encoding="utf-8") as f:
+            obj = json.load(f)
+        ent = commun.entete(lus)
+        self.assertEqual((lignes[:len(ent)], obj["entete"], lignes[0]), (ent, ent, commun.ETIQUETTE))
+        k = len(ent)
+        self.assertEqual(lignes[k], "schéma shogen.sim-bis.v1 ; sortie calibration_e1 (E1, E-S-38 ; ajout daté du "
+                                    "G0 du 2026-10-05 15:05:43 UTC) ; 2 réplications par point ; C0 et 2 points de "
+                                    "la grille")
+        ep = calibration.charger(PRM, environ={})
+        att = []
+        for s, c1 in (("calme", P0), ("stress", P)):
+            x = res["strates"][s]
+            self.assertEqual(x["C1"], c1)
+            ells = [c["ell"] for c in ep["fiv"]["D1-bis", s] if c["garde"]]
+            self.assertEqual(obj["strates"][s]["ell_residus"], ells)
+            att += [f"[E1] « {s} » : C2 = {pt(x['C2'])} ; C1 = {pt(c1)}",
+                    f"[RÉSIDUS C2] « {s} » : ln F_C2(ℓ) − ln F_EP(ℓ) aux ℓ gardés d'EP : "
+                    + " ; ".join(f"ℓ = {e} : {v}" for e, v in zip(ells, x["residus"])), x["ligne_bord"]]
+            for h, _f in E1R["calibration"]["unites"]:
+                u = x["unites"][h]
+                att.append(f"  « {s} » hôte {h} : résidus ln F̄_u,C1(ℓ) − ln F_u(ℓ) : "
+                           + (" ; ".join(f"ℓ = {e} : {'-' if v is None else v}" for e, v in u["residus_C1"])
+                              or "aucun ℓ retenu") + " ; point de Q₁ minimal pour cet hôte seul (diagnostic, jamais "
+                           "candidat) : " + (pt(u["point_Q1"]) if u["point_Q1"] else "aucun") + " ; réplications à "
+                           "FIV indéfini : " + ", ".join(f"{c} {n}" for c, n in u["indefinies"].items()))
+        for p in [None] + calib_fiv.grille(E1R):
+            for s in ("calme", "stress"):
+                m = moy[p][s]
+                att.append(f"[ÉCART-TYPE I_t] {calib_fiv.cellule(E1R, p)} « {s} » : {m['I']['definies']} réplications "
+                           f"définies, {m['I']['indefinies']} indéfinies ; " + " ; ".join(
+                               f"ℓ = {e} : {'-' if v is None else v}" for e, v in zip(E1R["calibration"]["ell"],
+                                                                                     m["ecart_type"])))
+        for n in ("C1", "C2"):
+            for s in ("calme", "stress"):
+                f = res["faisabilite"][n][s]
+                att.append(f"[FAISABILITÉ {n}] « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, {f['ou'][1]}) : "
+                           + ("faisable, r′ < 1" if f["faisable"] else "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)"))
+        texte = commun.lire_entree(PRM, "intervalles", environ={}, sommes="sommes_plan2").decode("utf-8")
+        att += res["phrases"] + e1.lignes_pauses(E1R, e1.pauses_c1(E1R, EP, cal, {"calme": P0, "stress": P}, 1),
+                                                 {"calme": P0, "stress": P}, 2, texte) + [""]
+        self.assertEqual(lignes[k + 1:], att)
+        self.assertEqual((obj["phrases"], sorted(obj["points"])), (res["phrases"], sorted(
+            calib_fiv.cellule(E1R, p) for p in [None] + calib_fiv.grille(E1R))))
+        for p in [None] + calib_fiv.grille(E1R):
+            self.assertEqual(obj["points"][calib_fiv.cellule(E1R, p)],
+                             json.loads(json.dumps(executer.jsonable(moy[p]))))
+        with open(journal[0][0], "rb") as f:
+            self.assertEqual(json.loads(f.read().split(commun.NL.encode(), 1)[1])["entete"], ent)
+
+    def test_entete_changee(self):
+        """Entrée lue en cours d'E1 (calibrer enveloppé : `lus` gagne une ligne) : E1/entete, aucune sortie écrite.
+        Mutation M-11P-08 (contrôle de l'entête retiré)."""
+        lots, sorties, vraie = dossier(self), dossier(self), e1.calibrer
+
+        def calibrer(*a):
+            a[3]["docs/autre.txt"] = "0" * 64
+            return vraie(*a)
+        with unittest.mock.patch.object(e1, "calibrer", side_effect=calibrer):
+            with self.assertRaises(commun.Refus) as c:
+                e1.lancer_e1(E1R, lots, sorties, 1, 1, {"suite sim-bis conforme": True}, {}, {})
+        self.assertEqual((c.exception.code, os.listdir(sorties)), ("E1/entete", []))
 
 if __name__ == "__main__":
     unittest.main()
