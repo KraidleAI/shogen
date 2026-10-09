@@ -3,6 +3,7 @@
 import hashlib
 import os
 import tempfile
+import time
 import unittest
 from decimal import Decimal
 from fractions import Fraction
@@ -88,6 +89,17 @@ class TestFrequences(unittest.TestCase):
                              (v, c))
 
 
+def lent(k: int, n: int) -> int:
+    """Tâche de test : rend k après (n − k)·50 ms, d'où un achèvement dans l'ordre inverse des tâches."""
+    time.sleep((n - k) * 0.05)
+    return k
+
+
+def pid(k: int) -> int:
+    """Tâche de test : numéro du processus qui l'exécute."""
+    return os.getpid()
+
+
 R2 = [{"i": 0, "x": Fraction(1, 3), "d": Decimal("0.5"), "t": (1, 2)}, {"i": 1, "x": Fraction(2), "d": None, "t": []}]
 
 
@@ -153,6 +165,30 @@ class TestLots(unittest.TestCase):
         for cel, a, b, e, code in (("N2", 0, 1, [{"i": 1}], "LOT/indices"), ("N2", 1, 1, [], "LOT/nom"),
                                    ("E1/1", 0, 1, [{"i": 0}], "LOT/nom"), ("N1.x", 0, 1, [{"i": 0}], "LOT/nom")):
             self.assertEqual(code_de(executer.ecrire_lot, self.r, cel, a, b, e, ["e"]), code, cel)
+
+
+class TestProcessus(unittest.TestCase):
+    def test_appliquer_ordonne(self):
+        """E-S-42 : quatre tâches achevées dans l'ordre inverse (lent) : résultats dans l'ordre des tâches, en 1 et en 4
+        processus, ceux-ci hors du processus appelant ; processus 0 ou booléen : EXEC/processus. Mutations M-11C-01
+        (ordre d'achèvement, imap_unordered), M-11C-06 (un seul processus quel que soit le nombre demandé)."""
+        taches = [(k, 4) for k in range(4)]
+        self.assertEqual([executer.appliquer(lent, taches, p) for p in (1, 4)], [[0, 1, 2, 3], [0, 1, 2, 3]])
+        self.assertNotIn(os.getpid(), executer.appliquer(pid, [(k,) for k in range(4)], 4))
+        for p in (0, True):
+            self.assertEqual(code_de(executer.appliquer, lent, taches, p), "EXEC/processus")
+
+    def test_plan_90_min(self):
+        """Adjudication 6 du G0 (lots de 90 min au plus), C1-COUT-1 : 1 000 réplications de 60 s, un processus : lots de
+        90 (5 400 s), le dernier de 10 ; 200 réplications de 30 s, deux processus : un lot ; 400 : 360 et 40 ; 10
+        réplications de 5 401 s : EXEC/plan. Mutations M-11C-02 (processus ignorés), M-11C-03 (borne dépassée d'une
+        réplication)."""
+        s = 10 ** 9
+        p = executer.plan(1000, 60 * s, 1)
+        self.assertEqual((len(p), p[:1], p[-2:]), (12, [(0, 90)], [(900, 990), (990, 1000)]))
+        self.assertEqual(executer.plan(200, 30 * s, 2), [(0, 200)])
+        self.assertEqual(executer.plan(400, 30 * s, 2), [(0, 360), (360, 400)])
+        self.assertEqual(code_de(executer.plan, 10, 5401 * s, 4), "EXEC/plan")
 
 
 if __name__ == "__main__":

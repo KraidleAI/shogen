@@ -3,10 +3,12 @@
 Decimal sous le contexte de r1, borne unilatérale à 95 % quand x = 0 ; E-S-40, E-S-43) ; fréquences des valeurs et des
 causes de NON ÉVALUABLE, par cause et par combinaison (E-S-52). SB-11b : empreinte d'une suite d'enregistrements
 (E-S-44) ; fichiers partiels de lot, un par (cellule, plage de i), relus à la condition que chaque i y soit une fois et
-une seule (E-S-45, E-S-06). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de
-libm."""
+une seule (E-S-45, E-S-06). SB-11c : tâches dans l'ordre, en un ou plusieurs processus (E-S-42) ; plan de lots de 90 min
+au plus sur le coût mesuré (adjudication 6 du G0). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
+puissance, aucune fonction de libm."""
 import hashlib
 import json
+import multiprocessing
 import os
 import re
 from decimal import Decimal
@@ -19,6 +21,7 @@ import regle
 VALEURS = ("REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE")
 INSUFFISANTE = ("unites", "k_crit", "runs")         # information insuffisante (E-S-52) ; n_prime compté à part
 NOM, SUFFIXE = re.compile("[A-Za-z0-9_-]+"), ".lot"  # nom de cellule sans « / » ni « . » (Q-T4-8) ; jamais .jsonl
+BORNE = 90 * 60 * 1000000000                         # 90 min en ns : adjudication 6 du G0 (lots détachés)
 
 
 def taux(x: int, R: int, k: dict) -> dict:
@@ -142,3 +145,28 @@ def lire_lots(dossier: str, cellule: str, R_rep: int, entete: list) -> list:
     if i != R_rep:
         raise commun.Refus("LOT/manquant" if i < R_rep else "LOT/surplus", f"{cellule} : {i} réplications pour {R_rep}")
     return [e for c in lots for e in c["enregistrements"]]
+
+
+def appliquer(fonction, taches: list, processus: int) -> list:
+    """[fonction(*t) pour t de taches], dans l'ordre des tâches (E-S-42) : en ce processus si processus = 1, sinon
+    par `processus` processus neufs (méthode « spawn »), starmap ordonné : le résultat ne dépend ni du nombre de
+    processus ni de l'ordre d'achèvement. processus entier ≥ 1, sinon EXEC/processus."""
+    if type(processus) is not int or processus < 1:
+        raise commun.Refus("EXEC/processus", f"{processus!r} : entier ≥ 1")
+    if processus == 1:
+        return [fonction(*t) for t in taches]
+    with multiprocessing.get_context("spawn").Pool(processus) as p:
+        out = p.starmap(fonction, taches, chunksize=1)
+        p.close()
+        p.join()
+    return out
+
+
+def plan(R_rep: int, ns: int, processus: int, borne: int = BORNE) -> list:
+    """Plages [(a, b)] de [0, R_rep), dans l'ordre, de T = borne·processus // ns réplications (la dernière au plus) :
+    durée d'un lot (b − a)·ns/processus ≤ borne, sur le coût mesuré ns par réplication (en ns ; adjudication 6 du G0,
+    90 min ; SHOGEN-SIM-BIS-C1-COUT-1) ; une réplication plus longue que la borne : EXEC/plan."""
+    if not all(type(v) is int and v >= 1 for v in (R_rep, ns, processus, borne)) or ns > borne:
+        raise commun.Refus("EXEC/plan", f"R = {R_rep!r}, {ns!r} ns par réplication, borne {borne!r} ns")
+    t = borne * processus // ns
+    return [(a, min(a + t, R_rep)) for a in range(0, R_rep, t)]
