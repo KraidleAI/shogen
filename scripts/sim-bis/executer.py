@@ -6,8 +6,10 @@ causes de NON ÉVALUABLE, par cause et par combinaison (E-S-52). SB-11b : emprei
 une seule (E-S-45, E-S-06). SB-11c : tâches dans l'ordre, en un ou plusieurs processus (E-S-42) ; plan de lots de 90 min
 au plus sur le coût mesuré (adjudication 6 du G0). SB-11d : couche d'observateurs d'une cellule (grille
 cellules.couches, O-5 ; perte sur le W de la cellule, L-2). SB-11e : cellules sous schéma fermé et refus nommés
-(SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2) ; fond des sources d'une cellule. Entiers, rationnels
-et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
+(SHOGEN-SIM-BIS-SB11-IMPRESSIONS-1 ; O-1 de la G2 de la tranche 2) ; fond des sources d'une cellule. SB-11f :
+réplication d'une cellule, chaîne entière (T_début, sources, observateurs, fenêtres retenues, retraits, première unité,
+règle par classe et par strate). Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune
+fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -16,6 +18,8 @@ import re
 from decimal import Decimal
 from fractions import Fraction
 
+import aleas
+import calendrier
 import calib_fiv
 import commun
 import observateurs
@@ -313,3 +317,42 @@ def cellule(prm: dict, ep: dict, cel: dict, points: dict, W: int) -> dict:
     p = dict(prm, sources=dict(prm["sources"], **cel["surcharges"]))
     return {"nom": cel["nom"], "prm": p, "fond": fond(p, cel, points, W), "couche": couche(p, ep, cel, W),
             "regle": cel["regle"]}
+
+
+def _court(r: dict) -> dict:
+    """Champs d'un résultat de la règle gardés dans l'enregistrement."""
+    return {k: r[k] for k in ("valeur", "causes", "C", "C1", "C_S", "r", "K", "S", "runs", "unites") if k in r}
+
+
+def replication(prm: dict, ep: dict, cel: dict, points: dict, W: int, i: int) -> dict:
+    """Réplication i ≥ 0 d'une cellule (cellule ; W semaines, échelle de calendrier.echelle) : T_début tiré sur le flux
+    « debut » d'indice 0 (E-S-14, Q-S-08 ; E-S-41) ; masques de strate sur T_max ; état vrai (sources.Replication),
+    couche et quorum (observateurs.Couche) ; par strate, fenêtres retenues (n_s premières évaluables, ou n′_s) ;
+    retraits D1-bis et presque mort par classe sur l'ok consolidé des retenues (E-S-24) ; première unité : premier hôte
+    BTC de la strate après retraits (Q-T3-15) ; séries D comprimées et R1-2 (regle.tester) par classe ; valeurs de la
+    strate (regle.strate) ; impression de M_j : fenêtres de la strate à M_j = 0..M (ADR-0029 l.97 a)."""
+    c = cellule(prm, ep, cel, points, W)
+    p, nom, rg, cal, st = c["prm"], c["nom"], c["regle"], prm["calendrier"], prm["calibration"]["strates"]
+    e = calendrier.echelle(cal, W)
+    debut = calendrier.t_debut(cal, sources.flux(p, nom, i, "debut", 0))
+    m = calendrier.masques(cal, debut, e["t_max"])
+    etat = sources.Replication(p, ep, c["fond"], nom, i, m, e["t_max"]).etat()
+    q, cons = observateurs.Couche(p, c["couche"], nom, i, e["t_max"]).consolidation(etat, m)
+    ret = {s: calendrier.retenues(q.evaluables, m[s], e["n"][s]) for s in st}
+    pools, graine = dict(sources.classes(p)), aleas.graine_regle(p["aleas"], nom, i)
+    n = {s: ret[s]["n"] for s in st}
+    rt = {cl: regle.retraits({(u, s): (cons[u, cl][1] & ret[s]["masque"]).bit_count() for u in pools[cl]
+                              for s in st}, n) for cl in rg["classes"]}
+    out = {"i": i, "jour": (debut - cal["lundi_reference"]) // 86400, "strates": {}}
+    for s in st:
+        prem = regle.premiere([u for u in pools["BTC"] if (u, s) not in rt["BTC"]])
+        segs = calendrier.segments(ret[s]["masque"])
+        res = {}
+        for cl in rg["classes"]:
+            series = {u: calendrier.comprimer(cons[u, cl][0], segs) for u in pools[cl] if (u, s) not in rt[cl]}
+            res[cl] = _court(regle.tester(series, prem, graine, s, n[s], e["n"][s], p, rg["R"], rg["S"]))
+        out["strates"][s] = {
+            "n": n[s], "atteinte": ret[s]["atteinte"], "suffisant": ret[s]["suffisant"], "premiere": prem,
+            "M": [(x & m[s]).bit_count() for x in q.nombre], "classes": res, "valeurs": regle.strate(res),
+            "retraits": {cl: sorted([u, x] for (u, t), x in rt[cl].items() if t == s) for cl in rg["classes"]}}
+    return out
