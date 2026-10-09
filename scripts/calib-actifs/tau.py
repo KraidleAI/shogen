@@ -7,7 +7,7 @@ des autres places définies (moyenne des deux du milieu pour un nombre pair) ; m
 from __future__ import annotations
 
 import math
-from decimal import Decimal
+from decimal import Context, Decimal, localcontext
 from fractions import Fraction
 
 import bougies
@@ -139,4 +139,57 @@ def controle_fragment(prm: dict, frag: dict, btc: dict) -> None:
         for nom, ok in regles.items():
             if not ok:
                 raise socle.Refus("CA/fragment", f"contrôle E-CA-23 ({nom}) du fragment en écart", a)
+
+
+def affiche(x) -> str:
+    """Rationnel ou décimal en chaîne décimale à 10⁻¹⁰ près (impression seule, contexte fixé : prec 50) ; None : « - ».
+    """
+    if x is None:
+        return "-"
+    with localcontext(Context(prec=50)):
+        return str((Decimal(Fraction(x).numerator) / Decimal(Fraction(x).denominator)).quantize(Decimal("1E-10")))
+
+
+def queue(prm: dict, cel: dict) -> dict:
+    """{place : (cellules au-delà du P99,9 de leur strate, part de la queue, âge médian en minutes)} (§4.3 pt 5 ;
+    AVIS Q-CA-04 : montre si τ vient de prix périmés)."""
+    par = {}
+    for e, pl, ag in cel.values():
+        q = socle.quantile(e, *prm["tau"]["rang"])
+        for x, p, a in zip(e, pl, ag):
+            if q is not None and x > q:
+                par.setdefault(p, []).append(a)
+    n = sum(len(v) for v in par.values())
+    return {p: (len(v), Fraction(len(v), n), socle.quantile(v, 50, 100)) for p, v in sorted(par.items())}
+
+
+def actives_seules(r: dict) -> dict:
+    """Clôtures des seules minutes actives (âge 0), None ailleurs : variante « minutes actives seules » (§4.3 pt 5)."""
+    return {p: [c if a == 0 else None for c, a in zip(r["closes"][p], r["ages"][p])] for p in r["closes"]}
+
+
+def descriptifs(prm: dict, actif: str, r: dict) -> list:
+    """Lignes descriptives d'un actif, jamais décisives (E-CA-20) : troisième terme sur toutes les places horodatées
+    (lettre de l.189) et P99 des suites ; variante « minutes actives seules » ; queue par place ; règle au maximum ;
+    τ des agrégateurs sous les autres dénominateurs, τ_agr_BTC tel quel, drapeau τ_agr < τ_places. Ne modifie pas r."""
+    lec, ag = socle.lecture(prm), r["agregateurs"]
+    hor = [p for p in lec["places"][actif] if p in prm["classes"]["place_horodatee"]]
+    terme, detail = sigma.troisieme_terme(prm, {p: r["ages"][p] for p in hor}, r["strates"])
+    out = [f"[{actif}] descriptif : troisième terme sur toutes les places horodatées ({', '.join(hor)}) : "
+           f"{terme if terme is not None else 'absent'} ; P99 des suites (population retenue) : "
+           + " ; ".join(f"{st} {affiche(d[2])} min" for st, d in r["detail_terme"].items())]
+    if r["cellules"] is not None:
+        try:
+            cel = ecarts(actif, actives_seules(r), r["ages"], r["strates"], lec["n_min"][actif], {})
+            v = affiche(places(prm, actif, cel)["tau"])
+        except socle.Refus as e:
+            v = str(e)
+        out += [f"[{actif}] descriptif : τ des places, variante minutes actives seules : {v}",
+                f"[{actif}] descriptif : règle au maximum : {affiche(r['places']['regle_au_maximum'])}"]
+        out += [f"[{actif}] descriptif : queue au-delà du P99,9, {p} : {n} cellules, part {affiche(f)}, âge médian "
+                f"{a} min" for p, (n, f, a) in queue(prm, r["cellules"]).items()]
+    out.append(f"[{actif}] descriptif : τ des agrégateurs sous les dénominateurs " + " ; ".join(
+        f"{k} {affiche(v)}" for k, v in ag["autres"].items())
+        + f" ; τ_agr < τ_places : {'oui' if ag['sous_places'] else 'non'}")
+    return out
 
