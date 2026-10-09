@@ -1259,3 +1259,38 @@ Items : SHOGEN-SIM-BIS-FIV-IDENTIF-1 reste **ouvert** jusqu'à la sortie d'E1 é
 |---|---|---|---|---|---|
 | SHOGEN-SIM-BIS-C1-COUT-1 | la règle de C1 ajoute 20 courbes par réplication : 0,32 à 0,34 s mesurés par réplication, soit environ 70 min de CPU pour E1 ; à porter au budget et au découpage de SB-11 (lots de 90 min au plus), avec SHOGEN-SIM-BIS-TABLES-CACHE-1 | orch. | brief de SB-11 | un découpage [mesuré] | générateur I-1 ; G2 |
 | SHOGEN-MUTANTS-SITE-APPEL-1 | les six survivants de la G2 relèvent d'un même angle mort de méthode : muter aussi le site d'appel d'une fonction partagée et la source des données passées sous une étiquette inchangée | orch. | prochain brief de campagne de mutants | une ligne de brief [inféré] | G2, I-R3 |
+
+## B.81 Amendement daté du 2026-10-08 22:13:03 UTC (heure produite par `date -u`) : G0 du lot CALIB-ACTIFS adjugé
+
+G0 `docs/adr-0029/g0-calib/G0-CALIB-ACTIFS.md` : proposition (`claude-opus-5-5`) corrigée par l'avis de l'advisor (`claude-fable-5-1`, treize questions adoptées, deux modifiées) ; relevé du lecteur (`claude-sonnet-5-5`) ; ajout daté du même jour à l'ADR-0029 (USDC à cinq places, lettre de l.189, sensibilité « USD seules » sur ETH, taille du lot). Débloqués : CB-7, CB-8, CB-9, E-CA-23 de RB-2, code CA-0 à CA-6 sur fixtures. Attendent INV-1 et INV-2 : l'épinglage et le lancement unique.
+
+Items **fermés** : SHOGEN-S2BIS-PAIRES-1 (paires lues sur pièce et recomptées, PROPOSITION §2) ; SHOGEN-S2BIS-ETH-USD-SEULES-1, formé et fermé par l'ajout daté (4). Items **précisés** : SHOGEN-S2BIS-SIGMA-ACTIFS-1 (règles complètes, valeurs au lot CA) ; SHOGEN-S2BIS-CALIB-L189-1 (E-CA-23 écrits, avec le champ de mode ; RB-2 et lot CA) ; SHOGEN-S2BIS-SECONDE-VAGUE-1 (dépend d'INV-1 ; sous A, A′ ou C, aucune seconde vague) ; SHOGEN-S2BIS-LICENCES-API-1 (conditions des archives lues : Binance Vision, Bitstamp, Kraken, OKX, et, le 2026-10-08, Coinbase et Bitfinex ; INV-1 et INV-2 posées avec la conséquence sur le pool en direct) ; SHOGEN-S2BIS-P1-ESTIMATION-1 (≈ 200 contre ≈ 1 100 à 1 300 lignes). SHOGEN-S2BIS-VAGUE2-CALIB-1 n'est formé que si INV-1 = B.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-S2BIS-FORMES-DOC-1 | champs de réponse de Gemini non documentés dans les pages lues ; Gemini v1 `usdtusd` non sondé ; codes `UDC` et `UST` de Bitfinex non cités sur une page ; hôte `coins.llama.fi` absent de la documentation lue (BTC compris) ; limites publiques de Kraken non trouvées | orch. | gel de `formes.json` (CB-7, CB-8) | des captures datées [inféré] | PROPOSITION §13 ; AVIS §2 pt 2 |
+| SHOGEN-S2BIS-HORODATAGE-SENS-1 | sens de l'horodatage documenté pour Coinbase (dernière transaction) et OKX (génération), inféré d'une mesure pour Bitstamp et Gemini ; il fixe la population du troisième terme de σ | orch. | CB-7, avant l'épinglage du lot CA | deux captures par place (E-CA-07) [inféré] | PROPOSITION §13 ; AVIS Q-CA-07 |
+| SHOGEN-S2BIS-BINANCE-HOTE-1 | `api.binance.com` en 451 depuis l'hôte de session ; fixtures depuis `data-api.binance.vision`, déclarées ; l'unité reste `api.binance.com` | orch. | smoke de chaque observateur, avant le gel | un smoke (E-C-37) [inféré] | PROPOSITION §13 ; AVIS Q-CA-02 |
+| SHOGEN-S2BIS-TEMOIN-RPC-1 | deux hôtes RPC du témoin (`eth.drpc.org`, `rpc.mevblocker.io`), tous deux sur AS13335 au 2026-10-04 ; conditions et limites non lues ; `eth_call` non documenté chez MEV Blocker ; remplaçant (Tenderly) non essayé | orch. | avant le sceau | lecture des conditions et smoke [inféré] | PROPOSITION §13 ; AVIS Q-CA-10 |
+| SHOGEN-S2BIS-CURVE-DOC-1 | documentation de `get_dy` du 3pool non lue ; rattachement du pool NG à sa fabrique non vérifié ; sens de `price_oracle` non lu | orch. | G2 de CB-9 | une lecture [inféré] | PROPOSITION §13 ; AVIS Q-CA-09 |
+| SHOGEN-S2BIS-CHAINLINK-PARAMS-1 | unité du seuil de déviation inférée ; `data.chain.link` non lu (429) ; agrégateurs d'USDC et d'USDT récents (≈ 25 tours en phase 4) : paramètres à relire au paquet | orch. | paquet (E-CA-10) | une relecture, refus nommé en cas d'écart [inféré] | PROPOSITION §13 ; AVIS §6 risque 3 |
+| SHOGEN-S2BIS-PJ-BRUIT-1 | bruit de P_j sur des historiques stable/stable non mesuré ; seuil de 0,5 % scellé (l.212) | orch. | G0 de REJEU-DECROCHAGES, à lancer avant le sceau | une mesure au rejeu [inféré] | AVIS Q-CA-12 |
+| SHOGEN-S2BIS-CADENCE-AGREG-1 | cadence des agrégateurs pour ETH et les stables à mesurer (horodatages seuls) par un script séparé, hors du lanceur du lot CA | orch. | avant le sceau | ≈ 40 lignes, une exécution, versement daté [inféré] | AVIS Q-CA-11 |
+
+## B.82 Amendement daté du 2026-10-08 22:42:53 UTC (heure produite par `date -u`) : décision de l'investisseur sur l'usage des sources (INV-1 = A ; question 13 révisée)
+
+Décision verbatim : « option A, on utilise toutes les sources qu'on veut sans restriction, aucune. » Portée : ajout daté du même jour à l'ADR-0029 et au G0 de CALIB-ACTIFS. Items **fermés** : SHOGEN-S2BIS-LICENCES-API-1 (conditions des sources lues et consignées le 2026-10-08 ; aucune source retirée pour ce motif, décision de l'investisseur) ; SHOGEN-S2BIS-SECONDE-VAGUE-1 (option A : aucune seconde vague). SHOGEN-S2BIS-VAGUE2-CALIB-1 n'est pas formé.
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-S2BIS-CONDITIONS-DECLAREES-1 | les conditions d'usage lues des sources (restrictions de republication, d'usage commercial, d'indices) ne sont pas suivies à la lettre, par décision de l'investisseur ; ce que le paquet et la publication en disent reste à écrire | orch. ; requis : investisseur | G0 du paquet, avant le sceau | une phrase de limite et une liste datée des conditions lues [inféré] | décision du 2026-10-08 ; synthèse licences et abonnements |
+
+## B.83 Amendement daté du 2026-10-09 00:44:06 UTC (heure produite par `date -u`) : SB-13 première passe commise (oracle croisé avec RB-6)
+
+Quatre commits `a6ae6af` à `ad47ad7` (SB-13A à SB-13D) sous le G0 de SIM-BIS (E-S-51, première moitié ; PROPOSITION §6.1, SB-13) : épingle de RB-6 au commit `f458980` dans `parametres.json`, extraction par `git archive`, réplique et recalcul, croisement de o(r, u) et K^(r) (0 écart sur les vecteurs du contrat et 100 séries synthétiques), et tests qui lient les noms, seuils et vecteurs des deux textes. Générateur `claude-opus-5-5` ; G2 neuve (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-3, plus O-1, O-2, O-4 adjugés en C-4 à C-6) ; corrections ; contre-contrôle neuf CONFORME (17 mutants du réviseur et 7 neufs tués, un équivalent ; matrice 3.10 à 3.13 stricte). Plancher sim-bis 194 → 210. Avant chaque commit : xtask VERT, runner, jobs s2bis, S2 et sim-bis. Pièces : `docs/adr-0029/g0-sim/revue-sb13/`. Q-SB13-1 à Q-SB13-5 adoptées.
+
+Items : SHOGEN-SIM-BIS-CONTRAT-RB6-1 **fermé** ; SHOGEN-SIM-BIS-ORACLE-RB7-1 reste **ouvert** et **précisé** (seconde passe : test de l'`analyse.json` extrait par sentinelle sur le contenu lu, O-CC-1 ; cas de croisement avec une unité décalée de la seule classe USDT, O-CC-2) ; SHOGEN-S2BIS-HOTE-COMMUN-1 reste **ouvert** avec la mention « deux textes sur trois liés » (le troisième, `collecte/entree.py`, absent à `f458980`).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SIM-BIS-README-MODULES-1 | aucun test n'exige une ligne de README par module de `scripts/sim-bis` (la correction C-3 l'a fait à la main) | orch. | prochain sous-lot qui ajoute un module | un test de quelques lignes [inféré] | correcteur, E-10 ; contre-contrôle |

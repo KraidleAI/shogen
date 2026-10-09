@@ -228,6 +228,8 @@ jobs:
     # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20). Sous-lot SB-14
     # (2026-10-05 ; E-S-01, E-S-39) : l'adaptateur oracle_r1 lit le harnais de f35a70c par git archive, d'où
     # l'historique complet (fetch-depth: 0, Q-T4-11) ; une copie sans ce commit échoue fermé (ORACLE/extraction).
+    # Sous-lot SB-13 (2026-10-08 ; E-S-01, E-S-51) : l'adaptateur oracle_recalc lit de même par git archive le paquet
+    # s2bis de f458980 (RB-6), seconde raison de fetch-depth: 0 ; sans ce commit, ORACLE/extraction.
     name: sim-bis-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -244,4 +246,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 194
+          python3 -B enforcement/verdict-suite-s2.py scripts/sim-bis --aucun-saut --egal --plancher 210
