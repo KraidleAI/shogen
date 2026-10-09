@@ -1932,3 +1932,34 @@ l'état corrigé ; au premier, « bit RD pris pour TC » était tué par un autr
 emploie désormais 0x82 (TC sans RD), campagne relancée. Liste : section lue malgré TC, drapeau perdu, rcode non lu sous
 TC, bit RD pris pour TC, identifiant non contrôlé, 65 536, booléen ou −1 admis, refus non rattrapé par `interroger`, §12
 défait, plancher non relevé. Suite : 284 tests ; plancher du job : 284, égalité exigée.
+
+## CB-12b (2026-10-08) : relevé ASN d'un hôte : A propre, RIPEstat, Team Cymru (E-C-30)
+
+Objet : module `collecte/asn.py`, `releve(hote, resolveur)` : A de l'hôte au résolveur de l'observateur (client DNS de
+CB-10, récursion demandée), première adresse de type A ; RIPEstat prefix-overview sur cette adresse (client HTTPS de
+CB-3 ; forme de S2, `r2._ripestat_asn` : `data.asns[0].asn` et `.holder`, `data.resource`) ; TXT de Team Cymru au même
+résolveur (forme de S2, `_cymru_asn`). Chaque partie journalisée à part, brute et décodée ; échec typé, sans jugement ;
+sans adresse (NXDOMAIN, CNAME seul, drapeau TC), RIPEstat et Cymru non interrogés ; ne lève jamais. Corps RIPEstat
+synthétique, sans capture ni réseau (AS de documentation 64500, préfixe 192.0.2.0/24). FORMAT §15.4 (CB-13b).
+Corrections C-2 de la G2 de P2A (G14, G17) : l'AS 0, admis par le FORMAT §15.4 (de 0 à 2³² exclu), et la première
+chaîne d'un TXT à deux chaînes, figés par un cas de test chacun (RIPEstat `asn` 0 et TXT « 0 | x » : 0 ; TXT
+« 64500 | x », « 64501 | y » : 64500).
+
+Rouge (refait sur les tests finals ; bouchon sans effet : constantes de CB-12b, fonctions qui ne lisent rien) : 4 des 5
+tests échouent par assertion (7 échecs, sous-tests compris) ; le témoin de taille passe sur ce bouchon par construction.
+Le premier rouge, pris en cours de sous-lot, finissait sur une erreur après trois échecs d'assertion du même test. C-2 :
+le code d'avant était juste ; chaque cas neuf échoue sous le mutant du réviseur qu'il vise (G14, G17).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/asn.py` | 68 | — |
+| `tests/test_asn.py` | 129 | 5 (neuf : relevé complet ; échecs typés ; RIPEstat, bornes et base muette ; Cymru ; plus grand relevé sous LIMITE) |
+
+Mutants (même commande) : 17 mutants du sous-lot, 17 tués (0 vivant, 0 FATAL), 16 par leur test visé, rejoués sur l'état
+corrigé ; « borne doublée » l'est par le test de RIPEstat (détenteur de 4 096 caractères admis), le témoin de taille,
+visé, se calculant sur la borne. Liste : dernière adresse au lieu de la première, A sans filtre de type, RIPEstat sans
+l'adresse, nom de Cymru non inversé, RIPEstat non décodé, indécodable gardé `ok`, dernier AS au lieu du premier, booléen
+ou 2^32 admis, borne des valeurs relâchée ou doublée, types des champs non contrôlés, premier TXT seulement, TXT sans
+filtre de type, dernier champ du TXT, bases interrogées sans adresse, plancher non relevé. Corrections : 2 mutants
+neufs, 2 tués par leur test visé : AS 0 refusé, seconde chaîne du TXT. Suite : 289 tests ; plancher du job : 289,
+égalité exigée.
