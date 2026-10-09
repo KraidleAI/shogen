@@ -23,6 +23,14 @@ class TestSigma(unittest.TestCase):
         deux = sigma.troisieme_terme(P, {"coinbase": [0, 5], "bitstamp": [0, 9]}, ["stress"] * 2)[0]
         self.assertEqual(deux, 3 * 9 * 60)                  # cellules des deux places mises en commun : 0, 5, 0, 9
 
+    def test_maximum_des_strates(self):
+        """C-2 (l.189, maximum sur les deux strates) : âges (0, 2) en calme et (0, 7) en stress, puis l'inverse : P99 au
+        rang 2 de chaque strate, 2 et 7, maximum 7, soit 3 × 7 × 60 = 1 260 s dans les deux ordres. Mutations : G14
+        (première strate) ; dernière strate."""
+        for st in (["calme"] * 2 + ["stress"] * 2, ["stress"] * 2 + ["calme"] * 2):
+            terme, detail = sigma.troisieme_terme(P, {"coinbase": [0, 2, 0, 7]}, st)
+            self.assertEqual((terme, sorted(d[1] for d in detail.values())), (1260, [2, 7]))
+
     def test_cellules_et_suites(self):
         """Âges (-, 0, 1, 2, 0, 1) sur les strates (c, c, c, s, s, s) : cellules {c : 0, 1 ; s : 2, 0, 1} ; suites
         {s : 2, 1} (suite comptée dans la strate de sa dernière minute, suite ouverte en fin de fenêtre comprise).

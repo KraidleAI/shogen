@@ -14,6 +14,7 @@ FEN = {"debut": 1775260500, "fin": 1775261100}                  # 2026-04-03 23:
 BTC = {("tau", "agregateur"): Decimal("0.0265"), ("tau", "place_horodatee"): Decimal("0.0045"),
        ("tau", "sans_horodatage"): Decimal("0.0050"), ("sigma", "agregateur"): Decimal(900),
        ("sigma", "place_horodatee"): Decimal(90)}
+BTC_PH = BTC | {("tau", "place_horodatee"): Decimal("0.0050"), ("tau", "sans_horodatage"): Decimal("0.0045")}  # C-1
 
 
 def serie(j: int, fen=FEN) -> dict:

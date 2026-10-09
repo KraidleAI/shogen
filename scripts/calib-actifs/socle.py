@@ -31,12 +31,13 @@ LIGNE_BTC = re.compile("(tau|sigma) (" + "|".join(CLASSES) + ") (?:([0-9]+(?:[.]
 
 class Refus(Exception):
     """Refus nommé (E-CA-24) : code, motif, puis actif, classe, strate et place s'ils sont connus ; jamais une
-    valeur."""
+    valeur dans le message ; `valeur` (nom, valeur calculée) portée hors du message, imprimée à part (C-13)."""
 
-    def __init__(self, code: str, motif: str, actif=None, classe=None, strate=None, place=None):
-        self.code = code
+    def __init__(self, code: str, motif: str, actif=None, classe=None, strate=None, place=None, valeur=None):
+        self.code, self.valeur = code, valeur
         lieu = [f"{n} {v}" for n, v in (("actif", actif), ("classe", classe), ("strate", strate), ("place", place))
                 if v is not None]
+        self.lieu = " ; ".join(lieu)
         super().__init__(" ; ".join([f"REFUS {code} : {motif}", *lieu]))
 
 

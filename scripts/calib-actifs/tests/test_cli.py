@@ -102,6 +102,21 @@ class TestCli(unittest.TestCase):
             self.assertEqual([tau.main(x, {}) for x in (["--bruts", d], argv[:4] + ["--x", argv[5]])], [2, 2])
         self.assertEqual(err.getvalue().count("REFUS CA/usage"), 2)
 
+    def test_borne_valeur(self):
+        """C-13 (O-1) : refus CA/borne au calcul (borne haute abaissée à 0,0015) : valeur calculée de la règle sur une
+        ligne à part de calib_actifs.txt, nommée et descriptive, après le refus, égale à la règle du calcul direct sous
+        la borne scellée ; refus et fragment JSON sans valeur (§5.7). Mutations : ligne omise ; valeur d'une autre
+        règle."""
+        argv, d = banc(self, lambda p: p["tau"].update(borne_haute_exclue="0.0015"))
+        self.assertEqual(tau.main(argv, {}), 1)
+        texte, frag = lire(d)
+        p = socle.lire()
+        regle = tau.calcul_actif(p, "ETH", sy.series(p, "ETH"), sy.FEN, sy.BTC)["places"]["regle"]
+        refus = "REFUS CA/borne : τ des places à la borne haute exclue ou au-delà ; actif ETH"
+        valeur = ("descriptif hors refus (jamais décisif) : valeur calculée de la règle, τ des places : "
+                  f"{regle} ; actif ETH")
+        self.assertEqual((texte[1:], frag["refus"]), ([refus, valeur, ""], refus))
+
 
 if __name__ == "__main__":
     unittest.main()

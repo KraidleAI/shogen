@@ -5,6 +5,8 @@ import contextlib
 import io
 import json
 import os
+import subprocess
+import sys
 import unittest
 
 import acquerir
@@ -87,15 +89,26 @@ class TestPages(unittest.TestCase):
                               ""]))
         with open(os.path.join(d, "b", "manifeste.tsv"), encoding="utf-8") as f:
             self.assertEqual(len(f.read().split(socle.NL)), 1 + 12 + 1)
+        desc = os.path.join(d, "b", "descriptive")                  # C-7 : bornes de la fenêtre descriptive (G08)
+        self.assertEqual({x for _r, _s, fs in os.walk(desc) for x in fs}, {"page-1790811000.json"})
+        self.assertIn("/s/ethusd?n=30&start=1790811000&end=1790812740", s.vus)    # fin de septembre : 1790812800 - 60
 
 
     def test_garde_reseau(self):
         """Aucune variable de mandataire dans l'environnement des tests ; une URL hors de la boucle locale lève
-        ReseauInterdit avant tout envoi (nom non résolu). Mutation : variables de mandataire gardées (un mandataire sur
-        la boucle locale ferait passer la requête)."""
+        ReseauInterdit avant tout envoi (nom non résolu). C-3 : purge vérifiée hors de l'environnement courant, dans un
+        sous-processus qui pose quatre variables de mandataire fictives (boucle locale), importe tests et lit
+        urllib.request.getproxies() : aucune clé http, https ni all. Mutation G11 : purge retirée (un mandataire sur la
+        boucle locale ferait passer la requête), tuée même sans mandataire dans l'environnement du job."""
         self.assertEqual([k for k in os.environ if k.lower() in ("http_proxy", "https_proxy", "all_proxy")], [])
         with self.assertRaises(tests.ReseauInterdit):
             acquerir.lire_url(local(self, "")[0], "https://example.invalid/x")
+        fictif = dict.fromkeys(("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "ALL_PROXY"), "http://127.0.0.1:9")
+        code = "import tests, urllib.request as u; print(sorted({'http', 'https', 'all'} & set(u.getproxies())))"
+        ici = os.path.dirname(socle.PARAMETRES)
+        r = subprocess.run([sys.executable, "-B", "-c", code], cwd=ici, text=True, capture_output=True,
+                           env=dict(os.environ, PYTHONPATH=ici, **fictif))
+        self.assertEqual((r.returncode, r.stdout), (0, "[]" + socle.NL), r.stderr)
 
 
 if __name__ == "__main__":

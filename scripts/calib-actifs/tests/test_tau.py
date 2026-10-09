@@ -72,6 +72,7 @@ class TestTau(unittest.TestCase):
             with self.assertRaises(tau.socle.Refus) as e:
                 tau.places(P, "USDC", cel | {"stress": ecarts})
             self.assertEqual(e.exception.code, code)
+        self.assertEqual(getattr(e.exception, "valeur", None), ("τ des places", Decimal("0.0300")))  # 1,5 × 0,02 (C-13)
 
     def test_agregateurs(self):
         """T-CA-AGR-1 (valeurs synthétiques) : τ_places 0,0010, τ_agr_BTC 0,0265, classes de places de BTC 0,0045 et
@@ -88,6 +89,23 @@ class TestTau(unittest.TestCase):
         with self.assertRaises(tau.socle.Refus) as e:
             tau.agregateurs(P, "ETH", Decimal("0.0010"), {k: v for k, v in btc.items() if k[1] != "sans_horodatage"})
         self.assertEqual(e.exception.code, "CA/btc")
+
+    def test_agregateurs_suite(self):
+        """C-1 : classes de BTC inversées (0,0050 horodatée, 0,0045 sans horodatage) : dénominateur 0,0050, τ_agr
+        0,0055 (0,0060 sous la seule classe sans horodatage). C-9 : τ de BTC nul pour une classe : CA/btc. C-13 :
+        τ_places 0,0100 : règle 0,053 ≥ 2,85 %, CA/borne portant la valeur 0,0530 hors du message. Mutations : G01
+        (dénominateur = classe sans horodatage) ; G13 (τ nul admis) ; valeur non portée."""
+        btc = {("tau", "agregateur"): Decimal("0.0265"), ("tau", "place_horodatee"): Decimal("0.0050"),
+               ("tau", "sans_horodatage"): Decimal("0.0045")}
+        self.assertEqual(tau.agregateurs(P, "ETH", Decimal("0.0010"), btc)["tau"], F(55, 10000))
+        for k in btc:
+            with self.assertRaises(tau.socle.Refus) as e:
+                tau.agregateurs(P, "ETH", Decimal("0.0010"), btc | {k: Decimal(0)})
+            self.assertEqual(e.exception.code, "CA/btc", k)
+        with self.assertRaises(tau.socle.Refus) as e:
+            tau.agregateurs(P, "ETH", Decimal("0.0100"), btc)
+        self.assertEqual((e.exception.code, getattr(e.exception, "valeur", None), "0.053" in str(e.exception)),
+                         ("CA/borne", ("τ des agrégateurs", Decimal("0.0530")), False))
 
 
 if __name__ == "__main__":

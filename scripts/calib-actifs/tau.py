@@ -63,7 +63,8 @@ def places(prm: dict, actif: str, cel: dict) -> dict:
     p999 = max(v[1] for v in par.values())
     tau, drapeau, valeur = socle.regle(t["facteur"], p999, t["pas"], t["borne_basse"], t["borne_haute_exclue"])
     if tau is None:
-        raise socle.Refus("CA/borne", "τ des places à la borne haute exclue ou au-delà", actif)
+        raise socle.Refus("CA/borne", "τ des places à la borne haute exclue ou au-delà", actif,
+                          valeur=("τ des places", valeur))
     return {"tau": tau, "drapeau": drapeau, "regle": valeur, "p999": p999, "strates": par,
             "regle_au_maximum": socle.regle(t["facteur"], max(v[3] for v in par.values()), t["pas"], 0, 1)[2]}
 
@@ -82,7 +83,8 @@ def agregateurs(prm: dict, actif: str, tau_places, btc: dict) -> dict:
         return socle.regle(1, Fraction(tau_places) * a / den, t["pas"], t["borne_basse"], t["borne_haute_exclue"])
     tau, drapeau, valeur = r(max(ph, sh))
     if tau is None:
-        raise socle.Refus("CA/borne", "τ des agrégateurs à la borne haute exclue ou au-delà", actif, "agregateur")
+        raise socle.Refus("CA/borne", "τ des agrégateurs à la borne haute exclue ou au-delà", actif, "agregateur",
+                          valeur=("τ des agrégateurs", valeur))
     return {"tau": tau, "drapeau": drapeau, "regle": valeur, "sous_places": tau < tau_places,
             "autres": {"place_horodatee": r(ph)[2], "sans_horodatage": r(sh)[2], "minimum": r(min(ph, sh))[2],
                        "tel_quel": btc["tau", "agregateur"]}}
@@ -263,7 +265,9 @@ def main(argv=None, env=None) -> int:
         sorties, code = {"calib_actifs.txt": lignes, "fragment_analyse.json": frag}, 0
     except Exception as e:                                          # jamais une trace : refus nommé, type seul
         r = e if isinstance(e, socle.Refus) else socle.Refus("CA/calcul", f"calcul en échec ({type(e).__name__})")
-        sorties, code = {"calib_actifs.txt": [str(r)], "fragment_analyse.json": {"refus": str(r)}}, 1
+        hors = [] if r.valeur is None else [f"descriptif hors refus (jamais décisif) : valeur calculée de la règle, "
+                                            f"{r.valeur[0]} : {r.valeur[1]} ; {r.lieu}"]      # C-13 : ligne à part
+        sorties, code = {"calib_actifs.txt": [str(r), *hors], "fragment_analyse.json": {"refus": str(r)}}, 1
     os.makedirs(a[3], exist_ok=True)
     socle.ecrire(a[3], SORTIES[0], sorties[SORTIES[0]])
     socle.ecrire(a[3], SORTIES[1], [json.dumps({"etiquette": socle.ETIQUETTE} | sorties[SORTIES[1]], sort_keys=True,

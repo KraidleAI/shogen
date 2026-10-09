@@ -49,11 +49,14 @@ class TestSeries(unittest.TestCase):
         q = socle.json.loads(socle.json.dumps(P))
         q["oracle_sh"] = {"debut": T0, "fin": T0 + 360, "actives": [["USDC", "binance", 3], ["USDC", "bitfinex", 9]],
                           "concurrences": [["USDC", ["binance", "bitstamp", "kraken"], [0, 1, 2]]]}
-        series = {("USDC", "binance"): s([(0, 1), (1, 1), (2, 1)], [3]),
+        series = {("USDC", "binance"): s([(0, 1), (1, 1), (2, 1), (9, 1)], [3]),     # 9 : hors semaine (C-5, G07)
                   ("USDC", "kraken"): s([(i, 1) for i in (1, 2, 3, 4)]),
                   ("USDC", "bitstamp"): s([(2, 1)], [0, 1, 3, 4, 5])}
-        self.assertEqual(bougies.oracle_sh(q, series)[0],
-                         "oracle de SH §4 : USDC bitfinex non applicable (place hors lecture)")
+        try:
+            lignes = bougies.oracle_sh(q, series)
+        except socle.Refus as e:                                    # rouge d'assertion sous la mutation G07
+            lignes = [str(e)]
+        self.assertEqual(lignes[0], "oracle de SH §4 : USDC bitfinex non applicable (place hors lecture)")
         trois = ["binance", "bitstamp", "kraken"]
         for cle, valeur in (("actives", [["USDC", "binance", 4]]), ("concurrences", [["USDC", trois, [0, 1, 3]]])):
             r = socle.json.loads(socle.json.dumps(q))
@@ -63,14 +66,27 @@ class TestSeries(unittest.TestCase):
             self.assertEqual(e.exception.code, "CA/oracle-sh")
 
     def test_comptes_de_sh(self):
-        """Chaque compte du paramètre oracle_sh figure sur les lignes 103 à 111 de SOURCES-HISTORIQUES.md, à la forme du
-        document (espace des milliers). Mutation : compte altéré dans parametres.json."""
+        """C-6 : chaque compte du paramètre oracle_sh lié à sa place et à sa colonne (SOURCES-HISTORIQUES l.103-111) :
+        concurrences = lignes du tableau dans l'ordre (classe ; jeu de places lu dans sa colonne, « ci-dessus » et
+        « sans » compris ; comptes à au moins 4, 3, 2 places) ; actives = phrase « Minutes actives par place », place
+        nommée puis son compte. Mutations : compte altéré ; comptes permutés entre places (G29) ; compte pris à une
+        autre place (G30)."""
         with open(os.path.join(socle.RACINE, "docs", "adr-0029", "calib", "SOURCES-HISTORIQUES.md"),
                   encoding="utf-8") as f:
             sh = f.read().split(socle.NL)[102:111]
-        o = P["oracle_sh"]
-        for n in [x[2] for x in o["actives"]] + [n for x in o["concurrences"] for n in x[2]]:
-            self.assertTrue(any(f"{n:,}".replace(",", " ") in x for x in sh), n)
+        conc, prec = [], []
+        for x in [x.split(" | ") for x in sh if x.startswith("| ") and "/USD" in x]:
+            nommees = {p for p in socle.PLACES if p.capitalize() in x[1] or p.upper() in x[1]}
+            prec = sorted(set(prec) - nommees if "sans" in x[1] else nommees | set(prec if "ci-dessus" in x[1] else []))
+            comptes = [int(c.strip("*| ").split(" (")[0].replace(" ", "")) for c in x[2:5]]
+            conc.append([x[0][2:].split("/")[0], prec, comptes])
+        self.assertEqual(conc, P["oracle_sh"]["concurrences"])
+        phrase = next(x for x in sh if x.startswith("Minutes actives par place"))
+        motif = "([A-Z][a-z]+) [*]{0,2}([0-9]+(?: [0-9]{3})*)"             # place, puis compte (espace des milliers)
+        lus = {a: {m[0].lower(): int(m[1].replace(" ", "")) for m in socle.re.findall(
+            motif, phrase.split(a + "/USD")[1].split("/USD")[0])} for a in socle.F3}
+        actives = P["oracle_sh"]["actives"]
+        self.assertEqual([[a, p, lus[a].get(p)] for a, p, _n in actives], actives)
 
 
 if __name__ == "__main__":

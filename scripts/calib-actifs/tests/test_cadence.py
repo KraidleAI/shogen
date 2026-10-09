@@ -11,6 +11,7 @@ import unittest
 import acquerir
 import cadence
 import socle
+import tests
 from tests.serveur import Serveur
 
 P = socle.lire()
@@ -66,15 +67,47 @@ class TestCadence(unittest.TestCase):
         return f.name
 
     def test_cli_hors_lanceur(self):
-        """Variable posée : code 3 ; arguments faux : code 2 ; lancer.sh ne nomme pas cadence.py (relevé séparé).
-        Mutations : garde retirée ; relevé greffé au lanceur."""
-        err = io.StringIO()
-        with contextlib.redirect_stderr(err):
-            codes = [cadence.main(["--sortie", "x"], {"SHOGEN_S2_CAMPAGNE_CONTROL": "x"}), cadence.main(["--x"], {})]
+        """Variable posée : code 3, sur des paramètres locaux (C-3 : sans la garde, le relevé irait au serveur local,
+        jamais à un hôte réel : tests.TENTATIVES inchangé) ; arguments faux : code 2 ; lancer.sh ne nomme pas cadence.py
+        (relevé séparé). Mutations : garde retirée ; relevé greffé au lanceur."""
+        d, err, avant = tempfile.mkdtemp(prefix="ca_cad_"), io.StringIO(), list(tests.TENTATIVES)
+        self.addCleanup(shutil.rmtree, d, True)
+        prm = json.loads(json.dumps(P))
+        with Serveur({}) as s, contextlib.redirect_stderr(err):
+            prm["cadence"].update(lectures=1)
+            prm["reseau"].update(essais=1)
+            for nom in cadence.AGREGATEURS:
+                prm["cadence"][nom]["url"] = s.base + "/{ids}"
+            argv = ["--sortie", os.path.join(d, "c.txt"), "--parametres", self.prm(d, prm)]
+            codes = [cadence.main(argv, {"SHOGEN_S2_CAMPAGNE_CONTROL": "x"}), cadence.main(["--x"], {})]
+        self.assertEqual(tests.TENTATIVES, avant)
         self.assertEqual((codes, [x[:14] for x in err.getvalue().split(socle.NL)]),
                          ([3, 2], ["REFUS CA/varia", "REFUS CA/usage", ""]))
         with open(os.path.join(os.path.dirname(socle.PARAMETRES), "lancer.sh"), encoding="utf-8") as f:
             self.assertNotIn("cadence", f.read())
+
+    def test_corps_hors_forme(self):
+        """C-10 : corps [] ou "x" (liste, chaîne) chez les deux agrégateurs : deux lectures comptées en échec, aucune
+        trace ; BTC différent d'un agrégateur à l'autre : chacun comparé à son propre BTC (defillama ETH, médiane 150,
+        sous son BTC 200 : non ; coingecko ETH, 150 sur 100 : oui). Mutations : TypeError ou AttributeError non captée
+        (G28) ; BTC de l'autre agrégateur (G10)."""
+        prm = json.loads(json.dumps(P))
+        prm["cadence"].update(lectures=1)
+        with Serveur({}) as s:
+            for nom in cadence.AGREGATEURS:
+                prm["cadence"][nom]["url"] = s.base + "/{ids}"
+            vus = []
+            for corps in (b"[]", b'"x"'):
+                s.defaut = corps
+                try:
+                    vus.append(cadence.releve(prm))
+                except Exception as e:                      # une trace est le défaut cherché : rendue en assertion
+                    vus.append(type(e).__name__)
+        self.assertEqual(vus, [({}, 2), ({}, 2)])
+        ts = {("coingecko", "BTC"): [0, 100, 200], ("defillama", "BTC"): [0, 200, 400]}
+        lignes = cadence.lignes(P, ts | {(n, "ETH"): [0, 150, 300] for n in cadence.AGREGATEURS}, 0)
+        self.assertEqual([x for x in lignes if "plus lent" in x], ["coingecko ETH plus lent que BTC (médiane) : oui",
+                                                                  "defillama ETH plus lent que BTC (médiane) : non"])
 
 
 if __name__ == "__main__":

@@ -46,11 +46,12 @@ class TestFenetre(unittest.TestCase):
                              "USDT": (Decimal("0.00375"), 129600)})
         self.assertEqual({a: str(t) for a, (t, _s) in o.items()}, config_analyse.TAU_ORACLES)
         self.assertEqual({a: o[a][1] for a in config_analyse.SIGMA_ORACLES}, config_analyse.SIGMA_ORACLES)
-        q = socle.json.loads(socle.json.dumps(P))
-        q["chainlink"]["USDT"]["heartbeat_s"] = 82800
-        with self.assertRaises(socle.Refus) as r:
-            socle.oracles(q)
-        self.assertEqual((r.exception.code, "actif USDT" in str(r.exception)), ("CA/chainlink", True))
+        for cle, valeur in (("heartbeat_s", 82800), ("seuil", "0.003")):           # C-9 : seuil, mutation G12
+            q = socle.json.loads(socle.json.dumps(P))
+            q["chainlink"]["USDT"][cle] = valeur
+            with self.assertRaises(socle.Refus) as r:
+                socle.oracles(q)
+            self.assertEqual((r.exception.code, "actif USDT" in str(r.exception)), ("CA/chainlink", True))
 
     def test_ecrire(self):
         """Étiquette mot pour mot en première ligne (E-CA-04) ; .partiel puis renommage : renommage en échec, la cible

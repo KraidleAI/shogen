@@ -34,7 +34,7 @@ def releve(prm: dict) -> tuple:
             try:
                 url = c[nom]["url"].format(ids=",".join(ids.values()), options=c[nom]["options"])
                 h = horodatages(nom, acquerir.lire_url(prm, url), ids)
-            except (socle.Refus, ValueError, KeyError, AttributeError):
+            except (socle.Refus, ValueError, KeyError, AttributeError, TypeError):    # C-10 : corps [] ou chaîne
                 echecs += 1
                 continue
             for a, t in h.items():

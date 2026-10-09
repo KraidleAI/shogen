@@ -66,12 +66,14 @@ class TestFragment(unittest.TestCase):
     def test_planchers_seuls(self):
         """Mode « planchers seuls » pour USDT (F3) : τ des places 0,00375, hors grille admis, τ_agr = grid-ceil(0,00375
         × 0,0265 / 0,0050) = 0,0200 (0,019875 arrondi au-dessus), σ des places horodatées sans le troisième terme (180
-        s, calculé et écarté) : 90 s ; le contrôle (b) l'admet. Mutation : mode ignoré."""
+        s, calculé et écarté) : 90 s ; le contrôle (b) l'admet ; même τ_agr sous BTC_PH (τ_ph > τ_sh, C-1 : 0,0225 sous
+        la seule classe sans horodatage, 0,022083… arrondi). Mutations : mode ignoré ; G01 ; G02."""
         q = json.loads(json.dumps(P))
         q["lectures"]["A"]["modes"]["USDT"] = "planchers_seuls"
-        r = tau.calcul_actif(q, "USDT", sy.series(q, "USDT"), sy.FEN, sy.BTC)
-        self.assertEqual((r["places"]["tau"], r["agregateurs"]["tau"], r["sigma"]["place_horodatee"]),
-                         (Decimal("0.00375"), Decimal("0.0200"), 90))
+        for btc in (sy.BTC_PH, sy.BTC):
+            r = tau.calcul_actif(q, "USDT", sy.series(q, "USDT"), sy.FEN, btc)
+            self.assertEqual((r["places"]["tau"], r["agregateurs"]["tau"], r["sigma"]["place_horodatee"]),
+                             (Decimal("0.00375"), Decimal("0.0200"), 90))
         self.assertEqual(r["terme"], 180)                     # coinbase sans échange une minute : 3 × 1 × 60 s, écarté
         tau.controle_fragment(q, tau.fragment(q, {"USDT": r}), sy.BTC)
 
@@ -85,6 +87,23 @@ class TestFragment(unittest.TestCase):
         self.addCleanup(setattr, tau, "ecarts", ecarts)
         r = [tau.calcul_actif(P, a, sy.series(P, a), sy.FEN, sy.BTC) for a in ("ETH", "USDC")]
         self.assertEqual(vus, [{"coinbase": r[0]["sigma"]["place_horodatee"]}, {}])
+
+    def test_borne_basse_et_variante(self):
+        """C-8 : six places au même prix, écarts nuls : règle 0, τ des places 0,0005 (borne basse, drapeau) ; τ_agr
+        calculé sur 0,0005 : 0,0005 × 0,0265 / 0,0050 = 0,00265, soit 0,0030. C-11 : lecture A-prime, USDC sur trois
+        places (binance, bitstamp, kraken) à N_min 3 : 5 minutes × 3 places par strate. Mutations : G23 (τ_agr sur la
+        valeur de la règle) ; G27 (N_min codé à 4)."""
+        egal = {p: {t: (Decimal(100), True) for t in socle.minutes(sy.FEN)} for p in socle.lecture(P)["places"]["ETH"]}
+        r = tau.calcul_actif(P, "ETH", egal, sy.FEN, sy.BTC)
+        self.assertEqual((r["places"]["regle"], r["places"]["tau"], r["places"]["drapeau"], r["agregateurs"]["tau"]),
+                         (0, Decimal("0.0005"), "borne basse appliquée", Decimal("0.0030")))
+        q = json.loads(json.dumps(P))
+        q["lecture"] = "A-prime"
+        try:
+            cel = tau.calcul_actif(q, "USDC", sy.series(q, "USDC"), sy.FEN, sy.BTC)["cellules"]
+        except socle.Refus as e:                                    # rouge d'assertion sous la mutation G27
+            cel = {str(e): ((), (), ())}
+        self.assertEqual({st: len(e) for st, (e, _p, _a) in cel.items()}, {"calme": 15, "stress": 15})
 
 
 if __name__ == "__main__":

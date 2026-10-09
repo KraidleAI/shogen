@@ -27,7 +27,9 @@ Depuis ce dossier : `env -u SHOGEN_S2_CAMPAGNE_CONTROL python3 -B -m unittest di
 `calib-actifs-unittest` de `.github/workflows/gates.yml`. Les tests retirent les variables de mandataire et posent une
 garde réseau (boucle locale seule) ; le serveur des tests d'acquisition écoute sur 127.0.0.1. Le vrai `tau_sigma.txt`
 n'y est que haché ou copié, jamais interprété. Exception écrite (E-CA-03) : seul `tests/test_lancer.py` pose
-`SHOGEN_S2_CAMPAGNE_CONTROL`, à une valeur fictive, dans le seul sous-processus du lanceur.
+`SHOGEN_S2_CAMPAGNE_CONTROL`, à une valeur fictive, dans le seul sous-processus du lanceur. L'identité (T-CA-DET-1)
+tourne sous l'interpréteur de la suite et chaque `python3.10` à `python3.13` présent ; la matrice 3.10 à 3.13 en
+`-X dev -W error` reste une étape écrite du G3 opérant et de la G2.
 
 ## Lancement (orchestrateur seul, une fois, après la G2 et l'épinglage au JOURNAL, E-CA-27 et E-CA-28)
 
@@ -40,7 +42,8 @@ n'y est que haché ou copié, jamais interprété. Exception écrite (E-CA-03) :
    l'étape réseau reprend sur le manifeste des bruts.
 3. Sorties : `calib_actifs.txt`, `fragment_analyse.json`, `manifeste.tsv`, `SHA256SUMS`. Les octets bruts restent hors
    du dépôt (référence : URL, taille, sha256 du manifeste). Le fragment entre à `s2bis/config/analyse.json` au lot du
-   paquet, avec les valeurs de BTC (E-CA-29).
+   paquet, avec les valeurs de BTC (E-CA-29). Sous un refus CA/borne, une ligne descriptive suit le refus dans
+   `calib_actifs.txt` : la valeur calculée de la règle, nommée, jamais décisive (le refus et le JSON n'en portent pas).
 
 ## Relevé de cadence (séparé, avant le sceau)
 
