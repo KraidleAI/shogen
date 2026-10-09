@@ -52,23 +52,25 @@ class TestSocle(unittest.TestCase):
         self.assertEqual([len(p["unites"][a]) for a in socle.ACTIFS], [10, 8, 10])
 
     def test_parametres_schema(self):
-        """Clé en trop, booléen pour un entier, clé absente : CA/parametres ; flottant et clé dupliquée refusés dès la
-        lecture (illisible). Mutations : schéma retiré ; type non contrôlé ; clé en trop admise ; flottant admis ; clé
-        dupliquée admise."""
-        for modif in (lambda p: p.update(inconnu=1), lambda p: p["passes"].update(A=False), lambda p: p.pop("lot")):
+        """Clé en trop, booléen pour un entier, clé absente, accès inconnu : CA/parametres ; flottant et clé dupliquée
+        refusés dès la lecture (illisible). Mutations : schéma retiré ; type non contrôlé ; clé en trop admise ;
+        flottant admis ; clé dupliquée admise ; accès non contrôlé."""
+        for modif in (lambda p: p.update(inconnu=1), lambda p: p["passes"].update(A=False), lambda p: p.pop("lot"),
+                      lambda p: p["series"]["okx"].update(acces="ftp")):
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
         for texte in ('{"lot": 0.5}', '{"lot": "x", "lot": "x"}'):
             self.assertIn("illisible", self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, len, texte)))
 
     def test_parametres_coherence(self):
         """Place hors des unités, places non triées, N_min au-delà du nombre de places, dernière transaction hors des
-        places horodatées, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée, strates sans le
-        dimanche : CA/parametres. Mutation : chaque contrôle de cohérence retiré à son tour."""
+        places horodatées, place sans série, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée,
+        strates sans le dimanche : CA/parametres. Mutation : chaque contrôle de cohérence retiré à son tour."""
         def a(cle, actif, valeur):
             return lambda p: p["lectures"]["A"][cle].update({actif: valeur})
         cas = [a("places", "USDC", ["binance", "bitfinex", "bitstamp", "kraken", "okx"]),
                a("places", "ETH", ["okx", "kraken", "coinbase", "bitstamp", "bitfinex", "binance"]),
                a("n_min", "USDC", 5), a("derniere_transaction", "USDC", ["binance"]),
+               a("places", "USDC", ["binance", "bitfinex", "bitstamp", "gemini", "kraken"]),
                a("modes", "ETH", "planchers_seuls"),
                lambda p: p.update(lecture="B"), lambda p: p["fenetre"].update(debut=1775001601),
                lambda p: p["strates"].update(stress=[5])]

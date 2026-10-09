@@ -69,3 +69,26 @@ def lire_url(prm: dict, url: str, plage=None) -> bytes:
             if essai + 1 < r["essais"]:
                 DORMIR(r["pause_s"])
     raise socle.Refus("CA/acquisition", f"téléchargement impossible ({erreur})")
+
+
+def mois(fen: dict) -> list:
+    """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre ; rang du mois borné (la boucle finit)."""
+    a, b = (datetime.datetime.fromtimestamp(x, datetime.timezone.utc) for x in (fen["debut"], fen["fin"] - 60))
+    return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in range(12 * a.year + a.month - 1, 12 * b.year + b.month)]
+
+
+def mensuels(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str) -> None:
+    """Fichiers mensuels d'une (place, actif) : Binance avec son .CHECKSUM (sha256 différent : CA/acquisition, E-CA-13),
+    OKX sans somme publiée."""
+    s = prm["series"][place]
+    for m in mois(fen):
+        url = s["url"].format(s=s["paires"][actif], m=m, mm=m.replace("-", ""))
+        rel = os.path.join(nom, place, actif, url.rsplit("/", 1)[1])
+        if man.present(rel):
+            continue
+        octets = lire_url(prm, url)
+        if s["acces"] == "mensuel_checksum":
+            somme = lire_url(prm, url + ".CHECKSUM").decode("ascii", "replace").split(" ")[0]
+            if somme != hashlib.sha256(octets).hexdigest():
+                raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
+        man.ajouter(url, rel, octets)

@@ -20,6 +20,7 @@ ETIQUETTE = ("préparation de S2-bis ; calibration d'ETH, d'USDC et d'USDT sur h
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
 ACTIFS = ("ETH", "USDC", "USDT")
 CLASSES = ("agregateur", "oracle_chainlink", "place_horodatee", "sans_horodatage")
+PLACES = ("binance", "bitfinex", "bitstamp", "coinbase", "kraken", "okx")       # places à historique (SH §1)
 HOTE = re.compile("[a-z0-9.-]{1,253}")
 DECIMAL = re.compile("[0-9]+(?:[.][0-9]+)?")
 F3 = ("USDC", "USDT")                   # classes exploratoires : seules admises en « planchers seuls » (l.191)
@@ -62,6 +63,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "chainlink": _par_actif({"proxy": str, "seuil": "dec", "heartbeat_s": int})
           | {"facteur": "dec", "source": str},
           "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
+          "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "intervalle_ms": int,
+                                         "url": str, "paires": "paires"}) | {"source": str},
           "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
 
 
@@ -76,6 +79,10 @@ def conforme(x, s) -> bool:
         return type(x) is str and HOTE.fullmatch(x) is not None
     if s == "dec":
         return type(x) is str and DECIMAL.fullmatch(x) is not None
+    if s == "paires":
+        return type(x) is dict and x and set(x) <= set(ACTIFS) and all(type(v) is str and v for v in x.values())
+    if s == "acces":
+        return x in ("archive", "mensuel", "mensuel_checksum", "pages")
     if s == "mode":
         return x in ("calibre", "planchers_seuls")
     return type(x) is s
@@ -101,6 +108,7 @@ def coherent(p: dict) -> bool:
             ok = ok and _trie(pl) and set(pl) <= set(p["unites"][a]) and 2 <= lec["n_min"][a] <= len(pl)
             ok = ok and set(lec["derniere_transaction"][a]) <= set(pl) & set(p["classes"]["place_horodatee"])
             ok = ok and (lec["modes"][a] == "calibre" or a in F3)
+            ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
     return ok
 
 
