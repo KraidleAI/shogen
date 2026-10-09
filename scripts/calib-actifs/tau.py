@@ -6,8 +6,12 @@ des autres places définies (moyenne des deux du milieu pour un nombre pair) ; m
 (Fraction), jamais de flottant (E-CA-18)."""
 from __future__ import annotations
 
+import math
+from decimal import Decimal
 from fractions import Fraction
 
+import bougies
+import sigma
 import socle
 
 
@@ -79,4 +83,60 @@ def agregateurs(prm: dict, actif: str, tau_places, btc: dict) -> dict:
     return {"tau": tau, "drapeau": drapeau, "regle": valeur, "sous_places": tau < tau_places,
             "autres": {"place_horodatee": r(ph)[2], "sans_horodatage": r(sh)[2], "minimum": r(min(ph, sh))[2],
                        "tel_quel": btc["tau", "agregateur"]}}
+
+
+def calcul_actif(prm: dict, actif: str, series: dict, fen: dict, btc: dict) -> dict:
+    """Un actif, dans l'ordre σ, τ des places, τ des agrégateurs, oracles (E-CA-17) : séries {place : série} de la
+    lecture retenue sur la fenêtre ; mode « planchers seuls » : τ des places = 0,375 %, aucun troisième terme (§4.7)."""
+    lec, closes, ages = socle.lecture(prm), {}, {}
+    strates = [socle.strate(t, prm) for t in socle.minutes(fen)]
+    for p, s in series.items():
+        c, a = bougies.derniers(s, fen)
+        closes[p], ages[p] = rationnels(c), a
+    pop, mode = sigma.population(prm, actif), lec["modes"][actif]
+    terme, detail = sigma.troisieme_terme(prm, {p: ages[p] for p in pop}, strates)
+    sig, cel = sigma.sigmas(prm, actif, btc, terme, mode), None
+    if mode == "planchers_seuls":
+        tp = {"tau": Decimal(prm["tau"]["planchers_seuls"]), "drapeau": "planchers seuls (ADR-0029 l.191)"}
+    else:
+        cel = ecarts(actif, closes, ages, strates, lec["n_min"][actif], {p: sig["place_horodatee"] for p in pop})
+        tp = places(prm, actif, cel)
+    return {"mode": mode, "sigma": sig, "terme": terme, "detail_terme": detail, "places": tp, "cellules": cel,
+            "agregateurs": agregateurs(prm, actif, tp["tau"], btc), "oracle": socle.oracles(prm)[actif],
+            "closes": closes, "ages": ages, "strates": strates}
+
+
+def fragment(prm: dict, res: dict) -> dict:
+    """Fragment pour s2bis/config/analyse.json (E-CA-22) : tau_sigma et unites d'ETH, d'USDC et d'USDT (forme de
+    config_analyse.py : τ en chaîne décimale, σ entier ou null), et le mode par actif (Q-CA-15 modifiée)."""
+    ts = {}
+    for a, r in res.items():
+        tp, s = str(r["places"]["tau"]), r["sigma"]
+        ts[a] = {"agregateur": {"sigma": s["agregateur"], "tau": str(r["agregateurs"]["tau"])},
+                 "oracle_chainlink": {"sigma": r["oracle"][1], "tau": str(r["oracle"][0])},
+                 "place_horodatee": {"sigma": s["place_horodatee"], "tau": tp},
+                 "sans_horodatage": {"sigma": None, "tau": tp}}
+    return {"modes": {a: r["mode"] for a, r in res.items()}, "tau_sigma": ts,
+            "unites": {a: prm["unites"][a] for a in res}}
+
+
+def controle_fragment(prm: dict, frag: dict, btc: dict) -> None:
+    """Contrôles E-CA-23 (a) à (h), rejoués côté lot sur le fragment avant toute écriture (ils resserrent ; RB-2 les
+    porte côté recalcul) : un écart, CA/fragment nommé par la règle et l'actif."""
+    t, o = prm["tau"], socle.oracles(prm)
+    pas = Decimal(t["pas"])
+    for a, x in frag["tau_sigma"].items():
+        tp, ag, mode = Decimal(x["place_horodatee"]["tau"]), Decimal(x["agregateur"]["tau"]), frag["modes"][a]
+        attendu = agregateurs(prm, a, tp, btc)["tau"]
+        sigma_agr = max(prm["sigma"]["planchers_s"]["agregateur"], math.ceil(Fraction(btc["sigma", "agregateur"])))
+        seuls = mode == "planchers_seuls"
+        regles = {"a": ag % pas == 0,
+                  "b": (tp == Decimal(t["planchers_seuls"])) == seuls and (tp % pas == 0 or seuls),
+                  "c": Decimal(x["oracle_chainlink"]["tau"]) == o[a][0], "d": ag == attendu,
+                  "e": x["agregateur"]["sigma"] == sigma_agr, "f": x["oracle_chainlink"]["sigma"] == o[a][1],
+                  "g": x["sans_horodatage"]["sigma"] is None,
+                  "h": x["sans_horodatage"]["tau"] == x["place_horodatee"]["tau"]}
+        for nom, ok in regles.items():
+            if not ok:
+                raise socle.Refus("CA/fragment", f"contrôle E-CA-23 ({nom}) du fragment en écart", a)
 
