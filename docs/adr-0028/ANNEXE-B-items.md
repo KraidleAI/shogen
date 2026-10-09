@@ -1284,3 +1284,13 @@ Décision verbatim : « option A, on utilise toutes les sources qu'on veut sans 
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-S2BIS-CONDITIONS-DECLAREES-1 | les conditions d'usage lues des sources (restrictions de republication, d'usage commercial, d'indices) ne sont pas suivies à la lettre, par décision de l'investisseur ; ce que le paquet et la publication en disent reste à écrire | orch. ; requis : investisseur | G0 du paquet, avant le sceau | une phrase de limite et une liste datée des conditions lues [inféré] | décision du 2026-10-08 ; synthèse licences et abonnements |
+
+## B.83 Amendement daté du 2026-10-09 00:44:06 UTC (heure produite par `date -u`) : SB-13 première passe commise (oracle croisé avec RB-6)
+
+Quatre commits `a6ae6af` à `ad47ad7` (SB-13A à SB-13D) sous le G0 de SIM-BIS (E-S-51, première moitié ; PROPOSITION §6.1, SB-13) : épingle de RB-6 au commit `f458980` dans `parametres.json`, extraction par `git archive`, réplique et recalcul, croisement de o(r, u) et K^(r) (0 écart sur les vecteurs du contrat et 100 séries synthétiques), et tests qui lient les noms, seuils et vecteurs des deux textes. Générateur `claude-opus-5-5` ; G2 neuve (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-3, plus O-1, O-2, O-4 adjugés en C-4 à C-6) ; corrections ; contre-contrôle neuf CONFORME (17 mutants du réviseur et 7 neufs tués, un équivalent ; matrice 3.10 à 3.13 stricte). Plancher sim-bis 194 → 210. Avant chaque commit : xtask VERT, runner, jobs s2bis, S2 et sim-bis. Pièces : `docs/adr-0029/g0-sim/revue-sb13/`. Q-SB13-1 à Q-SB13-5 adoptées.
+
+Items : SHOGEN-SIM-BIS-CONTRAT-RB6-1 **fermé** ; SHOGEN-SIM-BIS-ORACLE-RB7-1 reste **ouvert** et **précisé** (seconde passe : test de l'`analyse.json` extrait par sentinelle sur le contenu lu, O-CC-1 ; cas de croisement avec une unité décalée de la seule classe USDT, O-CC-2) ; SHOGEN-S2BIS-HOTE-COMMUN-1 reste **ouvert** avec la mention « deux textes sur trois liés » (le troisième, `collecte/entree.py`, absent à `f458980`).
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-SIM-BIS-README-MODULES-1 | aucun test n'exige une ligne de README par module de `scripts/sim-bis` (la correction C-3 l'a fait à la main) | orch. | prochain sous-lot qui ajoute un module | un test de quelques lignes [inféré] | correcteur, E-10 ; contre-contrôle |
