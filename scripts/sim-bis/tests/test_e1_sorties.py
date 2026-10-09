@@ -117,9 +117,11 @@ class TestRenduE1(unittest.TestCase):
         sélection enveloppée (C1 ≠ C2) : texte écrit = entête (étiquette en tête), ligne de schéma (à la main), par
         strate [E1] (C2, C1), [RÉSIDUS C2] aux ℓ gardés d'EP, ligne [BORD E1], une ligne par hôte (résidus à C1, point
         de Q₁ de l'hôte seul, réplications indéfinies par point), [ÉCART-TYPE I_t] par point et par strate,
-        [FAISABILITÉ] à C1 et à C2, phrases du bord, puis la section des pauses de C1 ; chaque section recomposée ici
-        depuis calibrer et pauses_c1 appelés à part sur les lots relus ; entête des lots = entête des sorties ; JSON :
-        mêmes entête, phrases, points sous leurs noms de cellule. Mutations M-11P-01 (pauses rejouées à C2),
+        [FAISABILITÉ] à C1 et à C2, des cellules du §5.1 et de la grille (SB-11u), phrases du bord, puis la section
+        des pauses de C1 ; chaque section recomposée ici depuis calibrer et pauses_c1 appelés à part sur les lots
+        relus ; entête des lots = entête des sorties ; JSON : mêmes entête, phrases, points sous leurs noms de
+        cellule. Mutations M-11U-06 (lignes des cellules omises), M-11U-07 (nombre de points de la grille),
+        M-11P-01 (pauses rejouées à C2),
         M-11P-02 (entête prise avant fiv_unites.txt : E1/entete), M-11P-03 (résidus de C2 sous des ℓ non gardés),
         M-11P-04 (écart-type d'un autre point), M-11P-05 (faisabilité de C2 sous l'étiquette C1), M-11P-06 (phrases
         omises), M-11P-07 (hôtes d'une autre strate), M-11P-09 (moyennes de C0 sous chaque nom), M-11P-11 (nombre
@@ -172,6 +174,16 @@ class TestRenduE1(unittest.TestCase):
                 f = res["faisabilite"][n][s]
                 att.append(f"[FAISABILITÉ {n}] « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, {f['ou'][1]}) : "
                            + ("faisable, r′ < 1" if f["faisable"] else "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)"))
+        for cn, x in res["faisabilite_cellules"].items():
+            for n in ("C1", "C2"):
+                for s in ("calme", "stress"):
+                    f = x[n][s]
+                    att.append(f"[FAISABILITÉ cellule {cn}] {n} « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, "
+                               f"{f['ou'][1]}) : " + ("faisable, r′ < 1" if f["faisable"] else
+                                                      "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)"))
+        for s in ("calme", "stress"):
+            v, p = res["faisabilite_grille"][s]
+            att.append(f"[FAISABILITÉ grille E1] « {s} » : r′ maximal sur les 2 points = {v} au point {pt(p)}")
         texte = commun.lire_entree(PRM, "intervalles", environ={}, sommes="sommes_plan2").decode("utf-8")
         att += res["phrases"] + e1.lignes_pauses(E1R, e1.pauses_c1(E1R, EP, cal, {"calme": P0, "stress": P}, 1),
                                                  {"calme": P0, "stress": P}, 2, texte) + [""]

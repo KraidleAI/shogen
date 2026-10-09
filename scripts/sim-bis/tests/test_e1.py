@@ -239,5 +239,34 @@ class TestCalibrer(unittest.TestCase):
         self.assertEqual([r[s]["faisable"] for s in ("calme", "stress")], [True, False])
 
 
+    def test_faisabilite_cellules_et_grille(self):
+        """REGIME-FAISABILITE-1, contrôle sur les cellules du §5.1 et les points de la grille (item, B.64 l.1067) :
+        pour chaque cellule de cellules.nulles, à C1 et à C2 (sélection enveloppée), taux f·M de la cellule, M = plus
+        grand multiplicateur de sa dérive (tendances, commune, sauts : 19/10 ; transitoire : 3 ; sinon 1 : forme de
+        sources.Replication.union), part de ses pannes longues ; grille d'E1 sous son fond (f = 1, aucune panne
+        longue), φ dans l'ordre inverse (1/10 puis 1/100) : r′ maximal sur les points et le point où il est atteint,
+        par strate, jamais le premier point (garde d'attendu) ; attendus de attendu().
+        Mutations M-11U-01 (multiplicateur de dérive ignoré), M-11U-02 (transitoire au multiplicateur des tendances),
+        M-11U-03 (part longue de la cellule ignorée), M-11U-04 (point de C2 sous l'étiquette C1), M-11U-05 (grille :
+        premier point au lieu du maximum)."""
+        inv = dict(E1R, e1=dict(E1R["e1"], phi=E1R["e1"]["phi"][::-1]))
+        with mock.patch.object(calib_fiv, "selection", side_effect=forcee):
+            r = e1.calibrer(inv, cal_e1(), fixture_e1(), None, {})
+        mult = {None: 1, "tendances": Fraction(19, 10), "commune": Fraction(19, 10), "sauts": Fraction(19, 10),
+                "transitoire": Fraction(3), "initiale": 1}
+        c1, c2 = {"calme": P0, "stress": P}, {"calme": P, "stress": P0}
+        self.assertEqual(sorted(r["faisabilite_cellules"]), sorted(c["nom"] for c in PRM["cellules"]["nulles"]))
+        for c in PRM["cellules"]["nulles"]:
+            m = max(mult[x] for x in (c["derive"] or [None]))
+            for n, pts in (("C1", c1), ("C2", c2)):
+                for s in ("calme", "stress"):
+                    self.assertEqual(r["faisabilite_cellules"][c["nom"]][n][s],
+                                     attendu(EP, s, pts[s], Fraction(*c["f"]) * m, Fraction(*c["longues"])),
+                                     (c["nom"], n, s))
+        for s in ("calme", "stress"):
+            g = [(attendu(EP, s, p, Fraction(1), Fraction(0))["max"], p) for p in calib_fiv.grille(inv)]
+            self.assertNotEqual(max(g, key=lambda y: y[0])[1], g[0][1])
+            self.assertEqual(r["faisabilite_grille"][s], list(max(g, key=lambda y: y[0])))
+
 if __name__ == "__main__":
     unittest.main()

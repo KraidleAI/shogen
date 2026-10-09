@@ -8,6 +8,7 @@ impressions par hôte du point (6). SB-11l : faisabilité du régime à C1 et à
 loi des pauses d'une série sur le masque, définitions d'EP (point (6)). SB-11n : loi des pauses du modèle à C1,
 rejouée, à côté d'intervalles.txt (point (6)). SB-11o : lots d'E1 par point, reprenables (E-S-45), et écriture
 des sorties calibration_e1.{json,txt} (E-S-05, E-S-48). SB-11p : contenu des sorties et E1 entière (lancer_e1).
+SB-11u : faisabilité du régime pour chaque cellule du §5.1 à C1 et à C2, et sur la grille d'E1 (REGIME-FAISABILITE-1).
 Entiers, rationnels et Decimal seuls : aucun flottant, aucune puissance, aucune fonction de libm."""
 import hashlib
 import os
@@ -127,7 +128,22 @@ def calibrer(prm: dict, cal: dict, moy: dict, lus=None, environ=None) -> dict:
             h: _par_hote(prm, moy, s, h, fu, sel[s]["C1"], ctx) for h, fu in unites[s].items()})
     out["faisabilite"] = {n: faisabilite(prm, e["episodes"], {s: sel[s][n] for s in st}, Fraction(*fe["f"]),
                                          Fraction(*fe["longues"])) for n in ("C1", "C2")}
+    out["faisabilite_cellules"] = {c["nom"]: {n: faisabilite(prm, e["episodes"], {s: sel[s][n] for s in st}, Fraction(
+        *c["f"]) * multiplicateur(prm, c["derive"]), Fraction(*c["longues"])) for n in ("C1", "C2")}
+        for c in prm["cellules"]["nulles"]}
+    g = [(faisabilite(prm, e["episodes"], {s: p for s in st}, Fraction(*fe["f"]), Fraction(*fe["longues"])), p)
+         for p in calib_fiv.grille(prm)]
+    out["faisabilite_grille"] = {s: list(max(((x[s]["max"], p) for x, p in g), key=lambda y: y[0])) for s in st}
     return out
+
+
+def multiplicateur(prm: dict, derive) -> Fraction:
+    """Plus grand multiplicateur de taux des dérives d'une cellule (forme de sources.Replication.union : taux tiré
+    au maximum M de la dérive de l'hôte) : tendances, commune, sauts : la plus grande borne de sources.derive.bornes ;
+    transitoire : son facteur ; initiale ou aucune dérive : 1."""
+    d = prm["sources"]["derive"]
+    m = dict.fromkeys(("commune", "tendances", "sauts"), max(Fraction(*b) for b in d["bornes"]))
+    return max([m.get(x, Fraction(d["transitoire"][0]) if x == "transitoire" else 1) for x in derive or []] + [1])
 
 
 def pauses(m: int, d: int) -> dict:
@@ -292,9 +308,15 @@ def rendu_e1(prm: dict, moy: dict, res: dict, pz: dict, entete: list, texte: str
     lignes += [f"[FAISABILITÉ {n}] « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, {f['ou'][1]}) : "
                + ("faisable, r′ < 1" if f["faisable"] else "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)")
                for n in ("C1", "C2") for s in st for f in [res["faisabilite"][n][s]]]
+    lignes += [f"[FAISABILITÉ cellule {c}] {n} « {s} » : r′ maximal = {f['max']} ({f['ou'][0]}, {f['ou'][1]}) : "
+               + ("faisable, r′ < 1" if f["faisable"] else "INFAISABLE, r′ ≥ 1 (REGIME-FAISABILITE-1)")
+               for c, x in res["faisabilite_cellules"].items() for n in ("C1", "C2") for s in st for f in [x[n][s]]]
+    lignes += [f"[FAISABILITÉ grille E1] « {s} » : r′ maximal sur les {len(g) - 1} points = {v} au point {_pt(p)}"
+               for s in st for v, p in [res["faisabilite_grille"][s]]]
     lignes += res["phrases"] + lignes_pauses(prm, pz, c1, R, texte)
     obj = {"schema": prm["schema"], "sortie": "calibration_e1", "entete": entete, "replications": R,
            "phrases": res["phrases"], "faisabilite": res["faisabilite"],
+           "faisabilite_cellules": res["faisabilite_cellules"], "faisabilite_grille": res["faisabilite_grille"],
            "points": {calib_fiv.cellule(prm, p): moy[p] for p in g},
            "pauses": {s: {h: {k: sorted([a, b] for a, b in v.items()) if k in CLES_PAUSES else v for k, v in x.items()}
                           for h, x in hs.items()} for s, hs in pz.items()},
