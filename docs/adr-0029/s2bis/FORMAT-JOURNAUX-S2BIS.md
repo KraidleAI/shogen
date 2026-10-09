@@ -46,7 +46,9 @@
   (§9.1, relevés des décodeurs de CB-6a et CB-6b) et le champ `decodeur` des formes (§14.1), et ferme pour les
   décodeurs SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§9.1) ; le diff CB-6d ferme SHOGEN-S2BIS-TARDIVES-BORNE-1 (§13.6),
   SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1 (§8.3) et le volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (§8.4) ; le
-  diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12).
+  diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
+  (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
+  CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -491,9 +493,10 @@ résolution et sans envoi (ADR-0029 l.109).
 retenue, `statut` `reponse`, `rcode` lu, `tc` vrai ; sa section réponse, coupée par définition (RFC 1035 §4.2.1, cité
 plus haut), n'est pas lue : `reponses` null. Avant CB-12a, une réponse coupée au milieu d'un enregistrement donnait
 `forme`, drapeau perdu. Le client ne fait aucun repli en TCP (choix du lot, admis pour D-4 et D-5 par la G2 de la
-tranche B) : le drapeau se lit au recalcul, et le relevé ASN (CB-12b) tient une résolution tronquée pour une adresse non
-obtenue. **Identifiant** (CB-12a, SHOGEN-S2BIS-DNS-ID-16BITS-1 ; O-10) : entier de 0 à 65 535 ; tout autre
-identifiant (injecté par un test, booléen compris) est un refus nommé de la requête (`requête DNS invalide :
+tranche B) : le drapeau se lit au recalcul, et le relevé ASN (§15.4) tient une résolution tronquée pour une adresse non
+obtenue, sans repli en TCP non plus (Q-3 de la G2 de P2A, adjugée le 2026-10-08 ; taux de troncature mesuré au rodage :
+SHOGEN-S2BIS-ASN-TRONCATURE-1). **Identifiant** (CB-12a, SHOGEN-S2BIS-DNS-ID-16BITS-1 ; O-10) : entier de 0 à 65 535 ;
+tout autre identifiant (injecté par un test, booléen compris) est un refus nommé de la requête (`requête DNS invalide :
 identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : `struct.error`, non nommé).
 
 ## 13. Enregistrement `sante` complet (CB-11 ; E-C-25 à E-C-29)
@@ -501,8 +504,8 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 1. Un enregistrement `sante` par fenêtre lue, avant le marqueur. Ses clés forment une **liste blanche fermée** :
    `type`, `ws`, `seq`, `prec`, `d2`, `fils`, `horloges` (§11.6), `d3`, `d4`, `d5`, `disque`, `resolveur`. Aucune clé
    n'est tirée d'une lecture de source ; aucun champ ne porte de jugement (« dégradé » se juge au recalcul et dans
-   `status`, avec les seuils scellés, E-C-26). Une boucle construite sans sondes (tests de la boucle seule) écrit la
-   même liste : `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
+   `status`, avec les seuils scellés, E-C-26). Une boucle construite sans sondes (tests de la boucle seule ; boucle de
+   la carte, §15.3) écrit la même liste : `d3`, `disque` et `resolveur` null, `d4` et `d5` vides (O-7).
 2. **Instant des sondes** (Q-C-03) : les sondes D-3, D-4 et D-5 partent au départ D = ws + w − δ, chacune sur son fil,
    hors du pool des lectures ; la boucle les attend avec les lectures, jusqu'à l'échéance au plus. Une sonde encore en
    cours au relevé de l'échéance (§11.4, avant toute écriture) vaut null, de même qu'une sonde finie après E (règle
@@ -576,7 +579,8 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    l'observateur). Tout écart est un refus nommé (`CONFIG/…` ou `BOUCLE/…`), levé avant l'ouverture du journal.
 2. **Câblage** (SHOGEN-S2BIS-PLAN-CABLAGE-1) : une lecture par forme ; plan par hôte (§11.1) ; sondes construites
    depuis `sante.json`, dirigées vers le résolveur du descripteur, disque relevé sur le dossier du journal ; la boucle
-   tourne toujours avec ses sondes (§13.1 : une `sante` sans sondes n'existe que dans les tests de la boucle seule).
+   tourne toujours avec ses sondes (§13.1 : une `sante` sans sondes n'existe que dans les tests de la boucle seule et
+   au journal du processus secondaire, §15.3).
 3. **Commande** (CB-18d) : `python3 -m shogen_s2bis.collecte pool --formes F --sante S --descripteur D --journal
    DOSSIER --commit SHA` (code de référence : `s2bis/shogen_s2bis/collecte/entree.py`). `--fenetres N` arrête après N
    fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. Un refus de configuration donne la sortie 2
@@ -589,3 +593,67 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    qu'elle soit. Une OSError ou un refus de l'écrivain (`JOURNAL/casse` compris, et toute ouverture refusée) arrête la
    boucle : sortie 1, refus nommé (`collecte : arrêt : <code> : …`) ; systemd relance le service, et l'instance
    suivante reprend le journal (§7). Sortie 0 : les N fenêtres demandées sont écrites.
+
+## 15. Processus secondaire : carte et relevé ASN (CB-12b, CB-13 ; E-C-30 à E-C-33)
+
+1. **Isolement** (E-C-32 ; ADR-0029 l.235, AQT Q1) : la carte et le relevé ASN tournent dans un processus distinct de
+   celui du pool (service systemd à lui, borné en mémoire par `MemoryMax` : lot DEPLOI-BIS), avec son pool de fils et
+   son propre journal chaîné, au préfixe `secondaire` (fichiers `secondaire-AAAA-MM-JJ-k.jsonl`, verrou
+   `secondaire.verrou`), du même format que celui du pool (§1 à §8) et sur sa grille (même w) ; sa tête entre dans
+   l'échange des têtes et le jeton quotidien (CB-15). Le pool ne lit rien du secondaire : un refus,
+   un arrêt, une lecture pendue de la carte n'écrivent rien au journal du pool, ni D-1 à D-5 ni son marqueur
+   (`s2bis/tests/test_secondaire.py`, `Isolement` : les deux processus ensemble, carte pendue, carte refusée).
+2. **`carte.json`** (CB-13b), configuration scellée : `depart`, `delai`, `marge` (µs), `places` (pool de fils de la
+   carte), `asn` (`{periode, decalage}`, s ; `periode` de 86 400 s au plus : relevé au moins quotidien, E-C-30) et
+   `formes`, liste de formes du §14.1, vide admise (sans source prête au gel, le processus relève l'ASN seul). Règles
+   des formes du pool (§14.1 : `noms-uniques`, `methode-corps`, `hote-forme`, `chemin-forme`, `espace-par-hote`,
+   `places-formes`, `decodeur-connu`), puis règles croisées avec `formes.json` du pool, que le secondaire charge aussi
+   (son sha256 entre au `run_params` du secondaire, à comparer à celui du `run_params` du pool) :
+   - `budget-partage` (E-C-33) : sur chaque hôte, les lectures du pool et de la carte, ensemble, sont au plus 5 par
+     fenêtre (borne du §11.1) : un hôte présent aux deux garde un seul budget de débit, les limites lues étant par
+     adresse (ADR-0029 l.234). Règle scellée (Q-1 de la G2 de P2A, adoptée le 2026-10-08) : un plafond, que le G0 de
+     la carte (ADR-0029 l.235, SHOGEN-S2BIS-CARTE-AVEUGLE-1) peut serrer hôte par hôte, sur les limites lues ;
+   - `espace-partage` : un hôte présent aux deux porte le même `espace` ;
+   - `hors-delta` (E-C-32) : `depart` + plus grand décalage du plan de la carte + `delai` ≤ w·10⁶ − `delta` du pool,
+     égalité admise : toute lecture de la carte finit avant le départ du pool ;
+   - `marge-carte` : `depart` + plus grand décalage + `delai` + `marge` ≤ w·10⁶, égalité admise (budget du §14.1, sans
+     tolérance : la carte n'a pas de D-2) ;
+   - `cadence` : `periode` et `decalage` multiples de w, `decalage` < `periode`.
+
+   En production, `depart` vaut 5 s (E-C-32, valeur scellée). Tout écart est un refus nommé (`CONFIG/…`), levé avant
+   l'ouverture du journal.
+3. **Boucle de la carte** : celle du pool (§11), départ D = ws + `depart` (δ de la carte : w − `depart`), échéance
+   E = ws + w − `marge`, `places` de la carte, une lecture par forme au `delai` de la carte, décodée par le décodeur de
+   sa forme (§9.1), et sans sondes : la `sante` porte les champs des sondes nuls ou vides (§13.1). Mêmes
+   enregistrements `lecture`, `sante` et marqueur qu'au §11.
+4. **Relevé ASN** (E-C-30, E-C-31 ; Q-C-04 ; CB-12b, CB-13a) : les hôtes relevés sont ceux du pool et de la carte,
+   dans l'ordre des points de code. Un relevé est dû à la première fenêtre de chaque exécution, puis à la première
+   fenêtre lue qui suit un instant de la cadence (ws mod `periode` = `decalage`) : un instant sauté, dans une fenêtre
+   sautée ou pendant un arrêt, est rattrapé à la fenêtre lue suivante ou au redémarrage (C-4 de la G2 de P2A ;
+   ADR-0029 l.247 : relevé quotidien), en mémoire seule, sans relecture du journal (E-C-15). Un enregistrement
+   `releve_asn` (champs `hotes`, `lance`) note le relevé dû ; `lance` est faux si le relevé précédent n'a pas rendu :
+   celui-ci est alors sauté (un fil de relevé au plus). Le relevé tourne sur un fil démon, jamais sur
+   le fil qui écrit ; chaque hôte relevé est écrit en `asn` par le fil de la boucle, en tête de la première fenêtre qui
+   suit son rendu (avant le `releve_asn` de cette fenêtre, s'il y en a un), dans l'ordre des hôtes. Champs de `asn` :
+   - `hote` ;
+   - `a` : résultat DNS (§12) de la requête A de l'hôte au résolveur du descripteur, récursion demandée (jamais
+     1.1.1.1, ADR-0029 l.82) ;
+   - `ip` : première adresse de type A de la section réponse ; null sans réponse retenue, sans A, ou sous le drapeau TC
+     (`reponses` null, §12) ;
+   - `ripestat` : null sans `ip` ; sinon les champs d'une `lecture` (§9.1) de
+     `https://stat.ripe.net/data/prefix-overview/data.json?resource=<ip>`, dont `valeurs`, au statut `ok`, est
+     `{asn, detenteur, prefixe}` : `data.asns[0].asn` et `.holder`, `data.resource` (forme de S2, r2.py l.275-289) ;
+     `asn` et `detenteur` null si `asns` est vide ; `asn`, entier ou texte décimal lu comme `int()` de S2, de 0 à 2³²
+     exclu ; 4 096 octets canoniques au plus ; tout autre corps : `panne_decode` ;
+   - `cymru` : null sans `ip` ; sinon le résultat DNS (§12) de la requête TXT de `<d>.<c>.<b>.<a>.origin.asn.cymru.com.`
+     au même résolveur, plus `asn` : premier nombre du premier champ (avant « | ») de la première chaîne de la première
+     réponse TXT qui en a un, de 0 à 2³² exclu (forme de S2, `_cymru_asn` l.292-312) ; null sinon.
+
+   Un défaut imprévu du relevé d'un hôte donne un `asn` à `a`, `ip`, `ripestat` et `cymru` nuls, et le relevé
+   continue. Aucun jugement : la concordance des deux bases se juge au recalcul (E-R-29).
+5. **Taille** : le plus grand `asn` (A et TXT au plus grand résultat du §13.6, corps RIPEstat de 1 048 576 octets,
+   valeurs à leur borne, hôte de 253 caractères) fait moins de 2 000 000 octets, sous LIMITE (§7.1) : témoin
+   `test_asn.Decodage.test_plus_grand_releve_sous_limite`.
+6. **Commande** (CB-13b) : `python3 -m shogen_s2bis.collecte secondaire --formes F --carte C --descripteur D --journal
+   DOSSIER --commit SHA` ; `--fenetres`, sorties, refus et fermeture comme aux §14.3 et §14.5 ; `run_params` comme au
+   §14.4, `sha256` et contenus `{formes, carte, descripteur}`.

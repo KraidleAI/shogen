@@ -1,15 +1,41 @@
 """CB-13a (E-C-30 à E-C-32 ; ADR-0029 l.235 ; AQT Q1 ; Q-C-04) : processus secondaire, boucle de la carte et relevé ASN
 hors de tout fil qui écrit. Horloges et attentes injectées (`test_boucle.Temps`), relevé injecté, journal relu par
-`chaine`. Fenêtres : m(3) = 2026-10-04 23:01 UTC = 1791154860 (date -u -d) ; 1791154860 mod 120 = 60 (bc)."""
+`chaine`. Fenêtres : m(3) = 2026-10-04 23:01 UTC = 1791154860 (date -u -d) ; 1791154860 mod 120 = 60 (bc). CB-13b
+(E-C-32, E-C-33) : `carte.json`, budget de débit partagé par hôte, règles croisées, commande `secondaire` ; isolement
+du pool éprouvé de bout en bout, les deux processus ensemble, carte pendue et carte refusée."""
+import json
+import os
+import pathlib
+import socket
+import subprocess
+import sys
 import threading
+from unittest import mock
 
-from shogen_s2bis.collecte import secondaire
+from shogen_s2bis.collecte import entree, secondaire
 from shogen_s2bis.collecte.lecture import S
 from tests.test_boucle import Temps, borne, rapide
+from tests.test_bout_en_bout import HARNAIS, servir
+from tests.test_entree import COMMIT, RACINE, configurations, port_ferme, refus
 from tests.test_journal import Base, chaine
 from tests.test_reprise import m, sans_chaine
 
 NUL = {"hote": None, "a": None, "ip": None, "ripestat": None, "cymru": None}
+
+
+def carte(port, n=1, **champs):
+    """carte.json de test, sur la grille du pool de `configurations` (w = 1 s, δ = 0,6 s) : n formes vers 127.0.0.1,
+    départ 0,05 s, délai 0,3 s (0,05 + 0,3 ≤ 1 − 0,6), marge 0,2 s ; relevé ASN toutes les 3 600 s."""
+    x = {"hote": "127.0.0.1", "port": port, "methode": "GET", "corps": "", "espace": False, "decodeur": "binance_btc"}
+    return {"depart": S // 20, "delai": 3 * S // 10, "marge": S // 5, "places": 4, "asn": {"periode": 3600,
+            "decalage": 0}, "formes": [{**x, "nom": f"m{k}", "chemin": f"/m{k}"} for k in range(n)], **champs}
+
+
+def fichiers(dossier, **contenus):
+    """Écrit chaque configuration en JSON dans `dossier` ; rend {nom : chemin}."""
+    for nom, donnees in contenus.items():
+        pathlib.Path(dossier, nom + ".json").write_text(json.dumps(donnees), encoding="utf-8")
+    return {nom: os.path.join(dossier, nom + ".json") for nom in contenus}
 
 
 class Secondaire(Base):
@@ -84,3 +110,86 @@ class Secondaire(Base):
                                    ("asn", m(6), "b.example")])
         e = [x for x in sans_chaine(chaine(self.etat()["secondaire-2026-10-04-0.jsonl"])[2]) if x["type"] == "asn"]
         self.assertEqual([(x["a"], x["ip"]) for x in e[:2]], [(None, None), (None, "192.0.2.1")])
+
+
+class Configuration(Base):                                         # CB-13b (E-C-32, E-C-33 ; FORMAT §15.2)
+    def test_carte_budget_partage_et_regles_croisees(self):
+        """Pool de deux formes sur 127.0.0.1 (w = 1 s, δ = 0,6 s). Carte de trois formes sur cet hôte : 5 lectures par
+        fenêtre, admis ; quatre : 6 > 5 (PAR_HOTE), `budget-partage` ; carte vide admise ; hôte espacé d'un côté :
+        `espace-partage`. Départ + délai = 0,4 s = w − δ : admis ; 1 µs de plus, ou deux lectures espacées de 1 s :
+        `hors-delta`. Marge, cadence (grille de 60 s), décodeur : refus nommés ; `periode` de 86 401 s : borne."""
+        f, _s, d = configurations(1)
+        g, x = {**f, "w": 60}, carte(1)["formes"][0]
+        e = [{**x, "hote": "b.example", "espace": True, "nom": n} for n in ("m0", "m1")]     # décalages 0 et 1 s
+        cas = [(f, carte(1, 3), None), (f, carte(1, 4), "budget-partage"), (f, carte(1, 0), None),
+               (f, carte(1, formes=[{**x, "espace": True}]), "espace-partage"), (f, carte(1, depart=S // 10), None),
+               (f, carte(1, depart=S // 10 + 1), "hors-delta"), (f, carte(1, formes=e), "hors-delta"),
+               (f, carte(1, marge=S), "marge-carte"), (f, carte(1, formes=[{**x, "decodeur": "x"}]), "decodeur-connu")]
+        cas += [(f, carte(1, asn={"periode": 3600, "decalage": 3600}), "cadence"),
+                (g, carte(1, asn={"periode": 3600, "decalage": 60}), None),
+                (g, carte(1, asn={"periode": 90, "decalage": 0}), "cadence"),
+                (g, carte(1, asn={"periode": 3600, "decalage": 30}), "cadence"),
+                (f, carte(1, asn={"periode": 86401, "decalage": 0}), "CONFIG/borne : $.asn.periode")]    # C-2 (G20)
+        for formes, c, regle in cas:
+            with self.subTest(regle=regle, carte=c):
+                r = refus(lambda: entree.configurer_secondaire(fichiers(self.d, formes=formes, carte=c, descripteur=d),
+                                                               COMMIT))
+                self.assertEqual(r and r.split(" = ")[0], regle and (regle if "/" in regle else
+                                                                     "CONFIG/incoherent : " + regle))
+
+    def test_construction_journal_propre_hors_delta_sans_sondes(self):
+        """Journal `secondaire` sur la grille du pool ; départ ws + `depart` (δ de la carte : w − `depart`), échéance
+        ws + w − `marge`, sans sondes ; délai et places de la carte jusqu'aux lectures ; hôtes du pool et de la carte,
+        résolveur du descripteur, cadence de `asn`."""
+        f, _s, d = configurations(1)
+        c = carte(1, 2, delai=S // 4, marge=S // 8, places=3)
+        c["formes"] = [{**x, "hote": "b.example"} for x in c["formes"]]
+        jl, b = entree.construire_secondaire(f, c, d, self.d)
+        with mock.patch.object(entree.http, "lire") as lire:
+            b.lectures["m1"]({})
+        self.assertEqual((jl.prefixe, jl.dossier, jl.w, b.journal, b.w, b.delta, b.marge, b.sondes, b.plan,
+                          lire.call_args.args[0][:2], lire.call_args.kwargs.get("delai")),
+                         ("secondaire", self.d, 1, jl, 1, S - S // 20, S // 8, None, [(0, "m0"), (0, "m1")],
+                          ("b.example", "/m1"), S // 4))
+        self.assertEqual((b.hotes, b.resolveur, b.periode, b.decalage, [b.places.acquire(blocking=False) for _ in
+                                                                         range(4)]),
+                         (["127.0.0.1", "b.example"], "127.0.9.53", 3600, 0, [True] * 3 + [False]))
+
+
+class Isolement(Base):                                             # E-C-32 ; PROPOSITION §2.4, processus secondaire
+    def test_carte_pendue_ou_refusee_le_pool_intact(self):
+        """Pool et secondaires ensemble, trois fenêtres (w = 1 s) : la carte lit un serveur qui accepte et ne répond
+        jamais ; un second secondaire, au budget dépassé, sort en 2 sans rien écrire. Le journal du pool ne porte que
+        ses lectures (a, b, c), aucun fil abandonné, trois marqueurs ; celui du secondaire, sa lecture en panne."""
+        pendu, tenues = socket.create_server(("127.0.0.1", 0)), []
+        self.addCleanup(lambda: [x.close() for x in (pendu, *tenues)])
+
+        def tenir():
+            try:
+                while True:
+                    tenues.append(pendu.accept()[0])
+            except OSError:                                         # serveur fermé à la fin du test
+                return
+        threading.Thread(target=tenir, daemon=True).start()
+        f, s, d = configurations(servir(self))
+        f["formes"].append({**f["formes"][0], "nom": "c", "port": port_ferme(), "chemin": "/c"})
+        s["commande"], s["delai"], d["config_resolveur"] = ["/bin/echo", "suivi"], S // 5, os.path.join(self.d, "r")
+        ch = fichiers(self.d, formes=f, sante=s, descripteur=d, carte=carte(pendu.getsockname()[1]), trop=carte(1, 4))
+        lancer, dossiers = [], {}
+        for nom, cmd, cfg in (("pool", "pool", ("formes", "sante", "descripteur")), ("sec", "secondaire", ("formes",
+                              "carte", "descripteur")), ("trop", "secondaire", ("formes", "trop", "descripteur"))):
+            os.mkdir(dossiers.setdefault(nom, os.path.join(self.d, "j-" + nom)))
+            args = [x for c in cfg for x in ("--" + c.replace("trop", "carte"), ch[c])]
+            lancer.append(subprocess.Popen([sys.executable, "-B", "-c", HARNAIS, cmd, *args, "--journal", dossiers[nom],
+                                            "--commit", COMMIT, "--fenetres", "3"], cwd=RACINE, stderr=subprocess.PIPE))
+            self.addCleanup(lambda p=lancer[-1]: (p.kill(), p.wait(), p.stderr.close()))
+        refuse = [b"collecte", b"refus", b"CONFIG/incoherent", b"budget-partage"]
+        self.assertEqual([(p.communicate(timeout=60)[1].strip().split(b" : "), p.returncode) for p in lancer],
+                         [([b""], 0), ([b""], 0), (refuse, 2)])
+        lus = {n: chaine(b"".join(pathlib.Path(x, y).read_bytes() for y in sorted(os.listdir(x)) if y.endswith(
+            ".jsonl")))[2] if os.listdir(x) else [] for n, x in dossiers.items()}
+        lectures = [[(e["forme"], e["statut"]) for e in lus[n] if e["type"] == "lecture"] for n in ("pool", "sec")]
+        self.assertEqual(lectures, [[("a", "ok"), ("b", "panne_http"), ("c", "panne_transport")] * 3,
+                                    [("m0", "panne_transport")] * 3])
+        self.assertEqual(([e["fils"]["abandonnes"] for e in lus["pool"] if e["type"] == "sante"], [len([e for e in lus[
+            n] if e["type"] == "marqueur"]) for n in ("pool", "sec")], lus["trop"]), ([0] * 3, [3, 3], []))

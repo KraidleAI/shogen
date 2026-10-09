@@ -1990,3 +1990,38 @@ cadence ou décalage ignorés, hôtes dans l'ordre de la configuration, défaut 
 défaut, relevés jamais écrits, résolveur de l'observateur perdu, plancher non relevé. Corrections : 3 mutants neufs, 3
 tués par leur test visé : aucun relevé au démarrage, instant sauté non rattrapé, mémoire de la dernière fenêtre non
 tenue. Suite : 293 tests ; plancher du job : 293, égalité exigée.
+
+## CB-13b (2026-10-08) : `carte.json`, budget de débit partagé, commande `secondaire`, isolement (E-C-32, E-C-33)
+
+Objet : `carte.json` scellé (`depart`, `delai`, `marge`, `places`, cadence `asn`, `formes`, liste vide admise : forme
+de schéma `[s, n, 0]` neuve dans `config.controler`) ; règles de forme du pool appliquées aux formes de la carte ; cinq
+règles croisées avec `formes.json` du pool, refus nommés : `budget-partage` (E-C-33 : lectures du pool et de la carte,
+ensemble, au plus 5 par hôte et par fenêtre ; règle scellée, Q-1 de la G2 de P2A adoptée : plafond que le G0 de la
+carte peut serrer hôte par hôte), `espace-partage`, `hors-delta` (E-C-32 : toute lecture de la carte finit avant le
+départ du pool), `marge-carte`, `cadence` ; `construire_secondaire` (journal `secondaire` sur la grille du pool, départ
+ws + `depart`, hôtes du pool et de la carte relevés au résolveur du descripteur) ; commande `secondaire`. FORMAT §15
+écrit (processus secondaire, relevé ASN de CB-12b et CB-13a, dont le relevé au démarrage et le rattrapage de C-4) ;
+§12, §13.1 et §14.2 retouchés (§12 : aucun repli en TCP pour le relevé ASN non plus, Q-3 adjugée, taux de troncature
+au rodage, SHOGEN-S2BIS-ASN-TRONCATURE-1). Correction C-2 de la G2 de P2A (G20) : `periode` de 86 401 s refusée
+(`CONFIG/borne`), figée par un cas de test.
+
+Rouge : sur des bouchons (aucune règle croisée, câblage du pool, pas de commande `secondaire`), les 4 tests neufs
+échouent par assertion (12 échecs, sous-tests compris). C-2 : le code d'avant était juste ; le cas neuf échoue sous le
+mutant du réviseur qu'il vise (G20).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/config.py` | 73 | — |
+| `shogen_s2bis/collecte/entree.py` | 191 | — |
+| `tests/test_format.py` | 237 | 14 (1 de plus : §15, règles croisées du code nommées, renvoi du §12, puce « Partie P2 ») |
+| `tests/test_secondaire.py` | 195 | 7 (3 de plus : règles croisées à la borne ; construction ; pool et secondaires ensemble, carte pendue, carte refusée) |
+
+Mutants (même commande) : 21 mutants du sous-lot, 21 tués par leur test visé (0 vivant, 0 FATAL), rejoués sur l'état
+corrigé : budget relâché d'une lecture ou compté sur la carte seule, espace de la carte seule, `hors-delta` sans les
+décalages, sans égalité ou sans le δ du pool, marge ignorée, décalage hors de la période ou période hors de la grille
+admis, règles de forme non appliquées à la carte, délai, départ, places ou préfixe du journal pris au pool, hôtes du
+pool non relevés, budget non contrôlé à la commande, carte vide refusée, liste vide admise partout, fichiers du
+secondaire dans le désordre, renvoi du §12 perdu, plancher non relevé. Corrections : 1 mutant neuf, tué par son test
+visé (`periode` de 86 401 s admise). Les 26 mutants de la G2 de P2A, rejoués sur cet état : 26 tués, dont les six
+vivants de la G2 (G01, G02, G03, G14, G17, G20), chacun par le cas neuf qui le vise. Suite : 297 tests ; plancher du
+job : 297, égalité exigée.

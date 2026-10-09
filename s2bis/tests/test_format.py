@@ -16,7 +16,7 @@ import pathlib
 import tempfile
 import unittest
 
-from shogen_s2bis.collecte import journal
+from shogen_s2bis.collecte import entree, journal
 
 NL = chr(10)
 FORMAT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs",
@@ -208,6 +208,17 @@ class Format(unittest.TestCase):
         self.assertEqual([x in sections["12"] for x in attendus], [True] * 3)
         self.assertEqual([all(x in p for x in ("CB-12a", "DNS-TC-1", "DNS-ID-16BITS-1")) for p in puces if
                           p.startswith("**Partie P2, tranche A**")], [True])
+
+    def test_paragraphe_15_processus_secondaire(self):              # CB-13b (CB-12b, CB-13a ; E-C-30 à E-C-33)
+        """§15 : journal au préfixe `secondaire`, `carte.json`, chaque règle croisée du code nommée, champs de
+        `releve_asn` et de `asn`, commande ; le §12 renvoie au §15 ; la puce « Partie P2 » nomme CB-13b."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        quinze = sections.get("15", "")
+        attendus = ["préfixe `secondaire`", "`carte.json`", "`releve_asn`", "`hotes`, `lance`", "`hote`", "`ripestat`",
+                    "`cymru`", "secondaire --formes F --carte C --descripteur D"]
+        self.assertEqual([x in quinze for x in attendus + [f"`{n}`" for n, _r in entree.CROISEES]], [True] * 13)
+        self.assertEqual(("relevé ASN (§15.4)" in sections["12"], [("CB-13b" in p) for p in puces if p.startswith(
+            "**Partie P2, tranche A**")]), (True, [True]))
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
