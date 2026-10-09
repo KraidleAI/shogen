@@ -867,6 +867,7 @@ fn temoin_sg5_interdits_voisins_gardent_le_texte() {
         "docs/adr-0028/voisin.md",
         "docs/adr-0028/monark-m009ab/voisin.md",
         "docs/adr-0028/execution-bis/voisin.md",
+        "docs/b.jsonlx/voisin.md",
         "s2-harness/docs/rapports/voisin.md",
     ];
     for relatif in voisins {
@@ -878,6 +879,36 @@ fn temoin_sg5_interdits_voisins_gardent_le_texte() {
     for relatif in voisins {
         let attendu = format!(
             "{relatif}:3 citation introuvable dans le registre et les octets détenus : « the visible sentence of this file is not in the corpus »"
+        );
+        assert!(
+            motifs.contains(&attendu),
+            "« {attendu} » absent :\n{motifs}"
+        );
+    }
+}
+
+/// DT4-f (DETTES-T4, C-9 du contre-contrôle) : casse pliée (majuscules puis minuscules, `ſ` compris) et tout
+/// composant en `.jsonl`, dossier compris : la citation se rapporte par `chemin:ligne` seul, verdict inchangé.
+#[test]
+fn mutant_sg5_interdits_casse_et_jsonl() {
+    let racine = arbre_documentaire("sg5-interdits-casse");
+    let factices = [
+        "docs/Rapports/factice.md",
+        "docs/adr-0028/EXECUTION/factice.md",
+        "docs/rapport\u{17F}/factice.md",
+        "docs/b.jsonl/factice.md",
+        "docs/x/Y.JSONL/factice.md",
+    ];
+    for (rang, relatif) in factices.iter().enumerate() {
+        citation_factice(&racine, relatif, &format!("zorglub{rang}"));
+    }
+    let rapport = xtask::sg5::executer(&racine);
+    let motifs = motifs(&rapport);
+    assert_eq!(rapport.violations.len(), factices.len(), "{motifs}");
+    assert!(!motifs.contains("zorglub"), "texte imprimé :\n{motifs}");
+    for relatif in factices {
+        let attendu = format!(
+            "{relatif}:3 citation introuvable dans le registre et les octets détenus (emplacement interdit"
         );
         assert!(
             motifs.contains(&attendu),
