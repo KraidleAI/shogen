@@ -49,6 +49,10 @@ def naturel(v) -> bool:
     return type(v) is int and v >= 0
 
 
+def booleen(v) -> bool:
+    return type(v) is bool
+
+
 def question(v) -> bool:
     """Valeur adjugée d'une question de la tranche 3 (P-2 de ses corrections G2) : texte qui cite ses lignes de
     l'avis AVIS-SIM-T3.md et de la PROPOSITION."""
@@ -97,6 +101,10 @@ SCHEMA = {"lot": texte, "schema": texte, "rattachement": texte,
                  "fond": {"f": (positif, positif), "longues": (naturel, positif), "autres": (positif, positif),
                           "hors_enveloppe": (naturel, positif), "classe": texte, "source": texte},
                  "questions": {f"Q-T4-{n}": question_t4 for n in (5, 6, 7, 8, 9, 10, 13)}},
+          "cellules": {"couches": {g: {"absences": (naturel, positif), "degradations": (naturel, positif),
+                                       "paires": (naturel, positif), "perte": booleen, "local": (naturel, positif),
+                                       "artefacts": (naturel, positif)} for g in ("nominale", "degradee", "large")},
+                       "source": texte},
           "oracle_r1": {"commit": hex40, "dossier": texte, "source": texte,
                         "fichiers": {f"shogen_s2/{m}.py": hex64
                                      for m in ("__init__", "model", "records", "window", "r1")},

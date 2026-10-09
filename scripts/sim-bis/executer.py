@@ -4,8 +4,9 @@ Decimal sous le contexte de r1, borne unilatérale à 95 % quand x = 0 ; E-S-40,
 causes de NON ÉVALUABLE, par cause et par combinaison (E-S-52). SB-11b : empreinte d'une suite d'enregistrements
 (E-S-44) ; fichiers partiels de lot, un par (cellule, plage de i), relus à la condition que chaque i y soit une fois et
 une seule (E-S-45, E-S-06). SB-11c : tâches dans l'ordre, en un ou plusieurs processus (E-S-42) ; plan de lots de 90 min
-au plus sur le coût mesuré (adjudication 6 du G0). Entiers, rationnels et Decimal seuls : aucun flottant, aucune
-puissance, aucune fonction de libm."""
+au plus sur le coût mesuré (adjudication 6 du G0). SB-11d : couche d'observateurs d'une cellule (grille
+cellules.couches, O-5 ; perte sur le W de la cellule, L-2). Entiers, rationnels et Decimal seuls : aucun flottant,
+aucune puissance, aucune fonction de libm."""
 import hashlib
 import json
 import multiprocessing
@@ -16,6 +17,7 @@ from fractions import Fraction
 
 import calib_fiv
 import commun
+import observateurs
 import regle
 
 VALEURS = ("REJETTE", "NE REJETTE PAS", "NON ÉVALUABLE")
@@ -170,3 +172,21 @@ def plan(R_rep: int, ns: int, processus: int, borne: int = BORNE) -> list:
         raise commun.Refus("EXEC/plan", f"R = {R_rep!r}, {ns!r} ns par réplication, borne {borne!r} ns")
     t = borne * processus // ns
     return [(a, min(a + t, R_rep)) for a in range(0, R_rep, t)]
+
+
+def couche(prm: dict, ep: dict, cel: dict, W: int) -> dict:
+    """Couche d'observateurs.Couche d'une cellule : grille cellules.couches[grille] de parametres.json (O-5) ;
+    perte tirée sur la durée nominale W de la cellule, celle passée à calendrier.echelle, jamais sur T_max (L-2 ;
+    Q-T3-7) ; chemin : référence (1 − f)·p̂ (observateurs.chemin_reference, Q-S-12) × facteur, ou ε fixe ; repli,
+    pannes régionales et manques de la cellule ; défaut local et artefacts : ceux de la cellule, ou, à None, ceux de
+    la grille."""
+    c, g, unites = cel["couche"], prm["cellules"]["couches"][cel["couche"]["grille"]], prm["calibration"]["unites"]
+    if c["chemin"]["mode"] == "fixe":
+        eps = {(h, s): Fraction(*c["chemin"]["epsilon"]) for h, _f in unites for s in prm["calibration"]["strates"]}
+    else:
+        ref = observateurs.chemin_reference(prm, ep, Fraction(*cel["f"]))
+        eps = {k: x * Fraction(*c["chemin"]["facteur"]) for k, x in ref.items()}
+    return {"absences": Fraction(*g["absences"]), "degradations": Fraction(*g["degradations"]),
+            "paires": Fraction(*g["paires"]), "perte": W if g["perte"] else None, "repli": c["repli"], "chemin": eps,
+            "local": Fraction(*(c["local"] or g["local"])), "artefacts": Fraction(*(c["artefacts"] or g["artefacts"])),
+            "regionale": Fraction(*c["regionale"]), "manque": Fraction(*c["manque"])}
