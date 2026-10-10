@@ -2637,3 +2637,31 @@ texte d'AS sans borne de longueur, de 1 à 9 chiffres. Les huit derniers, sur l'
 manquants que C-5 à C-9 ajoutent).
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-l (2026-10-10) : réserves R-1 à R-6 du contre-contrôle du lot (lot DETTES-T6)
+
+Objet : réserves du contre-contrôle neuf (CONFORME-AVEC-RÉSERVES). Code : R-1, `status.chrony` ne convertit plus une
+partie entière de plus de `journal.CHIFFRES` chiffres (relevé illisible) : une `sante` hors FORMAT dont System time a
+4 301 chiffres faisait lever `ValueError` à `status` et `resume` (limite de `int()` ; 641 chiffres sous la plus petite
+limite), contre I-3 de STATUS-QUEUES-1. Tests : R-2 (ligne de LIMITE + 1 octets coupée, de LIMITE octets lue), R-3
+(fenêtre D-4 sans relevé récent : D-3 et D-4, triés), R-4 (l'entier 0 dans la borne « au plus 8 fois »), R-5 (Cymru :
+premier champ vide, réponse suivante lue), R-6 (code de sortie négatif : relevé illisible). Aucun test ajouté (cas dans
+des tests existants) ; FORMAT inchangé (le §17.2 exige déjà la forme `%.9f` du §13.3).
+
+Rouge : R-1, test sur le `status.py` d'avant : FAIL 1, ERROR 0 (`ValueError` rendu par `sans_attente`) ; R-2 à R-6,
+chacun sur le mutant du contre-contrôle qu'il vise (M01, M03, M07, M10, M12, vivants sur l'état DT6-k) : FAIL 1 (R-5 :
+ERROR 1, `IndexError`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 277 | — |
+| `tests/test_status.py` | 556 | 24 |
+| `tests/test_journal.py` | 357 | 17 |
+| `tests/test_asn.py` | 152 | 6 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 8 tués par leur test visé, 1 vivant équivalent, 0 FATAL : M01, M03, M07, M10,
+M12 ; R-1 défait, borne à 4 300 chiffres, à 641 ; borne à 639 vivante, équivalente (une sortie de chrony a 19 chiffres
+entiers au plus : `UTI_FloatNetworkToHost`).
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
