@@ -281,8 +281,9 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
     def test_fichiers_arretes_avant_leur_fin_nommes(self):
         """O-3 de la G2 de P2B : un fichier arrêté avant sa fin est nommé, avec son motif, en dernière ligne du rapport
         local (ligne illisible, hors FORMAT, jour postérieur au sien, ligne coupée, pas un fichier ordinaire ; C-5 et
-        C-6 de la G2 de DETTES-T6 : lien vers un fichier absent, illisible (FileNotFoundError) ; ligne de plus de
-        LIMITE octets, coupée par la borne de lecture) ; le reste du rapport est celui du journal sain."""
+        C-6 de la G2 de DETTES-T6 : lien vers un fichier absent, illisible (FileNotFoundError) ; ligne de LIMITE + 1
+        octets, coupée par la borne de lecture, quand une ligne de LIMITE octets est lue : R-2 du contre-contrôle,
+        borne exacte) ; le reste du rapport est celui du journal sain."""
         jdir = self.journal("a")
         seq, sha = tete_du_fichier(jdir)
         posterieur = ligne({"prec": "0" * 64, "seq": 9, "type": "marqueur", "ws": 1791244800})    # 2026-10-06 00:00
@@ -290,13 +291,19 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
             pathlib.Path(jdir, f"pool-2026-10-05-{k}.jsonl").write_bytes(octets)
         os.mkfifo(os.path.join(jdir, "pool-2026-10-05-5.jsonl"))
         os.symlink(os.path.join(jdir, "absent"), os.path.join(jdir, "pool-2026-10-05-6.jsonl"))
+        bord = len(ligne({"prec": "0" * 64, "seq": 9, "type": "x", "z": ""}))      # R-2 : ligne de LIMITE + 1 octets
         pathlib.Path(jdir, "pool-2026-10-05-7.jsonl").write_bytes(ligne({"prec": "0" * 64, "seq": 9, "type": "x",
-                                                                     "z": "a" * journal.LIMITE}))
+                                                                     "z": "a" * (journal.LIMITE + 1 - bord)}))
         motifs = ("ligne illisible", "hors FORMAT", "jour postérieur au sien", "ligne coupée",
                   "pas un fichier ordinaire", "illisible (FileNotFoundError)", "ligne coupée")
         self.assertEqual(sans_attente(lambda: status.rapport(jdir)), [x.format(seq=seq, sha=sha) for x in ATTENDU] + [
             "fichiers arrêtés avant leur fin : " + " ; ".join(f"pool-2026-10-05-{k}.jsonl ({x})" for k, x in enumerate(
                 motifs, 1))])
+        pathlib.Path(jdir, "pool-2026-10-05-7.jsonl").write_bytes(ligne({"prec": "0" * 64, "seq": 9, "type": "x",
+                                                                     "z": "a" * (journal.LIMITE - bord)}))
+        arrets = []                                                     # R-2 : ligne de LIMITE octets, lue
+        lu = sans_attente(lambda: [x for _e, x in status.enregistrements(jdir, arrets=arrets)][-1])
+        self.assertEqual((len(lu), [m for n, m in arrets if n == "pool-2026-10-05-7.jsonl"]), (journal.LIMITE, []))
 
     def test_saut_d_horloge_en_avant_refus_nomme(self):
         """R-B1 du contre-contrôle de P2B : un saut d'horloge en avant fait écrire par l'écrivain réel, sans fichier
