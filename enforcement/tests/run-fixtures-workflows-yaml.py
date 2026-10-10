@@ -1,8 +1,9 @@
 """Shōgen, lot DETTES-T5, DT5-8 (adjudication C-2 du 2026-10-09) : cas de enforcement/workflows-yaml.py, chacun dans un
 arbre temporaire, sauf W-01 (l'arbre du dépôt). W-02 : la forme de DT4-a (« cas : » dans un nom d'étape en scalaire
 simple). Relecture G2 du lot : W-12 (chargeur sûr, C-3), W-13 (erreur interne en 3, C-3), W-14 (libellés -latest après
-lecture YAML, C-8). Lancé par l'interpréteur qui porte PyYAML (python3-yaml, docs/R-8-outillage.md). Sortie : 0 tout
-passe (CAS cas joués, ni plus ni moins), 1 un cas échoue, 3 erreur."""
+lecture YAML, C-8) ; adjudication C-10 : W-15 ; contre-contrôle du lot : W-16 (étiquettes explicites qui perdent le
+texte). Lancé par l'interpréteur qui porte PyYAML (python3-yaml, docs/R-8-outillage.md). Sortie : 0 tout passe (CAS cas
+joués, ni plus ni moins), 1 un cas échoue, 3 erreur."""
 import json
 import os
 import shutil
@@ -13,7 +14,7 @@ import tempfile
 ICI = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(os.path.dirname(ICI), "workflows-yaml.py")
 RACINE = os.path.dirname(os.path.dirname(ICI))
-CAS = 15
+CAS = 16
 NL = chr(10)
 BON = NL.join(["name: w", "on: push", "jobs:", "  a:", "    runs-on: ubuntu-24.04", "    steps:", ""])
 ok, ko = [], []
@@ -103,6 +104,21 @@ def main():
         cas("W-15 extension pliée en casse et fichiers cachés lus, autres entrées nommées (adjudication C-10)",
             code == 1 and "G.YAML : ligne 1" in err and ".h.yml : document vide" in err and "i.yml.bak" not in err
             and "2 " + autres + "i.yml.bak, sous.yml" in out, f"{code} {out!r} {err!r}")
+        t = ["name: w", "on: push", "jobs:", "  a:"]
+        m = ["    runs-on: ubuntu-24.04", "    strategy:", "      matrix:"]
+        etiquettes = {
+            "t1.yml": NL.join(t + ["    strategy:", "      matrix:", "        cfg: [&x !!null ubuntu-latest]",
+                                   "    runs-on: *x", ""]),
+            "t2.yml": NL.join(["env: {X: &x !!binary ubuntu-latest}"] + t + ["    runs-on: *x", ""]),
+            "t3.yml": NL.join(t + m + ["        cfg: [!!set {windows-latest}]", ""]),
+            "t4.yml": NL.join(t + m + ["        cfg: !!pairs [{k: windows-latest}]", ""]),
+            "t5.yml": BON.replace("ubuntu-24.04", "!!str ubuntu-24.04")}
+        code, out, err = controler(arbre(etiquettes, w))
+        lignes = err.split(NL)
+        cas("W-16 étiquette explicite qui perd le texte refusée (!!null, !!binary, !!set, !!pairs ; !!str admise)",
+            code == 1 and "t5.yml" not in err and all(any(x.startswith(f"workflows-yaml : refus : t{i}.yml : ligne")
+                                                         and "étiquette explicite refusée" in x for x in lignes)
+                                                     for i in range(1, 5)), f"sortie {code} ; {err!r}")
     finally:
         shutil.rmtree(w, ignore_errors=True)
     joues = len(ok) + len(ko)

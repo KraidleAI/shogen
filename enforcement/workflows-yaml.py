@@ -6,7 +6,11 @@ python3-yaml de la distribution, contrôle R-8 dans docs/R-8-outillage.md) en un
 sans clé répétée à aucun niveau. Refus : erreur de lecture (ligne et colonne), clé répétée, document vide ou
 autre qu'un mapping, octets hors UTF-8, aucun workflow ; et (relecture G2 du lot, C-8) tout libellé en -latest
 (casse ignorée) dans la valeur lue de `runs-on` ou de `strategy.matrix` d'un job, ancres, alias, échappements et
-clés explicites résolus : formes que runners-epingles.py, lecteur par lignes, ne voit pas.
+clés explicites résolus : formes que runners-epingles.py, lecteur par lignes, ne voit pas. Refusées aussi
+(contre-contrôle du lot) : toute étiquette explicite dont la valeur construite perd le texte du scalaire (`!!null`,
+`!!bool`, `!!int`, `!!float`, `!!binary`, `!!timestamp`, `!!set`, `!!omap`, `!!pairs` : un libellé -latest y
+deviendrait invisible), et toute clé de fusion `<<` (le lecteur construit chaque clé avant la fusion ; PyYAML n'a
+pas de constructeur pour l'étiquette merge).
 Limites : PyYAML lit le YAML 1.1, la forge son propre analyseur ; un fichier admis ici peut encore être refusé par elle
 (L-5). Sur la forge, ce contrôle ne voit pas l'illisibilité de gates.yml lui-même, qui empêche le job g1 de démarrer :
 elle ne paraît que comme un run du workflow gates en échec sans job, qui ne bloque la fusion que si les contrôles requis
@@ -20,11 +24,21 @@ import re
 import sys
 
 FLOTTANT = re.compile(r"-latest(?![A-Za-z0-9_.])", re.IGNORECASE)      # C-8 : forme de runners-epingles.py
+PERTE = {"tag:yaml.org,2002:" + t for t in    # étiquettes explicites qui perdent le texte du scalaire
+         ("null", "bool", "int", "float", "binary", "timestamp", "set", "omap", "pairs")}
 
 
 def lecteur(yaml):
-    """Chargeur sûr (SafeLoader) qui refuse toute clé répétée d'un mapping, à tout niveau."""
+    """Chargeur sûr (SafeLoader) qui refuse toute clé répétée d'un mapping, à tout niveau, et toute étiquette
+    explicite de PERTE (contre-contrôle du lot : la valeur construite, None, octets, ensemble ou paires, ne porterait
+    plus le texte du libellé, qu'un alias cache aussi à runners-epingles.py)."""
     class Lecteur(yaml.SafeLoader):
+        def compose_node(self, parent, index):
+            e = self.peek_event()
+            if getattr(e, "tag", None) in PERTE:
+                raise yaml.composer.ComposerError(None, None, f"étiquette explicite refusée « {e.tag} »", e.start_mark)
+            return super().compose_node(parent, index)
+
         def construct_mapping(self, noeud, deep=False):
             vues = set()
             for k, _v in noeud.value:
