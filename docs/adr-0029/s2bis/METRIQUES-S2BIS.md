@@ -2474,8 +2474,9 @@ Objet : SHOGEN-S2BIS-CHRONYC-FORMAT-1 (I-B1 et O-3 de la G2 de P1-B ; Q-9 de la 
 au FORMAT §13.3 ; `status` juge D-3 (§17.2) : relevé lisible (code 0 ; System time, Root delay, Root dispersion et Leap
 status une fois chacune ; neuf décimales), borne |System time| + Root dispersion + Root delay / 2 de plus de 1 s,
 statut autre que Normal, Insert second ou Delete second, ou aucun relevé lisible d'une fenêtre commencée moins de 120 s
-avant (âge compté en fenêtres du journal, Q-1 du lot). La sonde garde la sortie d'erreur, à la suite de la sortie
-standard, dans la borne de 4 096 caractères (O-3). Une `sante` sans `ws` et un `code` non entier (booléen compris),
+avant (âge compté en fenêtres du journal, Q-1 du lot). La sonde garde la sortie d'erreur, mêlée à la sortie
+standard dans l'ordre des écritures de la commande, dans la borne de 4 096 caractères (O-3 ; C-3 de la G2).
+Une `sante` sans `ws` et un `code` non entier (booléen compris),
 hors FORMAT, ne font jamais lever ni lire un relevé (I-3 ; défaut de la première écriture, vu en relecture du
 générateur). Fixture `tests/fixtures/chrony/tracking.txt` : l'exemple de la documentation (l.147-159), copié octet pour
 octet ; 13 lignes, hors compte de R-25.
@@ -2600,5 +2601,39 @@ réseau isolé ; témoin VIVANT) : 12 mutants, 12 tués par leur test visé, 0 v
 du §16), taille d'une tête écrite 2 048, `TAILLE` de `tetes` à 2 048, refus de liaison renommé, `NOMBRE` de têtes à 32,
 grille écrite 46 081 fenêtres, `GRILLE` de 64 jours, taille d'un résumé écrite 65 536, arrêts nommés retirés du §17,
 quorum écrit à 3, `PLAFOND` de réponse à 2^17, nonce écrit sur 32 bits.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-k (2026-10-10) : corrections C-1 à C-10 de la G2 du lot (lot DETTES-T6)
+
+Objet : liste fermée de la G2 (ACCEPTE-AVEC-CORRECTIONS), adoptée par l'orchestrateur, dans la forme du diff du
+réviseur. Code : C-1, une `sante` dont `ws` n'est pas un entier (liste, objet) n'entre plus en clé de l'état de
+`status` (elle levait TypeError dans `status` et `resume`, I-3 de STATUS-QUEUES-1) ; C-2, l'étendue de la grille se
+compte exactement (`len(range(...))`, `ws` hors grille compris : 46 081 fenêtres passaient). Tests : C-5 et C-6 (motifs
+`illisible (FileNotFoundError)` et `ligne coupée` d'une ligne de plus de LIMITE octets), C-7 (Root delay, Root
+dispersion et `sortie` mal formés : D-3, jamais une trace), C-8 (`_synchro` ouvert sans attente), C-9 (texte d'AS de 10
+chiffres admis, de 11 refusé). Textes : C-3 (sorties standard et d'erreur mêlées dans l'ordre des écritures, FORMAT
+§13.3, docstring, section DT6-e), C-4 (Q-1 adoptée, §17.2), C-10 (motif `ligne coupée` passager pendant la collecte,
+§17.4). Ajout daté DETTES-T6 du FORMAT complété et redaté. Aucun test ajouté (cas dans des tests existants).
+
+Rouge : C-1 et C-2, tests de DT6-k sur le `status.py` de DT6-j : 2 tests en échec d'assertion (FAIL 2, ERROR 0 :
+`TypeError` rendu par `sans_attente`, `RefusStatus` non levé) ; tests seuls, chacun sur le mutant qu'il vise (K06 à
+K13) : FAIL 1, ERROR 0. Sur l'état DT6-j, ces huit mutants vivaient (commande du job).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 275 | — |
+| `shogen_s2bis/collecte/sante.py` | 111 | — |
+| `tests/test_status.py` | 535 | 24 |
+| `tests/test_reprise.py` | 383 | 28 |
+| `tests/test_asn.py` | 151 | 6 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 13 mutants, 13 tués par leur test visé, 0 vivant, 0 FATAL : C-1 défait (`ws`
+quelconque en clé), dernière santé retenue pour un `ws` entier seulement, C-2 défait (`(max(juges) - debut) // W +
+1`), borne en comparaison large, compte d'une fenêtre de moins, OSError à l'ouverture non rattrapée, ligne lue sans
+borne, Root delay et Root dispersion non contrôlés, type de `sortie` non contrôlé, `_synchro` ouvert en attente,
+texte d'AS sans borne de longueur, de 1 à 9 chiffres. Les huit derniers, sur l'état DT6-j : 8 vivants (tests
+manquants que C-5 à C-9 ajoutent).
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).

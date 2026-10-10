@@ -206,7 +206,8 @@ class Etat(Base):
         = 0,007926771 s, calcul à la main) : « Not synchronised », borne de 1 s exactement (0,5 + 0,25 + 0,5 / 2) puis
         d'1 ns de plus, « Invalid », « fast », « Insert second », « Delete second » : D-3 si le statut n'est pas
         Normal, Insert second ou Delete second, ou si la borne passe 1 s. Relevé illisible (ligne manquante, code 1
-        ou faux, ligne en double, erreur, null, valeur sans ses neuf décimales) : la fenêtre prend le dernier relevé
+        ou faux, ligne en double, erreur, null, valeur sans ses neuf décimales, dont Root delay et Root dispersion,
+        sortie qui n'est pas un texte : C-7 de la G2 de DETTES-T6) : la fenêtre prend le dernier relevé
         lisible d'une fenêtre commencée moins de 120 s avant elle, sinon D-3 (la première fenêtre, sans relevé
         lisible avant elle, est D-3) ; une fenêtre sans `sante` reste D-1 seul."""
         def chronyc(**champs):
@@ -227,15 +228,17 @@ class Etat(Base):
                      ({"erreur": "absente", "debut": 1, "fin": 2}, ["D-3"]),
                      (chronyc(System_time="0.000006523 seconds fast of NTP time"), []), (None, []),
                      (chronyc(Leap_status="Insert second"), []), (chronyc(Leap_status="Delete second"), []),
-                     (chronyc(System_time="1.5 seconds slow of NTP time"), []), ({**D3, "code": False}, ["D-3"])]
+                     (chronyc(System_time="1.5 seconds slow of NTP time"), []), ({**D3, "code": False}, ["D-3"]),
+                     (chronyc(Root_delay="0.5 seconds"), ["D-3"]), (chronyc(Root_dispersion="0.25 seconds"), ["D-3"]),
+                     ({**D3, "sortie": None}, ["D-3"])]
         jl = journal.Journal(self.d, "pool").ouvrir(VEN)
         for n, (d3, _c) in enumerate(variantes, 1):
             jl.ecrire("sante", VEN + 60 * n, **sante(d3=d3))
             jl.marqueur(VEN + 60 * n)
-        jl.marqueur(VEN + 60 * 18)                          # sans `sante` : D-1 seul (dernier relevé lisible à 180 s)
+        jl.marqueur(VEN + 60 * 21)                          # sans `sante` : D-1 seul (dernier relevé lisible à 360 s)
         jl.fermer()
-        self.assertEqual(status.etat(self.d)[0], {**{VEN + 60 * n: c for n, (_d, c) in enumerate(variantes, 1)},
-                                                  VEN + 60 * 18: ["D-1"]})
+        self.assertEqual(sans_attente(lambda: status.etat(self.d)[0]), {**{VEN + 60 * n: c for n, (_d, c) in enumerate(
+            variantes, 1)}, VEN + 60 * 21: ["D-1"]})
 
     def test_jugement_par_fenetre_tete_et_releves_absents(self):
         """Chaque fenêtre de m(1) à m(63) jugée (codes écrits à la main), y compris m(1), première admise sans
@@ -277,16 +280,20 @@ class Etat(Base):
 class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (O-3, R-B1 de P2B ; I-3)
     def test_fichiers_arretes_avant_leur_fin_nommes(self):
         """O-3 de la G2 de P2B : un fichier arrêté avant sa fin est nommé, avec son motif, en dernière ligne du rapport
-        local (ligne illisible, hors FORMAT, jour postérieur au sien, ligne coupée, pas un fichier ordinaire) ; le reste
-        du rapport est celui du journal sain."""
+        local (ligne illisible, hors FORMAT, jour postérieur au sien, ligne coupée, pas un fichier ordinaire ; C-5 et
+        C-6 de la G2 de DETTES-T6 : lien vers un fichier absent, illisible (FileNotFoundError) ; ligne de plus de
+        LIMITE octets, coupée par la borne de lecture) ; le reste du rapport est celui du journal sain."""
         jdir = self.journal("a")
         seq, sha = tete_du_fichier(jdir)
         posterieur = ligne({"prec": "0" * 64, "seq": 9, "type": "marqueur", "ws": 1791244800})    # 2026-10-06 00:00
         for k, octets in enumerate((b'{"x":' + bytes([10]), b"[1]" + bytes([10]), posterieur, b'{"prec"'), 1):
             pathlib.Path(jdir, f"pool-2026-10-05-{k}.jsonl").write_bytes(octets)
         os.mkfifo(os.path.join(jdir, "pool-2026-10-05-5.jsonl"))
+        os.symlink(os.path.join(jdir, "absent"), os.path.join(jdir, "pool-2026-10-05-6.jsonl"))
+        pathlib.Path(jdir, "pool-2026-10-05-7.jsonl").write_bytes(ligne({"prec": "0" * 64, "seq": 9, "type": "x",
+                                                                     "z": "a" * journal.LIMITE}))
         motifs = ("ligne illisible", "hors FORMAT", "jour postérieur au sien", "ligne coupée",
-                  "pas un fichier ordinaire")
+                  "pas un fichier ordinaire", "illisible (FileNotFoundError)", "ligne coupée")
         self.assertEqual(sans_attente(lambda: status.rapport(jdir)), [x.format(seq=seq, sha=sha) for x in ATTENDU] + [
             "fichiers arrêtés avant leur fin : " + " ; ".join(f"pool-2026-10-05-{k}.jsonl ({x})" for k, x in enumerate(
                 motifs, 1))])
@@ -326,10 +333,17 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
                 lus.append(e.code)
         self.assertEqual(lus, ["fenêtres : de 2026-10-01 00:00 à 2026-11-01 23:59 UTC, 46080 ; dernier marqueur : "
                                "2026-11-01 23:59 UTC", "STATUS/grille"])
+        os.remove(os.path.join(self.d, "pool-2026-11-02-0.jsonl"))       # C-2 de la G2 : `ws` hors grille, hors
+        pathlib.Path(self.d, "pool-2026-11-01-0.jsonl").write_bytes(ligne(     # FORMAT : 46 081 fenêtres
+            {"prec": "0" * 64, "seq": 1, "type": "marqueur", "ws": p + 46079 * 60 + 30}))
+        with self.assertRaises(status.RefusStatus) as r:
+            status.etat(self.d)
+        self.assertEqual(r.exception.code, "STATUS/grille")
 
     def test_ligne_hors_format_jamais_une_trace(self):
         """I-3 du générateur de P2B : une `sante` au `disque` partiel, puis une `sante` au `ws` non entier, puis une
-        `sante` sans `ws` (DT6-e), lignes JSON valides hors FORMAT : le rapport dit le disque non relevé, sans lever."""
+        `sante` sans `ws` (DT6-e), puis des `sante` au `ws` liste ou objet (C-1 de la G2 de DETTES-T6 : TypeError),
+        lignes JSON valides hors FORMAT : le rapport dit le disque non relevé, sans lever."""
         jl = journal.Journal(self.d, "pool").ouvrir(VEN)
         jl.ecrire("sante", VEN + 60, **{**sante(), "disque": {"libre": 1000}})
         jl.marqueur(VEN + 60)
@@ -341,6 +355,10 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
         with open(os.path.join(self.d, "pool-2026-10-09-0.jsonl"), "ab") as f:
             f.write(ligne({"prec": "0" * 64, "seq": 10, "type": "sante"}))
         self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), "disque : non relevé (None)")
+        for n, ws in ((11, [1]), (12, {"a": 1})):
+            with open(os.path.join(self.d, "pool-2026-10-09-0.jsonl"), "ab") as f:
+                f.write(ligne({"disque": {"libre": n}, "prec": "0" * 64, "seq": n, "type": "sante", "ws": ws}))
+            self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), f"disque : non relevé ({{'libre': {n}}})")
 
 
 class Rapport(Base):

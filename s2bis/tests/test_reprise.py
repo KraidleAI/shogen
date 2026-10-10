@@ -357,7 +357,8 @@ class Reprise(AvecJournal):
         l'ouverture est refusée (JOURNAL/fichier) sans attendre (le tube bloquait la reprise sans fin), sans rien
         écrire, verrou rendu ; le nom libéré, l'écrivain reprend (FORMAT §5, §7.7). Tube posé après le contrôle par
         `stat` (simulé : `os.stat` rend celui d'un fichier ordinaire) : la relecture et les sommes, ouvertes sans
-        attente, le refusent de même."""
+        attente, le refusent de même ; un fichier de la veille non sommé, synchronisé avant sa somme, aussi (C-8 de la
+        G2 de DETTES-T6 : `_synchro` l'ouvre sans attente, puis sa lecture le refuse)."""
         from tests.test_tetes import sans_attente               # import local : test_tetes importe test_reprise
         self.preparer()
         avant, refus, veille = self.etat(), [], "pool-2026-10-03-0.jsonl"
@@ -372,5 +373,11 @@ class Reprise(AvecJournal):
             with mock.patch.object(j.os, "stat", return_value=ordinaire):
                 refus.append(sans_attente(lambda: code(lambda: j.Journal(self.d, "pool").ouvrir(m(9)))))
             os.remove(chemin)
-        self.assertEqual((refus, self.etat()), (["JOURNAL/fichier"] * 8, avant))
+        open(os.path.join(self.d, "pool.sha256"), "wb").close()                 # C-8 : veille non sommée
+        os.mkfifo(chemin := os.path.join(self.d, veille))
+        with mock.patch.object(j.os, "stat", return_value=ordinaire):
+            refus.append(sans_attente(lambda: code(lambda: j.Journal(self.d, "pool", fsync=self.espion).ouvrir(m(9)))))
+        os.remove(chemin)
+        os.remove(os.path.join(self.d, "pool.sha256"))
+        self.assertEqual((refus, self.etat()), (["JOURNAL/fichier"] * 9, avant))
         self.journal(m(9)).fermer()

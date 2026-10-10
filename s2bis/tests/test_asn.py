@@ -113,10 +113,11 @@ class Decodage(Base):
         ok = {"asns": [{"asn": 64500, "holder": V["detenteur"]}], "resource": "192.0.2.0/24"}
         cas = [(ok, V), ({**ok, "asns": []}, {**V, "asn": None, "detenteur": None}),
                ({**ok, "asns": [{"asn": "64500"}]}, {**V, "detenteur": None}),
+               ({**ok, "asns": [{"asn": "0000064500"}]}, {**V, "detenteur": None}),     # C-9 de la G2 : 10 chiffres
                ({**ok, "asns": [{"asn": 0}]}, {**V, "asn": 0, "detenteur": None})]                  # C-2 (G14) : AS 0
         cas += [({**ok, "asns": [{"asn": x}]}, "refus") for x in (True, -1, 1 << 32, 64500.0)]
         cas += [({**ok, "asns": [{"asn": x}]}, "refus")                     # DT6-f : ASN-LECTURE-1, chiffres ASCII
-                for x in ("13_335", "+13335", "-0", " 13335", "13335 ", ARABE, "4294967296", "")]
+                for x in ("13_335", "+13335", "-0", " 13335", "13335 ", ARABE, "4294967296", "", "00000064500")]
         cas += [({**ok, "resource": 5}, "refus"), ({**ok, "asns": [{"asn": 1, "holder": "x" * 4096}]}, "refus"),
                 ({**ok, "asns": [{"asn": 64500, "holder": V["detenteur"]}, {"asn": 64501, "holder": "B"}]}, V)]
         self.assertEqual([v(d) for d, _a in cas], [a for _d, a in cas])

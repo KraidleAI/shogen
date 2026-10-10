@@ -21,9 +21,9 @@ SORTIE = 4096                                                       # caractère
 
 
 def horloge_systeme(commande, delai=2 * S, lancer=subprocess.run, horloge=horloge):
-    """D-3 : {sortie, code} de la commande, ou {erreur : absente, delai, autre} ; instants de début et de fin. La sortie
-    d'erreur suit la sortie standard dans le même flux, coupé à SORTIE caractères (DT6-e,
-    SHOGEN-S2BIS-CHRONYC-FORMAT-1 : elle était jetée, O-3 de la G2 de P1-B)."""
+    """D-3 : {sortie, code} de la commande, ou {erreur : absente, delai, autre} ; instants de début et de fin. Sorties
+    standard et d'erreur mêlées dans un même tube, dans l'ordre où la commande les écrit, coupé à SORTIE caractères
+    (DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 : la sortie d'erreur était jetée, O-3 de la G2 de P1-B)."""
     debut = horloge()
     try:
         p = lancer(commande, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=delai / S)

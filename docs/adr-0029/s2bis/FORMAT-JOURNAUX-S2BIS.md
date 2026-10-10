@@ -49,14 +49,15 @@
   diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
   (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
   CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
-- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 23:42:21 UTC, heure lue par `date -u` à la dernière écriture
+- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-10 01:18:37 UTC, heure lue par `date -u` à la dernière écriture
   du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
   graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
   SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
   §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6) ; le diff DT6-f,
   SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4) ; le diff DT6-g, par un test seul,
   SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15) ; le diff DT6-h achève SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§14.4) ; le
-  diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17).
+  diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17) ; le diff DT6-k porte
+  les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -538,8 +539,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    précédente a rendu ; une sonde qui lève vaut null et repart de même. Le nombre d'instances encore en cours est
    journalisé (`fils.sondes`, §11.6) : les fils de sonde restent bornés, au plus un par sonde.
 3. `d3` : sortie brute de la commande d'horloge scellée (configuration de l'observateur ; relevé chrony, ADR-0029
-   l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard, suivie de la sortie d'erreur
-   dans le même flux (DT6-e : elle était jetée, O-3 de la G2 de P1-B), lue en UTF-8 (octet invalide remplacé par
+   l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard et la sortie d'erreur, mêlées
+   dans un même tube dans l'ordre où la commande les écrit (DT6-e : la sortie d'erreur était jetée, O-3 de la G2
+   de P1-B ; C-3 de la G2 de DETTES-T6), lue en UTF-8 (octet invalide remplacé par
    U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur` valant
    `absente` (commande introuvable), `delai` (plus de 2 s) ou `autre`. Le collecteur n'analyse pas cette sortie : la
    borne d'erreur, le statut et l'âge du relevé se jugent au recalcul et dans `status` (§17.2). **Forme lue sur pièce**
@@ -822,7 +824,7 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    comprise (avec w = 60 s : elle et la précédente), ne porte un relevé lisible, ou si le dernier de ces relevés dit une
    borne d'erreur |System time| + Root dispersion + Root delay / 2 de plus de 1 s, ou un statut autre que `Normal`,
    `Insert second` ou `Delete second` (« Not synchronised », ADR-0029 §2.3 ; « Invalid »). L'âge se compte en fenêtres
-   du journal (Q-1 du lot DETTES-T6, à adjuger : « relevé chrony » est le relevé D-3 de la fenêtre, ADR-0029 l.239) ;
+   du journal (Q-1 du lot DETTES-T6, adoptée : « relevé chrony » est le relevé D-3 de la fenêtre, ADR-0029 l.239) ;
    une fenêtre sans `sante` reste D-1 seul.
 3. **État par fenêtre** (CB-17b) : sont jugées les fenêtres de w = 60 s (§3.1) de la première que le journal admet
    (`suivante` de son premier enregistrement), jamais avant le jour du premier fichier présent moins un jour (segment de
@@ -845,9 +847,11 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    (<codes>)` ; `fenêtres valides (compte local) : calme <n> ; stress <n>` (strates : stress le samedi et le dimanche
    UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » jusqu'à DT6-e, qui juge D-3, point 2 ; C-7 de la G2 de P2B, Q-9) ;
    s'il y en a, `fichiers arrêtés avant leur fin : <nom> (<motif>) ; …`, motifs `ligne illisible`, `hors FORMAT`,
-   `jour postérieur au sien`, `ligne coupée`, `pas un fichier ordinaire` ou `illisible (<exception>)` (DT6-d). Aucun
-   nombre à virgule, aucun statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements
-   `lecture`.
+   `jour postérieur au sien`, `ligne coupée`, `pas un fichier ordinaire` ou `illisible (<exception>)` (DT6-d). Lu
+   pendant la collecte, le dernier fichier peut porter `ligne coupée` pour la ligne que l'écrivain est en train
+   d'écrire (une écriture de plusieurs pages se lit en cours : C-10 de la G2 de DETTES-T6, mesuré) : ce motif
+   passager disparaît à la lecture suivante ; persistant, il dit une queue (§7). Aucun nombre à virgule, aucun
+   statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
 5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
    DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
    `<observateur>-<jour>.resume` au dépôt (écriture atomique, §16.4), une ligne canonique `{jour, observateur,

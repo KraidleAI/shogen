@@ -163,15 +163,18 @@ def etat(dossier, prefixe="pool", arrets=None):
         if premiere is None and e["type"] in ("ouverture", "reprise") and type(e.get("suivante")) is int:
             premiere = e["suivante"]
         if e["type"] == "sante":
-            en_cours[e.get("ws")] = derniere = e
-            if type(e.get("ws")) is int and (lu := chrony(e.get("d3"))):
-                releve = e["ws"], *lu
+            derniere = e
+            if type(e.get("ws")) is int:                    # C-1 de la G2 : `ws` liste ou objet, jamais une clé
+                en_cours[e["ws"]] = e
+                if lu := chrony(e.get("d3")):
+                    releve = e["ws"], *lu
         elif e["type"] == "marqueur" and type(e.get("ws")) is int:
             codes = juger(en_cours.pop(e["ws"], None))
             juges[e["ws"]] = codes if codes == ["D-1"] or not trois(releve, e["ws"]) else sorted(codes + ["D-3"])
     debut = max(min([x for x in (premiere,) if x is not None] + list(juges), default=0), plancher)
-    if juges and (max(juges) - debut) // W + 1 > GRILLE:                # DT6-d : avant d'allouer la grille
-        raise RefusStatus("STATUS/grille", f"{(max(juges) - debut) // W + 1} fenêtres de {heure(debut)} à "
+    n = len(range(debut, max(juges) + W, W)) if juges else 0      # DT6-d : avant d'allouer la grille ; compte
+    if n > GRILLE:                                                  # exact, `ws` hors grille compris (C-2 de la G2)
+        raise RefusStatus("STATUS/grille", f"{n} fenêtres de {heure(debut)} à "
                           f"{heure(max(juges))} UTC, plus que {GRILLE} (32 jours) : saut d'horloge, ou journal "
                           "non purgé")
     grille = {ws: juges.get(ws, ["D-1"]) for ws in range(debut, max(juges) + W, W)} if juges else {}
