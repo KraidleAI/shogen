@@ -13,7 +13,7 @@ import tempfile
 ICI = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(os.path.dirname(ICI), "workflows-yaml.py")
 RACINE = os.path.dirname(os.path.dirname(ICI))
-CAS = 14
+CAS = 15
 NL = chr(10)
 BON = NL.join(["name: w", "on: push", "jobs:", "  a:", "    runs-on: ubuntu-24.04", "    steps:", ""])
 ok, ko = [], []
@@ -69,7 +69,9 @@ def main():
               "g.yaml : octets hors UTF-8")
         d = arbre({"g.yml": BON, "sous/x.yml": "a: : b" + NL, "x.txt": "a: : b" + NL}, w)
         code, out, err = controler(d)
-        cas("W-10 sous-dossier et .txt non lus ; aucun workflow refusé", code == 0 and "conforme (1 workflow(s)" in out
+        autres = "autre(s) entrée(s) de .github/workflows non lue(s) : "
+        cas("W-10 sous-dossier et .txt non lus, nommés ; aucun workflow refusé", code == 0
+            and "conforme (1 workflow(s)" in out and "2 " + autres + "sous, x.txt" in out
             and controler(arbre({}, w))[0] == 1, f"{code} {out!r} {err!r}")
         faux = os.path.join(w, "faux", "yaml")
         os.makedirs(faux)
@@ -95,6 +97,12 @@ def main():
         cas("W-14 libellé -latest après lecture YAML refusé (alias, échappement, clé explicite, matrice et casse)",
             code == 1 and all(f"{n}.yml : image flottante (-latest)" in err for n in "aexm"),
             f"sortie {code} ; {err!r}")
+        d = arbre({"G.YAML": "a: : b" + NL, ".h.yml": "- a" + NL, "i.yml.bak": "a: : b" + NL,
+                   "sous.yml/j.yml": "- a" + NL}, w)
+        code, out, err = controler(d)
+        cas("W-15 extension pliée en casse et fichiers cachés lus, autres entrées nommées (adjudication C-10)",
+            code == 1 and "G.YAML : ligne 1" in err and ".h.yml : document vide" in err and "i.yml.bak" not in err
+            and "2 " + autres + "i.yml.bak, sous.yml" in out, f"{code} {out!r} {err!r}")
     finally:
         shutil.rmtree(w, ignore_errors=True)
     joues = len(ok) + len(ko)

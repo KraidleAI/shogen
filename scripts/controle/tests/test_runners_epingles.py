@@ -94,6 +94,17 @@ class RunnersEpingles(unittest.TestCase):
         code, out, err = controler(d)
         self.assertEqual((code, err), (0, ""))
         self.assertIn("conforme (1 workflow(s), 3 clé(s) runs-on/os lues)", out)
+        self.assertIn("2 autre(s) entrée(s) de .github/workflows non lue(s) : sous, w.txt", out)
+
+    def test_extension_en_capitales_caches_et_autres_entrees(self):
+        """Adjudication C-10 : extension .yml ou .yaml pliée en casse, fichiers cachés compris, lue ; toute autre entrée
+        du dossier (dossier au nom en .yml compris) comptée et nommée à la sortie, non refusée."""
+        r = "    runs-on: ubuntu-latest" + NL
+        d = self.arbre({"A.YML": r, ".b.Yaml": "    os: [macos-latest]" + NL, "c.yml.txt": r, "sous.yml/d.yml": r})
+        code, out, err = controler(d)
+        self.assertEqual((code, sorted(re.findall(r"image flottante \(-latest\) : (\S+:\d+ : \S+)", err))), (1, [
+            ".github/workflows/.b.Yaml:1 : macos-latest", ".github/workflows/A.YML:1 : ubuntu-latest"]), err)
+        self.assertIn("2 autre(s) entrée(s) de .github/workflows non lue(s) : c.yml.txt, sous.yml", out)
 
     def test_erreurs_sortie_3(self):
         """Racine sans .github/workflows, arguments en trop ou absents, workflow illisible (UTF-8 invalide) : 3."""

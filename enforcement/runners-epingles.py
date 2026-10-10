@@ -1,19 +1,19 @@
 """Shōgen, lot DETTES-T5 (2026-10-09 ; SHOGEN-CI-RUNNERS-1, ADR-0028 annexe B l.80 et l.822-824 ; adjudication Q-2 du
-2026-10-09) : aucune image de runner flottante. Dans chaque workflow (.github/workflows/*.yml et *.yaml, premier niveau
-seul, comme la forge), toute valeur d'une clé `runs-on` ou `os` (matrice, `include`, entrée d'action), ou d'une clé de
-matrice qu'une valeur `runs-on` nomme (`${{ matrix.<clé> }}`), qui porte un libellé en `-latest` (casse ignorée) est
-refusée : forme en ligne, entre guillemets, en liste ou en mapping de flux (clé JSON collée à sa valeur comprise), ou
-sur les lignes plus indentées qui suivent une clé sans valeur, une ancre ou une étiquette seule, un en-tête de scalaire
-de bloc (`|`, `>`) ou un flux ouvert ; après une clé sans valeur, aussi la suite `-` écrite au retrait de la clé
-(relecture G2 du lot, C-1). Les commentaires (`#` en tête ou après une espace, hors guillemets) ne comptent pas.
-Lecture par lignes, bibliothèque standard seule (R-8), sans analyseur YAML : refus en plus possibles (une ligne
-`os: …-latest` dans un bloc `run:` qui suit une clé lue), jamais un refus en moins sur ces formes. Limites : ancre et
-alias, clé de fusion `<<` ; échappement dans un scalaire entre guillemets doubles (hexadécimal, unicode, fin de ligne
+2026-10-09) : aucune image de runner flottante. Dans chaque workflow (fichier de .github/workflows dont le nom, plié en
+casse, finit par .yml ou .yaml, fichiers cachés compris, premier niveau seul ; toute autre entrée nommée à la sortie,
+non lue : adjudication C-10), toute valeur d'une clé `runs-on` ou `os` (matrice, `include`, entrée d'action), ou d'une
+clé de matrice qu'une valeur `runs-on` nomme (`${{ matrix.<clé> }}`), qui porte un libellé en `-latest` (casse ignorée)
+est refusée : forme en ligne, entre guillemets, en liste ou en mapping de flux (clé JSON collée à sa valeur comprise),
+ou sur les lignes plus indentées qui suivent une clé sans valeur, une ancre ou une étiquette seule, un en-tête de
+scalaire de bloc (`|`, `>`) ou un flux ouvert ; après une clé sans valeur, aussi la suite `-` écrite au retrait de la
+clé (relecture G2 du lot, C-1). Les commentaires (`#` en tête ou après une espace, hors guillemets) ne comptent pas.
+Lecture par lignes, bibliothèque standard seule (R-8), sans analyseur YAML : refus en plus possibles (une ligne `os:
+…-latest` dans un bloc `run:` qui suit une clé lue), jamais un refus en moins sur ces formes. Limites : ancre et alias,
+clé de fusion `<<` ; échappement dans un scalaire entre guillemets doubles (hexadécimal, unicode, fin de ligne
 échappée) ; clé explicite (`? runs-on`) ; suite d'un flux moins indentée que sa clé (refusée par YAML 1.2) ; libellé
 posé par une variable ou par une expression `${{ }}` autre que `matrix.<clé>`.
 Usage : python3 -B runners-epingles.py <racine> ; sortie 0 conforme, 1 refus (motifs sur stderr), 3 erreur, toute
 exception comprise (une erreur n'est jamais un refus)."""
-import glob
 import os
 import re
 import sys
@@ -79,18 +79,29 @@ def refus(texte: str) -> tuple:
     return list(dict.fromkeys(motifs)), n          # une ligne lue deux fois (clé dans un bloc) n'est dite qu'une fois
 
 
+def entrees(dossier: str) -> tuple:
+    """Adjudication C-10 : (workflows lus, autres entrées) du dossier, noms triés : un fichier dont le nom, plié en
+    casse, finit par .yml ou .yaml est lu, fichier caché compris ; toute autre entrée (fichier, dossier) est nommée,
+    non lue."""
+    lus, autres = [], []
+    for x in sorted(os.listdir(dossier)):
+        ok = os.path.isfile(os.path.join(dossier, x)) and x.casefold().endswith((".yml", ".yaml"))
+        (lus if ok else autres).append(x)
+    return lus, autres
+
+
 def main(argv: list) -> int:
     try:
         if len(argv) != 1 or not os.path.isdir(os.path.join(argv[0], ".github", "workflows")):
             print(f"runners-epingles : erreur : racine illisible {argv!r}", file=sys.stderr)
             return 3
         dossier = os.path.join(argv[0], ".github", "workflows")
-        fichiers = sorted(glob.glob(os.path.join(dossier, "*.yml")) + glob.glob(os.path.join(dossier, "*.yaml")))
+        fichiers, autres = entrees(dossier)
         motifs, cles = [], 0
-        for chemin in fichiers:
-            with open(chemin, encoding="utf-8") as f:
+        for nom in fichiers:
+            with open(os.path.join(dossier, nom), encoding="utf-8") as f:
                 m, n = refus(f.read())
-            motifs += [f".github/workflows/{os.path.basename(chemin)}:{x}" for x in m]
+            motifs += [f".github/workflows/{nom}:{x}" for x in m]
             cles += n
     except Exception as e:
         print(f"runners-epingles : erreur : {e}", file=sys.stderr)
@@ -99,6 +110,9 @@ def main(argv: list) -> int:
         print(f"runners-epingles : refus : image flottante (-latest) : {m}", file=sys.stderr)
     if not motifs:
         print(f"runners-epingles : conforme ({len(fichiers)} workflow(s), {cles} clé(s) runs-on/os lues)")
+    if autres:
+        print(f"runners-epingles : {len(autres)} autre(s) entrée(s) de .github/workflows non lue(s) : "
+              f"{', '.join(autres)}")
     return 1 if motifs else 0
 
 

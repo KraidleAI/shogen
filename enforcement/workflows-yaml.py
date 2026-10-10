@@ -1,11 +1,12 @@
-"""Shōgen, lot DETTES-T5, DT5-8 (2026-10-09 ; adjudication C-2 : DT4-a avait rendu gates.yml illisible pour la forge, un
-« : » dans un nom d'étape en scalaire simple, sans qu'aucune gate le voie) : chaque workflow (.github/workflows/*.yml et
-*.yaml, premier niveau seul, comme la forge) se charge avec PyYAML (paquet python3-yaml de la distribution, contrôle
-R-8 dans docs/R-8-outillage.md) en un seul document qui est un mapping, sans clé répétée à aucun niveau. Refus : erreur
-de lecture (ligne et colonne), clé répétée, document vide ou autre qu'un mapping, octets hors UTF-8, aucun workflow ;
-et (relecture G2 du lot, C-8) tout libellé en -latest (casse ignorée) dans la valeur lue de `runs-on` ou de
-`strategy.matrix` d'un job, ancres, alias, échappements et clés explicites résolus : formes que runners-epingles.py,
-lecteur par lignes, ne voit pas.
+"""Shōgen, lot DETTES-T5, DT5-8 (2026-10-09 ; adjudication C-2 : DT4-a avait rendu gates.yml illisible pour la
+forge, un « : » dans un nom d'étape en scalaire simple, sans qu'aucune gate le voie) : chaque workflow (fichier
+de .github/workflows dont le nom, plié en casse, finit par .yml ou .yaml, fichiers cachés compris, premier niveau
+seul ; toute autre entrée nommée à la sortie, non lue : adjudication C-10) se charge avec PyYAML (paquet
+python3-yaml de la distribution, contrôle R-8 dans docs/R-8-outillage.md) en un seul document qui est un mapping,
+sans clé répétée à aucun niveau. Refus : erreur de lecture (ligne et colonne), clé répétée, document vide ou
+autre qu'un mapping, octets hors UTF-8, aucun workflow ; et (relecture G2 du lot, C-8) tout libellé en -latest
+(casse ignorée) dans la valeur lue de `runs-on` ou de `strategy.matrix` d'un job, ancres, alias, échappements et
+clés explicites résolus : formes que runners-epingles.py, lecteur par lignes, ne voit pas.
 Limites : PyYAML lit le YAML 1.1, la forge son propre analyseur ; un fichier admis ici peut encore être refusé par elle
 (L-5). Sur la forge, ce contrôle ne voit pas l'illisibilité de gates.yml lui-même, qui empêche le job g1 de démarrer :
 elle ne paraît que comme un run du workflow gates en échec sans job, qui ne bloque la fusion que si les contrôles requis
@@ -14,7 +15,6 @@ pas exigé du poste) ; avant un commit, seule la chaîne de commits de l'orchest
 gate). Libellé posé par une variable ou par une expression `${{ }}` : non lu.
 Usage : python3 -B workflows-yaml.py <racine> ; sortie 0 conforme, 1 refus (motifs sur stderr), 3 erreur (arguments,
 racine sans .github/workflows, PyYAML absent, toute autre exception)."""
-import glob
 import os
 import re
 import sys
@@ -75,6 +75,17 @@ def refus(yaml, Lecteur, nom, octets):
     return f"{nom} : image flottante (-latest) après lecture YAML : {', '.join(f)}" if f else None
 
 
+def entrees(dossier: str) -> tuple:
+    """Adjudication C-10 : (workflows lus, autres entrées) du dossier, noms triés : un fichier dont le nom, plié en
+    casse, finit par .yml ou .yaml est lu, fichier caché compris ; toute autre entrée (fichier, dossier) est nommée,
+    non lue."""
+    lus, autres = [], []
+    for x in sorted(os.listdir(dossier)):
+        ok = os.path.isfile(os.path.join(dossier, x)) and x.casefold().endswith((".yml", ".yaml"))
+        (lus if ok else autres).append(x)
+    return lus, autres
+
+
 def main(argv: list) -> int:
     try:
         dossier = os.path.join(argv[0], ".github", "workflows") if len(argv) == 1 else ""
@@ -83,10 +94,10 @@ def main(argv: list) -> int:
             return 3
         import yaml
         Lecteur, motifs = lecteur(yaml), []
-        fichiers = sorted(glob.glob(os.path.join(dossier, "*.yml")) + glob.glob(os.path.join(dossier, "*.yaml")))
-        for chemin in fichiers:
-            with open(chemin, "rb") as f:
-                motifs.append(refus(yaml, Lecteur, os.path.basename(chemin), f.read()))
+        fichiers, autres = entrees(dossier)
+        for nom in fichiers:
+            with open(os.path.join(dossier, nom), "rb") as f:
+                motifs.append(refus(yaml, Lecteur, nom, f.read()))
         motifs = [m for m in motifs if m] + ([] if fichiers else ["aucun workflow lu"])
     except Exception as e:
         print(f"workflows-yaml : erreur : {e!r}", file=sys.stderr)
@@ -95,6 +106,9 @@ def main(argv: list) -> int:
         print(f"workflows-yaml : refus : {m}", file=sys.stderr)
     if not motifs:
         print(f"workflows-yaml : conforme ({len(fichiers)} workflow(s), PyYAML {yaml.__version__})")
+    if autres:
+        print(f"workflows-yaml : {len(autres)} autre(s) entrée(s) de .github/workflows non lue(s) : "
+              f"{', '.join(autres)}")
     return 1 if motifs else 0
 
 
