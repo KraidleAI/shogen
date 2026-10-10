@@ -2712,3 +2712,21 @@ Mutants (même commande ; témoin VIVANT) : U01 (`fin >= limite` : un témoin re
 `test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null`, 0 vivant, 0 FATAL.
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-v (2026-10-10) : règle `fin` > E appliquée à chaque sonde, d3 comprise (lot DETTES-T6)
+
+Objet : R-8 de la passe 2 du contre-contrôle. Le mutant V4 (d3 exemptée de la règle `fin` > E de `Sondes.joindre`)
+vivait avant comme après DT6-u : aucun test n'appliquait la règle à d3. Deux lignes de plus dans
+`test_sondes_en_parallele_arguments_et_ordre` : `joindre` avec une limite antérieure à toutes les fins nulle chaque
+sonde (d3, témoins, noms). Aucun test ajouté ; FORMAT inchangé.
+
+Rouge : sur V4, FAIL 1 ; vert sur le code ; module `test_sante` vert sous 3.10 à 3.13 en `-X dev -W error`.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_sante.py` | 290 | 14 |
+
+Mutants (commande exacte du job s2bis-unittest ; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : V4 tué
+par `test_sondes_en_parallele_arguments_et_ordre`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
