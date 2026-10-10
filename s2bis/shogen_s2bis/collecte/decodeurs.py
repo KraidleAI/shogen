@@ -49,9 +49,10 @@ def _entier(x):
     temps quadratique en son exposant et tient le GIL (1E+200000 : 0,4 s ; 1E+1000000 : 10 s, mesurés), int() d'un
     texte aussi si la limite de l'interpréteur est levée (PYTHONINTMAXSTRDIGITS=0 ; 10^6 chiffres : 3,8 s sous 3.10).
     Refus : Decimal fini d'exposant ajusté ≥ CHIFFRES (2^53 = 9007199254740992 < 10^16 : un tel instant, en secondes
-    ou en millisecondes, dépasse 2^53 µs, FORMAT §9.2 ; rien de recevable n'est refusé) ; texte de plus de TEXTE
-    caractères (limite par défaut de int(), 4 300 chiffres de 3.10.20 à 3.13.14, mesurée), quelle que soit la
-    configuration de l'interpréteur."""
+    ou en millisecondes, dépasse 2^53 µs, FORMAT §9.2 ; aucun instant non nul recevable n'est refusé, et 0E+16,
+    l'instant 0 écrit avec un exposant, sans objet pour une source, l'est : DT6-b, O-A2 du contre-contrôle de P2A) ;
+    texte de plus de TEXTE caractères (limite par défaut de int(), 4 300 chiffres de 3.10.20 à 3.13.14, mesurée), quelle
+    que soit la configuration de l'interpréteur. Borne figée par un test (DT6-b, DECODEURS-BORNE-TEST-1)."""
     if type(x) is Decimal and x.is_finite() and x.adjusted() >= CHIFFRES or type(x) is str and len(x) > TEXTE:
         raise ValueError("instant : hors bornes avant int()")
     return int(x)

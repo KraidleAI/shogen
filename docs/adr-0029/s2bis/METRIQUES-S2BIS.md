@@ -2392,3 +2392,27 @@ saut de ligne non compté, signe non compté, null et booléens comptés 5, nomb
 conteneur partagé compté une fois.
 
 Suite : 344 tests ; plancher du job : 344, égalité exigée (`--egal`).
+
+## DT6-b (2026-10-09) : borne d'exposant de `decodeurs._entier` figée, docstring exacte (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-DECODEURS-BORNE-TEST-1 (O-A1 et O-A2 du contre-contrôle de P2A). La borne d'exposant de `_entier`
+(16) n'était figée par aucun test au-dessous de 10^6 : le mutant K1-03 (borne à 200 000) vivait, alors que
+`int(Decimal("1E+199999"))` coûte 0,51 s. Test de la borne exacte (9E+15 et 9,999999999999999E+15 convertis ;
+1E+16, 1E+17, 10000000000000000 et 0E+16 refusés avant int(), espion qui lève) et des nombres JSON 1E+199999 et
+1E+200000 à chaque champ d'instant (`panne_decode` en moins de 0,1 s) ; docstring rendue exacte (0E+16, l'instant 0,
+est refusé). Code inchangé.
+
+Rouge : sur la base, le test passe (code juste) ; sur le mutant K1-03, 5 échecs d'assertion (FAIL 5, ERROR 0 : quatre
+refus attendus avant int(), puis 1E+199999 décodé en 0,48 s).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 147 | — |
+| `tests/test_decodeurs.py` | 260 | 20 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 9 tués par le test visé, 0 vivant, 0 FATAL : K1-03 (200 000), borne à
+200 001, à 100 000, à 17 et à 15, comparaison stricte, branche Decimal retirée, zéro admis à tout exposant, exposant
+brut au lieu de l'exposant ajusté.
+
+Suite : 345 tests ; plancher du job : 345, égalité exigée (`--egal`).

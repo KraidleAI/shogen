@@ -165,6 +165,27 @@ class Bornes(unittest.TestCase):          # C-1 de la G2 de P2A : un test par ch
         self.champ({"defillama_btc": '{"coins":{"coingecko:bitcoin":{"price":1,"timestamp":%s}}}'},
                    ("1785946190", 1785946190000000))
 
+    def test_borne_d_exposant_figee(self):        # SHOGEN-S2BIS-DECODEURS-BORNE-TEST-1 (O-A1, O-A2 du contre-contrôle)
+        """Borne de `_entier` (exposant ajusté de 16) : 9E+15 et 9,999999999999999E+15 convertis, valeurs écrites à la
+        main ; 1E+16, 1E+17, 10000000000000000 (exposant ajusté de 16) et 0E+16 (l'instant 0, sans objet pour une
+        source : docstring) refusés avant int(). Nombres JSON 1E+199999 et 1E+200000 à chaque champ d'instant :
+        `panne_decode` en moins de 0,1 s (une borne relâchée à 200 000 laisse int() convertir 1E+199999 : 0,51 s,
+        mesuré par le contre-contrôle de P2A)."""
+        self.assertEqual([decodeurs._entier(Decimal(x)) for x in ("9E+15", "9.999999999999999E+15")],
+                         [9000000000000000, 9999999999999999])
+        for x in ("1E+16", "1E+17", "10000000000000000", "0E+16"):
+            with self.subTest(x=x), mock.patch.object(decodeurs, "int", create=True, side_effect=AssertionError):
+                self.assertRaisesRegex(ValueError, "instant : hors bornes avant int", decodeurs._entier, Decimal(x))
+        gabarits = {"okx_ticker_btc": '{"code":"0","data":[{"last":"1","ts":%s}]}', "bitstamp_btc":
+                    '{"last":"1","timestamp":%s}', "gemini_btc": '{"last":"1","volume":{"timestamp":%s}}',
+                    "coingecko_btc": '{"bitcoin":{"usd":1,"last_updated_at":%s}}',
+                    "defillama_btc": '{"coins":{"coingecko:bitcoin":{"price":1,"timestamp":%s}}}'}
+        for nom, g in gabarits.items():
+            for v in ("1E+199999", "1E+200000"):
+                t = time.monotonic()
+                r = decodeurs.decoder(nom, (g % v).encode())
+                self.assertEqual((nom, v, r, time.monotonic() - t < 0.1), (nom, v, PANNE, True))
+
 
 class Illisible(unittest.TestCase):
     def test_corps_illisible_vide_profond_ou_nom_inconnu_panne_jamais_une_valeur(self):
