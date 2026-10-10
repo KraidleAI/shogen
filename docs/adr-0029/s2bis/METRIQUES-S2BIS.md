@@ -2638,7 +2638,7 @@ manquants que C-5 à C-9 ajoutent).
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
 
-## DT6-l (2026-10-10) : réserves R-1 à R-6 du contre-contrôle du lot (lot DETTES-T6)
+## DT6-l à DT6-q (2026-10-10) : réserves R-1 à R-6 du contre-contrôle du lot (lot DETTES-T6)
 
 Objet : réserves du contre-contrôle neuf (CONFORME-AVEC-RÉSERVES). Code : R-1, `status.chrony` ne convertit plus une
 partie entière de plus de `journal.CHIFFRES` chiffres (relevé illisible) : une `sante` hors FORMAT dont System time a
