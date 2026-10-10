@@ -1,7 +1,9 @@
 """Suite de s2bis (CB-0 ; E-C-40) : garde réseau posée à l'import du paquet de tests, avant tout module de test. Une
-connexion, un envoi ou une résolution hors de la boucle locale (127.0.0.0/8, ::1, « localhost » ; AF_UNIX permis) lève
-ReseauInterdit et s'inscrit dans TENTATIVES. ReseauInterdit dérive de BaseException : un `except Exception` du code
-testé ne la masque pas. Un sous-processus pose la garde par `import tests`. Limite : un appel direct à `_socket`.
+connexion (connect, connect_ex), un envoi (sendto) ou une résolution (getaddrinfo, gethostbyname, gethostbyname_ex,
+gethostbyaddr) hors de la boucle locale (127.0.0.0/8, ::1, « localhost » ; AF_UNIX permis) lève ReseauInterdit et
+s'inscrit dans TENTATIVES. ReseauInterdit dérive de BaseException : un `except Exception` du code testé ne la masque
+pas. Un sous-processus pose la garde par `import tests`. Limites : un appel direct à `_socket` ; un envoi par `sendmsg`
+vers une adresse, non gardé (lot DETTES-T5, 2026-10-09 : relecture G2, C-6, et adjudication C-9 ; documentaire).
 SHOGEN-TESTS-GARDE-MANDATAIRE-1 : les variables de mandataire (http_proxy, https_proxy, all_proxy, toutes casses) sont
 retirées de l'environnement, et de celui des sous-processus, avant la garde : un mandataire sur la boucle locale
 (HTTPS_PROXY=http://127.0.0.1:…) ferait sortir urllib par la boucle locale, que la garde admet."""
