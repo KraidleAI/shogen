@@ -21,8 +21,9 @@
 # à la fusion : la protection de main n'en avait pas (required_status_checks, GC-09) ; son
 # état n'est pas vérifiable depuis la session (retouche datée du 2026-10-09, lot DETTES-T5).
 # La forge a exécuté les jobs le 2026-10-09, dépôt alors public (GC-01 ; check runs des PR
-# #7 à #9) ; dépôt privé ensuite, les workflows y échouent sans machine (PR n° 10, constat
-# de l'orchestrateur du 2026-10-09 vers 21:28 UTC ; leur relance est un acte de
+# #7 à #9) ; dépôt privé ensuite : sur la PR n° 10, le workflow gates a échoué sans job
+# (cohérent avec son YAML alors illisible, corrigé par DT5-0) et les autres sans machine
+# (constat de l'orchestrateur du 2026-10-09 vers 21:28 UTC ; leur relance est un acte de
 # l'investisseur) : l'oracle local reste le G3 opérant, rejoué par l'orchestrateur
 # (ADR-0028 D6 (iii), §4.11). Contrôle requis (premiers runs faits) : items
 # SHOGEN-CI-S2-FORGE-1 (ADR-0028, annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a),
