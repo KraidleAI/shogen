@@ -116,6 +116,11 @@ jobs:
           awk --version < /dev/null 2>&1 || awk -W version < /dev/null 2>&1 || true
           cat /etc/os-release || true
           echo "ImageOS=${ImageOS:-absente} ImageVersion=${ImageVersion:-absente}"
+      # Lot DETTES-T5 (2026-10-09, adjudication Q-2 ; SHOGEN-CI-RUNNERS-1) : aucun libellé de runner en -latest, ni
+      # dans runs-on ni dans une clé os, dans les workflows ; cas dans la suite du job controle-unittest.
+      - name: images de runner épinglées (aucun -latest, SHOGEN-CI-RUNNERS-1)
+        shell: bash
+        run: python3 -B enforcement/runners-epingles.py .
       - name: cas du lint d'épinglage (fixtures, arbres temporaires)
         shell: bash
         run: bash enforcement/tests/run-fixtures-model-pinning.sh
@@ -305,6 +310,7 @@ jobs:
   controle-unittest:
     # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et
     # sommes de scripts/controle ; patron du job calib-actifs (aucun saut, Ran = plancher, --egal) ; cas K-04 du runner.
+    # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (7 tests), plancher 26 → 33.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -320,4 +326,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 26
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 33
