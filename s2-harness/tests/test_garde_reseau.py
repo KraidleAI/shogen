@@ -41,6 +41,20 @@ class GardeReseau(unittest.TestCase):
         self.assertEqual([h for _n, h in tentatives[n:]],
                          ["192.0.2.1"] * 3 + ["example.invalid"] * 2 + ["192.0.2.1", "example.invalid", "192.0.2.1"])
 
+    def test_resolution_par_mot_cle_et_getnameinfo(self):
+        """Contre-contrôle du lot (R-3) et adjudication C-11 : getaddrinfo, l'hôte passé par mot-clé, et getnameinfo
+        hors de la boucle locale refusés et inscrits ; boucle locale (littéraux de 127.0.0.0/8 et de ::1) admise."""
+        tentatives = getattr(tests, "TENTATIVES", [])
+        n, num = len(tentatives), socket.NI_NUMERICHOST | socket.NI_NUMERICSERV
+        appels = (lambda: socket.getaddrinfo(host="example.invalid", port=443),
+                  lambda: socket.getnameinfo(("192.0.2.1", 80), 0),
+                  lambda: socket.getnameinfo(("2001:db8::1", 80, 0, 0), 0))
+        self.assertEqual([levee(a) for a in appels], ["ReseauInterdit"] * 3)
+        self.assertEqual([h for _n, h in tentatives[n:]], ["example.invalid", "192.0.2.1", "2001:db8::1"])
+        self.assertEqual([levee(lambda: socket.getaddrinfo(host="127.0.0.1", port=80)),
+                          levee(lambda: socket.getnameinfo(("127.0.0.1", 80), num)),
+                          levee(lambda: socket.getnameinfo(("::1", 80, 0, 0), num))], [None] * 3)
+
     def test_boucle_locale_permise(self):
         with socket.socket() as srv:
             srv.bind(("127.0.0.1", 0))

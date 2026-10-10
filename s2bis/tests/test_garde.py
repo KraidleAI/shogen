@@ -29,6 +29,25 @@ class Garde(unittest.TestCase):
         self.assertEqual([h for _n, h in tests.TENTATIVES[n:]],
                          ["192.0.2.1", "192.0.2.1", "example.invalid", "example.invalid", "192.0.2.1", "192.0.2.1"])
 
+    def test_resolution_par_mot_cle_et_getnameinfo(self):
+        """Contre-contrôle du lot DETTES-T5 (R-3) et adjudication C-11 : getaddrinfo, l'hôte passé par mot-clé, et
+        getnameinfo hors de la boucle locale refusés et inscrits ; boucle locale (127.0.0.0/8, ::1) admise."""
+        def levee(appel):
+            try:
+                appel()
+            except BaseException as e:      # ReseauInterdit dérive de BaseException : capture large, bornée au relevé
+                return type(e).__name__
+            return None
+        n, num = len(tests.TENTATIVES), socket.NI_NUMERICHOST | socket.NI_NUMERICSERV
+        appels = (lambda: socket.getaddrinfo(host="example.invalid", port=443),
+                  lambda: socket.getnameinfo(("192.0.2.1", 80), 0),
+                  lambda: socket.getnameinfo(("2001:db8::1", 80, 0, 0), 0))
+        self.assertEqual([levee(a) for a in appels], ["ReseauInterdit"] * 3)
+        self.assertEqual([h for _n, h in tests.TENTATIVES[n:]], ["example.invalid", "192.0.2.1", "2001:db8::1"])
+        self.assertEqual([levee(lambda: socket.getaddrinfo(host="127.0.0.1", port=80)),
+                          levee(lambda: socket.getnameinfo(("127.0.0.1", 80), num)),
+                          levee(lambda: socket.getnameinfo(("::1", 80, 0, 0), num))], [None] * 3)
+
     def test_boucle_locale_permise(self):
         with socket.socket() as srv:
             srv.bind(("127.0.0.1", 0))
