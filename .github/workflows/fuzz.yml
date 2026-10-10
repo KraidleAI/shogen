@@ -478,7 +478,9 @@ jobs:
         # ⌈E × 471/789⌉ arêtes gagnées dans E (642 pour E = 1074 au binaire de c1122de), mesure
         # imprimée avant le verdict (README du corpus). Coût mesuré le 2026-10-09 : 2,4 s pour la
         # carte du dérivé (2353 entrées). `rm` sans correspondance casse le pas : des graines
-        # renommées ne passent pas pour absentes.
+        # renommées ne passent pas pour absentes. L'empreinte du dérivé est ÉPINGLÉE ici (revue G2
+        # du lot FUZZ) : le dérivé fixe E, donc le seuil ; le substituer, même avec le SHA256SUMS du
+        # dossier à jour, est un changement de cette gate, jamais une mise à jour de pièce.
         run: |
           set -euo pipefail
           D="${RUNNER_TEMP}/distillation"
@@ -488,6 +490,8 @@ jobs:
           rm "${D}/corpus/README.md"
           cp "${D}/corpus/"* "${D}/base/"
           rm "${D}/base/"dirigee-distillee-*
+          echo "cbc2ab113d1ab5965cbe60f28caa24944d561d483294457318760c1ea9ba59dd  ${PIECES}/corpus-derive-2026-10-09.tar.gz" |
+            sha256sum -c -
           (cd "${PIECES}" && grep '  corpus-derive-2026-10-09.tar.gz$' SHA256SUMS | sha256sum -c -)
           tar -xzf "${PIECES}/corpus-derive-2026-10-09.tar.gz" -C "${D}"
           for carte in base corpus derive; do

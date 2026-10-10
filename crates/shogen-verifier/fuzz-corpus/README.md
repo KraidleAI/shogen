@@ -52,6 +52,12 @@ dérivé hors de la base, recalculé sur le binaire du jour. Seuil : ⌈E ×
 arête de la base absente de la carte entière, est ROUGE. **Règle** : un
 changement du vérificateur qui fait passer les graines sous le seuil appelle
 une nouvelle distillation, jamais un seuil abaissé (13 §7 dette 3, verrou 2).
+Le corpus dérivé fixe E, donc le seuil : son empreinte est épinglée dans le pas
+CI ; le remplacer est un changement de la gate (nouvelle mesure de référence
+datée, adjugée), jamais la réponse à un rouge.
+Un dérivé remplacé, même avec le `SHA256SUMS` du dossier à jour, fait échouer
+le pas et ne peut plus abaisser le seuil ; la nouvelle épingle se pose par un
+lot qui redistille, jamais en même temps qu'un seuil plus bas.
 
 **À l'instrument de libFuzzer**, sans second seuil : compteurs 8 bits du
 binaire nightly (assertions de débogage et AddressSanitizer, défauts de
