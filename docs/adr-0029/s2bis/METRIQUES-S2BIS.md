@@ -2442,3 +2442,27 @@ d'ouverture ; lecture), refus de l'écrivain non rattrapé par `status`, ouvertu
 de la reprise et sommes relues par `open` (tués par le cas du tube posé après le contrôle).
 
 Suite : 347 tests ; plancher du job : 347, égalité exigée (`--egal`).
+
+## DT6-d (2026-10-09) : `status`, fichiers arrêtés nommés, étendue de la grille bornée (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-STATUS-QUEUES-1 (O-3 de la G2 de P2B ; résiduel de C-3 ; R-B1 du contre-contrôle ; I-3 du
+générateur). Un fichier arrêté avant sa fin l'était sans le dire : il est nommé en dernière ligne du rapport local, avec
+son motif. Un saut d'horloge en avant, sans fichier forgé (l'écrivain nomme le fichier par le jour de `ws`), étendait la
+grille jusqu'à MemoryError (trace Python, 3,6 s sous 512 Mio, mesuré) : la grille compte au plus 46 080 fenêtres
+(32 jours), au-delà le refus nommé `STATUS/grille` (0,15 s). Un `disque` partiel faisait lever KeyError (FORMAT §17.1,
+§17.3, §17.4).
+
+Rouge : sur l'état DT6-c, 4 tests en échec d'assertion (FAIL 4, ERROR 0) : ligne des arrêts absente, grille de 46 081
+fenêtres admise, `KeyError` rendu par le rapport, trace Python au lieu du refus nommé.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 242 | — |
+| `tests/test_status.py` | 473 | 23 (4 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 11 mutants, 11 tués par leur test visé, 0 vivant, 0 FATAL : borne relâchée et serrée
+d'une fenêtre, comparaison large, borne retirée, ligne illisible non notée, motifs confondus, ligne coupée non notée,
+fichier spécial noté illisible, ligne des arrêts omise, disque partiel lu, arrêts non transmis.
+
+Suite : 351 tests ; plancher du job : 351, égalité exigée (`--egal`).

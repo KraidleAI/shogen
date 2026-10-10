@@ -49,10 +49,11 @@
   diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
   (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
   CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
-- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 22:01:56 UTC, heure lue par `date -u` à la dernière écriture
+- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 22:26:55 UTC, heure lue par `date -u` à la dernière écriture
   du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
   graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
-  SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1).
+  SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
+  §17.3, §17.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -783,8 +784,10 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée, illisible,
    sans `type` chaîne ni `seq` entier, ou d'un jour postérieur à celui de son fichier : `ws` à la fin du jour du nom du
    fichier ou au-delà, `suivante` au-delà (§6.1 : aucune fenêtre n'est d'un jour postérieur à celui de son fichier ;
-   CB-17c, C-3 de la G2 de P2B). Un fichier dont le jour n'est pas au calendrier n'est pas lu. La chaîne n'est pas
-   contrôlée : l'intégrité se juge au recalcul (RB-1, RB-18).
+   CB-17c, C-3 de la G2 de P2B). Un fichier arrêté avant sa fin est nommé au rapport, avec son motif (point 4 ; DT6-d,
+   SHOGEN-S2BIS-STATUS-QUEUES-1 : ses fenêtres disparaissaient sans le dire, O-3 de la G2 de P2B). Un fichier dont le
+   jour n'est pas au calendrier n'est pas lu. La chaîne n'est pas contrôlée : l'intégrité se juge au recalcul (RB-1,
+   RB-18).
 2. **Jugement d'une santé** (CB-17a ; ADR-0029 §2.3 ; seuils égaux au bloc `degradation` de
    `s2bis/config/analyse.json`, contrôlé par un test) : D-1, aucune `sante` lisible ; D-2, `d2.non_parties` non nul ou
    `d2.retard_max` au-delà de 5 s (règle Q-C-02 de l'AVIS, §11.6) ; D-4, au moins 2 témoins dont le résultat n'est pas
@@ -798,15 +801,24 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    marqueur vaut D-1 ; une fenêtre close prend les codes de sa `sante` (point 2). Une fenêtre est **valide** si elle n'a
    aucun code. La tête est celle du dernier enregistrement lu hors `lecture`. Limites : seuls les fichiers présents sont
    lus (la rétention locale de 7 jours en retire, ajout daté du 2026-10-04 17:03:38 UTC à l'ADR-0029, point 2) ; la
-   grille est celle de w = 60 s.
+   grille est celle de w = 60 s. **Étendue** (DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 ; R-B1 du contre-contrôle de P2B) :
+   la grille compte au plus 46 080 fenêtres (32 jours, plus de trois fois la rétention locale) ; au-delà, refus
+   `STATUS/grille`, qui nomme l'étendue, sans rien allouer. Un saut d'horloge en avant y mène sans aucun fichier forgé :
+   la boucle prend `ws` sur l'horloge murale et l'écrivain nomme le fichier par son jour (§6.1) ; `status`, qui tourne
+   sous la même horloge, ne peut pas écarter les noms postérieurs à elle. Avant DT6-d : MemoryError, trace Python
+   (3,6 s sous 512 Mio d'espace d'adressage, mesuré).
 4. **Commande et rapport** (CB-17b) : `python3 -m shogen_s2bis.collecte status --journal DOSSIER` : sortie 0 et le
-   rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal`, ou dossier illisible). Rapport, une ligne par
-   rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC, <n> ; dernier marqueur :
-   <fin> UTC` ; `tête : seq <s>, sha256 <h>` ; `disque : <libre> octets libres sur <total>` (dernière `sante`) ;
+   rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal` ou `STATUS/grille`, ou dossier illisible).
+   Rapport, une ligne par rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC,
+   <n> ; dernier marqueur : <fin> UTC` ; `tête : seq <s>, sha256 <h>` ; `disque : <libre> octets libres sur <total>`
+   (dernière `sante` ; `disque : non relevé (<valeur>)` si elle n'a pas ces deux champs : DT6-d, I-3 du générateur de
+   P2B) ;
    `dégradations : D-1 <n> ; D-2 <n> ; D-3 non jugé (… ; relevé absent ou en erreur : <n>) ; D-4 <n> ; D-5 <n>` ;
    `dernière fenêtre : valide` ou `dégradée (<codes>)` ; `fenêtres valides hors D-3 (compte local) : calme <n> ; stress
    <n>` (strates : stress le samedi et le dimanche UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » : D-3 n'est pas jugé,
-   point 2, tant que SHOGEN-S2BIS-CHRONYC-FORMAT-1 est ouvert ; C-7 de la G2 de P2B, Q-9). Aucun nombre à virgule, aucun
+   point 2, tant que SHOGEN-S2BIS-CHRONYC-FORMAT-1 est ouvert ; C-7 de la G2 de P2B, Q-9) ; s'il y en a, `fichiers
+   arrêtés avant leur fin : <nom> (<motif>) ; …`, motifs `ligne illisible`, `hors FORMAT`, `jour postérieur au sien`,
+   `ligne coupée`, `pas un fichier ordinaire` ou `illisible (<exception>)` (DT6-d). Aucun nombre à virgule, aucun
    statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
 5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
    DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier

@@ -233,6 +233,72 @@ class Etat(Base):
             self.assertLess(time.monotonic() - debut, 2)
 
 
+class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (O-3, R-B1 de P2B ; I-3)
+    def test_fichiers_arretes_avant_leur_fin_nommes(self):
+        """O-3 de la G2 de P2B : un fichier arrêté avant sa fin est nommé, avec son motif, en dernière ligne du rapport
+        local (ligne illisible, hors FORMAT, jour postérieur au sien, ligne coupée, pas un fichier ordinaire) ; le reste
+        du rapport est celui du journal sain."""
+        jdir = self.journal("a")
+        seq, sha = tete_du_fichier(jdir)
+        posterieur = ligne({"prec": "0" * 64, "seq": 9, "type": "marqueur", "ws": 1791244800})    # 2026-10-06 00:00
+        for k, octets in enumerate((b'{"x":' + bytes([10]), b"[1]" + bytes([10]), posterieur, b'{"prec"'), 1):
+            pathlib.Path(jdir, f"pool-2026-10-05-{k}.jsonl").write_bytes(octets)
+        os.mkfifo(os.path.join(jdir, "pool-2026-10-05-5.jsonl"))
+        motifs = ("ligne illisible", "hors FORMAT", "jour postérieur au sien", "ligne coupée",
+                  "pas un fichier ordinaire")
+        self.assertEqual(sans_attente(lambda: status.rapport(jdir)), [x.format(seq=seq, sha=sha) for x in ATTENDU] + [
+            "fichiers arrêtés avant leur fin : " + " ; ".join(f"pool-2026-10-05-{k}.jsonl ({x})" for k, x in enumerate(
+                motifs, 1))])
+
+    def test_saut_d_horloge_en_avant_refus_nomme(self):
+        """R-B1 du contre-contrôle de P2B : un saut d'horloge en avant fait écrire par l'écrivain réel, sans fichier
+        forgé, un fichier d'un jour lointain (2999-01-01 : 32472144000, date -u -d) ; `status` (sous-processus, 512 Mio
+        d'espace d'adressage) sort en 1 sur le refus nommé STATUS/grille en moins de 2 s (avant : MemoryError, trace
+        Python, en 3,6 s, mesuré)."""
+        jl = journal.Journal(self.d, "pool").ouvrir(VEN)
+        for ws in (VEN + 60, 32472144000):
+            jl.ecrire("sante", ws, **sante())
+            jl.marqueur(ws)
+        jl.fermer()
+        borne = ("import resource, sys; resource.setrlimit(resource.RLIMIT_AS, (1 << 29, 1 << 29)); from "
+                 "shogen_s2bis.collecte import entree; raise SystemExit(entree.main(sys.argv[1:]))")
+        debut = time.monotonic()
+        r = subprocess.run([sys.executable, "-B", "-c", borne, "status", "--journal", self.d], cwd=RACINE,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual((r.returncode, r.stdout, r.stderr.split(" : ")[:3], "pool-2999-01-01-0.jsonl" in os.listdir(
+            self.d)), (1, "", ["status", "refus", "STATUS/grille"], True))
+        self.assertLess(time.monotonic() - debut, 2)
+
+    def test_etendue_de_la_grille_a_la_borne(self):
+        """Grille de 32 jours au plus : 46 080 fenêtres, de 2026-10-01 00:00 (1790812800, date -u -d ; le plancher de
+        C-3, jour du premier fichier moins un jour) à 2026-11-01 23:59 : jugées ; une de plus : refus STATUS/grille.
+        Lignes écrites ici, sans l'écrivain (`status` ne contrôle pas la chaîne)."""
+        p = 1790812800
+        ouverture = {"jour": "2026-10-02", "prec": "0" * 64, "seq": 0, "suivante": p, "type": "ouverture"}
+        pathlib.Path(self.d, "pool-2026-10-02-0.jsonl").write_bytes(ligne(ouverture))
+        lus = []
+        for nom, ws in (("pool-2026-11-01-0.jsonl", p + 46079 * 60), ("pool-2026-11-02-0.jsonl", p + 46080 * 60)):
+            pathlib.Path(self.d, nom).write_bytes(ligne({"prec": "0" * 64, "seq": 1, "type": "marqueur", "ws": ws}))
+            try:
+                lus.append(status.rapport(self.d)[1])
+            except status.RefusStatus as e:
+                lus.append(e.code)
+        self.assertEqual(lus, ["fenêtres : de 2026-10-01 00:00 à 2026-11-01 23:59 UTC, 46080 ; dernier marqueur : "
+                               "2026-11-01 23:59 UTC", "STATUS/grille"])
+
+    def test_ligne_hors_format_jamais_une_trace(self):
+        """I-3 du générateur de P2B : une `sante` au `disque` partiel, puis une `sante` au `ws` non entier, lignes JSON
+        valides hors FORMAT : le rapport dit le disque non relevé, sans lever."""
+        jl = journal.Journal(self.d, "pool").ouvrir(VEN)
+        jl.ecrire("sante", VEN + 60, **{**sante(), "disque": {"libre": 1000}})
+        jl.marqueur(VEN + 60)
+        jl.fermer()
+        self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), "disque : non relevé ({'libre': 1000})")
+        with open(os.path.join(self.d, "pool-2026-10-09-0.jsonl"), "ab") as f:
+            f.write(ligne({"disque": {"total": 5}, "prec": "0" * 64, "seq": 9, "type": "sante", "ws": "x"}))
+        self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), "disque : non relevé ({'total': 5})")
+
+
 class Rapport(Base):
     def test_sante_seule_jugee_et_comptee_par_strate(self):
         """Rapport écrit à la main : m(1) à m(61) le dimanche (stress), m(62) et m(63) le lundi (calme)."""
