@@ -34,13 +34,15 @@ jobs:
     # machine du mainteneur (Windows) et doit l'être à l'octet près ailleurs,
     # sans quoi « le lot versionné » ne veut rien dire pour qui clone.
     # Le rejeu ci-dessous est aussi ce qui éprouve, à chaque exécution, la règle
-    # `-text` du `.gitattributes` : sur `windows-latest`, `core.autocrlf` vaut
+    # `-text` du `.gitattributes` : sur l'image Windows, `core.autocrlf` vaut
     # `true` par défaut, et un lot mal attribué ressortirait du checkout amputé
     # de ses CR — le sha256 tomberait ici.
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest]  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
+        # Images épinglées par libellé, jamais par digest (SHOGEN-CI-RUNNERS-1 ; limite en tête de
+        # squelette.yml) : Linux au lot DETTES-B2, Windows au lot DETTES-T5 (2026-10-09, Q-1).
+        os: [ubuntu-24.04, windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     defaults:

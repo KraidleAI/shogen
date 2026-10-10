@@ -53,7 +53,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-latest]  # image Linux épinglée (SHOGEN-CI-RUNNERS-1, lot DETTES-B2)
+        # Images épinglées par libellé, jamais par digest (SHOGEN-CI-RUNNERS-1 ; limite en tête de
+        # squelette.yml) : Linux au lot DETTES-B2, Windows au lot DETTES-T5 (2026-10-09, Q-1).
+        os: [ubuntu-24.04, windows-2025]
     steps:
       - name: Checkout
         # actions/checkout, épinglé par SHA de commit — tag v7.0.1
