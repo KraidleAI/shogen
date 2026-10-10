@@ -200,8 +200,8 @@ jobs:
     # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
     # elle pose sa garde réseau à l'import de tests/ (lot DETTES-T5, 2026-10-09 ; forme de
     # s2bis/tests/__init__.py), dans ce job comme en local. Le job ne coupe pas le réseau
-    # du runner : la garde ne voit ni un appel direct à _socket ni un sous-processus qui
-    # n'importe pas tests (item SHOGEN-CI-S2-FORGE-1 (d)).
+    # du runner : la garde ne voit ni un appel direct à _socket, ni un envoi par sendmsg vers
+    # une adresse, ni un sous-processus qui n'importe pas tests (item SHOGEN-CI-S2-FORGE-1 (d)).
     # Sous-lot D8a-3 (2026-10-04, lot DETTES-B1 ; SHOGEN-CI-S2-SAUT-1, ADR-0028
     # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
     # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final

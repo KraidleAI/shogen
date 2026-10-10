@@ -2,10 +2,12 @@
 rangé sous un dossier unique, retiré à la fin du processus (0 entrée laissée dans TMP).
 Lot DETTES-T5 (2026-10-09 ; SHOGEN-CI-S2-FORGE-1 (d), ADR-0028 annexe B.4) : garde réseau de s2bis/tests/__init__.py,
 même forme, posée à l'import du paquet de tests, avant tout module de test, et donc dans le job s2-harness-unittest.
-Une connexion, un envoi ou une résolution hors de la boucle locale (127.0.0.0/8, ::1, « localhost » ; AF_UNIX permis)
-lève ReseauInterdit et s'inscrit dans TENTATIVES ; ReseauInterdit dérive de BaseException : un `except Exception` du
-code testé ne la masque pas. Les variables de mandataire (http_proxy, https_proxy, all_proxy, toutes casses) sont
+Une connexion (connect, connect_ex), un envoi (sendto) ou une résolution (getaddrinfo, gethostbyname,
+gethostbyname_ex, gethostbyaddr) hors de la boucle locale (127.0.0.0/8, ::1, « localhost » ; AF_UNIX permis) lève
+ReseauInterdit et s'inscrit dans TENTATIVES ; ReseauInterdit dérive de BaseException : un `except Exception` du code
+testé ne la masque pas. Les variables de mandataire (http_proxy, https_proxy, all_proxy, toutes casses) sont
 retirées de l'environnement, et de celui des sous-processus, avant la garde. Limites : un appel direct à `_socket` ;
+un envoi par `sendmsg` vers une adresse, non gardé, comme dans s2bis/tests/__init__.py (relecture G2 du lot, C-6) ;
 un sous-processus Python n'a la garde que s'il importe tests."""
 import atexit
 import ipaddress
