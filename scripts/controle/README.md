@@ -59,7 +59,8 @@ dépendent des tests du harnais qu'ils importent.
 > dans le `SHA256SUMS`.
 
 > *Ajout daté du 2026-10-09 22:24:59 UTC (`date -u` ; lot DETTES-T5, DT5-7, adjudication Q-2 ; SHOGEN-CI-RUNNERS-1 ;
-> relecture G2 du lot, C-7)* : `tests/test_runners_epingles.py` porte les cas de `enforcement/runners-epingles.py`
+> relecture G2 du lot, C-7 ; compte et parenthèse retouchés par DT5-14, adjudication C-10 du 2026-10-09 22:37:10
+> UTC)* : `tests/test_runners_epingles.py` porte les cas de `enforcement/runners-epingles.py`
 > (étape du job `g1-model-pinning`) : aucun libellé de runner en `-latest` (casse ignorée) dans `runs-on`, dans une
 > clé `os` ou dans une clé de matrice que nomme `runs-on`, sous les formes que ce lecteur par lignes lit ; 10 tests
 > (adjudication C-10 : extension pliée en casse, fichiers cachés lus, autres entrées nommées), plancher du job
