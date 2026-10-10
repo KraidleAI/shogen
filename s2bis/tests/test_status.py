@@ -209,7 +209,8 @@ class Etat(Base):
         ou faux, ligne en double, erreur, null, valeur sans ses neuf décimales, dont Root delay et Root dispersion,
         sortie qui n'est pas un texte : C-7 de la G2 de DETTES-T6) : la fenêtre prend le dernier relevé
         lisible d'une fenêtre commencée moins de 120 s avant elle, sinon D-3 (la première fenêtre, sans relevé
-        lisible avant elle, est D-3) ; une fenêtre sans `sante` reste D-1 seul."""
+        lisible avant elle, est D-3) ; une fenêtre sans `sante` reste D-1 seul ; une fenêtre D-4 sans relevé lisible
+        récent porte D-3 et D-4, triés (R-3 du contre-contrôle de DETTES-T6 : ordre des codes figé)."""
         def chronyc(**champs):
             t = TRACKING
             for cle, valeur in champs.items():
@@ -236,9 +237,11 @@ class Etat(Base):
             jl.ecrire("sante", VEN + 60 * n, **sante(d3=d3))
             jl.marqueur(VEN + 60 * n)
         jl.marqueur(VEN + 60 * 21)                          # sans `sante` : D-1 seul (dernier relevé lisible à 360 s)
+        jl.ecrire("sante", VEN + 60 * 22, **sante(d3=None, d4=[temoin("delai")] * 3))      # R-3 : D-4, puis D-3
+        jl.marqueur(VEN + 60 * 22)
         jl.fermer()
         self.assertEqual(sans_attente(lambda: status.etat(self.d)[0]), {**{VEN + 60 * n: c for n, (_d, c) in enumerate(
-            variantes, 1)}, VEN + 60 * 21: ["D-1"]})
+            variantes, 1)}, VEN + 60 * 21: ["D-1"], VEN + 60 * 22: ["D-3", "D-4"]})
 
     def test_jugement_par_fenetre_tete_et_releves_absents(self):
         """Chaque fenêtre de m(1) à m(63) jugée (codes écrits à la main), y compris m(1), première admise sans
