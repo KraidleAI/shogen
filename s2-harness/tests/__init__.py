@@ -8,7 +8,8 @@ ReseauInterdit et s'inscrit dans TENTATIVES ; ReseauInterdit dérive de BaseExce
 testé ne la masque pas. Les variables de mandataire (http_proxy, https_proxy, all_proxy, toutes casses) sont
 retirées de l'environnement, et de celui des sous-processus, avant la garde. Limites : un appel direct à `_socket` ;
 un envoi par `sendmsg` vers une adresse, non gardé, comme dans s2bis/tests/__init__.py (relecture G2 du lot, C-6) ;
-un sous-processus Python n'a la garde que s'il importe tests."""
+une résolution par `getnameinfo`, ou par `getaddrinfo` dont l'hôte est passé par mot-clé (`host=`), non gardée
+(contre-contrôle du lot) ; un sous-processus Python n'a la garde que s'il importe tests."""
 import atexit
 import ipaddress
 import os
