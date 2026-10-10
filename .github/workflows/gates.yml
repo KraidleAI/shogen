@@ -17,14 +17,16 @@
 #   - collecte : collector, sources, run_campaign, closure, smoke, journal, model,
 #     r2.collect_asn et records.append_asn. Jetable, en quarantaine (campagne
 #     scellée). Ses tests tournent dans le même job, sur fixtures.
-# Invariant : jobs bloquants dans ce workflow, jamais de continue-on-error. Requis à la
-# fusion : la protection de main n'avait pas de required_status_checks (GC-09) ; son état
-# n'est pas vérifiable depuis la session (retouche datée du 2026-10-09, lot DETTES-T5).
-# La forge exécute de nouveau les jobs depuis le 2026-10-09 (GC-01 ; dépôt rendu public,
-# check runs des PR #7 à #9) ; l'oracle local reste rejoué par l'orchestrateur (ADR-0028
-# D6 (iii), §4.11). Contrôle requis (premiers runs faits) : items SHOGEN-CI-S2-FORGE-1
-# (ADR-0028, annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a), SHOGEN-G3-FORGE-1 (lot D8b) et
-# SHOGEN-G5-FORGE-1 (lot D8c).
+# Invariant : jobs bloquants dans ce workflow, jamais de continue-on-error. Contrôles requis
+# à la fusion : la protection de main n'en avait pas (required_status_checks, GC-09) ; son
+# état n'est pas vérifiable depuis la session (retouche datée du 2026-10-09, lot DETTES-T5).
+# La forge a exécuté les jobs le 2026-10-09, dépôt alors public (GC-01 ; check runs des PR
+# #7 à #9) ; dépôt privé ensuite, les workflows y échouent sans machine (PR n° 10, constat
+# de l'orchestrateur du 2026-10-09 vers 21:28 UTC ; leur relance est un acte de
+# l'investisseur) : l'oracle local reste le G3 opérant, rejoué par l'orchestrateur
+# (ADR-0028 D6 (iii), §4.11). Contrôle requis (premiers runs faits) : items
+# SHOGEN-CI-S2-FORGE-1 (ADR-0028, annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a),
+# SHOGEN-G3-FORGE-1 (lot D8b) et SHOGEN-G5-FORGE-1 (lot D8c).
 # Épinglage (ajout daté du 2026-10-09, lot DETTES-T5, SHOGEN-CI-RUNNERS-1) : actions par SHA
 # de commit, images par libellé, jamais par digest ; limite écrite en tête de squelette.yml.
 
@@ -279,8 +281,8 @@ jobs:
     # synthétiques et sorties versées de PLAN-S2BIS). Verdict par le vérificateur des jobs unittest : résumé final exigé,
     # aucun saut admis, Ran = plancher committé ci-dessous (--egal), relevé au compte mesuré à chaque sous-lot ; étapes
     # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Le G3 opérant local lance cette ligne telle qu'écrite
-    # (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20) ; la forge exécute aussi le job depuis le 2026-10-09
-    # (retouche datée du 2026-10-09, lot DETTES-T5). Sous-lot SB-14
+    # (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20) ; la forge a aussi exécuté le job le 2026-10-09, dépôt
+    # alors public (PR #7 à #9 ; retouche datée du 2026-10-09, lot DETTES-T5). Sous-lot SB-14
     # (2026-10-05 ; E-S-01, E-S-39) : l'adaptateur oracle_r1 lit le harnais de f35a70c par git archive, d'où
     # l'historique complet (fetch-depth: 0, Q-T4-11) ; une copie sans ce commit échoue fermé (ORACLE/extraction).
     # Sous-lot SB-13 (2026-10-08 ; E-S-01, E-S-51) : l'adaptateur oracle_recalc lit de même par git archive le paquet
