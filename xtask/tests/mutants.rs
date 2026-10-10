@@ -25,6 +25,9 @@
 //! ni systématique ni comptée, et aucun score n'en sort. C'est un test négatif
 //! de l'outil, et c'est tout ce qu'il prétend être.
 
+mod commun;
+
+use commun::Arbre;
 use std::path::{Path, PathBuf};
 use xtask::rapport::Rapport;
 
@@ -45,9 +48,8 @@ fn fixture(nom: &str) -> String {
 }
 
 /// Copie les chemins EXACTS sous gate dans un arbre temporaire neuf.
-fn arbre_copie(nom_du_cas: &str) -> PathBuf {
-    let cible = std::env::temp_dir().join(format!("shogen-mutant-{nom_du_cas}"));
-    let _ = std::fs::remove_dir_all(&cible);
+fn arbre_copie(nom_du_cas: &str) -> Arbre {
+    let cible = Arbre::nouveau("shogen-mutant", nom_du_cas);
     let source = racine_depot();
     for relatif in ["crates/shogen-core/src", "crates/shogen-verifier/src"] {
         copier_repertoire(&source.join(relatif), &cible.join(relatif));
@@ -390,9 +392,8 @@ fn mutant_sg2_manifeste_illisible_par_la_gate() {
 /// S-G4/S-G5 depuis SHOGEN-ORACLE-PERIMETRE-1 (i)), JOURNAL.md valide,
 /// biblio/INDEX.md dont l'en-tête et les mentions concordent avec deux
 /// artefacts présents.
-fn arbre_documentaire(nom_du_cas: &str) -> PathBuf {
-    let racine = std::env::temp_dir().join(format!("shogen-mutant-doc-{nom_du_cas}"));
-    let _ = std::fs::remove_dir_all(&racine);
+fn arbre_documentaire(nom_du_cas: &str) -> Arbre {
+    let racine = Arbre::nouveau("shogen-mutant-doc", nom_du_cas);
     ecrire(
         &racine,
         "docs/09-vocabulaire.md",
@@ -639,7 +640,7 @@ fn mutant_sg8_ligne_de_journal_malformee() {
 /// la branche qui transforme les violations en notes est celle qui porte la
 /// promesse « un contrôle partiel qui se dit partiel » — elle se teste comme
 /// le reste, sinon le vert de CI repose sur du code hors registre d'assurance.
-fn arbre_documentaire_sans_octets(nom_du_cas: &str) -> PathBuf {
+fn arbre_documentaire_sans_octets(nom_du_cas: &str) -> Arbre {
     let racine = arbre_documentaire(nom_du_cas);
     std::fs::remove_file(racine.join("biblio/artefact-a.html")).expect("suppression artefact a");
     std::fs::remove_file(racine.join("biblio/artefact-b.txt")).expect("suppression artefact b");
@@ -765,7 +766,7 @@ fn citation_factice(racine: &Path, relatif: &str, marque: &str) {
 }
 
 /// L'arbre augmenté des sept fixtures interdites, marquées `zorglub0` à `zorglub6`.
-fn avec_factices_interdits(racine: PathBuf) -> PathBuf {
+fn avec_factices_interdits(racine: Arbre) -> Arbre {
     for (rang, relatif) in FACTICES_INTERDITS.iter().enumerate() {
         citation_factice(&racine, relatif, &format!("zorglub{rang}"));
     }
@@ -958,9 +959,8 @@ ligne 3
 fichier sans extension
 ";
 
-fn arbre_menace(nom_du_cas: &str) -> PathBuf {
-    let racine = std::env::temp_dir().join(format!("shogen-mutant-sg9-{nom_du_cas}"));
-    let _ = std::fs::remove_dir_all(&racine);
+fn arbre_menace(nom_du_cas: &str) -> Arbre {
+    let racine = Arbre::nouveau("shogen-mutant-sg9", nom_du_cas);
     for bloc in ARBRE_MENACE.split("@@@ ").skip(1) {
         let (relatif, contenu) = bloc.split_once('\n').expect("bloc : chemin puis contenu");
         ecrire(&racine, relatif, contenu);

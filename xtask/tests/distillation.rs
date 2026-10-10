@@ -1,7 +1,10 @@
 //! Les graines distillées du corpus de fuzz (13 §7 dette 3, lot FUZZ) : chacune rend le classement
 //! que son nom annonce, au jugement du vérificateur lui-même, et le corpus committé est, à l'octet,
-//! ce que le générateur écrit. Arbre temporaire sous `CARGO_TARGET_TMPDIR`, propre à la cible cargo.
+//! ce que le générateur écrit. Arbres temporaires : `commun::Arbre`, nom unique, effacés à la fin.
 
+mod commun;
+
+use commun::Arbre;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use xtask::fuzz::{CORPUS, ecrire_corpus_dirige};
@@ -47,8 +50,7 @@ fn graines_dirigees(corpus: &Path) -> BTreeMap<String, Vec<u8>> {
 
 #[test]
 fn le_corpus_committe_est_ce_que_le_generateur_ecrit_graines_distinctes() {
-    let racine = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("distillation-corpus");
-    let _ = std::fs::remove_dir_all(&racine);
+    let racine = Arbre::nouveau("distillation", "corpus");
     ecrire_corpus_dirige(&racine).expect("corpus dirigé écrit");
     let ecrites = graines_dirigees(&racine.join(CORPUS));
     let depot = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -137,7 +139,7 @@ fn carte_hors_forme_refusee() {
 
 #[test]
 fn commande_rend_0_vert_1_rouge_ou_illisible_64_usage() {
-    let dossier = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("distillation-cartes");
+    let dossier = Arbre::nouveau("distillation", "cartes");
     std::fs::create_dir_all(&dossier).expect("dossier des cartes");
     let seuil = xtask::distillation::seuil(100);
     let cartes = [
