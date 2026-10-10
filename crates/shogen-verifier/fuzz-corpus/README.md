@@ -49,15 +49,17 @@ de `fuzz.yml`). La mesure comparée est le nombre d'**arêtes gagnées dans E** 
 arêtes du corpus entier hors de la base qui sont aussi dans E, l'apport du
 dérivé hors de la base, recalculé sur le binaire du jour. Seuil : ⌈E ×
 471/789⌉, soit 642 pour E = 1074 au binaire de `c1122de`. Un E vide, ou une
-arête de la base absente de la carte entière, est ROUGE. **Règle** : un
-changement du vérificateur qui fait passer les graines sous le seuil appelle
-une nouvelle distillation, jamais un seuil abaissé (13 §7 dette 3, verrou 2).
+arête de la base absente de la carte entière, est ROUGE. **Règle** : ce qui
+ne baisse jamais est la fraction, 471/789 de E ; le nombre absolu suit E, sans
+plancher (642 n'en est pas un). Un changement du vérificateur qui fait passer
+les graines sous le seuil appelle une nouvelle distillation, jamais une
+fraction abaissée (13 §7 dette 3, verrou 2).
 Le corpus dérivé fixe E, donc le seuil : son empreinte est épinglée dans le pas
-CI ; le remplacer est un changement de la gate (nouvelle mesure de référence
-datée, adjugée), jamais la réponse à un rouge.
+CI ; le remplacer est un changement de la gate, jamais la réponse à un rouge.
 Un dérivé remplacé, même avec le `SHA256SUMS` du dossier à jour, fait échouer
-le pas et ne peut plus abaisser le seuil ; la nouvelle épingle se pose par un
-lot qui redistille, jamais en même temps qu'un seuil plus bas.
+le pas et ne peut plus abaisser le seuil. Une épingle nouvelle ne se pose que
+par un lot revu (G2), daté, qui écrit l'ancien et le nouvel E, le binaire
+mesuré et la raison du changement.
 
 **À l'instrument de libFuzzer**, sans second seuil : compteurs 8 bits du
 binaire nightly (assertions de débogage et AddressSanitizer, défauts de
