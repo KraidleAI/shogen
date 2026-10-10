@@ -132,8 +132,9 @@ class Decodage(Base):
                               [WE, 5, 60, None], [WE, 16, 60, []], [WE, 16, 60, ["64502 | z"]]]}), c("0 | x"),
                           asn.cymru({"reponses": [[WE, 16, 60, ["64500 | x", "64501 | y"]]]})],     # C-2 : G14, G17
                          [64500, 64500, 64501, None, None, None, 64502, 0, 64500])     # CNAME, TXT vide, puis TXT
-        self.assertEqual([c(x + " | y") for x in ("+13335", "1_3335", ARABE, " 13335", "-0")],
-                         [None, None, None, 13335, None])                                    # DT6-f, ASN-LECTURE-1
+        self.assertEqual([c(x + " | y") for x in ("+13335", "1_3335", ARABE, " 13335", "-0", "", " ")] + [c(
+            " | x", "64501 | y")], [None, None, None, 13335, None, None, None, 64501])      # DT6-f, ASN-LECTURE-1 ;
+        # R-5 du contre-contrôle de DETTES-T6 : premier champ vide (IndexError rattrapée), la réponse suivante est lue
 
     def test_plus_grand_releve_sous_limite(self):
         """Témoin : A et TXT au plus grand résultat du FORMAT §13.6 (14 réponses SOA, noms de 1 024 caractères de
