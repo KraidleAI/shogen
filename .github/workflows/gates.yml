@@ -24,6 +24,8 @@
 # Required check et premier run sur la forge : items SHOGEN-CI-S2-FORGE-1 (ADR-0028,
 # annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a), SHOGEN-G3-FORGE-1 (lot D8b) et
 # SHOGEN-G5-FORGE-1 (lot D8c).
+# Épinglage (ajout daté du 2026-10-09, lot DETTES-T5, SHOGEN-CI-RUNNERS-1) : actions par SHA
+# de commit, images par libellé, jamais par digest ; limite écrite en tête de squelette.yml.
 
 name: gates
 on:

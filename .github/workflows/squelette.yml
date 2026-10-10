@@ -8,6 +8,13 @@
 #     verify`) — l'entrée est LA MÊME ici et sur le poste.
 #   - ADR-0013, point 5 : « actions GitHub épinglées par SHA de commit, jamais
 #     par tag — la version taguée d'une action est une page mutable ».
+#     Limite (ajout daté du 2026-10-09, lot DETTES-T5 ; SHOGEN-CI-RUNNERS-1, ADR-0028
+#     annexe B l.823) : les actions sont épinglées par SHA de commit, les images des
+#     runners hébergés par libellé (`runs-on`), jamais par digest : un runner hébergé
+#     ne s'épingle pas par empreinte. Le libellé fixe le système et la lignée
+#     d'image, pas sa version, qui change sous le même libellé ; elle se lit au
+#     journal de chaque job (section « Runner Image » : Image, Version). Même limite
+#     pour les six autres workflows.
 #   - ADR-0009, point 3 : la toolchain vient de `rust-toolchain.toml`, jamais
 #     d'un canal flottant ; le job le VÉRIFIE au lieu de l'espérer.
 #   - ADR-0012 D1 : toute construction est verrouillée (`--locked`) ; une
