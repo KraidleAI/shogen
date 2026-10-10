@@ -51,3 +51,9 @@ faite par l agent ; chaque message reçu est signalé tel quel à l investisseur
   we got your request”), ticket PRES-159.
 - 20:18 UTC, de `support@coingecko.com` : « Please verify your email address » (vérifiée par l investisseur), puis accusé automatique du
   ticket #139007 (« a support ticket (#139007) has been created for you »).
+
+> *Ajout daté du 2026-10-10 11:11:58 UTC (`date -u`)* :
+> - **Réponse reçue** : de CoinGecko (Devie, ticket n° 139007), le 2026-10-10 à 08:19 UTC, sur quatre points.
+> - **Réponse envoyée** : par l'investisseur le même jour, telle que rédigée par l'orchestrateur, avec le PDF du brouillon (`fd60b4e6…7c88`).
+> - **Pièce** : `reponses/COINGECKO-2026-10-10.md`.
+> - **Engagements** : trois corrections de texte avant publication (annexe B.98).

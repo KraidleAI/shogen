@@ -516,3 +516,12 @@ Orchestrateur Shōgen `claude-fable-5-1`, 00:2x-01:2x UTC. **Vague 1** (workflow
 > **2026-10-10 06:47:25 UTC — DETTES-T14 (BIBLIO) commis** (annexe B.96 ; pièces `docs/adr-0028/revue-dettes14/`) : règle et entrées de `biblio/INDEX.md` (compte 196), ajouts datés et errata placés en fin de document sans décalage, fermeture des points du procurement PAROXYSME (P-01, P-03, P-05, P-08, P-10, P-11, P-14 et huit items) ; octets privés versés hors git. Restent : P-15 et E1-METHODE-1 (ii), achat de Shostack (acte de l'investisseur). Inscrits : SG5-COMMENTAIRE-HTML-1, REFS-LIGNE-CONTENU-1 (lot DETTES-T15).
 
 > **2026-10-10 09:08:09 UTC — DETTES-T6 commis** (annexe B.97 ; pièces `docs/adr-0028/revue-dettes6/`) : seize items du collecteur P2 de S2-bis fermés (bornes d'octets et de cycle de `canonique`, fichiers spéciaux du journal, arrêts nommés et grille bornée de `status`, D-3 jugé sur `chronyc -n tracking` lu sur pièce, numéro d'AS en chiffres ASCII, IPv4 littérale, conformité du secondaire, refus de configuration de `run_params`, phrases du FORMAT figées, règle `env`, convention R-25) et le test instable `test_sante` corrigé (cause au test) ; G2 neuve, contre-contrôle CONFORME en deux passes ; plancher `s2bis` 358 ; aucun item formé.
+
+> **2026-10-10 11:11:58 UTC — Préavis de S2 : réponse de CoinGecko et réponse envoyée** (annexe B.98 ; pièce `docs/publication/envoi-preavis/reponses/COINGECKO-2026-10-10.md`) :
+> - **Quatre points vérifiés** sur le rapport et le code de collecte : couverture, mot `outage`, amont `binance → coingecko`, φ du §7.5.
+>   - Trois sont justes.
+>   - Le premier l'est en partie : la fenêtre réelle compte 32 068 minutes de semaine, et tous les manques sont du côté du harnais.
+> - **Réponse envoyée** telle quelle par l'investisseur, avec le PDF du brouillon.
+> - **Engagés** : trois corrections de texte avant le 2026-10-25 (SHOGEN-PUBLICATION-S2-AMENDEMENTS-1).
+> - **Inscrit** : SHOGEN-S2BIS-CHAINLINK-LECTURE-1, lecture de Chainlink en S2-bis (question de l'investisseur).
+> - Les autres travaux restent en pause depuis 09:32 UTC, à la demande de l'investisseur.

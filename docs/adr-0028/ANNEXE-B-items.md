@@ -1675,3 +1675,31 @@ Précisions d'items existants : **SHOGEN-S2BIS-RB3-DEGRADATIONS-1** (l.1331) cou
 Limites écrites, sans item : une IPv4 écrite autrement qu'en forme canonique est un nom (relève de SHOGEN-S2BIS-NOMS-HOTE-RFC1123-1, ouvert) ; la forme de `tracking` est lue en chrony 4.6.1 et 4.9, la version installée se scelle au G0 de DEPLOI-BIS ; la signature de l'archive chrony 4.6.1 n'est pas vérifiée (clé du projet non détenue ; archive, sources et documentation identifiées par sha256) ; la mémoire de la capture D-3 est bornée par le délai seul ; un entier de 641 à 4 300 chiffres dans une ligne reçoit un verdict qui dépend du réglage de l'interpréteur (le collecteur n'en écrit jamais) ; le test de R-8 fixe la limite à 0, antérieure à toute fin parce que l'horloge monotone de Linux compte depuis le démarrage (`min(fins) − 1` ne dépendrait de rien). Les 34 dossiers temporaires laissés par des tests relèvent de SHOGEN-VERIFIER-TESTS-TMP-RESTES-1 (lot DETTES-T7).
 
 Aucun item formé.
+
+## B.98 Amendement daté du 2026-10-10 11:11:58 UTC (heure produite par `date -u`) : réponse de CoinGecko au préavis du rapport de S2, réponse envoyée, deux items formés
+
+**L'échange.** CoinGecko a répondu au préavis le 2026-10-10 à 08:19 UTC (ticket n° 139007), sur quatre points :
+- la couverture de la fenêtre de mesure ;
+- le mot `outage` ;
+- l'amont déclaré `binance → coingecko` ;
+- le φ ≈ 0,901 de coingecko × chainlink au §7.5.
+
+L'orchestrateur a vérifié les quatre points sur le rapport anglais et sur le code de collecte (`ed479c5`) :
+- trois sont justes ;
+- le premier l'est en partie : la fenêtre réelle compte 32 068 minutes de semaine (et non 34 560) et 14 400 de week-end, soit une couverture de 76,7 % et de 79,1 % ;
+- tous les manques sont du côté du harnais.
+
+L'investisseur a envoyé la réponse telle quelle, avec le PDF du brouillon (`fd60b4e6…7c88`). La pièce est `docs/publication/envoi-preavis/reponses/COINGECKO-2026-10-10.md` : texte reçu, texte envoyé, vérification ligne à ligne, engagements.
+
+**Le coingecko × chainlink du week-end** se lit sur la table imposée par les marges et le φ : [108 19 5 11 265] [calc].
+- 118 des 133 minutes à deux anomalies ou plus en ont trois ou plus (§11.1).
+- 74 des 133 tombent dans des démarrages dont la sonde DNS a échoué.
+
+Lecture : un mode commun de l'observateur, compatible avec les données et non établi. La lecture de Chainlink passait par un seul RPC public tiers.
+
+Items formés (lots futurs nommés) :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PUBLICATION-S2-AMENDEMENTS-1 | engagements envoyés à CoinGecko le 2026-10-10 : (i) `outage` devient `failed reading` dans le texte anglais là où le mot désigne une lecture manquée (l.23, 62, 90, 202, 547, 672, 714, 715 ; la l.553, sur Pyth, reste) ; (ii) note près de l'amont déclaré `binance → coingecko` (§4.1, §4.2 (c)) : une source parmi les nombreuses que CoinGecko agrège, sortie scellée inchangée ; (iii) §7.5 : un φ élevé décrit des lectures manquées en même temps par le harnais, non une dépendance entre fournisseurs. Aucune valeur ni aucun verdict ne change ; la version française est mise en cohérence (étiquette scellée « panne » inchangée) | orch. | avant la publication, au plus tard le 2026-10-25 | lot court de texte, G2 neuve, PDF reconstruit | réponse envoyée à CoinGecko le 2026-10-10 |
+| SHOGEN-S2BIS-CHAINLINK-LECTURE-1 | en S2, chainlink est lu par `eth_call` sur un seul RPC public tiers (`ethereum-rpc.publicnode.com`, AS13335), et une lecture ratée compte comme panne du flux. Avis de l'orchestrateur du 2026-10-10, à soumettre aux advisors : pour un oracle sur chaîne, une lecture ratée relève du chemin de lecture, classée à part ; les seules défaillances propres à Chainlink sont une valeur non mise à jour au-delà de son heartbeat ou une valeur aberrante ; au moins deux RPC indépendants sur des ASN distincts (candidats mesurés : `docs/adr-0029/ETUDE-POOL-BIS.md` l.169-175) ; un client léger qui vérifie la valeur est à étudier ; un nœud Ethereum en propre a un coût, décision de l'investisseur | orch., advisors | avant le scellement du paquet de S2-bis | avis des advisors, amendement daté d'ADR-0029, code du collecteur, tests | question de l'investisseur du 2026-10-10 (« lire chainlink directement à la source ») |
