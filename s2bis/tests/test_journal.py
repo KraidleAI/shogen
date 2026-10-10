@@ -238,7 +238,8 @@ class Ecrivain(Base):
         quatre chaînes de 1 048 572, trois virgules ; quatre de 1 048 566 et dix « -5 », signes et virgules : la borne y
         est exacte) : refus JOURNAL/taille sans appel au sérialiseur (tailles recomptées par json.dumps). Une ligne
         d'exactement LIMITE octets reste admise, quelle que soit la valeur répétée : la borne ne passe jamais les octets
-        écrits ; une valeur simple en écrit au plus 8 fois sa borne (docstring de `canonique`)."""
+        écrits ; une valeur simple en écrit au plus 8 fois sa borne (docstring de `canonique` ; l'entier 0 compris,
+        un chiffre : R-4 du contre-contrôle de DETTES-T6)."""
         long_, refus = "a" * (1 << 20), []
         with mock.patch.object(j.json, "dumps", side_effect=AssertionError("sérialiseur appelé")):
             t = time.monotonic()
@@ -252,7 +253,7 @@ class Ecrivain(Base):
                                               ).encode())                   # 1 000 fois la valeur, puis du remplissage
             with self.subTest(valeur=v):
                 self.assertEqual(len(j.canonique({"x": [v] * 1000, "y": "a" * r})), j.LIMITE)
-        for v in (chr(1) * 9, -2.2250738585072014e-308, float("-inf"), -9, False, None, 10 ** 639, ""):
+        for v in (chr(1) * 9, -2.2250738585072014e-308, float("-inf"), -9, 0, False, None, 10 ** 639, ""):
             n = len(json.dumps(v, ensure_ascii=False).encode())       # écrit au plus 8 fois sa borne (docstring)
             self.assertTrue(j._octets(v) <= n <= 8 * j._octets(v), (v, j._octets(v), n))
 
