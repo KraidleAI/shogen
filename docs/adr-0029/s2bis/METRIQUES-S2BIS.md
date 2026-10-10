@@ -2580,3 +2580,25 @@ contrôle après l'ouverture du journal (forme d'avant DT6-h), version de Python
 calcul.
 
 Suite : 356 tests ; plancher du job : 356, égalité exigée (`--egal`).
+
+## DT6-i (2026-10-09) : phrases normatives des §16 et §17 figées par `test_format` (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1 du contre-contrôle de P2B). Tests seuls : 23 phrases normatives du §16
+(dont celle du dépôt local de C-7) et 23 du §17, prises au texte, et les bornes du texte égales à celles du code
+(`tetes` : 1 024 octets, 16 têtes, 65 536 octets ; `status` : 46 080 fenêtres, 131 072 octets).
+
+Rouge : le mutant K-C7-2 du contre-contrôle de P2B (« local » retiré de la phrase du dépôt, vivant à ce contre-contrôle)
+fait échouer `test_paragraphe_16_tetes_depot_et_jeton` (FAIL 1, ERROR 0) ; la grille écrite 46 081 fenêtres,
+`test_paragraphe_17_status_et_resumes` (FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 280 | 16 (2 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : K-C7-2 (« local » retiré
+du §16), taille d'une tête écrite 2 048, `TAILLE` de `tetes` à 2 048, refus de liaison renommé, `NOMBRE` de têtes à 32,
+grille écrite 46 081 fenêtres, `GRILLE` de 64 jours, taille d'un résumé écrite 65 536, arrêts nommés retirés du §17,
+quorum écrit à 3, `PLAFOND` de réponse à 2^17, nonce écrit sur 32 bits.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
