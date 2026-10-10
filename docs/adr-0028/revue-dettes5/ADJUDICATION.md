@@ -4,7 +4,7 @@ Pièce : `RAPPORT-GENERATEUR.md` (générateur `claude-opus-5-5` ; FM-1.1 : 0 fr
 
 **Faits établis par l'orchestrateur :**
 - `git ls-remote https://github.com/actions/checkout 'refs/tags/v7.0.1*'` (lecture seule, 2026-10-09 20:24:20 UTC) : `3d3c42e5aac5ba805825da76410c181273ba90b1  refs/tags/v7.0.1` (étiquette légère) : le SHA épinglé est celui du tag v7.0.1 ; résidu B.47 levé.
-- Libellés Windows [2nd, recherche du jour] : le changelog GitHub du 2026-05-14 (`` update the `runs-on:` target … to the new label `windows-2025-vs2026` ``) et le README d'`actions/runner-images` donnent `windows-2025` et `windows-2025-vs2026` comme libellés ; `windows-2025-vs2026` est un libellé d'essai appelé à rejoindre `windows-2025` après la migration (issue runner-images n° 14004 : `windows-2025` sert déjà l'image vs2026 depuis le 2026-05-05).
+- Libellés Windows [2nd, recherche du jour] : le changelog GitHub du 2026-05-14 (« update the `runs-on:` target … to the new label `windows-2025-vs2026` ») et le README d'`actions/runner-images` donnent `windows-2025` et `windows-2025-vs2026` comme libellés ; `windows-2025-vs2026` est un libellé d'essai appelé à rejoindre `windows-2025` après la migration (issue runner-images n° 14004 : `windows-2025` sert déjà l'image vs2026 depuis le 2026-05-05).
 
 **Décisions :**
 - **Q-1** : variante **B** (`windows-2025`, libellé durable) ; la ligne « Runner Image » du premier run de la PR qui porte ce lot sera lue et consignée au JOURNAL par l'orchestrateur.
