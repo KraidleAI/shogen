@@ -1591,3 +1591,19 @@ Item formé (lot futur nommé) :
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-VERIFIER-TESTS-TMP-RESTES-1 | chaque `cargo test --workspace` laisse 34 dossiers `shogen-{canonique,coquille,e2e,reel}-*-<pid>` sous `temp_dir()` : les tests d'intégration de `shogen-verifier` y posent leurs arbres sans les effacer (déjà présent à `094fa5d`, hors de la série FUZZ) | orch. | lot de dettes DETTES-T7 (brief prêt) | arbres sous un dossier unique effacé à la fin, sur le modèle de `xtask/tests/commun/mod.rs` [inféré] | générateur du lot FUZZ (rapport, ajout daté de la phase 4) ; contre-contrôle, passe 2 (34 restes comptés) |
+
+## B.94 Amendement daté du 2026-10-10 03:49:26 UTC (heure produite par `date -u`) : correctif de DETTES-T5, DT5-24 et DT5-25 (alerte CodeQL de la PR n° 11)
+
+Deux commits, `d49df1b` (DT5-24) et `719762d` (DT5-25) : auteur l'orchestrateur ; réviseur G2 neuf `claude-opus-5-5` (ACCEPTE-AVEC-CORRECTIONS, C-1 à C-3, reprises à l'identique, seule la date de l'ajout de C-2 posée à l'application) ; enregistrement de rôle G2 `shogen-ba5ea95-G2-20261010T033744Z-15258.json` (sha256 `cb8872c1f4b2656d…`) ; réseau coupé. Avant chaque commit : xtask VERT, runner, suites `s2bis`, S2, `sim-bis`, `calib-actifs` et `controle` comme la forge, `cargo test -p xtask`, `docs-sha256sums`, lecture YAML des workflows, `runners-epingles`, `workflows-yaml`. Pièces : `docs/adr-0028/revue-dettes5-codeql/`.
+
+- **Constat** : contrôle `CodeQL` de la PR n° 11 rouge, alerte `py/redos` « high » sur `enforcement/runners-epingles.py` l.26 : les motifs `VIDE` et `BLOC` de DT5 (groupe étoilé `(?:[&!]\S*\s*)*`) font un retour arrière exponentiel sur une valeur faite de « ! » en grand nombre suivie d'un mot qui échoue (temps doublé à chaque « ! » ajouté). Défaut de DT5, corrigé dans le lot.
+- **Correction** (`d49df1b`) : `\s*(?:[&!]\S*\s+)*(?:[&!]\S*)?`, et le même préfixe devant l'en-tête de bloc de `BLOC`. Mêmes chaînes acceptées en `fullmatch` : preuve par automates (toutes longueurs) et contre-épreuves de 21,7 millions et de 2,6 millions de chaînes, 0 écart ; ni ambiguïté exponentielle ni polynomiale ; temps linéaire mesuré jusqu'à 4 millions de caractères. Test de temps borné sur des valeurs adverses, rouge sur `ba5ea95` (délai de 20 s), vert après ; plancher de `controle-unittest` 36 → 37.
+- **Corrections de la G2** (`719762d`) : la troisième valeur adverse atteint désormais `BLOC` (C-1) ; ajout daté au README des contrôles (11 tests, plancher 37 ; C-2) ; quatre formes YAML de plus dans `test_formes_hors_ligne` (C-3 : sept mutants survivaient, dont un créé par la réécriture et six trous antérieurs à DT5-24). Mutants : 28, dont 27 tués après corrections ; M16 équivalent déclaré (décision du script identique sur toutes les chaînes, par produit d'automates).
+- **Écart de l'orchestrateur, déclaré** : la troisième valeur adverse de DT5-24 ne testait rien, et le compte du README n'était pas mis à jour ; relevés par la G2 (C-1, C-2).
+- La fermeture de l'alerte sur la forge se lit au run qui suit la poussée (constat O-1 de la G2) ; l'état est consigné au bloc daté qui suit la fusion.
+
+Item formé (lot futur nommé) :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1 | le motif `FLOTTANT` de `enforcement/runners-epingles.py` est quadratique sur une longue valeur sans `-latest` (4,7 s pour 32 000 caractères ; valeurs réelles de quelques dizaines de caractères) | orch. | lot de dettes DETTES-T15 (gates et contrôles), brief écrit après le versement de DETTES-T14 | motif à temps linéaire (jeton délimité puis test du suffixe), test de temps borné [inféré] | G2 du correctif DT5-24, O-5 |
