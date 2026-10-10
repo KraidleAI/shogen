@@ -31,7 +31,9 @@ class Garde(unittest.TestCase):
 
     def test_resolution_par_mot_cle_et_getnameinfo(self):
         """Contre-contrôle du lot DETTES-T5 (R-3) et adjudication C-11 : getaddrinfo, l'hôte passé par mot-clé, et
-        getnameinfo hors de la boucle locale refusés et inscrits ; boucle locale (127.0.0.0/8, ::1) admise."""
+        getnameinfo hors de la boucle locale refusés et inscrits ; boucle locale (127.0.0.0/8, ::1) admise.
+        Contre-contrôle, passe 2 : hôte positionnel avec mots-clés, et getnameinfo numérique hors boucle, refusés ;
+        forme invalide laissée à l'appel d'origine (TypeError), rien d'inscrit."""
         def levee(appel):
             try:
                 appel()
@@ -40,13 +42,22 @@ class Garde(unittest.TestCase):
             return None
         n, num = len(tests.TENTATIVES), socket.NI_NUMERICHOST | socket.NI_NUMERICSERV
         appels = (lambda: socket.getaddrinfo(host="example.invalid", port=443),
+                  lambda: socket.getaddrinfo("example.invalid", 443, type=socket.SOCK_STREAM),
                   lambda: socket.getnameinfo(("192.0.2.1", 80), 0),
+                  lambda: socket.getnameinfo(("192.0.2.1", 80), num),
                   lambda: socket.getnameinfo(("2001:db8::1", 80, 0, 0), 0))
-        self.assertEqual([levee(a) for a in appels], ["ReseauInterdit"] * 3)
-        self.assertEqual([h for _n, h in tests.TENTATIVES[n:]], ["example.invalid", "192.0.2.1", "2001:db8::1"])
+        self.assertEqual([levee(a) for a in appels], ["ReseauInterdit"] * 5)
+        self.assertEqual([h for _n, h in tests.TENTATIVES[n:]],
+                         ["example.invalid", "example.invalid", "192.0.2.1", "192.0.2.1", "2001:db8::1"])
         self.assertEqual([levee(lambda: socket.getaddrinfo(host="127.0.0.1", port=80)),
                           levee(lambda: socket.getnameinfo(("127.0.0.1", 80), num)),
                           levee(lambda: socket.getnameinfo(("::1", 80, 0, 0), num))], [None] * 3)
+        self.assertEqual([levee(lambda: socket.getnameinfo("192.0.2.1", 0)),
+                          levee(lambda: socket.getnameinfo((), 0)),
+                          levee(lambda: socket.getnameinfo(("192.0.2.1", 80), flags=0)),
+                          levee(lambda: socket.getnameinfo(sockaddr=("192.0.2.1", 80), flags=0)),
+                          levee(lambda: socket.gethostbyname(host="example.invalid"))], ["TypeError"] * 5)
+        self.assertEqual(len(tests.TENTATIVES), n + 5)
 
     def test_boucle_locale_permise(self):
         with socket.socket() as srv:
