@@ -86,9 +86,10 @@ jobs:
     # docs/G1-lot-D8a.md) : épinglage des modèles en liste blanche exacte (R-1), sur le
     # frontmatter des agents, des skills et des commandes (tout .claude/ de l'arbre, hors
     # worktrees) et sur les réglages JSON de .claude/.
-    # Étape 1 (après l'environnement, lot DETTES-T5) : les cas du lint, sur copies de fixtures
-    # dans des arbres mktemp ; étape 2 : l'arbre du dépôt. Aucune action nouvelle ; une seule installation,
-    # python3-yaml de la distribution, contrôlée R-8 (lot DETTES-T5, DT5-8) ; sinon bash et les outils
+    # Étape 1 (après l'environnement et les deux contrôles des workflows, lot DETTES-T5) : les
+    # cas du lint, sur copies de fixtures dans des arbres mktemp ; étape 2 : l'arbre du dépôt.
+    # Aucune action nouvelle ; une seule installation, python3-yaml de la distribution,
+    # contrôlée R-8 (lot DETTES-T5, DT5-8) ; sinon bash et les outils
     # de l'image. awk de l'image (mawk, inféré, non mesuré), employé par le runner seul :
     # item SHOGEN-G1-FORGE-1 (c) ; imprimé par l'étape d'environnement (lot DETTES-T5).
     # name: = identifiant du job, un seul nom pour le contrôle requis (état sur main non
@@ -125,9 +126,13 @@ jobs:
         shell: bash
         run: python3 -B enforcement/runners-epingles.py .
       # Lot DETTES-T5, DT5-8 (2026-10-09, adjudication C-2) : chaque workflow se lit en YAML (un seul document, un
-      # mapping, aucune clé répétée). PyYAML du paquet python3-yaml de la distribution, version exacte (contrôle R-8 :
-      # docs/R-8-outillage.md), installé par apt-get seulement s'il manque à l'image ; version au journal ;
-      # interpréteur du système (/usr/bin/python3), celui du paquet.
+      # mapping, aucune clé répétée ; libellés -latest après lecture, relecture G2 C-8). PyYAML du paquet python3-yaml
+      # de la distribution, version exacte (contrôle R-8 : docs/R-8-outillage.md), installé à cette version par apt-get
+      # si l'image ne l'a pas à cette version (une version plus récente fait échouer l'étape : apt refuse le retour
+      # arrière sous -y [inféré]) ; version relue après l'installation, module importé rattaché au paquet (dpkg -S),
+      # relecture G2 C-2 ; interpréteur du système (/usr/bin/python3), celui du paquet. Limites (C-4) : ce contrôle ne
+      # voit pas sur la forge l'illisibilité de ce fichier-ci (le job ne démarre pas) ; le crochet local ne le lance pas
+      # (adjudication Q-4) : docstring de enforcement/workflows-yaml.py.
       - name: workflows lisibles en YAML (python3-yaml de la distribution, version exacte)
         shell: bash
         run: |
@@ -137,6 +142,10 @@ jobs:
               { sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends "python3-yaml=$V"; }
           fi
           dpkg-query -W python3-yaml
+          [ "$(dpkg-query -W -f='${Version}' python3-yaml)" = "$V" ] || { echo "python3-yaml $V exigé" >&2; exit 1; }
+          M="$(/usr/bin/python3 -B -P -c 'import yaml; print(yaml.__file__)')"
+          case "$(dpkg -S "$M" 2>&1)" in "python3-yaml: $M") echo "PyYAML lu : $M" ;;
+            *) echo "PyYAML lu hors du paquet python3-yaml : $M" >&2; exit 1 ;; esac
           /usr/bin/python3 -B enforcement/tests/run-fixtures-workflows-yaml.py
           /usr/bin/python3 -B enforcement/workflows-yaml.py .
       - name: cas du lint d'épinglage (fixtures, arbres temporaires)

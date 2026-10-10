@@ -1,7 +1,9 @@
 """Shōgen, lot DETTES-T5, DT5-8 (adjudication C-2 du 2026-10-09) : cas de enforcement/workflows-yaml.py, chacun dans un
 arbre temporaire, sauf W-01 (l'arbre du dépôt). W-02 : la forme de DT4-a (« cas : » dans un nom d'étape en scalaire
-simple). Lancé par l'interpréteur qui porte PyYAML (python3-yaml, docs/R-8-outillage.md). Sortie : 0 tout passe (CAS
-cas joués, ni plus ni moins), 1 un cas échoue, 3 erreur."""
+simple). Relecture G2 du lot : W-12 (chargeur sûr, C-3), W-13 (erreur interne en 3, C-3), W-14 (libellés -latest après
+lecture YAML, C-8). Lancé par l'interpréteur qui porte PyYAML (python3-yaml, docs/R-8-outillage.md). Sortie : 0 tout
+passe (CAS cas joués, ni plus ni moins), 1 un cas échoue, 3 erreur."""
+import json
 import os
 import shutil
 import subprocess
@@ -11,7 +13,7 @@ import tempfile
 ICI = os.path.dirname(os.path.abspath(__file__))
 SCRIPT = os.path.join(os.path.dirname(ICI), "workflows-yaml.py")
 RACINE = os.path.dirname(os.path.dirname(ICI))
-CAS = 11
+CAS = 14
 NL = chr(10)
 BON = NL.join(["name: w", "on: push", "jobs:", "  a:", "    runs-on: ubuntu-24.04", "    steps:", ""])
 ok, ko = [], []
@@ -76,6 +78,23 @@ def main():
         sorties = [controler()[0], controler(RACINE, RACINE)[0], controler(w)[0],
                    controler(RACINE, env=dict(os.environ, PYTHONPATH=os.path.dirname(faux)))[0]]
         cas("W-11 erreurs en 3 (arguments, racine sans workflows, PyYAML absent)", sorties == [3] * 4, str(sorties))
+        marque = os.path.join(w, "marque")
+        python = BON + "      - run: !!python/object/apply:os.mkdir [" + json.dumps(marque) + "]" + NL
+        code, out, err = controler(arbre({"g.yml": python}, w))
+        cas("W-12 étiquette python refusée, sans effet (chargeur sûr)", code == 1 and "python/object/apply" in err
+            and not os.path.exists(marque), f"sortie {code} ; {err!r}")
+        code = controler(arbre({"g.yml": BON + "? [a, b]" + NL + ": c" + NL}, w))[0]
+        cas("W-13 erreur interne (clé non hachable) : 3, jamais un refus", code == 3, f"sortie {code}")
+        alias = NL.join(["name: w", "on: push", "env: {R: &r ubuntu-latest}", "jobs:", "  a:", "    runs-on: *r",
+                         "    steps:", ""])
+        echappe = BON.replace("ubuntu-24.04", '"ubuntu-l' + chr(92) + 'x61test"')
+        explicite = BON.replace("    runs-on: ubuntu-24.04", "    ? runs-on" + NL + "    : ubuntu-latest")
+        matrice = BON.replace("    steps:", NL.join(["    strategy:", "      matrix:", "        include:",
+                                                      "          - os: Windows-Latest", "    steps:"]))
+        code, out, err = controler(arbre({"a.yml": alias, "e.yml": echappe, "x.yml": explicite, "m.yml": matrice}, w))
+        cas("W-14 libellé -latest après lecture YAML refusé (alias, échappement, clé explicite, matrice et casse)",
+            code == 1 and all(f"{n}.yml : image flottante (-latest)" in err for n in "aexm"),
+            f"sortie {code} ; {err!r}")
     finally:
         shutil.rmtree(w, ignore_errors=True)
     joues = len(ok) + len(ko)

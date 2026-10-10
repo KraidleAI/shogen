@@ -167,7 +167,9 @@ Limite déclarée : pas de compte de téléchargements ni d'ancienneté pour un 
 Usage : `enforcement/workflows-yaml.py` charge chaque workflow de `.github/workflows/` et refuse tout fichier illisible
 (adjudication C-2 du lot DETTES-T5 : un nom d'étape hors forme YAML avait rendu `gates.yml` illisible pour la forge sans
 qu'aucune gate le voie). Forme retenue : le paquet de la distribution, jamais `pip` ; dans le job g1, installé à version
-exacte par `apt-get` s'il manque à l'image, version imprimée au journal ; interpréteur du système (`/usr/bin/python3`).
+exacte par `apt-get` si l'image ne l'a pas à cette version, version relue après l'installation et imprimée au journal,
+module importé rattaché au paquet par `dpkg -S` (relecture G2 du lot, C-2) ; interpréteur du système
+(`/usr/bin/python3`).
 Registre officiel : archive Ubuntu 24.04 (noble), champs recopiés de `apt-cache show python3-yaml` et du fichier
 `copyright` du paquet (session cloud, conteneur où le paquet était déjà installé).
 
