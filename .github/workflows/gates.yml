@@ -160,8 +160,10 @@ jobs:
     # Lot CI-S2 (2026-09-29, ADR-0028 D6 (iii) ; cp-1 bref C-1..C-8) : la suite
     # unittest de s2-harness (bibliothèque standard seule, fixtures gelées), tests
     # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
-    # l'oracle local la rejoue sous garde réseau (0 tentative). Le job ne coupe pas
-    # le réseau du runner (item SHOGEN-CI-S2-FORGE-1).
+    # elle pose sa garde réseau à l'import de tests/ (lot DETTES-T5, 2026-10-09 ; forme de
+    # s2bis/tests/__init__.py), dans ce job comme en local. Le job ne coupe pas le réseau
+    # du runner : la garde ne voit ni un appel direct à _socket ni un sous-processus qui
+    # n'importe pas tests (item SHOGEN-CI-S2-FORGE-1 (d)).
     # Sous-lot D8a-3 (2026-10-04, lot DETTES-B1 ; SHOGEN-CI-S2-SAUT-1, ADR-0028
     # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
     # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final
