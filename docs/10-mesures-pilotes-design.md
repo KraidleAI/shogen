@@ -707,3 +707,60 @@ serait embarrassante à l'audit — « les axes R2 discriminent » — n'y figur
 pas : c'est la question que l'instrument existe pour trancher, et sa
 réponse s'écrira avec n, K, z, la partition constatée et k_eff vs
 k nominal, quel que soit son signe.
+
+## Ajouts datés en fin de document
+
+*Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot DETTES-T14* : les ajouts datés du lot DETTES-T14
+sont placés ici, en fin de document, pour n'en décaler aucune ligne, ce document étant cité ailleurs par
+numéro de ligne ; chacun nomme la section qu'il vise, dont le texte est inchangé.
+
+**Vise §4.2 (b).** *Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot DETTES-T14 ; P-03, décision
+Q-E de l'adjudication du procurement du 2026-10-09 ; l'erratum du 2026-09-30 et l'ajout du 2026-10-02 de
+cette section sont inchangés* : le primaire est détenu et lu : Fisher 1921, *Metron* 1(3) : 3-32
+(`biblio/fisher1921-metron-1-3-32.pdf`), pp. 14 et 18, lues sur l'image et contrôlées sur l'OCR. P. 14 :
+exprimée en z, la courbe d'échantillonnage est « sufficiently normal and constant in deviation », et son
+erreur probable « may be obtained from the same table as before entered with the value » n − 3. P. 18 :
+« The weight of each sample measured on the scale of z is taken to be » (n − 3). La forme littérale
+1/√(n−3) n'y est pas imprimée : c'est celle du manuel (Penn State STAT 509 L7, `biblio/INDEX.md` l.328),
+que nomme la ligne imprimée de `report.py` (« transformation de Fisher ; Penn State STAT 509 L7 »),
+inchangée. Limite : un poids (n − 3) vaut une variance 1/(n − 3) [inféré : le poids est l'inverse de la
+variance]. Les racines imprimées aux pp. 10 (cas fraternel) et 11 (erreur probable de r), vues sur
+l'image, visent d'autres cas : elles ne se citent jamais pour cette ligne. P-03 est fermé.
+
+**Vise §4.2 (b), précédent académique de (2c).** *Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot
+DETTES-T14 ; SHOGEN-DONG-CORPS-1 ; le paragraphe visé est inchangé* : le corps de Dong 2010 est lu (pp.
+1358-1361 et 1365, PDF pp. 1-4 et 8 : lecteur du procurement le 2026-10-09, citations recontrôlées par
+script au lot DETTES-T14) et le prédécesseur est détenu et lu (PVLDB 2(1) : 550-561, 2009 ;
+`biblio/INDEX.md`, section du lot DETTES-T14). Dong 2010 situe lui-même en 2009 la décision par paires :
+« In particular, [6] makes pairwise decisions based on common mistakes made by the sources » (p. 1358),
+[6] étant le papier de 2009 (références, p. 1365) ; 2009 pose que « two independent sources providing the
+same false value is a rare event » (§3.1). Les deux modélisent la copie par une analyse bayésienne
+(probabilité des données observées sous indépendance ou sous copie), non par un compte binomial de
+co-aberrances (« binomial » : 0 occurrence dans le texte de 2009). (2c) peut donc citer cette lignée pour
+l'idée que des fautes partagées signalent une dépendance, jamais pour sa statistique z, qui reste celle
+de §5.1.
+
+**Vise §4.3 (c), points 2 à 4.** *Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot DETTES-T14 ;
+SHOGEN-BIBLIO-PAGES-4-3-1, décision Q-D de l'adjudication du procurement du 2026-10-09 ; les cinq points
+de cette section sont inchangés* : état des trois pages au 2026-10-09 (copies, sha256 et conditions à
+`biblio/INDEX.md`, section du lot DETTES-T14). Point 2 (CoinGecko ← Binance) : la page HTML répond 403
+derrière un contrôle anti-robot, non contourné ; le chiffre est re-vérifié sur l'API officielle
+(`api.coingecko.com/api/v3/exchanges/binance`, copie JSON datée) : `pairs` = 1372, égal au chiffre daté
+du 2026-08-05 ; la copie octets-exacts de la page reste non détenue. Point 3 (Pyth, agrégation) : la
+citation est gardée avec sa date (vérifiée le 2026-08-05). La page a été retirée par Pyth : la page de
+renvoi, détenue, dit « Pythnet is being shut down as part of the Pyth Core sunset », et l'expression
+citée y a 0 occurrence. La copie du 2026-08-05 n'est pas détenue : la citation n'est plus re-vérifiable
+et décrit le mécanisme d'un produit en extinction. Point 4 (Pyth ← Coinbase) : la copie du jour range
+Coinbase sous « Crypto », et le libellé cité y a 0 occurrence ; elle atteste l'arête au niveau réseau à
+sa date, sans valoir copie de la page du 2026-08-05.
+
+**Vise §10, dettes 1, 4 et 7.** *Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot DETTES-T14 ; la
+table de cette section est inchangée* : dette 1 **fermée** (SHOGEN-DONG-CORPS-1) : corps de Dong 2010 lu
+aux pp. 1358-1361 et 1365 (lecteur du procurement), citations recontrôlées par script ; PVLDB 2009 détenu
+et lu ; la lignée 2009-2010 se cite pour l'idée de (2c), non pour sa statistique (ajout ci-dessus visant
+§4.2 (b), précédent académique de (2c)). Dette 4 **fermée par la décision Q-D**
+(SHOGEN-BIBLIO-PAGES-4-3-1), avec un résidu écrit : aucune copie octets-exacts du 2026-08-05 n'est
+détenue pour les points 2 à 4 de §4.3 ; leur état daté est à l'ajout ci-dessus qui vise ces points
+(substitut d'API pour CoinGecko ; page Pyth retirée, citation datée gardée ; copie du jour de la page des
+publishers), et leurs citations ne se reprennent dans aucun ADR comme texte courant de ces pages. Dette
+7 : le primaire est détenu et lu (P-03 fermé ; ajout ci-dessus visant §4.2 (b)).
