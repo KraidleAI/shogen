@@ -66,6 +66,28 @@ AFL_SKIP_CPUFREQ=1 AFL_NO_AFFINITY=1 cargo afl fuzz \
 Il l'était déjà sur la machine de mesure ; en CI, le job l'impose par
 `sudo sysctl`.
 
+## La gate de distillation (lot FUZZ, 2026-10-09)
+
+Le job `cargo-afl` mesure, avant sa campagne, la couverture des graines
+distillées (`crates/shogen-verifier/fuzz-corpus/README.md`) par l'outil de la
+mesure de référence, sur la cible AFL construite ci-dessus :
+
+```sh
+D=~/distillation && P=docs/adr-0028/revue-fuzz/pieces && mkdir -p "$D/corpus" "$D/base"
+cp crates/shogen-verifier/fuzz-corpus/* "$D/corpus/" && rm "$D/corpus/README.md"
+cp "$D/corpus/"* "$D/base/" && rm "$D/base/"dirigee-distillee-*
+tar -xzf "$P/corpus-derive-2026-10-09.tar.gz" -C "$D"
+for carte in base corpus derive; do
+  cargo afl showmap -C -i "$D/$carte" -o "$D/$carte.carte" -- fuzz/target/release/eprouver-afl
+done
+cargo xtask fuzz-distillation "$D/base.carte" "$D/corpus.carte" "$D/derive.carte"
+```
+
+Le corpus dérivé de la mesure (2353 entrées, campagnes de 660 s des deux
+moteurs) n'entre pas au corpus de graines, comme le veut `fuzz/.gitignore` :
+il est versé en archive avec les pièces de revue du lot
+(`docs/adr-0028/revue-fuzz/pieces/`), où la gate le relit.
+
 ## Ce qu'une campagne verte dit, et rien de plus
 
 *tested* — sur les cas exécutés, avec leur compte, leur corpus de départ et

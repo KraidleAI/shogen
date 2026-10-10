@@ -1,0 +1,143 @@
+"""Shōgen, lot DETTES-T5, DT5-8 (adjudication C-2 du 2026-10-09) : cas de enforcement/workflows-yaml.py, chacun dans un
+arbre temporaire, sauf W-01 (l'arbre du dépôt). W-02 : la forme de DT4-a (« cas : » dans un nom d'étape en scalaire
+simple). Relecture G2 du lot : W-12 (chargeur sûr, C-3), W-13 (erreur interne en 3, C-3), W-14 (libellés -latest après
+lecture YAML, C-8) ; adjudication C-10 : W-15 ; contre-contrôle du lot : W-16 (étiquettes explicites qui perdent le
+texte). Lancé par l'interpréteur qui porte PyYAML (python3-yaml, docs/R-8-outillage.md). Sortie : 0 tout passe (CAS cas
+joués, ni plus ni moins), 1 un cas échoue, 3 erreur."""
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ICI = os.path.dirname(os.path.abspath(__file__))
+SCRIPT = os.path.join(os.path.dirname(ICI), "workflows-yaml.py")
+RACINE = os.path.dirname(os.path.dirname(ICI))
+CAS = 16
+NL = chr(10)
+BON = NL.join(["name: w", "on: push", "jobs:", "  a:", "    runs-on: ubuntu-24.04", "    steps:", ""])
+ok, ko = [], []
+
+
+def controler(*argv, env=None):
+    p = subprocess.run([sys.executable, "-B", SCRIPT, *argv], capture_output=True, text=True, timeout=60, env=env)
+    return p.returncode, p.stdout, p.stderr
+
+
+def arbre(fichiers, w):
+    d = tempfile.mkdtemp(dir=w)
+    os.makedirs(os.path.join(d, ".github", "workflows"))
+    for nom, texte in fichiers.items():
+        chemin = os.path.join(d, ".github", "workflows", nom)
+        os.makedirs(os.path.dirname(chemin), exist_ok=True)
+        with open(chemin, "wb") as f:
+            f.write(texte if isinstance(texte, bytes) else texte.encode("utf-8"))
+    return d
+
+
+def cas(nom, vrai, detail=""):
+    (ok if vrai else ko).append(nom)
+    if not vrai:
+        print(f"ÉCHEC {nom} : {detail[:300]}", file=sys.stderr)
+
+
+def refus(nom, w, fichiers, attendu):
+    """Sortie 1 et un refus nommant `attendu` (fichier et motif), rien sur stdout."""
+    code, out, err = controler(arbre(fichiers, w))
+    cas(nom, code == 1 and out == "" and attendu in err, f"sortie {code} ; {err!r}")
+
+
+def main():
+    w = tempfile.mkdtemp()
+    try:
+        code, out, err = controler(RACINE)
+        cas("W-01 arbre du dépôt conforme", code == 0 and out.startswith("workflows-yaml : conforme ("), err)
+        dt4a = BON + "      - name: x (a ; cas : b)" + NL + "        run: c" + NL
+        refus("W-02 forme de DT4-a refusée", w, {"g.yml": dt4a},
+              "g.yml : ligne 7, colonne")
+        refus("W-03 clé répétée refusée (job)", w, {"g.yml": BON + "  a:" + NL + "    runs-on: x" + NL},
+              "g.yml : ligne 7, colonne 3 : clé répétée « a »")
+        refus("W-04 clé répétée refusée (étape)", w, {"g.yml": BON + "      - run: a" + NL + "        run: b" + NL},
+              "g.yml : ligne 8, colonne 9 : clé répétée « run »")
+        refus("W-05 tabulation d'indentation refusée", w, {"g.yml": BON.replace("    steps:", chr(9) + "steps:")},
+              "g.yml : ligne")
+        vide = "g.yml : document vide ou autre qu'un mapping"
+        refus("W-06 document vide refusé", w, {"g.yml": "# rien" + NL}, vide)
+        refus("W-07 liste au premier niveau refusée", w, {"g.yml": "- a" + NL}, vide)
+        refus("W-08 deux documents refusés", w, {"g.yml": BON + "---" + NL + BON}, "g.yml : ligne")
+        refus("W-09 octets hors UTF-8 refusés, .yaml lu", w, {"g.yaml": BON.encode("utf-8") + b"# \xff" + NL.encode()},
+              "g.yaml : octets hors UTF-8")
+        d = arbre({"g.yml": BON, "sous/x.yml": "a: : b" + NL, "x.txt": "a: : b" + NL}, w)
+        code, out, err = controler(d)
+        autres = "autre(s) entrée(s) de .github/workflows non lue(s) : "
+        cas("W-10 sous-dossier et .txt non lus, nommés ; aucun workflow refusé", code == 0
+            and "conforme (1 workflow(s)" in out and "2 " + autres + "sous, x.txt" in out
+            and controler(arbre({}, w))[0] == 1, f"{code} {out!r} {err!r}")
+        faux = os.path.join(w, "faux", "yaml")
+        os.makedirs(faux)
+        with open(os.path.join(faux, "__init__.py"), "w", encoding="utf-8") as f:
+            f.write("raise ImportError('absent')" + NL)
+        sorties = [controler()[0], controler(RACINE, RACINE)[0], controler(w)[0],
+                   controler(RACINE, env=dict(os.environ, PYTHONPATH=os.path.dirname(faux)))[0]]
+        cas("W-11 erreurs en 3 (arguments, racine sans workflows, PyYAML absent)", sorties == [3] * 4, str(sorties))
+        marque = os.path.join(w, "marque")
+        python = BON + "      - run: !!python/object/apply:os.mkdir [" + json.dumps(marque) + "]" + NL
+        code, out, err = controler(arbre({"g.yml": python}, w))
+        cas("W-12 étiquette python refusée, sans effet (chargeur sûr)", code == 1 and "python/object/apply" in err
+            and not os.path.exists(marque), f"sortie {code} ; {err!r}")
+        code = controler(arbre({"g.yml": BON + "? [a, b]" + NL + ": c" + NL}, w))[0]
+        cas("W-13 erreur interne (clé non hachable) : 3, jamais un refus", code == 3, f"sortie {code}")
+        alias = NL.join(["name: w", "on: push", "env: {R: &r ubuntu-latest}", "jobs:", "  a:", "    runs-on: *r",
+                         "    steps:", ""])
+        echappe = BON.replace("ubuntu-24.04", '"ubuntu-l' + chr(92) + 'x61test"')
+        explicite = BON.replace("    runs-on: ubuntu-24.04", "    ? runs-on" + NL + "    : ubuntu-latest")
+        matrice = BON.replace("    steps:", NL.join(["    strategy:", "      matrix:", "        include:",
+                                                      "          - os: Windows-Latest", "    steps:"]))
+        r = alias.split(NL)                     # contre-contrôle du lot : un seul libellé par fichier, une seule voie
+        second = NL.join(r[:4] + ["  a:", "    runs-on: ubuntu-24.04", "    steps:", "  b:"] + r[5:])
+        groupe = alias.replace("    runs-on: *r", "    runs-on: {group: g, labels: [self-hosted, *r]}")
+        suffixe = alias.replace("&r ubuntu-latest", "&r macos-latest-xlarge")
+        cles = BON.replace("    steps:", NL.join(["    strategy:", "      matrix:", "        python: ['3.12']",
+                                                  '        img: [windows-2025, "ubuntu-l' + chr(92) + 'x61test"]',
+                                                  "    steps:"]))
+        code, out, err = controler(arbre({"a.yml": alias, "e.yml": echappe, "x.yml": explicite, "m.yml": matrice,
+                                          "j.yml": second, "g.yml": groupe, "s.yml": suffixe, "k.yml": cles}, w))
+        cas("W-14 libellé -latest après lecture YAML refusé (alias, échappement, clé explicite, matrice et casse ; "
+            "second job, runs-on en mapping, suffixe, seconde clé de matrice)",
+            code == 1 and all(f"{n}.yml : image flottante (-latest)" in err for n in "aexmjgsk"),
+            f"sortie {code} ; {err!r}")
+        d = arbre({"G.YAML": "a: : b" + NL, ".h.yml": "- a" + NL, "i.yml.bak": "a: : b" + NL,
+                   "sous.yml/j.yml": "- a" + NL}, w)
+        code, out, err = controler(d)
+        cas("W-15 extension pliée en casse et fichiers cachés lus, autres entrées nommées (adjudication C-10)",
+            code == 1 and "G.YAML : ligne 1" in err and ".h.yml : document vide" in err and "i.yml.bak" not in err
+            and "2 " + autres + "i.yml.bak, sous.yml" in out, f"{code} {out!r} {err!r}")
+        t = ["name: w", "on: push", "jobs:", "  a:"]
+        m = ["    runs-on: ubuntu-24.04", "    strategy:", "      matrix:"]
+        etiquettes = {
+            "t1.yml": NL.join(t + ["    strategy:", "      matrix:", "        cfg: [&x !!null ubuntu-latest]",
+                                   "    runs-on: *x", ""]),
+            "t2.yml": NL.join(["env: {X: &x !!binary ubuntu-latest}"] + t + ["    runs-on: *x", ""]),
+            "t3.yml": NL.join(t + m + ["        cfg: [!!set {windows-latest}]", ""]),
+            "t4.yml": NL.join(t + m + ["        cfg: !!pairs [{k: windows-latest}]", ""]),
+            "t5.yml": BON.replace("ubuntu-24.04", "!!str ubuntu-24.04")}
+        code, out, err = controler(arbre(etiquettes, w))
+        lignes = err.split(NL)
+        cas("W-16 étiquette explicite qui perd le texte refusée (!!null, !!binary, !!set, !!pairs ; !!str admise)",
+            code == 1 and "t5.yml" not in err and all(any(x.startswith(f"workflows-yaml : refus : t{i}.yml : ligne")
+                                                         and "étiquette explicite refusée" in x for x in lignes)
+                                                     for i in range(1, 5)), f"sortie {code} ; {err!r}")
+    finally:
+        shutil.rmtree(w, ignore_errors=True)
+    joues = len(ok) + len(ko)
+    print(f"workflows-yaml : {len(ok)} ok, {len(ko)} échec ({joues} cas joués, {CAS} exigés)")
+    return 0 if not ko and joues == CAS else 1
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as e:
+        print(f"ERREUR FATALE : {e!r}", file=sys.stderr)
+        raise SystemExit(3)

@@ -2,9 +2,15 @@
 # Shōgen, installeur du hook pre-commit versionné : lot D8c d'ADR-0028 D8 (G0 docs/adr-0028/G0-lot-D8c.md,
 # CH-5 et CH-6 ; journal docs/G1-lot-D8c.md). Copie le blob COMMITTÉ enforcement/hooks/pre-commit, jamais
 # le fichier de l'arbre de travail, dans le dossier des hooks du dépôt, si son sha256 égale ATTENDU.
-# Hook déjà présent : égal à ATTENDU, rien n'est écrit ; d'empreinte connue (CONNUS), sauvegardé en
+# Hook déjà présent : égal à ATTENDU et exécutable, rien n'est écrit ; égal à ATTENDU sans le bit d'exécution,
+# recopié sans sauvegarde ; d'empreinte connue (CONNUS), sauvegardé en
 # pre-commit.<12 premiers caractères de son sha256> puis remplacé ; inconnu, refusé sans rien écrire.
 # La copie est contrôlée après écriture. --verifier : lecture seule, 0 si le hook installé égale ATTENDU.
+# Bit d'exécution (lot DETTES-T5, 2026-10-09, SHOGEN-G5-FORGE-1 (c) ; cas I-15 à I-17) : exigé par --verifier et
+# après la copie ; sous Linux, git ne lance pas un hook non exécutable.
+# Sous Git Bash (MSYS), `test -x` suit l'heuristique de MSYS (fichier qui commence par `#!`), pas le mode [inféré] :
+# ces contrôles y sont vides et les cas I-15 à I-17 sont une gate Linux ; le premier passage de l'installeur sur le
+# poste local (acte du mainteneur) le confirmera (adjudication Q-3 du 2026-10-09).
 # Refus préalables, dans les deux modes : argument inconnu ; GIT_DIR, GIT_WORK_TREE ou GIT_INDEX_FILE
 # posées ; hors d'un dépôt ; arbre lié (les hooks sont partagés : lancé d'un worktree, l'installeur
 # écrirait dans le dossier du dépôt principal) ; core.hooksPath posé ; installeur différent de son blob
@@ -33,19 +39,23 @@ D="$HD/pre-commit"; AV=absent; SV=
 if [ "${1-}" = --verifier ]; then
   [ -f "$D" ] || refus "aucun hook installé ($D)"
   AV="$(sha "$D")"; [ "$AV" = "$ATTENDU" ] || refus "hook installé ($AV) différent d'ATTENDU ($ATTENDU)"
+  [ -x "$D" ] || refus "hook installé conforme ($AV) mais non exécutable : git ne le lancerait pas ; relancer l'installeur"
   echo "OK (installation) : hook installé conforme ($AV)"; exit 0
 fi
 if [ -e "$D" ]; then
   AV="$(sha "$D")"
-  [ "$AV" = "$ATTENDU" ] && { echo "OK (installation) : déjà conforme ($AV) ; rien écrit"; exit 0; }
-  case " $CONNUS " in *" $AV "*) ;; *) refus "hook présent d'empreinte inconnue ($AV) : examen manuel ; rien écrit" ;; esac
-  SV="$D.${AV:0:12}"
-  if [ -e "$SV" ]; then [ "$(sha "$SV")" = "$AV" ] || refus "sauvegarde $SV présente et différente ; rien écrit"
-  else cp "$D" "$SV" && [ "$(sha "$SV")" = "$AV" ] || refus "sauvegarde $SV impossible"; fi
+  [ "$AV" = "$ATTENDU" ] && [ -x "$D" ] && { echo "OK (installation) : déjà conforme ($AV) ; rien écrit"; exit 0; }
+  if [ "$AV" != "$ATTENDU" ]; then
+    case " $CONNUS " in *" $AV "*) ;; *) refus "hook présent d'empreinte inconnue ($AV) : examen manuel ; rien écrit" ;; esac
+    SV="$D.${AV:0:12}"
+    if [ -e "$SV" ]; then [ "$(sha "$SV")" = "$AV" ] || refus "sauvegarde $SV présente et différente ; rien écrit"
+    else cp "$D" "$SV" && [ "$(sha "$SV")" = "$AV" ] || refus "sauvegarde $SV impossible"; fi
+  fi
 fi
 T="$(mktemp "$HD/pre-commit.XXXXXX")" || refus "mktemp dans $HD impossible"
 git show HEAD:enforcement/hooks/pre-commit > "$T" 2>/dev/null && [ "$(sha "$T")" = "$ATTENDU" ] && chmod 755 "$T" &&
   mv -f "$T" "$D" || { rm -f "$T"; refus "copie vers $D impossible"; }
 AP="$(sha "$D")"; [ "$AP" = "$ATTENDU" ] || refus "hook installé ($AP) différent d'ATTENDU après copie"
+[ -x "$D" ] || refus "hook installé ($D) non exécutable après copie : git ne le lancerait pas"
 echo "OK (installation) : $D ; avant $AV ; après $AP${SV:+ ; sauvegarde $SV}"
 exit 0

@@ -17,13 +17,19 @@
 #   - collecte : collector, sources, run_campaign, closure, smoke, journal, model,
 #     r2.collect_asn et records.append_asn. Jetable, en quarantaine (campagne
 #     scellée). Ses tests tournent dans le même job, sur fixtures.
-# Invariant : jobs bloquants dans ce workflow, jamais de continue-on-error. Ils ne
-# sont pas requis à la fusion : la protection de main n'a pas de
-# required_status_checks (GC-09). La forge ne démarre plus les jobs (GC-01) : le G3
-# opérant est l'oracle local, rejoué par l'orchestrateur (ADR-0028 D6 (iii), §4.11).
-# Required check et premier run sur la forge : items SHOGEN-CI-S2-FORGE-1 (ADR-0028,
-# annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a), SHOGEN-G3-FORGE-1 (lot D8b) et
-# SHOGEN-G5-FORGE-1 (lot D8c).
+# Invariant : jobs bloquants dans ce workflow, jamais de continue-on-error. Contrôles requis
+# à la fusion : la protection de main n'en avait pas (required_status_checks, GC-09) ; son
+# état n'est pas vérifiable depuis la session (retouche datée du 2026-10-09, lot DETTES-T5).
+# La forge a exécuté les jobs le 2026-10-09, dépôt alors public (GC-01 ; check runs des PR
+# #7 à #9) ; dépôt privé ensuite : sur la PR n° 10, le workflow gates a échoué sans job
+# (cohérent avec son YAML alors illisible, corrigé par DT5-0) et les autres sans machine
+# (constat de l'orchestrateur du 2026-10-09 vers 21:28 UTC ; leur relance est un acte de
+# l'investisseur) : l'oracle local reste le G3 opérant, rejoué par l'orchestrateur
+# (ADR-0028 D6 (iii), §4.11). Contrôle requis (premiers runs faits) : items
+# SHOGEN-CI-S2-FORGE-1 (ADR-0028, annexe B.4), SHOGEN-G1-FORGE-1 (lot D8a),
+# SHOGEN-G3-FORGE-1 (lot D8b) et SHOGEN-G5-FORGE-1 (lot D8c).
+# Épinglage (ajout daté du 2026-10-09, lot DETTES-T5, SHOGEN-CI-RUNNERS-1) : actions par SHA
+# de commit, images par libellé, jamais par digest ; limite écrite en tête de squelette.yml.
 
 name: gates
 on:
@@ -43,7 +49,7 @@ jobs:
     # hook pre-commit versionné (enforcement/hooks/), jumelle locale de ce job : même motif,
     # mêmes exclusions, octet pour octet (cas H-20). Aucune action ni installation nouvelle
     # (R-8) : bash, git et les outils de l'image (item SHOGEN-G5-FORGE-1 (c)). Identifiant
-    # g5-dette et name inchangés : aucun required check n'existe (GC-09).
+    # g5-dette et name inchangés : aucun required check n'existait (GC-09, 2026-09-30).
     name: g5-no-naked-todo
     # Image épinglée et checkout v7.0.1 : part de g5 dans SHOGEN-CI-RUNNERS-1, tirée en
     # avance par le lot D8c (le job porte désormais des tests).
@@ -81,11 +87,14 @@ jobs:
     # docs/G1-lot-D8a.md) : épinglage des modèles en liste blanche exacte (R-1), sur le
     # frontmatter des agents, des skills et des commandes (tout .claude/ de l'arbre, hors
     # worktrees) et sur les réglages JSON de .claude/.
-    # Étape 1 : les cas du lint, sur copies de fixtures dans des arbres mktemp ; étape 2 :
-    # l'arbre du dépôt. Aucune action ni installation nouvelle (R-8) : bash et les outils
+    # Étape 1 (après l'environnement et les deux contrôles des workflows, lot DETTES-T5) : les
+    # cas du lint, sur copies de fixtures dans des arbres mktemp ; étape 2 : l'arbre du dépôt.
+    # Aucune action nouvelle ; une seule installation, python3-yaml de la distribution,
+    # contrôlée R-8 (lot DETTES-T5, DT5-8) ; sinon bash et les outils
     # de l'image. awk de l'image (mawk, inféré, non mesuré), employé par le runner seul :
-    # item SHOGEN-G1-FORGE-1 (c).
-    # name: = identifiant du job, un seul nom pour le futur required check.
+    # item SHOGEN-G1-FORGE-1 (c) ; imprimé par l'étape d'environnement (lot DETTES-T5).
+    # name: = identifiant du job, un seul nom pour le contrôle requis (état sur main non
+    # vérifiable depuis la session ; retouche datée du 2026-10-09, lot DETTES-T5).
     name: g1-model-pinning
     # Image épinglée, comme s2-harness-unittest (GC-11 ; SHOGEN-CI-RUNNERS-1).
     runs-on: ubuntu-24.04
@@ -98,6 +107,48 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
+      # Lot DETTES-T5 (2026-10-09 ; SHOGEN-LINT-ENVIRONNEMENTS-1, SHOGEN-G1-FORGE-1 (c), SHOGEN-CI-S2-FORGE-1 (c)) :
+      # environnement de l'image imprimé pour la lecture du journal, sans effet sur le verdict (chaque commande suivie
+      # de || true ; ImageOS et ImageVersion, variables des images hébergées, inférées, non lues). s2-harness-unittest
+      # n'en porte pas : son gabarit (cas K-01 du runner, analyseur de l'enregistreur de rôle) admet trois étapes
+      # exactement ; il imprime python3 --version, et l'image s'y lit à la section « Runner Image » du journal.
+      - name: environnement de l'image (locale, python3, awk, système), sans effet sur le verdict
+        shell: bash
+        run: |
+          locale || true
+          python3 --version || true
+          readlink -f "$(command -v awk)" || true
+          awk --version < /dev/null 2>&1 || awk -W version < /dev/null 2>&1 || true
+          cat /etc/os-release || true
+          echo "ImageOS=${ImageOS:-absente} ImageVersion=${ImageVersion:-absente}"
+      # Lot DETTES-T5 (2026-10-09, adjudication Q-2 ; SHOGEN-CI-RUNNERS-1) : aucun libellé de runner en -latest, ni
+      # dans runs-on ni dans une clé os, dans les workflows ; cas dans la suite du job controle-unittest.
+      - name: images de runner épinglées (aucun -latest, SHOGEN-CI-RUNNERS-1)
+        shell: bash
+        run: python3 -B enforcement/runners-epingles.py .
+      # Lot DETTES-T5, DT5-8 (2026-10-09, adjudication C-2) : chaque workflow se lit en YAML (un seul document, un
+      # mapping, aucune clé répétée ; libellés -latest après lecture, relecture G2 C-8). PyYAML du paquet python3-yaml
+      # de la distribution, version exacte (contrôle R-8 : docs/R-8-outillage.md), installé à cette version par apt-get
+      # si l'image ne l'a pas à cette version (une version plus récente fait échouer l'étape : apt refuse le retour
+      # arrière sous -y [inféré]) ; version relue après l'installation, module importé rattaché au paquet (dpkg -S),
+      # relecture G2 C-2 ; interpréteur du système (/usr/bin/python3), celui du paquet. Limites (C-4) : ce contrôle ne
+      # voit pas sur la forge l'illisibilité de ce fichier-ci (le job ne démarre pas) ; le crochet local ne le lance pas
+      # (adjudication Q-4) : docstring de enforcement/workflows-yaml.py.
+      - name: workflows lisibles en YAML (python3-yaml de la distribution, version exacte)
+        shell: bash
+        run: |
+          V=6.0.1-2build2
+          if [ "$(dpkg-query -W -f='${Version}' python3-yaml 2>/dev/null)" != "$V" ]; then
+            sudo apt-get install -y -q --no-install-recommends "python3-yaml=$V" ||
+              { sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends "python3-yaml=$V"; }
+          fi
+          dpkg-query -W python3-yaml
+          [ "$(dpkg-query -W -f='${Version}' python3-yaml)" = "$V" ] || { echo "python3-yaml $V exigé" >&2; exit 1; }
+          M="$(/usr/bin/python3 -B -P -c 'import yaml; print(yaml.__file__)')"
+          case "$(dpkg -S "$M" 2>&1)" in "python3-yaml: $M") echo "PyYAML lu : $M" ;;
+            *) echo "PyYAML lu hors du paquet python3-yaml : $M" >&2; exit 1 ;; esac
+          /usr/bin/python3 -B enforcement/tests/run-fixtures-workflows-yaml.py
+          /usr/bin/python3 -B enforcement/workflows-yaml.py .
       - name: cas du lint d'épinglage (fixtures, arbres temporaires)
         shell: bash
         run: bash enforcement/tests/run-fixtures-model-pinning.sh
@@ -124,7 +175,8 @@ jobs:
     # (toutes les branches et tous les tags, --all). Aucune action ni installation nouvelle
     # (R-8) : bash, git et les outils de l'image (grep, awk, tr, mktemp, iconv : item
     # SHOGEN-G3-FORGE-1 (c)).
-    # name: = identifiant du job, un seul nom pour le futur required check.
+    # name: = identifiant du job, un seul nom pour le contrôle requis (état sur main non
+    # vérifiable depuis la session ; retouche datée du 2026-10-09, lot DETTES-T5).
     name: g3-secrets
     # Image épinglée, comme les autres jobs (GC-11 ; SHOGEN-CI-RUNNERS-1).
     runs-on: ubuntu-24.04
@@ -158,8 +210,11 @@ jobs:
     # Lot CI-S2 (2026-09-29, ADR-0028 D6 (iii) ; cp-1 bref C-1..C-8) : la suite
     # unittest de s2-harness (bibliothèque standard seule, fixtures gelées), tests
     # du chemin de recalcul et de la collecte. La suite n'exige aucun réseau :
-    # l'oracle local la rejoue sous garde réseau (0 tentative). Le job ne coupe pas
-    # le réseau du runner (item SHOGEN-CI-S2-FORGE-1).
+    # elle pose sa garde réseau à l'import de tests/ (lot DETTES-T5, 2026-10-09 ; forme de
+    # s2bis/tests/__init__.py), dans ce job comme en local. Le job ne coupe pas le réseau
+    # du runner : la garde ne voit ni un appel direct à _socket, ni un envoi par sendmsg vers
+    # une adresse, ni un sous-processus qui n'importe pas tests (item SHOGEN-CI-S2-FORGE-1 (d)) ;
+    # getnameinfo et getaddrinfo appelé avec host= sont gardés (adjudication C-11 du lot).
     # Sous-lot D8a-3 (2026-10-04, lot DETTES-B1 ; SHOGEN-CI-S2-SAUT-1, ADR-0028
     # annexe B.4) : le verdict porte sur la sortie de la suite, non plus sur le seul
     # code de sortie de unittest (enforcement/verdict-suite-s2.py : résumé final
@@ -167,7 +222,8 @@ jobs:
     # committé) ; ses cas tournent avant la suite. Diff CB-18m (G2 de la tranche C de P1,
     # décision de l'orchestrateur) : --egal exige Ran = PLANCHER du vérificateur ; un
     # plancher oublié ou abaissé fait échouer le job (SHOGEN-CI-PLANCHER-SUIVI-1).
-    # name: = identifiant du job, un seul nom pour le futur required check.
+    # name: = identifiant du job, un seul nom pour le contrôle requis (état sur main non
+    # vérifiable depuis la session ; retouche datée du 2026-10-09, lot DETTES-T5).
     name: s2-harness-unittest
     # Image épinglée : ubuntu-latest bascule vers Ubuntu 26 à partir du 2026-10-19
     # (annotation de forge, GC-11). Python de l'image : 3.12.3 au manifeste
@@ -228,15 +284,16 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 341
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 342
 
   sim-bis-unittest:
     # Lot SIM-BIS, sous-lot SB-0 (2026-10-05 ; ADR-0029 §6 lot 4 ; G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md, PROPOSITION
     # Q-S-20 (a), adoptée par l'AVIS) : suite unittest de scripts/sim-bis (bibliothèque standard seule, données
     # synthétiques et sorties versées de PLAN-S2BIS). Verdict par le vérificateur des jobs unittest : résumé final exigé,
     # aucun saut admis, Ran = plancher committé ci-dessous (--egal), relevé au compte mesuré à chaque sous-lot ; étapes
-    # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Tant que la forge ne lance pas les jobs, le G3 opérant
-    # lance cette ligne telle qu'écrite (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20). Sous-lot SB-14
+    # lues par le cas K-03 du runner (SHOGEN-CI-S2-CABLAGE-1). Le G3 opérant local lance cette ligne telle qu'écrite
+    # (SHOGEN-S2BIS-G3-LIGNE-JOB-1, étendue à ce job par Q-S-20) ; la forge a aussi exécuté le job le 2026-10-09, dépôt
+    # alors public (PR #7 à #9 ; retouche datée du 2026-10-09, lot DETTES-T5). Sous-lot SB-14
     # (2026-10-05 ; E-S-01, E-S-39) : l'adaptateur oracle_r1 lit le harnais de f35a70c par git archive, d'où
     # l'historique complet (fetch-depth: 0, Q-T4-11) ; une copie sans ce commit échoue fermé (ORACLE/extraction).
     # Sous-lot SB-13 (2026-10-08 ; E-S-01, E-S-51) : l'adaptateur oracle_recalc lit de même par git archive le paquet
@@ -282,6 +339,9 @@ jobs:
   controle-unittest:
     # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et
     # sommes de scripts/controle ; patron du job calib-actifs (aucun saut, Ran = plancher, --egal) ; cas K-04 du runner.
+    # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (10 tests, dont 2 de la relecture G2 et 1 de
+    # l'adjudication C-10), plancher 26 → 36.
+    # Correctif DT5-24 (2026-10-10, alerte CodeQL de la PR n° 11 : retour arrière exponentiel) : un test, plancher 37.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -297,4 +357,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 26
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 37

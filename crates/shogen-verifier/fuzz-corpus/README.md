@@ -20,6 +20,54 @@ par une panique que le dépôt a observée.
 `cargo xtask fuzz-corpus` n'écrase **que** les `dirigee-*`. Une commande qui
 viderait le répertoire perdrait la moitié qui compte.
 
+## Les graines distillées (`dirigee-distillee-*`, lot FUZZ, 2026-10-09)
+
+13 §7 dette 3 (SHOGEN-FUZZ-DISTILLATION-1) : les campagnes instrumentées
+atteignent des arêtes que les graines dirigées n'atteignent pas. Plutôt que
+de verser leurs entrées, la distillation nomme les formes qu'elles exercent
+(`xtask/src/distillation.rs`), une graine par forme : le plus souvent un refus
+nommé du vérificateur, à chaque profondeur du lot canonique, du `subject`, du
+constat et du CBOR, plus le registre en texte riche. Chaque graine porte le
+classement que le vérificateur doit en rendre (`xtask/tests/distillation.rs`).
+Ce sont des `dirigee-*` : `cargo xtask fuzz-corpus` les réécrit.
+
+**Mesure de référence** (2026-10-09, Linux de la session cloud) : `afl-showmap
+-C` d'AFL++ 4.40c (cargo-afl 0.18.2, rustc 1.97.1), binaire du commit
+`c1122de`. Corpus dirigé d'origine, 16 graines : 1339 arêtes sur 3904. Corpus
+dérivé de deux campagnes de 660 s (AFL++ ; libFuzzer sur nightly-2026-08-10,
+graine 20261009), 2353 entrées : avec le corpus dirigé, 2413 arêtes, soit
+1074 de plus que lui seul. Avec les 108 graines distillées : 2084 arêtes, 745
+gagnées, dont 719 parmi les 1074 (66,95 %). La mesure 471/789 de 13 §7
+(binaire de `20e1084`) n'est plus rejouable depuis `58dc96e` : la fraction
+s'applique à la mesure neuve (adjudication du 2026-10-09, sur avis d'advisor).
+Le corpus dérivé et les trois cartes sont versés dans
+`docs/adr-0028/revue-fuzz/pieces/` (sommes au `SHA256SUMS` du dossier).
+
+**La gate** : `cargo xtask fuzz-distillation <carte sans distillées> <carte
+du corpus> <carte du dérivé>`, trois cartes d'un même binaire (job `cargo-afl`
+de `fuzz.yml`). La mesure comparée est le nombre d'**arêtes gagnées dans E** :
+arêtes du corpus entier hors de la base qui sont aussi dans E, l'apport du
+dérivé hors de la base, recalculé sur le binaire du jour. Seuil : ⌈E ×
+471/789⌉, soit 642 pour E = 1074 au binaire de `c1122de`. Un E vide, ou une
+arête de la base absente de la carte entière, est ROUGE. **Règle** : ce qui
+ne baisse jamais est la fraction, 471/789 de E ; le nombre absolu suit E, sans
+plancher (642 n'en est pas un). Un changement du vérificateur qui fait passer
+les graines sous le seuil appelle une nouvelle distillation, jamais une
+fraction abaissée (13 §7 dette 3, verrou 2).
+Le corpus dérivé fixe E, donc le seuil : son empreinte est épinglée dans le pas
+CI ; le remplacer est un changement de la gate, jamais la réponse à un rouge.
+Un dérivé remplacé, même avec le `SHA256SUMS` du dossier à jour, fait échouer
+le pas et ne peut plus abaisser le seuil. Une épingle nouvelle ne se pose que
+par un lot revu (G2), daté, qui écrit l'ancien et le nouvel E, le binaire
+mesuré et la raison du changement.
+
+**À l'instrument de libFuzzer**, sans second seuil : compteurs 8 bits du
+binaire nightly (assertions de débogage et AddressSanitizer, défauts de
+cargo-fuzz), base 724, base et graines distillées 1218, base et dérivé 1575 ;
+une fusion `-merge=1` trouve 378 arêtes du dérivé hors des graines : environ
+55,6 % de son apport couverts. Les deux instruments ne comptent pas les mêmes
+arêtes ; 13 §7 fixe afl-showmap, seul instrument de la gate.
+
 ## Pourquoi une graine dirigée, et pas seulement du bruit
 
 La forme canonique est étroite : un tirage qui part de zéro n'atteint jamais un

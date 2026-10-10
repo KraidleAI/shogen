@@ -5,6 +5,7 @@ import contextlib
 import io
 import json
 import os
+import socket
 import subprocess
 import sys
 import unittest
@@ -99,10 +100,22 @@ class TestPages(unittest.TestCase):
         ReseauInterdit avant tout envoi (nom non résolu). C-3 : purge vérifiée hors de l'environnement courant, dans un
         sous-processus qui pose quatre variables de mandataire fictives (boucle locale), importe tests et lit
         urllib.request.getproxies() : aucune clé http, https ni all. Mutation G11 : purge retirée (un mandataire sur la
-        boucle locale ferait passer la requête), tuée même sans mandataire dans l'environnement du job."""
+        boucle locale ferait passer la requête), tuée même sans mandataire dans l'environnement du job. Contre-contrôle
+        du lot DETTES-T5, passe 2 : getaddrinfo (host=) et getnameinfo hors de la boucle locale refusés et inscrits ;
+        mutation : bloc de garde d'avant C-11 (host= et getnameinfo non gardés)."""
         self.assertEqual([k for k in os.environ if k.lower() in ("http_proxy", "https_proxy", "all_proxy")], [])
         with self.assertRaises(tests.ReseauInterdit):
             acquerir.lire_url(local(self, "")[0], "https://example.invalid/x")
+        n, levees = len(tests.TENTATIVES), []
+        for appel in (lambda: socket.getaddrinfo(host="example.invalid", port=443),
+                      lambda: socket.getnameinfo(("192.0.2.1", 80), 0)):
+            try:
+                appel()
+                levees.append(None)
+            except BaseException as e:      # ReseauInterdit dérive de BaseException : capture large, bornée au relevé
+                levees.append(type(e).__name__)
+        self.assertEqual(levees, ["ReseauInterdit"] * 2)
+        self.assertEqual([h for _n, h in tests.TENTATIVES[n:]], ["example.invalid", "192.0.2.1"])
         fictif = dict.fromkeys(("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "ALL_PROXY"), "http://127.0.0.1:9")
         code = "import tests, urllib.request as u; print(sorted({'http', 'https', 'all'} & set(u.getproxies())))"
         ici = os.path.dirname(socle.PARAMETRES)

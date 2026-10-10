@@ -10,6 +10,7 @@
 //! rend les mutants semés rejouables sur un arbre copié (`xtask/tests/`) sans
 //! jamais toucher l'arbre de travail.
 
+pub mod distillation;
 pub mod documents;
 pub mod exemple;
 pub mod fuzz;

@@ -55,9 +55,10 @@ import subprocess
 import tempfile
 
 VARIABLE = "SHOGEN_S2_CAMPAGNE_CONTROL"
-PLANCHER = 415      # tests de la suite après OUT-2j du lot OUT-2 (2026-10-08 ; 414 après OUT-2i) ; un lot
-                    # qui ajoute des tests le relève (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m
-                    # (--egal) ; l'abaisser desserre la gate : décision datée seulement
+PLANCHER = 419      # tests de la suite après DT5-21 du lot DETTES-T5 (2026-10-09 : garde réseau, 3 tests en DT5-2 et 1
+                    # en DT5-21 ; 415 après OUT-2j du lot OUT-2) ; un lot qui ajoute des tests le relève
+                    # (SHOGEN-CI-PLANCHER-SUIVI-1), ce que le job exige depuis CB-18m (--egal) ; l'abaisser desserre
+                    # la gate : décision datée seulement
 SUITE = ["discover", "-s", "tests", "-t", ".", "-v"]                   # arguments de unittest, lancé par AMORCE
 COMPILES = (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES)    # SUITE-CODE-COMPILE-1 (OUT-2h)
 AMORCE = chr(10).join([                 # SUITE-RESUME-FORGE-1 (OUT-2e) : python -m unittest, plus le compte réel

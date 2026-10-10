@@ -162,6 +162,28 @@ Usage : OCR mécanique des scans Künsch 1989 et Fisher 1921 (sans couche de tex
 
 Limite déclarée : pas de compte de téléchargements ni d'ancienneté pour un paquet d'archive Ubuntu (champs absents du registre) ; l'outil s'installe dans le conteneur éphémère de la session, pas sur le poste de l'investisseur.
 
+## Lecture YAML des workflows (PyYAML de la distribution) — contrôlé le 2026-10-09 21:29 UTC, avant emploi au dépôt (lot DETTES-T5, DT5-8)
+
+Usage : `enforcement/workflows-yaml.py` charge chaque workflow de `.github/workflows/` et refuse tout fichier illisible
+(adjudication C-2 du lot DETTES-T5 : un nom d'étape hors forme YAML avait rendu `gates.yml` illisible pour la forge sans
+qu'aucune gate le voie). Forme retenue : le paquet de la distribution, jamais `pip` ; dans le job g1, installé à version
+exacte par `apt-get` si l'image ne l'a pas à cette version, version relue après l'installation et imprimée au journal,
+module importé rattaché au paquet par `dpkg -S` (relecture G2 du lot, C-2) ; interpréteur du système
+(`/usr/bin/python3`).
+Registre officiel : archive Ubuntu 24.04 (noble), champs recopiés de `apt-cache show python3-yaml` et du fichier
+`copyright` du paquet (session cloud, conteneur où le paquet était déjà installé).
+
+| paquet | version retenue | licence | mainteneurs | origine | contrôle du | usage |
+|---|---|---|---|---|---|---|
+| `python3-yaml` (source `pyyaml`) | 6.0.1-2build2 (`pool/main/p/pyyaml/python3-yaml_6.0.1-2build2_amd64.deb`, SHA256 de l'index `315e59500af855f23ee4e95525b99009bd798c4d2658af8eb4b2d66a8a91ec23` ; priorité `important` ; dépend de `libyaml-0-2`) | MIT (texte du fichier `copyright` ; Copyright (c) 2017-2019 Ingy döt Net, 2006-2016 Kirill Simonov) | Ubuntu Developers ; mainteneur d'origine Debian Python Team | Ubuntu, `noble/main` ; amont `https://github.com/yaml/pyyaml` | 2026-10-09 21:29 UTC | lecture YAML des workflows (job g1) |
+
+Limites déclarées : pas de compte de téléchargements ni d'ancienneté pour un paquet d'archive (champs absents du
+registre) ; PyYAML lit le YAML 1.1, la forge son propre analyseur : un fichier accepté ici peut encore être refusé
+par la forge (le contrôle refuse en plus les clés répétées et les documents multiples, qu'elle refuse aussi
+[inféré]) ; présence du paquet sur l'image `ubuntu-24.04` non lue (d'où l'installation conditionnelle). Écart :
+`yaml.safe_load` de ce paquet a servi d'outil de mesure hors dépôt aux phases 1 et 2 du lot, avant cette ligne
+(E-12 du journal G1 du lot).
+
 ## Ce que ce registre ne dit pas
 
 Qu'un outil contrôlé est sûr. R-8 mesure ce qu'un registre publie — existence,

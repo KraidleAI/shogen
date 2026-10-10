@@ -6,6 +6,8 @@
 # G1 : extraction de l'index en échec), C-14 (ajouté au G1 : lancement direct, index inchangé, forme d'O-13).
 # Ajouté à la revue G2 (2026-10-01) : H-23 (git commit --amend, consommateur 1 du G0 §10). Lot DETTES-B2 (2026-10-04) :
 # H-24a à H-24c (étape de balayage du job g5, git grep en erreur : SHOGEN-G5-ERREUR-GREP-1), H-20 lu sur la forme captée.
+# Lot DETTES-T5 (2026-10-09, SHOGEN-G5-FORGE-1 (c)) : I-15 à I-17, bit d'exécution du hook (--verifier, après copie, hook
+# conforme mais non exécutable).
 # Dépôt modèle sous mktemp, hors de tout dépôt : git init -b main, identité factice, commit.gpgsign=false,
 # core.autocrlf=false ; un commit avec deux agents valides (fixtures de D8a), puis le commit de base qui
 # ajoute le lint et la gate de l'arbre, le hook et l'installeur sous test, dont ATTENDU est remplacé par
@@ -118,6 +120,13 @@ c0; e0="$(etat)"; o="$(cd "$R" && GIT_INDEX_FILE="$W/nulle" bash enforcement/hoo
 mkdir "$W/hors2" && cp "$INST" "$W/hors2/i.sh" || fatal hors2; o="$(cd "$W/hors2" && bash i.sh 2>&1)"; [ $? = 2 ] && printf '%s\n' "$o" | grep -qF "hors d'un dépôt"; res I-12 $?
 c0; echo "# x" >> "$R/enforcement/hooks/install-pre-commit.sh"; inst 2 "installeur différent" && [ -z "$(ho)" ]; res I-13 $?
 c0; e0="$(etat)"; inst 2 "argument inconnu" --verify && [ "$(etat)" = "$e0" ]; res I-14 $?
+# I-15 à I-17 (lot DETTES-T5) : sous Linux, git ne lance pas un hook non exécutable. I-16 : chmod neutralisé par PATH.
+c1; chmod 644 "$R/.git/hooks/pre-commit" && e0="$(etat)" && inst 2 "non exécutable" --verifier && [ "$(etat)" = "$e0" ]; res I-15 $?
+mkdir -p "$W/sans-chmod" && printf '#!/bin/sh\nexit 0\n' > "$W/sans-chmod/chmod" && chmod 755 "$W/sans-chmod/chmod" || fatal sans-chmod
+c0; o="$(cd "$R" && PATH="$W/sans-chmod:$PATH" bash enforcement/hooks/install-pre-commit.sh 2>&1)"; [ $? = 2 ] &&
+  printf '%s\n' "$o" | grep -qF "non exécutable après copie"; res I-16 $?
+c1; chmod 644 "$R/.git/hooks/pre-commit" && inst 0 "OK (installation)" && [ -x "$R/.git/hooks/pre-commit" ] &&
+  [ "$(ho)" = "$(sha "$HOOK")" ] && [ ! -e "$R/.git/hooks/pre-commit.$(ho | cut -c1-12)" ]; res I-17 $?
 # Branchement (§7.3) : lint d'épinglage et gate des secrets, pris dans l'index du commit.
 A=.claude/agents/shogen-devops.md; B="claude-opus-""5"; V="$(forme V-01)" || fatal "sonde V-01 introuvable"
 op() { sed 's/^model: .*/model: opus/' "$FX/shogen-devops.md" > "$R/$A"; }

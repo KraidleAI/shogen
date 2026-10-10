@@ -57,3 +57,18 @@ dépendent des tests du harnais qu'ils importent.
 > forme » alors que `sha256sum -c` l'accepte : l'écrire depuis le dossier, `sha256sum <fichiers>`). **Consigne** : un
 > `SHA256SUMS` versé ne nomme que des pièces versées ; une pièce restée hors du dépôt se nomme dans le texte, jamais
 > dans le `SHA256SUMS`.
+
+> *Ajout daté du 2026-10-09 22:24:59 UTC (`date -u` ; lot DETTES-T5, DT5-7, adjudication Q-2 ; SHOGEN-CI-RUNNERS-1 ;
+> relecture G2 du lot, C-7 ; compte et parenthèse retouchés par DT5-14, adjudication C-10 du 2026-10-09 22:37:10
+> UTC)* : `tests/test_runners_epingles.py` porte les cas de `enforcement/runners-epingles.py`
+> (étape du job `g1-model-pinning`) : aucun libellé de runner en `-latest` (casse ignorée) dans `runs-on`, dans une
+> clé `os` ou dans une clé de matrice que nomme `runs-on`, sous les formes que ce lecteur par lignes lit ; 10 tests
+> (adjudication C-10 : extension pliée en casse, fichiers cachés lus, autres entrées nommées), plancher du job
+> `controle-unittest` 36. Les formes qu'il ne lit pas (alias, échappements, clé explicite) sont
+> refusées dans le même job par `enforcement/workflows-yaml.py`, après lecture YAML (relecture G2, C-8).
+
+> *Ajout daté du 2026-10-10 03:35:43 UTC (`date -u` ; correctif DT5-24, alerte CodeQL de la PR n° 11 ; relecture G2,
+> C-2)* : VIDE et BLOC de `enforcement/runners-epingles.py` réécrits sans retour arrière exponentiel, mêmes chaînes
+> acceptées ; `tests/test_runners_epingles.py` compte 11 tests (un test de temps borné sur des valeurs adverses ;
+> `test_formes_hors_ligne` étendu, relecture G2 C-3), plancher du job `controle-unittest` 37 ; le compte de 10 tests et
+> le plancher 36 de l'ajout du 2026-10-09 22:24:59 UTC précèdent ce correctif.

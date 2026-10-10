@@ -30,6 +30,9 @@
 //!    dit que le rouge du mutant vient de l'injection et non de la machinerie.
 
 use shogen_core::{empreinte_en_hexadecimal, empreinte_sha256};
+mod commun;
+
+use commun::Arbre;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use xtask::reproductible::{Comparaison, Plan, comparer};
@@ -319,10 +322,8 @@ fn mutant_base_dans_l_arbre_source_est_refusee_avant_toute_suppression() {
 // L'arbre jouet
 // ---------------------------------------------------------------------------
 
-fn racine_du_cas(cas: &str) -> PathBuf {
-    let racine = std::env::temp_dir().join(format!("shogen-d6-{cas}"));
-    let _ = std::fs::remove_dir_all(&racine);
-    racine
+fn racine_du_cas(cas: &str) -> Arbre {
+    Arbre::nouveau("shogen-d6", cas)
 }
 
 /// Ce que la source du jouet contient.
@@ -351,9 +352,13 @@ enum Jouet {
 fn arbre_jouet(racine: &Path, jouet: &Jouet) -> PathBuf {
     let source = racine.join("source");
     std::fs::create_dir_all(source.join("src")).expect("création de l'arbre jouet");
+    // `[workspace]` vide : le jouet est sa propre racine. `commun::Arbre` le
+    // pose sous la cible cargo, donc DANS le workspace du dépôt quand la cible
+    // est celle par défaut (forge : `squelette.yml`) ; sans cette table,
+    // cargo le croit membre de ce workspace et refuse de le résoudre.
     ecrire(
         &source.join("Cargo.toml"),
-        "[package]\nname = \"jouet\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[[bin]]\nname = \"jouet\"\npath = \"src/main.rs\"\n\n[dependencies]\n",
+        "[package]\nname = \"jouet\"\nversion = \"0.0.0\"\nedition = \"2021\"\n\n[[bin]]\nname = \"jouet\"\npath = \"src/main.rs\"\n\n[dependencies]\n\n[workspace]\n",
     );
     let source_rust = match jouet {
         #[cfg(target_os = "linux")]
