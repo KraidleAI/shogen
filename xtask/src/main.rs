@@ -228,6 +228,27 @@ fn executer() -> i32 {
                 }
             }
         }
+        // 13 §7 dette 3 (lot FUZZ). Hors de `verify` comme `fuzz` : les deux cartes viennent
+        // d'`afl-showmap` sur la cible instrumentée, dans le job `cargo-afl` de fuzz.yml (Linux).
+        "fuzz-distillation" => match (arguments.next(), arguments.next(), arguments.next()) {
+            (Some(base), Some(corpus), None) => {
+                match xtask::distillation::juger(&PathBuf::from(base), &PathBuf::from(corpus)) {
+                    Ok(mesure) => {
+                        mesure.imprimer();
+                        if mesure.vert() { 0 } else { 1 }
+                    }
+                    Err(erreur) => {
+                        // Fail-closed : ce qui empêche de conclure est ROUGE.
+                        eprintln!("distillation : ROUGE — {erreur}");
+                        1
+                    }
+                }
+            }
+            _ => {
+                eprintln!("usage : cargo xtask fuzz-distillation <carte-sans-distillees> <carte>");
+                64
+            }
+        },
         // Réécrit les graines DIRIGÉES du corpus — celles qui se déduisent des
         // formes du dépôt. Les contre-exemples, eux, ne se régénèrent pas :
         // ils sont écrits par une panique observée et restent au corpus.
@@ -245,7 +266,7 @@ fn executer() -> i32 {
         },
         _ => {
             eprintln!(
-                "usage : cargo xtask <verify|gates|emettre-exemple|muter|double-build|mutation|fuzz|fuzz-corpus>"
+                "usage : cargo xtask <verify|gates|emettre-exemple|muter|double-build|mutation|fuzz|fuzz-corpus|fuzz-distillation>"
             );
             eprintln!("  verify           : toutes les gates + fmt + clippy (l'entrée de CI)");
             eprintln!("  gates            : les gates lexicales seules, sans sous-processus cargo");
@@ -261,6 +282,9 @@ fn executer() -> i32 {
                 "  fuzz             : éprouve le vérificateur sur des suites d'octets tirées depuis le corpus committé (ADR-0011 seuil 7)"
             );
             eprintln!("  fuzz-corpus      : réécrit les graines dirigées du corpus de fuzz");
+            eprintln!(
+                "  fuzz-distillation : juge deux cartes afl-showmap, sans et avec les graines distillées (13 §7 dette 3)"
+            );
             64
         }
     }
