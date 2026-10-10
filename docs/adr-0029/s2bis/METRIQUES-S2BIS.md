@@ -2556,3 +2556,27 @@ relevé seul), hôtes du pool non relevés, `run_params` sans le sha256 de la ca
 `asn` de Cymru non relevé, journal au préfixe `carte`, `releve_asn` sans `lance`, hôtes non triés.
 
 Suite : 355 tests ; plancher du job : 355, égalité exigée (`--egal`).
+
+## DT6-h (2026-10-09) : `run_params` trop grand, refus de configuration avant l'ouverture du journal (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1, volet restant (sondes DNS de P1 : C-1 ; décodeurs : CB-6c). `run_params`,
+seul enregistrement écrit d'une configuration, pouvait atteindre un refus de l'écrivain : admis au premier démarrage
+(`seq` et `ws` courts), refusé plus tard, chaque relance écrivant une `reprise`. Sa taille est contrôlée avant
+l'ouverture du journal, `seq` et `ws` écrits sur 19 chiffres : au-delà de LIMITE, refus `CONFIG/taille` (sortie 2,
+rien d'écrit) ; un refus de l'écrivain sur ses valeurs devient un refus de configuration (FORMAT §14.4).
+
+Rouge : sur les tests de DT6-h et le code de l'état DT6-g (`entree.py`), 1 test en échec d'assertion (FAIL 1, ERROR 0) :
+ligne de LIMITE + 1 octets admise au premier démarrage (sortie 0, journal écrit).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 285 | — |
+| `tests/test_entree.py` | 300 | 11 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 9 tués par leur test visé, 0 vivant, 0 FATAL : contrôle retiré, borne
+doublée, comparaison large, `seq` et `ws` courts (0), `ws` court seul, refus de l'écrivain propagé sans conversion,
+contrôle après l'ouverture du journal (forme d'avant DT6-h), version de Python omise du calcul, contenus omis du
+calcul.
+
+Suite : 356 tests ; plancher du job : 356, égalité exigée (`--egal`).

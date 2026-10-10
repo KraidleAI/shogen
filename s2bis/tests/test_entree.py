@@ -16,6 +16,7 @@ import io
 import json
 import os
 import pathlib
+import shutil
 import socket
 import stat
 import subprocess
@@ -220,6 +221,31 @@ class Entree(unittest.TestCase):
         with contextlib.redirect_stderr(err):
             code = borne(self, lambda: entree.main(args, **injections), delai=10)
         return code, err.getvalue()
+
+    def test_run_params_qui_passerait_limite_refus_de_configuration(self):    # DT6-h, ECRIVAIN-REFUS-ARRET-1
+        """Une configuration dont `run_params`, `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE : refus
+        CONFIG/taille, sortie 2, rien d'écrit (avant : journal ouvert, `run_params` refusé à l'écriture ou admis selon
+        `seq` et `ws`, et une `reprise` de plus à chaque relance). Taille prise par json.dumps sur les contenus et les
+        octets écrits ici : 64 formes, la dernière au corps ajusté ; ligne de LIMITE octets admise, sortie 0 ; un octet
+        de plus, refusée ; 80 corps de 65 536 caractères (borne basse de `canonique` déjà au-delà), refusée."""
+        f, s, d = configurations(port_ferme())
+        x = {**f["formes"][0], "methode": "POST", "decodeur": "binance_btc"}
+
+        def essai(n, dernier):
+            g = {**f, "places": n, "formes": [{**x, "nom": f"f{k}", "hote": f"h{k // 5}.example", "chemin": f"/{k}",
+                                                "corps": "a" * (dernier if k == n - 1 else 65536)} for k in range(n)]}
+            sha, chemins = self.ecrire(g, s, d)
+            ligne = {"commit": COMMIT, "sha256": sha, "python": sys.version, "formes": g, "sante": s,
+                     "descripteur": d, "type": "run_params", "ws": 10 ** 18, "seq": 10 ** 18, "prec": "0" * 64}
+            shutil.rmtree(self.journal)
+            os.mkdir(self.journal)
+            r = self.pool(chemins, self.journal, "--fenetres", "0")
+            taille = len(json.dumps(ligne, sort_keys=True, separators=(",", ":")).encode()) + 1
+            return taille, r[0], r[1].split(" : ")[:3], os.listdir(self.journal)
+        n0 = essai(64, 1)[0]
+        refus = (2, ["collecte", "refus", "CONFIG/taille"], [])
+        self.assertEqual([essai(64, journal.LIMITE - n0 + 1)[:2], essai(64, journal.LIMITE - n0 + 2),
+                          essai(80, 65536)[1:]], [(journal.LIMITE, 0), (journal.LIMITE + 1, *refus), refus])
 
     def test_point_d_entree_refus_sortie_2(self):                        # CB-18d
         """Refus de configuration au point d'entrée : sortie 2, refus nommé sur la sortie d'erreur, rien au dossier du

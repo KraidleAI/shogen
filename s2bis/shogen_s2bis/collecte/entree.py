@@ -22,7 +22,8 @@ l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec 
 CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
 sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
 journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
-quorum ; `--depot` sans `--descripteur` : sortie 2."""
+quorum ; `--depot` sans `--descripteur` : sortie 2. DT6-h (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : une configuration
+dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal."""
 import argparse
 import collections
 import ipaddress
@@ -140,6 +141,22 @@ def configurer_secondaire(chemins, commit):
     return lus
 
 
+def _run_params(lus, commit):
+    """Champs de `run_params` (FORMAT §14.4). Une ligne qui passerait LIMITE, `seq` et `ws` écrits sur 19 chiffres
+    (10^18), est un refus de configuration (CONFIG/taille, ou le code de l'écrivain), levé avant l'ouverture du
+    journal : l'écrivain la refuserait à un démarrage, et chaque relance écrirait une `reprise` (DT6-h)."""
+    champs = {"commit": commit, "sha256": {n: lus[n][1] for n in lus}, "python": sys.version,
+              **{n: lus[n][0] for n in lus}}
+    try:
+        n = len(journal.canonique({**champs, "type": "run_params", "ws": 10 ** 18, "seq": 10 ** 18,
+                                   "prec": journal.GENESE}))
+    except journal.ErreurJournal as e:
+        raise config.RefusConfig("CONFIG/" + e.code.split("/")[1], e) from None
+    if n > journal.LIMITE:
+        raise config.RefusConfig("CONFIG/taille", f"run_params de {n} octets, {journal.LIMITE} au plus")
+    return champs
+
+
 def _lecteur(x, delai, tls):
     req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
     return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
@@ -250,7 +267,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
-        f = lus["formes"][0]
+        f, champs = lus["formes"][0], _run_params(lus, a.commit)
         args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
         jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args, releve)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
@@ -258,8 +275,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         return 2
     try:
         jl.ouvrir(horloge() // (S * f["w"]) * f["w"])
-        jl.ecrire("run_params", jl.suivante, commit=a.commit, sha256={n: lus[n][1] for n in lus}, python=sys.version,
-                  **{n: lus[n][0] for n in lus})
+        jl.ecrire("run_params", jl.suivante, **champs)
         b.tourner(a.fenetres)
     except (OSError, journal.ErreurJournal) as e:
         print(f"collecte : arrêt : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)

@@ -55,7 +55,7 @@
   SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
   §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6) ; le diff DT6-f,
   SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4) ; le diff DT6-g, par un test seul,
-  SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15).
+  SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15) ; le diff DT6-h achève SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§14.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -621,7 +621,11 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
    `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
    `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
-   `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8).
+   `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8). Une configuration dont `run_params`,
+   `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE est un refus de configuration (`CONFIG/taille`,
+   sortie 2), levé avant l'ouverture du journal (DT6-h, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : l'écrivain refuserait la
+   ligne à un démarrage, quand `seq` aurait grandi, et chaque relance écrirait une `reprise` ; aucun enregistrement
+   que la boucle écrit n'atteint ainsi un refus de l'écrivain (§9.1, §13.6, §15.5, §16.5).
 5. **Fermeture** (CB-18d, SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : le journal est fermé à la sortie du point d'entrée, quelle
    qu'elle soit. Une OSError ou un refus de l'écrivain (`JOURNAL/casse` compris, et toute ouverture refusée) arrête la
    boucle : sortie 1, refus nommé (`collecte : arrêt : <code> : …`) ; systemd relance le service, et l'instance
