@@ -470,6 +470,26 @@ jobs:
         # D'où le chemin de l'étape suivante.
         run: cargo afl build --release --locked --manifest-path fuzz/afl/Cargo.toml
 
+      - name: Distillation — les graines distillées gardent leur couverture (13 §7 dette 3)
+        # Lot FUZZ (SHOGEN-FUZZ-DISTILLATION-1, ADR-0028 annexe A) : le même outil que la mesure de
+        # référence du 2026-10-09 (afl-showmap d'AFL++ 4.40c, sur ce binaire), deux cartes, sans et
+        # avec les graines `dirigee-distillee-*` ; `cargo xtask fuzz-distillation` les juge, mesure
+        # imprimée avant le verdict (seuil ⌈1074 × 471/789⌉ = 642 arêtes gagnées, README du corpus).
+        # `rm` sans correspondance casse le pas : des graines renommées ne passent pas pour absentes.
+        run: |
+          set -euo pipefail
+          D="${RUNNER_TEMP}/distillation"
+          mkdir -p "${D}/corpus" "${D}/base"
+          cp crates/shogen-verifier/fuzz-corpus/* "${D}/corpus/"
+          rm "${D}/corpus/README.md"
+          cp "${D}/corpus/"* "${D}/base/"
+          rm "${D}/base/"dirigee-distillee-*
+          for carte in base corpus; do
+            cargo afl showmap -C -i "${D}/${carte}" -o "${D}/${carte}.carte" \
+              -- fuzz/target/release/eprouver-afl
+          done
+          cargo run --locked --package xtask -- fuzz-distillation "${D}/base.carte" "${D}/corpus.carte"
+
       - name: Corpus de départ — une COPIE, jamais l'original
         # POURQUOI UNE COPIE : le corpus committé ne doit être ni modifié ni
         # écrit par ce job (`permissions: contents: read`, et l'étape de

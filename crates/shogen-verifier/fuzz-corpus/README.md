@@ -20,6 +20,33 @@ par une panique que le dépôt a observée.
 `cargo xtask fuzz-corpus` n'écrase **que** les `dirigee-*`. Une commande qui
 viderait le répertoire perdrait la moitié qui compte.
 
+## Les graines distillées (`dirigee-distillee-*`, lot FUZZ, 2026-10-09)
+
+13 §7 dette 3 (SHOGEN-FUZZ-DISTILLATION-1) : les campagnes instrumentées
+atteignent des arêtes que les graines dirigées n'atteignent pas. Plutôt que
+de verser leurs entrées, la distillation nomme les formes qu'elles exercent
+(`xtask/src/distillation.rs`), une graine par forme : le plus souvent un refus
+nommé du vérificateur, à chaque profondeur du lot canonique, du `subject`, du
+constat et du CBOR, plus le registre en texte riche. Chaque graine porte le
+classement que le vérificateur doit en rendre (`xtask/tests/distillation.rs`).
+Ce sont des `dirigee-*` : `cargo xtask fuzz-corpus` les réécrit.
+
+**Mesure de référence** (2026-10-09, Linux de la session cloud) : `afl-showmap
+-C` d'AFL++ 4.40c (cargo-afl 0.18.2, rustc 1.97.1), binaire du commit
+`c1122de`. Corpus dirigé d'origine, 16 graines : 1339 arêtes sur 3904. Corpus
+dérivé de deux campagnes de 660 s (AFL++ ; libFuzzer sur nightly-2026-08-10,
+graine 20261009), 2353 entrées : avec le corpus dirigé, 2413 arêtes, soit
+1074 de plus que lui seul. Avec les 108 graines distillées : 2084 arêtes, 745
+gagnées, dont 719 parmi les 1074 (66,95 %). La mesure 471/789 de 13 §7
+(binaire de `20e1084`) n'est plus rejouable depuis `58dc96e` : la fraction
+s'applique à la mesure neuve.
+
+**La gate** : `cargo xtask fuzz-distillation <carte sans distillées> <carte
+du corpus>` (job `cargo-afl` de `fuzz.yml`) refuse sous ⌈1074 × 471/789⌉ = 642
+arêtes gagnées, ou si une arête du reste du corpus manque à la carte entière.
+Un changement du vérificateur qui la fait passer sous le seuil appelle une
+nouvelle distillation, jamais un seuil abaissé (13 §7 dette 3, verrou 2).
+
 ## Pourquoi une graine dirigée, et pas seulement du bruit
 
 La forme canonique est étroite : un tirage qui part de zéro n'atteint jamais un
