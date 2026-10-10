@@ -5,9 +5,10 @@ forme canonique (FORMAT §1.2, §9.1), et n'est jamais décodée : aucun statut 
 n'entre au jugement. Jugement par fenêtre aux seuils scellés (ADR-0029 §2.3 ; égaux au bloc `degradation` de
 `config/analyse.json`, test croisé) : D-1 aucun marqueur, ou aucune `sante` ; D-2 lecture partie plus de 5 s après
 son instant planifié, ou non partie (règle Q-C-02 de l'AVIS, FORMAT §11.6) ; D-4 au moins 2 témoins sans réponse
-retenue ; D-5 au moins 2 noms témoins non résolus (sans réponse retenue, rcode non nul, ou sans réponse A). D-3 n'est
-pas jugé : le format de la sortie de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; seuls les
-relevés absents ou en erreur sont comptés.
+retenue ; D-5 au moins 2 noms témoins non résolus (sans réponse retenue, rcode non nul, ou sans réponse A). DT6-e
+(SHOGEN-S2BIS-CHRONYC-FORMAT-1) : D-3 jugé sur la sortie de `chronyc -n tracking`, forme lue sur pièce (FORMAT §13.3) :
+aucun relevé lisible d'une fenêtre commencée moins de 120 s avant, borne d'erreur de plus de 1 s, ou statut de
+synchronisation autre que Normal, Insert second, Delete second (FORMAT §17.2).
 CB-17b : état par fenêtre (w = 60 s, FORMAT §3.1), de la première que le journal admet au dernier marqueur, sur les
 fichiers présents (la rétention locale peut en avoir retiré) ; rapport (santé seule, aucun nombre à virgule) ;
 strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196).
@@ -35,6 +36,9 @@ LECTURE, W = b'{"adresse":', 60                      # première clé d'une `lec
 D2, D4, D5 = 5 * S, 2, 2                             # retard (µs), témoins sans réponse, noms non résolus
 CODES, TAILLE = ("D-1", "D-2", "D-3", "D-4", "D-5"), 1 << 17                 # codes d'un résumé ; octets au plus
 GRILLE = 32 * 1440          # fenêtres jugées au plus (DT6-d) : 32 jours ; rétention locale de 7 jours (ADR-0029 §6)
+D3_BORNE, D3_AGE = 10 ** 9, 120            # D-3 (DT6-e) : borne d'erreur, ns ; âge du dernier relevé lisible, s
+CHRONY = re.compile("^(System time|Root delay|Root dispersion|Leap status) *: (.*)$", re.M)   # chronyc tracking
+SYNCHRO, NS = ("Normal", "Insert second", "Delete second"), "([0-9]+)[.]([0-9]{9}) seconds"     # client.c, %L et %.9f
 RESUME = re.compile("([a-z0-9]{1,16})-([0-9]{4}-[0-9]{2}-[0-9]{2})[.]resume")    # <observateur>-<jour>.resume
 
 
@@ -109,41 +113,69 @@ def _resolu(v):
 
 
 def juger(sante):
-    """(codes, relevé D-3 absent ou en erreur) d'une fenêtre close dont `sante` est la santé (None : aucune) ; sans
-    santé lisible : D-1."""
+    """Codes D-2, D-4, D-5 d'une fenêtre close dont `sante` est la santé (None : aucune) ; sans santé lisible : D-1.
+    D-3 se juge sur les relevés de plusieurs fenêtres (`etat`, `trois`)."""
     try:
-        d2, d3, codes = sante["d2"], sante["d3"], []
+        d2, codes = sante["d2"], []
         if d2["non_parties"] or d2["retard_max"] is not None and d2["retard_max"] > D2:
             codes.append("D-2")
         codes += ["D-4"] * (sum(not _repond(v) for v in sante["d4"]) >= D4)
         codes += ["D-5"] * (sum(not _resolu(v) for v in sante["d5"]) >= D5)
-        return codes, type(d3) is not dict or "erreur" in d3 or d3.get("code") != 0
+        return codes
     except (KeyError, TypeError, AttributeError):
-        return ["D-1"], False
+        return ["D-1"]
+
+
+def chrony(d3):
+    """(deux fois la borne d'erreur en ns, statut) d'un relevé D-3 lisible : `code` 0 (entier, booléen exclu), sortie
+    de `chronyc -n tracking` où les lignes System time, Root delay, Root dispersion et Leap status figurent une fois
+    chacune, valeurs en secondes à neuf décimales ; borne de la documentation de chrony, |System time| + Root
+    dispersion + Root delay / 2 (FORMAT §13.3, §17.2 ; DT6-e) ; None sinon."""
+    if type(d3) is not dict or type(d3.get("code")) is not int or d3["code"] != 0 or type(d3.get("sortie")) is not str:
+        return None
+    lus = CHRONY.findall(d3["sortie"])
+    c = dict(lus)
+    if len(lus) != 4 or len(c) != 4:
+        return None
+    formes = (("System time", " (slow|fast) of NTP time"), ("Root delay", ""), ("Root dispersion", ""))
+    o, r, d = (re.fullmatch(NS + x, c[cle]) for cle, x in formes)
+    if not (o and r and d):
+        return None
+    ns = [int(x[1]) * 10 ** 9 + int(x[2]) for x in (o, r, d)]
+    return 2 * ns[0] + ns[1] + 2 * ns[2], c["Leap status"]
+
+
+def trois(releve, ws):
+    """D-3 de la fenêtre `ws` (ADR-0029 §2.3 ; DT6-e) : `releve` (ws de sa santé, deux fois la borne, statut), le
+    dernier relevé lisible à elle, manque ou vient d'une fenêtre commencée D3_AGE s ou plus avant elle, ou dit une borne
+    de plus de D3_BORNE, ou un statut hors SYNCHRO."""
+    return releve is None or ws - releve[0] >= D3_AGE or releve[1] > 2 * D3_BORNE or releve[2] not in SYNCHRO
 
 
 def etat(dossier, prefixe="pool", arrets=None):
     """{ws : codes} des fenêtres de la première admise au dernier marqueur, GRILLE au plus (sinon STATUS/grille, DT6-d),
-    dernière `sante`, tête (seq, sha256) du dernier enregistrement lu, nombre de relevés D-3 absents ou en erreur ;
-    fichiers arrêtés avant leur fin notés dans `arrets`."""
+    dernière `sante`, tête (seq, sha256) du dernier enregistrement lu ; fichiers arrêtés avant leur fin notés dans
+    `arrets`. D-3 (DT6-e) : sur le dernier relevé lisible (`chrony`, `trois`)."""
     plancher = fichiers(dossier, prefixe)[0][0] - 86400       # C-3 : jour du premier fichier, moins un jour (§6.1)
-    premiere, en_cours, juges, derniere, tete, absents = None, {}, {}, None, None, 0
+    premiere, en_cours, juges, derniere, tete, releve = None, {}, {}, None, None, None
     for e, ligne in enregistrements(dossier, prefixe, arrets):
         tete = e["seq"], hashlib.sha256(ligne).hexdigest()
         if premiere is None and e["type"] in ("ouverture", "reprise") and type(e.get("suivante")) is int:
             premiere = e["suivante"]
         if e["type"] == "sante":
             en_cours[e.get("ws")] = derniere = e
+            if type(e.get("ws")) is int and (lu := chrony(e.get("d3"))):
+                releve = e["ws"], *lu
         elif e["type"] == "marqueur" and type(e.get("ws")) is int:
-            juges[e["ws"]], absent = juger(en_cours.pop(e["ws"], None))
-            absents += absent
+            codes = juger(en_cours.pop(e["ws"], None))
+            juges[e["ws"]] = codes if codes == ["D-1"] or not trois(releve, e["ws"]) else sorted(codes + ["D-3"])
     debut = max(min([x for x in (premiere,) if x is not None] + list(juges), default=0), plancher)
     if juges and (max(juges) - debut) // W + 1 > GRILLE:                # DT6-d : avant d'allouer la grille
         raise RefusStatus("STATUS/grille", f"{(max(juges) - debut) // W + 1} fenêtres de {heure(debut)} à "
                           f"{heure(max(juges))} UTC, plus que {GRILLE} (32 jours) : saut d'horloge, ou journal "
                           "non purgé")
     grille = {ws: juges.get(ws, ["D-1"]) for ws in range(debut, max(juges) + W, W)} if juges else {}
-    return grille, derniere, tete, absents
+    return grille, derniere, tete
 
 
 def heure(ws):
@@ -209,8 +241,7 @@ def quorum(grille, depot, observateur, maintenant):
         compte = {"calme": 0, "stress": 0}
         for ws, codes in grille.items():
             compte[strate(ws)] += (not codes) + sum(v.get(ws, False) for v in autres.values()) >= 2
-        lignes = [f"quorum hors D-3 (au moins 2 observateurs valides) : calme {compte['calme']} ; stress "
-                  f"{compte['stress']}",
+        lignes = [f"quorum (au moins 2 observateurs valides) : calme {compte['calme']} ; stress {compte['stress']}",
                   "résumés lus : " + " ; ".join(f"{o} jusqu'à {heure(max(v))} UTC (âge {maintenant // S - max(v) - W}"
                                                 f" s)" for o, v in sorted(autres.items()))]
     return lignes + (["résumés refusés : " + " ; ".join(refus)] if refus else [])
@@ -220,7 +251,7 @@ def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=No
     """Lignes du rapport : fenêtres, tête, disque, dégradations par code, dernière fenêtre, valides par strate ; avec
     un dépôt, le compte à quorum (`quorum`)."""
     arrets = []
-    grille, sante, tete, absents = etat(dossier, prefixe, arrets)
+    grille, sante, tete = etat(dossier, prefixe, arrets)
     lignes = [f"status : journal « {prefixe} », lecture seule"]
     arretes = ["fichiers arrêtés avant leur fin : " + " ; ".join(f"{n} ({m})" for n, m in arrets)] if arrets else []
     if not grille:
@@ -228,15 +259,14 @@ def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=No
                          *arretes]
     debut, fin = min(grille), max(grille)
     disque = (sante or {}).get("disque")
-    compte = {c: sum(c in x for x in grille.values()) for c in ("D-1", "D-2", "D-4", "D-5")}
+    compte = {c: sum(c in x for x in grille.values()) for c in CODES}
     strates = {s: sum(not x and strate(ws) == s for ws, x in grille.items()) for s in ("calme", "stress")}
     return lignes + [
         f"fenêtres : de {heure(debut)} à {heure(fin)} UTC, {len(grille)} ; dernier marqueur : {heure(fin)} UTC",
         f"tête : seq {tete[0]}, sha256 {tete[1]}",
         f"disque : {disque['libre']} octets libres sur {disque['total']}" if type(disque) is dict and {
             "libre", "total"} <= disque.keys() else f"disque : non relevé ({disque})",
-        f"dégradations : D-1 {compte['D-1']} ; D-2 {compte['D-2']} ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1 ; "
-        f"relevé absent ou en erreur : {absents}) ; D-4 {compte['D-4']} ; D-5 {compte['D-5']}",
+        "dégradations : " + " ; ".join(f"{c} {compte[c]}" for c in CODES),
         "dernière fenêtre : " + (f"dégradée ({', '.join(grille[fin])})" if grille[fin] else "valide"),
-        f"fenêtres valides hors D-3 (compte local) : calme {strates['calme']} ; stress {strates['stress']}",
+        f"fenêtres valides (compte local) : calme {strates['calme']} ; stress {strates['stress']}",
         *arretes] + (quorum(grille, depot, observateur, maintenant) if depot else [])

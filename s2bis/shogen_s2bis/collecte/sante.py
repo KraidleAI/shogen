@@ -1,7 +1,7 @@
 """Sondes de santé par fenêtre (CB-11 ; E-C-25 à E-C-29 ; ADR-0029 §2.3, §2.9 l.237). Elles partent au départ des
 lectures (ws + w − δ, Q-C-03), chacune sur son fil démon, hors du pool des lectures ; la boucle les joint avant
-l'échéance. D-3 : sortie brute de la commande d'horloge scellée, sans analyse ici (son format n'est pas supposé : le
-recalcul l'analyse, sur pièce) ; D-4 : SOA de « . » vers chaque témoin, adresse IPv4 littérale, sans récursion ; D-5 :
+l'échéance. D-3 : sortie brute de la commande d'horloge scellée, sans analyse ici (forme lue sur pièce, jugée au
+recalcul et par `status`, DT6-e) ; D-4 : SOA de « . » vers chaque témoin, adresse IPv4 littérale, sans récursion ; D-5 :
 A de chaque nom témoin, par le résolveur de l'observateur ; délai de 2 s (l.109-110). S'y ajoutent, au relevé, le
 disque du journal et l'empreinte de la configuration du résolveur. Valeurs brutes, aucun jugement (E-C-26). Une sonde
 dont l'instance précédente n'a pas rendu n'est pas relancée : au plus un fil par sonde (C-5 de la G2 de P1-B).
@@ -21,10 +21,12 @@ SORTIE = 4096                                                       # caractère
 
 
 def horloge_systeme(commande, delai=2 * S, lancer=subprocess.run, horloge=horloge):
-    """D-3 : {sortie, code} de la commande, ou {erreur : absente, delai, autre} ; instants de début et de fin."""
+    """D-3 : {sortie, code} de la commande, ou {erreur : absente, delai, autre} ; instants de début et de fin. La sortie
+    d'erreur suit la sortie standard dans le même flux, coupé à SORTIE caractères (DT6-e,
+    SHOGEN-S2BIS-CHRONYC-FORMAT-1 : elle était jetée, O-3 de la G2 de P1-B)."""
     debut = horloge()
     try:
-        p = lancer(commande, capture_output=True, timeout=delai / S)
+        p = lancer(commande, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=delai / S)
         r = {"sortie": p.stdout.decode("utf-8", "replace")[:SORTIE], "code": p.returncode}
     except FileNotFoundError:
         r = {"erreur": "absente"}

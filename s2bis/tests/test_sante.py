@@ -7,6 +7,7 @@ des futurs. CB-19b (C-1 (b) de la relecture d'intégration de P1) : témoin de l
 import concurrent.futures
 import os
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -49,7 +50,8 @@ class Sondes(unittest.TestCase):
         f = Faux()
         self.assertEqual(sante.horloge_systeme(["horloge", "-x"], lancer=f.lancer, horloge=lambda: next(instants)),
                          {"sortie": GELEE[:-1].decode() + chr(0xFFFD), "code": 0, "debut": 10, "fin": 20})
-        self.assertEqual(f.appels, [("lancer", (["horloge", "-x"],), {"capture_output": True, "timeout": 2.0})])
+        self.assertEqual(f.appels, [("lancer", (["horloge", "-x"],), {"stdout": subprocess.PIPE,
+                                                                      "stderr": subprocess.STDOUT, "timeout": 2.0})])
         for erreur, attendu in ((FileNotFoundError(2, "absente"), "absente"), (PermissionError(13, "refus"), "autre"),
                                 (subprocess.TimeoutExpired("h", 2), "delai")):
             def lancer(*a, **k):
@@ -59,6 +61,15 @@ class Sondes(unittest.TestCase):
         long = sante.horloge_systeme(["h"], lancer=lambda *a, **k: types.SimpleNamespace(stdout=b"x" * 5000,
                                                                                          returncode=1))
         self.assertEqual((len(long["sortie"]), long["code"]), (4096, 1))
+
+    def test_sortie_d_erreur_gardee_dans_la_borne(self):  # DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (O-3 de la G2 de P1-B)
+        """Commande réelle (l'interpréteur) qui écrit sur ses deux sorties puis sort en 1 : le message d'erreur, jeté
+        avant DT6-e, est dans `sortie`, après la sortie standard ; un flot d'erreur reste coupé à 4 096 caractères."""
+        ecrire = "import sys; sys.stdout.write('a'); sys.stdout.flush(); sys.stderr.write(%r); sys.exit(1)"
+        r = [sante.horloge_systeme([sys.executable, "-c", ecrire % x], delai=10 * S) for x in (
+            "506 Cannot talk to daemon", "e" * 5000)]
+        self.assertEqual([(x["sortie"], x["code"]) for x in r],
+                         [("a506 Cannot talk to daemon", 1), ("a" + "e" * 4095, 1)])
 
     def test_disque_et_empreinte_du_resolveur(self):
         """`disque` lit le statvfs du dossier donné, injecté ici (SHOGEN-S2BIS-TEST-DISQUE-INSTABLE-1 : deux lectures du

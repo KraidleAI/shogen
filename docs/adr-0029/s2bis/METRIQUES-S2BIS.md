@@ -2466,3 +2466,38 @@ d'une fenêtre, comparaison large, borne retirée, ligne illisible non notée, m
 fichier spécial noté illisible, ligne des arrêts omise, disque partiel lu, arrêts non transmis.
 
 Suite : 351 tests ; plancher du job : 351, égalité exigée (`--egal`).
+
+## DT6-e (2026-10-09) : D-3 jugé sur la sortie de `chronyc -n tracking`, forme lue sur pièce (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-CHRONYC-FORMAT-1 (I-B1 et O-3 de la G2 de P1-B ; Q-9 de la G2 de P2B). La forme de la sortie de
+`chronyc tracking` est lue dans la source de chrony 4.6.1 (`client.c`, `doc/chronyc.adoc` ; inchangée en 4.9) et écrite
+au FORMAT §13.3 ; `status` juge D-3 (§17.2) : relevé lisible (code 0 ; System time, Root delay, Root dispersion et Leap
+status une fois chacune ; neuf décimales), borne |System time| + Root dispersion + Root delay / 2 de plus de 1 s,
+statut autre que Normal, Insert second ou Delete second, ou aucun relevé lisible d'une fenêtre commencée moins de 120 s
+avant (âge compté en fenêtres du journal, Q-1 du lot). La sonde garde la sortie d'erreur, à la suite de la sortie
+standard, dans la borne de 4 096 caractères (O-3). Une `sante` sans `ws` et un `code` non entier (booléen compris),
+hors FORMAT, ne font jamais lever ni lire un relevé (I-3 ; défaut de la première écriture, vu en relecture du
+générateur). Fixture `tests/fixtures/chrony/tracking.txt` : l'exemple de la documentation (l.147-159), copié octet pour
+octet ; 13 lignes, hors compte de R-25.
+
+Rouge : sur les tests de DT6-e et le code de l'état DT6-d (`status.py`, `sante.py`), 10 tests en échec d'assertion
+(FAIL 10, ERROR 0) : D-3 non jugé (grille, rapport, résumés, quorum, arrêts), `juger` rendant un couple, seuils D-3
+absents, sortie d'erreur jetée. Correctif de relecture : sur le code d'avant lui, 2 tests en échec d'assertion
+(FAIL 2, ERROR 0 : `code` faux lu comme 0, `KeyError` sur une `sante` sans `ws`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/sante.py` | 111 | — |
+| `shogen_s2bis/collecte/status.py` | 272 | — |
+| `tests/fixtures/chrony/tracking.txt` | 13 | — |
+| `tests/test_sante.py` | 285 | 14 (1 de plus) |
+| `tests/test_status.py` | 517 | 24 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 17 mutants, 17 tués par leur test visé, 0 vivant, 0 FATAL : âge en comparaison
+stricte, âge porté à 180 s, borne en comparaison large, borne sans le facteur 2, « Not synchronised » admis,
+« Invalid » admis, « Insert second » refusé, ligne en double admise, code de sortie ignoré, « fast » illisible, délai
+racine compté entier, décimales libres, D-3 ajouté à une fenêtre D-1, première fenêtre sans relevé lisible jugée sans
+D-3 (vivant au premier passage : cas ajouté), sortie d'erreur jetée, `code` booléen admis, `ws` lu par indexation.
+
+Suite : 353 tests ; plancher du job : 353, égalité exigée (`--egal`).
