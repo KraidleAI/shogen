@@ -224,7 +224,7 @@ class Etat(Base):
                      (chronyc(**{**un, "Root_dispersion": "0.250000001 seconds"}), ["D-3"]),
                      (chronyc(Leap_status="Invalid"), ["D-3"]), (nominal, []),
                      ({**D3, "sortie": TRACKING.replace("Root delay", "Root  delay")}, []),
-                     ({**D3, "code": 1}, ["D-3"]),
+                     ({**D3, "code": -9}, ["D-3"]),        # R-6 du contre-contrôle : code négatif (signal)
                      ({**D3, "sortie": TRACKING + "Leap status     : Normal" + chr(10)}, ["D-3"]),
                      ({"erreur": "absente", "debut": 1, "fin": 2}, ["D-3"]),
                      (chronyc(System_time="0.000006523 seconds fast of NTP time"), []), (None, []),
