@@ -6,6 +6,10 @@
 - **Mesures** : lignes physiques par `wc -l` ; tests par `unittest` (compte de la découverte, sans sous-tests) ;
   campagnes de mutants classées par la sortie du lanceur (SHOGEN-MUT-FATAL-1 : 1 tué par le test nommé, 0 vivant, toute
   autre sortie FATAL), témoin vert avant chaque campagne. Chaque sous-lot ajoute sa section à la fin de ce fichier.
+- **Compte de R-25** (SHOGEN-S2BIS-R25-COMPTE-1, O-7 de la G2 de P2A ; lot DETTES-T6, diff DT6-a) : la borne de
+  200 lignes par sous-lot porte sur les lignes ajoutées des fichiers de code, `.py` et `.yml` (colonne des ajouts de
+  `git diff --numstat`) ; données (`.json`, `.bin`), fixtures et documents (`.md`) sont hors compte et déclarés dans
+  la section du sous-lot.
 
 ## Fonctions de fitness
 
@@ -2364,3 +2368,27 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 340 tests ; plancher du job : 340, égalité exigée (`--egal`).
+
+## DT6-a (2026-10-09) : borne basse des octets par occurrence, cycle refusé avant le sérialiseur (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-CANONIQUE-OCTETS-1 (O-4 de la G2 de P2A) et résiduel du volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1.
+`canonique` comptait une valeur par occurrence : une chaîne de 1 Mio partagée 1 000 fois passait la borne, puis le
+sérialiseur écrivait 1 Gio (10 s, pic de 2 Gio, mesuré) ; un cycle placé derrière un graphe partagé n'était vu par le
+sérialiseur qu'après le développement du graphe (2^20 feuilles : 3,8 s, mesuré). La borne porte sur une borne basse des
+octets, comptée une fois par occurrence, et un cycle est refusé avant le sérialiseur (FORMAT §8.4). En-tête : convention
+du compte de R-25.
+
+Rouge : sur la base, 2 tests en échec d'assertion (FAIL 2, ERROR 0) : sérialiseur appelé (espion qui lève).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 452 | — |
+| `tests/test_journal.py` | 356 | 17 (2 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : cycle laissé au
+sérialiseur, chaîne comptée 1, entier compté 1, chiffres surestimés (4/10), clés non comptées, virgules non comptées,
+saut de ligne non compté, signe non compté, null et booléens comptés 5, nombre à virgule compté 24, borne retirée,
+conteneur partagé compté une fois.
+
+Suite : 344 tests ; plancher du job : 344, égalité exigée (`--egal`).

@@ -17,6 +17,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import journal as j
 
@@ -229,6 +230,45 @@ class Ecrivain(Base):
         self.assertEqual((code(lambda: j.canonique({"x": x})), self.etat()), ("JOURNAL/taille", avant))
         self.assertLess(time.monotonic() - t, 1)
         self.assertEqual(len(j.canonique({"x": [x1] * 2})), 4004012)
+
+    def test_octets_comptes_par_occurrence_avant_le_serialiseur(self):     # SHOGEN-S2BIS-CANONIQUE-OCTETS-1 (O-4)
+        """Borne basse des octets, une fois par occurrence : une chaîne de 2^20 caractères partagée 1 000 fois (avant :
+        admise en 10 s, pic de 2 Gio, mesuré) ou 5 fois, un entier de 640 chiffres partagé 10 000 fois, une clé de 2^20
+        caractères dans un objet partagé 5 fois ; lignes ASCII de LIMITE + 1, + 4 et + 10 octets (chaîne de LIMITE − 8 ;
+        quatre chaînes de 1 048 572, trois virgules ; quatre de 1 048 566 et dix « -5 », signes et virgules : la borne y
+        est exacte) : refus JOURNAL/taille sans appel au sérialiseur (tailles recomptées par json.dumps). Une ligne
+        d'exactement LIMITE octets reste admise, quelle que soit la valeur répétée : la borne ne passe jamais les octets
+        écrits ; une valeur simple en écrit au plus 8 fois sa borne (docstring de `canonique`)."""
+        long_, refus = "a" * (1 << 20), []
+        with mock.patch.object(j.json, "dumps", side_effect=AssertionError("sérialiseur appelé")):
+            t = time.monotonic()
+            refus.append((code(lambda: j.canonique({"x": [long_] * 1000})), time.monotonic() - t < 0.5))
+            for x in ([long_] * 5, [10 ** 639] * 10000, [{"k" * (1 << 20): 0}] * 5, "a" * (j.LIMITE - 8),
+                      ["a" * 1048572] * 4, ["a" * 1048566] * 4 + [-5] * 10):
+                refus.append((code(lambda: j.canonique({"x": x})), True))
+        self.assertEqual(refus, [("JOURNAL/taille", True)] * 7)
+        for v in (chr(1), chr(233), chr(0x1F600), 10 ** 639, -1, 0, None, False, True, [], {}, "", '"'):
+            r = j.LIMITE - 1 - len(json.dumps({"x": [v] * 1000, "y": ""}, separators=(",", ":"), ensure_ascii=False
+                                              ).encode())                   # 1 000 fois la valeur, puis du remplissage
+            with self.subTest(valeur=v):
+                self.assertEqual(len(j.canonique({"x": [v] * 1000, "y": "a" * r})), j.LIMITE)
+        for v in (chr(1) * 9, -2.2250738585072014e-308, float("-inf"), -9, False, None, 10 ** 639, ""):
+            n = len(json.dumps(v, ensure_ascii=False).encode())       # écrit au plus 8 fois sa borne (docstring)
+            self.assertTrue(j._octets(v) <= n <= 8 * j._octets(v), (v, j._octets(v), n))
+
+    def test_cycle_refuse_avant_le_serialiseur(self):     # SHOGEN-S2BIS-CORPS-BORNE-1, volet graphe : résiduel de CB-6d
+        """Un cycle derrière un graphe partagé de 2^40 feuilles : refus JOURNAL/type sans appel au sérialiseur, qui
+        développait le graphe avant de voir le cycle (2^18 feuilles : 0,99 s ; 2^20 : 3,8 s ; mesuré) ; un entier de 641
+        chiffres dans un cycle reste refusé JOURNAL/entier."""
+        x, z = [1], [10 ** 640]
+        for _i in range(40):
+            x = [x, x]
+        y = [x]
+        y.append(y)
+        z.append(z)
+        with mock.patch.object(j.json, "dumps", side_effect=AssertionError("sérialiseur appelé")):
+            self.assertEqual([code(lambda: j.canonique({"a": y})), code(lambda: j.canonique({"b": z}))],
+                             ["JOURNAL/type", "JOURNAL/entier"])
 
     def test_entiers_de_640_chiffres_au_plus(self):                    # SHOGEN-S2BIS-ENTIER-ECRIVAIN-1 (I-1)
         """640 chiffres, signe non compté, plus petite limite non nulle de conversion des entiers de l'interpréteur :

@@ -29,7 +29,9 @@ dernière écrite restent refusées (C-1) ; le marqueur qui suit des fenêtres s
 ses octets avant tout décodeur, par la copie du compte du lecteur du recalcul (RB-1j, RB-1l ; texte égal, contrôlé par
 `test_fitness`) : une RecursionError n'est jamais un verdict (SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1) ;
 `canonique` compte les valeurs une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur plus
-de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1)."""
+de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1). DT6-a : la borne porte sur les
+octets (SHOGEN-S2BIS-CANONIQUE-OCTETS-1 : une longue chaîne partagée comptait pour une valeur), et un cycle est refusé
+avant le sérialiseur, qui développait le graphe partagé placé devant lui (résiduel de CORPS-BORNE-1)."""
 import fcntl
 import hashlib
 import json
@@ -64,11 +66,25 @@ class JournalOccupe(ErreurJournal):
     pass
 
 
+def _octets(v):
+    """Borne basse des octets que le sérialiseur écrit pour la valeur simple `v` (DT6-a,
+    SHOGEN-S2BIS-CANONIQUE-OCTETS-1) : chaîne, sa longueur et deux guillemets ; entier, son signe et ses chiffres,
+    bornés par sa taille en bits (3/10 < log10 2) ; null, true, false, 4 ; nombre à virgule, 3 ; autre valeur, 1."""
+    if isinstance(v, str):
+        return len(v) + 2
+    if v is None or isinstance(v, bool):
+        return 4
+    if isinstance(v, int):
+        return (v < 0) + 1 + (max(v.bit_length(), 1) - 1) * 3 // 10
+    return 3 if isinstance(v, float) else 1
+
+
 def _parcours(enr):
-    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr` et nombre de ses valeurs, une
-    fois par occurrence, None sur un cycle), sans récursion. Chaque conteneur n'est développé qu'une fois, sa hauteur
-    et son nombre de valeurs retenus : un conteneur partagé compte à sa plus grande profondeur et autant de fois qu'il
-    figure, sans parcours exponentiel (CB-6d) ; un cycle n'arrête pas la recherche des entiers."""
+    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr` et borne basse de ses octets,
+    une fois par occurrence, None sur un cycle), sans récursion. Chaque conteneur n'est développé qu'une fois, sa
+    hauteur et sa borne retenues : un conteneur partagé compte à sa plus grande profondeur et autant de fois qu'il
+    figure, sans parcours exponentiel (CB-6d) ; sa borne compte crochets, séparateurs, clés (`_octets`, deux-points) et
+    valeurs (DT6-a) ; un cycle n'arrête pas la recherche des entiers."""
     long_, cycle, haut, chemin, pile, n = False, False, {}, set(), [(enr, False)], {}
     while pile:
         v, fin = pile.pop()
@@ -80,7 +96,9 @@ def _parcours(enr):
             chemin.discard(id(v))
             haut[id(v)] = 1 + max([haut.get(id(x), 0) for x in enfants if isinstance(x, (dict, list, tuple))],
                                   default=0)
-            n[id(v)] = 1 + sum(n.get(id(x), 1) if isinstance(x, (dict, list, tuple)) else 1 for x in enfants)
+            cles = sum(_octets(k) + 1 for k in v) if isinstance(v, dict) else 0     # clé entre guillemets, deux-points
+            n[id(v)] = 1 + len(enfants) + cles + sum(n.get(id(x), 1) if isinstance(x, (dict, list, tuple)) else
+                                                     _octets(x) for x in enfants)
         elif id(v) in chemin:
             cycle = True                                            # le sérialiseur le refusera (JOURNAL/type)
         else:
@@ -114,17 +132,21 @@ def _types(e):
 
 
 def canonique(enr):
-    """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Le
-    contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3). Un entier de plus de CHIFFRES chiffres
-    (JOURNAL/entier, I-1) et un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication, C-4) sont refusés avant le
-    sérialiseur, quel que soit le réglage de l'interpréteur."""
-    long_, niveaux, valeurs = _parcours(enr)
+    """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Un
+    entier de plus de CHIFFRES chiffres (JOURNAL/entier, I-1), un cycle (JOURNAL/type, DT6-a : le sérialiseur
+    développait d'abord le graphe partagé qui le précède), un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication,
+    C-4) et une ligne de plus de LIMITE octets selon la borne basse de `_parcours` (JOURNAL/taille, DT6-a) sont refusés
+    avant le sérialiseur, quel que soit le réglage de l'interpréteur : celui-ci écrit au plus 8 × LIMITE octets (8 :
+    nombre à virgule de 24 caractères compté 3), et le parcours des valeurs qui le suit se termine (C-3)."""
+    long_, niveaux, octets = _parcours(enr)
     if long_:
         raise ErreurJournal("JOURNAL/entier", f"entier de plus de {CHIFFRES} chiffres")
-    if niveaux is not None and niveaux > NIVEAUX:
+    if niveaux is None:
+        raise ErreurJournal("JOURNAL/type", "structure cyclique")
+    if niveaux > NIVEAUX:
         raise ErreurJournal("JOURNAL/imbrication", f"{niveaux} niveaux, {NIVEAUX} au plus")
-    if valeurs is not None and valeurs > LIMITE:                 # chaque valeur écrit un octet au moins (CB-6d)
-        raise ErreurJournal("JOURNAL/taille", f"{valeurs} valeurs, plus que {LIMITE} octets")
+    if octets + 1 > LIMITE:                                     # saut de ligne compris (CB-6d ; DT6-a)
+        raise ErreurJournal("JOURNAL/taille", f"au moins {octets + 1} octets, plus que {LIMITE}")
     try:
         octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication

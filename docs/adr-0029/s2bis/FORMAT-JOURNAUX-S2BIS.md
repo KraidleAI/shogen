@@ -49,6 +49,9 @@
   diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
   (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
   CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
+- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 21:31:02 UTC, heure lue par `date -u` à la dernière écriture
+  du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
+  graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -299,12 +302,20 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    lecture mesuré sur les décodeurs Python du projet est 988 niveaux (Python 3.10, limite de récursion par défaut ;
    seuils mesurés sous 3.10 et 3.12 seulement, banc de la G2 de RB-18) ; N est très au-dessus du premier et très
    au-dessous du second.
-4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
-   le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
-   partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure. L'écrivain en compte les valeurs
-   une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur un enregistrement de plus de
-   LIMITE valeurs, qui ferait plus de LIMITE octets (`JOURNAL/taille` ; CB-6d, volet graphe de
-   SHOGEN-S2BIS-CORPS-BORNE-1 : `canonique` développait le graphe, en temps exponentiel).
+4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`),
+   avant le sérialiseur (CB-2e, C-3 ; DT6-a : le contrôle de cycle du sérialiseur `json` ne voyait le cycle qu'après
+   avoir développé le graphe partagé placé devant lui, en temps exponentiel, 3,8 s pour 2^20 feuilles, mesuré). Une
+   sous-structure partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure. L'écrivain en
+   compte, une fois par occurrence et sans développer le graphe, une borne basse des octets de la ligne (DT6-a) :
+   crochets, accolades, virgules et deux-points ; chaque chaîne, clés comprises, sa longueur et ses deux guillemets ;
+   chaque entier, son signe et ses chiffres, bornés par sa taille en bits ; `null`, `true` et `false`, 4 octets ; un
+   nombre à virgule, 3 ; toute autre valeur, 1. Il refuse avant le sérialiseur un enregistrement dont la borne, saut
+   de ligne compris, passe LIMITE (`JOURNAL/taille` ; CB-6d, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 : `canonique`
+   développait le graphe, en temps exponentiel ; DT6-a, SHOGEN-S2BIS-CANONIQUE-OCTETS-1 : la borne comptait les
+   valeurs, et une chaîne de 1 Mio partagée 1 000 fois faisait écrire 1 Gio, en 10 s, mesuré). Le contrôle prend un
+   temps linéaire dans le nombre de liens des conteneurs distincts ; le sérialiseur, qui ne part que sous cette borne,
+   écrit au plus 8 × LIMITE octets (un caractère de contrôle s'écrit en 6 octets pour 1 compté, un nombre à virgule,
+   refusé après lui, en 24 au plus pour 3).
 
 ## 9. Enregistrement `lecture` (CB-3a ; E-C-03, E-C-04, E-C-17)
 
