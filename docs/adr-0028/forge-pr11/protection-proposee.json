@@ -1,0 +1,20 @@
+{
+  "required_status_checks": {
+    "strict": true,
+    "contexts": [
+      "g1-model-pinning", "g3-secrets", "g5-no-naked-todo", "s2-harness-unittest", "s2bis-unittest",
+      "sim-bis-unittest", "calib-actifs-unittest", "controle-unittest",
+      "squelette (ubuntu-24.04)", "squelette (windows-2025)", "temoignage (ubuntu-24.04)", "temoignage (windows-2025)",
+      "compagnon (ubuntu-24.04)", "compagnon (windows-2025)", "double-build D6 (x86_64-unknown-linux-gnu)",
+      "mutation du diff (budget 10 min)", "fuzz (15 min)",
+      "fuzz instrumenté — cargo-fuzz / libFuzzer (Linux)", "fuzz instrumenté — cargo-afl / AFL++ (Linux)",
+      "CodeQL"
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {"required_approving_review_count": 0, "dismiss_stale_reviews": true},
+  "restrictions": null,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}

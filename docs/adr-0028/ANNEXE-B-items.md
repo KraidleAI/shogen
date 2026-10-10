@@ -1607,3 +1607,19 @@ Item formé (lot futur nommé) :
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1 | le motif `FLOTTANT` de `enforcement/runners-epingles.py` est quadratique sur une longue valeur sans `-latest` (4,7 s pour 32 000 caractères ; valeurs réelles de quelques dizaines de caractères) | orch. | lot de dettes DETTES-T15 (gates et contrôles), brief écrit après le versement de DETTES-T14 | motif à temps linéaire (jeton délimité puis test du suffixe), test de temps borné [inféré] | G2 du correctif DT5-24, O-5 |
+
+## B.95 Amendement daté du 2026-10-10 04:16:19 UTC (heure produite par `date -u`) : premier passage sur la forge de DETTES-T5 et du lot FUZZ (PR n° 11), état des réglages de la forge
+
+PR n° 11 fusionnée par le commit de fusion `5e445c4`, après une CI verte sur `0e03a9f` : 24 contrôles verts, et 3 sautés par construction (fuzz de nuit, mutation de la poussée, mutation complète). `squelette (ubuntu-24.04)` a été relancé une fois : son installation de la chaîne Rust avait échoué avant tout test (téléchargement depuis `static.rust-lang.org` en délai dépassé) ; il est vert à la relance. CodeQL : `No new alerts in code changed by this pull request`, l'alerte `py/redos` est close. Pièces : `docs/adr-0028/forge-pr11/` (extraits datés des journaux des jobs, refus du mandataire, réglage proposé ; `SHA256SUMS` du dossier).
+
+- **Environnement du job g1** (étape de DT5-4), lu au premier passage : image `ubuntu-24.04` version 20261004.327.1, locale `C.UTF-8`, `python3` 3.12.3, `awk` GNU Awk 5.2.1 ; `python3-yaml` 6.0.1-2build2 déjà présent (aucune installation). Fermés par cette lecture : **SHOGEN-G1-FORGE-1 (c)** (variante d'`awk`) et le volet « locale du job g1 » de **SHOGEN-LINT-ENVIRONNEMENTS-1** ; le volet Git Bash reste au lot DETTES-T7. Les mesures demandées par SHOGEN-CI-S2-FORGE-1 (c) (version réelle de l'image, `python3` de l'image) sont lues.
+- **Pas « Distillation » du job `cargo-afl`** (FZ-f, FZ-h), premier passage : empreinte de l'archive dérivée conforme ; base 1 346 arêtes, corpus entier 2 090 ; E 1 073 ; aucune arête de la base perdue ; 744 arêtes gagnées, dont 718 dans E ; seuil 641 = ⌈1 073 × 471/789⌉ ; verdict VERT. E diffère d'une arête de la mesure locale (1 074, binaire de `c1122de`) : le nombre suit E et la fraction est tenue (règle Q-8). La limite L-1 de l'adjudication du lot FUZZ (pas CI à lire au premier passage) est soldée.
+- **Volets (a) « contrôles requis sur `main` »** de SHOGEN-CI-S2-FORGE-1, SHOGEN-G3-FORGE-1, SHOGEN-G5-FORGE-1, SHOGEN-G1-FORGE-1 et SHOGEN-S2BIS-CI-FORGE-1, et **SHOGEN-FORGE-SECRET-SCANNING-1** : le jeton de la session a les droits d'administration (lus), mais le mandataire réseau refuse l'écriture (HTTP 403 sur la protection de branche et sur les réglages du dépôt ; réponses versées). Ces volets deviennent des **actes de l'investisseur**, décrits pas à pas dans son dossier d'actes, dans la forme de `protection-proposee.json` :
+  - PR obligatoire ;
+  - 20 contrôles exigés : les 19 jobs lancés à chaque PR, plus CodeQL ;
+  - branche à jour, conversations résolues ;
+  - aucun contournement, ni poussée forcée ni suppression ;
+  - balayage des secrets et protection des poussées.
+  Déclencheur de fermeture : l'investisseur dit les avoir posés ; l'orchestrateur relit les réglages en lecture (admise par le mandataire) et les consigne à un bloc daté.
+
+Aucun item formé.
