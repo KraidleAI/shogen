@@ -466,6 +466,14 @@ pub fn ecrire_corpus_dirige(racine: &Path) -> Result<Vec<String>, String> {
         "dirigee-constat-hexadecimal-impair.txt",
         constat_dirige("041a2b3").into_bytes(),
     ));
+    // 6. Les graines DISTILLÉES (13 §7 dette 3) : les formes que les campagnes instrumentées
+    //    exerçaient, nommées (`crate::distillation`).
+    let distillees = crate::distillation::graines();
+    graines.extend(
+        distillees
+            .iter()
+            .map(|g| (g.nom.as_str(), g.octets.clone())),
+    );
 
     let mut journal = Vec::new();
     journal.push(format!("corpus dirigé : {}", repertoire.display()));
@@ -528,7 +536,7 @@ fn constat_dirige(chiffres_de_la_cle: &str) -> String {
 ///
 /// Les valeurs reprennent celles du test de bout en bout, aux mêmes empreintes
 /// tierces, pour que le corpus et la suite parlent de la même forme.
-fn temoignage_canonique_exemple() -> shogen_core::Temoignage {
+pub(crate) fn temoignage_canonique_exemple() -> shogen_core::Temoignage {
     shogen_core::Temoignage {
         subject: String::from("https://api.example.com/v3/simple/price?ids=bitcoin"),
         attestor: vec![shogen_core::Attestor {
