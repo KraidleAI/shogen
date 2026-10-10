@@ -114,6 +114,14 @@ class RunnersEpingles(unittest.TestCase):
             ".github/workflows/.b.Yaml:1 : macos-latest", ".github/workflows/A.YML:1 : ubuntu-latest"]), err)
         self.assertIn("2 autre(s) entrée(s) de .github/workflows non lue(s) : c.yml.txt, sous.yml", out)
 
+    def test_valeur_adverse_en_temps_borne(self):
+        """Alerte CodeQL de la PR n° 11 : une valeur faite de « ! » en grand nombre puis d'un mot qui n'est ni ancre ni
+        étiquette se juge en temps borné (l'ancienne forme de VIDE et BLOC y faisait un retour arrière exponentiel)."""
+        for valeur in ("!" * 5000 + "x b", "&" * 5000 + " b", "!" * 5000 + "|x"):
+            p = subprocess.run([sys.executable, "-B", SCRIPT, self.arbre({"w.yml": "    runs-on: " + valeur + NL})],
+                               capture_output=True, text=True, timeout=20)
+            self.assertEqual(p.returncode, 0, p.stderr)
+
     def test_erreurs_sortie_3(self):
         """Racine sans .github/workflows, arguments en trop ou absents, workflow illisible (UTF-8 invalide) : 3."""
         vide = tempfile.mkdtemp()

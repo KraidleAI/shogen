@@ -341,6 +341,7 @@ jobs:
     # sommes de scripts/controle ; patron du job calib-actifs (aucun saut, Ran = plancher, --egal) ; cas K-04 du runner.
     # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (10 tests, dont 2 de la relecture G2 et 1 de
     # l'adjudication C-10), plancher 26 → 36.
+    # Correctif DT5-24 (2026-10-10, alerte CodeQL de la PR n° 11 : retour arrière exponentiel) : un test, plancher 37.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -356,4 +357,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 36
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 37

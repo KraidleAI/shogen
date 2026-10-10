@@ -22,8 +22,10 @@ import sys
 
 FLOTTANT = re.compile(r"[A-Za-z0-9_.-]*-latest(?![A-Za-z0-9_.])[A-Za-z0-9_.-]*", re.IGNORECASE)
 MATRICE = re.compile(r"matrix\s*\.\s*([A-Za-z_][A-Za-z0-9_-]*)", re.IGNORECASE)   # ${{ matrix.<clé> }} d'un runs-on
-VIDE = re.compile(r"\s*(?:[&!]\S*\s*)*")                    # valeur absente, ou ancre et étiquette seules
-BLOC = re.compile(r"\s*(?:[&!]\S*\s*)*[|>][-+0-9]*\s*")     # en-tête de scalaire de bloc
+# Mots séparés par des blancs, chacun lu d'un seul tenant : aucun découpage ambigu d'un mot, donc aucun retour
+# arrière exponentiel (alerte CodeQL de la PR n° 11) ; mêmes chaînes acceptées que la forme `(?:[&!]\S*\s*)*`.
+VIDE = re.compile(r"\s*(?:[&!]\S*\s+)*(?:[&!]\S*)?")         # valeur absente, ou ancre et étiquette seules
+BLOC = re.compile(r"\s*(?:[&!]\S*\s+)*(?:[&!]\S*)?[|>][-+0-9]*\s*")  # en-tête de scalaire de bloc
 
 
 def cle(noms) -> re.Pattern:
