@@ -269,6 +269,10 @@ jobs:
     # exigé, aucun saut admis, Ran ≥ plancher committé ci-dessous (SHOGEN-CI-S2-SAUT-1), relevé au compte mesuré à
     # chaque sous-lot (SHOGEN-CI-PLANCHER-SUIVI-1). Étapes lues par le cas K-02 du runner (SHOGEN-CI-S2-CABLAGE-1).
     # Diff CB-2e (Q-2 de la G2 de P1) : --egal exige Ran = plancher ; un plancher oublié ou abaissé fait échouer le job.
+    # Forme fermée des jobs unittest (lot DETTES-T6, DT6-j ; SHOGEN-S2BIS-ENV-ETAPE-1) : aucune clé `env`, ni au
+    # workflow, ni au job, ni à l'étape (leurres L-10, L-12, L-19 et L-33 du runner, refusés) ; une variable dont une
+    # suite a besoin se pose dans la suite (son tests/__init__.py, comme la purge des mandataires) ; tout autre besoin
+    # amende le gabarit K du runner et l'analyseur de enforcement/verdict-suite-s2.py, avec leurs cas.
     name: s2bis-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
