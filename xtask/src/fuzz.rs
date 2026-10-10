@@ -499,7 +499,7 @@ fn alloc_octets(octets: &[u8]) -> Vec<u8> {
 /// parlent de la même forme. `empreinte_sent_revele_sha256` est l'empreinte de
 /// la suite VIDE (vecteur mesuré du dépôt) : ce lot d'exemple ne porte aucun
 /// octet émis, et les trois longueurs du sens émis valent zéro en conséquence.
-fn constat_dirige(chiffres_de_la_cle: &str) -> String {
+pub(crate) fn constat_dirige(chiffres_de_la_cle: &str) -> String {
     format!(
         "{{\"attestor_cle_algorithme\":\"exemple\",\
 \"attestor_cle_hex\":\"{chiffres_de_la_cle}\",\
