@@ -8,9 +8,11 @@
 //! fragment du classement que le vérificateur doit en rendre (`attendu`), contrôlé par
 //! `xtask/tests/distillation.rs`. Mesure et seuil : `crates/shogen-verifier/fuzz-corpus/README.md`.
 //!
-//! La gate `cargo xtask fuzz-distillation` juge deux cartes `afl-showmap -C`, sans et avec les
-//! graines distillées, et refuse sous ⌈1074 × 471/789⌉ = 642 arêtes gagnées. Hors de `verify`
-//! comme `fuzz` : la mesure exige la cible instrumentée (job `cargo-afl` de `fuzz.yml`, Linux).
+//! La gate `cargo xtask fuzz-distillation` juge trois cartes `afl-showmap -C` d'un même binaire :
+//! corpus sans les graines distillées, corpus entier, corpus dérivé versé. Elle compte les arêtes
+//! gagnées dans E (l'apport du dérivé hors de la base, mesuré sur ce binaire) et refuse sous
+//! ⌈E × 471/789⌉ (642 pour E = 1074 au binaire de `c1122de`, 2026-10-09). Hors de `verify` comme
+//! `fuzz` : la mesure exige la cible instrumentée (job `cargo-afl` de `fuzz.yml`, Linux).
 
 use crate::fuzz::{constat_dirige, temoignage_canonique_exemple};
 use shogen_core::{Attestor, Temoignage, encoder_temoignage_canonique};
@@ -100,16 +102,12 @@ fn position(octets: &[u8], motif: &[u8]) -> Option<usize> {
     octets.windows(largeur).position(|fenetre| fenetre == motif)
 }
 
-/// 13 §7 dette 3 : « ≥ 471 des 789 arêtes » que le corpus dérivé atteignait hors du corpus dirigé.
+/// 13 §7 dette 3 : « ≥ 471 des 789 arêtes » que le corpus dérivé apportait hors du corpus dirigé.
 pub const FRACTION: (u64, u64) = (471, 789);
 
-/// Les arêtes du corpus dérivé hors du corpus dirigé d'origine, mesurées le 2026-10-09 (README du
-/// corpus) : la base de la fraction sur le binaire courant, qui n'est plus celui de 471/789.
-pub const ARETES_DU_DERIVE: u64 = 1074;
-
-/// Le seuil de la gate, en arêtes gagnées par les graines distillées : ⌈1074 × 471 / 789⌉.
-pub fn seuil() -> u64 {
-    ARETES_DU_DERIVE
+/// Le seuil, en arêtes gagnées dans E : ⌈E × 471 / 789⌉, E étant mesuré sur le binaire du jour.
+pub fn seuil(apport_du_derive: usize) -> u64 {
+    (apport_du_derive as u64)
         .saturating_mul(FRACTION.0)
         .div_ceil(FRACTION.1)
 }
@@ -140,32 +138,38 @@ pub fn lire_carte(texte: &str) -> Result<BTreeSet<u32>, String> {
 
 /// La mesure, imprimée avant le verdict (ADR-0013, point 2).
 pub struct Mesure {
-    /// Arêtes du corpus sans les graines distillées.
+    /// Arêtes du corpus sans les graines distillées : la base.
     pub base: usize,
     /// Arêtes du corpus entier.
     pub corpus: usize,
-    /// Arêtes du corpus entier hors de la base : l'apport des graines distillées.
+    /// E : arêtes du corpus dérivé hors de la base.
+    pub apport: usize,
+    /// Arêtes du corpus entier hors de la base.
     pub gagnees: usize,
-    /// Arêtes de la base absentes du corpus entier : non nul, les deux cartes sont incomparables.
+    /// Les mêmes, dans E : la mesure comparée au seuil.
+    pub gagnees_dans_e: usize,
+    /// Arêtes de la base absentes du corpus entier : non nul, les cartes sont incomparables.
     pub perdues: usize,
 }
 
 impl Mesure {
-    pub fn de(base: &BTreeSet<u32>, corpus: &BTreeSet<u32>) -> Self {
-        let gagnees = corpus.difference(base).count();
-        let perdues = base.difference(corpus).count();
-        let (base, corpus) = (base.len(), corpus.len());
+    pub fn de(base: &BTreeSet<u32>, corpus: &BTreeSet<u32>, derive: &BTreeSet<u32>) -> Self {
+        let apport: BTreeSet<u32> = derive.difference(base).copied().collect();
+        let gagnees: Vec<&u32> = corpus.difference(base).collect();
         Self {
-            base,
-            corpus,
-            gagnees,
-            perdues,
+            base: base.len(),
+            corpus: corpus.len(),
+            apport: apport.len(),
+            gagnees: gagnees.len(),
+            gagnees_dans_e: gagnees.iter().filter(|a| apport.contains(a)).count(),
+            perdues: base.difference(corpus).count(),
         }
     }
 
-    /// Vert si les graines distillées gagnent au moins le seuil, sur deux cartes comparables.
+    /// Vert si les graines distillées gagnent au moins ⌈E × 471/789⌉ arêtes de E, E non vide, sur
+    /// des cartes comparables. Un E vide (dérivé absent ou confondu avec la base) est ROUGE.
     pub fn vert(&self) -> bool {
-        self.perdues == 0 && self.gagnees as u64 >= seuil()
+        self.perdues == 0 && self.apport > 0 && self.gagnees_dans_e as u64 >= seuil(self.apport)
     }
 
     pub fn imprimer(&self) {
@@ -173,28 +177,31 @@ impl Mesure {
         println!("--- distillation du corpus de fuzz (13 §7 dette 3) ---");
         println!("  arêtes, corpus sans graines distillées : {}", self.base);
         println!("  arêtes, corpus entier                  : {}", self.corpus);
+        println!("  E, apport du corpus dérivé             : {}", self.apport);
         println!(
             "  arêtes de la base perdues (attendu 0)  : {}",
             self.perdues
         );
         println!(
-            "  arêtes gagnées : {} ; seuil {} = ⌈{ARETES_DU_DERIVE} × {numerateur}/{denominateur}⌉",
+            "  arêtes gagnées : {}, dont dans E : {} ; seuil {} = ⌈{} × {numerateur}/{denominateur}⌉",
             self.gagnees,
-            seuil()
+            self.gagnees_dans_e,
+            seuil(self.apport),
+            self.apport
         );
         let verdict = if self.vert() { "VERT" } else { "ROUGE" };
         println!("  VERDICT : {verdict}");
     }
 }
 
-/// Juge deux cartes : celle du corpus sans les graines distillées, celle du corpus entier.
-pub fn juger(carte_base: &Path, carte_corpus: &Path) -> Result<Mesure, String> {
+/// Juge trois cartes : corpus sans les graines distillées, corpus entier, corpus dérivé.
+pub fn juger(base: &Path, corpus: &Path, derive: &Path) -> Result<Mesure, String> {
     let lire = |chemin: &Path| {
         let texte = std::fs::read_to_string(chemin)
             .map_err(|erreur| format!("{} illisible : {erreur}", chemin.display()))?;
         lire_carte(&texte).map_err(|erreur| format!("{} : {erreur}", chemin.display()))
     };
-    Ok(Mesure::de(&lire(carte_base)?, &lire(carte_corpus)?))
+    Ok(Mesure::de(&lire(base)?, &lire(corpus)?, &lire(derive)?))
 }
 
 /// Une table, une ligne par graine : la macro garde la ligne hors de rustfmt (même forme que

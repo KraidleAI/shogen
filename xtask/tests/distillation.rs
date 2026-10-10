@@ -73,12 +73,16 @@ fn le_corpus_committe_est_ce_que_le_generateur_ecrit_graines_distinctes() {
     );
 }
 
-// La gate `fuzz-distillation` : seuil, bornes, cartes hors forme, codes de sortie.
+// La gate `fuzz-distillation` : seuil sur l'apport du dérivé recalculé, bornes, cartes hors forme,
+// codes de sortie.
 
 #[test]
-fn seuil_de_la_gate_642_aretes() {
+fn seuil_471_sur_789_de_l_apport_du_derive() {
+    use xtask::distillation::seuil;
     // 1074 × 471 = 505 854 ; 789 × 641 = 505 749 < 505 854 ≤ 789 × 642 = 506 538.
-    assert_eq!(xtask::distillation::seuil(), 642);
+    assert_eq!(seuil(1074), 642);
+    assert_eq!(seuil(789), 471);
+    assert_eq!(seuil(100), 60, "47 100 / 789 = 59,7 : arrondi au-dessus");
 }
 
 /// Une carte au format d'`afl-showmap` (`%06u:%u`) : `n` arêtes à partir de `debut`.
@@ -89,15 +93,27 @@ fn carte(debut: u64, n: u64) -> String {
 }
 
 #[test]
-fn gate_verte_au_seuil_rouge_dessous_et_sur_base_perdue() {
+fn gate_compte_l_apport_du_derive_seul_et_refuse_un_apport_nul() {
     use xtask::distillation::{Mesure, lire_carte, seuil};
     let lire = |texte: String| lire_carte(&texte).expect("carte de forme afl-showmap");
-    let base = lire(carte(0, 10));
-    assert!(Mesure::de(&base, &lire(carte(0, 10 + seuil()))).vert());
-    assert!(!Mesure::de(&base, &lire(carte(0, 9 + seuil()))).vert());
+    // Base : arêtes 0 à 9 ; le dérivé en apporte 100 de plus (10 à 109) ; seuil 60.
+    let (base, derive, s) = (lire(carte(0, 10)), lire(carte(0, 110)), seuil(100));
+    assert!(Mesure::de(&base, &lire(carte(0, 10 + s)), &derive).vert());
+    assert!(!Mesure::de(&base, &lire(carte(0, 9 + s)), &derive).vert());
+    let hors_apport = lire(carte(0, 10) + &carte(500, 100));
     assert!(
-        !Mesure::de(&base, &lire(carte(1, 10 + seuil()))).vert(),
+        !Mesure::de(&base, &hors_apport, &derive).vert(),
+        "gain hors de l'apport compté"
+    );
+    let perdue = lire(carte(1, 10 + s));
+    assert!(
+        !Mesure::de(&base, &perdue, &derive).vert(),
         "arête 0 perdue"
+    );
+    let tout = lire(carte(0, 110));
+    assert!(
+        !Mesure::de(&base, &tout, &base).vert(),
+        "apport du dérivé nul"
     );
 }
 
@@ -123,8 +139,14 @@ fn carte_hors_forme_refusee() {
 fn commande_rend_0_vert_1_rouge_ou_illisible_64_usage() {
     let dossier = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("distillation-cartes");
     std::fs::create_dir_all(&dossier).expect("dossier des cartes");
-    let seuil = xtask::distillation::seuil();
-    for (nom, n) in [("base", 10), ("verte", 10 + seuil), ("rouge", 9 + seuil)] {
+    let seuil = xtask::distillation::seuil(100);
+    let cartes = [
+        ("base", 10),
+        ("derive", 110),
+        ("verte", 10 + seuil),
+        ("rouge", 9 + seuil),
+    ];
+    for (nom, n) in cartes {
         std::fs::write(dossier.join(nom), carte(0, n)).expect("carte écrite");
     }
     let code = |arguments: &[&str]| {
@@ -135,8 +157,9 @@ fn commande_rend_0_vert_1_rouge_ou_illisible_64_usage() {
             .expect("xtask lancé")
             .code()
     };
-    assert_eq!(code(&["base", "verte"]), Some(0));
-    assert_eq!(code(&["base", "rouge"]), Some(1));
-    assert_eq!(code(&["base", "absente"]), Some(1));
-    assert_eq!(code(&["base"]), Some(64));
+    assert_eq!(code(&["base", "verte", "derive"]), Some(0));
+    assert_eq!(code(&["base", "rouge", "derive"]), Some(1));
+    assert_eq!(code(&["base", "verte", "absente"]), Some(1));
+    assert_eq!(code(&["base", "verte"]), Some(64));
+    assert_eq!(code(&["base", "verte", "derive", "derive"]), Some(64));
 }

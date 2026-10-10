@@ -228,11 +228,17 @@ fn executer() -> i32 {
                 }
             }
         }
-        // 13 §7 dette 3 (lot FUZZ). Hors de `verify` comme `fuzz` : les deux cartes viennent
+        // 13 §7 dette 3 (lot FUZZ). Hors de `verify` comme `fuzz` : les trois cartes viennent
         // d'`afl-showmap` sur la cible instrumentée, dans le job `cargo-afl` de fuzz.yml (Linux).
-        "fuzz-distillation" => match (arguments.next(), arguments.next(), arguments.next()) {
-            (Some(base), Some(corpus), None) => {
-                match xtask::distillation::juger(&PathBuf::from(base), &PathBuf::from(corpus)) {
+        "fuzz-distillation" => match (
+            arguments.next(),
+            arguments.next(),
+            arguments.next(),
+            arguments.next(),
+        ) {
+            (Some(base), Some(corpus), Some(derive), None) => {
+                let [base, corpus, derive] = [base, corpus, derive].map(PathBuf::from);
+                match xtask::distillation::juger(&base, &corpus, &derive) {
                     Ok(mesure) => {
                         mesure.imprimer();
                         if mesure.vert() { 0 } else { 1 }
@@ -245,7 +251,9 @@ fn executer() -> i32 {
                 }
             }
             _ => {
-                eprintln!("usage : cargo xtask fuzz-distillation <carte-sans-distillees> <carte>");
+                eprintln!(
+                    "usage : cargo xtask fuzz-distillation <carte-sans-distillees> <carte> <carte-du-derive>"
+                );
                 64
             }
         },
@@ -283,7 +291,7 @@ fn executer() -> i32 {
             );
             eprintln!("  fuzz-corpus      : réécrit les graines dirigées du corpus de fuzz");
             eprintln!(
-                "  fuzz-distillation : juge deux cartes afl-showmap, sans et avec les graines distillées (13 §7 dette 3)"
+                "  fuzz-distillation : juge trois cartes afl-showmap (sans graines distillées, corpus, dérivé) — 13 §7 dette 3"
             );
             64
         }

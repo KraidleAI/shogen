@@ -39,13 +39,26 @@ graine 20261009), 2353 entrées : avec le corpus dirigé, 2413 arêtes, soit
 1074 de plus que lui seul. Avec les 108 graines distillées : 2084 arêtes, 745
 gagnées, dont 719 parmi les 1074 (66,95 %). La mesure 471/789 de 13 §7
 (binaire de `20e1084`) n'est plus rejouable depuis `58dc96e` : la fraction
-s'applique à la mesure neuve.
+s'applique à la mesure neuve (adjudication du 2026-10-09, sur avis d'advisor).
+Le corpus dérivé et les trois cartes sont versés dans
+`docs/adr-0028/revue-fuzz/pieces/` (sommes au `SHA256SUMS` du dossier).
 
 **La gate** : `cargo xtask fuzz-distillation <carte sans distillées> <carte
-du corpus>` (job `cargo-afl` de `fuzz.yml`) refuse sous ⌈1074 × 471/789⌉ = 642
-arêtes gagnées, ou si une arête du reste du corpus manque à la carte entière.
-Un changement du vérificateur qui la fait passer sous le seuil appelle une
-nouvelle distillation, jamais un seuil abaissé (13 §7 dette 3, verrou 2).
+du corpus> <carte du dérivé>`, trois cartes d'un même binaire (job `cargo-afl`
+de `fuzz.yml`). La mesure comparée est le nombre d'**arêtes gagnées dans E** :
+arêtes du corpus entier hors de la base qui sont aussi dans E, l'apport du
+dérivé hors de la base, recalculé sur le binaire du jour. Seuil : ⌈E ×
+471/789⌉, soit 642 pour E = 1074 au binaire de `c1122de`. Un E vide, ou une
+arête de la base absente de la carte entière, est ROUGE. **Règle** : un
+changement du vérificateur qui fait passer les graines sous le seuil appelle
+une nouvelle distillation, jamais un seuil abaissé (13 §7 dette 3, verrou 2).
+
+**À l'instrument de libFuzzer**, sans second seuil : compteurs 8 bits du
+binaire nightly (assertions de débogage et AddressSanitizer, défauts de
+cargo-fuzz), base 724, base et graines distillées 1218, base et dérivé 1575 ;
+une fusion `-merge=1` trouve 378 arêtes du dérivé hors des graines : environ
+55,6 % de son apport couverts. Les deux instruments ne comptent pas les mêmes
+arêtes ; 13 §7 fixe afl-showmap, seul instrument de la gate.
 
 ## Pourquoi une graine dirigée, et pas seulement du bruit
 

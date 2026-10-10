@@ -73,18 +73,20 @@ distillées (`crates/shogen-verifier/fuzz-corpus/README.md`) par l'outil de la
 mesure de référence, sur la cible AFL construite ci-dessus :
 
 ```sh
-D=~/distillation && mkdir -p "$D/corpus" "$D/base"
+D=~/distillation && P=docs/adr-0028/revue-fuzz/pieces && mkdir -p "$D/corpus" "$D/base"
 cp crates/shogen-verifier/fuzz-corpus/* "$D/corpus/" && rm "$D/corpus/README.md"
 cp "$D/corpus/"* "$D/base/" && rm "$D/base/"dirigee-distillee-*
-for carte in base corpus; do
+tar -xzf "$P/corpus-derive-2026-10-09.tar.gz" -C "$D"
+for carte in base corpus derive; do
   cargo afl showmap -C -i "$D/$carte" -o "$D/$carte.carte" -- fuzz/target/release/eprouver-afl
 done
-cargo xtask fuzz-distillation "$D/base.carte" "$D/corpus.carte"
+cargo xtask fuzz-distillation "$D/base.carte" "$D/corpus.carte" "$D/derive.carte"
 ```
 
 Le corpus dérivé de la mesure (2353 entrées, campagnes de 660 s des deux
-moteurs) n'est pas versé, comme le veut `fuzz/.gitignore` ; son manifeste
-sha256 est une pièce du lot FUZZ.
+moteurs) n'entre pas au corpus de graines, comme le veut `fuzz/.gitignore` :
+il est versé en archive avec les pièces de revue du lot
+(`docs/adr-0028/revue-fuzz/pieces/`), où la gate le relit.
 
 ## Ce qu'une campagne verte dit, et rien de plus
 

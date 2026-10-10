@@ -472,23 +472,30 @@ jobs:
 
       - name: Distillation — les graines distillées gardent leur couverture (13 §7 dette 3)
         # Lot FUZZ (SHOGEN-FUZZ-DISTILLATION-1, ADR-0028 annexe A) : le même outil que la mesure de
-        # référence du 2026-10-09 (afl-showmap d'AFL++ 4.40c, sur ce binaire), deux cartes, sans et
-        # avec les graines `dirigee-distillee-*` ; `cargo xtask fuzz-distillation` les juge, mesure
-        # imprimée avant le verdict (seuil ⌈1074 × 471/789⌉ = 642 arêtes gagnées, README du corpus).
-        # `rm` sans correspondance casse le pas : des graines renommées ne passent pas pour absentes.
+        # référence du 2026-10-09 (afl-showmap d'AFL++ 4.40c, sur ce binaire), trois cartes : sans
+        # les graines `dirigee-distillee-*`, corpus entier, corpus dérivé versé (sha256 contrôlé).
+        # `cargo xtask fuzz-distillation` recalcule E (apport du dérivé) sur ce binaire et exige
+        # ⌈E × 471/789⌉ arêtes gagnées dans E (642 pour E = 1074 au binaire de c1122de), mesure
+        # imprimée avant le verdict (README du corpus). Coût mesuré le 2026-10-09 : 2,4 s pour la
+        # carte du dérivé (2353 entrées). `rm` sans correspondance casse le pas : des graines
+        # renommées ne passent pas pour absentes.
         run: |
           set -euo pipefail
           D="${RUNNER_TEMP}/distillation"
+          PIECES=docs/adr-0028/revue-fuzz/pieces
           mkdir -p "${D}/corpus" "${D}/base"
           cp crates/shogen-verifier/fuzz-corpus/* "${D}/corpus/"
           rm "${D}/corpus/README.md"
           cp "${D}/corpus/"* "${D}/base/"
           rm "${D}/base/"dirigee-distillee-*
-          for carte in base corpus; do
+          (cd "${PIECES}" && grep '  corpus-derive-2026-10-09.tar.gz$' SHA256SUMS | sha256sum -c -)
+          tar -xzf "${PIECES}/corpus-derive-2026-10-09.tar.gz" -C "${D}"
+          for carte in base corpus derive; do
             cargo afl showmap -C -i "${D}/${carte}" -o "${D}/${carte}.carte" \
               -- fuzz/target/release/eprouver-afl
           done
-          cargo run --locked --package xtask -- fuzz-distillation "${D}/base.carte" "${D}/corpus.carte"
+          cargo run --locked --package xtask -- fuzz-distillation \
+            "${D}/base.carte" "${D}/corpus.carte" "${D}/derive.carte"
 
       - name: Corpus de départ — une COPIE, jamais l'original
         # POURQUOI UNE COPIE : le corpus committé ne doit être ni modifié ni
