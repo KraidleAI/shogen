@@ -94,9 +94,18 @@ def main():
         explicite = BON.replace("    runs-on: ubuntu-24.04", "    ? runs-on" + NL + "    : ubuntu-latest")
         matrice = BON.replace("    steps:", NL.join(["    strategy:", "      matrix:", "        include:",
                                                       "          - os: Windows-Latest", "    steps:"]))
-        code, out, err = controler(arbre({"a.yml": alias, "e.yml": echappe, "x.yml": explicite, "m.yml": matrice}, w))
-        cas("W-14 libellé -latest après lecture YAML refusé (alias, échappement, clé explicite, matrice et casse)",
-            code == 1 and all(f"{n}.yml : image flottante (-latest)" in err for n in "aexm"),
+        r = alias.split(NL)                     # contre-contrôle du lot : un seul libellé par fichier, une seule voie
+        second = NL.join(r[:4] + ["  a:", "    runs-on: ubuntu-24.04", "    steps:", "  b:"] + r[5:])
+        groupe = alias.replace("    runs-on: *r", "    runs-on: {group: g, labels: [self-hosted, *r]}")
+        suffixe = alias.replace("&r ubuntu-latest", "&r macos-latest-xlarge")
+        cles = BON.replace("    steps:", NL.join(["    strategy:", "      matrix:", "        python: ['3.12']",
+                                                  '        img: [windows-2025, "ubuntu-l' + chr(92) + 'x61test"]',
+                                                  "    steps:"]))
+        code, out, err = controler(arbre({"a.yml": alias, "e.yml": echappe, "x.yml": explicite, "m.yml": matrice,
+                                          "j.yml": second, "g.yml": groupe, "s.yml": suffixe, "k.yml": cles}, w))
+        cas("W-14 libellé -latest après lecture YAML refusé (alias, échappement, clé explicite, matrice et casse ; "
+            "second job, runs-on en mapping, suffixe, seconde clé de matrice)",
+            code == 1 and all(f"{n}.yml : image flottante (-latest)" in err for n in "aexmjgsk"),
             f"sortie {code} ; {err!r}")
         d = arbre({"G.YAML": "a: : b" + NL, ".h.yml": "- a" + NL, "i.yml.bak": "a: : b" + NL,
                    "sous.yml/j.yml": "- a" + NL}, w)

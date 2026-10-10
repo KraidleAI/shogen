@@ -64,36 +64,44 @@ class RunnersEpingles(unittest.TestCase):
 
     def test_formes_hors_ligne(self):
         """Relecture G2 du lot (C-1) : suite `-` au retrait d'une clé sans valeur, scalaire de bloc, ancre ou étiquette
-        seule, clé JSON collée à sa valeur, mapping de flux ouvert ; chaque forme hors du bloc d'une autre clé."""
+        seule, clé JSON collée à sa valeur, mapping de flux ouvert ; chaque forme hors du bloc d'une autre clé.
+        Contre-contrôle du lot : en-tête de bloc à indicateur d'indentation, ancre et étiquette ensemble, paire dans une
+        suite de flux."""
         self.refuse(NL.join([
             "    runs-on:", "    - self-hosted", "    - ubuntu-latest", "    strategy:", "      matrix:", "        os:",
             "        - ubuntu-24.04", "        - windows-latest", "    x: 1", "    runs-on: >-", "      macos-latest",
             "    runs-on: &r", "      ubuntu-latest", "    runs-on: !!str", "      ubuntu-latest",
             "    matrix: {\"os\":[\"ubuntu-24.04\",\"windows-latest\"]}", "    runs-on: {group: g,",
-            "      labels: [macos-latest]}", ""]),
+            "      labels: [macos-latest]}", "    runs-on: |2-", "      ubuntu-latest", "    runs-on: &a !!str",
+            "      windows-latest", "    include: [os: macos-latest]", ""]),
             ["3 : ubuntu-latest", "8 : windows-latest", "11 : macos-latest", "13 : ubuntu-latest", "15 : ubuntu-latest",
-             "16 : windows-latest", "18 : macos-latest"])
+             "16 : windows-latest", "18 : macos-latest", "20 : ubuntu-latest", "22 : windows-latest",
+             "23 : macos-latest"])
 
     def test_casse_cle_de_matrice_et_jetons(self):
         """Relecture G2 du lot (C-1) : casse ignorée ; clé de matrice qu'un runs-on nomme ; deux jetons sur une ligne ;
-        ligne lue deux fois, dite une fois ; dièse sans blanc devant, et dièse entre guillemets : pas un commentaire."""
+        ligne lue deux fois, dite une fois ; dièse sans blanc devant, et dièse entre guillemets : pas un commentaire ;
+        clé de matrice à trait d'union (contre-contrôle du lot)."""
         self.refuse(NL.join([
             "    runs-on: Ubuntu-Latest", "    runs-on:", "      ${{ matrix.image }}", "    strategy:", "      matrix:",
             "        image: [ubuntu-24.04, windows-latest]", "        os: [ubuntu-latest, macos-LATEST]",
             "    runs-on:", "      os: windows-latest", "    os: [a#b, windows-latest]",
-            "    os: ['a #b', macos-latest]", ""]),
+            "    os: ['a #b', macos-latest]", "    runs-on: ${{ matrix.runner-os }}",
+            "    runner-os: [ubuntu-24.04, windows-latest]", ""]),
             ["1 : Ubuntu-Latest", "6 : windows-latest", "7 : ubuntu-latest", "7 : macos-LATEST", "9 : windows-latest",
-             "10 : windows-latest", "11 : macos-latest"])
+             "10 : windows-latest", "11 : macos-latest", "13 : windows-latest"])
 
     def test_admis(self):
-        """Commentaires, expression de matrice, libellés épinglés, autres clés, sous-dossier (la forge ne le lit pas)."""
+        """Commentaires (dièse après une espace ou une tabulation), expression de matrice, libellés épinglés, autres
+        clés, sous-dossier (la forge ne le lit pas)."""
         d = self.arbre({"w.yml": "# runs-on: ubuntu-latest" + NL + "    runs-on: ${{ matrix.os }}  # windows-latest"
                         + NL + "        os: [ubuntu-24.04, windows-2025] # macos-latest" + NL
-                        + "      - run: echo ubuntu-latest" + NL + "    runs-on: 'a#b' # ubuntu-latest" + NL,
+                        + "      - run: echo ubuntu-latest" + NL + "    runs-on: 'a#b' # ubuntu-latest" + NL
+                        + "    runs-on: ubuntu-24.04" + chr(9) + "# ubuntu-latest" + NL,
                         "sous/x.yml": "    runs-on: ubuntu-latest" + NL, "w.txt": "    runs-on: ubuntu-latest" + NL})
         code, out, err = controler(d)
         self.assertEqual((code, err), (0, ""))
-        self.assertIn("conforme (1 workflow(s), 3 clé(s) runs-on/os lues)", out)
+        self.assertIn("conforme (1 workflow(s), 4 clé(s) runs-on/os lues)", out)
         self.assertIn("2 autre(s) entrée(s) de .github/workflows non lue(s) : sous, w.txt", out)
 
     def test_extension_en_capitales_caches_et_autres_entrees(self):
