@@ -16,7 +16,8 @@ Limites : PyYAML lit le YAML 1.1, la forge son propre analyseur ; un fichier adm
 elle ne paraît que comme un run du workflow gates en échec sans job, qui ne bloque la fusion que si les contrôles requis
 de main nomment des jobs de gates.yml [inféré]. Le crochet pre-commit ne le lance pas (adjudication Q-4 : PyYAML n'est
 pas exigé du poste) ; avant un commit, seule la chaîne de commits de l'orchestrateur le rejoue (procédure, non une
-gate). Libellé posé par une variable ou par une expression `${{ }}` : non lu.
+gate). Libellé posé par une variable, par une entrée (`with:` d'un workflow réutilisable, `inputs`) ou par une
+expression `${{ }}`, matrice que pose une expression comprise : non lu (contre-contrôle du lot).
 Usage : python3 -B workflows-yaml.py <racine> ; sortie 0 conforme, 1 refus (motifs sur stderr), 3 erreur (arguments,
 racine sans .github/workflows, PyYAML absent, toute autre exception)."""
 import os

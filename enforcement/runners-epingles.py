@@ -10,8 +10,10 @@ clé (relecture G2 du lot, C-1). Les commentaires (`#` en tête ou après une es
 Lecture par lignes, bibliothèque standard seule (R-8), sans analyseur YAML : refus en plus possibles (une ligne `os:
 …-latest` dans un bloc `run:` qui suit une clé lue), jamais un refus en moins sur ces formes. Limites : ancre et alias,
 clé de fusion `<<` ; échappement dans un scalaire entre guillemets doubles (hexadécimal, unicode, fin de ligne
-échappée) ; clé explicite (`? runs-on`) ; suite d'un flux moins indentée que sa clé (refusée par YAML 1.2) ; libellé
-posé par une variable ou par une expression `${{ }}` autre que `matrix.<clé>`.
+échappée) ; clé explicite (`? runs-on`) ; suite d'un flux moins indentée que sa clé (refusée par YAML 1.2), ou flux
+dont la ligne de clé porte un crochet ou une accolade entre guillemets ; libellé posé par une variable, par une entrée
+(`with:` d'un workflow réutilisable, `inputs`) ou par une expression `${{ }}` autre que `matrix.<clé>`, ou par une
+matrice que pose une expression (`matrix: ${{ fromJSON(…) }}`, `include: ${{ … }}`) (contre-contrôle du lot).
 Usage : python3 -B runners-epingles.py <racine> ; sortie 0 conforme, 1 refus (motifs sur stderr), 3 erreur, toute
 exception comprise (une erreur n'est jamais un refus)."""
 import os
