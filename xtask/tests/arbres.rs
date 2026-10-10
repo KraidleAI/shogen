@@ -40,7 +40,10 @@ fn arbre_unique_sous_la_cible_et_efface_a_la_fin_panique_comprise() {
 
 #[test]
 fn arbre_sur_un_reste_le_vide_d_abord() {
-    let chemin = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("essai-reste-d-un-processus-tue");
+    let chemin = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join(format!(
+        "essai-reste-d-un-processus-tue-{}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(chemin.join("vieux")).expect("reste posé");
     let arbre = Arbre::sur(chemin.clone());
     assert!(

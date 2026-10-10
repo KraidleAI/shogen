@@ -120,6 +120,18 @@ fn gate_compte_l_apport_du_derive_seul_et_refuse_un_apport_nul() {
 }
 
 #[test]
+fn apport_compte_en_ensemble_quand_le_derive_manque_des_aretes_de_la_base() {
+    use xtask::distillation::{Mesure, lire_carte, seuil};
+    let lire = |texte: String| lire_carte(&texte).expect("carte de forme afl-showmap");
+    // Base 0 à 9 ; dérivé 5 à 109, sans les arêtes 0 à 4 de la base (mesure réelle : 3 arêtes de
+    // la base hors du dérivé). E = 10 à 109, 100 arêtes, seuil 60 ; |dérivé| − |base| donnerait 57.
+    let (base, derive) = (lire(carte(0, 10)), lire(carte(5, 105)));
+    let mesure = Mesure::de(&base, &lire(carte(0, 10 + 59)), &derive);
+    assert_eq!((mesure.apport, seuil(mesure.apport)), (100, 60));
+    assert!(!mesure.vert(), "59 arêtes gagnées dans E, sous le seuil 60");
+}
+
+#[test]
 fn carte_hors_forme_refusee() {
     // Chaque faute suit une ligne valide : une ligne fautive sautée ne passerait pas pour une carte vide.
     assert!(
