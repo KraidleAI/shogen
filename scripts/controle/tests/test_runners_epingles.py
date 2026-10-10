@@ -66,17 +66,22 @@ class RunnersEpingles(unittest.TestCase):
         """Relecture G2 du lot (C-1) : suite `-` au retrait d'une clé sans valeur, scalaire de bloc, ancre ou étiquette
         seule, clé JSON collée à sa valeur, mapping de flux ouvert ; chaque forme hors du bloc d'une autre clé.
         Contre-contrôle du lot : en-tête de bloc à indicateur d'indentation, ancre et étiquette ensemble, paire dans une
-        suite de flux."""
+        suite de flux. Relecture G2 du correctif DT5-24 (C-3) : étiquette puis ancre suivies d'un commentaire ;
+        étiquette `!` suivie d'une ancre, puis seule ; ancre puis en-tête de bloc suivis d'un commentaire."""
         self.refuse(NL.join([
             "    runs-on:", "    - self-hosted", "    - ubuntu-latest", "    strategy:", "      matrix:", "        os:",
             "        - ubuntu-24.04", "        - windows-latest", "    x: 1", "    runs-on: >-", "      macos-latest",
             "    runs-on: &r", "      ubuntu-latest", "    runs-on: !!str", "      ubuntu-latest",
             "    matrix: {\"os\":[\"ubuntu-24.04\",\"windows-latest\"]}", "    runs-on: {group: g,",
             "      labels: [macos-latest]}", "    runs-on: |2-", "      ubuntu-latest", "    runs-on: &a !!str",
-            "      windows-latest", "    include: [os: macos-latest]", ""]),
+            "      windows-latest", "    include: [os: macos-latest]",
+            "    runs-on: !!str &a  # étiquette, ancre, commentaire", "      ubuntu-latest", "    runs-on: ! &a",
+            "      windows-latest", "    runs-on: !", "      macos-latest",
+            "    runs-on: &a >-  # en-tête, commentaire", "      ubuntu-latest", ""]),
             ["3 : ubuntu-latest", "8 : windows-latest", "11 : macos-latest", "13 : ubuntu-latest", "15 : ubuntu-latest",
              "16 : windows-latest", "18 : macos-latest", "20 : ubuntu-latest", "22 : windows-latest",
-             "23 : macos-latest"])
+             "23 : macos-latest", "25 : ubuntu-latest", "27 : windows-latest", "29 : macos-latest",
+             "31 : ubuntu-latest"])
 
     def test_casse_cle_de_matrice_et_jetons(self):
         """Relecture G2 du lot (C-1) : casse ignorée ; clé de matrice qu'un runs-on nomme ; deux jetons sur une ligne ;
@@ -115,9 +120,10 @@ class RunnersEpingles(unittest.TestCase):
         self.assertIn("2 autre(s) entrée(s) de .github/workflows non lue(s) : c.yml.txt, sous.yml", out)
 
     def test_valeur_adverse_en_temps_borne(self):
-        """Alerte CodeQL de la PR n° 11 : une valeur faite de « ! » en grand nombre puis d'un mot qui n'est ni ancre ni
-        étiquette se juge en temps borné (l'ancienne forme de VIDE et BLOC y faisait un retour arrière exponentiel)."""
-        for valeur in ("!" * 5000 + "x b", "&" * 5000 + " b", "!" * 5000 + "|x"):
+        """Alerte CodeQL de la PR n° 11 : une valeur faite de « ! » ou de « & » en grand nombre puis d'un mot qui n'est
+        ni ancre ni étiquette (en-tête de bloc invalide compris) se juge en temps borné (l'ancienne forme de VIDE et de
+        BLOC y faisait un retour arrière exponentiel)."""
+        for valeur in ("!" * 5000 + "x b", "&" * 5000 + " b", "!" * 5000 + " |x"):
             p = subprocess.run([sys.executable, "-B", SCRIPT, self.arbre({"w.yml": "    runs-on: " + valeur + NL})],
                                capture_output=True, text=True, timeout=20)
             self.assertEqual(p.returncode, 0, p.stderr)
