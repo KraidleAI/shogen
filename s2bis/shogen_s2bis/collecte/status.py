@@ -129,8 +129,10 @@ def juger(sante):
 def chrony(d3):
     """(deux fois la borne d'erreur en ns, statut) d'un relevé D-3 lisible : `code` 0 (entier, booléen exclu), sortie
     de `chronyc -n tracking` où les lignes System time, Root delay, Root dispersion et Leap status figurent une fois
-    chacune, valeurs en secondes à neuf décimales ; borne de la documentation de chrony, |System time| + Root
-    dispersion + Root delay / 2 (FORMAT §13.3, §17.2 ; DT6-e) ; None sinon."""
+    chacune, valeurs en secondes à neuf décimales, partie entière de journal.CHIFFRES chiffres au plus (`%.9f` d'un
+    double en écrit 309 au plus ; int() ne lève alors sous aucun réglage de l'interpréteur : R-1 du contre-contrôle de
+    DETTES-T6) ; borne de la documentation de chrony, |System time| + Root dispersion + Root delay / 2 (FORMAT §13.3,
+    §17.2 ; DT6-e) ; None sinon."""
     if type(d3) is not dict or type(d3.get("code")) is not int or d3["code"] != 0 or type(d3.get("sortie")) is not str:
         return None
     lus = CHRONY.findall(d3["sortie"])
@@ -139,7 +141,7 @@ def chrony(d3):
         return None
     formes = (("System time", " (slow|fast) of NTP time"), ("Root delay", ""), ("Root dispersion", ""))
     o, r, d = (re.fullmatch(NS + x, c[cle]) for cle, x in formes)
-    if not (o and r and d):
+    if not (o and r and d) or max(len(x[1]) for x in (o, r, d)) > journal.CHIFFRES:         # R-1 du contre-contrôle
         return None
     ns = [int(x[1]) * 10 ** 9 + int(x[2]) for x in (o, r, d)]
     return 2 * ns[0] + ns[1] + 2 * ns[2], c["Leap status"]

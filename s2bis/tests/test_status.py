@@ -343,7 +343,9 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
     def test_ligne_hors_format_jamais_une_trace(self):
         """I-3 du générateur de P2B : une `sante` au `disque` partiel, puis une `sante` au `ws` non entier, puis une
         `sante` sans `ws` (DT6-e), puis des `sante` au `ws` liste ou objet (C-1 de la G2 de DETTES-T6 : TypeError),
-        lignes JSON valides hors FORMAT : le rapport dit le disque non relevé, sans lever."""
+        puis des `sante` dont System time a une partie entière de 4 301 chiffres, et de 641 sous la plus petite limite
+        de int() (R-1 du contre-contrôle de DETTES-T6 : ValueError), lignes JSON valides hors FORMAT : le rapport dit le
+        disque non relevé, sans lever."""
         jl = journal.Journal(self.d, "pool").ouvrir(VEN)
         jl.ecrire("sante", VEN + 60, **{**sante(), "disque": {"libre": 1000}})
         jl.marqueur(VEN + 60)
@@ -358,6 +360,15 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
         for n, ws in ((11, [1]), (12, {"a": 1})):
             with open(os.path.join(self.d, "pool-2026-10-09-0.jsonl"), "ab") as f:
                 f.write(ligne({"disque": {"libre": n}, "prec": "0" * 64, "seq": n, "type": "sante", "ws": ws}))
+            self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), f"disque : non relevé ({{'libre': {n}}})")
+        limite = sys.get_int_max_str_digits()                   # R-1 du contre-contrôle : partie entière de plus de
+        self.addCleanup(sys.set_int_max_str_digits, limite)     # journal.CHIFFRES chiffres, illisible sans int()
+        for n, chiffres, borne in ((13, 4301, limite), (14, journal.CHIFFRES + 1, journal.CHIFFRES)):
+            sys.set_int_max_str_digits(borne)
+            d3 = {**D3, "sortie": D3["sortie"].replace("0.000006523", "9" * chiffres + ".000006523")}
+            with open(os.path.join(self.d, "pool-2026-10-09-0.jsonl"), "ab") as f:
+                f.write(ligne({"d3": d3, "disque": {"libre": n}, "prec": "0" * 64, "seq": n, "type": "sante",
+                               "ws": VEN + 120}))
             self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), f"disque : non relevé ({{'libre': {n}}})")
 
 
