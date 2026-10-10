@@ -1,0 +1,14 @@
+# Adjudication de l'orchestrateur sur l'avis du procurement (2026-10-09 21:55:27 UTC, `date -u`)
+
+Pièces : `RAPPORT-PROCUREMENT.md` (lecteur `claude-sonnet-5-5`, FM-1.1 0) ; `AVIS.md` (advisor `claude-fable-5-1`, Gate 0 sur le transcript ; FM-1.1 0).
+
+**Fait établi par l'orchestrateur (contrôle mécanique demandé par Q-A)** : `git fetch origin` puis `git log --all --format= --name-only -- biblio/` sur les 7 branches distantes (claude/compassionate-noether-szmdyj, main, monark-m009a-mesure, partie-2-rendu, partie-3-paquet, partie-4-execution, passation-cloud-2026-10-02) : **0 fichier de `biblio/` autre que `INDEX.md`** n'a jamais été versionné ; aucune purge à faire.
+
+**Décisions (avis adopté) :**
+- **Q-A** : versement privé des octets à `biblio/` (ignoré par git, `.gitignore` l.1-8) et au dossier Drive privé de l'investisseur ; `INDEX.md` public porte URL, date, sha256, taille, conditions lues, version, citations ≤ 25 mots ; règle écrite en tête d'`INDEX.md` (trois lignes de l'avis) et colonne « redistribuable » pour les entrées neuves ; question à l'avocat (copies d'étude lues dans un environnement cloud tiers ; extractions par service tiers, dont Kalyuzhny « all rights reserved »).
+- **Q-B** : **seul achat : Shostack 2014, e-book, 54,00 USD** (acte de l'investisseur ; à défaut, toute reprise de Shostack retirée de docs/17) ; aucun achat de Little & Rubin, Manski 2003, Mantel & Haenszel, Cochran ; D2 pt 4 n'est attribué ni à MH ni à Cochran : rédigé comme z stratifié sous indépendance (UConn Prop. 12.3) et différence avec CMH citée (Agresti 2013 §6.4.2 éq. (6.6), PSU 504 §5.3.5) ; SHOGEN-POOLEE-SOURCE-1 fermé par cette non-attribution (erratum daté si un texte validé attribue).
+- **Q-C** : P-14 « choix de conception » documenté (P-10 sans durée ; OSF 48 h / 4 ans, précédent de pratique) ; PEARSON-IF : Croux & Dehon éq. (4) avec limite ; R1-PLUGIN : Chen & Liu 1997 et NIST §1.3.5.15 avec limite en trois membres.
+- **Q-D** : textes validés retouchés par ajouts datés seulement : NUREG/CR-5485 gardé « copie non détenue » ; « Finkbeiner 2025 » : attribution retirée ; Pyth : citation datée gardée, page retirée ; CoinGecko : substitut API (`pairs` = 1372) avec copie datée.
+- **Q-E** : P-03 fermé (poids (n−3), pp. 14 et 18 ; forme 1/√(n−3) du manuel) ; erratum daté de doc 10 §4.2 b ; `report.py` inchangé.
+- Ces retouches forment le lot **DETTES-T14 (BIBLIO)** : versement des pièces VERSABLES (INDEX, octets locaux), règle d'INDEX, ajouts datés et errata, phrases de fermeture des items (P-01, P-03, P-05, P-08, P-10, P-11, P-14, PEARSON-IF, DONG-CORPS, BIBLIO-PAGES-4-3-1, FETCH-AVANT-PUB, RFC-REGISTRE, R1-PLUGIN, CENSURE-INFO-2, DEP-FENETRES-2 (a), POOLEE-SOURCE-1, E1-METHODE-1 (i)) ; E1-METHODE-1 (ii) et P-15 attendent l'achat.
+- Constat annexe : `biblio/WISHLIST.md` (cité annexe B l.21) absent : à traiter au lot (référence corrigée ou fichier).
