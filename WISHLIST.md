@@ -253,7 +253,7 @@ deadline = clôture de la calibration 48 h.
 - ~~Reply to the Criticisms~~ — détenu (sunnyday.mit.edu) ; venue
   confirmée par fiches web (SEN 15(1), 1990).
 
-## Priorité 6 — procurement PAROXYSME (ajout daté du 2026-10-10 04:56:09 UTC ; lot DETTES-T14)
+## Priorité 6 — procurement PAROXYSME (ajout daté du 2026-10-10 04:56:45 UTC ; lot DETTES-T14)
 
 Heure de l'ajout : `date -u`. Section placée en fin de fichier, après « Déjà réglé »,
 pour ne décaler aucune ligne de ce fichier, cité ailleurs par numéro de ligne.
@@ -277,6 +277,11 @@ restent traitées comme inexistantes (règle de la priorité 3).
   version *JASA* de Horowitz et Manski 2000 ; version Cambridge de Kiefer et
   Vogelsang 2005 ; van der Meulen et Revilla 2008, *IEEE TSE* 34(6) (identité à
   fixer : la ligne de doc 06 §2 ne la donne pas).
+- [ ] Optionnels de la série P du 2026-09-30 (annexe B l.118, l.120, l.121, l.123), « les
+  optionnels retenus » de l'acte 8 du §1 bis.11 d'ADR-0028 ; identités [2nd] de l'annexe B :
+  Carlstein 1986, *Ann. Statist.* 14(3) : 1171-1179 (P-04) ; Newey et West 1987,
+  *Econometrica* 55(3) : 703-708 (P-06) ; Hall, Horowitz et Jing 1995, *Biometrika* 82(3) :
+  561-574 (P-07) ; Lahiri 2003, Springer (P-09).
 - [ ] Gestes gratuits de l'investisseur, en navigateur, non bloquants : version
   *PNAS* de Nosek et al. 2018 (pp. 2600-2606) ; version de l'éditeur de Croux et
   Dehon 2010 ; NUREG/CR-5485 sur ADAMS ; historique de la documentation de Pyth (page
