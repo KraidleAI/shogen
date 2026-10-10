@@ -236,7 +236,9 @@ class Branchement(Base):
     def test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null(self):  # CB-18b, SONDES-ECHEANCE-1
         """Règle `fin` > E appliquée aux sondes, sur l'horloge monotone de la boucle (E-1 des corrections de P1-B) :
         l'attente déborde de 1 ms ; le premier témoin, rendu à E, est gardé ; le second, rendu après E mais avant le
-        relevé, vaut null."""
+        relevé, vaut null. La lecture et d3, rendues avant E, sont attendues d'abord ; d3 rend 20 ms réelles après son
+        départ (DT6-u, SHOGEN-S2BIS-TEST-SANTE-CHARGE-1 : sans cette attente, un fil de d3 retardé par la charge
+        rendait après E + 1 ms et d3 valait null : ERROR une fois en 81 suites chargées)."""
         temps, portes = Temps(m(2) * S + 5 * S), [threading.Event(), threading.Event()]
         for p in portes:
             self.addCleanup(p.set)
@@ -246,12 +248,13 @@ class Branchement(Base):
             return {"statut": "reponse"}
 
         def attendre(futurs, t):                                    # futurs : lecture, d3, puis les deux témoins
+            concurrent.futures.wait(futurs[:2], 5)                  # DT6-u : lecture et d3 rendues avant E
             for porte, futur, instant in zip(portes, futurs[2:], (t, t + 1000)):
                 temps.avancer(instant)
                 porte.set()
                 concurrent.futures.wait([futur], 5)
         s = sante.Sondes(["horloge"], TEMOINS[:2], [], "192.0.2.53", self.d, interroger=interroger,
-                         lancer=Faux().lancer)
+                         lancer=Faux(pause=0.02).lancer)
         jl = borne(self, self.journal, m(2))
         borne(self, boucle.Boucle(jl, {"a": rapide}, [(0, "a")], 8, horloge=temps, dormir=temps.dormir,
                                   attendre=attendre, sondes=s, monotone=temps.monotone).tourner, 1)

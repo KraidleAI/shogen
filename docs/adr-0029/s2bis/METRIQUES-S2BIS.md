@@ -2685,3 +2685,30 @@ réseau isolé ; témoin VIVANT) : R1-M1 à R1-M4 (forme du contre-contrôleur),
 `test_ligne_hors_format_jamais_une_trace`, 0 vivant, 0 FATAL.
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-u (2026-10-10) : `test_sante`, lecture et d3 attendues avant E (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-TEST-SANTE-CHARGE-1 (constat E-6 du générateur de DB-1 :
+`test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null` en ERROR, `enr["d3"]` nul, une fois en 81 suites
+complètes sous charge). Mesures sur l'état DT6-r, sous 3 processus de charge (boucle Python vide ; charge moyenne sur
+1 min de 4,0 à 4,5) : 200 passages du module `test_sante`, 0 échec ; 10 000 passages du test dans un interpréteur, 2
+ERROR (`TypeError: 'NoneType' object is not subscriptable`, à `enr["d3"]["code"]`). Cause, lue au test : son `attendre`
+injecté n'attend que les deux témoins, puis avance l'horloge à E et à E + 1 ms ; un fil de d3 que la charge retarde rend
+après (non rendu au relevé, ou `fin` > E) et d3 vaut null, comme la règle `fin` > E le veut : le code est juste, le test
+ne l'était pas. Correction du test : `attendre` attend d'abord la lecture et d3 (`futurs[:2]`, borne de 5 s, celle de
+ses autres attentes) ; d3 rend 20 ms réelles après son départ (`Faux(pause=0.02)`), ce qui fige l'ordre que la charge
+défaisait. Aucun saut ; aucune borne d'attente changée.
+
+Rouge (test d'abord) : d3 lente, sans l'attente : 200 passages, 200 ERROR (`TypeError`, le symptôme du constat) ; avec
+l'attente : 200 passages, 0 échec. Sous charge, après la correction (charge moyenne de 4,5 à 4,9) : 10 000 passages du
+test, 0 échec ; 200 passages du module, 0 échec.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_sante.py` | 288 | 14 |
+
+Mutants (même commande ; témoin VIVANT) : U01 (`fin >= limite` : un témoin rendu à E vaut null), U02 (`fin > limite +
+1000`), U03 (limite des sondes prise au relevé, non à E) : 3 tués par
+`test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
