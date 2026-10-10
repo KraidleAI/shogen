@@ -21,6 +21,16 @@ from tests.test_journal import Base, chaine
 from tests.test_reprise import m, sans_chaine
 
 NUL = {"hote": None, "a": None, "ip": None, "ripestat": None, "cymru": None}
+SECONDAIRE = """
+import sys, tests
+from shogen_s2bis.collecte import asn, dns, entree, http
+from shogen_s2bis.collecte.lecture import S
+from tests.test_http_reseau import Resolveur
+dns_, rs = map(int, sys.argv[1:3])
+releve = lambda h, r: asn.releve(h, r, lire=lambda q: http.lire(q, tls=None, resoudre=Resolveur(rs)),
+                                 interroger=lambda a, n, t: dns.interroger(a, n, t, delai=S // 5, port=dns_))
+raise SystemExit(entree.main(sys.argv[3:], tls=None, releve=releve))
+"""                      # DT6-f : relevé ASN du secondaire vers des ports de boucle locale (RIPEstat, résolveur)
 
 
 def carte(port, n=1, **champs):
@@ -180,8 +190,10 @@ class Isolement(Base):                                             # E-C-32 ; PR
                               "carte", "descripteur")), ("trop", "secondaire", ("formes", "trop", "descripteur"))):
             os.mkdir(dossiers.setdefault(nom, os.path.join(self.d, "j-" + nom)))
             args = [x for c in cfg for x in ("--" + c.replace("trop", "carte"), ch[c])]
-            lancer.append(subprocess.Popen([sys.executable, "-B", "-c", HARNAIS, cmd, *args, "--journal", dossiers[nom],
-                                            "--commit", COMMIT, "--fenetres", "3"], cwd=RACINE, stderr=subprocess.PIPE))
+            harnais = [HARNAIS] if cmd == "pool" else [SECONDAIRE, str(port_ferme()), str(port_ferme())]
+            lancer.append(subprocess.Popen([sys.executable, "-B", "-c", *harnais, cmd, *args, "--journal",
+                                            dossiers[nom], "--commit", COMMIT, "--fenetres", "3"], cwd=RACINE,
+                                           stderr=subprocess.PIPE))
             self.addCleanup(lambda p=lancer[-1]: (p.kill(), p.wait(), p.stderr.close()))
         refuse = [b"collecte", b"refus", b"CONFIG/incoherent", b"budget-partage"]
         self.assertEqual([(p.communicate(timeout=60)[1].strip().split(b" : "), p.returncode) for p in lancer],

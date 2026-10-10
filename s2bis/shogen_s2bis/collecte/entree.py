@@ -31,7 +31,7 @@ import re
 import secrets
 import sys
 
-from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
+from shogen_s2bis.collecte import asn, boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
@@ -206,22 +206,22 @@ def _status(a, fsync):
     return 0
 
 
-def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
+def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
     du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
     échéance ws + w − `marge`, places de la carte, sans sondes ; relevé ASN des hôtes du pool et de la carte au
-    résolveur du descripteur, à la cadence de `asn`."""
+    résolveur du descripteur, à la cadence de `asn` ; `releve` injectable (tests sans réseau, DT6-f)."""
     jl = journal.Journal(dossier, "secondaire", w=f["w"], fsync=fsync)
     return jl, secondaire.Secondaire(
         jl, {x["nom"]: _lecteur(x, c["delai"], tls) for x in c["formes"]}, _plan(c), c["places"], _par_hote(f, c),
         d["resolveur"], c["asn"]["periode"], c["asn"]["decalage"], w=f["w"], delta=f["w"] * S - c["depart"],
-        marge=c["marge"])
+        marge=c["marge"], releve=releve)
 
 
 FICHIERS = {"pool": ("formes", "sante", "descripteur"), "secondaire": ("formes", "carte", "descripteur")}
 
 
-def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
+def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     p = argparse.ArgumentParser(prog="python3 -m shogen_s2bis.collecte", description="collecteur de S2-bis")
     commandes = p.add_subparsers(dest="commande", required=True)
     for nom, aide in (("pool", "processus du pool"), ("secondaire", "processus secondaire : carte et relevé ASN")):
@@ -252,7 +252,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
         f = lus["formes"][0]
         args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
-        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args)
+        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args, releve)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2

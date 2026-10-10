@@ -19,6 +19,7 @@ CORPS = json.dumps({"data": {"asns": [{"asn": 64500, "holder": "EXEMPLE-AS - doc
                              "resource": "192.0.2.0/24"}, "status": "ok"}).encode()
 TXT = b"64500 | 192.0.2.0/24 | ZZ | test | 2026-10-08"
 V = {"asn": 64500, "detenteur": "EXEMPLE-AS - documentation", "prefixe": "192.0.2.0/24"}
+ARABE = "".join(map(chr, (0x661, 0x663, 0x663, 0x663, 0x665)))           # 13335 en chiffres arabes-indiens (L-A1)
 
 
 def reponse(requete, rrs, drapeaux=0x8180):
@@ -47,11 +48,11 @@ def serveur_dns(test, a=((1, bytes([192, 0, 2, 1])), (1, bytes([192, 0, 2, 2])))
     return srv.getsockname()[1], recues
 
 
-def releve(test, corps=CORPS, code=200, **dns_):
+def releve(test, corps=CORPS, code=200, hote=WE, **dns_):
     port, recues = serveur_dns(test, **dns_)
     hport, requetes, fil = servir(repondre(b"HTTP/1.1 %d X" % code + CRLF + b"Content-Length: %d" % len(corps) + CRLF
                                            + CRLF + corps))
-    r = asn.releve(WE, "127.0.0.1", lire=lambda req: http.lire(req, tls=None, resoudre=Resolveur(hport)),
+    r = asn.releve(hote, "127.0.0.1", lire=lambda req: http.lire(req, tls=None, resoudre=Resolveur(hport)),
                    interroger=lambda a, n, t: dns.interroger(a, n, t, delai=S // 2, port=port))
     return r, recues, requetes
 
@@ -85,9 +86,25 @@ class Releve(Base):
         self.assertEqual([(r["ripestat"]["statut"], r["ripestat"]["code"], r["ripestat"]["valeurs"], r["cymru"]["asn"])
                           for r in (r1, r2)], [("panne_http", 503, None, None), ("panne_decode", 200, None, 64500)])
 
+    def test_hote_ipv4_litterale_releve_directement(self):    # DT6-f, SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (O-6 de P2A)
+        """Un hôte écrit en IPv4 littérale canonique est relevé directement : aucune requête A (la lecture le contacte
+        sans résolution), `a` null, `ip` l'hôte, RIPEstat sur lui, TXT de 7.2.0.192.origin.asn.cymru.com ; écrit
+        autrement (zéros de tête), c'est un nom : requête A d'abord, adresse du résolveur."""
+        r, recues, requetes = releve(self, hote="192.0.2.7")
+        cymru = b"".join(bytes([len(x)]) + x for x in (b"7", b"2", b"0", b"192", b"origin", b"asn", b"cymru", b"com"))
+        self.assertEqual(([m[12:] for m in recues], r["a"], r["ip"], requetes[0].split(CRLF)[0],
+                          r["ripestat"]["valeurs"], r["cymru"]["asn"]),
+                         ([cymru + bytes([0, 0, 16, 0, 1])], None, "192.0.2.7",
+                          b"GET /data/prefix-overview/data.json?resource=192.0.2.7 HTTP/1.1", V, 64500))
+        r, recues, _q = releve(self, hote="192.0.2.007")
+        self.assertEqual((struct.unpack(">H", recues[0][-4:-2])[0], r["a"]["statut"], r["ip"]),
+                         (1, "reponse", "192.0.2.1"))
+
 
 class Decodage(Base):
     def test_ripestat_forme_de_s2_bornes_et_base_muette(self):
+        """Forme de S2 ; `asn` entier, ou texte de chiffres ASCII seuls (DT6-f, SHOGEN-S2BIS-ASN-LECTURE-1 : `int()`
+        de S2 admettait souligné, signe, blancs et chiffres arabes-indiens, mesuré par la G2 de P2A, L-A1 et L-A2)."""
         def v(d):
             try:
                 return asn.ripestat(json.dumps({"data": d}).encode())
@@ -98,6 +115,8 @@ class Decodage(Base):
                ({**ok, "asns": [{"asn": "64500"}]}, {**V, "detenteur": None}),
                ({**ok, "asns": [{"asn": 0}]}, {**V, "asn": 0, "detenteur": None})]                  # C-2 (G14) : AS 0
         cas += [({**ok, "asns": [{"asn": x}]}, "refus") for x in (True, -1, 1 << 32, 64500.0)]
+        cas += [({**ok, "asns": [{"asn": x}]}, "refus")                     # DT6-f : ASN-LECTURE-1, chiffres ASCII
+                for x in ("13_335", "+13335", "-0", " 13335", "13335 ", ARABE, "4294967296", "")]
         cas += [({**ok, "resource": 5}, "refus"), ({**ok, "asns": [{"asn": 1, "holder": "x" * 4096}]}, "refus"),
                 ({**ok, "asns": [{"asn": 64500, "holder": V["detenteur"]}, {"asn": 64501, "holder": "B"}]}, V)]
         self.assertEqual([v(d) for d, _a in cas], [a for _d, a in cas])
@@ -112,6 +131,8 @@ class Decodage(Base):
                               [WE, 5, 60, None], [WE, 16, 60, []], [WE, 16, 60, ["64502 | z"]]]}), c("0 | x"),
                           asn.cymru({"reponses": [[WE, 16, 60, ["64500 | x", "64501 | y"]]]})],     # C-2 : G14, G17
                          [64500, 64500, 64501, None, None, None, 64502, 0, 64500])     # CNAME, TXT vide, puis TXT
+        self.assertEqual([c(x + " | y") for x in ("+13335", "1_3335", ARABE, " 13335", "-0")],
+                         [None, None, None, 13335, None])                                    # DT6-f, ASN-LECTURE-1
 
     def test_plus_grand_releve_sous_limite(self):
         """Témoin : A et TXT au plus grand résultat du FORMAT §13.6 (14 réponses SOA, noms de 1 024 caractères de

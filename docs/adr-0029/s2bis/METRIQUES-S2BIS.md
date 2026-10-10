@@ -2501,3 +2501,32 @@ racine compté entier, décimales libres, D-3 ajouté à une fenêtre D-1, premi
 D-3 (vivant au premier passage : cas ajouté), sortie d'erreur jetée, `code` booléen admis, `ws` lu par indexation.
 
 Suite : 353 tests ; plancher du job : 353, égalité exigée (`--egal`).
+
+## DT6-f (2026-10-09) : numéro d'AS en chiffres ASCII, IPv4 littérale relevée directement (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-ASN-LECTURE-1 (O-2 de la G2 de P2A ; Q-3 du lot) et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (O-6 ; Q-2).
+`asn` de RIPEstat et premier mot du TXT de Cymru : entier, ou texte de 1 à 10 chiffres ASCII, de 0 à 2³² exclu
+(souligné, signe, blancs et chiffres d'autres écritures refusés : écart à `int()` de S2, écrit au §15.4). Un hôte écrit
+en IPv4 littérale canonique est relevé directement : `a` null, `ip` l'hôte, aucune requête A ; écrit autrement, c'est
+un nom (§15.4). Le relevé du secondaire devient injectable (`entree.main`, `construire_secondaire`) : le test
+d'isolement des deux processus le dirige vers des ports fermés de boucle locale (sans lui, les hôtes 127.0.0.1 partaient
+vers RIPEstat, arrêtés par la garde réseau des tests, mesuré).
+
+Rouge : sur les tests de DT6-f et le code de l'état DT6-e (`asn.py`, `entree.py`), 4 tests en échec d'assertion
+(FAIL 4, ERROR 0) : textes signés, soulignés et non ASCII admis (RIPEstat, Cymru), IPv4 littérale jamais relevée,
+relevé du secondaire non injectable (sous-processus en échec).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/asn.py` | 85 | — |
+| `shogen_s2bis/collecte/entree.py` | 269 | — |
+| `tests/test_asn.py` | 150 | 6 (1 de plus) |
+| `tests/test_secondaire.py` | 207 | 7 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 11 mutants, 11 tués par leur test visé, 0 vivant, 0 FATAL : lecture d'avant DT6-f
+(`int()` de S2), chiffres de toute écriture (`isdigit`), signe admis, blancs admis, souligné admis, texte vide lu 0,
+littérale toujours fausse (forme d'avant DT6-f), littérale reconnue à un motif (zéros de tête admis), requête A gardée
+pour une littérale, relevé injecté ignoré par `construire_secondaire`, puis par `main`.
+
+Suite : 354 tests ; plancher du job : 354, égalité exigée (`--egal`).

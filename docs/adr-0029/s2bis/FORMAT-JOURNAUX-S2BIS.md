@@ -53,7 +53,8 @@
   du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
   graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
   SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
-  §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6).
+  §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6) ; le diff DT6-f,
+  SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -668,17 +669,24 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    suit son rendu (avant le `releve_asn` de cette fenêtre, s'il y en a un), dans l'ordre des hôtes. Champs de `asn` :
    - `hote` ;
    - `a` : résultat DNS (§12) de la requête A de l'hôte au résolveur du descripteur, récursion demandée (jamais
-     1.1.1.1, ADR-0029 l.82) ;
-   - `ip` : première adresse de type A de la section réponse ; null sans réponse retenue, sans A, ou sous le drapeau TC
-     (`reponses` null, §12) ;
+     1.1.1.1, ADR-0029 l.82) ; null pour un hôte écrit en IPv4 littérale canonique (forme du §12), relevé directement
+     (DT6-f, SHOGEN-S2BIS-ASN-HOTE-IPV4-1, Q-2 du lot DETTES-T6 : sa requête A ne rendait rien, et il n'était jamais
+     relevé) ;
+   - `ip` : première adresse de type A de la section réponse, ou l'hôte écrit en IPv4 littérale canonique, que la
+     lecture contacte sans résolution ; null sans réponse retenue, sans A, ou sous le drapeau TC (`reponses` null,
+     §12). Une IPv4 écrite autrement (« 127.1 », zéros de tête) est un nom, que le résolveur ne résout pas ; son
+     écriture canonique relève de SHOGEN-S2BIS-NOMS-HOTE-RFC1123-1 ;
    - `ripestat` : null sans `ip` ; sinon les champs d'une `lecture` (§9.1) de
      `https://stat.ripe.net/data/prefix-overview/data.json?resource=<ip>`, dont `valeurs`, au statut `ok`, est
      `{asn, detenteur, prefixe}` : `data.asns[0].asn` et `.holder`, `data.resource` (forme de S2, r2.py l.275-289) ;
-     `asn` et `detenteur` null si `asns` est vide ; `asn`, entier ou texte décimal lu comme `int()` de S2, de 0 à 2³²
-     exclu ; 4 096 octets canoniques au plus ; tout autre corps : `panne_decode` ;
+     `asn` et `detenteur` null si `asns` est vide ; `asn`, entier ou texte de 1 à 10 chiffres ASCII, de 0 à 2³² exclu
+     (DT6-f, SHOGEN-S2BIS-ASN-LECTURE-1, Q-3 du lot DETTES-T6 : écart à S2, dont `int()` admettait le souligné, le
+     signe, les blancs et les chiffres d'autres écritures) ; 4 096 octets canoniques au plus ; tout autre corps :
+     `panne_decode` ;
    - `cymru` : null sans `ip` ; sinon le résultat DNS (§12) de la requête TXT de `<d>.<c>.<b>.<a>.origin.asn.cymru.com.`
-     au même résolveur, plus `asn` : premier nombre du premier champ (avant « | ») de la première chaîne de la première
-     réponse TXT qui en a un, de 0 à 2³² exclu (forme de S2, `_cymru_asn` l.292-312) ; null sinon.
+     au même résolveur, plus `asn` : premier mot du premier champ (avant « | ») de la première chaîne de la première
+     réponse TXT dont ce mot est un numéro lu comme celui de RIPEstat (chiffres ASCII, de 0 à 2³² exclu ; DT6-f), dans
+     la forme de S2 (`_cymru_asn` l.292-312) ; null sinon.
 
    Un défaut imprévu du relevé d'un hôte donne un `asn` à `a`, `ip`, `ripestat` et `cymru` nuls, et le relevé
    continue. Aucun jugement : la concordance des deux bases se juge au recalcul (E-R-29).
