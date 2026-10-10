@@ -714,7 +714,7 @@ k nominal, quel que soit son signe.
 sont placés ici, en fin de document, pour n'en décaler aucune ligne, ce document étant cité ailleurs par
 numéro de ligne ; chacun nomme la section qu'il vise, dont le texte est inchangé.
 
-**Vise §4.2 (b).** *Ajout daté du 2026-10-10 04:55:14 UTC (`date -u`) ; lot DETTES-T14 ; P-03, décision
+**Vise §4.2 (b).** *Ajout daté du 2026-10-10 04:56:45 UTC (`date -u`) ; lot DETTES-T14 ; P-03, décision
 Q-E de l'adjudication du procurement du 2026-10-09 ; l'erratum du 2026-09-30 et l'ajout du 2026-10-02 de
 cette section sont inchangés* : le primaire est détenu et lu : Fisher 1921, *Metron* 1(3) : 3-32
 (`biblio/fisher1921-metron-1-3-32.pdf`), pp. 14 et 18, lues sur l'image et contrôlées sur l'OCR. P. 14 :
@@ -722,7 +722,7 @@ exprimée en z, la courbe d'échantillonnage est « sufficiently normal and cons
 erreur probable « may be obtained from the same table as before entered with the value » n − 3. P. 18 :
 « The weight of each sample measured on the scale of z is taken to be » (n − 3). La forme littérale
 1/√(n−3) n'y est pas imprimée : c'est celle du manuel (Penn State STAT 509 L7, `biblio/INDEX.md` l.328),
-que nomme la ligne imprimée de `report.py` (« transformation de Fisher ; Penn State STAT 509 L7 »),
+que nomme la ligne imprimée de `report.py` (« transformation de Fisher, Penn State STAT 509 L7 §7.8 »),
 inchangée. Limite : un poids (n − 3) vaut une variance 1/(n − 3) [inféré : le poids est l'inverse de la
 variance]. Les racines imprimées aux pp. 10 (cas fraternel) et 11 (erreur probable de r), vues sur
 l'image, visent d'autres cas : elles ne se citent jamais pour cette ligne. P-03 est fermé.
