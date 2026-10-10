@@ -101,6 +101,8 @@ class Sondes(unittest.TestCase):
         self.assertEqual((r["d3"]["code"], r["d4"], r["d5"]),
                          (0, [{"adresse": a, "statut": "reponse", "rcode": 0} for a in TEMOINS],
                           [{"nom": n, "statut": "reponse", "rcode": 0} for n in NOMS]))
+        tard = s.joindre(lancees, 0)    # R-8 du contre-contrôle (DETTES-T6) : `fin` > E nulle chaque sonde, d3 comprise
+        self.assertEqual((tard["d3"], tard["d4"], tard["d5"]), (None, [None] * 3, [None] * 2))
         self.assertEqual(sorted(x[1:] for x in f.appels if x[0] == "interroger"),
                          sorted([((a, ".", "SOA"), {"recursion": False, "delai": 2 * S}) for a in TEMOINS] +
                                 [(("192.0.2.53", n, "A"), {"recursion": True, "delai": 2 * S}) for n in NOMS]))
