@@ -328,7 +328,8 @@ jobs:
   controle-unittest:
     # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et
     # sommes de scripts/controle ; patron du job calib-actifs (aucun saut, Ran = plancher, --egal) ; cas K-04 du runner.
-    # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (7 tests), plancher 26 → 33.
+    # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (9 tests, dont 2 de la relecture G2), plancher
+    # 26 → 35.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -344,4 +345,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 33
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 35

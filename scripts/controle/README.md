@@ -57,3 +57,10 @@ dépendent des tests du harnais qu'ils importent.
 > forme » alors que `sha256sum -c` l'accepte : l'écrire depuis le dossier, `sha256sum <fichiers>`). **Consigne** : un
 > `SHA256SUMS` versé ne nomme que des pièces versées ; une pièce restée hors du dépôt se nomme dans le texte, jamais
 > dans le `SHA256SUMS`.
+
+> *Ajout daté du 2026-10-09 22:24:59 UTC (`date -u` ; lot DETTES-T5, DT5-7, adjudication Q-2 ; SHOGEN-CI-RUNNERS-1 ;
+> relecture G2 du lot, C-7)* : `tests/test_runners_epingles.py` porte les cas de `enforcement/runners-epingles.py`
+> (étape du job `g1-model-pinning`) : aucun libellé de runner en `-latest` (casse ignorée) dans `runs-on`, dans une
+> clé `os` ou dans une clé de matrice que nomme `runs-on`, sous les formes que ce lecteur par lignes lit ; 9 tests,
+> plancher du job `controle-unittest` 35. Les formes qu'il ne lit pas (alias, échappements, clé explicite) sont
+> refusées dans le même job par `enforcement/workflows-yaml.py`, après lecture YAML (relecture G2, C-8).

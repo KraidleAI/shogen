@@ -62,6 +62,29 @@ class RunnersEpingles(unittest.TestCase):
                     + "    \"runs-on\": 'macos-latest' # x" + NL, ["1 : ubuntu-latest", "2 : windows-latest",
                                                                   "3 : macos-latest"], nom="w.yaml")
 
+    def test_formes_hors_ligne(self):
+        """Relecture G2 du lot (C-1) : suite `-` au retrait d'une clé sans valeur, scalaire de bloc, ancre ou étiquette
+        seule, clé JSON collée à sa valeur, mapping de flux ouvert ; chaque forme hors du bloc d'une autre clé."""
+        self.refuse(NL.join([
+            "    runs-on:", "    - self-hosted", "    - ubuntu-latest", "    strategy:", "      matrix:", "        os:",
+            "        - ubuntu-24.04", "        - windows-latest", "    x: 1", "    runs-on: >-", "      macos-latest",
+            "    runs-on: &r", "      ubuntu-latest", "    runs-on: !!str", "      ubuntu-latest",
+            "    matrix: {\"os\":[\"ubuntu-24.04\",\"windows-latest\"]}", "    runs-on: {group: g,",
+            "      labels: [macos-latest]}", ""]),
+            ["3 : ubuntu-latest", "8 : windows-latest", "11 : macos-latest", "13 : ubuntu-latest", "15 : ubuntu-latest",
+             "16 : windows-latest", "18 : macos-latest"])
+
+    def test_casse_cle_de_matrice_et_jetons(self):
+        """Relecture G2 du lot (C-1) : casse ignorée ; clé de matrice qu'un runs-on nomme ; deux jetons sur une ligne ;
+        ligne lue deux fois, dite une fois ; dièse sans blanc devant, et dièse entre guillemets : pas un commentaire."""
+        self.refuse(NL.join([
+            "    runs-on: Ubuntu-Latest", "    runs-on:", "      ${{ matrix.image }}", "    strategy:", "      matrix:",
+            "        image: [ubuntu-24.04, windows-latest]", "        os: [ubuntu-latest, macos-LATEST]",
+            "    runs-on:", "      os: windows-latest", "    os: [a#b, windows-latest]",
+            "    os: ['a #b', macos-latest]", ""]),
+            ["1 : Ubuntu-Latest", "6 : windows-latest", "7 : ubuntu-latest", "7 : macos-LATEST", "9 : windows-latest",
+             "10 : windows-latest", "11 : macos-latest"])
+
     def test_admis(self):
         """Commentaires, expression de matrice, libellés épinglés, autres clés, sous-dossier (la forge ne le lit pas)."""
         d = self.arbre({"w.yml": "# runs-on: ubuntu-latest" + NL + "    runs-on: ${{ matrix.os }}  # windows-latest"
@@ -77,5 +100,6 @@ class RunnersEpingles(unittest.TestCase):
         vide = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, vide)
         illisible = self.arbre({"w.yml": b"    runs-on: ubuntu-24.04\n\xff\n"})
-        for argv in ((vide,), (illisible, illisible), (), (illisible,)):
+        valide = self.arbre({"w.yml": "    runs-on: ubuntu-24.04" + NL})
+        for argv in ((vide,), (illisible, illisible), (), (illisible,), (valide, valide)):
             self.assertEqual(controler(*argv)[0], 3, argv)
