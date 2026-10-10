@@ -83,10 +83,10 @@ jobs:
     # docs/G1-lot-D8a.md) : épinglage des modèles en liste blanche exacte (R-1), sur le
     # frontmatter des agents, des skills et des commandes (tout .claude/ de l'arbre, hors
     # worktrees) et sur les réglages JSON de .claude/.
-    # Étape 1 : les cas du lint, sur copies de fixtures dans des arbres mktemp ; étape 2 :
-    # l'arbre du dépôt. Aucune action ni installation nouvelle (R-8) : bash et les outils
+    # Étape 1 (après l'environnement, lot DETTES-T5) : les cas du lint, sur copies de fixtures
+    # dans des arbres mktemp ; étape 2 : l'arbre du dépôt. Aucune action ni installation nouvelle (R-8) : bash et les outils
     # de l'image. awk de l'image (mawk, inféré, non mesuré), employé par le runner seul :
-    # item SHOGEN-G1-FORGE-1 (c).
+    # item SHOGEN-G1-FORGE-1 (c) ; imprimé par l'étape d'environnement (lot DETTES-T5).
     # name: = identifiant du job, un seul nom pour le futur required check.
     name: g1-model-pinning
     # Image épinglée, comme s2-harness-unittest (GC-11 ; SHOGEN-CI-RUNNERS-1).
@@ -100,6 +100,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1
         with:
           persist-credentials: false
+      # Lot DETTES-T5 (2026-10-09 ; SHOGEN-LINT-ENVIRONNEMENTS-1, SHOGEN-G1-FORGE-1 (c), SHOGEN-CI-S2-FORGE-1 (c)) :
+      # environnement de l'image imprimé pour la lecture du journal, sans effet sur le verdict (chaque commande suivie
+      # de || true ; ImageOS et ImageVersion, variables des images hébergées, inférées, non lues). s2-harness-unittest
+      # n'en porte pas : son gabarit (cas K-01 du runner, analyseur de l'enregistreur de rôle) admet trois étapes
+      # exactement ; il imprime python3 --version, et l'image s'y lit à la section « Runner Image » du journal.
+      - name: environnement de l'image (locale, python3, awk, système), sans effet sur le verdict
+        shell: bash
+        run: |
+          locale || true
+          python3 --version || true
+          readlink -f "$(command -v awk)" || true
+          awk --version < /dev/null 2>&1 || awk -W version < /dev/null 2>&1 || true
+          cat /etc/os-release || true
+          echo "ImageOS=${ImageOS:-absente} ImageVersion=${ImageVersion:-absente}"
       - name: cas du lint d'épinglage (fixtures, arbres temporaires)
         shell: bash
         run: bash enforcement/tests/run-fixtures-model-pinning.sh
