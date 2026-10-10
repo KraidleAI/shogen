@@ -65,7 +65,8 @@ class TestSocle(unittest.TestCase):
     def test_parametres_coherence(self):
         """Place hors des unités, places non triées, N_min au-delà du nombre de places, dernière transaction hors des
         places horodatées, place sans série, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée,
-        strates sans le dimanche : CA/parametres. Mutation : chaque contrôle de cohérence retiré à son tour."""
+        strates sans le dimanche ; DETTES-T2 : double chevauchement égal au pas (Coinbase), chevauchement hors pages :
+        CA/parametres. Mutation : chaque contrôle de cohérence retiré à son tour."""
         def a(cle, actif, valeur):
             return lambda p: p["lectures"]["A"][cle].update({actif: valeur})
         cas = [a("places", "USDC", ["binance", "bitfinex", "bitstamp", "kraken", "okx"]),
@@ -74,7 +75,9 @@ class TestSocle(unittest.TestCase):
                a("places", "USDC", ["binance", "bitfinex", "bitstamp", "gemini", "kraken"]),
                a("modes", "ETH", "planchers_seuls"),
                lambda p: p.update(lecture="B"), lambda p: p["fenetre"].update(debut=1775001601),
-               lambda p: p["strates"].update(stress=[5]), lambda p: p["fenetre_descriptive"].update(sans=["okx"])]
+               lambda p: p["strates"].update(stress=[5]), lambda p: p["fenetre_descriptive"].update(sans=["okx"]),
+               lambda p: p["series"]["coinbase"].update(chevauchement=150),
+               lambda p: p["series"]["kraken"].update(chevauchement=1)]
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
 

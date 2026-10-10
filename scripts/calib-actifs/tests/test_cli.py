@@ -191,8 +191,9 @@ class TestCli(unittest.TestCase):
                 for actif, okx in (("ETH", eth), ("USDT", usdt)):
                     for x in socle.lecture(p)["places"][actif]:
                         s = {t: (socle.Decimal(okx if x == "okx" else 100), True) for t in socle.minutes(sy.FEN)}
-                        with open(os.path.join(argv[1], "principale", x, actif, "f.dat"), "wb") as f:
-                            f.write(sy.octets(p["series"][x]["format"], s))
+                        for n, o in sy.fichiers(p, x, s).items():
+                            with open(os.path.join(argv[1], "principale", x, actif, n), "wb") as f:
+                                f.write(o)
                 tau.calcul_actif = calcul_
                 try:
                     code = tau.main(argv, {})

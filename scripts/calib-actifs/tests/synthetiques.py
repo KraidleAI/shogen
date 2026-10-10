@@ -52,12 +52,24 @@ def octets(format_: str, s: dict) -> bytes:
     return lignes[format_]()
 
 
+def fichiers(prm: dict, place: str, s: dict, fen=FEN) -> dict:
+    """{nom : octets} : f.dat, ou une page-<début>.json par page de `pas` − 2·`chevauchement` minutes (découpage calculé
+    ici ; clé absente : découpage d'avant DETTES-T2, sans chevauchement, pour le rouge sur le code d'avant)."""
+    x = prm["series"][place]
+    if x["acces"] != "pages":
+        return {"f.dat": octets(x["format"], s)}
+    u = 60 * (x["pas"] - 2 * x.get("chevauchement", 0))
+    return {f"page-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
+            for d in range(fen["debut"], fen["fin"], u)}
+
+
 def ecrire_bruts(prm: dict, bruts: str, nom: str, fen=FEN) -> None:
-    """<bruts>/<nom>/<place>/<actif>/f.dat de chaque (actif, place) de la lecture retenue (fenêtre descriptive : sans
-    ses places exclues)."""
+    """<bruts>/<nom>/<place>/<actif>/ (fichiers()) de chaque (actif, place) de la lecture retenue (fenêtre
+    descriptive : sans ses places exclues)."""
     for actif in socle.ACTIFS:
         for p, s in series(prm, actif, fen).items():
             if nom == "principale" or p not in prm["fenetre_descriptive"]["sans"]:
                 os.makedirs(os.path.join(bruts, nom, p, actif), exist_ok=True)
-                with open(os.path.join(bruts, nom, p, actif, "f.dat"), "wb") as f:
-                    f.write(octets(prm["series"][p]["format"], s))
+                for n, o in fichiers(prm, p, s, fen).items():
+                    with open(os.path.join(bruts, nom, p, actif, n), "wb") as f:
+                        f.write(o)

@@ -164,16 +164,16 @@ def iso(t: int) -> str:
 
 
 def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str, debit: Debit) -> None:
-    """API paginée d'une (place, actif) : pages de `pas` minutes, dernière minute incluse et bornée à la fenêtre
-    (aucune bougie demandée hors fenêtre) ; une page par fichier page-<début>.json ; reprise sur le manifeste."""
-    s, pas = prm["series"][place], prm["series"][place]["pas"]
-    for debut in range(fen["debut"], fen["fin"], 60 * pas):
-        fin = min(debut + 60 * (pas - 1), fen["fin"] - 60)
+    """API paginée d'une (place, actif) : découpage de socle.pages (requête de départ à borne, `pas` bougies au plus,
+    chevauchement de chaque côté ; la première et la dernière peuvent demander une minute hors fenêtre, écartée au
+    chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste."""
+    s = prm["series"][place]
+    for debut, _f, depart, fin in socle.pages(prm, place, fen):
         rel = os.path.join(nom, place, actif, f"page-{debut}.json")
         if man.present(rel):
             continue
-        url = s["url"].format(s=s["paires"][actif], debut=debut, fin=fin, n=(fin - debut) // 60 + 1,
-                              debut_ms=debut * 1000, fin_ms=fin * 1000, debut_iso=iso(debut), fin_iso=iso(fin))
+        url = s["url"].format(s=s["paires"][actif], debut=depart, fin=fin, n=(fin - depart) // 60 + 1,
+                              debut_ms=depart * 1000, fin_ms=fin * 1000, debut_iso=iso(depart), fin_iso=iso(fin))
         debit.attendre(place, s["intervalle_ms"])
         man.ajouter(url, rel, lire_url(prm, url))
 

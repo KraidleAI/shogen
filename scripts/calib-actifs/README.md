@@ -12,6 +12,12 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   strates, planchers des oracles, quantile et règle de grille (Q-CA-13), écriture `.partiel` ;
 - `acquerir.py` : étape réseau ; mensuels de Binance (`.CHECKSUM`) et d'OKX, archive de Kraken lue par plages, pages de
   Coinbase, Bitstamp et Bitfinex à débit borné, manifeste et reprise ;
+- formes des API (SHOGEN-CALIB-FORMES-API-1, DETTES-T2 ; décision sur `RAPPORT.md`) : aucun pari sur une borne non
+  écrite. `pas` = bougies par requête au plus ; `chevauchement` 1 (Coinbase, Bitstamp : inclusion de `start` et de
+  `end` non écrite), une minute demandée de chaque côté de la page ; Bitfinex (bornes incluses, [lu]) : 0.
+  Chargement : fichiers exactement les pages de `socle.pages` ; bougie hors de la fenêtre de sa page (Coinbase : qui
+  précède `start` ; minute qui suit la fenêtre) écartée ; une minute servie par deux pages aux mêmes valeurs est
+  gardée une fois, aux valeurs différentes : CA/format nommé. Binance et Kraken restent stricts ;
 - `bougies.py` : six lecteurs, normalisation, dernier prix connu et âges, oracle d'exécution de SH §4 ;
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
 - `tau.py` : population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son

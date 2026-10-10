@@ -74,8 +74,9 @@ SCHEMA = {"lot": str, "rattachement": str,
           "chainlink": _par_actif({"proxy": str, "seuil": "dec", "heartbeat_s": int})
           | {"facteur": "dec", "source": str},
           "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
-          "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "intervalle_ms": int,
-                                         "url": str, "paires": "paires"}) | {"source": str},
+          "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "chevauchement": int,
+                                         "intervalle_ms": int, "url": str, "paires": "paires"})
+          | {"source": str},
           "kraken_sha256": _par_actif(str) | {"source": str},
           "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
                         "source": str},
@@ -131,6 +132,8 @@ def coherent(p: dict) -> bool:
             ok = ok and (lec["modes"][a] == "calibre" or a in F3)
             ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
     ok = ok and all(x in p["fenetre_descriptive"]["sans"] for x in PLACES if p["series"][x]["acces"] == "archive")
+    for s in (p["series"][x] for x in PLACES):              # pages : 0 <= 2 chevauchement < pas ; sinon 0
+        ok = ok and 0 <= 2 * s["chevauchement"] < (s["pas"] if s["acces"] == "pages" else 1)
     return ok
 
 
@@ -197,6 +200,16 @@ def valeurs_btc(chemin: str) -> dict:
 def minutes(fen: dict) -> range:
     """Débuts des minutes de la fenêtre [debut ; fin) (E-CA-16 ; T-CA-FEN-1)."""
     return range(fen["debut"], fen["fin"], 60)
+
+
+def pages(prm: dict, place: str, fen: dict) -> list:
+    """Découpage d'une place paginée (DECISION de FORMES-API-1, pt 1 et ajout daté) : [(début, fin, départ, borne)] ;
+    page [début ; fin) de `pas` − 2c minutes au plus (c = chevauchement) ; requête de départ = début − 60c à borne =
+    fin − 60 + 60c (`pas` bougies : début et fin − 60 servis, bornes incluses ou non) ; filtre [départ ; borne + 60)."""
+    c = prm["series"][place]["chevauchement"]
+    u = 60 * (prm["series"][place]["pas"] - 2 * c)
+    return [(d, min(d + u, fen["fin"]), d - 60 * c, min(d + u, fen["fin"]) + 60 * (c - 1))
+            for d in range(fen["debut"], fen["fin"], u)]
 
 
 def strate(t: int, prm: dict) -> str:
