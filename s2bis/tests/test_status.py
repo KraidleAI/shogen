@@ -355,7 +355,8 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
         `sante` sans `ws` (DT6-e), puis des `sante` au `ws` liste ou objet (C-1 de la G2 de DETTES-T6 : TypeError),
         puis des `sante` dont System time a une partie entière de 4 301 chiffres, et de 641 sous la plus petite limite
         de int() (R-1 du contre-contrôle de DETTES-T6 : ValueError), lignes JSON valides hors FORMAT : le rapport dit le
-        disque non relevé, sans lever."""
+        disque non relevé, sans lever ; une partie entière de journal.CHIFFRES chiffres exactement reste lisible sous
+        cette limite (DT6-t : borne exacte de R-1)."""
         jl = journal.Journal(self.d, "pool").ouvrir(VEN)
         jl.ecrire("sante", VEN + 60, **{**sante(), "disque": {"libre": 1000}})
         jl.marqueur(VEN + 60)
@@ -380,6 +381,8 @@ class Etendue(Base):                                # DT6-d, SHOGEN-S2BIS-STATUS
                 f.write(ligne({"d3": d3, "disque": {"libre": n}, "prec": "0" * 64, "seq": n, "type": "sante",
                                "ws": VEN + 120}))
             self.assertEqual(sans_attente(lambda: status.rapport(self.d)[3]), f"disque : non relevé ({{'libre': {n}}})")
+        d3 = {**D3, "sortie": D3["sortie"].replace("0.000006523", "9" * journal.CHIFFRES + ".000006523")}
+        self.assertIsNotNone(status.chrony(d3))       # DT6-t : borne exacte, journal.CHIFFRES chiffres lus (limite 640)
 
 
 class Rapport(Base):

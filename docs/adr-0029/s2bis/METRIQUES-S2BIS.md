@@ -2665,3 +2665,23 @@ M12 ; R-1 défait, borne à 4 300 chiffres, à 641 ; borne à 639 vivante, équi
 entiers au plus : `UTI_FloatNetworkToHost`).
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-t (2026-10-10) : borne exacte de R-1 figée (lot DETTES-T6)
+
+Objet : O-6 de la phase 3, adopté : R1-M4 (borne à 639 chiffres) vivait, la borne de R-1 n'étant figée qu'au-delà (641
+chiffres illisibles). Deux lignes de plus dans `test_ligne_hors_format_jamais_une_trace` (celles de l'essai de la phase
+3) : une partie entière d'exactement `journal.CHIFFRES` chiffres reste lisible sous la plus petite limite de `int()`
+(`status.chrony` ne rend pas None) ; docstring. Aucun test ajouté ; FORMAT inchangé.
+
+Rouge : sur R1-M4, vivant à l'état DT6-s : FAIL 1 (`AssertionError: unexpectedly None`) ; sur R1-M3 : FAIL 1 (cas de 641
+chiffres du même test, `ValueError`) ; vert sur le code.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_status.py` | 559 | 24 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : R1-M1 à R1-M4 (forme du contre-contrôleur), 4 tués par
+`test_ligne_hors_format_jamais_une_trace`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
