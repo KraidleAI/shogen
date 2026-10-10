@@ -1,7 +1,7 @@
 """Bougies (PROPOSITION §4.2 et §6.1 CA-3 ; E-CA-15, E-CA-16) : six lecteurs de formats (SOURCES-HISTORIQUES §3),
 normalisation sur la grille des minutes de la fenêtre. Nombres lus en chaînes puis en Decimal, jamais en flottant ;
 minute absente ou à volume nul = sans échange. Ligne illisible, colonne absente, temps hors fenêtre ou hors minute,
-minute en double : CA/format ; pages filtrées à leur fenêtre (DECISION de FORMES-API-1)."""
+minute en double : CA/format ; pages et mensuels à mois voisins filtrés à leur fenêtre (DECISION de FORMES-API-1)."""
 from __future__ import annotations
 
 import io
@@ -90,11 +90,12 @@ LECTEURS = {"binance": _binance, "bitfinex": _bitfinex, "bitstamp": _bitstamp, "
             "kraken": _kraken, "okx": _okx}
 
 
-def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenetres=None) -> dict:
+def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenetres=None, garde=None) -> dict:
     """{minute : (clôture, active)} des fichiers (octets), active = volume > 0 ; hors minute, ligne illisible, double
     dans un fichier : CA/format (E-CA-16). Sans `fenetres` : hors de [debut ; fin) ou double : CA/format. `fenetres`
     [(a, b)] par fichier (FORMES-API-1, pts 2 et 3) : hors de [a ; b) ∩ [debut ; fin) écartée ; minute de deux
-    fichiers aux mêmes clôture et volume (chevauchement) gardée une fois, aux valeurs différentes : CA/format."""
+    fichiers aux mêmes clôture et volume (chevauchement) gardée une fois, aux valeurs différentes : CA/format. `garde`
+    (mois voisins, C-1 de la G2) : une minute hors fenêtre n'est écartée que dans [garde[0] ; garde[1])."""
     out, vals = {}, {}
     try:
         for k, octets in enumerate(fichiers):
@@ -105,7 +106,7 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                 if not (c.is_finite() and v.is_finite() and c >= 0 <= v):
                     raise _refus("nombre non fini ou négatif", place, actif)
                 dehors = not a <= t < b
-                if t % 60 or (dehors and not fenetres):
+                if t % 60 or (dehors and (not fenetres or garde and not garde[0] <= t < garde[1])):
                     raise _refus("temps hors fenêtre ou hors minute", place, actif)
                 if dehors:
                     continue
@@ -141,8 +142,8 @@ def derniers(s: dict, fen: dict) -> tuple:
 def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) -> dict:
     """Série d'une (place, actif) depuis <bruts>/<nom>/<place>/<actif>/ (fichiers de l'acquisition, triés, .partiel
     exclus) ; dossier absent ou vide : CA/format. Place paginée : fichiers exactement ceux de socle.pages (sinon
-    CA/format), chacune filtrée à [départ ; borne + 60)."""
-    d, s, fenetres = os.path.join(bruts, nom, place, actif), prm["series"][place], None
+    CA/format), chacun filtré à [départ ; borne + 60) ; mensuels à mois voisins : filtrés à la fenêtre."""
+    d, s, fenetres, garde = os.path.join(bruts, nom, place, actif), prm["series"][place], None, None
     noms = sorted(x for x in os.listdir(d) if not x.endswith(".partiel")) if os.path.isdir(d) else []
     if not noms:
         raise _refus("aucun fichier acquis", place, actif)
@@ -151,11 +152,14 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
         if set(plan) != set(noms):
             raise _refus("pages différentes du découpage de la fenêtre", place, actif)
         fenetres = [plan[x] for x in noms]
+    elif s["voisins"]:                                               # garde : mois acquis ± 14 h (C-1 de la G2)
+        r, fenetres = socle.rangs_mois(fen, s["voisins"]), [(fen["debut"], fen["fin"])] * len(noms)
+        garde = (socle.debut_mois(r.start) - 50400, socle.debut_mois(r.stop) + 50400)
     fichiers = []
     for x in noms:
         with open(os.path.join(d, x), "rb") as f:
             fichiers.append(f.read())
-    return serie(s["format"], fichiers, fen, place, actif, fenetres)
+    return serie(s["format"], fichiers, fen, place, actif, fenetres, garde)
 
 
 

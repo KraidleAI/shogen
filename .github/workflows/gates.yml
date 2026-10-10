@@ -338,7 +338,7 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 67
+          python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 69
 
   controle-unittest:
     # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et

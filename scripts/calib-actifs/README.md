@@ -17,7 +17,12 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   `end` non écrite), une minute demandée de chaque côté de la page ; Bitfinex (bornes incluses, [lu]) : 0.
   Chargement : fichiers exactement les pages de `socle.pages` ; bougie hors de la fenêtre de sa page (Coinbase : qui
   précède `start` ; minute qui suit la fenêtre) écartée ; une minute servie par deux pages aux mêmes valeurs est
-  gardée une fois, aux valeurs différentes : CA/format nommé. Binance et Kraken restent stricts ;
+  gardée une fois, aux valeurs différentes : CA/format nommé. Binance et Kraken restent stricts.
+  OKX (alignement UTC ou UTC+8 non écrit) : `voisins` 1, le mois précédent et le suivant sont acquis, seules les
+  minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est refusée ; le mois qui suit la
+  fenêtre descriptive (2026-10) n'est publié qu'après sa fin : jusque-là, l'acquisition sort en code 4 sur
+  `REFUS CA/acquisition : mensuel 2026-10 non obtenu (téléchargement impossible (HTTPError)) ; un mensuel n'est publié
+  qu'après la fin de son mois ; actif ETH ; place okx` ;
 - `bougies.py` : six lecteurs, normalisation, dernier prix connu et âges, oracle d'exécution de SH §4 ;
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
 - `tau.py` : population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son

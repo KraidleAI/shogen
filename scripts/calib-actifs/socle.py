@@ -4,6 +4,8 @@ strictement (E-CA-06, E-CA-12) ; tau_sigma.txt de PLAN-S2BIS sous son épingle (
 seule ; aucune barre oblique inverse (E-CA-05)."""
 from __future__ import annotations
 
+import calendar
+import datetime
 import hashlib
 import json
 import math
@@ -75,7 +77,7 @@ SCHEMA = {"lot": str, "rattachement": str,
           | {"facteur": "dec", "source": str},
           "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
           "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "chevauchement": int,
-                                         "intervalle_ms": int, "url": str, "paires": "paires"})
+                                         "voisins": int, "intervalle_ms": int, "url": str, "paires": "paires"})
           | {"source": str},
           "kraken_sha256": _par_actif(str) | {"source": str},
           "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
@@ -133,7 +135,8 @@ def coherent(p: dict) -> bool:
             ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
     ok = ok and all(x in p["fenetre_descriptive"]["sans"] for x in PLACES if p["series"][x]["acces"] == "archive")
     for s in (p["series"][x] for x in PLACES):              # pages : 0 <= 2 chevauchement < pas ; sinon 0
-        ok = ok and 0 <= 2 * s["chevauchement"] < (s["pas"] if s["acces"] == "pages" else 1)
+        ok = ok and s["voisins"] >= 0 and 0 <= 2 * s["chevauchement"] < (s["pas"] if s["acces"] == "pages" else 1)
+        ok = ok and (s["voisins"] == 0 or s["acces"] in ("mensuel", "mensuel_checksum"))      # C-3 de la G2
     return ok
 
 
@@ -195,6 +198,17 @@ def valeurs_btc(chemin: str) -> dict:
         if m[3] is not None:
             out[m[1], m[2]] = Decimal(m[3])
     return out
+
+
+def rangs_mois(fen: dict, voisins: int = 0) -> range:
+    """Rangs 12·année + mois − 1 des mois UTC de [debut ; fin) et de `voisins` mois de chaque côté (FORMES-API-1,
+    pt 4) : mois demandés à l'acquisition, garde des mois acquis au chargement (C-1 de la G2)."""
+    a, b = (datetime.datetime.fromtimestamp(x, datetime.timezone.utc) for x in (fen["debut"], fen["fin"] - 60))
+    return range(12 * a.year + a.month - 1 - voisins, 12 * b.year + b.month + voisins)
+
+
+def debut_mois(k: int) -> int:
+    return calendar.timegm((k // 12, k % 12 + 1, 1, 0, 0, 0))
 
 
 def minutes(fen: dict) -> range:

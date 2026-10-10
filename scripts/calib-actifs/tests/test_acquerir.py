@@ -29,10 +29,11 @@ def local(test, base):
     return prm, d, pauses
 
 
-def zips(prefixe, symbole, somme=True, mauvais=()):
-    """Trois faux mensuels (2026-04 à 06) et, pour Binance, leurs .CHECKSUM (« sha256  nom »), faux pour `mauvais`."""
+def zips(prefixe, symbole, somme=True, mauvais=(), mois=("2026-04", "2026-05", "2026-06")):
+    """Faux mensuels (2026-04 à 06 par défaut) et, pour Binance, leurs .CHECKSUM (« sha256  nom »), faux pour
+    `mauvais`."""
     f = {}
-    for m in ("2026-04", "2026-05", "2026-06"):
+    for m in mois:
         chemin = f"{prefixe}/{symbole}-1m-{m}.zip" if somme else f"{prefixe}/{m.replace('-', '')}/{symbole}-{m}.zip"
         f[chemin] = f"{symbole} {m}".encode()
         if somme:
@@ -109,13 +110,13 @@ class TestAcquerir(unittest.TestCase):
 
 
     def test_okx_reprise(self):
-        """OKX : chemin par mois AAAAMM, trois fichiers ; second passage : aucune requête neuve (reprise). Mutations :
-        mois AAAAMM perdu ; reprise ignorée."""
-        with Serveur(zips("/o", "ETH-USDT", somme=False)) as s:
+        """OKX : chemin par mois AAAAMM, cinq fichiers (la fenêtre et un mois voisin de chaque côté, DETTES-T2) ;
+        second passage : aucune requête neuve (reprise). Mutations : mois AAAAMM perdu ; reprise ignorée."""
+        with Serveur(zips("/o", "ETH-USDT", somme=False, mois=[f"2026-0{m}" for m in range(3, 8)])) as s:
             prm, d, _p = local(self, s.base)
             for _ in range(2):
                 acquerir.mensuels(prm, acquerir.Manifeste(d), "principale", P["fenetre"], "okx", "ETH")
-        self.assertEqual(s.vus, [f"/o/2026{m:02d}/ETH-USDT-2026-{m:02d}.zip" for m in (4, 5, 6)])
+        self.assertEqual(s.vus, [f"/o/2026{m:02d}/ETH-USDT-2026-{m:02d}.zip" for m in range(3, 8)])
 
 
     def test_kraken_plages(self):

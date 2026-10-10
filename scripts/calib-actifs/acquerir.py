@@ -76,26 +76,29 @@ def lire_url(prm: dict, url: str, plage=None, total=False):
     raise socle.Refus("CA/acquisition", f"téléchargement impossible ({erreur})")
 
 
-def mois(fen: dict) -> list:
-    """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre ; rang du mois borné (la boucle finit)."""
-    a, b = (datetime.datetime.fromtimestamp(x, datetime.timezone.utc) for x in (fen["debut"], fen["fin"] - 60))
-    return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in range(12 * a.year + a.month - 1, 12 * b.year + b.month)]
+def mois(fen: dict, voisins: int = 0) -> list:
+    """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre, et `voisins` mois de chaque côté (OKX :
+    alignement des mensuels en UTC ou UTC+8 non écrit, DECISION de FORMES-API-1 pt 4) ; rang du mois borné."""
+    return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in socle.rangs_mois(fen, voisins)]
 
 
 def mensuels(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str) -> None:
     """Fichiers mensuels d'une (place, actif) : Binance avec son .CHECKSUM (sha256 différent : CA/acquisition, E-CA-13),
-    OKX sans somme publiée."""
+    OKX sans somme publiée ; mois voisins de parametres.json (minutes hors fenêtre écartées au chargement)."""
     s = prm["series"][place]
-    for m in mois(fen):
+    for m in mois(fen, s["voisins"]):
         url = s["url"].format(s=s["paires"][actif], m=m, mm=m.replace("-", ""))
         rel = os.path.join(nom, place, actif, url.rsplit("/", 1)[1])
         if man.present(rel):
             continue
-        octets = lire_url(prm, url)
-        if s["acces"] == "mensuel_checksum":
-            somme = lire_url(prm, url + ".CHECKSUM").decode("ascii", "replace").split(" ")[0]
-            if somme != hashlib.sha256(octets).hexdigest():
-                raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
+        try:                                                        # C-2 de la G2 : refus nommé par le mois
+            octets = lire_url(prm, url)
+            somme = lire_url(prm, url + ".CHECKSUM") if s["acces"] == "mensuel_checksum" else None
+        except socle.Refus as r:
+            raise socle.Refus("CA/acquisition", f"mensuel {m} non obtenu ({str(r).split(' : ', 1)[1]}) ; un mensuel "
+                              "n'est publié qu'après la fin de son mois", actif, place=place) from None
+        if somme is not None and somme.decode("ascii", "replace").split(" ")[0] != hashlib.sha256(octets).hexdigest():
+            raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
         man.ajouter(url, rel, octets)
 
 
