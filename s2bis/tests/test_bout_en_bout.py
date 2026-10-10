@@ -4,7 +4,9 @@ journal est validé contre le FORMAT (docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.
 texte, sans rien importer du collecteur. Exécution A : `entree.main` sans TLS, vers un serveur en clair de boucle
 locale, trois fenêtres. Exécution B : le point d'entrée `python3 -m shogen_s2bis.collecte` tel quel (contexte TLS
 d'urllib : poignée refusée par ce serveur), qui reprend le même journal, deux fenêtres. CB-6c : corps servi =
-binance.bin, décodé (relevé écrit à la main) ; `valeurs` contrôlées selon le §9.1."""
+binance.bin, décodé (relevé écrit à la main) ; `valeurs` contrôlées selon le §9.1. DT6-g : `anomalies` reçoit les champs
+par type (journal `secondaire`, `test_secondaire.Conformite`) et juge une `sante` sans sondes (§13.1) ; `servir` reçoit
+ses routes."""
 import base64
 import hashlib
 import json
@@ -79,9 +81,10 @@ def releves(e):
         and type(r["extra"]) is dict and all(type(k) is str is type(x) for k, x in r["extra"].items()) for r in v)
 
 
-def anomalies(enrs, f, s):
+def anomalies(enrs, f, s, champs=CHAMPS):
     """Écarts au FORMAT des enregistrements relus par `chaine` (§1 : JSON canonique, `seq` et `prec` chaînés) ; [] :
-    conforme. `f`, `s` : contenus de `formes.json` et `sante.json` (grille, départ, échéance, sondes)."""
+    conforme. `f`, `s` : contenus de `formes.json` et `sante.json` (grille, départ, échéance, sondes ; `s` None : sans
+    sondes, §13.1) ; `champs` : champs propres par type (DT6-g)."""
     ecarts, w, fenetre, marqueurs = [], f["w"], [], []
 
     def exige(ok, quoi):
@@ -89,9 +92,9 @@ def anomalies(enrs, f, s):
             ecarts.append(f"seq {e.get('seq')} {e.get('type')} : {quoi}")
     for i, e in enumerate(enrs):
         t, suivant = e.get("type"), enrs[i + 1].get("type") if i + 1 < len(enrs) else None
-        exige(set(e) == CHAMPS.get(t, set()) | {"type", "seq", "prec"}, f"champs {sorted(e)}")
+        exige(set(e) == champs.get(t, set()) | {"type", "seq", "prec"}, f"champs {sorted(e)}")
         exige(niveau(e) <= 64, "imbrication")                                                               # §8.3
-        if t not in CHAMPS or set(e) != CHAMPS[t] | {"type", "seq", "prec"}:
+        if t not in champs or set(e) != champs[t] | {"type", "seq", "prec"}:
             continue
         exige("ws" not in e or entiers(e["ws"]) and e["ws"] % w == 0, "ws hors grille")                    # §3.1
         if t in ("ouverture", "cloture"):
@@ -104,8 +107,9 @@ def anomalies(enrs, f, s):
             exige(entiers(e["de"], e["a"]) and e["de"] <= e["a"] and e["cause"] in ("arret", "horloge_reculee", "saut")
                   and suivant == "marqueur", "trou")                                                          # §8.1
         elif t == "run_params":
-            exige(re.fullmatch("[0-9a-f]{40}", e["commit"]) and sorted(e["sha256"]) == ["descripteur", "formes",
-                  "sante"] and all(HEX.fullmatch(h) for h in e["sha256"].values()), "run_params")           # §14.4
+            contenus = champs[t] - {"ws", "commit", "sha256", "python"}                # fichiers de configuration
+            exige(re.fullmatch("[0-9a-f]{40}", e["commit"]) and set(e["sha256"]) == contenus and all(
+                HEX.fullmatch(h) for h in e["sha256"].values()), "run_params")                               # §14.4
             exige(i > 0 and enrs[i - 1]["type"] in ("ouverture", "reprise"), "run_params hors tête")       # §11.5
         elif t == "lecture":
             p, depart, fin = e["phases"], (e["ws"] + w) * S - f["delta"], (e["ws"] + w) * S - f["marge"]
@@ -128,12 +132,15 @@ def anomalies(enrs, f, s):
             exige(set(fils) == {"abandonnes", "tardives", "sondes"} and entiers(fils["abandonnes"], fils["sondes"],
                   *fils["tardives"]) and fils["tardives"] == sorted(fils["tardives"]), "fils")              # §11.6
             exige(h is None or set(h) == {"murale", "monotone"} and entiers(*h.values()), "horloges")
+            exige(s or (e["d3"], e["d4"], e["d5"], e["disque"], e["resolveur"]) == (None, [], [], None, None),
+                  "sans sondes")                                                                              # §13.1
+            sd = s or {"temoins": [], "noms": []}
             exige(e["d3"] is None or set(e["d3"]) in ({"sortie", "code", "debut", "fin"}, {"erreur", "debut", "fin"}),
                   "d3")                                                                                       # §13.3
-            exige(len(e["d4"]) == len(s["temoins"]) and len(e["d5"]) == len(s["noms"]) and all(
-                requete_dns(v, "adresse", a) for v, a in zip(e["d4"], s["temoins"])) and all(
-                requete_dns(v, "nom", n) for v, n in zip(e["d5"], s["noms"])), "d4, d5")                     # §13.4
-            exige(set(e["disque"]) in ({"total", "libre"}, {"erreur"}) and (
+            exige(len(e["d4"]) == len(sd["temoins"]) and len(e["d5"]) == len(sd["noms"]) and all(
+                requete_dns(v, "adresse", a) for v, a in zip(e["d4"], sd["temoins"])) and all(
+                requete_dns(v, "nom", n) for v, n in zip(e["d5"], sd["noms"])), "d4, d5")                    # §13.4
+            exige(not s or set(e["disque"]) in ({"total", "libre"}, {"erreur"}) and (
                 e["resolveur"] is None or HEX.fullmatch(e["resolveur"])), "disque, resolveur")             # §13.5
             exige(suivant in ("trou", "marqueur"), "marqueur après la santé")                                 # §11.5
         elif t == "marqueur":
@@ -144,9 +151,10 @@ def anomalies(enrs, f, s):
     return ecarts
 
 
-def servir(test):
-    """Serveur de boucle locale, une connexion par fil : GET /a, 200 et CORPS ; autre requête, 503 ; une poignée TLS
-    (premier octet 22) reçoit la même réponse en clair et échoue. Fermé avec le test ; rend le port."""
+def servir(test, routes=((b"GET /a ", CORPS),)):
+    """Serveur de boucle locale, une connexion par fil : requête qui commence par le préfixe d'une route, 200 et son
+    corps (GET /a et CORPS par défaut) ; autre requête, 503 ; une poignée TLS (premier octet 22) reçoit la même réponse
+    en clair et échoue. Fermé avec le test ; rend le port."""
     srv = socket.create_server(("127.0.0.1", 0))
     test.addCleanup(srv.close)
 
@@ -157,7 +165,7 @@ def servir(test):
                 recu = b""
                 while FIN not in recu and recu[:1] != bytes([22]) and (bloc := conn.recv(4096)):
                     recu += bloc
-                code, corps = (200, CORPS) if recu.startswith(b"GET /a ") else (503, b"indisponible")
+                code, corps = next(((200, c) for p, c in routes if recu.startswith(p)), (503, b"indisponible"))
                 conn.sendall(CRLF.join([b"HTTP/1.1 %d X" % code, b"Content-Length: %d" % len(corps), b"", corps]))
             except OSError:                                         # client parti : fin du service de la connexion
                 pass

@@ -6,6 +6,7 @@ du pool éprouvé de bout en bout, les deux processus ensemble, carte pendue et 
 import json
 import os
 import pathlib
+import re
 import socket
 import subprocess
 import sys
@@ -15,7 +16,8 @@ from unittest import mock
 from shogen_s2bis.collecte import entree, secondaire
 from shogen_s2bis.collecte.lecture import S
 from tests.test_boucle import Temps, borne, rapide
-from tests.test_bout_en_bout import HARNAIS, servir
+from tests.test_asn import CORPS as RIPESTAT, V, serveur_dns
+from tests.test_bout_en_bout import CHAMPS, DNS, HARNAIS, anomalies, brut_intact, servir
 from tests.test_entree import COMMIT, RACINE, configurations, port_ferme, refus
 from tests.test_journal import Base, chaine
 from tests.test_reprise import m, sans_chaine
@@ -205,3 +207,47 @@ class Isolement(Base):                                             # E-C-32 ; PR
                                     [("m0", "panne_transport")] * 3])
         self.assertEqual(([e["fils"]["abandonnes"] for e in lus["pool"] if e["type"] == "sante"], [len([e for e in lus[
             n] if e["type"] == "marqueur"]) for n in ("pool", "sec")], lus["trop"]), ([0] * 3, [3, 3], []))
+
+
+class Conformite(Base):         # DT6-g, SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (O-5 de la G2 de P2A ; E-C-24)
+    def test_journal_secondaire_conforme_au_format(self):
+        """Le processus secondaire entier en sous-processus (w = 1 s, cinq fenêtres), son relevé ASN dirigé vers des
+        serveurs factices de boucle locale (résolveur : A 192.0.2.1 et 192.0.2.2, TXT « 64500 | … » ; RIPEstat en
+        clair). Chaque enregistrement est contrôlé contre le FORMAT par `anomalies` (§1 à §14 ; `sante` sans sondes,
+        §13.1 ; lectures de la carte aux instants du §15.3), puis contre le §15 par les règles écrites ici, sans rien
+        importer du collecteur : préfixe ; `run_params` à `{formes, carte, descripteur}` ; `releve_asn` des hôtes du
+        pool et de la carte, dans l'ordre ; un `asn` par hôte, en tête d'une fenêtre ; `a`, `ip`, `ripestat`, `cymru`
+        d'un hôte nommé et d'une IPv4 littérale."""
+        port_dns, _recues = serveur_dns(self)
+        port_rs = servir(self, ((b"GET /data/prefix-overview/data.json?resource=", RIPESTAT),))
+        f, _s, d = configurations(servir(self))
+        f["formes"][0]["hote"], d["resolveur"], c = "localhost", "127.0.0.1", carte(f["formes"][1]["port"])
+        c["formes"][0]["chemin"] = "/a"
+        ch = fichiers(self.d, formes=f, carte=c, descripteur=d)
+        os.mkdir(j := os.path.join(self.d, "j"))
+        r = subprocess.run([sys.executable, "-B", "-c", SECONDAIRE, str(port_dns), str(port_rs), "secondaire",
+                            *[x for n in ("formes", "carte", "descripteur") for x in ("--" + n, ch[n])], "--journal", j,
+                            "--commit", COMMIT, "--fenetres", "5"], cwd=RACINE, capture_output=True, timeout=60)
+        noms = sorted(n for n in os.listdir(j) if n.endswith(".jsonl"))
+        enrs = chaine(b"".join(pathlib.Path(j, n).read_bytes() for n in noms))[2]
+        champs = {**CHAMPS, "run_params": {"ws", "commit", "sha256", "python", "formes", "carte", "descripteur"},
+                  "releve_asn": {"ws", "hotes", "lance"}, "asn": {"ws", "hote", "a", "ip", "ripestat", "cymru"}}
+        g = {"w": f["w"], "delta": S - c["depart"], "marge": c["marge"], "formes": c["formes"]}       # §15.3
+        self.assertEqual((r.returncode, r.stderr, anomalies(enrs, g, None, champs)), (0, b"", []))
+        self.assertTrue(all(re.fullmatch("secondaire-[0-9]{4}-[0-9]{2}-[0-9]{2}-(0|[1-9][0-9]*)[.]jsonl", n)
+                            for n in noms) and "secondaire.verrou" in os.listdir(j))                 # §15.1
+        hotes, i = ["127.0.0.1", "localhost"], [k for k, e in enumerate(enrs) if e["type"] == "asn"]
+        avant = {enrs[k - 1]["type"] for k in i}                                      # en tête de fenêtre (§15.4)
+        self.assertEqual(([(e["hotes"], e["lance"]) for e in enrs if e["type"] == "releve_asn"][:1],
+                          [enrs[k]["hote"] for k in i], avant <= {"marqueur", "point", "asn"},
+                          [x["statut"] for x in enrs if x["type"] == "lecture"]),
+                         ([(hotes, True)], hotes, True, ["ok"] * 5))
+        lit, nom = (enrs[k] for k in i)
+        lecture = champs["lecture"] - {"ws", "forme", "prevu"}
+        adresses = [x[3] for x in nom["a"]["reponses"] if x[1] == 1]
+        self.assertEqual((lit["a"], lit["ip"], set(nom["a"]), nom["a"]["statut"], nom["ip"], adresses),
+                         (None, "127.0.0.1", DNS, "reponse", "192.0.2.1", ["192.0.2.1", "192.0.2.2"]))
+        for x in (lit, nom):
+            rs, cy = x["ripestat"], x["cymru"]
+            self.assertEqual((set(rs), rs["statut"], rs["valeurs"], brut_intact(rs), set(cy), cy["statut"], cy["asn"]),
+                             (lecture, "ok", V, True, DNS | {"asn"}, "reponse", 64500))

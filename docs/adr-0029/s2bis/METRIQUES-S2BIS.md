@@ -2530,3 +2530,29 @@ littérale toujours fausse (forme d'avant DT6-f), littérale reconnue à un moti
 pour une littérale, relevé injecté ignoré par `construire_secondaire`, puis par `main`.
 
 Suite : 354 tests ; plancher du job : 354, égalité exigée (`--egal`).
+
+## DT6-g (2026-10-09) : journal du secondaire contrôlé de bout en bout contre le FORMAT (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (O-5 de la G2 de P2A ; E-C-24). Test seul : le processus secondaire entier
+en sous-processus (w = 1 s, cinq fenêtres), son relevé ASN dirigé vers des serveurs factices de boucle locale
+(résolveur, RIPEstat en clair) ; chaque enregistrement est contrôlé contre le FORMAT par `anomalies` de
+`test_bout_en_bout` (§1 à §14 ; `sante` sans sondes, §13.1 ; lectures de la carte aux instants du §15.3), puis contre le
+§15 par des règles écrites dans le test (préfixe et fichiers, `run_params` à `{formes, carte, descripteur}`,
+`releve_asn` des hôtes du pool et de la carte dans l'ordre, un `asn` par hôte en tête de fenêtre, champs d'un hôte
+nommé et d'une IPv4 littérale). `anomalies` reçoit les champs par type, `servir` ses routes. Code inchangé.
+
+Rouge : sur l'état DT6-f, le mutant G05 (`run_params` du secondaire sans le sha256 de la carte) vit (aucun test ne le
+voit) ; sur les tests de DT6-g, `Conformite` échoue (FAIL 1, ERROR 0 : `seq 1 run_params : run_params`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_bout_en_bout.py` | 226 | 1 |
+| `tests/test_secondaire.py` | 253 | 8 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 10 mutants, 10 tués, 0 vivant, 0 FATAL, dont 9 par `Conformite` (G05 par elle seule) :
+`a` gardé null pour un hôte nommé, `ip` à la deuxième adresse A, `asn` écrits après la fenêtre (tué par un test du
+relevé seul), hôtes du pool non relevés, `run_params` sans le sha256 de la carte, santé sans sondes à `disque` {},
+`asn` de Cymru non relevé, journal au préfixe `carte`, `releve_asn` sans `lance`, hôtes non triés.
+
+Suite : 355 tests ; plancher du job : 355, égalité exigée (`--egal`).

@@ -54,7 +54,8 @@
   graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
   SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
   §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6) ; le diff DT6-f,
-  SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4).
+  SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4) ; le diff DT6-g, par un test seul,
+  SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15).
 
 ## 1. Ligne et chaîne (CB-1)
 
