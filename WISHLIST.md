@@ -252,3 +252,35 @@ deadline = clôture de la calibration 48 h.
 - ~~Eckhardt & Lee 1985~~ — version TM-86369 fetchée sur NTRS.
 - ~~Reply to the Criticisms~~ — détenu (sunnyday.mit.edu) ; venue
   confirmée par fiches web (SEN 15(1), 1990).
+
+## Priorité 6 — procurement PAROXYSME (ajout daté du 2026-10-10 04:56:09 UTC ; lot DETTES-T14)
+
+Heure de l'ajout : `date -u`. Section placée en fin de fichier, après « Déjà réglé »,
+pour ne décaler aucune ligne de ce fichier, cité ailleurs par numéro de ligne.
+Décisions de l'adjudication du procurement du 2026-10-09 (Q-B à Q-D) ; URL, prix lus
+et tentatives : rapport du procurement, hors dépôt ; ce qui est détenu est à
+`biblio/INDEX.md` (section du lot DETTES-T14). Les rediffusions non autorisées
+restent traitées comme inexistantes (règle de la priorité 3).
+
+- [ ] **P-15 ⚑ — Shostack, *Threat Modeling: Designing for Security*, Wiley, 2014 —
+  ISBN-13 978-1-118-80999-0 (e-book 978-1-118-81005-7).** Seul achat décidé (Q-B) :
+  l'e-book, 54,00 USD (fiche Wiley lue le 2026-10-09 ; valeur du jour), acte de
+  l'investisseur. Usage : forme et couverture de docs/17 (STRIDE, critères de sortie,
+  listes d'attaquants ; SHOGEN-E1-METHODE-1 (ii)). Détenus : les extraits officiels
+  (chapitre 1, table des matières, index). Sans achat, toute reprise de Shostack sort
+  de docs/17.
+- [ ] Optionnels, non nécessaires au but (Q-B, Q-D) ; prix non lus sauf mention :
+  Mantel et Haenszel 1959, *JNCI* 22(4) : 719-748 ; Cochran 1954, *Biometrics*
+  10(4) : 417-451 ; Manski 2003, Springer, DOI 10.1007/b97478 ; Little et Rubin 2019,
+  livre entier (108,95 USD relié, 87,00 USD e-book, fiche Wiley du 2026-10-09) ;
+  Malkhi et Reiter 1998, *Distributed Computing* 11(4), DOI 10.1007/s004460050050 ;
+  version *JASA* de Horowitz et Manski 2000 ; version Cambridge de Kiefer et
+  Vogelsang 2005 ; van der Meulen et Revilla 2008, *IEEE TSE* 34(6) (identité à
+  fixer : la ligne de doc 06 §2 ne la donne pas).
+- [ ] Gestes gratuits de l'investisseur, en navigateur, non bloquants : version
+  *PNAS* de Nosek et al. 2018 (pp. 2600-2606) ; version de l'éditeur de Croux et
+  Dehon 2010 ; NUREG/CR-5485 sur ADAMS ; historique de la documentation de Pyth (page
+  « price-aggregation » du 2026-08-05).
+- Sans objet : P-01 et P-03 (acte 8 du §1 bis.11 d'ADR-0028) : Künsch 1989 et Fisher
+  1921 sont détenus et lus (`biblio/INDEX.md`, partie 3 de S2, et note datée du lot
+  DETTES-T14).
