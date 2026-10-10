@@ -102,6 +102,17 @@ class LectureDuJournal(unittest.TestCase):
             pathlib.Path(self.d, "pool-2026-10-04-0.jsonl").write_bytes(sain + illisible + b"\n" + suite)
             self.assertEqual([e.get("ws") for e, _l in status.enregistrements(self.d)][-1], m(3), illisible)
 
+    def test_fichier_special_non_lu_sans_attente(self):      # DT6-c, SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (O-4, P2B)
+        """Tube nommé, puis dossier, au nom d'un fichier du journal : `status` ne l'ouvre pas en attente (le tube
+        bloquait, le dossier levait IsADirectoryError) et ne le lit pas ; les autres fichiers sont rendus."""
+        self.petit_journal()
+        attendu = [e["type"] for e, _l in status.enregistrements(self.d)]
+        chemin = os.path.join(self.d, "pool-2026-10-04-1.jsonl")
+        for faire, defaire in ((os.mkfifo, os.remove), (os.mkdir, os.rmdir)):
+            faire(chemin)
+            self.assertEqual(sans_attente(lambda: [e["type"] for e, _l in status.enregistrements(self.d)]), attendu)
+            defaire(chemin)
+
     def test_journal_absent(self):
         with self.assertRaises(status.RefusStatus) as r:
             list(status.enregistrements(self.d))

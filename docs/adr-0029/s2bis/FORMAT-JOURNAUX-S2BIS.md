@@ -49,9 +49,10 @@
   diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
   (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
   CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
-- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 21:31:02 UTC, heure lue par `date -u` à la dernière écriture
+- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-09 22:01:56 UTC, heure lue par `date -u` à la dernière écriture
   du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
-  graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4).
+  graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
+  SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -154,8 +155,8 @@ mécanique :
 - un écrivain s'ouvre une seule fois : un second `ouvrir` est refusé (`JOURNAL/ouvert`), sans toucher au verrou ni au
   fichier ouvert ;
 - une écriture avant `ouvrir` ou après `fermer`, et l'ouverture d'un écrivain fermé, sont refusées (`JOURNAL/ferme`) ;
-- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/nom`, `JOURNAL/illisible`) ferme l'écrivain et
-  rend le verrou ;
+- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/nom`, `JOURNAL/fichier`, `JOURNAL/illisible`)
+  ferme l'écrivain et rend le verrou ;
 - `fermer` est le seul appel admis de tout fil (nettoyage) ; il reste admis après une casse (§4).
 
 Aucun de ces refus n'écrit. Les trois méthodes publiques d'écriture portent la même garde que la casse de C-2 (§4) ; un
@@ -270,7 +271,12 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    `jour` d'une `ouverture` ou d'une `cloture` au nom de son fichier restent de la validité (RB-3). La reprise de
    l'écrivain ne juge pas le lien entre la première ligne d'un fichier et la dernière ligne intègre qui la précède
    dans la chaîne (§7.1) : ce lien se juge ici, par le lecteur du recalcul (RB-1) et le lecteur indépendant (RB-18)
-   seuls.
+   seuls. **Fichiers ordinaires** (DT6-c, SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 ; O-4 de la G2 de P2B) : un fichier
+   du journal, et le fichier de sommes, sont des fichiers ordinaires. Devant un tube nommé, un dossier ou un
+   périphérique à l'un de ces noms, l'écrivain refuse de démarrer (`JOURNAL/fichier`, contrôle par `stat`, sans
+   ouverture, avant toute lecture et toute écriture) ; il ouvre toute lecture sans attente (`O_NONBLOCK`) et n'y lit
+   qu'un fichier ordinaire, comme au dépôt (§16.9) : un tube nommé bloquait sa reprise sans fin. `status` ne lit pas
+   un tel fichier (§17.1).
 
 ## 8. Trous et sommes rattrapées (CB-2c, E-C-22, E-C-20)
 
@@ -771,7 +777,8 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
 
 1. **Lecture** (CB-17a) : le journal du pool est lu sans rien écrire ni prendre le verrou de l'écrivain (§5) : la
    lecture peut se faire pendant la collecte. Fichiers dans l'ordre (jour, k entier) de la grammaire du §6.1 ; aucun :
-   refus `STATUS/journal`. Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme canonique
+   refus `STATUS/journal`. Un fichier qui n'est pas un fichier ordinaire n'est pas lu : il est ouvert sans attente
+   (DT6-c, §7.7). Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme canonique
    (§1.2, §9.1, §11.2) et d'aucun autre type, est une `lecture` : elle n'est jamais décodée, et rien d'une lecture
    n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée, illisible,
    sans `type` chaîne ni `seq` entier, ou d'un jour postérieur à celui de son fichier : `ws` à la fin du jour du nom du

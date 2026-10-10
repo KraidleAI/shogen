@@ -2416,3 +2416,29 @@ réseau isolé ; témoin VIVANT) : 9 mutants, 9 tués par le test visé, 0 vivan
 brut au lieu de l'exposant ajusté.
 
 Suite : 345 tests ; plancher du job : 345, égalité exigée (`--egal`).
+
+## DT6-c (2026-10-09) : fichiers du journal ordinaires, lus sans attente (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (O-4 de la G2 de P2B). Un tube nommé au nom d'un fichier du journal
+bloquait `status` (ouverture sans `O_NONBLOCK`) et la reprise de l'écrivain ; un dossier à ce nom faisait lever
+`IsADirectoryError` à `status`. L'écrivain refuse de démarrer devant un nom du journal ou des sommes qui n'est pas un
+fichier ordinaire (`JOURNAL/fichier`, contrôle par `stat`, avant toute lecture et toute écriture) et ouvre toute lecture
+sans attente (`journal.ordinaire`, comme au dépôt) ; `status` ne lit pas un tel fichier (FORMAT §5, §7.7, §17.1).
+
+Rouge : sur l'état DT6-b, 2 tests en échec d'assertion (FAIL 2, ERROR 0) : appels bloqués, interrompus par l'alarme de
+2 s (`bloqué`), puis `JOURNAL/occupe` (verrou tenu par l'instance bloquée).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 471 | — |
+| `shogen_s2bis/collecte/status.py` | 219 | — |
+| `tests/test_reprise.py` | 376 | 28 (1 de plus) |
+| `tests/test_status.py` | 407 | 19 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : lecture ouverte en attente,
+type du fichier lu non contrôlé, contrôle d'ouverture retiré, sommes hors du contrôle, tube seul refusé (contrôle
+d'ouverture ; lecture), refus de l'écrivain non rattrapé par `status`, ouverture de `status` d'avant DT6-c, relecture
+de la reprise et sommes relues par `open` (tués par le cas du tube posé après le contrôle).
+
+Suite : 347 tests ; plancher du job : 347, égalité exigée (`--egal`).

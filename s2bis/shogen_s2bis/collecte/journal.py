@@ -31,12 +31,15 @@ ses octets avant tout décodeur, par la copie du compte du lecteur du recalcul (
 `canonique` compte les valeurs une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur plus
 de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1). DT6-a : la borne porte sur les
 octets (SHOGEN-S2BIS-CANONIQUE-OCTETS-1 : une longue chaîne partagée comptait pour une valeur), et un cycle est refusé
-avant le sérialiseur, qui développait le graphe partagé placé devant lui (résiduel de CORPS-BORNE-1)."""
+avant le sérialiseur, qui développait le graphe partagé placé devant lui (résiduel de CORPS-BORNE-1). DT6-c
+(SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1) : un fichier du journal ou des sommes qui n'est pas un fichier ordinaire est
+refusé à l'ouverture (JOURNAL/fichier), et toute lecture s'ouvre sans attente (`ordinaire`)."""
 import fcntl
 import hashlib
 import json
 import os
 import re
+import stat
 import threading
 import time
 
@@ -160,6 +163,17 @@ def canonique(enr):
     return octets
 
 
+def ordinaire(chemin):
+    """Descripteur en lecture du fichier ordinaire `chemin`, ouvert sans attente (O_NONBLOCK) : un tube nommé, un
+    dossier ou un périphérique à ce nom lève JOURNAL/fichier sans bloquer (DT6-c,
+    SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 ; comme au dépôt, FORMAT §16.9)."""
+    fd = os.open(chemin, os.O_RDONLY | os.O_NONBLOCK)
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ErreurJournal("JOURNAL/fichier", f"pas un fichier ordinaire : {os.path.basename(chemin)}")
+    return fd
+
+
 def jour(ws):
     return time.strftime("%Y-%m-%d", time.gmtime(ws))
 
@@ -172,7 +186,7 @@ def _tout(fd, octets):
 def _empreinte(chemin, debut=0):
     """(sha256, octets) du fichier `chemin` à partir de `debut`, lu par blocs."""
     h, n = hashlib.sha256(), 0
-    with open(chemin, "rb") as f:
+    with open(ordinaire(chemin), "rb") as f:
         f.seek(debut)
         for bloc in iter(lambda: f.read(1 << 20), b""):
             h.update(bloc)
@@ -226,7 +240,8 @@ class Journal:
 
     @_terminal
     def ouvrir(self, ws):
-        """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal."""
+        """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal. Un
+        nom du journal ou des sommes qui n'est pas un fichier ordinaire : JOURNAL/fichier (DT6-c)."""
         self.verrou = os.open(os.path.join(self.dossier, self.prefixe + ".verrou"), os.O_RDWR | os.O_CREAT, 0o644)
         try:
             fcntl.flock(self.verrou, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -236,6 +251,10 @@ class Journal:
         if type(ws) is not int or ws % self.w:
             raise ErreurJournal("JOURNAL/fenetre", ws)
         fichiers = self._fichiers(refus=True)
+        sommes = [self.prefixe + ".sha256"] * os.path.exists(os.path.join(self.dossier, self.prefixe + ".sha256"))
+        for n in [x for _j, _k, x in fichiers] + sommes:              # DT6-c : avant toute lecture et toute écriture
+            if not stat.S_ISREG(os.stat(os.path.join(self.dossier, n)).st_mode):
+                raise ErreurJournal("JOURNAL/fichier", f"pas un fichier ordinaire : {n}")
         if fichiers:
             self._reprendre(ws, fichiers)
         else:
@@ -339,7 +358,7 @@ class Journal:
     def _synchro(self, n=None):
         """fsync (injecté) du fichier `n` du dossier, ou du dossier lui-même, par un descripteur en lecture seule
         (C-2 de la relecture d'intégration de P1)."""
-        fd = os.open(os.path.join(self.dossier, n) if n else self.dossier, os.O_RDONLY)
+        fd = os.open(os.path.join(self.dossier, n) if n else self.dossier, os.O_RDONLY | os.O_NONBLOCK)
         try:
             self.fsync(fd)
         finally:
@@ -351,7 +370,7 @@ class Journal:
         État : celui du dernier intègre, ou None ; `derniere` : ws du dernier enregistrement écrit par `ecrire` ou
         `marqueur`, None si le fichier n'en a pas."""
         etat, pos, h = None, 0, hashlib.sha256()
-        with open(os.path.join(self.dossier, n), "rb") as f:
+        with open(ordinaire(os.path.join(self.dossier, n)), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 try:                                                # UTF-8 strict, niveaux avant le décodeur
                     texte = ligne.decode("utf-8")                   # (CB-6d) ; puis (c), (d) et (b)
@@ -423,7 +442,7 @@ class Journal:
         y est close par un saut de ligne, jamais réécrite."""
         chemin, texte = os.path.join(self.dossier, self.prefixe + ".sha256"), ""
         if os.path.exists(chemin):
-            with open(chemin, encoding="utf-8", errors="replace") as f:
+            with open(ordinaire(chemin), encoding="utf-8", errors="replace") as f:
                 texte = f.read()
         if texte and not texte.endswith("\n"):
             fd = os.open(chemin, os.O_WRONLY | os.O_APPEND)

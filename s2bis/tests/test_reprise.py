@@ -350,3 +350,27 @@ class Reprise(AvecJournal):
         self.assertEqual(([x["type"] for x in chaine(e[FICHIER])[2][-2:]],
                           [x["type"] for x in chaine(e["pool-2026-10-05-0.jsonl"], *chaine(e[FICHIER])[:2])[2]]),
                          (["reprise", "cloture"], ["ouverture", "run_params"]))
+
+    def test_fichier_special_au_nom_d_un_fichier_du_journal(self):    # DT6-c, JOURNAL-FICHIER-SPECIAL-1 (O-4, P2B)
+        """Tube nommé ou dossier au nom d'un fichier du journal (segment du jour, ou fichier de la veille), tube au nom
+        du fichier de sommes, redémarrage le même jour ou le lendemain (la clôture précède alors les sommes) :
+        l'ouverture est refusée (JOURNAL/fichier) sans attendre (le tube bloquait la reprise sans fin), sans rien
+        écrire, verrou rendu ; le nom libéré, l'écrivain reprend (FORMAT §5, §7.7). Tube posé après le contrôle par
+        `stat` (simulé : `os.stat` rend celui d'un fichier ordinaire) : la relecture et les sommes, ouvertes sans
+        attente, le refusent de même."""
+        from tests.test_tetes import sans_attente               # import local : test_tetes importe test_reprise
+        self.preparer()
+        avant, refus, veille = self.etat(), [], "pool-2026-10-03-0.jsonl"
+        for nom, faire, ws in ((SEG1, os.mkfifo, m(9)), (SEG2, os.mkdir, m(9)), ("pool.sha256", os.mkfifo, m(9)),
+                               (veille, os.mkfifo, J2), (veille, os.mkdir, J2), ("pool.sha256", os.mkfifo, J2)):
+            faire(chemin := os.path.join(self.d, nom))
+            refus.append(sans_attente(lambda: code(lambda: j.Journal(self.d, "pool", fsync=self.espion).ouvrir(ws))))
+            (os.rmdir if faire is os.mkdir else os.remove)(chemin)
+        ordinaire = os.stat(os.path.join(self.d, FICHIER))
+        for nom in (SEG1, "pool.sha256"):
+            os.mkfifo(chemin := os.path.join(self.d, nom))
+            with mock.patch.object(j.os, "stat", return_value=ordinaire):
+                refus.append(sans_attente(lambda: code(lambda: j.Journal(self.d, "pool").ouvrir(m(9)))))
+            os.remove(chemin)
+        self.assertEqual((refus, self.etat()), (["JOURNAL/fichier"] * 8, avant))
+        self.journal(m(9)).fermer()

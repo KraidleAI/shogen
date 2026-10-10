@@ -14,7 +14,9 @@ strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196).
 CB-17c (AVIS Q-D-03, point 2) : résumé par jour, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande
 `resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3).
 CB-17d (AVIS Q-D-03, point 3) : avec un dépôt, `status` ajoute le compte à quorum (au moins deux observateurs
-valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge."""
+valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge.
+DT6-c (SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1) : un fichier du journal est ouvert sans attente et lu s'il est un fichier
+ordinaire (`journal.ordinaire`) ; un tube nommé à son nom bloquait `status`."""
 import calendar
 import hashlib
 import json
@@ -62,9 +64,14 @@ def _au_dela(e, fin):
 
 def enregistrements(dossier, prefixe="pool"):
     """(enregistrement, ligne) hors `lecture`, dans l'ordre de `fichiers` ; un fichier s'arrête à sa première ligne
-    coupée, illisible, sans `type` ni `seq`, ou d'un jour postérieur au sien (`_au_dela`)."""
+    coupée, illisible, sans `type` ni `seq`, ou d'un jour postérieur au sien (`_au_dela`) ; un fichier qui n'est pas un
+    fichier ordinaire n'est pas lu (DT6-c)."""
     for debut, _k, n in fichiers(dossier, prefixe):
-        with open(os.path.join(dossier, n), "rb") as f:
+        try:                                                    # DT6-c : fichier ordinaire, ouvert sans attente
+            fd = journal.ordinaire(os.path.join(dossier, n))
+        except (journal.ErreurJournal, OSError):
+            continue
+        with open(fd, "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 if ligne.startswith(LECTURE):
                     continue
