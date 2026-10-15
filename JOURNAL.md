@@ -525,3 +525,5 @@ Orchestrateur Shōgen `claude-fable-5-1`, 00:2x-01:2x UTC. **Vague 1** (workflow
 > - **Engagés** : trois corrections de texte avant le 2026-10-25 (SHOGEN-PUBLICATION-S2-AMENDEMENTS-1).
 > - **Inscrit** : SHOGEN-S2BIS-CHAINLINK-LECTURE-1, lecture de Chainlink en S2-bis (question de l'investisseur).
 > - Les autres travaux restent en pause depuis 09:32 UTC, à la demande de l'investisseur.
+
+> **2026-10-15 13:39:21 UTC — DETTES-T16 (BIBLIO-API) commis** (annexe B.99 ; pièces `docs/adr-0028/revue-dettes16/`) : 8 pages des places de CALIB-FORMES-API-1 détenues (INDEX 196 → 204, octets privés hors git), 44 citations sur 45 du chercheur retrouvées, deux retouches déclarées au versement du rapport ; G2 neuve, C-1 et C-2 adoptées, clôture sans passe 2. Trouvaille : la page d'OKX dit UTC+8 pour les dates des fichiers historiques (encadré perdu par la copie du chercheur) ; erratum au versement. Question de valeur posée à l'investisseur : conditions d'usage des données d'OKX et de Bitstamp avant l'acquisition de CALIB-ACTIFS. Inscrits : PRESG5-QUADRATIQUE-1, BIBLIO-CONDITIONS-CAPTURE-1.
