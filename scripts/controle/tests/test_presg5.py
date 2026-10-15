@@ -2,7 +2,8 @@
 0, 1, 3, interdits jamais ouverts). E9 : versement refusé par S-G5, messages d'outils anglais entre guillemets
 français. Sortie dorée : SHA_DOREE est le sha256 de la sortie de l'outil d'origine (scratchpad, sha256 60de4077…87ef0)
 sur FIXTURE, mesuré avant le versement. Les guillemets français sont posés à l'exécution (<< et >>) : ce fichier n'en
-porte aucun autour d'un texte anglais. L'outil tourne en sous-processus (-X dev -W error -I -B)."""
+porte aucun autour d'un texte anglais. L'outil tourne en sous-processus (-X dev -W error -I -B).
+Relecture G2, C-10 : racine sous un interdit."""
 import hashlib
 import os
 import subprocess
@@ -99,3 +100,11 @@ class Presg5(unittest.TestCase):
             batir(d, {"biblio/" + m + ".txt": "the secret sentence is in this file\n",
                       "c.md": "<< the secret sentence is in this file >>\n"})
             self.assertEqual(lancer(d, ".", "c.md")[0], 1)
+
+    def test_c10_racine_interdite(self):
+        """C-10 : racine sous un interdit : sortie 3, rien d'ouvert, rien de nommé (l'outil lisait biblio/INDEX.md sous
+        cette racine, ou nommait ce chemin dans son erreur)."""
+        with tempfile.TemporaryDirectory() as d:
+            batir(d, {"docs/rapports/biblio/INDEX.md": "<< the hidden text is not in the corpus >>\n", "a.md": "x\n"})
+            code, sortie, erreur = lancer(d, "docs/rapports", "a.md")
+        self.assertEqual((code, sortie, "rapports" in erreur), (3, b"", False))

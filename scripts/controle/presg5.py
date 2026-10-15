@@ -3,7 +3,7 @@ l'orchestrateur (sha256 d'origine 60de4077…87ef0 ; lot GARDE-FOUS-ORCH, GF-2 ;
 inchangé : fragment anglais d'au moins 15 octets entre guillemets français, introuvable dans biblio/INDEX.md et les
 octets texte de biblio/. Changements : fonction introuvables(racine, fichiers) ; sorties 0 (aucun fragment), 1 (au
 moins un), 3 (erreur, biblio/INDEX.md absent compris) ; fichiers ouverts par `with` ; chemin interdit jamais ouvert
-ni nommé (garde_commun).
+ni nommé (garde_commun), la racine comprise (relecture G2, C-10).
 
 Usage : python3 -I -B presg5.py <racine du dépôt> <fichier.md>...
 Imprime chemin:ligne et le fragment anglais introuvable, puis le compte, comme l'outil d'origine.
@@ -158,7 +158,7 @@ def main(argv):
     if len(argv) < 2:
         print("usage : presg5.py <racine du dépôt> <fichier.md>...", file=sys.stderr)
         return 3
-    interdits = sum(map(GC.chemin_interdit, argv[1:]))
+    interdits = sum(map(GC.chemin_interdit, argv))
     if interdits:
         print(f"presg5 : {interdits} chemin(s) interdit(s), non ouvert(s)", file=sys.stderr)
         return 3

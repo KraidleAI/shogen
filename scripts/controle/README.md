@@ -308,3 +308,9 @@ dépendent des tests du harnais qu'ils importent.
 > horloge en échec), sort en 3 avec une ligne `ERREUR journal`, jamais en 1 avec une trace : `existe` sortait en 1,
 > lu comme absent, sur un fichier trouvé. `tests/test_avant_acte.py` compte 32 tests ; plancher du job
 > `controle-unittest` 100.
+
+> *Ajout daté du 2026-10-10 09:01:55 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-10)* : `presg5.py` (sha256
+> `8af899db31ce2dd955e836a5f452ca589de2c8d673db4c85535214469ac2951e`) : la racine passe au contrôle des
+> interdits comme les fichiers (sortie 3, rien d'ouvert ni de nommé) ; une racine sous un interdit faisait lire son
+> `biblio/INDEX.md`, ou nommer ce chemin dans l'erreur. `tests/test_presg5.py` compte 6 tests ; plancher du job
+> `controle-unittest` 101.
