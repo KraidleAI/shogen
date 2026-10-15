@@ -335,3 +335,10 @@ dépendent des tests du harnais qu'ils importent.
 > forge ; une variable héritée de l'environnement de l'orchestrateur déplaçait la cible (forme de E5).
 > `tests/test_gabarit_chaine.py` : `test_c1_verif_reelle` pose `CARGO_TARGET_DIR`, le cargo factice échoue s'il la
 > voit ; 8 tests, plancher du job `controle-unittest` inchangé, 103.
+
+> *Ajout daté du 2026-10-10 09:20:04 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-16 ; E8, faux refus)* :
+> `avant_acte.py` (sha256 `b0d5b0658ffc14170d7d3370d4668d694956cbe5ab5e87c0acb1a1c618d2fef6`) : C3 lit aussi
+> dans les sources la forme `passe N` (N passes faites), hors négation (`sans`, `aucune`, `pas de`) : l'adjudication
+> de DETTES-T6 n'écrit que `passe 2` et `sans passe 3`, et le message réel de DT6-d (`en deux passes`) était refusé
+> à tort ; le message réel de DT5-22 (`en trois passes`, erreur E8) reste refusé. `tests/test_avant_acte.py` compte
+> 34 tests ; plancher du job `controle-unittest` 104.

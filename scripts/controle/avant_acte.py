@@ -53,7 +53,9 @@ Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme
 Relecture G2, C-7 : chaine G1, chaque nom de GROUPES (hors la valeur aucun) nomme un diff du plan.
 Relecture G2, C-8 : verser refuse /, le dépôt et ses ancêtres (erreur, aucun parcours), ne parcourt jamais un dossier
 interdit (V0) et ne lit que des fichiers ordinaires (V5).
-Relecture G2, C-9 : une exception du journal (après la sous-commande) sort en 3, jamais en 1."""
+Relecture G2, C-9 : une exception du journal (après la sous-commande) sort en 3, jamais en 1.
+Relecture G2, C-16 : C3 lit aussi dans les sources « passe N » (N passes faites), hors négation (sans, aucune, pas
+de)."""
 import argparse
 import fnmatch
 import hashlib
@@ -78,6 +80,8 @@ GC = _module("garde_commun")
 P5 = _module("presg5")
 VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|NON-CONFORME|CONFORME|ACCEPTE|REFUSE)(?![A-Z-])")
 PASSES = re.compile("(?i)(?<![0-9a-zé])([0-9]+|une?|deux|trois|quatre|cinq|six) passes?(?![a-z])")
+PASSE_N = re.compile("(?i)(?<![0-9a-zé])passe ([0-9]+)(?![0-9])")
+NEGATION = re.compile("(?i)(?:sans|aucune|pas de|ni) (?:la |une )?$")
 NOMBRES = {"un": "1", "une": "1", "deux": "2", "trois": "3", "quatre": "4", "cinq": "5", "six": "6"}
 IDENT = re.compile("(?<![A-Za-z0-9-])(SHOGEN-[A-Z0-9]+(?:-[A-Z0-9]+)*|[GCRQLEOI]-[0-9]+)(?![A-Za-z0-9-])")
 SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]{7,40})(?![A-Za-z0-9…-])")
@@ -132,8 +136,12 @@ def sceller(a, fautes):
         f.write(GC.maintenant().strftime("%Y-%m-%dT%H:%M:%SZ") + chr(10))
 
 
-def passes(texte):
-    return {NOMBRES.get(n.lower(), n) for n in PASSES.findall(texte)}
+def passes(texte, source=False):
+    """Nombres de passes écrits (N passes) ; dans une source, aussi passe N hors négation (relecture G2, C-16)."""
+    vus = {NOMBRES.get(n.lower(), n) for n in PASSES.findall(texte)}
+    if source:
+        vus |= {m[1] for m in PASSE_N.finditer(texte) if not NEGATION.search(texte[max(0, m.start() - 12):m.start()])}
+    return vus
 
 
 def resolu(depot, sha):
@@ -159,7 +167,7 @@ def commit(a, fautes):
     corps = chr(10).join(x for x in texte.split(chr(10)) if not x.startswith(PIEDS))
     src = chr(10).join(b.decode("utf-8", "replace") for b in sources)
     manques = [("verdict", x) for x in sorted(set(VERDICT.findall(corps)) - set(VERDICT.findall(src)))]
-    manques += [("nombre de passes", x) for x in sorted(passes(corps) - passes(src))]
+    manques += [("nombre de passes", x) for x in sorted(passes(corps) - passes(src, source=True))]
     manques += [("identifiant", x) for x in sorted(set(IDENT.findall(corps)) - set(IDENT.findall(src)))]
     manques += [("sha court", x) for x in sorted(set(SHA.findall(corps))) if x not in src and not resolu(a.depot, x)]
     for genre, x in manques:

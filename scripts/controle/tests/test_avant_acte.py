@@ -17,7 +17,8 @@ GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
-ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17)."""
+ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
+passe N des sources)."""
 import contextlib
 import difflib
 import fnmatch
@@ -209,6 +210,19 @@ class Commit(Source):
                          "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"])
         self.assertEqual(self.commit(self.message(corps)), (0, ""))
 
+
+
+class PassesDesSources(Source):
+    def test_c16_passe_n_des_sources(self):
+        """C-16 : source qui écrit les passes en ordinal (contre-contrôle passe 2, clôture sans passe 3 : forme de
+        l'adjudication de DETTES-T6, dont les 23 messages disent deux passes) : deux passes admis ; trois passes refusé
+        (E8 gardé) ; sans passe 2, seul, n'atteste pas deux passes."""
+        self.lancer("sceller")
+        ag.ecrire(self.tmp, {"ADJUDICATION.md": "Contre-contrôle passe 2 : CONFORME ; clôture sans passe 3." + NL})
+        self.assertEqual(self.commit(self.message("x : contre-controle CONFORME en deux passes")), (0, ""))
+        self.assertEqual(self.commit(self.message("x : contre-controle CONFORME en trois passes"))[1][:9], "REFUS C3 ")
+        ag.ecrire(self.tmp, {"ADJUDICATION.md": "Clôture CONFORME sans passe 2 ; aucune passe 3." + NL})
+        self.assertEqual(self.commit(self.message("x : CONFORME en deux passes"))[1][:9], "REFUS C3 ")
 
 
 class CommitSuite(Source):
