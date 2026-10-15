@@ -99,3 +99,12 @@ dépendent des tests du harnais qu'ils importent.
 > : il devient un outil au diff suivant (GF-2b). `tests/test_presg5.py` (1 test) : sortie dorée, sha256 de sa sortie
 > sur une fixture (bornes de 14 et 15 octets, un seul mot anglais, crochets de 31 caractères, guillemets courbes,
 > tirets, accents graves, coupe à 160 caractères), mesuré avant le versement ; plancher du job `controle-unittest` 49.
+
+> *Ajout daté du 2026-10-10 05:48:04 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-2b)* : `presg5.py` (sha256
+> `6ae10d29e614c8ee6b65b3e2d465ad521fff81326f7724a727a67849d42075c8`) devient un outil, algorithme inchangé (lignes à
+> barre oblique inverse reprises à l'octet, sortie dorée identique) : fonction `introuvables(racine, fichiers)` ;
+> sorties 0 (aucun fragment), 1 (au moins un), 3 (erreur : sans fichier, `biblio/INDEX.md` absent, fichier illisible)
+> ; un chemin interdit (argument ou fichier de `biblio/`) n'est jamais ouvert ni nommé ; fichiers ouverts par `with`
+> (propre sous `-X dev -W error`). Usage : `python3 -I -B scripts/controle/presg5.py <racine du dépôt>
+> <fichier.md>...`. `tests/test_presg5.py` compte 5 tests (erreur E9 reproduite : message d'outil anglais entre
+> guillemets français, sortie 1) ; plancher du job `controle-unittest` 53.

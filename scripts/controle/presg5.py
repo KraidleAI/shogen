@@ -1,10 +1,30 @@
-"""Pré-contrôle S-G5 (approximation de xtask/src/sg5.rs, régime complet) sur des fichiers hors du dépôt.
+"""Pré-contrôle S-G5 (approximation de xtask/src/sg5.rs, régime complet), versé depuis le scratchpad de
+l'orchestrateur (sha256 d'origine 60de4077…87ef0 ; lot GARDE-FOUS-ORCH, GF-2 ; erreurs E9 et E10). Algorithme
+inchangé : fragment anglais d'au moins 15 octets entre guillemets français, introuvable dans biblio/INDEX.md et les
+octets texte de biblio/. Changements : fonction introuvables(racine, fichiers) ; sorties 0 (aucun fragment), 1 (au
+moins un), 3 (erreur, biblio/INDEX.md absent compris) ; fichiers ouverts par `with` ; chemin interdit jamais ouvert
+ni nommé (garde_commun).
 
-Usage : python3 -I presg5.py <racine du dépôt> <fichier.md>...
-Imprime chemin:ligne et le fragment anglais introuvable dans biblio/INDEX.md et les octets texte de biblio/.
+Usage : python3 -I -B presg5.py <racine du dépôt> <fichier.md>...
+Imprime chemin:ligne et le fragment anglais introuvable, puis le compte, comme l'outil d'origine.
 Signal seulement : la gate de xtask reste le juge.
 """
-import os, re, sys
+import importlib.util
+import os
+import re
+import sys
+
+
+def _module(nom):
+    """Module frère chargé par son chemin : sous -I, le dossier du script n'est pas dans sys.path."""
+    chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), nom + ".py")
+    spec = importlib.util.spec_from_file_location(nom, chemin)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+GC = _module("garde_commun")
 
 MOTS = [" the ", " of ", " to ", " is ", " are ", " that ", " not ", " be ", " with ", " it ", " we ",
         " this ", " they ", " has ", " have "]
@@ -13,6 +33,11 @@ ENTITES = [("&quot;", '"'), ("&#39;", "'"), ("&#x27;", "'"), ("&#8217;", "'"), (
            ("&#8220;", '"'), ("&#8221;", '"'), ("&ldquo;", '"'), ("&rdquo;", '"'), ("&apos;", "'"), ("&nbsp;", " "),
            ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&"), ("ﬀ", "ff"), ("ﬁ", "fi"), ("ﬂ", "fl"),
            ("ﬃ", "ffi"), ("ﬄ", "ffl")]
+
+
+def lire(chemin, **texte):
+    with open(chemin, "r" if texte else "rb", **texte) as f:
+        return f.read()
 
 
 def plier(c):
@@ -92,13 +117,13 @@ def anglais(f):
 
 
 def corpus(racine):
-    c = [normaliser(open(os.path.join(racine, "biblio", "INDEX.md"), encoding="utf-8", errors="replace").read())]
+    c = [normaliser(lire(os.path.join(racine, "biblio", "INDEX.md"), encoding="utf-8", errors="replace"))]
     for n in sorted(os.listdir(os.path.join(racine, "biblio"))):
         p = os.path.join(racine, "biblio", n)
         ext = n.rsplit(".", 1)[-1].lower() if "." in n else ""
-        if n == "INDEX.md" or not os.path.isfile(p):
+        if n == "INDEX.md" or not os.path.isfile(p) or GC.chemin_interdit(p):
             continue
-        t = open(p, "rb").read().decode("utf-8", "replace")
+        t = lire(p).decode("utf-8", "replace")
         if ext == "sidecar":
             c.append(normaliser(t))
         elif ext in TEXTE:
@@ -106,13 +131,14 @@ def corpus(racine):
     return c
 
 
-def main():
-    racine, fichiers = sys.argv[1], sys.argv[2:]
+def introuvables(racine, fichiers):
+    """[(fichier, ligne, fragment)] : fragments anglais d'au moins 15 octets, entre guillemets français, introuvables
+    dans biblio/INDEX.md et les octets texte de biblio/."""
     c = corpus(racine)
     cc = [x.replace("-", "").replace(" ", "") for x in c]
-    n = 0
+    trouves = []
     for f in fichiers:
-        t = open(f, encoding="utf-8").read()
+        t = lire(f, encoding="utf-8")
         for m in re.finditer("«([^»]*)»", t):
             for fr in fragments(m.group(1)):
                 x = normaliser(fr)
@@ -122,9 +148,30 @@ def main():
                 xc = x.replace("-", "").replace(" ", "")
                 if any(x in p for p in c) or any(xc in p for p in cc):
                     continue
-                n += 1
-                print(f"{f}:{t.count(chr(10), 0, m.start()) + 1}: « {x[:160]} »")
-    print(f"presg5 : {n} fragment(s) introuvable(s)")
+                trouves.append((f, t.count(chr(10), 0, m.start()) + 1, x))
+    return trouves
 
 
-main()
+def main(argv):
+    """Sortie 0 : aucun fragment ; 1 : au moins un (lignes de l'outil d'origine) ; 3 : erreur (arguments, fichier
+    illisible, biblio/INDEX.md absent, chemin interdit : jamais ouvert ni nommé)."""
+    if len(argv) < 2:
+        print("usage : presg5.py <racine du dépôt> <fichier.md>...", file=sys.stderr)
+        return 3
+    interdits = sum(map(GC.chemin_interdit, argv[1:]))
+    if interdits:
+        print(f"presg5 : {interdits} chemin(s) interdit(s), non ouvert(s)", file=sys.stderr)
+        return 3
+    try:
+        trouves = introuvables(argv[0], argv[1:])
+    except (OSError, UnicodeDecodeError) as e:
+        print(f"presg5 : erreur : {type(e).__name__} : {e}", file=sys.stderr)
+        return 3
+    for f, n, x in trouves:
+        print(f"{f}:{n}: « {x[:160]} »")
+    print(f"presg5 : {len(trouves)} fragment(s) introuvable(s)")
+    return 1 if trouves else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
