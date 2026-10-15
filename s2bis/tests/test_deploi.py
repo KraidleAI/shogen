@@ -22,11 +22,19 @@ IMAGE = {"usr/share/keyrings/debian-archive-keyring.pgp": "",           # image 
          "etc/apt/sources.list": "deb http://miroir.example/debian trixie main" + NL,
          "etc/apt/sources.list.d/fournisseur.list": "deb http://agent.example/apt stable main" + NL,
          "etc/ssh/sshd_config.d/50-cloud-init.conf": "PasswordAuthentication yes" + NL}
-ETAPES = ["sources", "paquets", "comptes", "observateur"]
+ETAPES = ["sources", "paquets", "comptes", "observateur", "ssh", "mises_a_jour"]
 GARDES = {"usr/share/keyrings/debian-archive-keyring.pgp", "etc/ssh/sshd_config.d/50-cloud-init.conf"}
 PRODUITS = {"etc/apt/sources.list.disabled", "etc/apt/sources.list.d/fournisseur.list.disabled",
             "etc/apt/sources.list.d/debian.sources", "home/intervention/.ssh/authorized_keys",
-            "etc/shogen/observateur.conf"}
+            "etc/shogen/observateur.conf", "etc/ssh/sshd_config.d/00-shogen.conf",
+            "etc/apt/apt.conf.d/90shogen-securite"}
+SSHD = [["PermitRootLogin", "no"], ["PasswordAuthentication", "no"], ["KbdInteractiveAuthentication", "no"],
+        ["PermitEmptyPasswords", "no"], ["PubkeyAuthentication", "yes"], ["AuthenticationMethods", "publickey"],
+        ["AllowUsers", "intervention"], ["DisableForwarding", "yes"]]
+APT = ['APT::Periodic::Update-Package-Lists "1";', 'APT::Periodic::Unattended-Upgrade "1";',
+       "#clear Unattended-Upgrade::Allowed-Origins;", "#clear Unattended-Upgrade::Origins-Pattern;",
+       'Unattended-Upgrade::Origins-Pattern { "origin=Debian,codename=trixie-security,label=Debian-Security"; };',
+       'Unattended-Upgrade::Automatic-Reboot "false";']        # Origin, Label, Codename : InRelease de trixie-security
 
 
 def commandes(o):
@@ -36,7 +44,8 @@ def commandes(o):
             "useradd --system --user-group --home-dir /var/lib/shogen --create-home --shell /usr/sbin/nologin shogen",
             "getent passwd intervention", "useradd --user-group --create-home --shell /bin/bash intervention",
             "chown -R intervention:intervention /home/intervention/.ssh",
-            "chown root:shogen /etc/shogen/observateur.conf"]
+            "chown root:shogen /etc/shogen/observateur.conf", "sshd -t", "systemctl try-reload-or-restart ssh.service",
+            "systemctl enable apt-daily.timer apt-daily-upgrade.timer"]
 
 
 class Essai(unittest.TestCase):
@@ -166,6 +175,21 @@ class PremierDemarrage(Essai):
         code, sortie, erreur, racine = self.lancer(self.parametres("o2"), sans)
         self.assertEqual((code, self.journal(racine), self.fichiers(racine)), (3, [], set(sans)))
         self.assertIn("APT/trousseau", erreur)
+
+    def test_tdp5_sshd_cle_seule(self):
+        code, _s, _e, racine = self.lancer(self.parametres("o3"))
+        self.assertEqual(code, 0)
+        self.assertEqual(sorted(os.listdir(os.path.join(racine, "etc/ssh/sshd_config.d"))),
+                         ["00-shogen.conf", "50-cloud-init.conf"])          # première valeur lue retenue par sshd
+        self.assertEqual([x.split(None, 1) for x in self.lire(racine, "etc/ssh/sshd_config.d/00-shogen.conf").split(
+            NL) if x.strip() and not x.startswith("#")], SSHD)
+
+    def test_tdp9_securite_seule_sans_redemarrage(self):
+        code, _s, _e, racine = self.lancer(self.parametres("o1"))
+        self.assertEqual(code, 0)
+        self.assertEqual([x.strip() for x in self.lire(racine, "etc/apt/apt.conf.d/90shogen-securite").split(NL)
+                          if x.strip() and not x.startswith("//")], APT)
+        self.assertEqual(os.listdir(os.path.join(racine, "etc/apt/apt.conf.d")), ["90shogen-securite"])
 
 
 if __name__ == "__main__":

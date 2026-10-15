@@ -116,12 +116,44 @@ EOF
     chown root:shogen "$R/etc/shogen/observateur.conf"
 }
 
+etape_ssh() {           # E-D-03, T-DP-5 : clé seule, ni root ni mot de passe ; lu avant les fichiers des images (00-)
+    ecrire /etc/ssh/sshd_config.d/00-shogen.conf 0644 <<'EOF'
+# Shōgen S2-bis (E-D-03) : clé seule, ni root ni mot de passe ; seul le compte d'intervention se connecte.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitEmptyPasswords no
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+AllowUsers intervention
+DisableForwarding yes
+EOF
+    sshd -t
+    systemctl try-reload-or-restart ssh.service
+}
+
+etape_mises_a_jour() {  # E-D-12, T-DP-9, décision 1 : sécurité seule (trixie-security), sans redémarrage automatique
+    ecrire /etc/apt/apt.conf.d/90shogen-securite 0644 <<'EOF'
+// Shōgen S2-bis (E-D-12) : mises à jour de sécurité seules, sans redémarrage automatique. Lu après
+// 50unattended-upgrades : #clear vide les listes d'origines des fichiers lus avant.
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+#clear Unattended-Upgrade::Allowed-Origins;
+#clear Unattended-Upgrade::Origins-Pattern;
+Unattended-Upgrade::Origins-Pattern { "origin=Debian,codename=trixie-security,label=Debian-Security"; };
+Unattended-Upgrade::Automatic-Reboot "false";
+EOF
+    systemctl enable apt-daily.timer apt-daily-upgrade.timer
+}
+
 etape() { echo "premier-demarrage : étape $1"; "etape_$1"; }
 verifier_parametres
 etape sources
 etape paquets
 etape comptes
 etape observateur
+etape ssh
+etape mises_a_jour
 # Points d'entrée suivants (PROPOSITION §4.3) : horloge (DB-2, E-D-06, Q-D-06), résolveur par famille (DB-2, E-D-07,
 # Q-D-05), code au commit scellé (DB-2, E-D-08, Q-D-01), descripteur et smoke (DB-2, E-D-13, E-D-14) ; unités et
 # minuteries (DB-3, E-D-09) ; sauvegarde, échange des têtes, signal de vie, alerte disque (DB-4, E-D-10, E-D-11) ;
