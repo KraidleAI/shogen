@@ -72,3 +72,12 @@ dépendent des tests du harnais qu'ils importent.
 > acceptées ; `tests/test_runners_epingles.py` compte 11 tests (un test de temps borné sur des valeurs adverses ;
 > `test_formes_hors_ligne` étendu, relecture G2 C-3), plancher du job `controle-unittest` 37 ; le compte de 10 tests et
 > le plancher 36 de l'ajout du 2026-10-09 22:24:59 UTC précèdent ce correctif.
+
+> *Ajout daté du 2026-10-10 05:28:37 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-1 ; G0 :
+> `docs/adr-0028/G0-lots-DETTES.md`, ajout GF-0)* : `garde_commun.py` (sha256
+> `db1528fd43cd50cd0dad532d7fb2e47af99018b6999ee3f6946ed687b8b8cbd0`), bibliothèque des contrôles avant l'acte, sans
+> ligne de commande. Horloge lue par `date -u` en sous-processus, jamais par celle de Python ; `horodatages_fautifs`
+> relève, hors code et hors guillemets français, une heure du jour plus tard que l'horloge + 120 s (`heure-future`,
+> erreur E14 de l'orchestrateur) et une heure écrite `HH:Mx` ou `HH:xx` (`heure-approchee`) ; une date d'un autre jour
+> n'est pas jugée. `tests/test_garde_commun.py` (6 tests ; horloge fixée par un faux `date` en tête du PATH), plancher
+> du job `controle-unittest` 43.
