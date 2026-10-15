@@ -99,7 +99,10 @@ etape_paquets() {       # E-D-04 et décision 1 : paquets de la distribution ; u
 etape_comptes() {       # E-D-03 : compte de service sans droit d'administration ; compte d'intervention, clé seule
     local service=(--system --user-group --home-dir /var/lib/shogen --create-home --shell /usr/sbin/nologin shogen)
     getent passwd shogen > /dev/null || useradd "${service[@]}"
-    getent passwd intervention > /dev/null || useradd --user-group --create-home --shell /bin/bash intervention
+    if getent passwd intervention > /dev/null; then     # relance : root n'écrit rien sous ce dossier, où le compte a pu
+        echo "premier-demarrage : COMPTES/intervention présent, clé inchangée" >&2; return 0     # poser des liens
+    fi
+    useradd --user-group --create-home --shell /bin/bash intervention       # clé posée à la création seule
     mkdir -p "$R/home/intervention"
     install -d -m 0700 "$R/home/intervention/.ssh"
     echo "$CLE_INTERVENTION" | ecrire /home/intervention/.ssh/authorized_keys 0600

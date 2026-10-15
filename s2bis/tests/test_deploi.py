@@ -215,6 +215,31 @@ class PremierDemarrage(Essai):
                 "etc/shogen/observateur.conf", "etc/ssh/sshd_config.d/00-shogen.conf",
                 "etc/apt/apt.conf.d/90shogen-securite", "etc/nftables.conf", "etc/nftables.d/shogen-observateur.nft")])
 
+    def test_tdp1_relance_rien_sous_le_compte_d_intervention(self):
+        """Relance, compte intervention déjà là : root n'écrit ni ne change rien sous son dossier, où le compte a pu
+        poser des liens vers des fichiers ou dossiers du système (ici, hors de la racine factice)."""
+        cible, dossier = os.path.join(self.tmp, "cible"), os.path.join(self.tmp, "dossier")
+        with open(cible, "w", encoding="utf-8") as f:
+            f.write("intact" + NL)
+        os.chmod(cible, 0o644)
+        os.mkdir(dossier)
+        os.chmod(dossier, 0o755)
+        liens = (("home/intervention/.ssh/authorized_keys.nouveau", cible), ("home/intervention/.ssh", dossier))
+        for lien, vers in liens:
+            with self.subTest(lien=lien):
+                def poser(racine, lien=lien, vers=vers):
+                    with open(os.path.join(racine, "essai.getent"), "a", encoding="utf-8") as f:
+                        f.write("passwd intervention x" + NL)
+                    os.makedirs(os.path.dirname(os.path.join(racine, lien)), exist_ok=True)
+                    os.symlink(vers, os.path.join(racine, lien))
+                code, _s, erreur, racine = self.lancer(self.parametres("o2"), avant=poser)
+                self.assertEqual(code, 0)
+                self.assertIn("COMPTES/intervention présent, clé inchangée", erreur)
+                self.assertEqual((self.lire(cible), os.stat(cible).st_mode & 0o777, os.listdir(dossier),
+                                  os.stat(dossier).st_mode & 0o777), ("intact" + NL, 0o644, [], 0o755))
+                self.assertEqual([c for c in self.journal(racine) if "intervention" in c],
+                                 ["getent passwd intervention"])
+
     def test_tdp1_sources_https_et_trousseau(self):
         bloc = "Types: deb{0}URIs: https://deb.debian.org/{1}{0}Suites: {2}{0}Components: main{0}Signed-By: {3}{0}"
         sans = {k: v for k, v in IMAGE.items() if not k.startswith("usr/")}
