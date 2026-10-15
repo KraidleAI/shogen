@@ -59,6 +59,11 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   marché mince (densité 0,1 ; décalage de 58 minutes, plus long que la fenêtre de 28 : toutes les réponses décalées
   tombent sur des minutes sans échange, donc rien n'est servi, comme les 64). Une fenêtre où rien n'est servi est
   indiscernable au chargement d'une fenêtre muette, admise par conception : la garde est au calcul (Q-DT2-11).
+  Après la garde (même propriété cc2) : les 66 pertes vers l'avant et 38 des 40 autres (les 11 de queue et les 29
+  hors de ce compte) deviennent des refus nommés, la série admise n'ayant aucune minute active ; restent 2 pertes
+  partielles (graine 13, densité 0,3), dont chaque série garde des minutes actives (3 chacune), hors de la garde par
+  construction : une de queue (fenêtre de 11 minutes, 1 minute échangée perdue sur 4) et une en marché mince
+  (fenêtre de 20 minutes, 4 perdues sur 7).
   OKX : mensuels découpés en UTC+8, établi sur pièce (DECISION de FORMES-API-1, ajout daté du 2026-10-09 19:51:45 UTC :
   le mensuel ETH-USDT de 2026-09 va du 2026-08-31 16:00 au 2026-09-30 15:59 UTC) ; `voisins` 1, le mois précédent et
   le suivant sont acquis, seules les minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est
@@ -72,6 +77,13 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
 - `tau.py` : place de la lecture sans minute active dans la fenêtre (rien de servi, ou minutes toutes sans échange) :
   CA/population, avant tout calcul (Q-DT2-11 : sans elle, Coinbase vide passait, σ des places horodatées changé) ;
+  coût de cette garde : une place dont la vraie fenêtre n'a aucune minute échangée est refusée, refus fermé et nommé,
+  jamais une perte ; dans la propriété du contre-contrôle cc2 (24 000 cas), elle refuse en plus 1 351 cas justes de la
+  prémisse (refus sur données complètes : de 3 791 à 5 142, sur 7 947), tous à vérité sans minute échangée : fenêtre
+  muette tirée, 477 ; marché mince (densité 0,3 ou moins), 453 ; densité de 0,6 à 1, 421 (bandes muettes de fin de
+  page ou silence après la première bougie, sauf 7 fenêtres de 1 à 3 minutes vides par le seul tirage) ; pour les
+  places du lot, paires liquides sur des fenêtres de 91 et de 30 jours (87 pages ou plus par découpage pour Coinbase et
+  Bitstamp), une fenêtre entière sans échange n'est pas une valeur juste plausible ;
   population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son
   contrôle, descriptifs, septembre, sorties ; point d'entrée du calcul ;
 - `lancer.sh` : lanceur unique (épingle, étape réseau, passes A et B, identité, copie) ;
