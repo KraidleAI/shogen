@@ -52,6 +52,16 @@ def simule(place, sem, m, pas):
     return rendre
 
 
+def echanges(a, b):
+    """Minutes échangées de rang a à b exclu (règle de marche, calculée ici)."""
+    return sum(i % 7 != 2 for i in range(a, b))
+
+
+def pages_attendues(bornes, toutes):
+    """[(début, reçues, attendues)] des pages de bornes en minutes (à la main)."""
+    return [(W0 + 60 * a, b - a if toutes else echanges(a, b), b - a) for a, b in zip(bornes, bornes[1:])]
+
+
 class TestFormesPages(unittest.TestCase):
     def acquis(self, place, sem, fen, fixture):
         m = marche(fen)
@@ -69,7 +79,8 @@ class TestFormesPages(unittest.TestCase):
         if not isinstance(x, dict):
             return x
         noms = sorted(os.listdir(os.path.join(d, "principale", place, "ETH")))
-        return ecart(x, verite(m, fen, place != "bitstamp")), noms
+        comptes = essai(lambda: bougies.comptes(prm, place, fen, x))
+        return ecart(x, verite(m, fen, place != "bitstamp")), noms, comptes
 
     def test_pages_semantiques(self):
         """Pour chaque place paginée et chaque sémantique : série égale à la vérité (aucune minute manquante, en trop
@@ -79,7 +90,9 @@ class TestFormesPages(unittest.TestCase):
         code d'avant perd en silence la dernière minute de chaque page de Coinbase sous « fin exclue », la première
         sous « début exclu » (Q-DT2-1 : la première de la fenêtre avec le seul chevauchement de fin). Mutations :
         chevauchement ignoré ou d'un seul côté ; n faux ; filtre retiré ou à la fenêtre entière ; fenêtre de page non
-        bornée à la fenêtre ; doublon identique refusé ; chevauchement ou pas lu à une autre place."""
+        bornée à la fenêtre ; doublon identique refusé ; chevauchement ou pas lu à une autre place.
+        Comptes par page (DECISION pt 5) : reçues et attendues à la main (règle du marché) ; mutations : attendues ou
+        reçues fausses, dernière page mal bornée."""
         cas = [("coinbase", ("incluses", "fin-exclue", "avant", "fin-exclue avant", "debut-exclu",
                              "debut-exclu fin-exclue"), [0, 3, 6, 9, 12, 14], [0, 298, 596, 894, 1192, 1200]),
                ("bitstamp", ("incluses", "fin-exclue", "depuis-start", "depuis-start debut-exclu"), [0, 5, 10, 14],
@@ -91,7 +104,8 @@ class TestFormesPages(unittest.TestCase):
                     with self.subTest(place=place, sem=sem, fixture=fixture):
                         fen = {"debut": W0, "fin": W0 + 60 * n}
                         pages = [f"page-{W0 + 60 * a}.json" for a in bornes[:-1]]
-                        self.assertEqual(self.acquis(place, sem, fen, fixture), (([], [], []), pages))
+                        self.assertEqual(self.acquis(place, sem, fen, fixture),
+                                         (([], [], []), pages, pages_attendues(bornes, place == "bitstamp")))
 
 
 if __name__ == "__main__":

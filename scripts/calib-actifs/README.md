@@ -22,7 +22,9 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est refusée ; le mois qui suit la
   fenêtre descriptive (2026-10) n'est publié qu'après sa fin : jusque-là, l'acquisition sort en code 4 sur
   `REFUS CA/acquisition : mensuel 2026-10 non obtenu (téléchargement impossible (HTTPError)) ; un mensuel n'est publié
-  qu'après la fin de son mois ; actif ETH ; place okx` ;
+  qu'après la fin de son mois ; actif ETH ; place okx`.
+  `calib_actifs.txt` porte, après septembre, les minutes reçues sur attendues de chaque place et de chaque fenêtre, au
+  total et par page (une perte systématique se voit), jamais décisives ;
 - `bougies.py` : six lecteurs, normalisation, dernier prix connu et âges, oracle d'exécution de SH §4 ;
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
 - `tau.py` : population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son

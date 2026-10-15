@@ -4,6 +4,7 @@ minute absente ou à volume nul = sans échange. Ligne illisible, colonne absent
 minute en double : CA/format ; pages et mensuels à mois voisins filtrés à leur fenêtre (DECISION de FORMES-API-1)."""
 from __future__ import annotations
 
+import bisect
 import io
 import json
 import os
@@ -161,6 +162,13 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
             fichiers.append(f.read())
     return serie(s["format"], fichiers, fen, place, actif, fenetres, garde)
 
+
+def comptes(prm: dict, place: str, fen: dict, s: dict) -> list:
+    """[(début, reçues, attendues)] par page de socle.pages (place paginée), sinon une seule pour la fenêtre : minutes
+    de la série s dans [début ; fin) de la page, minutes de cet intervalle (DECISION de FORMES-API-1, pt 5)."""
+    plan = socle.pages(prm, place, fen) if prm["series"][place]["acces"] == "pages" else [(fen["debut"], fen["fin"])]
+    ts = sorted(s)
+    return [(a, bisect.bisect_left(ts, b) - bisect.bisect_left(ts, a), (b - a) // 60) for a, b, *_r in plan]
 
 
 def oracle_sh(prm: dict, series: dict) -> list:
