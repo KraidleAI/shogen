@@ -301,3 +301,10 @@ dépendent des tests du harnais qu'ils importent.
 > parcourait et lisait tout fichier non interdit) ; un dossier interdit des pièces n'est jamais parcouru (V0 : il
 > était listé) ; un fichier non ordinaire (lien brisé, tube, appareil) n'est jamais ouvert (V5 : un tube bloquait
 > l'outil). `tests/test_avant_acte.py` compte 31 tests ; plancher du job `controle-unittest` 99.
+
+> *Ajout daté du 2026-10-10 09:01:10 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-9 ; contrat de GF-10b)* :
+> `avant_acte.py` (sha256 `d688cd2c0c6788ce860cd00a9fbd30ecebb77cef14fa668cf03e278dded96a55`) : une exception
+> du journal, écrit après la sous-commande (dossier `shogen-garde` impossible à créer, dépôt en lecture seule,
+> horloge en échec), sort en 3 avec une ligne `ERREUR journal`, jamais en 1 avec une trace : `existe` sortait en 1,
+> lu comme absent, sur un fichier trouvé. `tests/test_avant_acte.py` compte 32 tests ; plancher du job
+> `controle-unittest` 100.

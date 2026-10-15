@@ -52,7 +52,8 @@ Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT �
 Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme dossier (imprimé avec sa barre).
 Relecture G2, C-7 : chaine G1, chaque nom de GROUPES (hors la valeur aucun) nomme un diff du plan.
 Relecture G2, C-8 : verser refuse /, le dépôt et ses ancêtres (erreur, aucun parcours), ne parcourt jamais un dossier
-interdit (V0) et ne lit que des fichiers ordinaires (V5)."""
+interdit (V0) et ne lit que des fichiers ordinaires (V5).
+Relecture G2, C-9 : une exception du journal (après la sous-commande) sort en 3, jamais en 1."""
 import argparse
 import fnmatch
 import hashlib
@@ -569,7 +570,11 @@ def main(argv=None):
         return 3
     for niveau, code, raison, geste, _c in fautes:
         print(f"{niveau.upper()} {code} : {raison}" + (f" ; à faire : {geste}" if geste else ""))
-    journal(a, fautes)
+    try:
+        journal(a, fautes)
+    except Exception as e:      # journal non écrit : erreur de l'outil, jamais un refus (C-9)
+        print(f"ERREUR journal : {type(e).__name__} : {e}", file=sys.stderr)
+        return 3
     return 1 if any(f[0] == "refus" for f in fautes) else 0
 
 

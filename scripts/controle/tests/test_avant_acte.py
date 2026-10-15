@@ -17,7 +17,7 @@ GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
-ordinaires)."""
+ordinaires) ; C-9 (journal en erreur : sortie 3)."""
 import contextlib
 import difflib
 import hashlib
@@ -112,6 +112,24 @@ class Sceau(Depot):
         j = self.journal()
         self.assertEqual([x[1:] for x in j], [["sceller", "S1", "refus", "-"], ["sceller", "-", "conforme", "-"]])
         self.assertTrue(all(re.fullmatch("20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", x[0]) for x in j))
+
+
+class Journal(Depot):
+    def test_c9_journal_en_erreur(self):
+        """C-9 : journal impossible à écrire (shogen-garde n'est pas un dossier) ou horloge en échec, après une
+        sous-commande conforme : sortie 3 et ligne ERREUR, jamais 1 (existe aurait dit absent un fichier trouvé)."""
+        self.indexer({"WISHLIST.md": "x"})
+        argv = [sys.executable, "-I", "-B", avant_acte.__file__, "--depot", self.d, "existe", "WISHLIST.md"]
+        with open(os.path.join(self.d, ".git", "shogen-garde"), "w", encoding="utf-8") as f:
+            f.write("x")
+        p = subprocess.run(argv, capture_output=True, text=True, env=self.env, timeout=120)
+        self.assertEqual((p.returncode, p.stdout, p.stderr[:16]), (3, "WISHLIST.md" + NL, "ERREUR journal :"))
+        os.remove(os.path.join(self.d, ".git", "shogen-garde"))
+        ag.ecrire(self.tmp, {"faux/date": "#!/bin/sh" + NL + "exit 1" + NL})
+        os.chmod(os.path.join(self.tmp, "faux", "date"), 0o755)
+        env = dict(self.env, PATH=os.path.join(self.tmp, "faux") + os.pathsep + self.env["PATH"])
+        p = subprocess.run(argv, capture_output=True, text=True, env=env, timeout=120)
+        self.assertEqual((p.returncode, p.stdout, p.stderr[:16]), (3, "WISHLIST.md" + NL, "ERREUR journal :"))
 
 
 class Source(Depot):
