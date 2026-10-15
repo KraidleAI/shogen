@@ -4,7 +4,11 @@ commande du job (étapes `run:` de son gates.yml, lues par `etapes` du vérifica
 Tué : sortie dans --tue (1) ; vivant : toutes à 0 ; FATAL, jamais tué : borne, sortie hors contrat, inapplicable.
 Témoin vivant d'abord ; relevé `ps` des groupes vide en fin ; diff et sortie de chaque mutant dans --sortie. POSIX ;
 lancé depuis un arbre relu, à part de la copie mutée. Usage : mutants.py <copie> <job> <mutants.json> --sortie D
-[--borne S] [--tue C]... ; une ligne JSON par run ; 0 joué, 3 erreur."""
+[--borne S] [--tue C]... ; une ligne JSON par run ; 0 joué, 3 erreur. G2 du lot DETTES-T7 (C-1) : à la borne, les
+groupes de tous les descendants de l'étape (relevé ps par parenté : la suite que le vérificateur lance dans sa propre
+session depuis DT7-d) sont arrêtés et comptés au relevé de fin ; la sortie n'est plus attendue que RELIQUAT s
+(descendant détaché qui garde le tuyau) ; la première étape du job est le checkout, exigé ; les étapes sont
+relues sur la copie mutée (mutant de gates.yml classé par la ligne qu'il écrit ; illisibles : FATAL)."""
 import os                   # garde en tête (SHOGEN-S2BIS-GARDE-EN-TETE-1) : le dossier du script quitte sys.path
 import sys                  # avant tout autre import (un json.py posé à côté ne serait jamais lu)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
@@ -24,18 +28,34 @@ import time
 VERIF = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "enforcement",
                      "verdict-suite-s2.py")                 # analyseur unique des étapes, jamais recopié
 ENV = {k: v for k, v in os.environ.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}        # variable scellée jamais passée
+RELIQUAT = 5.0      # s de lecture après l'arrêt des groupes à la borne (descendant détaché : plus attendu, C-1)
 
 
 def etapes(copie: str, job: str) -> list:
-    """Blocs `run:` du job, première étape (checkout) sautée ; toute autre étape non admise : ValueError."""
+    """Blocs `run:` du job, première étape (checkout, non admise par l'analyseur, exigée) sautée ; toute autre étape
+    non admise : ValueError."""
     v = importlib.util.module_from_spec(importlib.util.spec_from_file_location("verdict_suite_s2", VERIF))
     with open(VERIF, encoding="utf-8") as f:                # la source, jamais un .pyc
         exec(compile(f.read(), VERIF, "exec", dont_inherit=True), v.__dict__)
     with open(os.path.join(copie, ".github", "workflows", "gates.yml"), encoding="utf-8") as f:
         pas = v.etapes(f.read(), job)
-    if not pas or None in pas[1:]:
-        raise ValueError(f"job {job} : étapes illisibles ou non admises par l'analyseur ({pas!r})")
+    if not pas or pas[0] is not None or None in pas[1:]:
+        raise ValueError(f"job {job} : étapes illisibles ou non admises par l'analyseur, ou première étape autre que "
+                         f"le checkout ({pas!r})")
     return pas[1:]
+
+
+def descendants(racine: int) -> set:
+    """Groupe de `racine` et groupes de ses descendants vivants ou zombies, lus par `ps -A -o pid=,ppid=,pgid=` : un
+    descendant parti dans sa propre session est suivi par son parent (forme de `groupes` de l'enregistreur de rôle,
+    s2-harness/tools/oracle_record.py) ; ps illisible : erreur (sortie 3)."""
+    t = [tuple(map(int, y.split())) for y in subprocess.run(["ps", "-A", "-o", "pid=,ppid=,pgid="], capture_output=True,
+                                                             text=True, check=True).stdout.splitlines()]
+    arbre, plus = {racine}, None
+    while plus != set():
+        plus = {y[0] for y in t if y[1] in arbre} - arbre
+        arbre |= plus
+    return {racine} | {y[2] for y in t if y[0] in arbre}
 
 
 def jouer(x, pas: list, groupes: set, dossier: str) -> tuple:
@@ -53,9 +73,18 @@ def jouer(x, pas: list, groupes: set, dossier: str) -> tuple:
             octets, code = p.communicate(timeout=max(fin - debut, 0.001))[0], p.returncode
         except subprocess.TimeoutExpired:
             octets, code = b"", None
-        with contextlib.suppress(ProcessLookupError):       # groupe entier, jamais l'enfant direct seul : à la
-            os.killpg(p.pid, signal.SIGKILL)                # borne, ou descendant resté après la sortie
-        octets += p.communicate()[0] if code is None else b""
+        cibles = descendants(p.pid) if code is None else {p.pid}      # C-1 : à la borne, l'arbre entier
+        groupes |= cibles
+        for g in {y for y in cibles if y > 1} - {os.getpgrp()}:      # groupes entiers, jamais l'enfant direct seul :
+            with contextlib.suppress(ProcessLookupError, PermissionError):     # à la borne, ou descendant resté
+                os.killpg(g, signal.SIGKILL)                         # après la sortie
+        if code is None:
+            try:
+                octets = p.communicate(timeout=RELIQUAT)[0]
+            except subprocess.TimeoutExpired as e:      # C-1 : descendant détaché qui garde le tuyau, plus attendu
+                octets = e.output or b""
+                p.stdout.close()
+                p.wait()
         sortie += octets
         vus.append((code, round(time.monotonic() - debut, 1), hashlib.sha256(octets).hexdigest()))
         if code is None:
@@ -66,8 +95,9 @@ def jouer(x, pas: list, groupes: set, dossier: str) -> tuple:
     return "vivant", "toutes les étapes à 0", vus, sortie
 
 
-def muter(x, m: dict, pas: list, groupes: set, dossier: str) -> tuple:
-    """Classement du mutant m ; diff et sortie écrits dans --sortie ; fichier rendu à ses octets, contrôlés."""
+def muter(x, m: dict, groupes: set, dossier: str) -> tuple:
+    """Classement du mutant m ; diff et sortie écrits dans --sortie ; fichier rendu à ses octets, contrôlés ; étapes
+    relues sur la copie mutée (C-1 de la G2 : un mutant de gates.yml est classé par la ligne qu'il écrit)."""
     chemin = os.path.join(x.copie, m["fichier"])
     with open(chemin, "rb") as f:
         avant = f.read()
@@ -80,7 +110,12 @@ def muter(x, m: dict, pas: list, groupes: set, dossier: str) -> tuple:
         try:
             with open(chemin, "wb") as f:
                 f.write(apres.encode("utf-8"))
-            r = jouer(x, pas, groupes, dossier)
+            try:
+                pas = etapes(x.copie, x.job)
+            except ValueError as e:
+                r = ("FATAL", f"étapes illisibles sous le mutant : {e}", [], b"")
+            else:
+                r = jouer(x, pas, groupes, dossier)
         finally:
             with open(chemin, "wb") as f:
                 f.write(avant)
@@ -103,7 +138,7 @@ def main(argv: list) -> int:
             mutants = json.load(f)
         os.makedirs(x.sortie, exist_ok=True)
         for m in [{"id": "témoin"}, *mutants]:
-            r = jouer(x, pas, groupes, dossier) if m["id"] == "témoin" else muter(x, m, pas, groupes, dossier)
+            r = jouer(x, pas, groupes, dossier) if m["id"] == "témoin" else muter(x, m, groupes, dossier)
             print(json.dumps({**m, "classement": r[0], "motif": r[1], "etapes": r[2]}, ensure_ascii=False), flush=True)
             if m["id"] == "témoin" and r[0] != "vivant":
                 raise ValueError("témoin non vivant : campagne arrêtée")

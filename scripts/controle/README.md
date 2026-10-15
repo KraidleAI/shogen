@@ -436,3 +436,14 @@ dépendent des tests du harnais qu'ils importent.
 > vivant), copie rendue à ses octets après chaque mutant, diff et sortie de chaque mutant versés dans `--sortie`.
 > L'outil se lance depuis un arbre relu, à part de la copie qu'il mute. Cas : `tests/test_mutants.py` (deux tests ;
 > plancher du job `controle-unittest` 39).
+>
+> *Ajout daté du 2026-10-15 22:04:01 UTC (`date -u` ; relecture G2 du lot DETTES-T7, correction C-1 ;
+> SHOGEN-MUTANTS-ORPHELINS-1, SHOGEN-S2BIS-MUT-COMMANDE-1)* : à la borne, `mutants.py` arrête aussi le groupe de
+> chaque descendant de l'étape, relevé par parenté (`ps -A -o pid=,ppid=,pgid=`, avant l'arrêt de l'enfant direct),
+> et le compte au relevé de fin : la suite que `enforcement/verdict-suite-s2.py` lance dans sa propre session depuis
+> DT7-d n'est pas du groupe de l'étape (mesure M-F1 de la relecture : elle survivait à la borne, relevé vide). Après
+> cet arrêt, la sortie n'est plus attendue que `RELIQUAT` s (5 s) : un descendant détaché de son parent (double
+> fork, `setsid`) n'est pas suivi et peut rester vivant. La première étape du job doit être le checkout ; les étapes
+> sont relues sur la copie mutée : un mutant de `gates.yml` se classe par la ligne qu'il écrit (avant C-1, par la
+> ligne d'origine : vivant à tort, mesure M-F2), et des étapes illisibles sous un mutant le classent FATAL. Cas :
+> M6, M7, M8 et le refus `tete` de `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).

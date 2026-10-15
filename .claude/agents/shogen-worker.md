@@ -156,3 +156,8 @@ tout brief le reprend.
   adjudication du 2026-10-10) : la suite S2 (`s2-harness`) se joue sous Python 3.11 à 3.13, jamais sous 3.10
   (`hashlib.file_digest` de `tools/rendu_unique.py`, format verbeux de unittest 3.11+ attendu par un test ; errata
   de `s2-harness/README.md`), comme `scripts/plan-s2bis/commun.py` (consigne Python de PLAN-S2BIS ci-dessus).
+- **Processus orphelins, suite** (ajout daté du 2026-10-10 07:15:53 UTC, relecture G2 du lot DETTES-T7, C-1) :
+  le groupe de l'enfant direct ne suffit pas quand un descendant ouvre sa propre session (la suite que lance
+  `enforcement/verdict-suite-s2.py` depuis DT7-d) : au dépassement, une campagne arrête aussi le groupe de chacun
+  des descendants, relevés par parenté (`ps -A -o pid=,ppid=,pgid=`) avant l'arrêt de l'enfant direct, et les
+  compte au relevé de fin ; `scripts/controle/mutants.py` le fait.
