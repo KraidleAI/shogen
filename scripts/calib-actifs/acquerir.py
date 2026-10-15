@@ -79,7 +79,8 @@ def lire_url(prm: dict, url: str, plage=None, total=False):
 
 def mois(fen: dict, voisins: int = 0) -> list:
     """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre, et `voisins` mois de chaque côté (OKX :
-    alignement des mensuels en UTC ou UTC+8 non écrit, DECISION de FORMES-API-1 pt 4) ; rang du mois borné."""
+    mensuels découpés en UTC+8, établi sur pièce, fuseau des dates écrit par la documentation détenue ; voisins
+    gardés, DECISION de FORMES-API-1 pt 4) ; rang du mois borné."""
     return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in socle.rangs_mois(fen, voisins)]
 
 
