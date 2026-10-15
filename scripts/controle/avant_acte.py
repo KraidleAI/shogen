@@ -43,7 +43,8 @@ rapport de contre-contrôle porte une seule ligne fixe GROUPES : (aucun, ou A+B 
 ensemble ; un nom seul ne groupe rien) ; G2, aucun pas du plan ne commet une partie d'un groupe sans le reste (diff
 nommé par son fichier, sans .diff) ; G3, durée estimée (pas × durée mesurée d'un pas, 6 min par défaut) au-delà de
 BORNE_LIEE min sans --detache : lancement lié refusé, lancement détaché donné.
-GF-10b : toute exception d'une sous-commande sort en 3 (ligne ERREUR), jamais en 1, qui est un refus."""
+GF-10b : toute exception d'une sous-commande sort en 3 (ligne ERREUR), jamais en 1, qui est un refus.
+Relecture G2, C-2 : pousser P3, la branche poussée (refs/heads/B, que pousse git push NOM B) est HEAD."""
 import argparse
 import fnmatch
 import hashlib
@@ -352,6 +353,12 @@ def pousser(a, fautes):
         return
     if not (a.distant and a.branche):
         raise Erreur("pousser : --distant et --branche, ou --acte")
+    poussee = subprocess.run(["git", "-C", a.depot, "rev-parse", "--verify", "--quiet", f"refs/heads/{a.branche}"],
+                             capture_output=True, text=True).stdout.strip()
+    if poussee != git(a.depot, "rev-parse", "--verify", "HEAD").strip():
+        fautes.append(("refus", "P3", f"la branche {a.branche} n'est pas HEAD : git push {a.distant} {a.branche} "
+                       "pousserait un commit ni scellé ni contrôlé (LA-N05, LA-N01)",
+                       f"se placer sur {a.branche}, vérifier, sceller --tete, relancer", "-"))
     if not os.path.exists(os.path.join(garde(a.depot, "sceaux"), cle(a.depot, tete=True))):
         fautes.append(("refus", "P1", "aucun sceau de la tête (LA-N05 : poussée rouge)",
                        "vérification complète de la tête, puis avant_acte.py sceller --tete", "-"))

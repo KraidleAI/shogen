@@ -13,7 +13,8 @@ mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret
 GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : disque presque plein, cibles cargo).
 GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du contre-contrôle annonçait ; E25 :
 chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
-GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus)."""
+GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
+Relecture G2 : C-2 (pousser, branche poussée égale à HEAD)."""
 import contextlib
 import hashlib
 import io
@@ -340,12 +341,12 @@ class Versement(Depot):
 
 class Poussee(Depot):
     def pousser(self, *argv):
-        return self.lancer("pousser", "--distant", "origin", "--branche", "b", *argv)
+        return self.lancer("pousser", "--distant", "origin", "--branche", "main", *argv)
 
     def test_la_n05_et_hors_distant(self):
         """LA-N05 : poussée sans sceau de la tête : refus P1 ; scellée : admise ; docs 15/16 dans la plage poussée, ou
         dans la tête d'une branche neuve : refus P2, fichier jamais nommé ; workflow illisible poussé : refus C8."""
-        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/b", "HEAD")
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/main", "HEAD")
         self.assertEqual(self.pousser()[1][:9], "REFUS P1 ")
         self.lancer("sceller", "--tete")
         self.assertEqual(self.pousser(), (0, ""))
@@ -354,13 +355,29 @@ class Poussee(Depot):
         self.lancer("sceller", "--tete")
         code, sortie = self.pousser()
         self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P2 ", False))
-        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/b", "HEAD")
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/main", "HEAD")
         self.assertEqual(self.pousser(), (0, ""))
+        ag.git(self.d, self.env, "branch", "neuve")
         self.assertEqual(self.lancer("pousser", "--distant", "origin", "--branche", "neuve")[1][:9], "REFUS P2 ")
         self.indexer({"enforcement/workflows-yaml.py": LECTEUR, ".github/workflows/w.yml": "on: push: x" + NL})
         ag.git(self.d, self.env, "commit", "-q", "-m", "w")
         self.lancer("sceller", "--tete")
         self.assertEqual(self.pousser()[1][:9], "REFUS C8 ")
+
+    def test_c2_branche_autre_que_la_tete(self):
+        """C-2 : git push origin b pousse refs/heads/b ; b en avance sur HEAD (commit non vérifié, docs/15-*), ou b
+        absente : refus P3, même tête scellée ; b égale à HEAD : admise."""
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/b", "HEAD")
+        ag.git(self.d, self.env, "branch", "b")
+        self.lancer("sceller", "--tete")
+        self.assertEqual(self.lancer("pousser", "--distant", "origin", "--branche", "b"), (0, ""))
+        ag.git(self.d, self.env, "switch", "-q", "b")
+        self.indexer({"docs/15-poche.md": "x" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "poche")
+        ag.git(self.d, self.env, "switch", "-q", "main")
+        for branche in ("b", "absente"):
+            code, sortie = self.lancer("pousser", "--distant", "origin", "--branche", branche)
+            self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P3 ", False), branche)
 
     def test_e17_actes_refuses(self):
         """E17 : écritures que le mandataire refuse (protection, réglages, suppression de branche) : refus P4 avant

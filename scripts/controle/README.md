@@ -242,3 +242,10 @@ dépendent des tests du harnais qu'ils importent.
 > `<s> = 120 × pas × minutes d'un pas` (le 6600 fixe tuait une chaîne de plus de 110 min, E25).
 > `tests/test_gabarit_chaine.py` compte 8 tests (`test_c1_verif_reelle` : cargo et portes factices) ; plancher du
 > job `controle-unittest` 90.
+
+> *Ajout daté du 2026-10-10 08:48:26 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-2 ; LA-N05, LA-N01)* :
+> `avant_acte.py` (sha256 `d89b567a9e721521508987f1917910c4d5c4e3665c89c32786427bb7f5da430c`) : `pousser` P3,
+> la branche poussée (`refs/heads/B`, ce que pousse `git push NOM B`, commande du skill) est HEAD ; sinon refus.
+> P1 et P2 jugeaient HEAD seule : une branche B en avance sur une tête scellée, porteuse d'un commit non vérifié
+> ou d'un `docs/15-*`, passait. `tests/test_avant_acte.py` compte 24 tests (`test_c2_branche_autre_que_la_tete`) ;
+> plancher du job `controle-unittest` 91.
