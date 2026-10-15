@@ -24,7 +24,8 @@ SERVEURS_NTP="sth1.nts.netnod.se gbg1.nts.netnod.se ntppool1.time.nl ntppool2.ti
 R=""
 if [ "$#" -eq 2 ] && [ "$1" = --essai ]; then
     R="$(cd "$2" && pwd -P)" || R=""
-    [ "$R" != / ] && [ -f "$R/essai.getent" ] || { echo "premier-demarrage : ESSAI/racine refusée" >&2; exit 2; }
+    [ -n "$R" ] && ! [ "$R" -ef / ] && [ -f "$R/essai.getent" ] ||  # vide (cd en échec), « / », « // » : refus
+        { echo "premier-demarrage : ESSAI/racine refusée" >&2; exit 2; }
     enregistrer() { echo "$*" >> "$R/essai.commandes"; }
     apt-get() { enregistrer apt-get "$@"; }
     systemctl() { enregistrer systemctl "$@"; }
