@@ -25,3 +25,35 @@ Adjugé par l'orchestrateur le 2026-10-04 17:03:38 UTC (heure produite par le sc
 *Ajout daté du 2026-10-05 09:20:01 UTC (heure produite par le script d'écriture), recalcul P3 tranche 1* : (a) **Q-RB-13** : les noms d'unité admis par le recalcul (rotation et `analyse.json`) sont restreints aux caractères d'un nom d'hôte en minuscules, `[a-z0-9.-]{1,253}` (resserrement du complément (3) de l'AVIS Q-R-02, qui admettait tout l'ASCII imprimable sans « : ») ; la structure en étiquettes (RFC 1123) est portée par l'item SHOGEN-S2BIS-NOMS-HOTE-RFC1123-1 ; même règle pour SIM-BIS (P-7 de sa tranche 3). (b) **Q-RB-14** : le mutant obligatoire « modulo n_s au lieu de n′_s » (§3.4) ne peut pas s'écrire dans RB-6, qui ne reçoit que n ; il est dû à RB-7.
 
 *Ajout daté du 2026-10-09 16:59:08 UTC (heure lue par `date -u` à la dernière écriture du texte ; lot DETTES-T3, DT3-D ; adjudication Q-D1 de l'orchestrateur, 2026-10-09 15:51:56 UTC), point 4, règle d'estimation (SHOGEN-S2BIS-P1-ESTIMATION-1, annexe B, B.60 ; volets B.61 et B.85)* : toute taille [inféré] d'une partie ou d'un lot de S2-bis entre au calendrier multipliée par 2 (borne basse) et par 3 (borne haute), le jalon se posant sur la borne haute ; à la clôture de chaque partie, son rapport mesuré (lignes ajoutées sur estimation) remplace ce facteur pour les parties de même nature, et le calendrier annoncé à l'investisseur suit. Fondement : CALIB-ACTIFS, 3 168 lignes ajoutées en 21 commits (`1ed872c` à `19a0c7e`, recompté par `git show --numstat`) contre environ 1 100 à 1 300 estimées, soit ×2,44 à ×2,88 [calc]. Le compte de P1 (998 lignes de code pour CB-0 à CB-2 contre environ 560, ×1,78, environ ×2 avec les corrections) est lu dans `docs/adr-0029/s2bis/revue-p1a/G2-P1A.md` l.389, base de compte non retrouvée au recompte ; la règle n'en dépend pas.
+
+*Ajout daté du 2026-10-10 04:06:47 UTC (heure lue par `date -u` à la dernière écriture du texte ; lot DEPLOI-BIS,
+sous-lot DB-1, diff DB1-a ; décisions 1 à 10 de l'adjudication de l'orchestrateur sur DB-0, 2026-10-09 21:51:16 UTC,
+prise sur le rapport du lecteur `claude-sonnet-5-5`)* : (1) **E-D-04, E-D-12** : le système est Debian 13 « trixie » ;
+les versions des paquets entrent au descripteur ; la suite `trixie-security` est admise, pour les seules mises à jour de
+sécurité ; `unattended-upgrades` s'ajoute à la liste d'E-D-04 (R-8 : ligne au tableau des paquets, licence lue à DB-6).
+(2) **E-D-15, E-D-16** : O1 Hetzner Helsinki (FI), O2 OVHcloud Gravelines (FR), O3 DigitalOcean AMS3 (NL), O4 Akamai
+Linode Singapour (SG, hors UE et hors États-Unis) ; repli : Linode Tokyo si une source géobloque Singapour ; Hetzner
+Singapour (7,99 €) est un choix payant de l'investisseur, non retenu par défaut ; les ASN se contrôlent sur le
+descripteur au démarrage. (3) **E-D-05, Q-D-07** (précision de l.241) : en sortie, le pare-feu admet aussi TCP/4460
+(échange de clés NTS), TCP/23 (rsync vers l'espace de sauvegarde, port documenté) et HTTPS vers Healthchecks et
+Certigna ; les serveurs NTP sont désignés par leur nom, résolu par le résolveur de l'observateur ; le refus par défaut
+reste ; IPv6 est refusé. (4) **Q-D-06** : serveurs NTP `sth1.nts.netnod.se`, `gbg1.nts.netnod.se`, `ntppool1.time.nl` et
+`ntppool2.time.nl`, en NTS ; limite écrite : le non-lissage de la seconde intercalaire chez Netnod est inféré, il n'est
+pas déclaré sur les pages lues. (5) **E-D-20, A-3** : la commande OVHcloud n'offre aucun champ de script ; le script de
+premier démarrage reste exécutable à la main (A-3 précisé pour O2) ; il tient sous 32 KiB (borne Hetzner, la plus petite
+lue), et un test contrôle sa taille. (6) **E-D-21, Q-D-10** : caducs depuis la décision Certigna de l'investisseur
+(2026-10-08) ; E-D-21 se lit « conditions et accès de Certigna » ; l'URL et l'authentification sont un acte extérieur
+(documentation d'API demandée à Certigna par l'investisseur), dû avant DB-3 (minuterie de `jeton`) ; l'échéance de la
+décision ANSSI (vers le 2027-02-17) se relit avant le sceau. (7) **Q-D-03** : un sous-compte d'écriture par
+observateur ; un sous-compte en lecture seule dont la home englobe les quatre, sous réserve de l'essai de l'investisseur
+à la mise en service ; repli écrit sans lecture croisée ; SHOGEN-S2BIS-STATUS-RETENTION-1 : la mémoire de `status` est
+faite des résumés quotidiens clos, exclus de la purge locale de 7 jours et copiés au dépôt, avec les deux tests proposés
+(au sous-lot DB-4, ou au diff de `status` qui les porte). (8) **Q-D-02** : N = 7 jours ; le CPX02 (20 Go) suffit
+(environ 23 jours d'autonomie sans copie) ; le volume se mesure au rodage. (9) **Items** : SHOGEN-S2BIS-R8-PAQUETS-1 et
+SHOGEN-S2BIS-HETZNER-DISPO-1 sont fermés par DB-0, leurs phrases versées avec P5 ; SHOGEN-S2BIS-REGIONS-1 : volet
+régions fermé, volet cloud-init re-daté au premier déploiement (OVHcloud, image Debian 13 de Hetzner, user data de
+DigitalOcean) ; SHOGEN-S2BIS-TSA-CERTIGNA-1 : volets lus fermés, volet URL et authentification en acte extérieur
+(point 6). (10) **Écart du lecteur de DB-0** : un `rm -rf /root/.gnupg` hors du scratchpad (répertoire créé par son
+propre premier appel `gpg`, absent avant et après, contrôlé) est admis ; les briefs suivants posent `GNUPGHOME` sous le
+TMPDIR du dossier. Les actes de l'investisseur ajoutés par l'adjudication sont au dossier des actes (§11 du rapport de
+DB-0) ; le texte validé de ce G0 reste tel quel.
