@@ -102,6 +102,16 @@ def tronquee(ts: list, pas: int, depart: int, derniere: int) -> bool:
     return len(ts) >= pas and min(ts) < depart and max(ts) < derniere
 
 
+def instants(format_: str, octets: bytes, illisible=None) -> list:
+    """Temps des bougies d'une réponse (C-15) ; illisible : `illisible` s'il est donné, sinon Forme ou erreur levée."""
+    try:
+        return [t for t, _c, _v in LECTEURS[format_](octets)]
+    except (Forme, ValueError, KeyError, IndexError, TypeError, zipfile.BadZipFile):
+        if illisible is None:
+            raise
+        return illisible
+
+
 def suspecte(format_: str, octets: bytes, pas: int, depart: int, derniere: int) -> bool:
     """C-8 : réponse de page tronquée selon `tronquee` (illisible : non, le chargement la refuse)."""
     try:
@@ -110,7 +120,8 @@ def suspecte(format_: str, octets: bytes, pas: int, depart: int, derniere: int) 
         return False
 
 
-def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenetres=None, garde=None) -> dict:
+def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenetres=None, garde=None,
+          t0=()) -> dict:
     """{minute : (clôture, active)} des fichiers (octets), active = volume > 0 ; hors minute, ligne illisible, double
     dans un fichier : CA/format (E-CA-16). Sans `fenetres` : hors de [debut ; fin) ou double : CA/format. `fenetres`
     [(a, b)] par fichier (FORMES-API-1, pts 2 et 3) : hors de [a ; b) ∩ [debut ; fin) écartée ; minute de deux
@@ -120,7 +131,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
     [départ ; borne] : CA/format (C-9). C-13 : une bougie d'un des fichiers dans [min(première bougie, cœur) ;
     dernière] absente de la page : CA/format nommé par le motif (TRONQUEE pour une page `tronquee`, C-7 ; sinon
     DISCORDE ; demi-page : son motif) ; mêmes minutes aux valeurs différentes, un fichier du second découpage (motif
-    DISCORDE) en cause : DISCORDE."""
+    DISCORDE) en cause : DISCORDE. `t0` (C-15) : (T0 ou None, aucune sonde non vide) ; une bougie au plus tard en
+    T0, ou aucune bougie servie ni sondée : CA/avant-historique."""
     out, vals, tous, controles = {}, {}, [], []
     try:
         for k, octets in enumerate(fichiers):
@@ -150,6 +162,9 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                 nom = motif if motif != TRONQUEE or tronquee(ts, *plafond[:3]) else DISCORDE
                 controles.append((min(ts + [plafond[5]]), plafond[2], set(ts), nom))
         tous.sort()
+        if t0 and (t0[1] if not tous else t0[0] is not None and tous[0] <= t0[0]):         # C-15
+            raise socle.Refus("CA/avant-historique", "réponse portant la première bougie de l'historique" if tous else
+                              "aucune bougie servie", actif, place=place)
         for bas, derniere, recus, nom in controles:       # C-13 : bougie connue absente d'une réponse qui la couvre
             if any(t not in recus for t in tous[bisect.bisect_left(tous, bas):bisect.bisect_right(tous, derniere)]):
                 raise _refus(nom, place, actif)
@@ -180,7 +195,7 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
     """Série d'une (place, actif) depuis <bruts>/<nom>/<place>/<actif>/ (fichiers de l'acquisition, triés, .partiel
     exclus) ; dossier absent ou vide : CA/format. Place paginée : fichiers exactement ceux de socle.pages (sinon
     CA/format), chacun filtré à [départ ; borne + 60) ; mensuels à mois voisins : filtrés à la fenêtre."""
-    d, s, fenetres, garde = os.path.join(bruts, nom, place, actif), prm["series"][place], None, None
+    d, s, fenetres, garde, t0 = os.path.join(bruts, nom, place, actif), prm["series"][place], None, None, ()
     noms = sorted(x for x in os.listdir(d) if not x.endswith(".partiel")) if os.path.isdir(d) else []
     if not noms:
         raise _refus("aucun fichier acquis", place, actif)
@@ -195,6 +210,8 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
                     for k, (dk, bk, dern) in enumerate(socle.demis(prm, place, dep, borne, b), 1):   # filtre de la demi
                         plan[f"{x}-{a}.{k}.json"] = (max(dk, dep), min(bk, borne) + 60, s["pas"], dk, dern,
                                                      INCOHERENTE if x == "page" else motif, bk, dk + 60 * c)
+        if s["couverture"] == 2:
+            t0, noms = _sonde(prm, d, place, actif, fen, noms), [x for x in noms if not x.startswith("sonde-")]
         if set(plan) != set(noms):
             raise _refus("pages différentes du découpage de la fenêtre", place, actif)
         fenetres = [plan[x] for x in noms]
@@ -205,7 +222,30 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
     for x in noms:
         with open(os.path.join(d, x), "rb") as f:
             fichiers.append(f.read())
-    return serie(s["format"], fichiers, fen, place, actif, fenetres, garde)
+    return serie(s["format"], fichiers, fen, place, actif, fenetres, garde, t0)
+
+
+def _sonde(prm: dict, d: str, place: str, actif: str, fen: dict, noms: list) -> tuple:
+    """C-15 : dichotomie rejouée sur les sondes acquises (fichiers exactement ses sondes, sinon CA/format) ; T0 =
+    première bougie de la sonde non vide la plus précoce ; requête de la fenêtre partant moins de pas − ⌊pas/2⌋ + 1
+    minutes après T0 : CA/avant-historique. Rend (T0 ou None, aucune sonde non vide)."""
+    s, lues = prm["series"][place], {}
+
+    def lire(x):
+        try:
+            with open(os.path.join(d, f"sonde-{x}.json"), "rb") as f:
+                lues[x] = instants(s["format"], f.read())
+        except (OSError, Forme, ValueError, KeyError, IndexError, TypeError):
+            raise _refus("sonde absente ou illisible", place, actif) from None
+        return not lues[x]
+    chemin, x = socle.sonde(prm, place, fen, lire)
+    if {f"sonde-{y}.json" for y in chemin} != {n for n in noms if n.startswith("sonde-")}:
+        raise _refus("sondes différentes de la recherche", place, actif)
+    depart = min(p[2] for p in socle.pages(prm, place, fen) + socle.doubles(prm, place, fen))
+    if x is not None and depart < min(lues[x]) + 60 * (s["pas"] - s["pas"] // 2 + 1):
+        raise socle.Refus("CA/avant-historique", "fenêtre commencée moins d'une page après la première bougie servie",
+                          actif, place=place)
+    return (None if x is None else min(lues[x]), x is None)
 
 
 def comptes(prm: dict, place: str, fen: dict, s: dict) -> list:

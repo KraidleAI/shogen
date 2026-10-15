@@ -55,7 +55,8 @@ def octets(format_: str, s: dict) -> bytes:
 def fichiers(prm: dict, place: str, s: dict, fen=FEN) -> dict:
     """{nom : octets} : f.dat, ou une page-<début>.json par page de ⌊`pas`/2⌋ − 2·`chevauchement` minutes (découpage
     calculé ici ; clé absente : découpage d'avant DETTES-T2, sans chevauchement, pour le rouge sur le code d'avant) ;
-    couverture 2 (C-13) : et une double-<début>.json par page décalée d'une demi-page h, de début − h à fin + h."""
+    couverture 2 (C-13) : et une double-<début>.json par page décalée d'une demi-page h, de début − h à fin + h ; et
+    (C-15) les sondes de socle.sonde, lecture exacte d'un historique fictif actif dès début − 7 jours."""
     x = prm["series"][place]
     if x["acces"] != "pages":
         return {"f.dat": octets(x["format"], s)}
@@ -63,8 +64,17 @@ def fichiers(prm: dict, place: str, s: dict, fen=FEN) -> dict:
     h = 60 * (u // 120)
     plans = [("page", range(fen["debut"], fen["fin"], u))] + [("double", range(fen["debut"] - h, fen["fin"] + h, u))
                                                                ] * (x.get("couverture", 1) == 2)
-    return {f"{n}-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
-            for n, r in plans for d in r}
+    f = {f"{n}-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
+         for n, r in plans for d in r}
+    if x.get("couverture", 1) == 2 and "historique" in prm:
+        k, h0 = 60 * (x["pas"] // 2), fen["debut"] - 7 * 86400
+
+        def vide(y):
+            b = {max(y, h0): (Decimal(100), True)} if y < fen["debut"] and y + k > h0 else {}
+            f[f"sonde-{y}.json"] = octets(x["format"], b | {t: v for t, v in s.items() if y <= t < y + k})
+            return f[f"sonde-{y}.json"] == octets(x["format"], {})
+        socle.sonde(prm, place, fen, vide)
+    return f
 
 
 def ecrire_bruts(prm: dict, bruts: str, nom: str, fen=FEN) -> None:

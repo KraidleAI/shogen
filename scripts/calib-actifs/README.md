@@ -33,10 +33,15 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   Garde (C-7, C-8, C-14) : une réponse d'au moins `pas` bougies, dont une avant le départ et aucune à la dernière
   minute de la page, est redemandée en deux demi-pages (`<page>.1.json` et `.2.json`), au même débit, qui la
   remplacent au chargement ; une page d'un seul point n'est jamais redemandée.
-  Limite (propriété rejouée dans tous les modes, plafond ancré jusqu'à 1000 minutes avant `start`) : un plafond ancré
-  avant le début de l'historique de la paire rend à toute requête les mêmes premières bougies de l'historique, ce
-  qu'aucune requête ne distingue d'un marché muet sous la lecture « les `pas` plus récentes » : minutes perdues sans
-  refus ; la complétude le montre (fenêtre vide ou presque).
+  Sonde de première bougie (C-15, couverture double) : sondes de ⌊`pas`/2⌋ créneaux, la première en fin − ⌊`pas`/2⌋
+  minutes, puis dichotomie depuis `historique.debut` (2009-01-03, avant toute cotation) jusqu'à la plus précoce non
+  vide (`sonde-<x>.json`, environ 24 par paire et par fenêtre, rejouées au chargement) ; T0 = sa première bougie.
+  CA/avant-historique : requête de la fenêtre partant moins de `pas` − ⌊`pas`/2⌋ + 1 minutes après T0 ; réponse
+  portant une bougie au plus tard en T0 (plafond ancré avant le début de l'historique) ; aucune bougie servie.
+  Limite résiduelle mesurée (L-C13-2, sans item) : un décalage ou un retard de plus d'une demi-page au-delà de la fin
+  n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété,
+  fenêtres de 1 à 10 minutes ; une fenêtre du lot (87 pages ou plus par découpage) le verrait dès un seul échange dans
+  une fin de page.
   OKX : mensuels découpés en UTC+8, établi sur pièce (DECISION de FORMES-API-1, ajout daté du 2026-10-09 19:51:45 UTC :
   le mensuel ETH-USDT de 2026-09 va du 2026-08-31 16:00 au 2026-09-30 15:59 UTC) ; `voisins` 1, le mois précédent et
   le suivant sont acquis, seules les minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est

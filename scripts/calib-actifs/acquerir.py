@@ -182,7 +182,8 @@ def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str
     chevauchement de chaque côté ; la première et la dernière peuvent demander une minute hors fenêtre, écartée au
     chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste. C-8 : page suspecte de
     troncature (bougies.suspecte) redemandée en deux demi-pages (socle.demis), page-<début>.1.json et .2.json. C-13 :
-    puis le second découpage (socle.doubles), double-<début>.json, de même."""
+    puis le second découpage (socle.doubles), double-<début>.json, de même. C-15 : puis les sondes de première bougie
+    (socle.sonde), sonde-<x>.json, en couverture double."""
     s = prm["series"][place]
     for prefixe, debut, fin, depart, borne in ([("page", *x) for x in socle.pages(prm, place, fen)]
                                                + [("double", *x) for x in socle.doubles(prm, place, fen)]):
@@ -192,6 +193,14 @@ def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str
             suspecte = bougies.suspecte(s["format"], f.read(), s["pas"], depart, fin - 60)
         for k, (a, b, _d) in enumerate(socle.demis(prm, place, depart, borne, fin) if suspecte else (), 1):
             requete(prm, man, f"{rel[:-5]}.{k}.json", place, actif, a, b, debit)
+
+    def vide(x):                                                    # C-15 : sonde de première bougie
+        rel = os.path.join(nom, place, actif, f"sonde-{x}.json")
+        requete(prm, man, rel, place, actif, x, x + 60 * (s["pas"] // 2 - 1), debit)
+        with open(os.path.join(man.bruts, rel), "rb") as f:
+            return not bougies.instants(s["format"], f.read(), [])          # illisible : arrêt (refus au chargement)
+    if s["couverture"] == 2:
+        socle.sonde(prm, place, fen, vide)
 
 
 def main(argv=None, env=None) -> int:

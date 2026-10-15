@@ -47,7 +47,7 @@ def simule(place, sem, m, pas):
             if "depuis-start" in sem:
                 e = int(q["start"]) + 60 * dx + 60 * (n - 1)
             ohlc = [{"timestamp": str(t), "close": m[t][0], "volume": m[t][1]}
-                    for t in range(e - 60 * n + 60, e + 60, 60)]
+                    for t in range(e - 60 * n + 60, e + 60, 60) if t in m]             # C-15 : hors historique, rien
             return None if n > pas else json.dumps({"data": {"pair": "ETH/USD", "ohlc": ohlc}}).encode()
         a, b = int(q["start"]) // 1000, int(q["end"]) // 1000      # Bitfinex : MTS >= start et <= end ([lu])
         ts = [t for t in sorted(m) if a <= t <= b and m[t][1] != "0"][:pas]
@@ -67,7 +67,7 @@ def pages_attendues(bornes, toutes):
 
 class TestFormesPages(unittest.TestCase):
     def acquis(self, place, sem, fen, fixture):
-        m = marche(fen, marge=600)                           # C-13 : second découpage jusqu'à fin + demi-page
+        m = marche(fen, marge=1000)              # C-13 : jusqu'à fin + demi-page ; C-15 : historique ≥ 751 minutes
         with Serveur({}) as s:
             prm, d, _p = local(self, s.base)
             urls(prm, s.base)
@@ -81,7 +81,7 @@ class TestFormesPages(unittest.TestCase):
             x = essai(f)
         if not isinstance(x, dict):
             return x
-        noms = sorted(os.listdir(os.path.join(d, "principale", place, "ETH")))
+        noms = sorted(x for x in os.listdir(os.path.join(d, "principale", place, "ETH")) if not x.startswith("sonde"))
         comptes = essai(lambda: bougies.comptes(prm, place, fen, x))
         return ecart(x, verite(m, fen, place != "bitstamp")), noms, comptes
 

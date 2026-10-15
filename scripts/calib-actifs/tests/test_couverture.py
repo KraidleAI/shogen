@@ -44,8 +44,10 @@ def lecture(m, mode, g=0, faux=None, vues=None):
 
 class TestCouverture(unittest.TestCase):
     def acquis(self, fen, serveur, **serie):
-        """Deux passages (le second : reprise) ; rend (requêtes par passage, fichiers, écart à la vérité ou refus)."""
-        m, vus = {W0 + 60 * i: (f"{2000 + i}.5", "1") for i in range(-200, 200)}, []
+        """Deux passages (le second : reprise) ; rend (requêtes par passage, fichiers, écart à la vérité ou refus).
+        Échanges des minutes `historique` (−200 par défaut) à `fin` (200) exclue ; sondes (C-15) depuis W0 − 999."""
+        m, vus = {W0 + 60 * i: (f"{2000 + i}.5", "1")
+                  for i in range(serie.pop("historique", -200), serie.pop("fin", 200))}, []
         m.update({W0 + 60 * i: ("1.5", "0") for i in serie.pop("sans", ())})
         with Serveur({}) as s:
             prm, d, pauses = local(self, s.base)
@@ -53,6 +55,7 @@ class TestCouverture(unittest.TestCase):
             horloge, acquerir.HORLOGE = acquerir.HORLOGE, lambda: 100.0
             self.addCleanup(setattr, acquerir, "HORLOGE", horloge)
             prm["series"]["coinbase"].update(serie)
+            prm["historique"] = {"debut": W0 - 999 * 60, "source": "tests"}
             s.fonction = serveur(m)
             for _k in range(2):
                 essai(lambda: acquerir.pages(prm, acquerir.Manifeste(d), "principale", fen, "coinbase", "ETH",
@@ -62,17 +65,20 @@ class TestCouverture(unittest.TestCase):
         x = essai(lambda: bougies.charger(prm, d, "principale", "coinbase", "ETH", fen))
         verite = {t: (Decimal(c), True) for t, (c, v) in m.items() if fen["debut"] <= t < fen["fin"] and v != "0"}
         self.assertEqual(pauses, [0.34] * max(vus[0] - 1, 0))                   # même débit, un seul passage
+        self.bruts = prm, d
         return vus, sorted(os.listdir(os.path.join(d, REP))), (ecart(x, verite) if isinstance(x, dict) else x)
 
     def test_double_couverture(self):
         """Lecture exacte, « 30 plus récentes » (minutes 11 et 12 sans échange), fenêtre décalée d'une minute
         (absorbée par le chevauchement) : série égale à la vérité ; lecture exacte : 8 requêtes, aucune à la reprise,
-        fichiers page-0, 13, 26, 39 et double-−6, 7, 20, 33. Fenêtre décalée de 2 minutes (la page 0 du second
+        fichiers page-0, 13, 26, 39 et double-−6, 7, 20, 33, et 11 sondes (C-15, à la main : 25, −487, −231, −103, −167,
+        −199, −215, −207, −211, −213, −214 ; première bougie en −200). Fenêtre décalée de 2 minutes (la page 0 du second
         découpage perd la minute 6, servie par la page 0 du premier) ; plafond de 30 bougies ou de 30 créneaux ancré
         100 minutes avant start (toute réponse avant son départ) ; clôture différente à la minute 10 dans le second
         découpage : refus nommé. Mutations : second découpage omis ; non décalé ; non chargé ; contrôle de couverture
         retiré ; valeurs non comparées ; bougies d'avant le départ non comptées comme preuve."""
-        noms = sorted(f"{x}-{W0 + d + 780 * k}.json" for x, d in (("page", 0), ("double", -360)) for k in range(4))
+        noms = sorted([f"{x}-{W0 + d + 780 * k}.json" for x, d in (("page", 0), ("double", -360)) for k in range(4)] + [
+            f"sonde-{W0 + 60 * x}.json" for x in (25, -487, -231, -103, -167, -199, -215, -207, -211, -213, -214)])
         cas = {"exact": lambda m: lecture(m, "exact"), "recentes": lambda m: lecture(m, "recentes"),
                "cren-1": lambda m: lecture(m, "cren", 1)}
         for nom, f in cas.items():
@@ -81,7 +87,7 @@ class TestCouverture(unittest.TestCase):
                                                sans=(11, 12) if nom == "recentes" else ())
                 self.assertEqual(r, ([], [], []))
                 if nom == "exact":
-                    self.assertEqual((vus, fichiers), ([8, 0], noms))
+                    self.assertEqual((vus, fichiers), ([19, 0], noms))
         cas = {"cren-2": lambda m: lecture(m, "cren", 2), "cpt-100": lambda m: lecture(m, "cpt", 100),
                "crenp-100": lambda m: lecture(m, "crenp", 100), "faux": lambda m: lecture(m, "exact", faux=10)}
         for nom, f in cas.items():
