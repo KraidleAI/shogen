@@ -60,22 +60,28 @@ def commandes(o):
 
 
 def pare_feu(texte):
-    """(tables, {chaîne : [crochet, politique, règles]}) d'un fichier nftables, commentaires et blancs retirés."""
-    tables, chaines, nom = [], {}, None
+    """(premier niveau, {ensemble : lignes}, {chaîne : [crochet, politique, règles]}) d'un fichier nftables,
+    commentaires et blancs retirés ; premier niveau : toute ligne hors d'un bloc set ou chain."""
+    dehors, ensembles, chaines, bloc = [], {}, {}, None
     for ligne in texte.splitlines():
         t = " ".join(ligne.split("#")[0].split())
-        if t.startswith("table "):
-            tables.append(t)
-        elif t.startswith("chain "):
-            nom = t.split()[1]
-            chaines[nom] = [None, None, []]
-        elif nom and t == "}":
-            nom = None
-        elif nom and t.startswith("type filter hook "):
-            chaines[nom][:2] = [t.split()[3], t.split()[-1]]
-        elif nom and t:
-            chaines[nom][2].append(t)
-    return tables, chaines
+        if t.startswith(("set ", "chain ")) and t.endswith(" {"):
+            bloc = t.split()[:2]
+            if bloc[0] == "set":
+                ensembles[bloc[1]] = []
+            else:
+                chaines[bloc[1]] = [None, None, []]
+        elif bloc and t == "}":
+            bloc = None
+        elif bloc and bloc[0] == "set" and t:
+            ensembles[bloc[1]].append(t)
+        elif bloc and t.startswith("type filter hook "):
+            chaines[bloc[1]][:2] = [t.split()[3], t.split()[-1]]
+        elif bloc and t:
+            chaines[bloc[1]][2].append(t)
+        elif t:
+            dehors.append(t)
+    return dehors, ensembles, chaines
 
 
 class Essai(unittest.TestCase):
@@ -277,18 +283,18 @@ class PremierDemarrage(Essai):
         self.assertEqual(os.listdir(os.path.join(racine, "etc/apt/apt.conf.d")), ["90shogen-securite"])
 
     def test_tdp2_refus_par_defaut_ipv4_et_ipv6(self):
-        texte = self.lire(NFT)
-        lignes = [t for t in (" ".join(x.split("#")[0].split()) for x in texte.split(NL)) if t]
-        self.assertEqual((lignes[0], lignes[-1]), ("flush ruleset", 'include "/etc/nftables.d/*.nft"'))
-        tables, chaines = pare_feu(texte)
-        self.assertEqual(tables, ["table inet shogen {"])         # inet : IPv4 et IPv6 passent par les mêmes chaînes
+        dehors, ensembles, chaines = pare_feu(self.lire(NFT))  # aucune règle hors des chaînes ni des ensembles
+        self.assertEqual(dehors, ["flush ruleset", "table inet shogen {", "}", 'include "/etc/nftables.d/*.nft"'])
+        # inet : IPv4 et IPv6 passent par les mêmes chaînes ; ensembles vides au dépôt, remplis par l'observateur seul
+        self.assertEqual(ensembles, {"resolveurs": ["type ipv4_addr", "flags interval"], "ntp": ["type ipv4_addr"],
+                                     "sauvegarde": ["type ipv4_addr"]})
         self.assertEqual({n: c[:2] for n, c in chaines.items()},
                          {"entree": ["input", "drop;"], "sortie": ["output", "drop;"], "transit": ["forward", "drop;"]})
         self.assertEqual([chaines[n][2][:2] for n in ("entree", "sortie")],
                          [['iif "lo" accept', "meta nfproto ipv6 drop"], ['oif "lo" accept', "meta nfproto ipv6 drop"]])
 
     def test_tdp2_regles_exactes(self):
-        _t, chaines = pare_feu(self.lire(NFT))
+        _d, _e, chaines = pare_feu(self.lire(NFT))
         self.assertEqual([chaines[n][2] for n in ("entree", "sortie", "transit")], [ENTREE, SORTIE, []])
         self.assertEqual([set(r.split("{")[1].split("}")[0].replace(",", " ").split()) for r in chaines["sortie"][2]
                           if "dport 53" in r and "{" in r], [TEMOINS])
