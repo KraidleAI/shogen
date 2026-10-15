@@ -349,3 +349,12 @@ dépendent des tests du harnais qu'ils importent.
 > stripspace`) est refusé : la reprise du modèle, qui lit tout l'historique, sautait ce pas sans rien dire (un nom
 > courant comme `C-1` d'un autre lot suffisait) ; même message, reprise après un arrêt : admis.
 > `tests/test_avant_acte.py` compte 35 tests ; plancher du job `controle-unittest` 105.
+
+> *Ajout daté du 2026-10-15 10:31:37 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-18 ; contrat GF-10b, L-16)* :
+> `avant_acte.py` (sha256 `2d274a8f23431d32e88c57a23f70df743cda033cb64613dadbb0ad14c0952d37`) et
+> `presg5.py` (sha256 `fb352419e5c5c70c8d89dd17ce32d4c410d08d212935a98901838349739cba4d`) : un module frère illisible
+> (installation abîmée), des interdits illisibles (`presg5` copié sans `enforcement/`), une exception hors des
+> sous-commandes ou l'échec du vidage final de la sortie standard (tube sans lecteur) sortent en 3 ; ils sortaient en
+> 1, qui se lit refus (ou fragment introuvable pour `presg5`), ou en 120 (vidage à la fin de l'interpréteur). Reste :
+> une erreur de syntaxe de l'outil lui-même sort en 1 (l'interpréteur, avant toute ligne de l'outil).
+> `tests/test_avant_acte.py` compte 36 tests, `tests/test_presg5.py` 7 ; plancher du job `controle-unittest` 107.

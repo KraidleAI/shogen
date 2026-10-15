@@ -57,8 +57,11 @@ Relecture G2, C-9 : une exception du journal (après la sous-commande) sort en 3
 Relecture G2, C-16 : C3 lit aussi dans les sources « passe N » (N passes faites), hors négation (sans, aucune, pas
 de).
 Relecture G2, C-17 : chaine G4, un Diff-Id du plan déjà porté par un commit d'un autre message est refusé (la reprise
-du modèle sauterait le pas)."""
+du modèle sauterait le pas).
+Relecture G2, C-18 : un module frère illisible (installation abîmée), une exception hors des sous-commandes ou l'échec
+du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais en 1 (un refus) ni en 120."""
 import argparse
+import contextlib
 import fnmatch
 import hashlib
 import importlib.util
@@ -78,8 +81,12 @@ def _module(nom, chemin=None):
     return m
 
 
-GC = _module("garde_commun")
-P5 = _module("presg5")
+try:
+    GC = _module("garde_commun")
+    P5 = _module("presg5")
+except Exception as _e:         # module frère illisible (installation abîmée) : erreur de l'outil, jamais 1 (C-18)
+    print(f"ERREUR chargement : {type(_e).__name__} : {_e}", file=sys.stderr)
+    sys.exit(3)
 VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|NON-CONFORME|CONFORME|ACCEPTE|REFUSE)(?![A-Z-])")
 PASSES = re.compile("(?i)(?<![0-9a-zé])([0-9]+|une?|deux|trois|quatre|cinq|six) passes?(?![a-z])")
 PASSE_N = re.compile("(?i)(?<![0-9a-zé])passe ([0-9]+)(?![0-9])")
@@ -598,5 +605,20 @@ def main(argv=None):
     return 1 if any(f[0] == "refus" for f in fautes) else 0
 
 
+def sortir(principal):
+    """C-18 : une exception hors des sous-commandes (écriture de la sortie) ou l'échec du vidage final de la sortie
+    standard (tube sans lecteur) rend 3, jamais 1 (un refus) ni 120 (vidage à la fin de l'interpréteur) ; la sortie
+    est alors détournée vers /dev/null, que l'interpréteur vide sans erreur."""
+    try:
+        code = principal()
+        sys.stdout.flush()
+    except Exception as e:
+        with contextlib.suppress(Exception):
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
+        print(f"ERREUR : {type(e).__name__} : {e}", file=sys.stderr)
+        return 3
+    return code
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(sortir(main))

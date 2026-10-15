@@ -18,7 +18,8 @@ Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu com
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
 ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
-passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit)."""
+passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
+sortie standard fermée : 3)."""
 import contextlib
 import difflib
 import fnmatch
@@ -146,6 +147,28 @@ class Journal(Depot):
         env = dict(self.env, PATH=os.path.join(self.tmp, "faux") + os.pathsep + self.env["PATH"])
         p = subprocess.run(argv, capture_output=True, text=True, env=env, timeout=120)
         self.assertEqual((p.returncode, p.stdout, p.stderr[:16]), (3, "WISHLIST.md" + NL, "ERREUR journal :"))
+
+    def test_c18_chargement_et_sortie(self):
+        """C-18 : module frère illisible (installation abîmée) : sortie 3, jamais 1 (un refus) ; sortie standard
+        fermée (tube sans lecteur) : 3, jamais 120 (échec du vidage à la fin de l'interpréteur)."""
+        r = os.path.join(self.tmp, "outil")
+        os.makedirs(r)
+        for n in ("avant_acte.py", "presg5.py"):
+            shutil.copy(os.path.join(os.path.dirname(avant_acte.__file__), n), r)
+        ag.ecrire(r, {"garde_commun.py": "def (" + NL})
+        fin = ["--depot", self.d, "existe", "a.md"]
+        p = subprocess.run([sys.executable, "-I", "-B", os.path.join(r, "avant_acte.py"), *fin], capture_output=True,
+                           text=True, env=self.env, timeout=120)
+        vus = [(p.returncode, p.stdout, p.stderr[:19])]
+        lu, ecrit = os.pipe()
+        os.close(lu)
+        try:
+            p = subprocess.run([sys.executable, "-I", "-B", avant_acte.__file__, *fin], stdout=ecrit,
+                               stderr=subprocess.PIPE, text=True, env=self.env, timeout=120)
+        finally:
+            os.close(ecrit)
+        vus.append((p.returncode, p.stderr[:24]))
+        self.assertEqual(vus, [(3, "", "ERREUR chargement :"), (3, "ERREUR : BrokenPipeError")])
 
 
 class Source(Depot):

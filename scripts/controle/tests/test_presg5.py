@@ -3,9 +3,10 @@
 français. Sortie dorée : SHA_DOREE est le sha256 de la sortie de l'outil d'origine (scratchpad, sha256 60de4077…87ef0)
 sur FIXTURE, mesuré avant le versement. Les guillemets français sont posés à l'exécution (<< et >>) : ce fichier n'en
 porte aucun autour d'un texte anglais. L'outil tourne en sous-processus (-X dev -W error -I -B).
-Relecture G2, C-10 : racine sous un interdit."""
+Relecture G2, C-10 : racine sous un interdit ; C-18 : installation abîmée (interdits ou module frère illisibles)."""
 import hashlib
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -108,3 +109,31 @@ class Presg5(unittest.TestCase):
             batir(d, {"docs/rapports/biblio/INDEX.md": "<< the hidden text is not in the corpus >>\n", "a.md": "x\n"})
             code, sortie, erreur = lancer(d, "docs/rapports", "a.md")
         self.assertEqual((code, sortie, "rapports" in erreur), (3, b"", False))
+
+    def test_c18_installation_abimee(self):
+        """C-18 : outil copié sans enforcement/ ni fm11.py (interdits illisibles), puis docs-sha256sums.py sans
+        INTERDITS (erreur hors d'OSError), puis module frère illisible ; enfin outil sain, sortie standard fermée (tube
+        sans lecteur) : sortie 3, jamais 1 (qui dit un fragment introuvable) ni 120 (vidage à la fin de
+        l'interpréteur) ; ligne d'erreur de l'outil, sans trace."""
+        vus = []
+        with tempfile.TemporaryDirectory() as d:
+            batir(d)
+            r = os.path.join(d, "outil", "scripts", "controle")
+            os.makedirs(r)
+            for n in ("presg5.py", "garde_commun.py"):
+                shutil.copy(os.path.join(os.path.dirname(PRESG5), n), r)
+            argv = [sys.executable, "-X", "dev", "-W", "error", "-I", "-B", os.path.join(r, "presg5.py"), ".", "a.md"]
+            for fichiers in ({}, {"outil/enforcement/docs-sha256sums.py": "X = 1" + chr(10)},
+                             {"outil/scripts/controle/garde_commun.py": "def (" + chr(10)}):
+                batir(d, fichiers)
+                p = subprocess.run(argv, cwd=d, capture_output=True, text=True, timeout=120)
+                vus.append((p.returncode, p.stdout, p.stderr[:17]))
+            lu, ecrit = os.pipe()
+            os.close(lu)
+            try:
+                p = subprocess.run(argv[:7] + [PRESG5, ".", "a.md"], cwd=d, stdout=ecrit, stderr=subprocess.PIPE,
+                                   text=True, timeout=120)
+            finally:
+                os.close(ecrit)
+            vus.append((p.returncode, None, p.stderr[:17]))
+        self.assertEqual(vus, [(3, "", "presg5 : erreur :")] * 3 + [(3, None, "presg5 : erreur :")])

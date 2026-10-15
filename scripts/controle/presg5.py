@@ -3,12 +3,14 @@ l'orchestrateur (sha256 d'origine 60de4077…87ef0 ; lot GARDE-FOUS-ORCH, GF-2 ;
 inchangé : fragment anglais d'au moins 15 octets entre guillemets français, introuvable dans biblio/INDEX.md et les
 octets texte de biblio/. Changements : fonction introuvables(racine, fichiers) ; sorties 0 (aucun fragment), 1 (au
 moins un), 3 (erreur, biblio/INDEX.md absent compris) ; fichiers ouverts par `with` ; chemin interdit jamais ouvert
-ni nommé (garde_commun), la racine comprise (relecture G2, C-10).
+ni nommé (garde_commun), la racine comprise (relecture G2, C-10). Relecture G2, C-18 : module frère ou interdits
+illisibles (installation abîmée), sortie standard fermée : 3, jamais 1 (qui dit un fragment introuvable).
 
 Usage : python3 -I -B presg5.py <racine du dépôt> <fichier.md>...
 Imprime chemin:ligne et le fragment anglais introuvable, puis le compte, comme l'outil d'origine.
 Signal seulement : la gate de xtask reste le juge.
 """
+import contextlib
 import importlib.util
 import os
 import re
@@ -24,7 +26,11 @@ def _module(nom):
     return m
 
 
-GC = _module("garde_commun")
+try:
+    GC = _module("garde_commun")
+except Exception as _e:         # module frère illisible (installation abîmée) : 3, jamais 1 (C-18)
+    print(f"presg5 : erreur : {type(_e).__name__} : {_e}", file=sys.stderr)
+    sys.exit(3)
 
 MOTS = [" the ", " of ", " to ", " is ", " are ", " that ", " not ", " be ", " with ", " it ", " we ",
         " this ", " they ", " has ", " have "]
@@ -158,18 +164,21 @@ def main(argv):
     if len(argv) < 2:
         print("usage : presg5.py <racine du dépôt> <fichier.md>...", file=sys.stderr)
         return 3
-    interdits = sum(map(GC.chemin_interdit, argv))
-    if interdits:
-        print(f"presg5 : {interdits} chemin(s) interdit(s), non ouvert(s)", file=sys.stderr)
-        return 3
     try:
+        interdits = sum(map(GC.chemin_interdit, argv))
+        if interdits:
+            print(f"presg5 : {interdits} chemin(s) interdit(s), non ouvert(s)", file=sys.stderr)
+            return 3
         trouves = introuvables(argv[0], argv[1:])
-    except (OSError, UnicodeDecodeError) as e:
+        for f, n, x in trouves:
+            print(f"{f}:{n}: « {x[:160]} »")
+        print(f"presg5 : {len(trouves)} fragment(s) introuvable(s)")
+        sys.stdout.flush()
+    except Exception as e:      # toute erreur, interdits illisibles et sortie fermée compris : 3, jamais 1 (C-18)
+        with contextlib.suppress(Exception):
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         print(f"presg5 : erreur : {type(e).__name__} : {e}", file=sys.stderr)
         return 3
-    for f, n, x in trouves:
-        print(f"{f}:{n}: « {x[:160]} »")
-    print(f"presg5 : {len(trouves)} fragment(s) introuvable(s)")
     return 1 if trouves else 0
 
 
