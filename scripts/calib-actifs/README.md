@@ -46,10 +46,18 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   plus que la fenêtre rend toutes les sondes vides quand l'historique commence entre leur portée et celle de la
   dernière requête, qui sert alors seule des bougies, toutes hors de la fenêtre).
   Limite résiduelle mesurée (L-C13-2, sans item) : un décalage ou un retard de plus d'une demi-page au-delà de la fin
-  n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété,
-  fenêtres de 1 à 10 minutes ; une fenêtre du lot (87 pages ou plus par découpage) le verrait dès un seul échange dans
-  une fin de page. En miroir (R-2 du contre-contrôle cc2), un décalage vers l'avant de plus d'une demi-page mais
-  de moins d'une requête n'est pas vu au début de la fenêtre si tous les débuts de page sont sans échange.
+  n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété
+  du générateur, fenêtres de 1 à 10 minutes, dont 23 à chevauchement 0, configuration absente des places du lot en
+  couverture double (c = 1) ; la propriété du contre-contrôle cc2 (24 000 cas) trouve 11 pertes de queue, fenêtres
+  jusqu'à 27 minutes, et 29 en marché mince (densité 0,3 ou moins, fenêtres jusqu'à 95 minutes) ; une fenêtre du lot
+  (87 pages ou plus par découpage) le verrait dès un seul échange dans une fin de page. En miroir (R-2 du
+  contre-contrôle cc2), un décalage vers l'avant de plus d'une demi-page mais de moins d'une requête n'est pas vu au
+  début de la fenêtre si tous les débuts de page sont sans échange.
+  Résidu de R-1 et R-2 (propriété cc2) : 66 pertes vers l'avant ; 64 où rien n'est servi pour la fenêtre (le
+  décalage porte toutes les requêtes au-delà de la fin des données), 1 miroir ci-dessus (fenêtre d'une minute), 1 en
+  marché mince (densité 0,1 ; décalage de 58 minutes, plus long que la fenêtre de 28 : toutes les réponses décalées
+  tombent sur des minutes sans échange, donc rien n'est servi, comme les 64). Une fenêtre où rien n'est servi est
+  indiscernable au chargement d'une fenêtre muette, admise par conception : la garde est au calcul (Q-DT2-11).
   OKX : mensuels découpés en UTC+8, établi sur pièce (DECISION de FORMES-API-1, ajout daté du 2026-10-09 19:51:45 UTC :
   le mensuel ETH-USDT de 2026-09 va du 2026-08-31 16:00 au 2026-09-30 15:59 UTC) ; `voisins` 1, le mois précédent et
   le suivant sont acquis, seules les minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est
