@@ -226,6 +226,14 @@ def pages(prm: dict, place: str, fen: dict) -> list:
             for d in range(fen["debut"], fen["fin"], u)]
 
 
+def demis(prm: dict, place: str, depart: int, borne: int, fin: int) -> list:
+    """C-8 : demi-requêtes d'une page suspecte, cœurs [départ ; m] et [m + 60 ; borne] (m au milieu des n points),
+    élargis de c minutes de chaque côté : [(départ, borne, minute à atteindre)] ; la seconde doit atteindre fin − 60."""
+    c, n = prm["series"][place]["chevauchement"], (borne - depart) // 60 + 1
+    m = depart + 60 * ((n + 1) // 2 - 1)
+    return [(depart - 60 * c, m + 60 * c, m), (m + 60 - 60 * c, borne + 60 * c, fin - 60)]
+
+
 def strate(t: int, prm: dict) -> str:
     """Strate de la minute t : jour de la semaine UTC (lundi = 0 ; le 1970-01-01 est un jeudi), calendrier de S2."""
     jour = (t // 86400 + 3) % 7

@@ -14,6 +14,7 @@ import time
 import urllib.request
 import zipfile
 
+import bougies
 import socle
 
 NL, TAB = chr(10), chr(9)
@@ -166,19 +167,29 @@ def iso(t: int) -> str:
     return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def requete(prm: dict, man: Manifeste, rel: str, place: str, actif: str, a: int, b: int, debit: Debit) -> None:
+    """Requête [a ; b] d'une place paginée vers rel, au débit de la place ; reprise sur le manifeste."""
+    s = prm["series"][place]
+    if not man.present(rel):
+        url = s["url"].format(s=s["paires"][actif], debut=a, fin=b, n=(b - a) // 60 + 1, debut_ms=a * 1000,
+                              fin_ms=b * 1000, debut_iso=iso(a), fin_iso=iso(b))
+        debit.attendre(place, s["intervalle_ms"])
+        man.ajouter(url, rel, lire_url(prm, url))
+
+
 def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str, debit: Debit) -> None:
     """API paginée d'une (place, actif) : découpage de socle.pages (requête de départ à borne, `pas` bougies au plus,
     chevauchement de chaque côté ; la première et la dernière peuvent demander une minute hors fenêtre, écartée au
-    chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste."""
+    chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste. C-8 : page suspecte de
+    troncature (bougies.suspecte) redemandée en deux demi-pages (socle.demis), page-<début>.1.json et .2.json."""
     s = prm["series"][place]
-    for debut, _f, depart, fin in socle.pages(prm, place, fen):
+    for debut, fin, depart, borne in socle.pages(prm, place, fen):
         rel = os.path.join(nom, place, actif, f"page-{debut}.json")
-        if man.present(rel):
-            continue
-        url = s["url"].format(s=s["paires"][actif], debut=depart, fin=fin, n=(fin - depart) // 60 + 1,
-                              debut_ms=depart * 1000, fin_ms=fin * 1000, debut_iso=iso(depart), fin_iso=iso(fin))
-        debit.attendre(place, s["intervalle_ms"])
-        man.ajouter(url, rel, lire_url(prm, url))
+        requete(prm, man, rel, place, actif, depart, borne, debit)
+        with open(os.path.join(man.bruts, rel), "rb") as f:
+            suspecte = bougies.suspecte(s["format"], f.read(), s["pas"], depart, fin - 60)
+        for k, (a, b, _d) in enumerate(socle.demis(prm, place, depart, borne, fin) if suspecte else (), 1):
+            requete(prm, man, f"{rel[:-5]}.{k}.json", place, actif, a, b, debit)
 
 
 def main(argv=None, env=None) -> int:

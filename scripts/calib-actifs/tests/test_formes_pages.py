@@ -94,26 +94,29 @@ class TestFormesPages(unittest.TestCase):
         chevauchement ignoré ou d'un seul côté ; n faux ; filtre retiré ou à la fenêtre entière ; fenêtre de page non
         bornée à la fenêtre ; doublon identique refusé ; chevauchement ou pas lu à une autre place.
         Comptes par page (DECISION pt 5) : reçues et attendues à la main (règle du marché) ; mutations : attendues ou
-        reçues fausses, dernière page mal bornée. C-7 : réponse plafonnée ancrée `pas` minutes avant start (fin de page
-        tronquée) et « fin exclue, avant » (plafond ancré avant le départ, sans la dernière minute propre, minute 2 sans
-        échange : indiscernable d'une troncature) : refus nommé ; mutations : contrôle retiré, plafond ignoré."""
+        reçues fausses, dernière page mal bornée. C-7 et C-8 : « fin exclue, avant » (plafond ancré avant le départ,
+        sans la dernière minute propre, sans échange : minute 2 de la fixture, 1199 du lot) : page redemandée en deux
+        demi-pages, admise ; plafond ancré `pas` minutes avant start : demi-réponses elles aussi tronquées : refus
+        nommé ; mutations : contrôle retiré, plafond ignoré."""
         cas = [("coinbase", ("incluses", "fin-exclue", "avant", "fin-exclue avant", "debut-exclu",
                              "debut-exclu fin-exclue", "tronquee"), [0, 3, 6, 9, 12, 14],
                 [0, 298, 596, 894, 1192, 1200]),
                ("bitstamp", ("incluses", "fin-exclue", "depuis-start", "depuis-start debut-exclu"), [0, 5, 10, 14],
                 [0, 998, 1200]),
                ("bitfinex", ("incluses",), [0, 4, 8, 12, 14], [0, 1200])]
-        tronque = ("REFUS CA/format : réponse plafonnée ancrée avant le départ : fin de page tronquée ; actif ETH ; "
-                   "place coinbase")
+        tronque = "REFUS CA/format : demi-page redemandée plafonnée et tronquée ; actif ETH ; place coinbase"
         for place, sems, b_fixture, b_lot in cas:
             for sem in sems:
                 for fixture, n, bornes in ((True, 14, b_fixture), (False, 1200, b_lot)):
                     with self.subTest(place=place, sem=sem, fixture=fixture):
                         fen = {"debut": W0, "fin": W0 + 60 * n}
                         pages = [f"page-{W0 + 60 * a}.json" for a in bornes[:-1]]
+                        if sem == "fin-exclue avant":                # C-8 : page 0 (fixture) ou 1192 (lot) redemandée
+                            p = pages[0 if fixture else -1][:-5]
+                            pages = sorted(pages + [p + ".1.json", p + ".2.json"])
                         attendu = (([], [], []), pages, pages_attendues(bornes, place == "bitstamp"))
                         obtenu = self.acquis(place, sem, fen, fixture)
-                        self.assertEqual(obtenu, tronque if sem in ("tronquee", "fin-exclue avant") else attendu)
+                        self.assertEqual(obtenu, tronque if sem == "tronquee" else attendu)
 
 
 if __name__ == "__main__":

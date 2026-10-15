@@ -221,16 +221,17 @@ def corps(prm: dict, res: dict) -> list:
     return out
 
 
-def completude(prm: dict, actif: str, nom: str, fen: dict, series: dict) -> list:
+def completude(prm: dict, actif: str, nom: str, fen: dict, series: dict, bruts: str) -> list:
     """Minutes reçues sur attendues de chaque place d'un actif sur une fenêtre, au total et par page pour une place
-    paginée (DECISION de FORMES-API-1, pt 5 : une perte systématique se voit) ; jamais décisif."""
+    paginée, avec le nombre de pages redemandées (DECISION de FORMES-API-1, pt 5 ; C-8) ; jamais décisif."""
     out = []
     for p, s in series.items():
         c = bougies.comptes(prm, p, fen, s)
         x = (f"[{actif}] descriptif : minutes reçues sur attendues, {p} ({nom}) : total {sum(r for _a, r, _e in c)}/"
              f"{sum(e for _a, _r, e in c)}")
         if prm["series"][p]["acces"] == "pages":
-            x += " ; par page " + " ; ".join(f"{a} {r}/{e}" for a, r, e in c)
+            n = sum(f.endswith(".1.json") for f in os.listdir(os.path.join(bruts, nom, p, actif)))
+            x += f" ; pages redemandées {n} ; par page " + " ; ".join(f"{a} {r}/{e}" for a, r, e in c)
         out.append(x)
     return out
 
@@ -244,7 +245,7 @@ def septembre(prm: dict, bruts: str, btc: dict, comptes=None) -> list:
             pl = [p for p in socle.lecture(prm)["places"][a] if p not in fen["sans"]]
             ser = {p: bougies.charger(prm, bruts, "descriptive", p, a, fen) for p in pl}
             if comptes is not None:
-                comptes.extend(completude(prm, a, "descriptive", fen, ser))
+                comptes.extend(completude(prm, a, "descriptive", fen, ser, bruts))
             r = calcul_actif(prm, a, ser, fen, btc)
             out.append(f"[{a}] septembre : τ des places {r['places']['tau']} ; σ des places horodatées "
                        f"{r['sigma']['place_horodatee']} s ; τ des agrégateurs {r['agregateurs']['tau']}")
@@ -292,7 +293,7 @@ def main(argv=None, env=None) -> int:
         desc = []                                                   # complétude de septembre (FORMES-API-1)
         lignes = tete + [y for x in socle.ACTIFS for y in descriptifs(prm, x, res[x])] + septembre(prm, a[1], btc, desc)
         lignes += [y for x in socle.ACTIFS for y in completude(prm, x, "principale", prm["fenetre"], {
-            p: series[x, p] for p in lec["places"][x]})] + desc
+            p: series[x, p] for p in lec["places"][x]}, a[1])] + desc
         sorties, code = {"calib_actifs.txt": lignes, "fragment_analyse.json": frag}, 0
     except Exception as e:                                          # jamais une trace : refus nommé, type seul
         r = e if isinstance(e, socle.Refus) else socle.Refus("CA/calcul", f"calcul en échec ({type(e).__name__})")

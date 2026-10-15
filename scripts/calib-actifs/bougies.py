@@ -91,18 +91,35 @@ LECTEURS = {"binance": _binance, "bitfinex": _bitfinex, "bitstamp": _bitstamp, "
             "kraken": _kraken, "okx": _okx}
 
 
+TRONQUEE = "réponse plafonnée ancrée avant le départ : fin de page tronquée"
+INCOHERENTE = "demi-page redemandée plafonnée et tronquée"
+
+
+def tronquee(ts: list, pas: int, depart: int, derniere: int) -> bool:
+    """C-7 : au moins `pas` bougies, une avant `depart`, aucune à `derniere` ou après (fin de réponse coupée)."""
+    return len(ts) >= pas and min(ts) < depart and max(ts) < derniere
+
+
+def suspecte(format_: str, octets: bytes, pas: int, depart: int, derniere: int) -> bool:
+    """C-8 : réponse de page tronquée selon `tronquee` (illisible : non, le chargement la refuse)."""
+    try:
+        return tronquee([t for t, _c, _v in LECTEURS[format_](octets)], pas, depart, derniere)
+    except (Forme, ValueError, KeyError, IndexError, TypeError, zipfile.BadZipFile):
+        return False
+
+
 def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenetres=None, garde=None) -> dict:
     """{minute : (clôture, active)} des fichiers (octets), active = volume > 0 ; hors minute, ligne illisible, double
     dans un fichier : CA/format (E-CA-16). Sans `fenetres` : hors de [debut ; fin) ou double : CA/format. `fenetres`
     [(a, b)] par fichier (FORMES-API-1, pts 2 et 3) : hors de [a ; b) ∩ [debut ; fin) écartée ; minute de deux
     fichiers aux mêmes clôture et volume (chevauchement) gardée une fois, aux valeurs différentes : CA/format. `garde`
     (mois voisins, C-1 de la G2) : une minute hors fenêtre n'est écartée que dans [garde[0] ; garde[1]).
-    Page (a, b, pas, fin) : réponse de `pas` bougies, une avant a, aucune à fin − 60 ou après : CA/format (C-7)."""
+    Page (a, b, pas, départ, dernière, motif) : `tronquee` (C-7, C-8) : CA/format nommé par le motif."""
     out, vals = {}, {}
     try:
         for k, octets in enumerate(fichiers):
             a, b, *plafond = fenetres[k] if fenetres else (fen["debut"], fen["fin"])
-            depart, a, b, vus, ts = a, max(a, fen["debut"]), min(b, fen["fin"]), set(), []
+            a, b, vus, ts = max(a, fen["debut"]), min(b, fen["fin"]), set(), []
             for t, cloture, volume in LECTEURS[format_](octets):
                 c, v = Decimal(cloture), Decimal(volume)
                 ts.append(t)
@@ -119,8 +136,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                     raise _refus("minute en double aux valeurs différentes", place, actif)
                 vus.add(t)
                 out[t] = (c, v > 0)
-            if plafond and len(ts) == plafond[0] and min(ts) < depart and max(ts) < plafond[1] - 60:
-                raise _refus("réponse plafonnée ancrée avant le départ : fin de page tronquée", place, actif)
+            if plafond and tronquee(ts, *plafond[:3]):
+                raise _refus(plafond[3], place, actif)
     except Forme as e:
         raise _refus(str(e), place, actif) from None
     except (ValueError, KeyError, IndexError, TypeError, InvalidOperation, zipfile.BadZipFile) as e:
@@ -153,7 +170,13 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
     if not noms:
         raise _refus("aucun fichier acquis", place, actif)
     if s["acces"] == "pages":
-        plan = {f"page-{a}.json": (dep, borne + 60, s["pas"], b) for a, b, dep, borne in socle.pages(prm, place, fen)}
+        plan = {}
+        for a, b, dep, borne in socle.pages(prm, place, fen):
+            plan[f"page-{a}.json"] = (dep, borne + 60, s["pas"], dep, b - 60, TRONQUEE)
+            if f"page-{a}.1.json" in noms or f"page-{a}.2.json" in noms:          # C-8 : demi-pages redemandées
+                plan[f"page-{a}.json"] = (dep, borne + 60)
+                for k, (dk, bk, dern) in enumerate(socle.demis(prm, place, dep, borne, b), 1):     # filtre de la demi
+                    plan[f"page-{a}.{k}.json"] = (max(dk, dep), min(bk, borne) + 60, s["pas"], dk, dern, INCOHERENTE)
         if set(plan) != set(noms):
             raise _refus("pages différentes du découpage de la fenêtre", place, actif)
         fenetres = [plan[x] for x in noms]

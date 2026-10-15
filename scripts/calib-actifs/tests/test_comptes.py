@@ -25,10 +25,10 @@ class TestComptes(unittest.TestCase):
         lignes = [x for x in texte if "minutes reçues sur attendues" in x] if isinstance(texte, list) else [texte]
         tete = "descriptif : minutes reçues sur attendues, "
         self.assertEqual([lignes[i] for i in (3, 9, 17, 18)] if len(lignes) == 29 else lignes, [
-            f"[ETH] {tete}coinbase (principale) : total 8/10 ; par page 1775260500 8/10",
+            f"[ETH] {tete}coinbase (principale) : total 8/10 ; pages redemandées 0 ; par page 1775260500 8/10",
             f"[USDC] {tete}kraken (principale) : total 8/10",
-            f"[ETH] {tete}bitfinex (descriptive) : total 8/10 ; par page 1788566100 8/10",
-            f"[ETH] {tete}bitstamp (descriptive) : total 10/10 ; par page 1788566100 10/10"])
+            f"[ETH] {tete}bitfinex (descriptive) : total 8/10 ; pages redemandées 0 ; par page 1788566100 8/10",
+            f"[ETH] {tete}bitstamp (descriptive) : total 10/10 ; pages redemandées 0 ; par page 1788566100 10/10"])
 
 
 if __name__ == "__main__":
