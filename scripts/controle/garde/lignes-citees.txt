@@ -11,3 +11,13 @@ JOURNAL.md
 scripts/controle/README.md
 scripts/controle/garde/*
 .claude/agents/*.md
+# Relecture G2 du lot (C-12, Q-10) : documents cités par numéro de ligne dans docs/17-modele-de-menace.md (cas
+# test_c12_documents_cites_par_docs17). biblio/INDEX.md et les workflows, cités aussi, n'y sont pas : une insertion
+# compensée (DT14-a, commis) ou une étape de workflow y seraient refusées sans voie d'admission au diff (limite).
+docs/AUDIT-ENTREE.md
+docs/03-temoignage.md
+docs/04-certificat-diversite.md
+docs/09-vocabulaire.md
+docs/13-temoignage-e2e-design.md
+docs/G1-lot-B0-pool-analyse.md
+CLAUDE.md

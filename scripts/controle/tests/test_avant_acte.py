@@ -17,9 +17,10 @@ GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
-ordinaires) ; C-9 (journal en erreur : sortie 3)."""
+ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17)."""
 import contextlib
 import difflib
+import fnmatch
 import hashlib
 import io
 import os
@@ -112,6 +113,20 @@ class Sceau(Depot):
         j = self.journal()
         self.assertEqual([x[1:] for x in j], [["sceller", "S1", "refus", "-"], ["sceller", "-", "conforme", "-"]])
         self.assertTrue(all(re.fullmatch("20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", x[0]) for x in j))
+
+
+class ListeDesCites(unittest.TestCase):
+    def test_c12_documents_cites_par_docs17(self):
+        """C-12 (Q-10) : chaque document (.md) que docs/17-modele-de-menace.md cite par numéro de ligne suit un motif de
+        garde/lignes-citees.txt, hors interdits (jamais ouverts) et hors biblio/INDEX.md (limite de la relecture G2)."""
+        racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        with open(os.path.join(racine, "docs", "17-modele-de-menace.md"), encoding="utf-8") as f:
+            cites = set(re.findall("([A-Za-z0-9_./-]+[.]md):[0-9]+", f.read())) - {"biblio/INDEX.md"}
+        with open(avant_acte.CITES, encoding="utf-8") as f:
+            motifs = [x.strip() for x in f if x.strip() and not x.startswith("#")]
+        hors = [c for c in sorted(cites) if not avant_acte.GC.chemin_interdit(os.path.join(racine, c))
+                and not any(fnmatch.fnmatchcase(c, m) for m in motifs)]
+        self.assertEqual(hors, [])
 
 
 class Journal(Depot):

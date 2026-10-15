@@ -321,3 +321,10 @@ dépendent des tests du harnais qu'ils importent.
 > (`de 04:10 à 04:22`, `04:10-04:22` : seule la première l'était) ; l'extrait va de la date à l'heure ; une heure
 > approchée écrite en X majuscule (`19:5X`, `21:XX`) est vue. `tests/test_garde_commun.py` compte 17 tests ;
 > plancher du job `controle-unittest` 102.
+
+> *Ajout daté du 2026-10-10 09:06:28 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-12 ; Q-10, erreur E21)* :
+> `garde/lignes-citees.txt` (sha256 `6c4a36213dc765907a9cb3007770ecb935b572ebac31cde112aaa8ec8c2f1398`) :
+> ajout en fin des documents que `docs/17-modele-de-menace.md` cite par numéro de ligne (`docs/AUDIT-ENTREE.md`,
+> docs 03, 04, 09 et 13, `docs/G1-lot-B0-pool-analyse.md`, `CLAUDE.md`) ; `biblio/INDEX.md` et les workflows, cités
+> aussi, restent hors de la liste (limite de la relecture G2). `tests/test_avant_acte.py` compte 33 tests
+> (`test_c12_documents_cites_par_docs17`) ; plancher du job `controle-unittest` 103.
