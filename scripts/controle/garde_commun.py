@@ -9,7 +9,8 @@ une heure écrite HH:Mx ou HH:xx. Une date d'un autre jour n'est pas jugée (éc
 GF-4 : interdits (E19, LA-N08 ; une seule source, jamais un nom de D.2 affiché), racines, analyse des lignes ajoutées
 d'un diff, disque (E4 : refus sous 3 Gio libres, avertissement sous 6, avis Q-13 adopté).
 GF-3 : citations (E16, LA-N08) ; seule la forme stricte « … » (chemin:N) est refusée, les autres formes donnent un
-avertissement compté au journal (avis c.4 adopté), à durcir après mesure."""
+avertissement compté au journal (avis c.4 adopté), à durcir après mesure.
+GF-4b : lignes ajoutées de l'index (git diff --cached), noms d'abord, contenu des seuls chemins admis."""
 import ast
 import fnmatch
 import functools
@@ -136,6 +137,21 @@ def analyser_diff(texte):
                 f["ajouts"].append((n, ligne[1:]))
             n += ligne[0] != "-"
     return fichiers
+
+
+def git(depot, *args, env=None):
+    return subprocess.run(["git", "-C", depot, "-c", "core.quotePath=false", *args], capture_output=True, text=True,
+                          check=True, env=env).stdout
+
+
+def lignes_ajoutees(depot):
+    """Lignes ajoutées de l'index par rapport à HEAD, hors interdits : noms d'abord, puis diff des seuls chemins admis
+    (le contenu d'un interdit n'est jamais lu) ; rend (fichiers analysés, nombre de fichiers écartés)."""
+    noms = [x for x in git(depot, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD").split(chr(0)) if x]
+    admis = [x for x in noms if not chemin_interdit(os.path.join(depot, x))]
+    texte = git(depot, "diff", "--cached", "--no-renames", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--",
+                *[":(literal)" + x for x in admis]) if admis else ""
+    return analyser_diff(texte), len(noms) - len(admis)
 
 
 def etat_disque(chemin="/", min_gio=None):

@@ -2,7 +2,8 @@
 réelle reproduite, verts sur le cas sain. GF-1 : horloge et heures. E14 : vers 04:18 et 04:22 écrits à 04:14 ; le
 2026-10-02 : une heure écrite 19:5x. L'horloge est fixée par un faux `date` dans le PATH, jamais par une variable.
 GF-4 : interdits (E19, LA-N08), racines, analyse d'un diff, disque (E4 : 222 Mio vus par un agent).
-GF-3 : citations (E16 : citation inexacte d'une ligne du JOURNAL ; LA-N08 : citation d'un interdit)."""
+GF-3 : citations (E16 : citation inexacte d'une ligne du JOURNAL ; LA-N08 : citation d'un interdit).
+GF-4b : lignes ajoutées de l'index, dans un dépôt git temporaire (tests/aide_garde.py), sans lire un interdit."""
 import collections
 import os
 import tempfile
@@ -11,6 +12,7 @@ from datetime import datetime, timezone
 from unittest import mock
 
 import garde_commun as gc
+from tests import aide_garde as ag
 
 
 def ag_ecrire(d, fichiers):
@@ -101,6 +103,19 @@ class Interdits(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.assertFalse(gc.racine_dangereuse(d))
         self.assertFalse(gc.racine_dangereuse(os.path.join(r, "scripts", "controle")))
+
+    def test_lignes_ajoutees_sans_interdit(self):
+        """Fichier interdit indexé dans un dépôt temporaire : son contenu n'est jamais lu ; numéros des lignes."""
+        with tempfile.TemporaryDirectory() as t:
+            d, env = ag.depot(t, {"a.md": NL.join(["un", "deux", ""])})
+            ag.ecrire(d, {"a.md": NL.join(["un", "neuf", "deux", "fin", ""]), "docs/rapports/r.md": "MARQUE"})
+            ag.git(d, env, "add", "-A")
+            with mock.patch.dict(os.environ, env, clear=True):
+                fichiers, caches = gc.lignes_ajoutees(d)
+        self.assertEqual(caches, 1)
+        self.assertEqual([(f["apres"], f["ajouts"]) for f in fichiers], [("a.md", [(2, "neuf"), (4, "fin")])])
+        self.assertEqual([b[:4] for b in fichiers[0]["blocs"]], [(1, 0, 2, 1), (2, 0, 4, 1)])
+        self.assertNotIn("MARQUE", repr(fichiers))
 
     def test_analyse_diff_de_worker(self):
         """Diff à trois lignes de contexte : lignes ajoutées numérotées, blocs, fichier nouveau ; un --- dans un bloc

@@ -118,3 +118,11 @@ dépendent des tests du harnais qu'ils importent.
 > `ALIAS` : JOURNAL, annexe B, ADR-0028) : avertissement compté (`citation-libre`, `citation-libre-absente`), à durcir
 > après mesure (avis c.4 adopté). `tests/test_garde_commun.py` compte 14 tests ; plancher du job `controle-unittest`
 > 56.
+
+> *Ajout daté du 2026-10-10 05:58:57 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-4b, suite de GF-4)* : `garde_commun.py`
+> (sha256 `a7237b2cfc5835b3ff8f6b363f0c924b84825795b7d8c79835e5f641ade3c998`) : `lignes_ajoutees(depot)`, lignes
+> ajoutées de l'index par rapport à HEAD (`git diff --cached -U0`), noms d'abord puis diff des seuls chemins admis :
+> le contenu d'un fichier interdit n'est jamais lu ; rend aussi le nombre de fichiers écartés. `tests/aide_garde.py` :
+> dépôts git temporaires isolés de la configuration de l'hôte (ni configuration globale ni système : ni crochet ni
+> signature), jamais le dépôt du projet. `tests/test_garde_commun.py` compte 15 tests ; plancher du job
+> `controle-unittest` 57.
