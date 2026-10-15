@@ -54,9 +54,9 @@ def commandes(o):
             "getent passwd intervention", "useradd --user-group --create-home --shell /bin/bash intervention",
             "chown -R intervention:intervention /home/intervention/.ssh",
             "chown root:shogen /etc/shogen/observateur.conf", "sshd -t", "systemctl try-reload-or-restart ssh.service",
-            "systemctl enable apt-daily.timer apt-daily-upgrade.timer",
+            "systemctl enable --now apt-daily.timer apt-daily-upgrade.timer",
             *("getent ahostsv4 " + n for n in [*NTP, "u1.your-storagebox.de"]), "nft -c -f /etc/nftables.conf",
-            "systemctl enable nftables.service", "systemctl restart nftables.service"]
+            "systemctl enable nftables.service", "systemctl reload-or-restart nftables.service"]
 
 
 def pare_feu(texte):
@@ -315,7 +315,8 @@ class PremierDemarrage(Essai):
                 self.assertIn("PARE-FEU/résolution : " + nom, erreur)
                 self.assertEqual(self.fichiers(racine) & {"etc/nftables.conf", "etc/nftables.d/shogen-observateur.nft"},
                                  set())
-                self.assertNotIn("systemctl restart nftables.service", self.journal(racine))
+                self.assertEqual([c for c in self.journal(racine) if c.startswith("nft ") or "nftables.service" in c],
+                                 [])
 
 
 if __name__ == "__main__":

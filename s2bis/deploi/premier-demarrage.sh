@@ -152,7 +152,7 @@ APT::Periodic::Unattended-Upgrade "1";
 Unattended-Upgrade::Origins-Pattern { "origin=Debian,codename=trixie-security,label=Debian-Security"; };
 Unattended-Upgrade::Automatic-Reboot "false";
 EOF
-    systemctl enable apt-daily.timer apt-daily-upgrade.timer
+    systemctl enable --now apt-daily.timer apt-daily-upgrade.timer      # actives sans attendre un redémarrage
 }
 
 adresses() {    # adresses IPv4 du nom $1 par le résolveur du système, jointes par des virgules ; refus si aucune
@@ -236,7 +236,7 @@ add element inet shogen sauvegarde { $sauvegarde }
 EOF
     nft -c -f "$R/etc/nftables.conf"
     systemctl enable nftables.service
-    systemctl restart nftables.service
+    systemctl reload-or-restart nftables.service    # actif : rechargement atomique (restart viderait le jeu)
 }
 
 etape() { echo "premier-demarrage : étape $1"; "etape_$1"; }
