@@ -255,6 +255,11 @@ class PremierDemarrage(Essai):
     def test_tdp1_sources_https_et_trousseau(self):
         bloc = "Types: deb{0}URIs: https://deb.debian.org/{1}{0}Suites: {2}{0}Components: main{0}Signed-By: {3}{0}"
         sans = {k: v for k, v in IMAGE.items() if not k.startswith("usr/")}
+        sans.update({"etc/apt/sources.list.d/debian.sources": "Types: deb" + NL + "URIs: http://miroir.example/debian"
+                     + NL + "Suites: trixie trixie-updates" + NL + "Components: main" + NL,   # image Debian 13 (deb822)
+                     "etc/apt/sources.list.d/fournisseur.sources": "Types: deb" + NL + "URIs: http://agent.example/apt"
+                     + NL + "Suites: stable" + NL + "Components: main" + NL})
+        desactives = [c for c in sans if c.startswith("etc/apt/") and not c.endswith("/debian.sources")]
         for ext in ("pgp", "gpg"):
             with self.subTest(ext=ext):
                 cle = "/usr/share/keyrings/debian-archive-keyring." + ext
@@ -262,8 +267,10 @@ class PremierDemarrage(Essai):
                 self.assertEqual(code, 0)
                 self.assertEqual(self.lire(racine, "etc/apt/sources.list.d/debian.sources"), bloc.format(
                     NL, "debian", "trixie", cle) + NL + bloc.format(NL, "debian-security", "trixie-security", cle))
-                self.assertEqual([self.lire(racine, c + ".disabled") for c in sans if c.startswith("etc/apt/")],
-                                 [IMAGE["etc/apt/sources.list"], IMAGE["etc/apt/sources.list.d/fournisseur.list"]])
+                self.assertEqual({c: self.lire(racine, c + ".disabled") for c in desactives},
+                                 {c: sans[c] for c in desactives})
+                self.assertEqual({c for c in self.fichiers(racine) if c.startswith("etc/apt/sources.list")},
+                                 {c + ".disabled" for c in desactives} | {"etc/apt/sources.list.d/debian.sources"})
         code, sortie, erreur, racine = self.lancer(self.parametres("o2"), sans)
         self.assertEqual((code, self.journal(racine), self.fichiers(racine)), (3, [], set(sans)))
         self.assertIn("APT/trousseau", erreur)
