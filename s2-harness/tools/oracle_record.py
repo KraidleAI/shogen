@@ -35,7 +35,9 @@ Limites : celle d'AMORCE (un test qui altère unittest dans son processus forge 
 écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture.
 SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : l'extraction n'écrit ni ne hache aucun fichier d'un emplacement
 interdit des briefs (prédicat `interdit` de INTERDITS, liste unique, jamais recopiée) ; tree.exclus consigne leur
-nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte."""
+nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte. SHOGEN-S2BIS-ANALYSEUR-
+RESIDUS-1 (lot DETTES-T7, faille LC-03 du run 38015225784) : la ligne d'un job n'est lue que si le gates.yml n'a aucun
+résidu (`residus` de VERIF) et que le job suit la forme K (`gabarit` de VERIF, celui du cas K-02 du runner)."""
 from __future__ import annotations
 
 import argparse
@@ -199,13 +201,20 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     N », une seule fois dans les blocs `run:` des étapes admises du job, lue par `lignes_du_job` de VERIF (étapes
     `if:` et `continue-on-error` exclues, `name: >` jamais lu). Job absent, ligne absente ou répétée, analyseur
     illisible, plancher 0 ou à zéro de tête (N suit `[1-9][0-9]*`, comme K-02 du runner : C-5 (a) de la relecture
-    d'intégration de P1) : ValueError (refus). Toute exception au chargement est rattrapée et nommée (OUT-1b)."""
+    d'intégration de P1) : ValueError (refus). Toute exception au chargement est rattrapée et nommée (OUT-1b).
+    ANALYSEUR-RESIDUS-1 : avant toute lecture, `residus` de VERIF vide (N-12, N-14, LC-02, LC-13) et job à la forme K
+    (`gabarit` de VERIF) ; sinon refus qui nomme chaque écart."""
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
             texte = f.read()
     except BaseException as e:
         raise ValueError(f"{GATES} de l'extraction illisible ({e!r}) — refus") from e
     analyseur = charger_verif()
+    ecarts = analyseur.residus(texte) + ([] if analyseur.gabarit(texte, job) else [
+        "forme K : lignes du job hors du gabarit de VERIF (cas K-02 du runner : name, runs-on, timeout-minutes, steps, "
+        "checkout épinglé, runner, étape du vérificateur puis son seul bloc)"])
+    if ecarts:
+        raise ValueError(f"job {job} de {GATES} : {' ; '.join(ecarts)} — refus")
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
              + " --aucun-saut --egal --plancher [1-9][0-9]*")      # C-5 (a) : plancher 0 refusé, comme K-02
     trouves = analyseur.lignes_du_job(texte, job, motif)

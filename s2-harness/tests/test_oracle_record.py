@@ -41,6 +41,17 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
 BANNI = "claude-opus-" + "5"                    # construit à l'exécution, comme dans le lint (aucun littéral)
 STUB = b"import sys\nprint('argv', sys.argv[1:])\n"    # tools/rendu_unique.py de fixture : imprime ses arguments
+SONDES = os.path.join(os.path.dirname(HARNESS), "enforcement", "tests", "fixtures", "sondes-forge")   # DETTES-T7
+
+
+def forme_k(nom: str) -> list:
+    """Job `nom` à la forme K (gabarit du cas K-02 du runner, écrit ici à la main ; SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1),
+    jusqu'à l'étape du runner comprise ; fetch-depth: 0 dans le seul job sim-bis-unittest."""
+    return [f"  {nom}:", f"    name: {nom}", "    runs-on: ubuntu-24.04", "    timeout-minutes: 10", "    steps:",
+            "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1", "        with:",
+            "          persist-credentials: false", *["          fetch-depth: 0"][:nom == "sim-bis-unittest"],
+            "      - name: cas", "        shell: bash",
+            "        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"]
 
 
 def g(d: str, *args: str, entree: bytes = None) -> str:
@@ -438,7 +449,8 @@ class TestOracleRecord(unittest.TestCase):
         vérificateur de s2bis présente dans le seul job suivant (C-2 de la G2 de la tranche C), leurres C1 (ligne dans
         un bloc `name: >`) et C4 (ligne dans une étape `if: false`), la vraie ligne étant affaiblie
         (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1), plancher 0 ou à zéro de tête (C-5 (a) de la relecture d'intégration de P1,
-        comme K-02 du runner) : refus avant toute écriture ; la CLI admet les deux noms. Rougit si : noms
+        comme K-02 du runner), job sim-bis sans fetch-depth: 0 (forme K, DETTES-T7) : refus avant toute écriture ; la
+        CLI admet les deux noms. Rougit si : noms
         hors liste fermée, ligne recopiée dans l'outil, autre job (MR-24 : lecture au-delà du job) ou autre suite lus,
         ligne lue hors d'un bloc `run:` ou dans une étape `if:`, ligne répétée admise, refus après écriture."""
         self.assertLessEqual({"suite-s2bis", "suite-sim-bis"}, set(orc.COMMANDES))      # liste fermée, étendue
@@ -449,8 +461,8 @@ class TestOracleRecord(unittest.TestCase):
         etape, faible = ["        shell: bash", "        run: |"], v.format("s2bis", 0).replace(" --egal", "")
 
         def gates(p1, p2, n1=1, apres=(), bis=None):               # lignes du vérificateur des deux jobs
-            return chr(10).join(["jobs:", "  s2bis-unittest:", "    steps:", *(bis or ["      - name: suite", *etape, *[
-                v.format("s2bis", p1)] * n1]), "  sim-bis-unittest:", "    steps:", "      - name: suite", *etape,
+            return chr(10).join(["jobs:", *forme_k("s2bis-unittest"), *(bis or ["      - name: suite", *etape, *[
+                v.format("s2bis", p1)] * n1]), *forme_k("sim-bis-unittest"), "      - name: suite", *etape,
                                  v.format("scripts/sim-bis", p2), *apres, ""]).encode()
         base = {"enforcement/verdict-suite-s2.py": verif, **{f"{x}/tests/{n}": c for x in (
             "s2bis", "scripts/sim-bis", "s2-harness") for n, c in (("__init__.py", b""), ("test_t.py", T))}}
@@ -461,9 +473,10 @@ class TestOracleRecord(unittest.TestCase):
                               "      - name: suite", *etape, faible])
         complaisant = chr(10).join(["import re", "lignes_du_job = lambda t, j, m: [x.strip() for x in t.split(chr(10))"
                                     " if re.fullmatch(m, x.strip())]", ""]).encode()   # analyseur complaisant du commit
-        ok, ko, double, sans, mauvaise, suivant, zero, zero7, leurre1, leurre4 = depot(dep, [
+        sans_fetch = gates(1, 1).replace(b"          fetch-depth: 0" + bytes([10]), b"")   # forme K de s2bis (DT7)
+        ok, ko, double, sans, mauvaise, suivant, zero, zero7, fetch, leurre1, leurre4 = depot(dep, [
             {**base, ".github/workflows/gates.yml": g} for g in (gates(1, 1), gates(2, 1), gates(1, 1, 2), gates(
-                1, 1).split(b"  sim-bis")[0], autre, loin, gates(0, 1), gates(1, "07"))] + [
+                1, 1).split(b"  sim-bis")[0], autre, loin, gates(0, 1), gates(1, "07"), sans_fetch)] + [
                 {**base, ".github/workflows/gates.yml": c1, "enforcement/verdict-suite-s2.py": complaisant},
                 {**base, ".github/workflows/gates.yml": c4}])
         chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
@@ -482,7 +495,7 @@ class TestOracleRecord(unittest.TestCase):
         avant = sorted(os.listdir(d))
         for commit, c in ((double, "suite-s2bis"), (sans, "suite-sim-bis"), (mauvaise, "suite-s2bis"),
                           (suivant, "suite-s2bis"), (leurre1, "suite-s2bis"), (leurre4, "suite-s2bis"),
-                          (zero, "suite-s2bis"), (zero7, "suite-sim-bis")):
+                          (zero, "suite-s2bis"), (zero7, "suite-sim-bis"), (fetch, "suite-sim-bis")):
             with self.subTest(commande=c), self.assertRaisesRegex(ValueError, "— refus$"):
                 orc.enregistrer(d, "cp-2", "claude-opus-5-5", dep, commit, ("suite", c))
         self.assertEqual(sorted(os.listdir(d)), avant)
@@ -503,7 +516,7 @@ class TestOracleRecord(unittest.TestCase):
         exception au chargement non rattrapée ou non nommée."""
         d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-verif"), "claude-opus-5-5"
         cle, verif, nl = "enforcement/verdict-suite-s2.py", Path(orc.VERIF).read_bytes(), chr(10)
-        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+        gates = nl.join(["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash",
                          "        run: |", "          python3 -B " + cle + " s2bis --aucun-saut --egal --plancher 1",
                          ""]).encode()
         faux = nl.join(["import sys", "print('verdict-suite-s2 : conforme')", "sys.exit(0)", ""]).encode()   # L2
@@ -543,6 +556,50 @@ class TestOracleRecord(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"UnicodeDecodeError.* — refus$"):
             orc.ligne_du_job(arbre, "s2bis-unittest", "s2bis")
 
+    def test_ligne_du_job_forme_k_et_residus_nommes(self):
+        """SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1 (lot DETTES-T7 ; épreuve de forge du 2026-10-10) : ligne_du_job exige la
+        forme K (gabarit de VERIF, cas K-02 du runner) et nomme chaque résidu ; les huit sondes (octets épinglés par le
+        sha256 de leur SHA256SUMS) ne sont pas à la forme K : refus `forme K` pour chacune, dont LC-03, faille du run
+        38015225784 (vert à 3 étapes, vérificateur avalé), plus N-12, N-14, LC-02 et LC-13 nommés ; à la forme K, LC-08
+        admis (run 38015225738), N-12, N-14, LC-02, LC-13 et LC-03 refusés. Rougit si : forme K non exigée, résidu non
+        nommé, sonde changée."""
+        d, nl = tempfile.mkdtemp(dir=self.d), chr(10)
+        gy = Path(d, ".github", "workflows", "gates.yml")
+        gy.parent.mkdir(parents=True)
+        sommes = Path(SONDES, "SHA256SUMS").read_bytes()
+        self.assertEqual(hashlib.sha256(sommes).hexdigest(),
+                         "675057da601f26d08680c8e4c378414bd1073aa29723c50da0e5d5ac78077846")
+        for ligne in sommes.decode().splitlines():                              # sommes du plan des sondes
+            self.assertEqual(hashlib.sha256(Path(SONDES, ligne[66:]).read_bytes()).hexdigest(), ligne[:64])
+        for sonde, motifs in (("t00-temoin", []), ("n12-cle-guillemets", ["N-12 : l.42 "]),    # runs : README
+                              ("n14-controle-us", ["N-14 : "]), ("l02-commentaire-set-e", ["LC-02 : l.39 "]),
+                              ("l03-etape-avalee", []), ("l08-timeout-600", []),
+                              ("l13-ancre-alias", ["LC-13 : l.8 ", "LC-13 : l.10 "]),
+                              ("an1-ancre-valide", ["LC-13 : l.8 ", "LC-13 : l.38 "])):
+            gy.write_bytes(Path(SONDES, f"sonde-{sonde}.yml").read_bytes())
+            with self.subTest(sonde=sonde):
+                with self.assertRaises(ValueError) as e:
+                    orc.ligne_du_job(d, "s2bis-unittest", "s2bis")
+                self.assertEqual([m in str(e.exception) for m in motifs + ["forme K :"]], [True] * (len(motifs) + 1))
+        ligne = "          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 7"
+        k = ["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash", "        run: |", ligne]
+        for nom, lignes, motif in (("témoin", k, None), ("LC-08", k[:4] + ["    timeout-minutes: 600"] + k[5:], None),
+                                   ("N-12", k + ['  "s2bis-unittest":', "    steps:"], "N-12 : "),
+                                   ("N-12 répété", k + ["  s2bis-unittest:", "    steps:"], "N-12 : "),
+                                   ("N-14", k[:2] + [k[2] + chr(31)] + k[3:], "N-14 : "),
+                                   ("U+2028", k[:2] + [k[2] + chr(8232)] + k[3:], "N-14 : "),
+                                   ("LC-02", k + ["        # c", "          set +e"], "LC-02 : "),
+                                   ("LC-13", k[:2] + ["    name: &n s2bis-unittest"] + k[3:], "LC-13 : "),
+                                   ("LC-03", k[:12] + ['      - name: "suite'] + k[13:] + ['      - name: fin"'],
+                                    "forme K :")):
+            gy.write_text(nl.join(lignes) + nl, encoding="utf-8")
+            with self.subTest(forme=nom):
+                if motif is None:
+                    self.assertEqual(orc.ligne_du_job(d, "s2bis-unittest", "s2bis"), ligne.split()[1:])
+                    continue
+                with self.assertRaisesRegex(ValueError, f"^job s2bis-unittest de .*{motif}.* — refus$"):
+                    orc.ligne_du_job(d, "s2bis-unittest", "s2bis")
+
     def test_racine_de_suite_qui_masque_la_bibliotheque_standard(self):
         """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : un unittest.py à la racine d'une suite, qui
         imprime un résumé conforme et sort en 0, masquerait le module standard pour -m unittest. Commande `suite`
@@ -555,7 +612,7 @@ class TestOracleRecord(unittest.TestCase):
         d, dep, a, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-masque"), "claude-opus-5-5", chr(10)
         leurre = nl.join(["import sys", "sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 1 test in 0.001s' + "
                           "chr(10) * 2 + 'OK' + chr(10))", "sys.exit(0)", ""]).encode()      # résumé conforme forgé
-        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+        gates = nl.join(["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash",
                          "        run: |", "          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut "
                          "--egal --plancher 1", ""]).encode()
         s2, s2bis = depot(dep, [{**KO, "s2-harness/unittest.py": leurre}, {
@@ -639,7 +696,8 @@ class TestOracleRecord(unittest.TestCase):
     def test_verificateur_de_l_outil_lu_dans_sa_source(self):
         """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : ligne_du_job exécute VERIF depuis sa source ; un .pyc à
         invalidation non vérifiée posé dans son __pycache__ (analyseur complaisant) est ignoré : job absent du
-        gates.yml, refus. Rougit si : VERIF chargé par le chargeur d'import (exec_module), qui lit ce .pyc."""
+        gates.yml, refus (forme K, DETTES-T7). Rougit si : VERIF chargé par le chargeur d'import (exec_module), qui lit
+        ce .pyc."""
         d, nl = tempfile.mkdtemp(dir=self.d), chr(10)
         v, src = os.path.join(d, "enforcement", "verdict-suite-s2.py"), os.path.join(d, "complaisant.py")
         os.makedirs(os.path.join(d, "arbre", ".github", "workflows"))
@@ -650,7 +708,7 @@ class TestOracleRecord(unittest.TestCase):
                              encoding="utf-8")
         py_compile.compile(src, importlib.util.cache_from_source(v), doraise=True,
                            invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
-        with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest absent"):
+        with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest de .*forme K"):
             orc.ligne_du_job(os.path.join(d, "arbre"), "s2bis-unittest", "s2bis")
 
     def test_verifier_refuse_un_arbre_qui_porte_un_masque(self):
