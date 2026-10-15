@@ -6,7 +6,8 @@ passes » contre deux ; verdicts, identifiants et sha courts lus dans les source
 GF-6 : commit C4 (E14, heures), C5 (E16, citations), C6 (LA-N04, index égal aux diffs nommés), C7 (E21, aucun bloc
 qui décale une ligne d'un fichier cité par numéro), C9 (Diff-Id).
 GF-6b : C8 (E1, workflows lus en YAML) ; diff d'un worker reçu avant la G2 : E21, E14, E16, E9 (presg5), E1,
-interdits, diff qui ne s'applique pas sur la tête."""
+interdits, diff qui ne s'applique pas sur la tête.
+GF-7 : verser (E9 : messages d'outils anglais entre guillemets, S-G5 ; E10 : adjudication versée en double)."""
 import contextlib
 import hashlib
 import io
@@ -48,6 +49,12 @@ class Depot(unittest.TestCase):
     def indexer(self, fichiers):
         ag.ecrire(self.d, fichiers)
         ag.git(self.d, self.env, "add", "-A")
+
+    def horloge(self, iso):
+        """Horloge fixée par un faux `date` en tête du PATH."""
+        ag.ecrire(os.path.join(self.tmp, "faux"), {"date": "#!/bin/sh" + NL + "echo " + iso + NL})
+        os.chmod(os.path.join(self.tmp, "faux", "date"), 0o755)
+        os.environ["PATH"] = os.path.join(self.tmp, "faux") + os.pathsep + os.environ["PATH"]
 
     def journal(self):
         with open(os.path.join(self.d, ".git", "shogen-garde", "journal.tsv"), encoding="utf-8") as f:
@@ -275,3 +282,50 @@ class DiffDeWorker(Source):
         self.indexer({"JOURNAL.md": NL.join(["autre", "l2", "l3", "l4", "l5", ""])})
         ag.git(self.d, self.env, "commit", "-q", "-m", "autre")
         self.assertEqual(self.lancer("diff", "--fichier", self.w)[1][:9], "REFUS D2 ")
+
+
+class Versement(Depot):
+    ADJ = "Adjudication de l'orchestrateur, section datée. " * 12
+
+    def setUp(self):
+        super().setUp()
+        ag.ecrire(self.d, {"biblio/INDEX.md": "# index" + NL})
+        self.p = os.path.join(self.tmp, "versement", "revue-x")
+
+    def verser(self, pieces, sommes=None):
+        """Pièces écrites dans un dossier du scratchpad, SHA256SUMS écrit depuis le dossier (forme exigée), sauf
+        `sommes` donné."""
+        shutil.rmtree(self.p, ignore_errors=True)
+        ag.ecrire(self.p, pieces)
+        if sommes is None:
+            sommes = "".join(f"{hashlib.sha256(x.encode()).hexdigest()}  {n}" + NL for n, x in sorted(pieces.items()))
+        ag.ecrire(self.p, {"SHA256SUMS": sommes})
+        return self.lancer("verser", "--pieces", self.p)
+
+    def test_e9_e10(self):
+        """E9 : message d'outil anglais entre guillemets dans une pièce : refus G5 ; E10 : adjudication versée deux
+        fois (même sha256, ou copie entière dans une autre pièce) : refus V2 ; pièces saines : sortie 0."""
+        self.assertEqual(self.verser({"ADJUDICATION-extrait.md": self.ADJ, "G2-transcrit.md": "Relecture G2." + NL}),
+                         (0, ""))
+        e9 = chr(171) + " fatal: not a git repository (or any of the parent directories) " + chr(187)
+        code, sortie = self.verser({"G2-transcrit.md": "Refus : " + e9 + NL})
+        self.assertEqual((code, sortie[:47]), (1, "REFUS G5 : G2-transcrit.md:1 : fatal: not a git"))
+        code, sortie = self.verser({"ADJUDICATION-extrait.md": self.ADJ, "G2-transcrit.md": "# G2" + NL + self.ADJ})
+        self.assertEqual((code, sortie[:9]), (1, "REFUS V2 "))
+        self.assertEqual(self.verser({"a.md": "court", "b.md": "court"})[1][:9], "REFUS V2 ")
+        self.assertEqual(self.verser({"a.md": self.ADJ[:400], "b.md": "x " + self.ADJ[:400]}), (0, ""))
+
+    def test_sommes_chemins_heures(self):
+        """V4 : SHA256SUMS écrit avec ./, ligne fausse, pièce non listée, absent : refus ; V3 : chemin absolu du
+        scratchpad dans une pièce : refus ; heure future (C4) ; fichier sous un interdit : refus sans le nommer."""
+        h = hashlib.sha256(b"x").hexdigest()
+        for pieces, sommes in [({"a.md": "x"}, h + "  ./a.md" + NL), ({"a.md": "y"}, h + "  a.md" + NL),
+                               ({"a.md": "x", "b.md": "y"}, h + "  a.md" + NL)]:
+            self.assertEqual(self.verser(pieces, sommes)[1][:9], "REFUS V4 ", sommes)
+        os.remove(os.path.join(self.p, "SHA256SUMS"))
+        self.assertEqual(self.lancer("verser", "--pieces", self.p)[1][:9], "REFUS V4 ")
+        self.assertEqual(self.verser({"a.md": "voir /tmp/claude-0/projet/session/scratchpad/x"})[1][:9], "REFUS V3 ")
+        self.horloge("2026-10-10T04:14:00Z")
+        self.assertEqual(self.verser({"a.md": "le 2026-10-10 04:22"})[1][:9], "REFUS C4 ")
+        code, sortie = self.verser({"docs/rapports/r.md": "x"})
+        self.assertEqual((code, sortie[:9], "rapports" in sortie), (1, "REFUS V0 ", False))

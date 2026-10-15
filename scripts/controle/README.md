@@ -166,3 +166,12 @@ dépendent des tests du harnais qu'ils importent.
 > tête (base ancienne) ; puis, sur HEAD plus le diff dans un index temporaire : C4, C5 et `presg5.py` (G5) sur les
 > lignes ajoutées des `.md`, C7 sur les fichiers cités, C8. `tests/test_avant_acte.py` compte 13 tests ; plancher du
 > job `controle-unittest` 70.
+
+> *Ajout daté du 2026-10-10 06:27:44 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-7 ; erreurs E9 et E10)* :
+> `avant_acte.py` (sha256 `d3a7a718485c61e5f2af36179c0d61ce9380af901fe9856d1175b3945acbea77`) : `verser --pieces
+> DOSSIER`, à lancer avant `xtask` sur les pièces d'un versement : V0, fichier sous un interdit (ni lu ni nommé) ; V2,
+> deux pièces de même sha256, ou une pièce `.md` (500 caractères pliés ou plus) contenue en entier dans une autre ;
+> V3, chemin absolu du scratchpad ; V4, chaque `SHA256SUMS` rejoué par `verifier()` de
+> `enforcement/docs-sha256sums.py` (forme de la gate : chemin relatif, sans `./`), présent à la racine du dossier,
+> chaque pièce listée ; puis C4, C5 et `presg5.py` (G5) sur les pièces `.md`. `tests/test_avant_acte.py` compte 15
+> tests ; plancher du job `controle-unittest` 72.

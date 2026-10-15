@@ -23,7 +23,11 @@ garde/lignes-citees.txt, sauf ligne Décalage admis : <chemin> du message, journ
 GF-6b : C8, un workflow touché : enforcement/workflows-yaml.py du dépôt lit les workflows de l'index (sortie 1 : refus ;
 absent ou autre sortie : erreur ; E1). diff --fichier F, à la réception d'un diff de worker, avant la G2 (avis b.2) :
 D1, fichier sous un interdit (ni lu ni nommé) ; D2, diff qui ne s'applique pas sur HEAD ; puis C4, C5 et presg5 (G5,
-E9) sur les lignes ajoutées des .md, C7 (E21), C8 sur les workflows de HEAD plus le diff."""
+E9) sur les lignes ajoutées des .md, C7 (E21), C8 sur les workflows de HEAD plus le diff.
+GF-7 : verser --pieces DOSSIER, avant xtask (E9, E10) : V0, fichier sous un interdit (ni lu ni nommé) ; V2, deux pièces
+de même sha256, ou une pièce .md (500 caractères pliés ou plus) contenue en entier dans une autre ; V3, chemin absolu
+du scratchpad ; V4, chaque SHA256SUMS rejoué par verifier() de enforcement/docs-sha256sums.py (forme de la gate),
+présent à la racine du dossier, chaque pièce listée ; puis C4, C5 et presg5 (G5) sur les pièces .md entières."""
 import argparse
 import fnmatch
 import hashlib
@@ -35,10 +39,10 @@ import sys
 import tempfile
 
 
-def _module(nom):
-    """Module frère chargé par son chemin : sous -I, le dossier du script n'est pas dans sys.path."""
-    spec = importlib.util.spec_from_file_location(nom, os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                                                    nom + ".py"))
+def _module(nom, chemin=None):
+    """Module chargé par son chemin (frère par défaut) : sous -I, le dossier du script n'est pas dans sys.path."""
+    chemin = chemin or os.path.join(os.path.dirname(os.path.abspath(__file__)), nom + ".py")
+    spec = importlib.util.spec_from_file_location(nom, chemin)
     m = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(m)
     return m
@@ -275,7 +279,51 @@ def diff(a, fautes):
         workflows(a.depot, fichiers, fautes, env)
 
 
-COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff}
+
+def verser(a, fautes):
+    racine = os.path.abspath(a.pieces)
+    if not os.path.isdir(racine) or GC.chemin_interdit(racine):
+        raise Erreur("dossier de pièces absent ou interdit (non lu)")
+    pieces, ecartes = {}, 0
+    for base, dossiers, fichiers in os.walk(racine):
+        dossiers.sort()
+        for x in sorted(fichiers):
+            if GC.chemin_interdit(os.path.join(base, x)):
+                ecartes += 1
+            else:
+                pieces[os.path.relpath(os.path.join(base, x), racine)] = lire(os.path.join(base, x))
+    if ecartes:
+        fautes.append(("refus", "V0", f"{ecartes} fichier(s) sous un interdit : ni lus ni nommés", "les retirer", "-"))
+    vues, md = {}, {r: b.decode("utf-8") for r, b in pieces.items() if r.endswith(".md")}
+    for r, b in pieces.items():
+        h = hashlib.sha256(b).hexdigest()
+        if h in vues:
+            fautes.append(("refus", "V2", f"{r} et {vues[h]} ont le même sha256 (E10)", "verser chaque pièce une fois",
+                           "-"))
+        vues.setdefault(h, r)
+    plies = {r: GC.plier(x) for r, x in md.items()}
+    for r1, t1 in plies.items():
+        for r2 in [r2 for r2, t2 in plies.items() if r2 != r1 and len(t1) >= 500 and t1 in t2]:
+            fautes.append(("refus", "V2", f"{r1} est contenu en entier dans {r2} (E10)",
+                           "verser la source entière une fois, sans copie dans une autre pièce", "-"))
+    for r in [r for r, b in pieces.items() if b"/tmp/claude-" in b]:
+        fautes.append(("refus", "V3", f"{r} porte un chemin absolu du scratchpad", "l'abréger en <scratchpad>", "-"))
+    if "SHA256SUMS" not in pieces:
+        fautes.append(("refus", "V4", "SHA256SUMS absent du dossier", "l'écrire depuis le dossier : sha256sum <pièces>",
+                       "-"))
+    ds = _module("docs_sha256sums", os.path.join(GC.RACINE_OUTILS, "enforcement", "docs-sha256sums.py"))
+    parent, nom = os.path.split(racine)
+    for s in [r for r in pieces if os.path.basename(r) == "SHA256SUMS"]:
+        motifs = []
+        non_listes = ds.verifier(parent, (nom + "/" + s).replace(os.sep, "/"), motifs)[2]
+        motifs += [f"{non_listes} pièce(s) non listée(s) dans {s}"] if non_listes else []
+        fautes += [("refus", "V4", m, "écrire SHA256SUMS depuis le dossier : sha256sum <pièces>", "-") for m in motifs]
+    textes = sorted(md.items())
+    heures_et_citations(a.depot, textes, fautes)
+    presg5(a.depot, textes, fautes)
+
+
+COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser}
 
 
 def journal(a, fautes):
@@ -300,6 +348,7 @@ def main(argv=None):
     c.add_argument("--diff", action="append", default=[])
     c.add_argument("--id")
     sp.add_parser("diff").add_argument("--fichier", required=True)
+    sp.add_parser("verser").add_argument("--pieces", required=True)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:
