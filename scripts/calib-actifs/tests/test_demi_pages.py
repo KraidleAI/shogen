@@ -3,8 +3,8 @@ suspecte de troncature (C-7) est redemandée en deux demi-pages au même débit 
 demi-réponses sont absentes en vérité ; refus nommé si une demi-réponse est elle-même plafonnée et tronquée. Serveur
 local, Coinbase simulée par un plafond de 30 bougies ancré `g` minutes avant start (échangées de start − g à end,
 croissantes, les 30 premières), au-delà de la lecture couverte par C-9 (g > 15). Fixture : pas 30, chevauchement 1,
-15 créneaux par page (C-9), 13 minutes utiles, 26 minutes en deux pages ; demi-pages à la main : page 0 (départ −1,
-borne 13) : [−2 ; 7] et [6 ; 14] ; page 13 (départ 12, borne 26) : [11 ; 20] et [19 ; 27]."""
+15 créneaux par page (C-9), 13 minutes utiles, 26 minutes en deux pages, couverture simple ; demi-pages à la main :
+page 0 (départ −1, borne 13) : [−2 ; 7] et [6 ; 14] ; page 13 (départ 12, borne 26) : [11 ; 20] et [19 ; 27]."""
 import datetime
 import os
 import unittest
@@ -55,7 +55,7 @@ class TestDemiPages(unittest.TestCase):
             urls(prm, s.base)
             horloge, acquerir.HORLOGE = acquerir.HORLOGE, lambda: 100.0
             self.addCleanup(setattr, acquerir, "HORLOGE", horloge)
-            prm["series"]["coinbase"].update(pas=30, chevauchement=1)
+            prm["series"]["coinbase"].update(pas=30, chevauchement=1, couverture=1)     # C-8 seul (C-13 : à part)
             prm["reseau"]["essais"] = 1 if panne else 2                     # un seul essai sur la demi-page en panne
             for k in range(2):                                      # second passage : reprise
                 s.fonction = plafond(m, g, panne and k == 0)

@@ -30,14 +30,18 @@ class TestPages(unittest.TestCase):
         """700 minutes, DETTES-T2 et C-9 (créneaux ≤ pas / 2) : Coinbase, 148 minutes utiles + 1 de chaque côté :
         23:59-02:28, 02:27-04:56, 04:55-07:24, 07:23-09:52, 09:51-11:40 UTC ; Bitstamp, 498 minutes utiles : n = 500 de
         1775001540 à 1775031480, puis n = 204 de 1775031420 à 1775043600 ; Bitfinex en ms, une page, fin 1775043540 ;
-        Coinbase repris : aucune requête ; attentes : 4 de 0,34 s, 1 de 0,2 s. Mutations : borne de page fausse ; pas
-        faux ; n faux ; reprise ; débit."""
+        C-13, second découpage décalé d'une demi-page jusqu'à fin + demi-page : Coinbase (74 minutes) 22:45-01:14 (le
+        31), 01:13-03:42, 03:41-06:10, 06:09-08:38, 08:37-11:06, 11:05-13:34 ; Bitstamp (249 minutes) n = 500 depuis
+        1774986600, 1775016480 et 1775046360 ; Coinbase repris : aucune requête ; attentes : 10 de 0,34 s, 4 de 0,2 s.
+        Mutations : borne de page fausse ; pas faux ; n faux ; reprise ; débit ; second découpage omis ou mal décalé."""
         fen = {"debut": T0, "fin": T0 + 700 * 60}
         attendus = [f"/c/ETH-USD?start=2026-0{a}:00Z&end=2026-04-01T{b}:00Z" for a, b in (
             ("3-31T23:59", "02:28"), ("4-01T02:27", "04:56"), ("4-01T04:55", "07:24"), ("4-01T07:23", "09:52"),
-            ("4-01T09:51", "11:40"))] + ["/s/ethusd?n=500&start=1775001540&end=1775031480",
-                                         "/s/ethusd?n=204&start=1775031420&end=1775043600",
-                    "/f/tETHUSD?start=1775001600000&end=1775043540000"]
+            ("4-01T09:51", "11:40"), ("3-31T22:45", "01:14"), ("4-01T01:13", "03:42"), ("4-01T03:41", "06:10"),
+            ("4-01T06:09", "08:38"), ("4-01T08:37", "11:06"), ("4-01T11:05", "13:34"))] + [
+            "/s/ethusd?n=500&start=1775001540&end=1775031480", "/s/ethusd?n=204&start=1775031420&end=1775043600"] + [
+            f"/s/ethusd?n=500&start={a}&end={a + 29940}" for a in (1774986600, 1775016480, 1775046360)] + [
+            "/f/tETHUSD?start=1775001600000&end=1775043540000"]
         horloge, acquerir.HORLOGE = acquerir.HORLOGE, lambda: 100.0
         self.addCleanup(setattr, acquerir, "HORLOGE", horloge)
         with Serveur(dict.fromkeys(attendus, b"[]")) as s:
@@ -45,9 +49,10 @@ class TestPages(unittest.TestCase):
             series(prm, s.base)
             for place in ("coinbase", "bitstamp", "bitfinex", "coinbase"):
                 acquerir.pages(prm, acquerir.Manifeste(d), "principale", fen, place, "ETH", acquerir.Debit())
-        self.assertEqual((s.vus, pauses), (attendus, [0.34] * 4 + [0.2]))
-        self.assertEqual(sorted(os.listdir(os.path.join(d, "principale", "coinbase", "ETH"))),
-                         [f"page-{x}.json" for x in (1775001600, 1775010480, 1775019360, 1775028240, 1775037120)])
+        self.assertEqual((s.vus, pauses), (attendus, [0.34] * 10 + [0.2] * 4))
+        self.assertEqual(sorted(os.listdir(os.path.join(d, "principale", "coinbase", "ETH"))), sorted(
+            [f"page-{x}.json" for x in (1775001600, 1775010480, 1775019360, 1775028240, 1775037120)]
+            + [f"double-{1775001600 + 60 * x}.json" for x in (-74, 74, 222, 370, 518, 666)]))
 
     def test_debit(self):
         """Horloge factice : coinbase à 100 s, 100,1 s, puis bitfinex et coinbase à 100,3 s, intervalle 340 ms :
@@ -65,7 +70,8 @@ class TestPages(unittest.TestCase):
 
     def test_main(self):
         """Lecture réduite aux places paginées (deux par actif), fenêtres d'une heure et d'une demi-heure : serveur
-        muet : code 4, CA/acquisition sur stderr ; puis code 0 et 12 pages au manifeste (reprise) ; variable posée :
+        muet : code 4, CA/acquisition sur stderr ; puis code 0 et 32 pages au manifeste (reprise ; 12 du premier
+        découpage, 2 du second par fenêtre et par paire de Coinbase et de Bitstamp, C-13) ; variable posée :
         code 3 ; arguments faux : code 2 ; dossier des bruts qui est un fichier : code 4, nommé par le type.
         Mutations : fenêtre descriptive omise ; code de refus faux ; garde non appelée ; exception non nommée."""
         with Serveur({}) as s:
@@ -90,9 +96,10 @@ class TestPages(unittest.TestCase):
             [4, 0, 3, 2, 4], ["REFUS CA/acquisition", "REFUS CA/variable", "REFUS CA/usage", "REFUS CA/acquisition",
                               ""]))
         with open(os.path.join(d, "b", "manifeste.tsv"), encoding="utf-8") as f:
-            self.assertEqual(len(f.read().split(socle.NL)), 1 + 12 + 1)
+            self.assertEqual(len(f.read().split(socle.NL)), 1 + 32 + 1)
         desc = os.path.join(d, "b", "descriptive")                  # C-7 : bornes de la fenêtre descriptive (G08)
-        self.assertEqual({x for _r, _s, fs in os.walk(desc) for x in fs}, {"page-1790811000.json"})
+        self.assertEqual({x for _r, _s, fs in os.walk(desc) for x in fs}, {"page-1790811000.json"} | {
+            f"double-{1790811000 + h}.json" for h in (-4440, 4440, -14940, 14940)})
         self.assertIn("/s/ethusd?n=32&start=1790810940&end=1790812800", s.vus)    # chevauchement des deux côtés
 
 

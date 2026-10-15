@@ -29,16 +29,19 @@ class TestSeries(unittest.TestCase):
 
     def test_charger(self):
         """Fichiers d'une (place, actif) lus, .partiel ignoré ; dossier vide : CA/format. Fenêtre de 300 minutes,
-        pages de Coinbase du découpage (DETTES-T2, C-9 : 148 minutes utiles, en T0, T0 + 8880, T0 + 17760). Mutations :
+        pages de Coinbase du découpage (DETTES-T2, C-9 : 148 minutes utiles, en T0, T0 + 8880, T0 + 17760) et du second
+        (C-13 : décalé de 74 minutes, en T0 − 4440, T0 + 4440, T0 + 13320, T0 + 22200, la dernière vide). Mutations :
         .partiel lu ; format de la place ignoré."""
         d = tempfile.mkdtemp(prefix="ca_ch_")
         self.addCleanup(shutil.rmtree, d, True)
         os.makedirs(os.path.join(d, "principale", "coinbase", "ETH"))
         fen = {"debut": T0, "fin": T0 + 18000}
         for nom, t in ((f"page-{T0}.json", T0), (f"page-{T0 + 8880}.json", T0 + 8880),
-                       (f"page-{T0 + 17760}.json", T0 + 17760), (f"page-{T0 + 17760}.json.partiel", T0 + 60)):
+                       (f"page-{T0 + 17760}.json", T0 + 17760), (f"page-{T0 + 17760}.json.partiel", T0 + 60),
+                       (f"double-{T0 - 4440}.json", T0), (f"double-{T0 + 4440}.json", T0 + 8880),
+                       (f"double-{T0 + 13320}.json", T0 + 17760), (f"double-{T0 + 22200}.json", None)):
             with open(os.path.join(d, "principale", "coinbase", "ETH", nom), "w", encoding="ascii") as f:
-                f.write(f"[[{t}, 1, 2, 1, 1.5, 3]]")
+                f.write("[]" if t is None else f"[[{t}, 1, 2, 1, 1.5, 3]]")
         self.assertEqual(sorted(bougies.charger(P, d, "principale", "coinbase", "ETH", fen)),
                          [T0, T0 + 8880, T0 + 17760])
         with self.assertRaises(socle.Refus) as r:

@@ -67,7 +67,7 @@ def pages_attendues(bornes, toutes):
 
 class TestFormesPages(unittest.TestCase):
     def acquis(self, place, sem, fen, fixture):
-        m = marche(fen)
+        m = marche(fen, marge=600)                           # C-13 : second découpage jusqu'à fin + demi-page
         with Serveur({}) as s:
             prm, d, _p = local(self, s.base)
             urls(prm, s.base)
@@ -98,23 +98,28 @@ class TestFormesPages(unittest.TestCase):
         reçues fausses, dernière page mal bornée. C-7 et C-8 : « fin exclue, avant » (plafond ancré avant le départ,
         sans la dernière minute propre, sans échange : minute 2 de la fixture, 443 et 1199 du lot) : page redemandée en
         deux demi-pages, admise ; plafond ancré `pas` minutes avant start : demi-réponses elles aussi tronquées : refus
-        nommé ; mutations : contrôle retiré, plafond ignoré."""
+        nommé ; mutations : contrôle retiré, plafond ignoré. C-13 : Coinbase et Bitstamp en couverture double, second
+        découpage à la main (fixture : Coinbase −1 à 14 par 3, Bitstamp −2 à 13 par 5 ; lot : Coinbase −74 à 1258 par
+        148, Bitstamp −249 à 1245 par 498), double 14 et 814 redemandées sous « fin exclue, avant » (dernières minutes
+        16 et 961 sans échange) ; refus « tronquee » nommé par le second découpage, contrôlé le premier."""
         cas = [("coinbase", ("incluses", "fin-exclue", "avant", "fin-exclue avant", "debut-exclu",
                              "debut-exclu fin-exclue", "tronquee"), [0, 3, 6, 9, 12, 14],
-                [0, 148, 296, 444, 592, 740, 888, 1036, 1184, 1200]),
+                [0, 148, 296, 444, 592, 740, 888, 1036, 1184, 1200], [-1, 2, 5, 8, 11, 14], range(-74, 1274, 148)),
                ("bitstamp", ("incluses", "fin-exclue", "depuis-start", "depuis-start debut-exclu"), [0, 5, 10, 14],
-                [0, 498, 996, 1200]),
-               ("bitfinex", ("incluses",), [0, 4, 8, 12, 14], [0, 1200])]
-        tronque = "REFUS CA/format : demi-page redemandée plafonnée et tronquée ; actif ETH ; place coinbase"
-        for place, sems, b_fixture, b_lot in cas:
+                [0, 498, 996, 1200], [-2, 3, 8, 13], [-249, 249, 747, 1245]),
+               ("bitfinex", ("incluses",), [0, 4, 8, 12, 14], [0, 1200], [], [])]
+        tronque = "REFUS CA/format : couverture double discordante ; actif ETH ; place coinbase"
+        for place, sems, b_fixture, b_lot, d_fixture, d_lot in cas:
             for sem in sems:
-                for fixture, n, bornes in ((True, 14, b_fixture), (False, 1200, b_lot)):
+                for fixture, n, bornes, dbl in ((True, 14, b_fixture, d_fixture), (False, 1200, b_lot, d_lot)):
                     with self.subTest(place=place, sem=sem, fixture=fixture):
                         fen = {"debut": W0, "fin": W0 + 60 * n}
-                        pages = [f"page-{W0 + 60 * a}.json" for a in bornes[:-1]]
-                        if sem == "fin-exclue avant":                # C-8 : page 0 (fixture), 296 et 1184 (lot)
-                            pages = sorted(pages + [f"page-{W0 + 60 * a}.{k}.json" for a in ((0,) if fixture else (
-                                296, 1184)) for k in (1, 2)])
+                        pages = sorted([f"page-{W0 + 60 * a}.json" for a in bornes[:-1]]
+                                       + [f"double-{W0 + 60 * a}.json" for a in dbl])
+                        if sem == "fin-exclue avant":   # C-8 : page 0 et double 14 (fixture), 296, 1184, double 814
+                            pages = sorted(pages + [f"{x}-{W0 + 60 * a}.{k}.json" for x, a in (
+                                (("page", 0), ("double", 14)) if fixture else (("page", 296), ("page", 1184),
+                                                                              ("double", 814))) for k in (1, 2)])
                         attendu = (([], [], []), pages, pages_attendues(bornes, place == "bitstamp"))
                         obtenu = self.acquis(place, sem, fen, fixture)
                         self.assertEqual(obtenu, tronque if sem == "tronquee" else attendu)

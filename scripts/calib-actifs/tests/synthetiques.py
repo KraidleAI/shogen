@@ -54,13 +54,17 @@ def octets(format_: str, s: dict) -> bytes:
 
 def fichiers(prm: dict, place: str, s: dict, fen=FEN) -> dict:
     """{nom : octets} : f.dat, ou une page-<début>.json par page de ⌊`pas`/2⌋ − 2·`chevauchement` minutes (découpage
-    calculé ici ; clé absente : découpage d'avant DETTES-T2, sans chevauchement, pour le rouge sur le code d'avant)."""
+    calculé ici ; clé absente : découpage d'avant DETTES-T2, sans chevauchement, pour le rouge sur le code d'avant) ;
+    couverture 2 (C-13) : et une double-<début>.json par page décalée d'une demi-page h, de début − h à fin + h."""
     x = prm["series"][place]
     if x["acces"] != "pages":
         return {"f.dat": octets(x["format"], s)}
     u = 60 * (x["pas"] // 2 - 2 * x.get("chevauchement", 0))
-    return {f"page-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
-            for d in range(fen["debut"], fen["fin"], u)}
+    h = 60 * (u // 120)
+    plans = [("page", range(fen["debut"], fen["fin"], u))] + [("double", range(fen["debut"] - h, fen["fin"] + h, u))
+                                                               ] * (x.get("couverture", 1) == 2)
+    return {f"{n}-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
+            for n, r in plans for d in r}
 
 
 def ecrire_bruts(prm: dict, bruts: str, nom: str, fen=FEN) -> None:
