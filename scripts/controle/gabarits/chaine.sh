@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Modèle de chaîne de commits de l'orchestrateur (lot GARDE-FOUS-ORCH, GF-9 ; erreurs E3, E8, LA-N04, LA-N05), à copier
-# par lot. Lancement détaché, avec un délai (E3 : jamais de chaîne en fond sans délai) :
-#   setsid nohup timeout 6600 bash chaine.sh > chaine.log 2>&1 &   (PID et journal consignés ; fin constatée)
+# Modèle de chaîne de commits de l'orchestrateur (lot GARDE-FOUS-ORCH, GF-9 ; erreurs E3, E8, E25, LA-N04, LA-N05), à
+# copier par lot. Lancement détaché, avec un délai (E3), attente dans un appel séparé ; un lancement lié est refusé
+# au-delà de 100 min estimées (DUREE_PAS : durée mesurée d'un pas en minutes, 6 par défaut) :
+#   DETACHE=1 setsid nohup timeout 6600 bash chaine.sh > chaine.log 2>&1 &   (PID et journal consignés)
 # PLAN : une ligne par commit, champs séparés par | : id|diff1,diff2|fichier de message|source1,source2. Un diff rouge
 # seul ne forme jamais une ligne : il va avec le diff qui le rend vert (E11). Le message est un fichier écrit après la
 # dernière retouche des sources, avec une ligne Source-Sha: <sha256> par source et la ligne Diff-Id: <id> ; la chaîne
-# ne l'écrit jamais (E8). Reprise : un id dont la ligne Diff-Id est déjà dans l'historique est sauté.
+# ne l'écrit jamais (E8). Reprise : un id dont la ligne Diff-Id est déjà dans l'historique est sauté. CC : rapport du
+# contre-contrôle, à la ligne fixe GROUPES : de gabarits/rapport-cc.md, lue avant tout pas (E11).
 set -euo pipefail
 DEPOT=${DEPOT:-/home/user/shogen}
 PLAN=${PLAN:?PLAN : fichier de plan}
+CC=${CC:?CC : rapport du contre-contrôle}
 OUTILS=${OUTILS:-$DEPOT/scripts/controle}
 PYTHON=${PYTHON:-python3}
 DELAI=${DELAI:-2400}
@@ -30,6 +33,7 @@ verif() {
 }
 # --- fin de verif
 
+acte chaine --plan "$PLAN" --cc "$CC" ${DUREE_PAS:+--duree-pas "$DUREE_PAS"} ${DETACHE:+--detache}
 acte disque --min-go "${DISQUE_MIN_GO:-0}"
 while IFS='|' read -r -u 3 id diffs message sources; do
   [ -n "$id" ] || continue

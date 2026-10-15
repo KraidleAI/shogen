@@ -37,7 +37,12 @@ GF-8b : existe NOM, avant d'écrire qu'un fichier manque (E15) : chemins du dép
 nom, hors interdits ; X1 si aucun. disque [--min-go N] [--lister D...] (E4) : DQ, refus sous 3 Gio libres sur /
 (--min-go ne fait que serrer), avertissement sous 6 ; --lister : dossiers target qui portent CACHEDIR.TAG (cibles
 cargo), à profondeur 4 au plus, sans entrer dans docs, .git, un lien ou un interdit, avec leur taille ; rien n'est
-effacé."""
+effacé.
+GF-9b : chaine --plan P --cc RAPPORT [--duree-pas MIN] [--detache], avant de lancer une chaîne (E11, E25) : G1, le
+rapport de contre-contrôle porte une seule ligne fixe GROUPES : (aucun, ou A+B ; C+D+E : diffs verts seulement
+ensemble ; un nom seul ne groupe rien) ; G2, aucun pas du plan ne commet une partie d'un groupe sans le reste (diff
+nommé par son fichier, sans .diff) ; G3, durée estimée (pas × durée mesurée d'un pas, 6 min par défaut) au-delà de
+BORNE_LIEE min sans --detache : lancement lié refusé, lancement détaché donné."""
 import argparse
 import fnmatch
 import hashlib
@@ -68,6 +73,7 @@ SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
+BORNE_LIEE = 100
 
 
 class Erreur(Exception):
@@ -416,8 +422,31 @@ def disque(a, fautes):
             print(f"{octets / 2 ** 30:.2f} Gio" + chr(9) + chemin)
 
 
+
+def chaine(a, fautes):
+    plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()]
+    duree = len(plan) * a.duree_pas
+    if duree > BORNE_LIEE and not a.detache:
+        fautes.append(("refus", "G3", f"durée estimée {duree:.0f} min ({len(plan)} pas × {a.duree_pas:g} min), "
+                       f"au-delà de {BORNE_LIEE} min pour un lancement lié (E25)",
+                       f"lancer détaché : DETACHE=1 setsid nohup timeout {int(duree * 120)} bash chaine.sh > "
+                       "chaine.log 2>&1 & (PID et journal consignés), puis attendre la fin dans un appel séparé", "-"))
+    lignes = [x for x in lire(a.cc).decode("utf-8").split(chr(10)) if x.startswith("GROUPES :")]
+    valeur = lignes[0][9:].strip() if len(lignes) == 1 else ""
+    groupes = [[x.strip() for x in g.split("+")] for g in valeur.split(";")]
+    if any(not all(re.fullmatch("[A-Za-z0-9._-]+", x) for x in g) for g in groupes):
+        fautes.append(("refus", "G1", "le rapport de contre-contrôle ne porte pas une seule ligne GROUPES : lisible",
+                       "ajouter la ligne fixe du gabarit rapport-cc.md (GROUPES : aucun, ou A+B ; C+D)", "-"))
+        return
+    for ligne in plan:
+        pas = {os.path.basename(d).removesuffix(".diff") for d in ligne.split("|")[1].split(",")}
+        for g in [g for g in groupes if set(g) & pas and not set(g) <= pas]:
+            fautes.append(("refus", "G2", f"le pas {ligne.split('|')[0]} coupe le groupe {'+'.join(g)} (E11)",
+                           "commettre le groupe en un seul pas", "-"))
+
+
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
-             "publier": publier, "existe": existe, "disque": disque}
+             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine}
 
 
 def journal(a, fautes):
@@ -451,6 +480,11 @@ def main(argv=None):
     s = sp.add_parser("disque")
     s.add_argument("--min-go", type=float)
     s.add_argument("--lister", nargs="+", default=[])
+    s = sp.add_parser("chaine")
+    s.add_argument("--plan", required=True)
+    s.add_argument("--cc", required=True)
+    s.add_argument("--duree-pas", type=float, default=6)
+    s.add_argument("--detache", action="store_true")
     try:
         a = p.parse_args(argv)
     except SystemExit as e:

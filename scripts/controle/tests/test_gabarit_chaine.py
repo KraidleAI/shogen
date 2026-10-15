@@ -40,7 +40,7 @@ class Chaine(unittest.TestCase):
             ag.git(copie, self.env, "add", "-A")
             ag.ecrire(self.tmp, {f"d{i}.diff": ag.git(copie, self.env, "diff", "--cached", "HEAD", "--", nom)})
             plan.append(f"X-{i}|{self.tmp}/d{i}.diff|{self.tmp}/m{i}.txt|{self.adj}")
-        ag.ecrire(self.tmp, {"plan": NL.join(plan) + NL + NL})
+        ag.ecrire(self.tmp, {"plan": NL.join(plan) + NL + NL, "cc.md": "GROUPES : aucun" + NL})
         self.messages()
 
     def messages(self):
@@ -53,7 +53,7 @@ class Chaine(unittest.TestCase):
 
     def lancer(self, **variables):
         env = dict(self.env, DEPOT=self.d, PLAN=os.path.join(self.tmp, "plan"), OUTILS=ICI, PYTHON=sys.executable,
-                   **variables)
+                   CC=os.path.join(self.tmp, "cc.md"), **variables)
         p = subprocess.run(["bash", self.chaine], env=env, capture_output=True, text=True, timeout=300)
         self.erreur = p.stderr
         return p.returncode, re.findall("(?m)^Diff-Id: (.+)$", ag.git(self.d, self.env, "log", "--format=%B"))
@@ -81,6 +81,19 @@ class Chaine(unittest.TestCase):
         ag.git(self.d, self.env, "rm", "-q", "-f", "b.md")
         self.messages()
         self.assertEqual(self.lancer(), (0, ["X-2", "X-1"]))
+
+    def test_e11_groupe(self):
+        """E11 : le contre-contrôle groupe d1 et d2 ; le plan les commet en deux pas : arrêt avant tout pas."""
+        ag.ecrire(self.tmp, {"cc.md": "GROUPES : d1+d2" + NL})
+        code, ids = self.lancer()
+        self.assertEqual((code != 0, ids), (True, []))
+
+    def test_e25_lancement_lie(self):
+        """E25 : durée estimée au-delà de 100 min (2 pas mesurés à 60 min) : lancement lié refusé avant tout pas ;
+        DETACHE=1 (lancement détaché) : admis."""
+        code, ids = self.lancer(DUREE_PAS="60")
+        self.assertEqual((code != 0, ids), (True, []))
+        self.assertEqual(self.lancer(DUREE_PAS="60", DETACHE="1"), (0, ["X-2", "X-1"]))
 
     def test_disque_et_arbre(self):
         """E4 : disque sous le seuil demandé : arrêt avant tout pas ; arbre non propre : arrêt avant d'appliquer."""

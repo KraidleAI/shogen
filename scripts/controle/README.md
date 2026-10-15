@@ -204,3 +204,15 @@ dépendent des tests du harnais qu'ils importent.
 > --diff … --id <id> && git commit -q -F <message>`, reprise par la ligne `Diff-Id:`, arrêt nommé au premier refus ;
 > la chaîne n'écrit jamais un message. Un arrêt laisse le pas appliqué à l'index : le retirer avant de relancer.
 > `tests/test_gabarit_chaine.py` (5 tests, `verif` remplacée par un faux) ; plancher du job `controle-unittest` 82.
+
+> *Ajout daté du 2026-10-10 06:58:08 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-9b ; erreurs E11 et E25 ; avis b.3
+> adopté)* : `avant_acte.py` (sha256 `c6972d99666c6f5fef6d3977be3b6fd62daa5e6499b8608cf5f9dafef2289544`) : `chaine
+> --plan P --cc RAPPORT [--duree-pas MIN] [--detache]`, avant de lancer une chaîne : G1, le rapport de contre-contrôle
+> porte une seule ligne fixe `GROUPES :` (`aucun`, ou `A+B ; C+D` : diffs verts seulement ensemble) ; G2, aucun pas du
+> plan ne commet une partie d'un groupe sans le reste ; G3, durée estimée (pas × durée mesurée d'un pas, 6 min par
+> défaut) au-delà de 100 min sans `--detache` : lancement lié refusé, lancement détaché donné (`DETACHE=1 setsid nohup
+> timeout …`, attente dans un appel séparé). `gabarits/rapport-cc.md` (sha256
+> `9f0f79dee307ae37ecd386460f03582486a16df0552a95ce50ceb3dfa517dea3`), gabarit du rapport de contre-contrôle à la
+> ligne fixe ; `gabarits/chaine.sh` (sha256 `11852ada40517b5c775fa61e85cd9c031483c6e354f353cbb2042097b32ff49e`) lance
+> `chaine` avant tout pas (variables `CC`, `DUREE_PAS`, `DETACHE`). `tests/test_avant_acte.py` compte 22 tests,
+> `tests/test_gabarit_chaine.py` 7 ; plancher du job `controle-unittest` 86.

@@ -10,7 +10,9 @@ interdits, diff qui ne s'applique pas sur la tête.
 GF-7 : verser (E9 : messages d'outils anglais entre guillemets, S-G5 ; E10 : adjudication versée en double).
 GF-8 : pousser (LA-N05 : poussée rouge ; ADR-0028 l.293 : docs 15/16 jamais au distant ; E17 : actes que le
 mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret ; chemin du scratchpad).
-GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : disque presque plein, cibles cargo)."""
+GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : disque presque plein, cibles cargo).
+GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du contre-contrôle annonçait ; E25 :
+chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min)."""
 import contextlib
 import hashlib
 import io
@@ -418,3 +420,34 @@ class ExisteDisque(Depot):
             dangereuses = [self.lancer("disque", "--lister", x)[0] for x in (self.tmp, os.path.join(s, "docs"))]
         self.assertEqual(dangereuses, [3, 3])
         self.assertEqual((code, sortie), (0, "0.00 Gio" + chr(9) + os.path.join(s, "lot1", "copie", "target") + NL))
+
+
+class PlanDeChaine(Depot):
+    def juger(self, groupes, *pas, options=()):
+        """Plan d'une ligne par pas (diffs nommés par leur fichier) et rapport de contre-contrôle à la ligne fixe."""
+        plan = [f"P-{i}|" + ",".join(f"/s/{d}.diff" for d in x) + "|/s/m.txt|/s/ADJ.md" for i, x in enumerate(pas)]
+        ag.ecrire(self.tmp, {"plan": NL.join(plan) + NL, "cc.md": "# Contre-contrôle" + NL + groupes + NL})
+        return self.lancer("chaine", "--plan", os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md"),
+                           *options)
+
+    def test_e11_groupe_coupe(self):
+        """E11 : FZ-x rouge seul, groupé avec FZ-i au rapport : plan qui les commet en deux pas, refus G2 ; en un pas,
+        admis ; rapport sans ligne GROUPES, avec deux, ou ligne illisible : refus G1 ; GROUPES : aucun : admis."""
+        code, sortie = self.juger("GROUPES : FZ-x+FZ-i", ["FZ-a"], ["FZ-x"], ["FZ-i", "FZ-g"])
+        self.assertEqual((code, sortie[:9], "FZ-x+FZ-i" in sortie), (1, "REFUS G2 ", True))
+        self.assertEqual(self.juger("GROUPES : FZ-x+FZ-i ; FZ-g+FZ-h", ["FZ-a"], ["FZ-x", "FZ-i"]), (0, ""))
+        self.assertEqual(self.juger("Groupes : voir le tableau", ["FZ-x"])[1][:9], "REFUS G1 ")
+        self.assertEqual(self.juger("GROUPES : FZ-x+", ["FZ-x"])[1][:9], "REFUS G1 ")
+        self.assertEqual(self.juger("GROUPES : aucun" + NL + "GROUPES : FZ-x+FZ-i", ["FZ-x"])[1][:9], "REFUS G1 ")
+        self.assertEqual(self.juger("GROUPES : aucun", ["FZ-x"], ["FZ-i"]), (0, ""))
+
+    def test_e25_duree(self):
+        """E25 : 23 commits à 6 min par défaut (138 min) en lancement lié : refus G3, lancement détaché donné ;
+        détaché : admis ; 16 pas (96 min) : admis ; durée mesurée de 8 min et 13 pas (104 min) : refus."""
+        pas = [[f"D-{i}"] for i in range(23)]
+        code, sortie = self.juger("GROUPES : aucun", *pas)
+        self.assertEqual((code, sortie[:9], "setsid nohup" in sortie, "138 min" in sortie),
+                         (1, "REFUS G3 ", True, True))
+        self.assertEqual(self.juger("GROUPES : aucun", *pas, options=["--detache"]), (0, ""))
+        self.assertEqual(self.juger("GROUPES : aucun", *pas[:16]), (0, ""))
+        self.assertEqual(self.juger("GROUPES : aucun", *pas[:13], options=["--duree-pas", "8"])[1][:9], "REFUS G3 ")
