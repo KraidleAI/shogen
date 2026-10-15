@@ -47,5 +47,11 @@ Conséquences opérationnelles :
    affichée, écrite ni commitée ; Gate 0 sur le champ `model` de la réponse (premier appel le 2026-10-08 :
    `claude-haiku-5-5`).
    Seul l'orchestrateur committe (R-19/R-20).
+   Ajout daté du 2026-10-10 06:37:26 UTC (lot DETTES-T7, DT7-j ; adjudication de Q-4 du 2026-10-10) : Haiku 5.5
+   a un cinquième rôle de signal, trieur de sources (sur une liste déjà constituée : classe et lecteur proposés par
+   source, citation contrôlée ; ne retire, n'écarte ni n'aiguille rien sans adjudication ; n'attribue aucun niveau
+   [lu]/[abs]/[2nd] ; adopté en signal le 2026-10-10, SHOGEN-HAIKU-ROLE-SOURCES-1) ; aiguiller seul, constituer la
+   liste des sources et juger une source admissible ou détenue restent refusés (décisions). Règle 7 de la fiche
+   `shogen-extracteur`.
 8. Audit d'entrée : fait le 2026-08-12 (docs/AUDIT-ENTREE.md, commit 10e5557) ; son rafraîchissement
    (état S2/S3 réel) est porté par la cartographie du 2026-09-29 (docs/rapports/cartographie-2026-09-29.md).
