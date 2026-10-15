@@ -447,3 +447,10 @@ dépendent des tests du harnais qu'ils importent.
 > sont relues sur la copie mutée : un mutant de `gates.yml` se classe par la ligne qu'il écrit (avant C-1, par la
 > ligne d'origine : vivant à tort, mesure M-F2), et des étapes illisibles sous un mutant le classent FATAL. Cas :
 > M6, M7, M8 et le refus `tete` de `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).
+>
+> *Ajout daté du 2026-10-15 23:13:50 UTC (`date -u` ; contre-contrôle du lot DETTES-T7, réserve R-1 ;
+> SHOGEN-S2BIS-MUT-COMMANDE-1)* : la première étape du job est le checkout épinglé du gabarit K (`ETAPES[1]` du
+> vérificateur, `with:` réduit à `persist-credentials: false`, puis `fetch-depth: 0` admis), lu sur les lignes
+> brutes du job ; avant R-1, toute première étape non admise passait pour le checkout (étape `if:` qui échouerait
+> sur la forge, autre action, `with:` autre : mesure du contre-contrôle). Cas : refus `tete-if`, `tete-action`,
+> `tete-with` et `fetch-depth: 0` admis, dans `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).

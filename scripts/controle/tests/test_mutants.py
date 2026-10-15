@@ -13,7 +13,9 @@ import unittest
 
 OUTIL = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "mutants.py")
 NL, CIBLE = chr(10), chr(10).join(["import sys", "sys.exit(0)", ""])
-GATES = ["jobs:", "  essai:", "    steps:", "      - uses: actions/checkout@0", "      - name: a",
+GATES = ["jobs:", "  essai:", "    steps:",                 # checkout du gabarit K, écrit à la main (réserve R-1)
+         "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1", "        with:",
+         "          persist-credentials: false", "      - name: a",
          "        shell: bash", "        run: echo premier", "      - name: b", "        shell: bash", "        run: |",
          "          python3 -B cible.py", "          echo fin"]
 
@@ -84,17 +86,26 @@ class Mutants(unittest.TestCase):
             time.sleep(max(0.0, debut + 6 - time.monotonic()))
             self.assertFalse(os.path.exists(marque), "petit-enfant vivant après la borne")
             self.assertFalse(os.path.exists(marque2), "petit-enfant d'une autre session vivant après la borne")
-            code, lignes, err, c = lancer(d, m[3:4], "--tue", "1", "--tue", "3")
+            code, lignes, err, c = lancer(d, m[3:4], "--tue", "1", "--tue", "3",       # FETCH admis (R-1)
+                                          gates=GATES[:6] + ["          fetch-depth: 0"] + GATES[6:])
             self.assertEqual((code, lignes[1]["classement"]), (0, "tué"), err)
 
     def test_refus_avant_tout_mutant(self):
         """Témoin non vivant, étape non admise (if:), job absent, première étape autre que le checkout (G2 du lot
-        DETTES-T7, C-1) : sortie 3, refus nommé, aucun mutant lancé."""
+        DETTES-T7, C-1) : sortie 3, refus nommé, aucun mutant lancé. Réserve R-1 du contre-contrôle : première étape
+        non admise autre que le checkout épinglé (étape `if:` qui échouerait, autre action, `with:` autre)."""
         m = [{"id": "M1", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": "sys.exit(1)"}]
         for nom, gates, job, motif in (("rouge", GATES[:-2] + ["          exit 1"], "essai", "témoin non vivant"),
-                                       ("if", GATES[:5] + ["        if: false"] + GATES[5:], "essai", "job essai : "),
+                                       ("if", GATES[:7] + ["        if: false"] + GATES[7:], "essai", "job essai : "),
                                        ("absent", GATES, "x", "job x : "),
-                                       ("tete", GATES[:3] + GATES[4:], "essai", "job essai : ")):
+                                       ("tete", GATES[:3] + GATES[6:], "essai", "job essai : "),
+                                       ("tete-if", GATES[:3] + ["      - name: avant", "        if: always()",
+                                                                "        shell: bash", "        run: exit 1"]
+                                        + GATES[6:], "essai", "job essai : "),
+                                       ("tete-action", GATES[:3] + ["      - uses: actions/setup-python@0"] + GATES[6:],
+                                        "essai", "job essai : "),
+                                       ("tete-with", GATES[:6] + ["          path: sous"] + GATES[6:], "essai",
+                                        "job essai : ")):
             with self.subTest(cas=nom), tempfile.TemporaryDirectory() as d:
                 code, lignes, err, _c = lancer(d, m, gates=gates, job=job)
                 self.assertEqual((code, [x["id"] for x in lignes if x["id"] != "témoin"], f"mutants : erreur : {motif}"

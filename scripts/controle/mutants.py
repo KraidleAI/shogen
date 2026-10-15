@@ -8,7 +8,8 @@ lancé depuis un arbre relu, à part de la copie mutée. Usage : mutants.py <cop
 groupes de tous les descendants de l'étape (relevé ps par parenté : la suite que le vérificateur lance dans sa propre
 session depuis DT7-d) sont arrêtés et comptés au relevé de fin ; la sortie n'est plus attendue que RELIQUAT s
 (descendant détaché qui garde le tuyau) ; la première étape du job est le checkout, exigé ; les étapes sont
-relues sur la copie mutée (mutant de gates.yml classé par la ligne qu'il écrit ; illisibles : FATAL)."""
+relues sur la copie mutée (mutant de gates.yml classé par la ligne qu'il écrit ; illisibles : FATAL). Réserve R-1
+du contre-contrôle : ce checkout est celui du gabarit K, lu sur les lignes brutes du job, jamais une autre étape."""
 import os                   # garde en tête (SHOGEN-S2BIS-GARDE-EN-TETE-1) : le dossier du script quitte sys.path
 import sys                  # avant tout autre import (un json.py posé à côté ne serait jamais lu)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
@@ -33,15 +34,21 @@ RELIQUAT = 5.0      # s de lecture après l'arrêt des groupes à la borne (desc
 
 def etapes(copie: str, job: str) -> list:
     """Blocs `run:` du job, première étape (checkout, non admise par l'analyseur, exigée) sautée ; toute autre étape
-    non admise : ValueError."""
+    non admise : ValueError. Réserve R-1 du contre-contrôle : la première étape est le checkout épinglé du gabarit K,
+    lignes brutes du job (`job` du vérificateur) égales à ETAPES[1], `with:` et `persist-credentials: false`, puis
+    FETCH admis ; toute autre première étape non admise (action, `if:`, `with:` autre) : ValueError."""
     v = importlib.util.module_from_spec(importlib.util.spec_from_file_location("verdict_suite_s2", VERIF))
     with open(VERIF, encoding="utf-8") as f:                # la source, jamais un .pyc
         exec(compile(f.read(), VERIF, "exec", dont_inherit=True), v.__dict__)
     with open(os.path.join(copie, ".github", "workflows", "gates.yml"), encoding="utf-8") as f:
-        pas = v.etapes(f.read(), job)
-    if not pas or pas[0] is not None or None in pas[1:]:
+        texte = f.read()
+    pas, b = v.etapes(texte, job), v.job(texte, job)
+    i = b.index("    steps:") + 1 if "    steps:" in b else len(b)
+    j = next((n for n in range(i + 1, len(b)) if b[n].startswith("      - ")), len(b))      # fin de la 1re étape
+    tete = ["      " + v.ETAPES[1], "        with:", "          persist-credentials: false"]   # checkout du gabarit K
+    if not pas or pas[0] is not None or None in pas[1:] or b[i:j] not in (tete, tete + [v.FETCH]):
         raise ValueError(f"job {job} : étapes illisibles ou non admises par l'analyseur, ou première étape autre que "
-                         f"le checkout ({pas!r})")
+                         f"le checkout épinglé du gabarit K ({pas!r})")
     return pas[1:]
 
 
