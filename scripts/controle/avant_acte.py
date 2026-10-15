@@ -460,7 +460,8 @@ def journal(a, fautes):
         f.writelines(chr(9).join([h, a.cmd, *x]) + chr(10) for x in lignes)
 
 
-def main(argv=None):
+def parseur():
+    """Lignes de commande des sous-commandes (lues aussi par tests/test_skills.py : options exigées)."""
     p = argparse.ArgumentParser(prog="avant_acte.py", description=__doc__.split(chr(10))[0])
     p.add_argument("--depot", default=".")
     sp = p.add_subparsers(dest="cmd", required=True)
@@ -485,8 +486,12 @@ def main(argv=None):
     s.add_argument("--cc", required=True)
     s.add_argument("--duree-pas", type=float, default=6)
     s.add_argument("--detache", action="store_true")
+    return p
+
+
+def main(argv=None):
     try:
-        a = p.parse_args(argv)
+        a = parseur().parse_args(argv)
     except SystemExit as e:
         return 0 if e.code == 0 else 3
     fautes = []

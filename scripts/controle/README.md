@@ -216,3 +216,13 @@ dépendent des tests du harnais qu'ils importent.
 > ligne fixe ; `gabarits/chaine.sh` (sha256 `11852ada40517b5c775fa61e85cd9c031483c6e354f353cbb2042097b32ff49e`) lance
 > `chaine` avant tout pas (variables `CC`, `DUREE_PAS`, `DETACHE`). `tests/test_avant_acte.py` compte 22 tests,
 > `tests/test_gabarit_chaine.py` 7 ; plancher du job `controle-unittest` 86.
+
+> *Ajout daté du 2026-10-10 07:04:30 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-10 ; avis c.6 adopté)* : quatre skills,
+> un par moment de l'acte, qui donnent les commandes à passer et le moment, sans répéter les règles du bloc commun des
+> fiches : `.claude/skills/shogen-avant-lancer/SKILL.md` (disque, `chaine`, lancement détaché),
+> `shogen-avant-committer` (`diff` à la réception, `sceller`, `commit`, `verser`, `presg5.py`), `shogen-avant-pousser`
+> (`sceller --tete`, `pousser`, `pousser --acte`, `publier`), `shogen-avant-ecrire` (`date -u`, `existe`, `publier`).
+> `avant_acte.py` (sha256 `17af293ca899f2ab2f5e2be2ce81a1187905dcfd2e5af24cce4d23f92993ac86`) expose `parseur()`.
+> `tests/test_skills.py` (2 tests) : en-tête (name égal au dossier, description de forme commune, aucune clé model),
+> sous-commandes et chemins cités existants, options exigées présentes, erreurs visées nommées, aucun marqueur de
+> dette nu ; plancher du job `controle-unittest` 88.
