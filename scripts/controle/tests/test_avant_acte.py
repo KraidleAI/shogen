@@ -4,12 +4,15 @@ retouchée après la vérification, commit sans verdict vert sur le contenu exac
 GF-5b : commit C1 (sceau), C2 (Source-Sha ; E8 : message écrit avant la clôture de la source), C3 (E8 : « trois
 passes » contre deux ; verdicts, identifiants et sha courts lus dans les sources ou résolus par git).
 GF-6 : commit C4 (E14, heures), C5 (E16, citations), C6 (LA-N04, index égal aux diffs nommés), C7 (E21, aucun bloc
-qui décale une ligne d'un fichier cité par numéro), C9 (Diff-Id)."""
+qui décale une ligne d'un fichier cité par numéro), C9 (Diff-Id).
+GF-6b : C8 (E1, workflows lus en YAML) ; diff d'un worker reçu avant la G2 : E21, E14, E16, E9 (presg5), E1,
+interdits, diff qui ne s'applique pas sur la tête."""
 import contextlib
 import hashlib
 import io
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,6 +23,8 @@ import avant_acte
 from tests import aide_garde as ag
 
 NL = chr(10)
+LECTEUR = NL.join(["import sys", "with open(sys.argv[1] + '/.github/workflows/w.yml') as f:",
+                   "    sys.exit(0 if f.read() == 'on: push' + chr(10) else 1)", ""])
 ADJ = ("Contre-contrôle CONFORME en deux passes ; "
        "G2 ACCEPTE-AVEC-CORRECTIONS, G-1 à G-5 ; SHOGEN-FUZZ-DISTILLATION-1." + NL)
 
@@ -213,3 +218,60 @@ class CommitSuite(Source):
         """C9 : ligne Diff-Id exigée quand --id est donné."""
         self.assertEqual(self.verifier({"a.md": "id" + NL}, self.CORPS, "--id", "GF-6")[1][:9], "REFUS C9 ")
         self.assertEqual(self.verifier({}, self.CORPS + NL + NL + "Diff-Id: GF-6", "--id", "GF-6"), (0, ""))
+
+
+    def test_e1_commit(self):
+        """E1 : workflow indexé, lecteur YAML du dépôt en refus : refus C8 ; lecteur absent : erreur 3."""
+        self.assertEqual(self.verifier({".github/workflows/w.yml": "on: push" + NL})[0], 3)
+        code, sortie = self.verifier({"enforcement/workflows-yaml.py": LECTEUR,
+                                      ".github/workflows/w.yml": "on: push: x" + NL})
+        self.assertEqual((code, sortie[:9]), (1, "REFUS C8 "))
+        self.assertEqual(self.verifier({".github/workflows/w.yml": "on: push" + NL}), (0, ""))
+
+
+class DiffDeWorker(Source):
+    def setUp(self):
+        super().setUp()
+        self.indexer({"JOURNAL.md": NL.join(["l1", "l2", "l3", "l4", "l5", ""]), "biblio/INDEX.md": "# index" + NL,
+                      "enforcement/workflows-yaml.py": LECTEUR, ".github/workflows/w.yml": "on: push" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "base")
+        self.w = os.path.join(self.tmp, "w.diff")
+
+    def diff_de(self, fichiers):
+        """Diff d'un worker : copie du dépôt, fichiers écrits et indexés, git diff --cached (contexte de 3 lignes)."""
+        c = os.path.join(self.tmp, "copie")
+        shutil.rmtree(c, ignore_errors=True)
+        shutil.copytree(self.d, c)
+        ag.ecrire(c, fichiers)
+        ag.git(c, self.env, "add", "-A")
+        ag.ecrire(self.tmp, {"w.diff": ag.git(c, self.env, "diff", "--cached", "HEAD")})
+        return self.lancer("diff", "--fichier", self.w)
+
+    def test_e21_e14_e16_e9(self):
+        """Diff de worker reçu avant la G2 : E21, insertion au milieu d'un fichier cité (refus C7 ; ajout en fin
+        admis) ; E14, heure future ; E16, citation stricte fausse ; E9, message d'outil anglais entre guillemets."""
+        code, sortie = self.diff_de({"JOURNAL.md": NL.join(["l1", "l2", "neuf", "l3", "l4", "l5", ""])})
+        self.assertEqual((code, sortie[:31]), (1, "REFUS C7 : JOURNAL.md : un bloc"))
+        self.assertEqual(self.diff_de({"JOURNAL.md": NL.join(["l1", "l2", "l3", "l4", "l5", "fin", ""])}), (0, ""))
+        faux = os.path.join(self.tmp, "faux")
+        ag.ecrire(faux, {"date": "#!/bin/sh" + NL + "echo 2026-10-10T04:14:00Z" + NL})
+        os.chmod(os.path.join(faux, "date"), 0o755)
+        os.environ["PATH"] = faux + os.pathsep + os.environ["PATH"]
+        g, d = chr(171), chr(187)
+        for ligne, refus in [("page du 2026-10-10 04:22", "REFUS C4 : heure-future à n.md:2"),
+                             (g + " l9 " + d + " (JOURNAL.md:2)", "REFUS C5 : citation-absente à n.md:2"),
+                             (g + " fatal: not a git repository (or any of the parent directories) " + d,
+                              "REFUS G5 : n.md:2 : fatal: not a git")]:
+            code, sortie = self.diff_de({"n.md": "x" + NL + ligne + NL})
+            self.assertEqual((code, sortie[:len(refus)]), (1, refus), ligne)
+
+    def test_e1_interdit_tete(self):
+        """E1 : workflow du diff illisible en YAML : refus C8 ; fichier du diff sous un interdit : refus, jamais
+        nommé ; diff qui ne s'applique pas sur la tête (base ancienne) : refus."""
+        self.assertEqual(self.diff_de({".github/workflows/w.yml": "on: push: x" + NL})[1][:9], "REFUS C8 ")
+        code, sortie = self.diff_de({"docs/rapports/r.md": "x" + NL})
+        self.assertEqual((code, sortie[:9], "rapports" in sortie), (1, "REFUS D1 ", False))
+        self.diff_de({"JOURNAL.md": NL.join(["L1", "l2", "l3", "l4", "l5", ""])})
+        self.indexer({"JOURNAL.md": NL.join(["autre", "l2", "l3", "l4", "l5", ""])})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "autre")
+        self.assertEqual(self.lancer("diff", "--fichier", self.w)[1][:9], "REFUS D2 ")

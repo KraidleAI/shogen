@@ -19,7 +19,11 @@ GF-6 : commit C4, heures du message et des lignes ajoutées des .md (E14) ; C5, 
 stricte refusée si fausse, autres formes en avertissement (E16) ; C6, --diff D... : HEAD plus les diffs nommés, dans
 l'ordre, donne l'arbre de l'index (LA-N04) ; C7, aucun bloc ne décale une ligne existante d'un fichier de
 garde/lignes-citees.txt, sauf ligne Décalage admis : <chemin> du message, journalisée en contournement (E21) ; C9,
---id ID : ligne Diff-Id: ID dans le message."""
+--id ID : ligne Diff-Id: ID dans le message.
+GF-6b : C8, un workflow touché : enforcement/workflows-yaml.py du dépôt lit les workflows de l'index (sortie 1 : refus ;
+absent ou autre sortie : erreur ; E1). diff --fichier F, à la réception d'un diff de worker, avant la G2 (avis b.2) :
+D1, fichier sous un interdit (ni lu ni nommé) ; D2, diff qui ne s'applique pas sur HEAD ; puis C4, C5 et presg5 (G5,
+E9) sur les lignes ajoutées des .md, C7 (E21), C8 sur les workflows de HEAD plus le diff."""
 import argparse
 import fnmatch
 import hashlib
@@ -41,6 +45,7 @@ def _module(nom):
 
 
 GC = _module("garde_commun")
+P5 = _module("presg5")
 VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|NON-CONFORME|CONFORME|ACCEPTE|REFUSE)(?![A-Z-])")
 PASSES = re.compile("(?i)(?<![0-9a-zé])([0-9]+|une?|deux|trois|quatre|cinq|six) passes?(?![a-z])")
 NOMBRES = {"un": "1", "une": "1", "deux": "2", "trois": "3", "quatre": "4", "cinq": "5", "six": "6"}
@@ -136,6 +141,7 @@ def commit(a, fautes):
     if a.diff:
         diffs_nommes(a, fautes)
     cites(a.depot, texte, fichiers, fautes)
+    workflows(a.depot, fichiers, fautes)
     if a.id and f"Diff-Id: {a.id}" not in texte.split(chr(10)):
         fautes.append(("refus", "C9", f"le message ne porte pas la ligne Diff-Id: {a.id}", "l'ajouter au message", "-"))
 
@@ -216,7 +222,60 @@ def cites(depot, texte, fichiers, fautes):
                            "ajouter en fin ; décalage voulu : ligne Décalage admis : " + chemin + " au message", "-"))
 
 
-COMMANDES = {"sceller": sceller, "commit": commit}
+def workflows(depot, fichiers, fautes, env=None):
+    """C8 (E1) : un workflow touché : enforcement/workflows-yaml.py du dépôt lit les workflows de l'index, ou de
+    l'index temporaire d'un diff (env)."""
+    if not any((f["apres"] or f["avant"] or "").startswith(".github/workflows/") for f in fichiers):
+        return
+    lecteur = os.path.join(depot, "enforcement", "workflows-yaml.py")
+    if not os.path.isfile(lecteur):
+        raise Erreur("enforcement/workflows-yaml.py absent : lecture YAML impossible")
+    with tempfile.TemporaryDirectory() as d:
+        noms = [x for x in git(depot, "ls-files", "-z", "--", ".github/workflows", env=env).split(chr(0)) if x]
+        git(depot, "checkout-index", "--prefix=" + d + os.sep, "--", *noms, env=env)
+        p = subprocess.run([sys.executable, "-B", lecteur, d], capture_output=True, text=True)
+    if p.returncode == 1:
+        fautes.append(("refus", "C8", "un workflow de l'index ne se lit pas en YAML (E1) : " + p.stderr.strip()[:200],
+                       "corriger le workflow, relancer enforcement/workflows-yaml.py", "-"))
+    elif p.returncode:
+        raise Erreur(f"enforcement/workflows-yaml.py : sortie {p.returncode}")
+
+
+
+def presg5(depot, textes, fautes):
+    """S-G5 approché par presg5.py (E9) : fragment anglais entre guillemets français, introuvable dans biblio/."""
+    with tempfile.TemporaryDirectory() as d:
+        for k, (nom, t) in enumerate(textes):
+            with open(os.path.join(d, str(k)), "w", encoding="utf-8") as f:
+                f.write(t)
+            for _p, n, x in P5.introuvables(depot, [os.path.join(d, str(k))]):
+                fautes.append(("refus", "G5", f"{nom}:{n} : {x[:80]} (E9)",
+                               "mettre le texte anglais ou le message d'outil en code", "-"))
+
+
+def diff(a, fautes):
+    fichiers = GC.analyser_diff(lire(a.fichier).decode("utf-8"))
+    if any(c and GC.chemin_interdit(os.path.join(a.depot, c)) for f in fichiers for c in (f["avant"], f["apres"])):
+        fautes.append(("refus", "D1", "fichier(s) du diff sous un interdit : ni lus ni nommés",
+                       "retirer ces fichiers du diff", "-"))
+        return
+    with tempfile.TemporaryDirectory() as d:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
+        git(a.depot, "read-tree", "HEAD", env=env)
+        try:
+            git(a.depot, "apply", "--cached", os.path.abspath(a.fichier), env=env)
+        except Erreur:
+            fautes.append(("refus", "D2", "le diff ne s'applique pas sur la tête du dépôt (base ancienne ?)",
+                           "refaire le diff sur la tête du moment", "-"))
+            return
+        textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
+        heures_et_citations(a.depot, textes, fautes)
+        presg5(a.depot, textes, fautes)
+        cites(a.depot, "", fichiers, fautes)
+        workflows(a.depot, fichiers, fautes, env)
+
+
+COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff}
 
 
 def journal(a, fautes):
@@ -240,6 +299,7 @@ def main(argv=None):
     c.add_argument("--source", action="append", required=True)
     c.add_argument("--diff", action="append", default=[])
     c.add_argument("--id")
+    sp.add_parser("diff").add_argument("--fichier", required=True)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:

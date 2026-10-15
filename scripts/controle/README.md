@@ -157,3 +157,12 @@ dépendent des tests du harnais qu'ils importent.
 > ligne `Décalage admis : <chemin>` du message, admise et journalisée en contournement ; C9, `--id ID` : ligne
 > `Diff-Id: ID` du message ; un fichier indexé sous un interdit n'est jamais lu (avertissement).
 > `tests/test_avant_acte.py` compte 10 tests ; plancher du job `controle-unittest` 67.
+
+> *Ajout daté du 2026-10-10 06:21:50 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-6b ; erreurs E1, E9, E14, E16, E21 ;
+> avis b.2 adopté)* : `avant_acte.py` (sha256 `25bf3e8001b9ffdfa3be946103043aeb4543fb35acf8b6716184731d57313ef1`) :
+> C8, un workflow touché : `enforcement/workflows-yaml.py` du dépôt lit les workflows de l'index (sortie 1 : refus ;
+> absent ou autre sortie : erreur), lancé par `commit` et par `diff`. `diff --fichier F`, à la réception d'un diff de
+> worker, avant la G2 : D1, fichier du diff sous un interdit (ni lu ni nommé) ; D2, diff qui ne s'applique pas sur la
+> tête (base ancienne) ; puis, sur HEAD plus le diff dans un index temporaire : C4, C5 et `presg5.py` (G5) sur les
+> lignes ajoutées des `.md`, C7 sur les fichiers cités, C8. `tests/test_avant_acte.py` compte 13 tests ; plancher du
+> job `controle-unittest` 70.
