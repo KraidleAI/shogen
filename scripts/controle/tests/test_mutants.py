@@ -61,7 +61,9 @@ class Mutants(unittest.TestCase):
         vérificateur (M6), arrêté avec son groupe ; descendant détaché qui garde le tuyau (M7) attendu RELIQUAT s au
         plus ; mutant de gates.yml (M8) classé par la ligne qu'il écrit, étapes relues sur la copie mutée.
         Réserve R-2 du contre-contrôle (Linux, moissonneur) : enfant d'une autre session resté après une sortie
-        normale (M9) et descendant détaché, parent sorti, à la borne (M10) : arrêtés avant la fin de la campagne."""
+        normale (M9) et descendant détaché, parent sorti, à la borne (M10) : arrêtés avant la fin de la campagne.
+        Réserve R-5 : mutant de gates.yml qui rend les étapes illisibles (M11, `if:` posé sur une étape) : FATAL,
+        aucune étape jouée, jamais tué."""
         p = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, p, True)
         for n in ("pid", "pid9", "pid10"):
@@ -94,14 +96,16 @@ class Mutants(unittest.TestCase):
                  {"id": "M8", "fichier": ".github/workflows/gates.yml", "avant": "run: echo premier",
                   "apres": "run: exit 1"},
                  {"id": "M9", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": reste},
-                 {"id": "M10", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": orphelin}]
+                 {"id": "M10", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": orphelin},
+                 {"id": "M11", "fichier": ".github/workflows/gates.yml", "avant": "run: echo premier",
+                  "apres": "run: echo premier" + NL + "        if: false"}]
             debut = time.monotonic()
             code, lignes, err, c = lancer(d, m, "--borne", "2")
             self.assertEqual((code, time.monotonic() - debut < 40, [(x["id"], x["classement"], len(x["etapes"])) for x
                                                                      in lignes]), (0, True, [
                 ("témoin", "vivant", 2), ("M1", "tué", 2), ("M2", "vivant", 2), ("M3", "FATAL", 2), ("M4", "FATAL", 2),
                 ("M5", "FATAL", 0), ("M6", "FATAL", 2), ("M7", "FATAL", 2), ("M8", "tué", 1), ("M9", "vivant", 2),
-                ("M10", "FATAL", 2)]), err)
+                ("M10", "FATAL", 2), ("M11", "FATAL", 0)]), err)
             if sys.platform.startswith("linux"):        # R-2 : moissonneur ; ailleurs, limite écrite au README
                 self.assertEqual([(os.path.exists(n), vit(n)) for n in (p9, p10)], [(True, False), (True, False)],
                                  "orphelin d'une étape vivant après la campagne")

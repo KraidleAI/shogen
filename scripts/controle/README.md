@@ -463,3 +463,8 @@ dépendent des tests du harnais qu'ils importent.
 > entre le relevé `ps` et l'arrêt pouvait échapper (mesures du contre-contrôle). Hors de Linux (POSIX sans
 > moissonneur), la limite de C-1 demeure : un descendant détaché n'est pas suivi. Cas : M9 et M10 de
 > `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).
+>
+> *Ajout daté du 2026-10-15 23:45:31 UTC (`date -u` ; contre-contrôle du lot DETTES-T7, réserve R-5 ;
+> SHOGEN-S2BIS-MUT-COMMANDE-1)* : le classement FATAL d'un mutant de `gates.yml` qui rend les étapes
+> illisibles (C-1) a son cas : M11 (`if:` posé sur une étape : FATAL, aucune étape jouée) ; avant R-5, ce
+> classement pouvait devenir `tué` sans qu'aucun cas ne rougisse (mutant CC7 du contre-contrôle, vivant).
