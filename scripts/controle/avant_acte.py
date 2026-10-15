@@ -65,7 +65,8 @@ Contre-contrôle, R-3 : pousser --acte ramène aussi les guillemets du shell, le
 placées avant la sous-commande.
 Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité.
 Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un pas du plan.
-Contre-contrôle, R-7 : verser compte fichiers et octets avant toute lecture (borne)."""
+Contre-contrôle, R-7 : verser compte fichiers et octets avant toute lecture (borne).
+Contre-contrôle, R-10 : C3 lit aussi le verdict CONFORME-AVEC-RÉSERVES, accentué ou non."""
 import argparse
 import contextlib
 import fnmatch
@@ -93,7 +94,8 @@ try:
 except Exception as _e:         # module frère illisible (installation abîmée) : erreur de l'outil, jamais 1 (C-18)
     print(f"ERREUR chargement : {type(_e).__name__} : {_e}", file=sys.stderr)
     sys.exit(3)
-VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|NON-CONFORME|CONFORME|ACCEPTE|REFUSE)(?![A-Z-])")
+VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|CONFORME-AVEC-R[ÉE]SERVES|NON-CONFORME|CONFORME"
+                     "|ACCEPTE|REFUSE)(?![A-Z-])")      # R-10 : verdict avec réserves, accentué ou non
 PASSES = re.compile("(?i)(?<![0-9a-zé])([0-9]+|une?|deux|trois|quatre|cinq|six) passes?(?![a-z])")
 PASSE_N = re.compile("(?i)(?<![0-9a-zé])passe ([0-9]+)(?![0-9])")
 NEGATION = re.compile("(?i)(?:sans|aucune|pas de|ni) (?:la |une )?$")
@@ -182,7 +184,8 @@ def commit(a, fautes):
                        "-"))
     corps = chr(10).join(x for x in texte.split(chr(10)) if not x.startswith(PIEDS))
     src = chr(10).join(b.decode("utf-8", "replace") for b in sources)
-    manques = [("verdict", x) for x in sorted(set(VERDICT.findall(corps)) - set(VERDICT.findall(src)))]
+    verdicts = lambda t: {x.replace("RESERVES", "RÉSERVES") for x in VERDICT.findall(t)}
+    manques = [("verdict", x) for x in sorted(verdicts(corps) - verdicts(src))]
     manques += [("nombre de passes", x) for x in sorted(passes(corps) - passes(src, source=True))]
     manques += [("identifiant", x) for x in sorted(set(IDENT.findall(corps)) - set(IDENT.findall(src)))]
     manques += [("sha court", x) for x in sorted(set(SHA.findall(corps))) if x not in src and not resolu(a.depot, x)]

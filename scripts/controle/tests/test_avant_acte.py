@@ -22,7 +22,7 @@ passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre comm
 sortie standard fermée : 3).
 Contre-contrôle : R-2 (pousser, historique de la plage) ; R-3 (pousser --acte, actes écrits autrement).
 Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé) ; R-5 (chaine : Diff-Id en double au plan).
-Contre-contrôle : R-7 (verser : borne du dossier de pièces)."""
+Contre-contrôle : R-7 (verser : borne du dossier de pièces) ; R-10 (C3 : verdict avec réserves)."""
 import contextlib
 import difflib
 import fnmatch
@@ -236,6 +236,18 @@ class Commit(Source):
                          "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"])
         self.assertEqual(self.commit(self.message(corps)), (0, ""))
 
+
+
+class VerdictAvecReserves(Source):
+    def test_r10_verdict_avec_reserves(self):
+        """R-10 : verdict CONFORME-AVEC-RÉSERVES (gabarit du contre-contrôle), lu au message et aux sources,
+        accentué ou non : absent des sources (NON-CONFORME) : refus C3 ; présent : admis."""
+        self.lancer("sceller")
+        corps = "x : contre-controle CONFORME-AVEC-RESERVES en deux passes"
+        ag.ecrire(self.tmp, {"ADJUDICATION.md": "Contre-contrôle NON-CONFORME en deux passes." + NL})
+        self.assertEqual(self.commit(self.message(corps))[1][:9], "REFUS C3 ")
+        ag.ecrire(self.tmp, {"ADJUDICATION.md": "Contre-contrôle CONFORME-AVEC-RÉSERVES en deux passes." + NL})
+        self.assertEqual(self.commit(self.message(corps)), (0, ""))
 
 
 class PassesDesSources(Source):

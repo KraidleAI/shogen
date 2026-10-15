@@ -417,3 +417,10 @@ dépendent des tests du harnais qu'ils importent.
 > se lit aussi en code ou dans une citation, l'heure seule restant masquée en code : une heure future écrite après une
 > date du jour en code (forme `` `AAAA-MM-JJ` HH:MM ``) n'était pas vue ; l'extrait se lit sur la ligne écrite.
 > `tests/test_garde_commun.py` compte 18 tests ; plancher du job `controle-unittest` 114.
+
+> *Ajout daté du 2026-10-15 11:48:38 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-10 ; E8)* :
+> `avant_acte.py` (sha256 `2992ac33117f4ebb55c96b64717efe9de5d9294f40560eb35dfd4bf7e8283fde`) : C3 lit aussi, au
+> message et aux sources, le verdict `CONFORME-AVEC-RÉSERVES` du gabarit de contre-contrôle, accentué ou non (les
+> messages de commit du projet sont écrits sans accents) : un message qui l'écrivait contre des sources NON-CONFORME
+> passait, le verdict n'étant pas lu. `tests/test_avant_acte.py` compte 42 tests ; plancher du job `controle-unittest`
+> 115.
