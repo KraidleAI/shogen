@@ -124,3 +124,24 @@ pré-enregistrement, exécution unique). Ce fichier ne porte aucun résultat de 
 > (cp-1 complet, 2026-10-04) ; ses chiffres restent hors de ce fichier. Collecte S2 : « L'arrêter
 > (Recommandé) », décision de l'investisseur du 2026-10-04 (JOURNAL, recopiée en
 > `docs/11-mesures-pilotes.md` §1). La suite est proposée par ADR-0029 (S2-bis, statut « proposée »).
+
+> *Errata daté du 2026-10-10 06:38:16 UTC (`date -u` ; lot DETTES-T7, DT7-k ; SHOGEN-S2-SUITE-PY310-1, adjudication
+> de l'orchestrateur du 2026-10-10)*, sur la l.17 (versions de Python). Minimum mesuré le 2026-10-10 sous Python
+> 3.10.20 et 3.11.15 (lignes des jobs telles qu'écrites, réseau coupé, variable scellée non posée ; tête `e5bf085`
+> avec la série du lot DETTES-T7) :
+> - `tools/oracle_record.py` seul : 3.10 (`--help` et chargement du module en sortie 0 sous les deux versions) ;
+> - sa suite (`tests/test_oracle_record.py`, 25 tests) : 3.11 ; sous 3.10.20, un échec
+>   (`test_enregistrement_champs_et_sha`) ;
+> - la suite S2 entière (423 tests, ligne du job `s2-harness-unittest`) : 3.11 ; sous 3.10.20, 77 échecs et
+>   3 erreurs, les mêmes à la tête `953270e` sans la série ;
+> - le vérificateur des jobs (`enforcement/verdict-suite-s2.py`) : 3.10 (runner : 152 cas passés ; ligne du job
+>   `controle-unittest` : conforme ; sous les deux versions).
+>
+> Causes, mesurées : `hashlib.file_digest`, ajouté en 3.11, dans `tools/rendu_unique.py` (`sha256_fichier`,
+> l.74 : gardes (3) et (4)) ; `datetime.fromisoformat` d'une date terminée par `Z`, acceptée depuis 3.11, dans le
+> même outil (voie (b), l.250) ; format verbeux de unittest 3.11+ (`test_a (tests.test_t.T.test_a) ... ok`)
+> attendu par `test_enregistrement_champs_et_sha` (`tests/test_oracle_record.py`) et `test_nominal_bout_en_bout`
+> (`tests/test_rendu_production.py`). Sur une copie d'essai hors dépôt où les deux premières causes sont levées,
+> il ne reste sous 3.10.20 que ces deux échecs. `tools/rendu_unique.py` demande donc 3.11, non 3.9. Les jobs de la
+> forge lancent `python3` de l'image (3.12.3, lu au premier passage du job g1, annexe B d'ADR-0028) ; les briefs
+> du projet jouent la suite sous 3.11 à 3.13 (bloc de gabarit de la fiche `shogen-worker`).
