@@ -136,3 +136,14 @@ dépendent des tests du harnais qu'ils importent.
 > (`<vérification> && avant_acte.py sceller`) : sceau sous la clé sha256 de HEAD et de l'arbre de l'index, ou de
 > `HEAD^{tree}` avec `--tete` ; refusé (S1) si un chemin est hors de l'index ou non suivi, ou, avec `--tete`, non
 > commis. `tests/test_avant_acte.py` (3 tests) ; plancher du job `controle-unittest` 60.
+
+> *Ajout daté du 2026-10-10 06:05:46 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-5b ; erreurs E8, LA-N03, LA-N05)* :
+> `avant_acte.py` (sha256 `b6880e94a21f95f12d6ff1eefefc7b5296f1bb039dffa6e7053909fc9a183dbc`) : `commit --message M
+> --source S [--source S]...`, à lancer juste avant `git commit -F M` (`avant_acte.py commit … && git commit -q -F
+> M`). C1 : sceau de l'index et de la tête présent. C2 (remplace la date de fichier, adjudication) : pour chaque
+> source, une ligne `Source-Sha: <sha256>` du message égale à son sha256 au moment du commit, et aucune ligne sans
+> source égale : une source retouchée après l'écriture du message est refusée. C3 : verdicts, nombres de passes (en
+> lettres ou en chiffres), identifiants `SHOGEN-…`, G-n, C-n, R-n, Q-n, L-n, E-n, O-n, I-n et sha courts du message,
+> hors pieds (`Source-Sha`, `Diff-Id`, `Co-Authored-By`, `Claude-Session`, `Décalage admis`), lus dans les sources ;
+> un sha court absent des sources doit se résoudre en commit. `tests/test_avant_acte.py` compte 6 tests ; plancher du
+> job `controle-unittest` 63.

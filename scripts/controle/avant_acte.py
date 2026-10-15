@@ -8,11 +8,18 @@ heure lue par date -u, sous-commande, code, niveau, contourne (moyen du contourn
 et les faux refus (avis b.5 adopté).
 GF-5 : sceller, derrière la vérification complète (verif && sceller) : sha256 de HEAD et de l'arbre de l'index (git
 write-tree), ou de HEAD^{tree} avec --tete ; refusé si un chemin diffère hors de l'index ou n'est pas suivi (LA-N05 :
-pièce retouchée après la vérification). Le sceau est exigé par commit (GF-5b)."""
+pièce retouchée après la vérification). Le sceau est exigé par commit (GF-5b).
+GF-5b : commit --message M --source S [--source S]... C1, sceau de l'index et de la tête présent (LA-N05) ; C2, pour
+chaque source, une ligne Source-Sha: <sha256> du message égale à son sha256 au moment du commit, et aucune ligne
+Source-Sha sans source égale (E8 : message écrit avant la clôture de la source, retouchée ensuite ; remplace la date de
+fichier, avis c.2) ; C3, verdicts, nombres de passes, identifiants SHOGEN-…, G-n, C-n, R-n, Q-n, L-n, E-n, O-n, I-n
+et sha courts du message (hors pieds Source-Sha, Diff-Id, Co-Authored-By, Claude-Session, Décalage admis) lus dans
+les sources, un sha court absent des sources résolu par git (E8, LA-N03)."""
 import argparse
 import hashlib
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 
@@ -27,6 +34,12 @@ def _module(nom):
 
 
 GC = _module("garde_commun")
+VERDICT = re.compile("(?<![A-Z-])(ACCEPTE-AVEC-CORRECTIONS|NON-CONFORME|CONFORME|ACCEPTE|REFUSE)(?![A-Z-])")
+PASSES = re.compile("(?i)(?<![0-9a-zé])([0-9]+|une?|deux|trois|quatre|cinq|six) passes?(?![a-z])")
+NOMBRES = {"un": "1", "une": "1", "deux": "2", "trois": "3", "quatre": "4", "cinq": "5", "six": "6"}
+IDENT = re.compile("(?<![A-Za-z0-9-])(SHOGEN-[A-Z0-9]+(?:-[A-Z0-9]+)*|[GCRQLEOI]-[0-9]+)(?![A-Za-z0-9-])")
+SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]{7,40})(?![A-Za-z0-9…-])")
+PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 
 
 class Erreur(Exception):
@@ -47,6 +60,14 @@ def garde(depot, *sous):
     return d
 
 
+def lire(chemin):
+    """Octets d'un fichier qui n'est pas sous un interdit (sinon erreur, sans ouverture ni nom)."""
+    if GC.chemin_interdit(chemin):
+        raise Erreur("chemin interdit, non ouvert")
+    with open(chemin, "rb") as f:
+        return f.read()
+
+
 def cle(depot, tete=False):
     """Clé du sceau : sha256 de HEAD et de l'arbre de l'index (git write-tree), ou de HEAD^{tree} avec --tete."""
     h = git(depot, "rev-parse", "--verify", "HEAD").strip()
@@ -65,7 +86,42 @@ def sceller(a, fautes):
         f.write(GC.maintenant().strftime("%Y-%m-%dT%H:%M:%SZ") + chr(10))
 
 
-COMMANDES = {"sceller": sceller}
+def passes(texte):
+    return {NOMBRES.get(n.lower(), n) for n in PASSES.findall(texte)}
+
+
+def resolu(depot, sha):
+    return subprocess.run(["git", "-C", depot, "rev-parse", "--verify", "--quiet", sha + "^{commit}"],
+                          capture_output=True).returncode == 0
+
+
+def commit(a, fautes):
+    texte, sources = lire(a.message).decode("utf-8"), [lire(s) for s in a.source]
+    if not os.path.exists(os.path.join(garde(a.depot, "sceaux"), cle(a.depot))):
+        fautes.append(("refus", "C1", "aucun sceau pour cet index et cette tête (LA-N05)",
+                       "relancer la vérification complète puis sceller : <vérification> && avant_acte.py sceller", "-"))
+    ecrits = set(re.findall("(?m)^Source-Sha: ([0-9a-f]{64})$", texte))
+    reels = [hashlib.sha256(b).hexdigest() for b in sources]
+    refaire = "relire la source finale et réécrire le message depuis elle, avec Source-Sha: <sha256 de la source>"
+    for s, h in zip(a.source, reels):
+        if h not in ecrits:
+            fautes.append(("refus", "C2", f"aucune ligne Source-Sha au sha256 actuel de {os.path.basename(s)} (source "
+                           "retouchée après le message, ou message écrit sans elle ; E8)", refaire, "-"))
+    for h in sorted(ecrits - set(reels)):
+        fautes.append(("refus", "C2", f"Source-Sha {h[:12]}… ne répond à aucune source : source retouchée", refaire,
+                       "-"))
+    corps = chr(10).join(x for x in texte.split(chr(10)) if not x.startswith(PIEDS))
+    src = chr(10).join(b.decode("utf-8", "replace") for b in sources)
+    manques = [("verdict", x) for x in sorted(set(VERDICT.findall(corps)) - set(VERDICT.findall(src)))]
+    manques += [("nombre de passes", x) for x in sorted(passes(corps) - passes(src))]
+    manques += [("identifiant", x) for x in sorted(set(IDENT.findall(corps)) - set(IDENT.findall(src)))]
+    manques += [("sha court", x) for x in sorted(set(SHA.findall(corps))) if x not in src and not resolu(a.depot, x)]
+    for genre, x in manques:
+        fautes.append(("refus", "C3", f"{genre} du message absent des sources : {x} (E8)",
+                       "reprendre les mots de l'adjudication et de la ligne d'annexe relues", "-"))
+
+
+COMMANDES = {"sceller": sceller, "commit": commit}
 
 
 def journal(a, fautes):
@@ -84,6 +140,9 @@ def main(argv=None):
     p.add_argument("--depot", default=".")
     sp = p.add_subparsers(dest="cmd", required=True)
     sp.add_parser("sceller").add_argument("--tete", action="store_true")
+    c = sp.add_parser("commit")
+    c.add_argument("--message", required=True)
+    c.add_argument("--source", action="append", required=True)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:
