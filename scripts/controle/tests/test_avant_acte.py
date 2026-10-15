@@ -19,7 +19,8 @@ diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (exi
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
 ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
 passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
-sortie standard fermée : 3)."""
+sortie standard fermée : 3).
+Contre-contrôle : R-2 (pousser, historique de la plage)."""
 import contextlib
 import difflib
 import fnmatch
@@ -517,6 +518,20 @@ class Poussee(Depot):
         for branche in ("b", "absente"):
             code, sortie = self.lancer("pousser", "--distant", "origin", "--branche", branche)
             self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P3 ", False), branche)
+
+    def test_r2_historique_de_la_plage(self):
+        """R-2 : docs/15-* ajouté puis retiré dans la plage poussée, tête scellée sans lui (ADR-0028 l.293 :
+        préfixes sans ces fichiers) : refus P2, jamais nommé ; le même historique déjà au distant : admis."""
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/main", "HEAD")
+        self.indexer({"docs/15-poche.md": "x" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "poche")
+        ag.git(self.d, self.env, "rm", "-q", "docs/15-poche.md")
+        ag.git(self.d, self.env, "commit", "-q", "-m", "retrait")
+        self.lancer("sceller", "--tete")
+        code, sortie = self.pousser()
+        self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P2 ", False))
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/main", "HEAD")
+        self.assertEqual(self.pousser(), (0, ""))
 
     def test_e17_actes_refuses(self):
         """E17 : écritures que le mandataire refuse (protection, réglages, suppression de branche) : refus P4 avant

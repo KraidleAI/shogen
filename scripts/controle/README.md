@@ -358,3 +358,10 @@ dépendent des tests du harnais qu'ils importent.
 > 1, qui se lit refus (ou fragment introuvable pour `presg5`), ou en 120 (vidage à la fin de l'interpréteur). Reste :
 > une erreur de syntaxe de l'outil lui-même sort en 1 (l'interpréteur, avant toute ligne de l'outil).
 > `tests/test_avant_acte.py` compte 36 tests, `tests/test_presg5.py` 7 ; plancher du job `controle-unittest` 107.
+
+> *Ajout daté du 2026-10-15 11:34:46 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-2 ; LA-N01, ADR-0028
+> l.293)* : `avant_acte.py` (sha256 `7aa53095f5cb9879bda43046228759cff61fd5857219c591378cb1d877a988af`) : `pousser` P2
+> juge aussi chaque commit de la plage poussée (`git rev-list HEAD --not --remotes=NOM` sur les chemins de
+> `garde/hors-distant.txt`) : un `docs/15-*` ajouté puis retiré avant la tête passait, l'arbre de la tête n'en portant
+> plus, alors que la poussée en porte le contenu (ADR-0028 l.293 : préfixes sans ces fichiers).
+> `tests/test_avant_acte.py` compte 37 tests ; plancher du job `controle-unittest` 108.

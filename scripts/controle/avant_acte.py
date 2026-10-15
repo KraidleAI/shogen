@@ -59,7 +59,8 @@ de).
 Relecture G2, C-17 : chaine G4, un Diff-Id du plan déjà porté par un commit d'un autre message est refusé (la reprise
 du modèle sauterait le pas).
 Relecture G2, C-18 : un module frère illisible (installation abîmée), une exception hors des sous-commandes ou l'échec
-du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais en 1 (un refus) ni en 120."""
+du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais en 1 (un refus) ni en 120.
+Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev-list HEAD --not --remotes=NOM)."""
 import argparse
 import contextlib
 import fnmatch
@@ -435,9 +436,14 @@ def pousser(a, fautes):
     p = subprocess.run(["git", "-C", a.depot, "diff", "--quiet", base, "HEAD", "--", *chemins], capture_output=True)
     if p.returncode not in (0, 1):
         raise Erreur(f"git diff : sortie {p.returncode}")
-    if p.returncode:
-        fautes.append(("refus", "P2", "la plage poussée change un chemin de garde/hors-distant.txt (non nommé)",
-                       "retirer ce chemin de la plage poussée (ADR-0028 l.293)", "-"))
+    historique = subprocess.run(["git", "-C", a.depot, "rev-list", "-n", "1", "HEAD", "--not",
+                                 f"--remotes={a.distant}", "--", *chemins], capture_output=True, text=True)
+    if historique.returncode:
+        raise Erreur(f"git rev-list : sortie {historique.returncode}")
+    if p.returncode or historique.stdout.strip():      # tête, ou un commit de la plage (contre-contrôle, R-2)
+        fautes.append(("refus", "P2", "la plage poussée change un chemin de garde/hors-distant.txt, dans la tête "
+                       "ou dans un de ses commits (non nommé)", "retirer ce chemin de l'historique poussé "
+                       "(ADR-0028 l.293 : préfixes sans ces fichiers)", "-"))
     noms = [x for x in git(a.depot, "diff", "--name-only", "-z", base, "HEAD", "--", ".github/workflows").split(chr(0))]
     with tempfile.TemporaryDirectory() as d:
         env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
