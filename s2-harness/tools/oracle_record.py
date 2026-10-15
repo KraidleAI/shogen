@@ -32,7 +32,10 @@ SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i) : `suite` passe par AMORCE de VERIF, 
 (environnement inchangé : la variable scellée y reste si elle est posée) ; un run sorti en 0 est jugé sur le compte
 réel (`compte_reel`) : refus, exit 1 consigné et motif nommé en fin de sortie, que la lecture cite (refus (exit)).
 Limites : celle d'AMORCE (un test qui altère unittest dans son processus forge encore le compte) ; un enregistrement
-écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture."""
+écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture.
+SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : l'extraction n'écrit ni ne hache aucun fichier d'un emplacement
+interdit des briefs (prédicat `interdit` de INTERDITS, liste unique, jamais recopiée) ; tree.exclus consigne leur
+nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte."""
 from __future__ import annotations
 
 import argparse
@@ -43,7 +46,9 @@ import io
 import json
 import math
 import os
+import posixpath
 import re
+import runpy
 import secrets
 import shutil
 import subprocess
@@ -73,6 +78,7 @@ LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.absp
                     "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
 VERIF = os.path.join(os.path.dirname(LINT), "verdict-suite-s2.py")    # analyseur unique des lignes de job, non recopié
 VERIF_COMMIT = "enforcement/verdict-suite-s2.py"     # vérificateur que lance la ligne d'un job, dans l'extraction
+INTERDITS = os.path.join(os.path.dirname(LINT), "docs-sha256sums.py")   # emplacements interdits : liste unique (DT4-a)
 DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
 EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
 COMPILES = (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES)     # règle de `compiles` de VERIF
@@ -210,30 +216,50 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     return trouves[0].split()[1:]
 
 
-def extraire(depot: str, sha: str, arbre: str) -> dict:
-    """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend {chemin : sha256} par
-    fichier."""
+def interdit():
+    """SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : prédicat `interdit` de INTERDITS (préfixes des
+    emplacements interdits des briefs, tout composant en .jsonl, casse pliée), exécuté depuis sa source, jamais
+    recopié ; toute exception au chargement : ValueError (refus)."""
+    try:
+        return runpy.run_path(INTERDITS, run_name="docs_sha256sums")["interdit"]
+    except BaseException as e:                     # comme charger_verif : SystemExit comprise
+        raise ValueError(f"emplacements interdits {INTERDITS} illisibles ({e!r}) — refus") from e
+
+
+def resume(exclus: list) -> dict:
+    """tree.exclus : nombre de chemins exclus et sha256 de leur liste triée (un par ligne), jamais leurs noms."""
+    return {"nombre": len(exclus), "sha256": hashlib.sha256(chr(10).join(exclus).encode()).hexdigest()}
+
+
+def extraire(depot: str, sha: str, arbre: str) -> tuple:
+    """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend ({chemin : sha256} par
+    fichier extrait, chemins exclus triés). EXTRACTION-INTERDITS-1 : un membre d'un emplacement interdit, ou un lien
+    qui y mène, n'est ni écrit ni haché."""
+    exclu, garde, hors = interdit(), [], []
     with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
+        for m in t.getmembers():
+            cible = posixpath.normpath(posixpath.join(posixpath.dirname(m.name), m.linkname)) if m.issym() else ""
+            (hors if exclu(m.name + "/" * m.isdir()) or cible and exclu(cible) else garde).append(m)
         try:
-            t.extractall(arbre, filter="data")
+            t.extractall(arbre, members=garde, filter="data")
         except tarfile.FilterError as e:
             raise ValueError(f"extraction de {sha} rejetée par le filtre data de tarfile ({e}) — refus") from e
     return {os.path.relpath(os.path.join(d, f), arbre).replace(os.sep, "/"): sha256_fichier(os.path.join(d, f))
-            for d, _sous, fs in os.walk(arbre) for f in fs}
+            for d, _sous, fs in os.walk(arbre) for f in fs}, sorted(m.name for m in hors if not m.isdir())
 
 
-def ecarts_arbre(depot: str, commit: str, consignes) -> list:
-    """Chemins dont le sha256 de la ré-extraction de `commit` diffère de `consignes` (fichiers en trop ou en moins
-    compris) ; ré-extraction impossible : un écart unique qui la nomme."""
+def ecarts_arbre(depot: str, commit: str, consignes) -> tuple:
+    """(chemins dont le sha256 de la ré-extraction de `commit` diffère de `consignes`, fichiers en trop ou en moins
+    compris ; `resume` de ses exclus) ; ré-extraction impossible : un écart unique qui la nomme, et None."""
     arbre = tempfile.mkdtemp(prefix="oracle_")
     try:
-        h = extraire(depot, commit, arbre)
+        h, x = extraire(depot, commit, arbre)
     except (ValueError, OSError, subprocess.CalledProcessError) as e:
-        return [f"ré-extraction impossible ({e})"]
+        return [f"ré-extraction impossible ({e})"], None
     finally:
         shutil.rmtree(arbre)
     t = consignes if isinstance(consignes, dict) else {}
-    return sorted(k for k in set(h) | set(t) if h.get(k) != t.get(k))
+    return sorted(k for k in set(h) | set(t) if h.get(k) != t.get(k)), resume(x)
 
 
 def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, commandes=("suite",), base=None,
@@ -267,7 +293,7 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     nom = f"shogen-{sha[:7]}-{role}-{maintenant:%Y%m%dT%H%M%SZ}-{os.getpid()}"
     arbre, runs = tempfile.mkdtemp(prefix="oracle_"), []
     try:
-        hashes = extraire(depot, sha, arbre)
+        hashes, exclus = extraire(depot, sha, arbre)
         lignes = {c: ligne_du_job(arbre, *JOBS[c]) for c in commandes if c in JOBS}     # refus avant tout run
         if lignes and hashes.get(VERIF_COMMIT) != sha256_fichier(VERIF):              # OUT-1b : leurre L2
             raise ValueError(f"vérificateur du commit {VERIF_COMMIT} (sha256 {hashes.get(VERIF_COMMIT)}) autre que "
@@ -310,7 +336,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     finally:
         shutil.rmtree(arbre)
     rec = {"schema": SCHEMA, "role": role, "auteur": auteur, "base": base, "static_only": False, "served_from": None,
-           "tree": {"commit": sha, "extraction": f"git archive {sha}", "sha256": dict(sorted(hashes.items()))},
+           "tree": {"commit": sha, "extraction": f"git archive {sha}", "sha256": dict(sorted(hashes.items())),
+                    "exclus": resume(exclus)},
            "python": sys.version, "env": consigne(os.environ), "runs": runs,
            "exit": 0 if all(r["exit"] == 0 for r in runs) else 1, "ecrit": f"{maintenant:%Y-%m-%dT%H:%M:%SZ}",
            "paquet": {"sha256": paquet_sha256}, "sceau": {"genTime": sceau_gentime}}
@@ -357,8 +384,9 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
             rec = json.load(f)
     except (OSError, ValueError):
         rec = None
-    exige(cles(rec, CHAMPS) and cles(rec["tree"], ("commit", "extraction", "sha256")) and cles(rec["paquet"], [
-        "sha256"]) and cles(rec["sceau"], ["genTime"]) and isinstance(rec["runs"], list) and all(
+    exige(cles(rec, CHAMPS) and cles(rec["tree"], ("commit", "extraction", "sha256", "exclus")) and cles(
+        rec["tree"]["exclus"], ("nombre", "sha256")) and cles(rec["paquet"], ["sha256"]) and cles(rec["sceau"], [
+            "genTime"]) and isinstance(rec["runs"], list) and all(
         cles(r, RUN) and cles(r["sortie"], ("chemin", "sha256")) for r in rec["runs"]), "champs")
     exige(rec["schema"] == SCHEMA, "schema")
     exige(rec["role"] == role, "rôle", f" : {rec['role']!r}, attendu {role!r}")
@@ -372,9 +400,15 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     if any(r["nom"] in tuple(JOBS) for r in rec["runs"]):     # OUT-1b : vérificateur lancé par la ligne du job
         v = rec["tree"]["sha256"].get(VERIF_COMMIT) if isinstance(rec["tree"]["sha256"], dict) else None
         exige(v == sha256_fichier(VERIF), "vérificateur", f" : {VERIF_COMMIT} {v!r}, attendu le sha256 de {VERIF}")
+    try:                                             # EXTRACTION-INTERDITS-1 : aucun chemin interdit haché
+        n = sum(map(interdit(), rec["tree"]["sha256"])) if isinstance(rec["tree"]["sha256"], dict) else 0
+    except ValueError as e:
+        exige(False, "exclus", f" : {e}")
+    exige(not n, "exclus", f" : {n} chemin(s) d'un emplacement interdit dans tree.sha256 (noms non imprimés)")
     if depot is not None:
-        e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
+        e, x = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
         exige(not e, "tree.sha256", f" : {e[:3]}{' …' if len(e) > 3 else ''} (ré-extraction depuis {depot})")
+        exige(x == rec["tree"]["exclus"], "exclus", f" : {rec['tree']['exclus']!r}, ré-extraction {x}")
     exige(rec["static_only"] is False, "static_only")
     racine = os.path.dirname(os.path.abspath(chemin))
     ko = [f"{r['nom']} exit {r['exit']!r}{fin_nommee(os.path.join(racine, str(r['sortie']['chemin'])))}"

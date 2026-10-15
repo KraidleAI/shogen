@@ -90,7 +90,8 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual((code, rec), (0, {
             "schema": "shogen.oracle-record.v1", "role": "G2", "auteur": "claude-opus-5-5", "base": None,
             "tree": {"commit": self.c1, "extraction": f"git archive {self.c1}",
-                     "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())}},
+                     "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())},
+                     "exclus": {"nombre": 0, "sha256": hashlib.sha256(b"").hexdigest()}},     # DETTES-T7 : aucun
             "static_only": False, "served_from": None, "python": sys.version, "exit": 0,
             "env": {"SHOGEN_S2_CAMPAGNE_CONTROL": None, "PYTHONHASHSEED": "17", "PYTHONPATH": os.environ.get(
                 "PYTHONPATH")},
@@ -300,6 +301,56 @@ class TestOracleRecord(unittest.TestCase):
             v = subprocess.run([sys.executable, "-B", OUTIL, "--verifier", x, "--role", "G2", "--commit", self.c1,
                                 "--depot", self.depot], capture_output=True, text=True)
             self.assertEqual((v.returncode, v.stdout, "refus (tree.sha256)" in v.stderr), (code, sortie, code == 2))
+
+    def test_extraction_sans_emplacement_interdit(self):
+        """SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : aucun fichier d'un emplacement interdit des briefs
+        (préfixes d'INTERDITS de enforcement/docs-sha256sums.py, liste unique ; composant en .jsonl ; casse pliée)
+        n'est écrit ni haché ; tree.exclus consigne leur nombre et le sha256 de leur liste triée, jamais leurs noms ;
+        --verifier refuse un tree.sha256 qui porte un chemin interdit, et, avec le dépôt, un tree.exclus autre que
+        celui de la ré-extraction. Rougit si : liste recopiée ou incomplète, .jsonl ou casse oubliés, fichier interdit
+        écrit ou haché, lien vers un interdit gardé, tree.exclus absent ou non vérifié, liste illisible admise."""
+        d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-interdits"), "claude-opus-5-5"
+        interdits = ["Docs/Rapports/i.md", "docs/15-a.md", "docs/16-b.md", "docs/adr-0025/e.md",
+                     "docs/adr-0028/execution/g/h.md", "docs/adr-0028/monark-m009a/f.txt", "docs/pocket-report/c.md",
+                     "docs/rapports/d.md", "docs/vers-interdit", "x/journal.jsonl", "y.JSONL/z.txt"]   # triés
+        permis = {**OK, **{k: b"permis" for k in ("docs/150.md", "docs/adr-0028/autre.md", "docs/rapports.md",
+                                                     "z.jsonl.txt", "docs/vers-permis")}}
+        list(depot(dep, [{k: v for k, v in permis.items() if k != "docs/vers-permis"}, {
+            k: b"interdit" for k in interdits if k != "docs/vers-interdit"}]))
+        for lien, cible in (("docs/vers-interdit", b"rapports/d.md"), ("docs/vers-permis", b"150.md")):
+            blob = g(dep, "hash-object", "-w", "--stdin", entree=cible)     # liens relatifs posés par la plomberie git
+            g(dep, "update-index", "--add", "--cacheinfo", f"120000,{blob},{lien}")
+        g(dep, "commit", "-q", "-m", "liens")
+        c = g(dep, "rev-parse", "HEAD")
+        arbre = os.path.join(d, "arbre")
+        h, x = orc.extraire(dep, c, arbre)
+        ecrits = {os.path.relpath(os.path.join(r, f), arbre).replace(os.sep, "/") for r, _s, fs in os.walk(arbre)
+                  for f in fs}
+        self.assertEqual((ecrits, h, x), (set(permis), {k: hashlib.sha256(v).hexdigest() for k, v in permis.items()},
+                                          interdits))
+        for r in ("docs/rapports", "docs/adr-0025", "docs/adr-0028/execution", "docs/pocket-report", "y.JSONL"):
+            self.assertFalse(os.path.exists(os.path.join(arbre, r)), r)
+        attendu = {"nombre": 11, "sha256": hashlib.sha256(chr(10).join(interdits).encode()).hexdigest()}
+        chemin = orc.enregistrer(d, "G2", a, dep, c)[0]
+        rec = orc.verifier(chemin, "G2", c, dep)
+        self.assertEqual((rec["exit"], rec["tree"]["exclus"], set(rec["tree"]["sha256"])), (0, attendu, set(permis)))
+        for nom, f, depot_, controle in (
+                ("haché", lambda r: r["tree"]["sha256"].update({"x/journal.jsonl": "0" * 64}), None, "exclus"),
+                ("nombre", lambda r: r["tree"]["exclus"].update(nombre=9), dep, "exclus"),
+                ("liste", lambda r: r["tree"]["exclus"].update(sha256="0" * 64), dep, "exclus"),
+                ("absent", lambda r: r["tree"].pop("exclus"), None, "champs"),
+                ("forme", lambda r: r["tree"]["exclus"].pop("sha256"), None, "champs")):
+            with self.subTest(copie=nom), self.assertRaisesRegex(ValueError, rf"^refus [(]{controle}[)] : "):
+                orc.verifier(self.copie(d, chemin, f"exclus-{nom}.json", f), "G2", c, depot_)
+        source = Path(orc.INTERDITS).read_text(encoding="utf-8")
+        autre = os.path.join(d, "interdits.py")
+        Path(autre).write_text(source.replace('"docs/rapports/", ', ""), encoding="utf-8")
+        with mock.patch.object(orc, "INTERDITS", autre):
+            self.assertEqual(orc.extraire(dep, c, os.path.join(d, "arbre-2"))[1], [y for y in interdits if y not in (
+                "Docs/Rapports/i.md", "docs/rapports/d.md", "docs/vers-interdit")])     # la liste partagée fait foi
+        with mock.patch.object(orc, "INTERDITS", os.path.join(d, "absent.py")), self.assertRaisesRegex(
+                ValueError, r"— refus$"):
+            orc.extraire(dep, c, os.path.join(d, "arbre-3"))
 
     def test_delai_depasse_exit_non_nul_enregistrement_ecrit(self):
         """SHOGEN-ENREG-VERIF-1 (iii) : test qui dort 20 s sous un délai de 1 s : commande arrêtée, exit 124 consigné

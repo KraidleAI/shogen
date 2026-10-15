@@ -29,3 +29,14 @@ commit par elle-même : elle le ramène à celui de l'arbre de l'outil, qui seul
 Le schéma `shogen.oracle-record.v1` ne consigne pas l'arbre de l'outil : cette règle est une règle d'usage, aucun
 contrôle ne l'impose. Consigner cet arbre (commit, sha256 de `VERIF`, état propre ou non) demanderait un schéma v2 et
 une décision.
+
+## Extraction sans emplacement interdit (ajout daté du 2026-10-10 04:16:22 UTC, lot DETTES-T7)
+
+Item SHOGEN-ENREG-EXTRACTION-INTERDITS-1. L'enregistreur extrait le commit par `git archive` dans le `TMPDIR` de
+l'agent qui l'emploie. Il n'écrit ni ne hache aucun fichier d'un emplacement interdit des briefs, ni un lien qui y
+mène : la règle est le prédicat `interdit` de `enforcement/docs-sha256sums.py` (préfixes d'`INTERDITS`, égaux à la
+liste de S-G5 par un cas ; tout composant en `.jsonl` ; casse pliée), lu dans l'arbre de l'outil, jamais recopié.
+L'enregistrement consigne `tree.exclus` : le nombre de chemins exclus et le sha256 de leur liste triée, un par ligne,
+jamais leurs noms. La lecture refuse (`exclus`) un `tree.sha256` qui porte un chemin interdit, et, avec `--depot`, un
+`tree.exclus` autre que celui de la ré-extraction. Un enregistrement sans `tree.exclus`, écrit par un outil antérieur,
+est refusé (`champs`) : il se refait avec l'outil courant.

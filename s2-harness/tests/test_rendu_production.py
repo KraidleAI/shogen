@@ -288,7 +288,8 @@ T_OK = b"import unittest\n\n\nclass T(unittest.TestCase):\n    def test_a(self):
 
 def monter_prod(d: str) -> dict:
     """Dépôt jetable : commit c1 = shogen_s2/ et tools/ du harnais (seule la table des sorties de rendu_unique remplacée
-    par TABLE), une suite triviale, le lint d'épinglage et le vérificateur (AMORCE de la commande `suite`, OUT-2i) ;
+    par TABLE), une suite triviale, le lint d'épinglage, le vérificateur (AMORCE de la commande `suite`, OUT-2i) et
+    les emplacements interdits (enforcement/docs-sha256sums.py, extraction de l'enregistreur, lot DETTES-T7) ;
     journaux du collecteur réel et sommes hors dépôt ; paquet,
     JOURNAL.md, go épinglé (voie (b), 2026-09-01) ; f["ru"] : module chargé depuis la copie du dépôt, dont le sha256
     est sha256_script (C-2)."""
@@ -305,7 +306,8 @@ def monter_prod(d: str) -> dict:
                        "test_t.py": T_OK, "s2-harness/tools/rendu_unique.py": outil.encode(),
                        "enforcement/lint-model-pinning.sh": Path(LINT).read_bytes(),
                        "enforcement/verdict-suite-s2.py": Path(LINT).with_name("verdict-suite-s2.py").read_bytes(),
-                       **{f"s2-harness/{r}": Path(HARNAIS, r).read_bytes() for r in code}})
+                       "enforcement/docs-sha256sums.py": Path(LINT).with_name("docs-sha256sums.py").read_bytes(),
+                       **{f"s2-harness/{r}": Path(HARNAIS, r).read_bytes() for r in code}})     # DETTES-T7 : interdits
     fixture(jx)
     poser(jx, {"campagne.log": b"x\n", "segments.json": b"{}\n"}, commit=False)
     noms = ("control.jsonl", "journal.jsonl", "raw.jsonl", "campagne.log", "segments.json")
