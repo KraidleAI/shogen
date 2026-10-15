@@ -90,7 +90,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           "cadence": {"lectures": int, "pas_s": int, "source": str,
                       **dict.fromkeys(("coingecko", "defillama"), {"url": str, "options": str,
                                                                   "ids": dict.fromkeys(ACTIFS + ("BTC",), str)})},
-          "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str}}
+          "reseau": {"agent": str, "delai_s": int, "essais": int, "pause_s": int, "source": str},
+          "historique": {"debut": int, "source": str}}
 
 
 def conforme(x, s) -> bool:
@@ -135,6 +136,7 @@ def coherent(p: dict) -> bool:
             ok = ok and (lec["modes"][a] == "calibre" or a in F3)
             ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
     ok = ok and all(x in p["fenetre_descriptive"]["sans"] for x in PLACES if p["series"][x]["acces"] == "archive")
+    ok = ok and p["historique"]["debut"] % 60 == 0 and all(p["historique"]["debut"] < f["debut"] for f in fen)  # C-15
     for s in (p["series"][x] for x in PLACES):              # C-12 : pages : 0 <= 2c < ⌊pas/2⌋ (créneaux, C-9),
         k, c = (s["pas"] // 2 if s["acces"] == "pages" else 1), s["chevauchement"]   # demi-requêtes sous pas ; sinon 0
         ok = ok and s["voisins"] >= 0 and 0 <= 2 * c < k and (k + 1) // 2 + 2 * c < max(s["pas"], 2)
@@ -238,6 +240,26 @@ def doubles(prm: dict, place: str, fen: dict) -> list:
     h = 60 * (u // 120)
     return [(d, d + u, d - 60 * c, d + u + 60 * (c - 1))
             for d in range(fen["debut"] - h, fen["fin"] + h, u)] if s["couverture"] == 2 else []
+
+
+def sonde(prm: dict, place: str, fen: dict, vide) -> tuple:
+    """C-15 : sondes de première bougie, k = ⌊pas/2⌋ créneaux de x à x + 60 (k − 1) ; `vide(x)` : réponse sans bougie.
+    Recul depuis haut = fin − 60 k, en haut − 60 k (2^j − 1), j = 0, 1, …, borné à lo = historique.debut (avant toute
+    cotation), jusqu'à une sonde non vide (aucune : None) ; puis dichotomie de lo à elle, jusqu'au premier x non vide.
+    Rend (x sondés, x non vide le plus précoce ou None)."""
+    lo, k = prm["historique"]["debut"], 60 * (prm["series"][place]["pas"] // 2)
+    chemin, j = [], 0
+    while not chemin or vide(chemin[-1]):
+        if chemin and chemin[-1] <= lo:
+            return chemin, None
+        chemin.append(max(lo, fen["fin"] - k - k * (2 ** j - 1)))
+        j += 1
+    hi = chemin[-1]
+    while hi - lo > 60:
+        m = lo + 60 * ((hi - lo) // 120)
+        chemin.append(m)
+        lo, hi = (m, hi) if vide(m) else (lo, m)
+    return chemin, hi
 
 
 def demis(prm: dict, place: str, depart: int, borne: int, fin: int) -> list:

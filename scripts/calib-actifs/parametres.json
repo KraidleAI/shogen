@@ -89,5 +89,7 @@
                         "USDT": "coingecko:tether"}},
   "source": "AVIS Q-CA-11 modifiée : relevé séparé, hors de lancer.sh, horodatages seuls ; PROPOSITION §2.2 (formes)"},
  "reseau": {"agent": "calib-actifs", "delai_s": 60, "essais": 3, "pause_s": 10,
-  "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"}
+  "source": "E-CA-13 : étape réseau séparée du calcul ; reprise sur les fichiers déjà au manifeste"},
+ "historique": {"debut": 1230940800,
+  "source": "C-15 (FORMES-API-1) : début des sondes, 2009-01-03 00:00 UTC (genèse de Bitcoin), avant toute cotation"}
 }

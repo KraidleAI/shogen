@@ -67,8 +67,9 @@ class TestSocle(unittest.TestCase):
         places horodatées, place sans série, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée,
         strates sans le dimanche ; DETTES-T2 : double chevauchement égal au pas (Coinbase), chevauchement hors pages,
         voisins négatifs (OKX) ou hors mensuels (Kraken), page sans créneau (pas 1), couverture 3, double hors pages ou
-        à demi-page nulle : CA/parametres. Bords, à la main : second découpage à 2 minutes utiles ; aucune demi-page
-        d'une page d'un point (C-14). Mutation : chaque contrôle de cohérence retiré à son tour."""
+        à demi-page nulle, sondes depuis le début de fenêtre ou hors minute (C-15) : CA/parametres. Bords, à la main :
+        second découpage à 2 minutes utiles ; aucune demi-page d'une page d'un point (C-14). Mutation : chaque contrôle
+        de cohérence retiré à son tour."""
         def a(cle, actif, valeur):
             return lambda p: p["lectures"]["A"][cle].update({actif: valeur})
         cas = [a("places", "USDC", ["binance", "bitfinex", "bitstamp", "kraken", "okx"]),
@@ -88,7 +89,9 @@ class TestSocle(unittest.TestCase):
                lambda p: p["series"]["coinbase"].update(pas=1, chevauchement=0),   # C-12 : pas 1, aucun créneau
                lambda p: p["series"]["coinbase"].update(couverture=3),        # C-13 : couverture 1 ou 2 seulement,
                lambda p: p["series"]["kraken"].update(couverture=2),          # double hors pages,
-               lambda p: p["series"]["coinbase"].update(pas=6, couverture=2)]  # demi-page nulle (1 minute utile)
+               lambda p: p["series"]["coinbase"].update(pas=6, couverture=2),  # demi-page nulle (1 minute utile)
+               lambda p: p.setdefault("historique", {}).update(debut=1775001600),   # C-15 : sondes depuis le début de
+               lambda p: p.setdefault("historique", {}).update(debut=1230940830)]   # fenêtre ; hors minute
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
         bord = socle.lire(ecrire_prm(self, lambda p: p["series"]["coinbase"].update(chevauchement=74)))   # C-12 : 2
