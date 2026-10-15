@@ -11,6 +11,9 @@
 //! Ces cas ne mesurent pas la logique de vérification : ils mesurent que la
 //! coquille refuse **ce qu'elle ne peut pas exécuter**, au lieu de deviner.
 
+mod commun;
+
+use commun::Arbre;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -27,11 +30,11 @@ fn lot_reel() -> Vec<u8> {
     std::fs::read(fixtures().join("s3-binance.lot.cbor")).expect("le lot réel est versionné")
 }
 
-fn repertoire(nom: &str) -> PathBuf {
-    let chemin = std::env::temp_dir().join(format!("shogen-coquille-{nom}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&chemin);
-    std::fs::create_dir_all(&chemin).expect("création du répertoire de test");
-    chemin
+/// Lot DETTES-T7 (SHOGEN-VERIFIER-TESTS-TMP-RESTES-1) : `commun::Arbre`, effacé à la fin du test.
+fn repertoire(nom: &str) -> Arbre {
+    let arbre = Arbre::nouveau("shogen-coquille", nom);
+    std::fs::create_dir_all(&*arbre).expect("création du répertoire de test");
+    arbre
 }
 
 fn executer(arguments: &[&Path]) -> (i32, String, String) {
@@ -53,7 +56,8 @@ fn executer(arguments: &[&Path]) -> (i32, String, String) {
 #[test]
 fn une_option_donnee_deux_fois_est_refusee() {
     let registre = fixtures().join("s3-binance.registre.txt");
-    let lot = repertoire("option-double").join("lot.cbor");
+    let repertoire = repertoire("option-double");
+    let lot = repertoire.join("lot.cbor");
     std::fs::write(&lot, lot_reel()).expect("écriture du lot");
     let (code, _, erreur) = executer(&[
         lot.as_path(),
@@ -69,7 +73,8 @@ fn une_option_donnee_deux_fois_est_refusee() {
 #[test]
 fn un_constat_donne_deux_fois_est_refuse() {
     let constat = fixtures().join("s3-binance.constat.json");
-    let lot = repertoire("constat-double").join("lot.cbor");
+    let repertoire = repertoire("constat-double");
+    let lot = repertoire.join("lot.cbor");
     std::fs::write(&lot, lot_reel()).expect("écriture du lot");
     let (code, _, erreur) = executer(&[
         lot.as_path(),
@@ -84,7 +89,8 @@ fn un_constat_donne_deux_fois_est_refuse() {
 
 #[test]
 fn une_option_inconnue_est_refusee() {
-    let lot = repertoire("option-inconnue").join("lot.cbor");
+    let repertoire = repertoire("option-inconnue");
+    let lot = repertoire.join("lot.cbor");
     std::fs::write(&lot, lot_reel()).expect("écriture du lot");
     let (code, _, erreur) = executer(&[lot.as_path(), Path::new("--verbeux")]);
     assert_eq!(code, CODE_USAGE, "{erreur}");
@@ -103,7 +109,8 @@ fn deux_lots_a_la_fois_sont_refuses() {
 
 #[test]
 fn une_option_privee_de_sa_valeur_est_refusee() {
-    let lot = repertoire("option-sans-valeur").join("lot.cbor");
+    let repertoire = repertoire("option-sans-valeur");
+    let lot = repertoire.join("lot.cbor");
     std::fs::write(&lot, lot_reel()).expect("écriture du lot");
     let (code, _, erreur) = executer(&[lot.as_path(), Path::new("--constat")]);
     assert_eq!(code, CODE_USAGE, "{erreur}");

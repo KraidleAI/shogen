@@ -21,6 +21,9 @@
 //! son pouvoir : une empreinte produite par le code vérifié ne prendrait ce code
 //! en défaut sur aucune erreur, puisqu'elle bougerait avec lui.
 
+mod commun;
+
+use commun::Arbre;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -176,12 +179,12 @@ fn lot_intact() -> Vec<u8> {
 /// le mutant `subject.rs:522:17` était compté survivant au premier run et tué
 /// aux suivants, sur un code de `subject.rs` que le lot trivial n'atteint même
 /// pas. Un score non rejouable n'est pas un fait (ADR-0011 point 2).
-fn repertoire(nom: &str) -> PathBuf {
-    let chemin =
-        std::env::temp_dir().join(format!("shogen-canonique-{nom}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&chemin);
-    std::fs::create_dir_all(&chemin).expect("création du répertoire de test");
-    chemin
+/// Lot DETTES-T7 (SHOGEN-VERIFIER-TESTS-TMP-RESTES-1) : `commun::Arbre`, sous la
+/// cible cargo, nom unique (processus et rang), effacé à la fin du test.
+fn repertoire(nom: &str) -> Arbre {
+    let arbre = Arbre::nouveau("shogen-canonique", nom);
+    std::fs::create_dir_all(&*arbre).expect("création du répertoire de test");
+    arbre
 }
 
 /// Le registre publié de référence, écrit comme `docs/08-assumptions.md` le
@@ -255,21 +258,26 @@ fn executer(arguments: &[&Path]) -> (i32, String, String) {
     )
 }
 
-/// Prépare un cas : écrit le lot, le registre et le constat, rend leurs chemins.
-fn preparer(nom: &str, lot: &[u8], residus_du_registre: &[&str]) -> (PathBuf, PathBuf, PathBuf) {
+/// Prépare un cas : écrit le lot, le registre et le constat, rend leurs chemins, et l'arbre qui les porte, à garder
+/// vivant jusqu'à la fin du cas (lot DETTES-T7 : il s'efface quand il est lâché).
+fn preparer(
+    nom: &str,
+    lot: &[u8],
+    residus_du_registre: &[&str],
+) -> (Arbre, PathBuf, PathBuf, PathBuf) {
     let repertoire = repertoire(nom);
     let chemin_lot = repertoire.join("lot.cbor");
     std::fs::write(&chemin_lot, lot).expect("écriture du lot");
     let registre = ecrire_registre(&repertoire, residus_du_registre);
     let constat = ecrire_constat(&repertoire, EMPREINTE_DE_PREUVE, EMPREINTE_D_UTTERANCE);
-    (chemin_lot, registre, constat)
+    (repertoire, chemin_lot, registre, constat)
 }
 
 const REGISTRE_COMPLET: &[&str] = &[RESIDU_1, RESIDU_2, RESIDU_DE_LA_DELEGATION];
 
 #[test]
 fn temoignage_canonique_intact_le_verdict_nomme_les_residus_et_la_delegation() {
-    let (lot, registre, constat) = preparer("intact", &lot_intact(), REGISTRE_COMPLET);
+    let (_arbre, lot, registre, constat) = preparer("intact", &lot_intact(), REGISTRE_COMPLET);
     let (code, sortie, erreur) = executer(&[
         &lot,
         Path::new("--registre"),
@@ -315,7 +323,7 @@ fn mutant_1_preuve_alteree_est_refusee_fail_closed() {
         &preuve,
         &[RESIDU_1, RESIDU_2],
     );
-    let (chemin, registre, constat) = preparer("preuve", &lot, REGISTRE_COMPLET);
+    let (_arbre, chemin, registre, constat) = preparer("preuve", &lot, REGISTRE_COMPLET);
     let (code, _, erreur) = executer(&[
         &chemin,
         Path::new("--registre"),
@@ -342,7 +350,7 @@ fn mutant_2_hash_d_utterance_faux_est_refuse_fail_closed() {
         OCTETS_DE_PREUVE,
         &[RESIDU_1, RESIDU_2],
     );
-    let (chemin, registre, constat) = preparer("hash", &lot, REGISTRE_COMPLET);
+    let (_arbre, chemin, registre, constat) = preparer("hash", &lot, REGISTRE_COMPLET);
     let (code, _, erreur) = executer(&[
         &chemin,
         Path::new("--registre"),
@@ -367,7 +375,7 @@ fn mutant_3_residu_non_resolu_est_refuse_fail_closed() {
         OCTETS_DE_PREUVE,
         &[RESIDU_1, "A(residu-jamais-publie)"],
     );
-    let (chemin, registre, constat) = preparer("residu", &lot, REGISTRE_COMPLET);
+    let (_arbre, chemin, registre, constat) = preparer("residu", &lot, REGISTRE_COMPLET);
     let (code, _, erreur) = executer(&[
         &chemin,
         Path::new("--registre"),
@@ -429,7 +437,7 @@ fn un_subject_non_canonique_est_refuse_au_decodage() {
         .position(|f| f == SUBJECT.as_bytes())
         .expect("le subject figure dans le lot");
     lot[position + 8] = b'A'; // première lettre de l'hôte, en majuscule
-    let (chemin, registre, constat) = preparer("subject", &lot, REGISTRE_COMPLET);
+    let (_arbre, chemin, registre, constat) = preparer("subject", &lot, REGISTRE_COMPLET);
     let (code, _, erreur) = executer(&[
         &chemin,
         Path::new("--registre"),
@@ -704,7 +712,8 @@ fn balayer_les_octets() {
 /// désormais sur le **tri strict** des clés.
 #[test]
 fn un_constat_a_cle_repetee_est_refuse() {
-    let (lot, registre, constat) = preparer("constat-cle-repetee", &lot_intact(), REGISTRE_COMPLET);
+    let (_arbre, lot, registre, constat) =
+        preparer("constat-cle-repetee", &lot_intact(), REGISTRE_COMPLET);
     let texte = std::fs::read_to_string(&constat).expect("constat de référence");
     let doublon = texte.replacen(
         &format!("\"server_name\":\"{ORIGINE}\","),
