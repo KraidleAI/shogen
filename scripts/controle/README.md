@@ -232,3 +232,13 @@ dépendent des tests du harnais qu'ils importent.
 > avec une ligne `ERREUR <sous-commande> : <type> : <message>` sur la sortie d'erreur ; jamais en 1, qui est un refus
 > (une ligne de plan illisible sortait en 1 avec une trace). `tests/test_avant_acte.py` compte 23 tests ; plancher du
 > job `controle-unittest` 89.
+
+> *Ajout daté du 2026-10-10 08:47:10 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-1 ; erreurs LA-N05 et E25)* :
+> `gabarits/chaine.sh` (sha256 `0db95f4cdef695f40854511dd52942db5dc6c5a5c384ba412dcb740a37a643fa`) : la
+> fonction `verif`, appelée par `verif <id> && avant_acte.py sceller`, tourne hors de `set -e` (règle de bash pour
+> une commande à gauche de `&&`) : seule sa dernière commande décidait ; un verdict ROUGE de `xtask`, un `cargo test`
+> ou une ligne de `gates.yml` en échec laissaient sceller et commettre le pas. Chaque pas sort désormais en 1 à son
+> échec ; une ligne de `gates.yml` lit `/dev/null`, jamais la suite des lignes ; délai du lancement détaché écrit
+> `<s> = 120 × pas × minutes d'un pas` (le 6600 fixe tuait une chaîne de plus de 110 min, E25).
+> `tests/test_gabarit_chaine.py` compte 8 tests (`test_c1_verif_reelle` : cargo et portes factices) ; plancher du
+> job `controle-unittest` 90.

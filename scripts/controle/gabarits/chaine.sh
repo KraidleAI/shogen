@@ -2,7 +2,7 @@
 # Modèle de chaîne de commits de l'orchestrateur (lot GARDE-FOUS-ORCH, GF-9 ; erreurs E3, E8, E25, LA-N04, LA-N05), à
 # copier par lot. Lancement détaché, avec un délai (E3), attente dans un appel séparé ; un lancement lié est refusé
 # au-delà de 100 min estimées (DUREE_PAS : durée mesurée d'un pas en minutes, 6 par défaut) :
-#   DETACHE=1 setsid nohup timeout 6600 bash chaine.sh > chaine.log 2>&1 &   (PID et journal consignés)
+#   DETACHE=1 setsid nohup timeout <s> bash chaine.sh > chaine.log 2>&1 &   (<s> = 120 × pas × minutes d'un pas)
 # PLAN : une ligne par commit, champs séparés par | : id|diff1,diff2|fichier de message|source1,source2. Un diff rouge
 # seul ne forme jamais une ligne : il va avec le diff qui le rend vert (E11). Le message est un fichier écrit après la
 # dernière retouche des sources, avec une ligne Source-Sha: <sha256> par source et la ligne Diff-Id: <id> ; la chaîne
@@ -18,18 +18,21 @@ DELAI=${DELAI:-2400}
 acte() { "$PYTHON" -I -B "$OUTILS/avant_acte.py" --depot "$DEPOT" "$@"; }
 
 # Vérification complète, comme la forge (à relire par lot) : xtask (verdict seul lu), cargo test de xtask à la cible
-# cargo par défaut de la copie (règle I-1), lignes python3 -B enforcement/ de gates.yml, lint R-1 et ses cas.
+# cargo par défaut de la copie (règle I-1), lignes python3 -B enforcement/ de gates.yml, lint R-1 et ses cas. Appelée
+# par verif && sceller, la fonction tourne hors de set -e : chaque pas sort en 1 à son échec (relecture G2, C-1).
 verif() {
   local j
   j="$(dirname "$PLAN")/verif-$1"
-  ( cd "$DEPOT"
+  ( cd "$DEPOT" || exit 1
     timeout "$DELAI" cargo --locked xtask verify > "$j-xtask.log" 2>&1 || true
-    grep -F "VERDICT GLOBAL : VERT" "$j-xtask.log" > /dev/null
-    timeout "$DELAI" cargo --locked test -p xtask > "$j-cargo.log" 2>&1
+    grep -F "VERDICT GLOBAL : VERT" "$j-xtask.log" > /dev/null || exit 1
+    timeout "$DELAI" cargo --locked test -p xtask > "$j-cargo.log" 2>&1 || exit 1
     grep -E '^ *(run: )?(/usr/bin/)?python3 -B enforcement/' .github/workflows/gates.yml | sed -E 's/^ *(run: )?//' |
-      while read -r ligne; do env -u SHOGEN_S2_CAMPAGNE_CONTROL timeout "$DELAI" bash -c "$ligne" > /dev/null 2>&1; done
-    timeout "$DELAI" bash enforcement/tests/run-fixtures-model-pinning.sh > /dev/null 2>&1
-    timeout "$DELAI" bash enforcement/lint-model-pinning.sh . > /dev/null 2>&1 )
+      while read -r ligne; do
+        env -u SHOGEN_S2_CAMPAGNE_CONTROL timeout "$DELAI" bash -c "$ligne" < /dev/null > /dev/null 2>&1 || exit 1
+      done || exit 1
+    timeout "$DELAI" bash enforcement/tests/run-fixtures-model-pinning.sh < /dev/null > /dev/null 2>&1 || exit 1
+    timeout "$DELAI" bash enforcement/lint-model-pinning.sh . < /dev/null > /dev/null 2>&1 )
 }
 # --- fin de verif
 
