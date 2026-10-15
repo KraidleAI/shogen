@@ -13,7 +13,9 @@ avertissement compté au journal (avis c.4 adopté), à durcir après mesure.
 GF-4b : lignes ajoutées de l'index (git diff --cached), noms d'abord, contenu des seuls chemins admis.
 Relecture G2, C-3 : lignes ajoutées d'un index temporaire (env), préfixes a/ et b/ forcés quelle que soit la
 configuration ; citations lues d'abord dans une surcouche (fichiers d'après un diff).
-Relecture G2, C-5 : la forme stricte admet la référence écrite en code, (`chemin:N`) ou (`chemin`:N)."""
+Relecture G2, C-5 : la forme stricte admet la référence écrite en code, (`chemin:N`) ou (`chemin`:N).
+Relecture G2, C-11 : toute heure écrite dans les 25 caractères qui suivent une date du jour est jugée, la seconde
+heure d'une plage comprise (seule la première l'était) ; une heure approchée en X majuscule (19:5X) est vue."""
 import ast
 import fnmatch
 import functools
@@ -26,9 +28,8 @@ from datetime import datetime, timedelta, timezone
 TOLERANCE_S = 120
 PLAN = re.compile(r"(?i)(prévue?s?|échéance|jalon|d['’]ici|à partir de)")
 DATE = r"[0-9]{4}-[0-9]{2}-[0-9]{2}"
-DATE_HEURE = re.compile("(" + DATE + ")(?:(?!" + DATE + ").){0,25}?"
-                        r"(?<![0-9])([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?(?![0-9])")
-APPROCHEE = re.compile(r"(?<![0-9:])(?:[01][0-9]|2[0-3]):(?:[0-5]x|xx)(?![0-9A-Za-z_])")
+HEURE = re.compile(r"(?<![0-9])([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?(?![0-9])")
+APPROCHEE = re.compile(r"(?<![0-9:])(?:[01][0-9]|2[0-3]):(?:[0-5][xX]|[xX]{2})(?![0-9A-Za-z_])")
 MASQUE = re.compile("`[^`]*`|«[^»]*»")
 RACINE_OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEUILS_GIO = (3, 6)
@@ -52,12 +53,16 @@ def horodatages_fautifs(texte, horloge):
     fautes, borne, jour = [], horloge + timedelta(seconds=TOLERANCE_S), horloge.strftime("%Y-%m-%d")
     for n, ligne in enumerate(texte.split(chr(10)), 1):
         nue = MASQUE.sub(lambda m: " " * len(m.group()), ligne)
-        for m in DATE_HEURE.finditer(nue):
-            if m.group(1) != jour or PLAN.search(nue[max(0, m.start() - 40):m.start()]):
+        dates = list(re.finditer(DATE, nue))
+        for m in HEURE.finditer(nue):
+            d = next((d for d in reversed(dates) if d.end() <= m.start()), None)
+            if not d or m.start() - d.end() > 25 or d.group(0) != jour:
                 continue
-            h = datetime.strptime(f"{m.group(1)} {m.group(2)}:{m.group(3)}:{m.group(4) or '00'}", "%Y-%m-%d %H:%M:%S")
+            if PLAN.search(nue[max(0, d.start() - 40):d.start()]):
+                continue
+            h = datetime.strptime(f"{d.group(0)} {m.group(1)}:{m.group(2)}:{m.group(3) or '00'}", "%Y-%m-%d %H:%M:%S")
             if h.replace(tzinfo=timezone.utc) > borne:
-                fautes.append((n, "heure-future", m.group(0).strip()))
+                fautes.append((n, "heure-future", nue[d.start():m.end()].strip()))
         fautes += [(n, "heure-approchee", m.group(0)) for m in APPROCHEE.finditer(nue)]
     return fautes
 

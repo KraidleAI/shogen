@@ -314,3 +314,10 @@ dépendent des tests du harnais qu'ils importent.
 > interdits comme les fichiers (sortie 3, rien d'ouvert ni de nommé) ; une racine sous un interdit faisait lire son
 > `biblio/INDEX.md`, ou nommer ce chemin dans l'erreur. `tests/test_presg5.py` compte 6 tests ; plancher du job
 > `controle-unittest` 101.
+
+> *Ajout daté du 2026-10-10 09:04:10 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-11 ; erreur E14)* :
+> `garde_commun.py` (sha256 `e6772475d222ae986b0f655011f3890df637e100a544f86d5053e61b94c7e94c`) : toute
+> heure écrite dans les 25 caractères qui suivent une date du jour est jugée, la seconde heure d'une plage comprise
+> (`de 04:10 à 04:22`, `04:10-04:22` : seule la première l'était) ; l'extrait va de la date à l'heure ; une heure
+> approchée écrite en X majuscule (`19:5X`, `21:XX`) est vue. `tests/test_garde_commun.py` compte 17 tests ;
+> plancher du job `controle-unittest` 102.
