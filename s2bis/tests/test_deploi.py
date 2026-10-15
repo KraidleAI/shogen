@@ -201,9 +201,10 @@ class PremierDemarrage(Essai):
             "OBSERVATEUR", "FOURNISSEUR", "REGION", "FAMILLE_RESOLVEUR", "RESOLVEUR_FOURNISSEUR",
             "ADRESSE_SURVEILLANCE", "ADRESSE_SAUVEGARDE")))
         self.assertEqual(self.lire(racine, "home/intervention/.ssh/authorized_keys"), CLE + NL)
+        # dossiers créés par le script (etc/shogen, etc/nftables.d) : root seul y écrit
         self.assertEqual([os.stat(os.path.join(racine, c)).st_mode & 0o777 for c in (
-            "etc/shogen/observateur.conf", "home/intervention/.ssh", "home/intervention/.ssh/authorized_keys")],
-            [0o640, 0o700, 0o600])
+            "etc/shogen/observateur.conf", "home/intervention/.ssh", "home/intervention/.ssh/authorized_keys",
+            "etc/shogen", "etc/nftables.d")], [0o640, 0o700, 0o600, 0o755, 0o755])
 
     def test_tdp1_temporaires_nes_0600(self):
         """Écriture par renommage : chaque temporaire naît 0600, même si un lancement interrompu en a laissé un lisible
