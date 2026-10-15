@@ -64,7 +64,8 @@ Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev
 Contre-contrôle, R-3 : pousser --acte ramène aussi les guillemets du shell, les blancs répétés et les options de git
 placées avant la sous-commande.
 Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité.
-Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un pas du plan."""
+Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un pas du plan.
+Contre-contrôle, R-7 : verser compte fichiers et octets avant toute lecture (borne)."""
 import argparse
 import contextlib
 import fnmatch
@@ -103,6 +104,7 @@ PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Déca
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
 BORNE_LIEE = 100
+PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
 
 
 class Erreur(Exception):
@@ -367,7 +369,7 @@ def verser(a, fautes):
     reel, depot = os.path.realpath(racine), os.path.realpath(a.depot)
     if depot == reel or depot.startswith(reel.rstrip(os.sep) + os.sep):
         raise Erreur("dossier de pièces refusé : /, le dépôt ou l'un de ses ancêtres (jamais parcouru)")
-    pieces, ecartes, autres = {}, 0, 0
+    pieces, ecartes, autres, octets = {}, 0, 0, 0
     for base, dossiers, fichiers in os.walk(racine):
         caches = {x for x in dossiers if GC.chemin_interdit(os.path.join(base, x))}
         ecartes += len(caches)
@@ -379,7 +381,11 @@ def verser(a, fautes):
             elif not os.path.isfile(p):
                 autres += 1
             else:
-                pieces[os.path.relpath(p, racine)] = lire(p)
+                pieces[os.path.relpath(p, racine)], octets = p, octets + os.path.getsize(p)
+                if len(pieces) > PIECES_MAX or octets > OCTETS_MAX:      # racine fausse (R-7)
+                    raise Erreur(f"dossier de pièces de plus de {PIECES_MAX} fichiers ou {OCTETS_MAX >> 20} Mio : "
+                                 "racine fausse ? (aucun fichier lu)")
+    pieces = {r: lire(p) for r, p in pieces.items()}
     if ecartes:
         fautes.append(("refus", "V0", f"{ecartes} fichier(s) ou dossier(s) sous un interdit : ni lus, ni parcourus, "
                        "ni nommés", "les retirer", "-"))

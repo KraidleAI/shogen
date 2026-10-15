@@ -21,7 +21,8 @@ ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités
 passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
 sortie standard fermée : 3).
 Contre-contrôle : R-2 (pousser, historique de la plage) ; R-3 (pousser --acte, actes écrits autrement).
-Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé). ; R-5 (chaine : Diff-Id en double au plan)."""
+Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé) ; R-5 (chaine : Diff-Id en double au plan).
+Contre-contrôle : R-7 (verser : borne du dossier de pièces)."""
 import contextlib
 import difflib
 import fnmatch
@@ -480,6 +481,18 @@ class Versement(Depot):
         code, sortie = self.lancer("verser", "--pieces", self.p)
         v5 = "REFUS V5 : 1 fichier(s) non ordinaire(s) (lien brisé, tube, appareil) : non lus ; à faire : les retirer"
         self.assertEqual((code, sortie.split(NL)[0]), (1, v5))
+
+    def test_r7_dossier_trop_grand(self):
+        """R-7 : dossier de pièces au-delà de la borne (racine fausse, comme /root, /usr ou le scratchpad entier) :
+        erreur 3 avant toute lecture, en fichiers comme en octets ; sous la borne : contrôles ordinaires."""
+        ag.ecrire(self.p, {"a.md": "a", "b.md": "b", "SHA256SUMS": "x"})
+        for borne in ({"PIECES_MAX": 2}, {"OCTETS_MAX": 2}):
+            lus = []
+            temoin = mock.patch.object(avant_acte, "lire", lambda c: lus.append(c) or b"")
+            with mock.patch.multiple(avant_acte, create=True, **borne), temoin:
+                code = self.lancer("verser", "--pieces", self.p)[0]
+            self.assertEqual((code, lus), (3, []), borne)
+        self.assertEqual(self.lancer("verser", "--pieces", self.p)[1][:9], "REFUS V4 ")
 
     def test_sommes_chemins_heures(self):
         """V4 : SHA256SUMS écrit avec ./, ligne fausse, pièce non listée, absent : refus ; V3 : chemin absolu du

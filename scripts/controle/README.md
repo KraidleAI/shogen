@@ -393,3 +393,10 @@ dépendent des tests du harnais qu'ils importent.
 > aussi une étape de `gates.yml` écrite `- run: python3 -B enforcement/…` (forme courante des workflows), que son
 > motif sautait : une telle étape rouge laissait sceller et commettre le pas. `tests/test_gabarit_chaine.py` compte 8
 > tests (`test_c1_verif_reelle` : étape en tiret) ; plancher du job `controle-unittest` inchangé, 111.
+
+> *Ajout daté du 2026-10-15 11:38:16 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-7 ; E19, C-8)* :
+> `avant_acte.py` (sha256 `a78d3e674738d3b1ed8826136052c9e4247cf392e90f9a72042a5a2aba112dda`) : `verser` compte les
+> fichiers et les octets du dossier de pièces avant toute lecture et sort en erreur au-delà de 5000 fichiers ou 512
+> Mio (racine fausse, voisine de `/` : `/root`, `/usr`, le scratchpad entier) ; ces racines étaient parcourues et lues
+> en entier, leurs `.md` jugés, des extraits imprimés aux refus. `tests/test_avant_acte.py` compte 41 tests ; plancher
+> du job `controle-unittest` 112.
