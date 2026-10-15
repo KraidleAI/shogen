@@ -1,7 +1,8 @@
 """Cas du modèle de chaîne gabarits/chaine.sh (lot GARDE-FOUS-ORCH, GF-9 ; erreurs E3, E8, LA-N04, LA-N05), lancé par
 bash dans un dépôt git temporaire isolé (tests/aide_garde.py). La fonction verif, propre à chaque lot, est remplacée
 par un faux réglé par ROUGE (id dont la vérification est rouge) ; le reste du modèle tourne tel quel.
-Relecture G2, C-1 : VerifDuModele lance la fonction verif telle qu'écrite (cargo et portes factices)."""
+Relecture G2, C-1 : VerifDuModele lance la fonction verif telle qu'écrite (cargo et portes factices) ; C-15 : cargo
+à la cible par défaut même si l'environnement pose CARGO_TARGET_DIR."""
 import hashlib
 import os
 import re
@@ -118,7 +119,8 @@ class Chaine(unittest.TestCase):
 class VerifDuModele(unittest.TestCase):
     PORTE = NL.join(["import os, sys", "if sys.argv[1] == 'mange':", "    sys.stdin.read()",
                      "sys.exit(1 if os.environ.get('ROUGE_A') == sys.argv[1] else 0)", ""])
-    CARGO = NL.join(["#!/bin/sh", 'case "$*" in', '  *"xtask verify"*) [ "$ROUGE_A" = xtask ] ||',
+    CARGO = NL.join(["#!/bin/sh", '[ -z "${CARGO_TARGET_DIR}${CARGO_BUILD_TARGET_DIR}" ] || exit 1', 'case "$*" in',
+                     '  *"xtask verify"*) [ "$ROUGE_A" = xtask ] ||',
                      '    echo "=== VERDICT GLOBAL : VERT ===" ;;', '  *) [ "$ROUGE_A" != cargo ] ;;', "esac", ""])
 
     def fichiers(self):
@@ -132,7 +134,8 @@ class VerifDuModele(unittest.TestCase):
         """C-1 : appelée par verif && sceller, la fonction verif tourne hors de set -e ; un pas rouge, quel qu'il soit
         (verdict de xtask, cargo test, ligne de gates.yml, même après une ligne qui lit l'entrée standard, cas du lint,
         lint), arrête la chaîne avant le sceau et le commit (le pas arrêté est retiré de l'index avant la relance) ;
-        tout vert : un commit."""
+        tout vert : un commit. C-15 (E5, règle I-1) : CARGO_TARGET_DIR posé dans l'environnement ne déplace pas la
+        cible de cargo (le cargo factice échoue s'il la voit)."""
         with tempfile.TemporaryDirectory() as t:
             d, env = ag.depot(t, self.fichiers())
             ag.ecrire(t, {"bin/cargo": self.CARGO, "ADJ.md": "CONFORME en deux passes." + NL,
@@ -150,7 +153,8 @@ class VerifDuModele(unittest.TestCase):
             chemin = os.path.join(t, "bin") + os.pathsep + env["PATH"]
             for rouge in ("xtask", "cargo", "porte", "cas", "lint", ""):
                 variables = dict(env, DEPOT=d, PLAN=os.path.join(t, "plan"), CC=os.path.join(t, "cc.md"), OUTILS=ICI,
-                                 PYTHON=sys.executable, ROUGE_A=rouge, PATH=chemin)
+                                 PYTHON=sys.executable, ROUGE_A=rouge, PATH=chemin,
+                                 CARGO_TARGET_DIR=os.path.join(t, "ailleurs"))
                 p = subprocess.run(["bash", os.path.join(ICI, "gabarits", "chaine.sh")], env=variables,
                                    capture_output=True, text=True, timeout=300)
                 ids = re.findall("(?m)^Diff-Id: (.+)$", ag.git(d, env, "log", "--format=%B"))

@@ -328,3 +328,10 @@ dépendent des tests du harnais qu'ils importent.
 > docs 03, 04, 09 et 13, `docs/G1-lot-B0-pool-analyse.md`, `CLAUDE.md`) ; `biblio/INDEX.md` et les workflows, cités
 > aussi, restent hors de la liste (limite de la relecture G2). `tests/test_avant_acte.py` compte 33 tests
 > (`test_c12_documents_cites_par_docs17`) ; plancher du job `controle-unittest` 103.
+
+> *Ajout daté du 2026-10-10 09:14:52 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-15 ; erreur E5, règle I-1)* :
+> `gabarits/chaine.sh` (sha256 `42bcb5b5d687dc14e7529187760dcc17b148fd47233275f45e938e9937c5979f`) : `verif`
+> lance cargo sans `CARGO_TARGET_DIR` ni `CARGO_BUILD_TARGET_DIR`, à la cible par défaut de la copie, comme la
+> forge ; une variable héritée de l'environnement de l'orchestrateur déplaçait la cible (forme de E5).
+> `tests/test_gabarit_chaine.py` : `test_c1_verif_reelle` pose `CARGO_TARGET_DIR`, le cargo factice échoue s'il la
+> voit ; 8 tests, plancher du job `controle-unittest` inchangé, 103.
