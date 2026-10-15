@@ -155,7 +155,11 @@ def lancer(harnais: str, environ=None) -> tuple:
     stdout, code, compte, nonce) : compte, ligne écrite par AMORCE au nonce du run, None si absente.
     SHOGEN-S2BIS-LEURRE-FORK-TMP-1 (lot DETTES-T7) : la suite tourne dans un groupe de processus neuf
     (start_new_session) ; à sa sortie, le groupe entier est arrêté avant l'effacement du dossier du compte : aucun
-    descendant (fork du leurre LE-05) n'y écrit après lui (POSIX ; Windows n'a pas de fork)."""
+    descendant (fork du leurre LE-05) n'y écrit après lui (POSIX ; Windows n'a pas de fork). Limites (réserve R-4 du
+    contre-contrôle du lot DETTES-T7, 2026-10-15 12:45:00 UTC, mesurées) : un descendant qui garde les tuyaux de la
+    suite est attendu sans borne (bornes : timeout-minutes du job, borne de scripts/controle/mutants.py, délai de
+    l'enregistreur) ; un descendant parti dans sa propre session (setsid) n'est pas du groupe arrêté : il survit et
+    peut recréer le dossier du compte après son effacement (dossier restant ; verdict rendu avant)."""
     env = {k: x for k, x in (os.environ if environ is None else environ).items() if k != VARIABLE}
     n, t, compte = secrets.token_hex(16), tempfile.mkdtemp(prefix="verdict_compte_"), None
     try:
