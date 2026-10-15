@@ -136,7 +136,8 @@ class PremierDemarrage(Essai):
         self.assertEqual((p.returncode, p.stderr), (0, b""))
 
     def test_tdp1_usage_et_racine_refusees(self):
-        """Script non rempli : hors du mode d'essai, le refus des paramètres arrêterait tout avant tout changement."""
+        """Script non rempli : hors du mode d'essai, le refus des paramètres arrêterait tout avant tout changement.
+        La racine / n'est jamais essayée, par sûreté (L-6) : sa garde se relit dans le script."""
         vide = tempfile.mkdtemp(dir=self.tmp)                               # racine sans essai.getent
         for args, motif in ((["--essai", vide], "ESSAI/racine"), (["--essai", vide + "/absente"], "ESSAI/racine"),
                             (["--essai"], "usage"), (["--autre", vide], "usage")):
