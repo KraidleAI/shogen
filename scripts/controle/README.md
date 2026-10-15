@@ -279,3 +279,10 @@ dépendent des tests du harnais qu'ils importent.
 > stricte de citation admet la référence écrite en code, (`` `chemin:N` ``) ou (`` `chemin`:N ``), forme courante du
 > projet, qui n'était vue ni en refus ni en avertissement ; le nom d'une forme libre perd ses accents graves.
 > `tests/test_garde_commun.py` compte 16 tests ; plancher du job `controle-unittest` 96.
+
+> *Ajout daté du 2026-10-10 08:56:46 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-6 ; erreur E15)* :
+> `avant_acte.py` (sha256 `933dc1a2ef0babfcf301d9fc17e752584c108f54b22695fed6816a055f36345c`) : `existe NOM`
+> cherche le nom en toute casse, comme fichier ou comme dossier (un dossier s'imprime avec sa barre finale) ; un nom
+> écrit dans une autre casse ou un nom de dossier sortaient en X1, absence fausse. Le refus X1 nomme ce qui n'est pas
+> cherché : fichiers ignorés par git et interdits. `tests/test_avant_acte.py` compte 29 tests ; plancher du job
+> `controle-unittest` 97.

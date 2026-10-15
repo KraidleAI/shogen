@@ -15,7 +15,7 @@ GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du
 chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
 GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
-diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17)."""
+diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers)."""
 import contextlib
 import difflib
 import hashlib
@@ -486,9 +486,21 @@ class ExisteDisque(Depot):
         self.indexer({"WISHLIST.md": "x", "biblio/INDEX.md": "x"})
         ag.ecrire(self.d, {"sous/WISHLIST.md": "x", "docs/rapports/WISHLIST.md": "x"})
         self.assertEqual(self.lancer("existe", "WISHLIST.md"), (0, "WISHLIST.md" + NL + "sous/WISHLIST.md" + NL))
-        self.assertEqual(self.lancer("existe", "ABSENT.md")[:2], (1, "REFUS X1 : ABSENT.md absent du dépôt "
-                                                                     "(suivis et non suivis, hors interdits)" + NL))
+        absent = ("REFUS X1 : ABSENT.md absent du dépôt (fichiers et dossiers, suivis ou non, toute casse ; hors "
+                  "fichiers ignorés par git et interdits)" + NL)
+        self.assertEqual(self.lancer("existe", "ABSENT.md")[:2], (1, absent))
         self.assertEqual([self.lancer("existe", x)[0] for x in ("biblio/INDEX.md", "*.md")], [3, 3])
+
+    def test_c6_casse_et_dossiers(self):
+        """C-6 : E15 sous d'autres formes : nom écrit dans une autre casse, ou nom d'un dossier : trouvés (le dossier
+        imprimé avec sa barre finale) ; dossier sous un interdit : jamais imprimé, absent."""
+        self.indexer({"WISHLIST.md": "x", "docs/adr-0028/forge-pr11/refus.txt": "x"})
+        ag.ecrire(self.d, {"docs/rapports/forge-pr11/x.txt": "x", "docs/rapports/pieces/y.txt": "y"})
+        self.assertEqual(self.lancer("existe", "wishlist.md"), (0, "WISHLIST.md" + NL))
+        self.assertEqual(self.lancer("existe", "forge-pr11"), (0, "docs/adr-0028/forge-pr11/" + NL))
+        self.assertEqual(self.lancer("existe", "ADR-0028"), (0, "docs/adr-0028/" + NL))
+        code, sortie = self.lancer("existe", "pieces")
+        self.assertEqual((code, "rapports" in sortie), (1, False))
 
     def test_e4_disque(self):
         """E4 : 2,9 Gio libres : refus ; 4 : avertissement ; 7 : rien ; --min-go 8 serre ; --lister : cibles cargo

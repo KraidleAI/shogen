@@ -48,7 +48,8 @@ Relecture G2, C-2 : pousser P3, la branche poussée (refs/heads/B, que pousse gi
 Relecture G2, C-3 : diff lu comme git l'applique (format du diff indifférent : D1 sur les chemins de git apply
 --numstat et des en-têtes, puis analyse de HEAD plus le diff par git diff -U0) ; citations (C5) et corpus de presg5
 (G5) lus dans l'état d'après le diff.
-Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT à -X PUT avant les motifs."""
+Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT à -X PUT avant les motifs.
+Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme dossier (imprimé avec sa barre)."""
 import argparse
 import fnmatch
 import hashlib
@@ -426,11 +427,17 @@ def publier(a, fautes):
 def existe(a, fautes):
     if "/" in a.nom or set(a.nom) & set("*?[]") or GC.chemin_interdit(a.nom):
         raise Erreur("existe : un nom de fichier simple, ni chemin, ni motif, ni interdit")
-    sortie = git(a.depot, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ":(glob)**/" + a.nom)
-    trouves = sorted({x for x in sortie.split(chr(0)) if x and not GC.chemin_interdit(os.path.join(a.depot, x))})
-    print(*trouves, sep=chr(10), end=chr(10) if trouves else "")
+    motifs = [":(glob,icase)**/" + a.nom, ":(glob,icase)**/" + a.nom + "/**"]
+    sortie = git(a.depot, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", *motifs)
+    trouves = set()
+    for x in [x for x in sortie.split(chr(0)) if x and not GC.chemin_interdit(os.path.join(a.depot, x))]:
+        parts = x.split("/")
+        k = next((i for i, p in enumerate(parts) if p.casefold() == a.nom.casefold()), len(parts) - 1)
+        trouves.add("/".join(parts[:k + 1]) + ("/" if k + 1 < len(parts) else ""))
+    print(*sorted(trouves), sep=chr(10), end=chr(10) if trouves else "")
     if not trouves:
-        fautes.append(("refus", "X1", f"{a.nom} absent du dépôt (suivis et non suivis, hors interdits)", "", "-"))
+        fautes.append(("refus", "X1", f"{a.nom} absent du dépôt (fichiers et dossiers, suivis ou non, toute casse ; "
+                       "hors fichiers ignorés par git et interdits)", "", "-"))
 
 
 def cibles(racine, profondeur=4):
