@@ -37,12 +37,12 @@ posées à l'investisseur en une fois ; elles ne sont pas des dettes oubliées.
 
 > *Ajout daté du 2026-10-04 06:52:35 UTC (relecture G2 du lot DETTES-B1, C-4 ; annexe B.4)* : pour SHOGEN-CI-S2-SAUT-1, l'orchestrateur retient un **plancher** du nombre de tests, et non un manifeste des modules (motifs du journal G1 du lot, §9 : le plancher refuse les deux pertes mesurées par le lot CI-S2, module renommé et retrait partiel, alors qu'un manifeste de modules ne voit pas un retrait partiel dans un module ; limite : après une croissance de la suite, un retrait inférieur à l'écart au plancher passe) ; valeur `PLANCHER = 405`, le compte mesuré après le lot ; il suit le compte aux lots suivants (SHOGEN-CI-PLANCHER-SUIVI-1). B.4 réservait ce choix à un G0 ; le G0 de D8a ne l'avait pas tranché.
 
-> *Ajout daté du 2026-10-10 05:22:37 UTC (heure lue par `date -u` ; lot GARDE-FOUS-ORCH, GF-0 ; adjudication de
+> *Ajout daté du 2026-10-10 09:12:23 UTC (heure lue par `date -u` ; lot GARDE-FOUS-ORCH, GF-0 ; adjudication de
 > l'orchestrateur du 2026-10-10)* : **rattachement du lot GARDE-FOUS-ORCH** (garde-fous contre les erreurs de
 > l'orchestrateur). Demande de l'investisseur du 2026-10-10, mot pour mot : « crérs des outils, des script ou je ne
 > sais quoi pour toutes les erreurs que tu as faites. pour t empécher de commetre les mémes erreurs; un skill ou des
 > skills. des erreurs qui ont couté de largent des tokens et du temps ». Pièces, versées avec le lot : liste des
-> erreurs relevées par l'orchestrateur (E1 à E21), proposition du worker G1 (`claude-opus-5-5`), avis de l'advisor
+> erreurs relevées par l'orchestrateur (E1 à E25), proposition du worker G1 (`claude-opus-5-5`), avis de l'advisor
 > (`claude-fable-5-1`, avis adopté), adjudication. Les règles communes ci-dessus valent pour ce lot ; il s'applique en
 > plus à lui-même : aucune heure écrite de mémoire, aucun ajout qui décale une ligne citée par numéro, aucun message
 > d'outil entre guillemets français.
