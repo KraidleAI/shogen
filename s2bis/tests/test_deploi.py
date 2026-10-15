@@ -157,6 +157,11 @@ class PremierDemarrage(Essai):
                 ("o2", "RESOLVEUR_FOURNISSEUR", "9.9.9.9"), ("o4", "RESOLVEUR_FOURNISSEUR", ""),
                 ("o2", "ADRESSE_SURVEILLANCE", "http://hc-ping.com/x"), ("o2", "ADRESSE_SAUVEGARDE", "u1@h;reboot"),
                 ("o2", "CLE_INTERVENTION", "ssh-rsa AAAAB3NzaC1yc2E")]
+        cas += [("o4", "RESOLVEUR_FOURNISSEUR", v) for v in ("010.1.1.1", "256.1.1.1", "203.0.113.53  203.0.113.54")]
+        cas += [("o2", "CLE_INTERVENTION", v) for v in (CLE[:40], CLE.replace(" inv", "A inv"), CLE + " x y",
+                                                        CLE.replace("AAAAI", "AAAAB", 1))]   # court, long, autre type
+        p = self.parametres("o4")
+        cas += [("o4", k, p[k] + NL + p[k]) for k in p]         # retour à la ligne : une ligne de plus, jamais écrite
         for o, k, v in cas:
             with self.subTest(o=o, k=k, v=v):
                 code, sortie, erreur, racine = self.lancer(self.parametres(o, **{k: v}))
