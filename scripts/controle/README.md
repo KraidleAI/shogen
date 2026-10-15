@@ -185,3 +185,12 @@ dépendent des tests du harnais qu'ils importent.
 > P4, acte sur la forge que le mandataire réseau a déjà refusé (lignes `acte`, annexe B, bloc B.95). `publier --texte
 > F`, avant toute publication : C4, C5, P5 (motif de secret de `enforcement/gate-secrets.sh`, jamais recopié), V3
 > (chemin absolu du scratchpad). `tests/test_avant_acte.py` compte 18 tests ; plancher du job `controle-unittest` 75.
+
+> *Ajout daté du 2026-10-10 06:38:31 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-8b ; erreurs E4 et E15)* :
+> `avant_acte.py` (sha256 `fc51b3288b1c42fe6bf7c09a5f69aa5edb83e7b3a6844daed19b5c1cb2300a82`) : `existe NOM`, avant
+> d'écrire qu'un fichier manque : chemins du dépôt, suivis ou non, qui portent ce nom, hors interdits (jamais
+> affichés) ; X1 si aucun ; un chemin ou un motif : erreur. `disque [--min-go N] [--lister D...]` : DQ, refus sous 3
+> Gio libres sur `/` (`--min-go` ne fait que serrer), avertissement sous 6 ; `--lister` imprime les dossiers `target`
+> qui portent `CACHEDIR.TAG` (cibles cargo), à profondeur 4 au plus, sans entrer dans `docs`, `.git` ni un interdit,
+> sans suivre de lien, avec leur taille ; rien n'est effacé ; racine refusée : `/`, le dépôt ou un ancêtre, un dossier
+> `docs`, un interdit. `tests/test_avant_acte.py` compte 20 tests ; plancher du job `controle-unittest` 77.

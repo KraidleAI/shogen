@@ -9,7 +9,8 @@ GF-6b : C8 (E1, workflows lus en YAML) ; diff d'un worker reçu avant la G2 : E2
 interdits, diff qui ne s'applique pas sur la tête.
 GF-7 : verser (E9 : messages d'outils anglais entre guillemets, S-G5 ; E10 : adjudication versée en double).
 GF-8 : pousser (LA-N05 : poussée rouge ; ADR-0028 l.293 : docs 15/16 jamais au distant ; E17 : actes que le
-mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret ; chemin du scratchpad)."""
+mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret ; chemin du scratchpad).
+GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : disque presque plein, cibles cargo)."""
 import contextlib
 import hashlib
 import io
@@ -19,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import collections
 import unittest
 from unittest import mock
 
@@ -380,3 +382,39 @@ class Poussee(Depot):
             self.assertEqual((sortie[:9], cle in sortie), (code, False), texte)
         ag.ecrire(self.tmp, {"texte.md": "Fusion du 2026-10-10 04:13." + NL})
         self.assertEqual(self.lancer("publier", "--texte", os.path.join(self.tmp, "texte.md")), (0, ""))
+
+
+class ExisteDisque(Depot):
+    def libre(self, gio):
+        usage = collections.namedtuple("usage", "total used free")
+        return mock.patch.object(avant_acte.GC.shutil, "disk_usage", return_value=usage(1, 1, int(gio * 2 ** 30)))
+
+    def test_e15_existe(self):
+        """E15 : WISHLIST.md cherché sous biblio/ alors qu'il est à la racine : existe le trouve partout (suivi ou non),
+        jamais sous un interdit ; nom absent : refus ; chemin ou motif : erreur."""
+        self.indexer({"WISHLIST.md": "x", "biblio/INDEX.md": "x"})
+        ag.ecrire(self.d, {"sous/WISHLIST.md": "x", "docs/rapports/WISHLIST.md": "x"})
+        self.assertEqual(self.lancer("existe", "WISHLIST.md"), (0, "WISHLIST.md" + NL + "sous/WISHLIST.md" + NL))
+        self.assertEqual(self.lancer("existe", "ABSENT.md")[:2], (1, "REFUS X1 : ABSENT.md absent du dépôt "
+                                                                     "(suivis et non suivis, hors interdits)" + NL))
+        self.assertEqual([self.lancer("existe", x)[0] for x in ("biblio/INDEX.md", "*.md")], [3, 3])
+
+    def test_e4_disque(self):
+        """E4 : 2,9 Gio libres : refus ; 4 : avertissement ; 7 : rien ; --min-go 8 serre ; --lister : cibles cargo
+        (CACHEDIR.TAG) à profondeur 4 au plus, sans docs, lien ni dossier sans étiquette ; racine dangereuse (ancêtre
+        du dépôt, dossier docs) : 3."""
+        for gio, argv, attendu in [(2.9, [], (1, "REFUS DQ")), (4, [], (0, "AVERTISSEMENT DQ")), (7, [], (0, "")),
+                                   (7, ["--min-go", "8"], (1, "REFUS DQ"))]:
+            with self.libre(gio):
+                code, sortie = self.lancer("disque", *argv)
+            self.assertEqual((code, sortie[:len(attendu[1])]), attendu, (gio, argv))
+        s = os.path.join(self.tmp, "s")
+        for chemin in ["lot1/copie/target/CACHEDIR.TAG", "lot2/target/x", "docs/x/target/CACHEDIR.TAG",
+                       "a/b/c/d/target/CACHEDIR.TAG", "lot1/copie/target/debug/gros"]:
+            ag.ecrire(s, {chemin: "x" * 1024})
+        os.symlink(os.path.join(s, "lot1"), os.path.join(s, "lien"))
+        with self.libre(7):
+            code, sortie = self.lancer("disque", "--lister", s)
+            dangereuses = [self.lancer("disque", "--lister", x)[0] for x in (self.tmp, os.path.join(s, "docs"))]
+        self.assertEqual(dangereuses, [3, 3])
+        self.assertEqual((code, sortie), (0, "0.00 Gio" + chr(9) + os.path.join(s, "lot1", "copie", "target") + NL))

@@ -32,7 +32,12 @@ GF-8 : pousser --distant NOM --branche B : P1, sceau de la tête (sceller --tete
 garde/hors-distant.txt changé entre NOM/B (ou l'arbre vide, branche neuve) et HEAD, jamais nommé (ADR-0028 l.293) ;
 C8 sur les workflows de HEAD si la plage en touche. pousser --acte TEXTE : P4, acte sur la forge déjà refusé par le
 mandataire (E17). publier --texte F : C4, C5, P5 motif de secret de enforcement/gate-secrets.sh (jamais recopié), V3
-chemin absolu du scratchpad."""
+chemin absolu du scratchpad.
+GF-8b : existe NOM, avant d'écrire qu'un fichier manque (E15) : chemins du dépôt (suivis et non suivis) qui portent ce
+nom, hors interdits ; X1 si aucun. disque [--min-go N] [--lister D...] (E4) : DQ, refus sous 3 Gio libres sur /
+(--min-go ne fait que serrer), avertissement sous 6 ; --lister : dossiers target qui portent CACHEDIR.TAG (cibles
+cargo), à profondeur 4 au plus, sans entrer dans docs, .git, un lien ou un interdit, avec leur taille ; rien n'est
+effacé."""
 import argparse
 import fnmatch
 import hashlib
@@ -372,8 +377,47 @@ def publier(a, fautes):
         fautes.append(("refus", "V3", "chemin absolu du scratchpad dans le texte", "l'abréger en <scratchpad>", "-"))
 
 
+
+def existe(a, fautes):
+    if "/" in a.nom or set(a.nom) & set("*?[]") or GC.chemin_interdit(a.nom):
+        raise Erreur("existe : un nom de fichier simple, ni chemin, ni motif, ni interdit")
+    sortie = git(a.depot, "ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ":(glob)**/" + a.nom)
+    trouves = sorted({x for x in sortie.split(chr(0)) if x and not GC.chemin_interdit(os.path.join(a.depot, x))})
+    print(*trouves, sep=chr(10), end=chr(10) if trouves else "")
+    if not trouves:
+        fautes.append(("refus", "X1", f"{a.nom} absent du dépôt (suivis et non suivis, hors interdits)", "", "-"))
+
+
+def cibles(racine, profondeur=4):
+    """(chemin, octets) des dossiers target qui portent CACHEDIR.TAG, à profondeur 4 au plus sous racine ; os.walk ne
+    suit aucun lien."""
+    trouves = []
+    for base, dossiers, fichiers in os.walk(racine):
+        if os.path.basename(base) == "target" and "CACHEDIR.TAG" in fichiers:
+            trouves.append((base, sum(os.path.getsize(os.path.join(b, x)) for b, _d, fs in os.walk(base) for x in fs
+                                      if not os.path.islink(os.path.join(b, x)))))
+            dossiers[:] = []
+            continue
+        niveau = 0 if base == racine else os.path.relpath(base, racine).count(os.sep) + 1
+        dossiers[:] = sorted(x for x in dossiers if niveau < profondeur and x not in ("docs", ".git")
+                             and not GC.chemin_interdit(os.path.join(base, x)))
+    return trouves
+
+
+def disque(a, fautes):
+    etat, libre = GC.etat_disque("/", a.min_go)
+    if etat != "ok":
+        fautes.append(("refus" if etat == "refus" else "avertissement", "DQ", f"{libre:.1f} Gio libres sur / (E4)",
+                       "lister les cibles cargo des lots clos (disque --lister <dossier>), puis les supprimer", "-"))
+    for racine in a.lister:
+        if GC.racine_dangereuse(racine, a.depot):
+            raise Erreur("disque --lister : racine refusée (/, dépôt ou ancêtre, dossier docs, interdit)")
+        for chemin, octets in cibles(racine):
+            print(f"{octets / 2 ** 30:.2f} Gio" + chr(9) + chemin)
+
+
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
-             "publier": publier}
+             "publier": publier, "existe": existe, "disque": disque}
 
 
 def journal(a, fautes):
@@ -403,6 +447,10 @@ def main(argv=None):
     for option in ("--distant", "--branche", "--acte"):
         s.add_argument(option)
     sp.add_parser("publier").add_argument("--texte", required=True)
+    sp.add_parser("existe").add_argument("nom")
+    s = sp.add_parser("disque")
+    s.add_argument("--min-go", type=float)
+    s.add_argument("--lister", nargs="+", default=[])
     try:
         a = p.parse_args(argv)
     except SystemExit as e:
