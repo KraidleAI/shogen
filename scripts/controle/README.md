@@ -91,3 +91,11 @@ dépendent des tests du harnais qu'ils importent.
 > ou un ancêtre, un dossier `docs`, un interdit) ; `analyser_diff` (lignes ajoutées et blocs d'un diff de git, avec ou
 > sans contexte) ; `etat_disque` : refus sous 3 Gio libres, avertissement sous 6, `--min-go` ne fait que serrer
 > (erreur E4). `tests/test_garde_commun.py` compte 11 tests, plancher du job `controle-unittest` 48.
+
+> *Ajout daté du 2026-10-10 05:45:29 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-2 ; erreurs E9 et E10 de
+> l'orchestrateur)* : `presg5.py` (sha256 `60de40770b2889b7dc449b863b42755df757789c7063ba445cbd982c81a87ef0`),
+> pré-contrôle S-G5 de l'orchestrateur (approximation de `xtask/src/sg5.rs`, régime complet), versé à l'octet depuis
+> son scratchpad, tel qu'il a servi aux versements du 2026-10-10 ; il sort toujours en 0 et n'écarte pas les interdits
+> : il devient un outil au diff suivant (GF-2b). `tests/test_presg5.py` (1 test) : sortie dorée, sha256 de sa sortie
+> sur une fixture (bornes de 14 et 15 octets, un seul mot anglais, crochets de 31 caractères, guillemets courbes,
+> tirets, accents graves, coupe à 160 caractères), mesuré avant le versement ; plancher du job `controle-unittest` 49.
