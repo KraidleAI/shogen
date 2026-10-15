@@ -27,7 +27,12 @@ E9) sur les lignes ajoutées des .md, C7 (E21), C8 sur les workflows de HEAD plu
 GF-7 : verser --pieces DOSSIER, avant xtask (E9, E10) : V0, fichier sous un interdit (ni lu ni nommé) ; V2, deux pièces
 de même sha256, ou une pièce .md (500 caractères pliés ou plus) contenue en entier dans une autre ; V3, chemin absolu
 du scratchpad ; V4, chaque SHA256SUMS rejoué par verifier() de enforcement/docs-sha256sums.py (forme de la gate),
-présent à la racine du dossier, chaque pièce listée ; puis C4, C5 et presg5 (G5) sur les pièces .md entières."""
+présent à la racine du dossier, chaque pièce listée ; puis C4, C5 et presg5 (G5) sur les pièces .md entières.
+GF-8 : pousser --distant NOM --branche B : P1, sceau de la tête (sceller --tete, LA-N05) ; P2, aucun chemin de
+garde/hors-distant.txt changé entre NOM/B (ou l'arbre vide, branche neuve) et HEAD, jamais nommé (ADR-0028 l.293) ;
+C8 sur les workflows de HEAD si la plage en touche. pousser --acte TEXTE : P4, acte sur la forge déjà refusé par le
+mandataire (E17). publier --texte F : C4, C5, P5 motif de secret de enforcement/gate-secrets.sh (jamais recopié), V3
+chemin absolu du scratchpad."""
 import argparse
 import fnmatch
 import hashlib
@@ -57,6 +62,7 @@ IDENT = re.compile("(?<![A-Za-z0-9-])(SHOGEN-[A-Z0-9]+(?:-[A-Z0-9]+)*|[GCRQLEOI]
 SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]{7,40})(?![A-Za-z0-9…-])")
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
+HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
 
 
 class Erreur(Exception):
@@ -323,7 +329,51 @@ def verser(a, fautes):
     presg5(a.depot, textes, fautes)
 
 
-COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser}
+
+def pousser(a, fautes):
+    with open(HORS, encoding="utf-8") as f:
+        regles = [x.split(" ", 1) for x in f.read().split(chr(10)) if x.strip() and not x.startswith("#")]
+    if a.acte is not None:
+        if any(fnmatch.fnmatchcase(a.acte, m) for k, m in regles if k == "acte"):
+            fautes.append(("refus", "P4", "acte sur la forge déjà refusé par le mandataire réseau (B.95, E17)",
+                           "ne pas le retenter : le décrire pas à pas à l'investisseur", "-"))
+        return
+    if not (a.distant and a.branche):
+        raise Erreur("pousser : --distant et --branche, ou --acte")
+    if not os.path.exists(os.path.join(garde(a.depot, "sceaux"), cle(a.depot, tete=True))):
+        fautes.append(("refus", "P1", "aucun sceau de la tête (LA-N05 : poussée rouge)",
+                       "vérification complète de la tête, puis avant_acte.py sceller --tete", "-"))
+    try:
+        base = git(a.depot, "rev-parse", "--verify", f"refs/remotes/{a.distant}/{a.branche}").strip()
+    except Erreur:
+        base = git(a.depot, "hash-object", "-t", "tree", os.devnull).strip()
+    chemins = [m for k, m in regles if k == "chemin"]
+    p = subprocess.run(["git", "-C", a.depot, "diff", "--quiet", base, "HEAD", "--", *chemins], capture_output=True)
+    if p.returncode not in (0, 1):
+        raise Erreur(f"git diff : sortie {p.returncode}")
+    if p.returncode:
+        fautes.append(("refus", "P2", "la plage poussée change un chemin de garde/hors-distant.txt (non nommé)",
+                       "retirer ce chemin de la plage poussée (ADR-0028 l.293)", "-"))
+    noms = [x for x in git(a.depot, "diff", "--name-only", "-z", base, "HEAD", "--", ".github/workflows").split(chr(0))]
+    with tempfile.TemporaryDirectory() as d:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
+        git(a.depot, "read-tree", "HEAD", env=env)
+        workflows(a.depot, [{"apres": x, "avant": None} for x in noms if x], fautes, env)
+
+
+def publier(a, fautes):
+    texte = lire(a.texte).decode("utf-8")
+    heures_et_citations(a.depot, [(os.path.basename(a.texte), texte)], fautes)
+    with open(os.path.join(GC.RACINE_OUTILS, "enforcement", "gate-secrets.sh"), encoding="utf-8") as f:
+        motif = [x for x in f.read().split(chr(10)) if x.startswith("VENDOR='")][0][8:].rsplit("'", 1)[0]
+    if re.search(motif, texte):
+        fautes.append(("refus", "P5", "motif de secret de la gate G3 dans le texte (non recopié)", "le retirer", "-"))
+    if "/tmp/claude-" in texte:
+        fautes.append(("refus", "V3", "chemin absolu du scratchpad dans le texte", "l'abréger en <scratchpad>", "-"))
+
+
+COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
+             "publier": publier}
 
 
 def journal(a, fautes):
@@ -349,6 +399,10 @@ def main(argv=None):
     c.add_argument("--id")
     sp.add_parser("diff").add_argument("--fichier", required=True)
     sp.add_parser("verser").add_argument("--pieces", required=True)
+    s = sp.add_parser("pousser")
+    for option in ("--distant", "--branche", "--acte"):
+        s.add_argument(option)
+    sp.add_parser("publier").add_argument("--texte", required=True)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:

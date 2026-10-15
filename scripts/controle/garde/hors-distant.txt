@@ -1,0 +1,15 @@
+# Ce qui ne va jamais au dépôt distant (lot GARDE-FOUS-ORCH, GF-8), lu par avant_acte.py pousser.
+# Source des chemins : docs/adr-0028/ADR-0028-decisions-sortie-S2.md l.293 à dda4bbc ; sha256 de la ligne entière,
+# saut de ligne compris : 16e208a95e493ff438ea902a66a764700781ede77fd7b33989220692364e9cd1 ; extraits mot pour mot :
+# les docs 15/16 ne vont pas sur le remote GitHub, même privé, tant que l'accord avec la Pocket Foundation ne
+# l'autorise pas ; [...] le push éventuel se limite aux préfixes sans ces fichiers.
+chemin docs/15-*
+chemin docs/16-*
+# Écritures sur la forge refusées par le mandataire réseau : HTTP 403 sur la protection de branche et sur les réglages
+# du dépôt, constatés le 2026-10-10 (annexe B, bloc B.95 ; la lecture est admise) ; suppression de branche refusée
+# selon la liste des erreurs de l'orchestrateur (E17), à confirmer. Motifs fnmatch sur le texte de l'acte.
+acte *-X PUT *protection*
+acte *--method PUT *protection*
+acte *-X PATCH *repos/*
+acte *--method PATCH *repos/*
+acte git push*--delete*

@@ -175,3 +175,13 @@ dépendent des tests du harnais qu'ils importent.
 > `enforcement/docs-sha256sums.py` (forme de la gate : chemin relatif, sans `./`), présent à la racine du dossier,
 > chaque pièce listée ; puis C4, C5 et `presg5.py` (G5) sur les pièces `.md`. `tests/test_avant_acte.py` compte 15
 > tests ; plancher du job `controle-unittest` 72.
+
+> *Ajout daté du 2026-10-10 06:32:31 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-8 ; erreurs LA-N05, E14, E17 ; ADR-0028
+> l.293)* : `avant_acte.py` (sha256 `1f564219f54fa5b6d6dcaee2078c54115f8b823b00a9227efde5c36d656d14fa`) : `pousser
+> --distant NOM --branche B`, juste avant `git push` : P1, sceau de la tête (`sceller --tete` après la vérification
+> complète) ; P2, aucun chemin `chemin` de `garde/hors-distant.txt` (sha256
+> `89928795caa9d5eb7fb73e3bf2fde07117317578824c3fb156d8aefb2ea90f0e`) changé entre `NOM/B` (l'arbre vide pour une
+> branche neuve) et HEAD, jamais nommé ; C8 sur les workflows de HEAD si la plage en touche. `pousser --acte TEXTE` :
+> P4, acte sur la forge que le mandataire réseau a déjà refusé (lignes `acte`, annexe B, bloc B.95). `publier --texte
+> F`, avant toute publication : C4, C5, P5 (motif de secret de `enforcement/gate-secrets.sh`, jamais recopié), V3
+> (chemin absolu du scratchpad). `tests/test_avant_acte.py` compte 18 tests ; plancher du job `controle-unittest` 75.

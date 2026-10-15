@@ -7,7 +7,9 @@ GF-6 : commit C4 (E14, heures), C5 (E16, citations), C6 (LA-N04, index égal aux
 qui décale une ligne d'un fichier cité par numéro), C9 (Diff-Id).
 GF-6b : C8 (E1, workflows lus en YAML) ; diff d'un worker reçu avant la G2 : E21, E14, E16, E9 (presg5), E1,
 interdits, diff qui ne s'applique pas sur la tête.
-GF-7 : verser (E9 : messages d'outils anglais entre guillemets, S-G5 ; E10 : adjudication versée en double)."""
+GF-7 : verser (E9 : messages d'outils anglais entre guillemets, S-G5 ; E10 : adjudication versée en double).
+GF-8 : pousser (LA-N05 : poussée rouge ; ADR-0028 l.293 : docs 15/16 jamais au distant ; E17 : actes que le
+mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret ; chemin du scratchpad)."""
 import contextlib
 import hashlib
 import io
@@ -329,3 +331,52 @@ class Versement(Depot):
         self.assertEqual(self.verser({"a.md": "le 2026-10-10 04:22"})[1][:9], "REFUS C4 ")
         code, sortie = self.verser({"docs/rapports/r.md": "x"})
         self.assertEqual((code, sortie[:9], "rapports" in sortie), (1, "REFUS V0 ", False))
+
+
+class Poussee(Depot):
+    def pousser(self, *argv):
+        return self.lancer("pousser", "--distant", "origin", "--branche", "b", *argv)
+
+    def test_la_n05_et_hors_distant(self):
+        """LA-N05 : poussée sans sceau de la tête : refus P1 ; scellée : admise ; docs 15/16 dans la plage poussée, ou
+        dans la tête d'une branche neuve : refus P2, fichier jamais nommé ; workflow illisible poussé : refus C8."""
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/b", "HEAD")
+        self.assertEqual(self.pousser()[1][:9], "REFUS P1 ")
+        self.lancer("sceller", "--tete")
+        self.assertEqual(self.pousser(), (0, ""))
+        self.indexer({"docs/15-poche.md": "x" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "poche")
+        self.lancer("sceller", "--tete")
+        code, sortie = self.pousser()
+        self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P2 ", False))
+        ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/b", "HEAD")
+        self.assertEqual(self.pousser(), (0, ""))
+        self.assertEqual(self.lancer("pousser", "--distant", "origin", "--branche", "neuve")[1][:9], "REFUS P2 ")
+        self.indexer({"enforcement/workflows-yaml.py": LECTEUR, ".github/workflows/w.yml": "on: push: x" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "w")
+        self.lancer("sceller", "--tete")
+        self.assertEqual(self.pousser()[1][:9], "REFUS C8 ")
+
+    def test_e17_actes_refuses(self):
+        """E17 : écritures que le mandataire refuse (protection, réglages, suppression de branche) : refus P4 avant
+        tout essai ; une lecture des réglages : admise ; une ligne chemin n'est pas un motif d'acte."""
+        for acte in ["gh api -X PUT repos/o/r/branches/main/protection --input p.json",
+                     "gh api -X PATCH repos/o/r -f security_and_analysis[secret_scanning][status]=enabled",
+                     "git push origin --delete essai/analyseur-residus"]:
+            self.assertEqual(self.lancer("pousser", "--acte", acte)[1][:9], "REFUS P4 ", acte)
+        self.assertEqual(self.lancer("pousser", "--acte", "gh api repos/o/r/branches/main/protection"), (0, ""))
+        self.assertEqual(self.lancer("pousser", "--acte", "docs/15-x"), (0, ""))
+        self.assertEqual(self.lancer("pousser")[0], 3)
+
+    def test_e14_publier(self):
+        """E14 : heure future dans un texte publié (04:22 à 04:14) : refus C4 ; motif de secret de la gate G3 : refus,
+        jamais recopié ; chemin du scratchpad : refus V3 ; texte sain : admis."""
+        self.horloge("2026-10-10T04:14:00Z")
+        cle = "AKIA" + "ABCDEFGHIJKLMNOP"
+        for texte, code in [("Fusion du 2026-10-10 04:22.", "REFUS C4 "), ("clé " + cle, "REFUS P5 "),
+                            ("voir /tmp/claude-0/p/s/scratchpad/x", "REFUS V3 ")]:
+            ag.ecrire(self.tmp, {"texte.md": texte + NL})
+            sortie = self.lancer("publier", "--texte", os.path.join(self.tmp, "texte.md"))[1]
+            self.assertEqual((sortie[:9], cle in sortie), (code, False), texte)
+        ag.ecrire(self.tmp, {"texte.md": "Fusion du 2026-10-10 04:13." + NL})
+        self.assertEqual(self.lancer("publier", "--texte", os.path.join(self.tmp, "texte.md")), (0, ""))
