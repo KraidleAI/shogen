@@ -410,7 +410,9 @@ class TestOracleRecord(unittest.TestCase):
         sauf sous Windows (aucun arrêt après la sortie : PID réemployés). Rougit si : enfant direct seul arrêté,
         descendant d'une autre session non suivi, aucun arrêt après la sortie. G2 du lot DETTES-T7 (C-2) : petit-enfant
         détaché (double fork, setsid) qui garde le tuyau et dort 90 s, suite sortie en 0, délai de 1 s : l'enregistreur
-        rend la main RELIQUAT s après l'arrêt de l'arbre, sans l'attendre. Rougit si : sortie attendue sans borne."""
+        rend la main RELIQUAT s après l'arrêt de l'arbre, sans l'attendre. Rougit si : sortie attendue sans borne.
+        Réserve R-3 du contre-contrôle : arrêt de l'arbre échoué (simulé : `groupes` vide), suite qui dort 20 s sous un
+        délai de 1 s : l'enregistreur rend la main RELIQUAT s après le délai. Rougit si : enfant direct attendu."""
         d, m, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-arbre")
         p = os.path.join(tempfile.mkdtemp(dir=self.d), "pid")
         marquer = "import os, sys, time; time.sleep(3); open(os.path.join(*sys.argv[1:]), 'w').close()"
@@ -437,13 +439,18 @@ class TestOracleRecord(unittest.TestCase):
             debut = time.monotonic()
             code3 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, detache, delai=1)[1]
             duree3 = time.monotonic() - debut
+        with mock.patch.object(orc, "groupes", lambda racine: set()), mock.patch.dict(os.environ, {
+                "ORACLE_ESSAI_MARQUES": tempfile.mkdtemp(dir=self.d)}):       # R-3 : arrêt de l'arbre échoué
+            debut = time.monotonic()
+            code4 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, long_, delai=1)[1]
+            duree4 = time.monotonic() - debut
         try:                                            # descendant détaché, que l'outil ne suit pas : arrêté ici
             os.kill(int(Path(p).read_text(encoding="utf-8")), 9)
         except (OSError, ValueError):
             pass
         time.sleep(4)                                   # chaque marque serait posée 3 s après son lancement
-        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m)), code3, duree3 < 30),
-                         (1, True, 0, ["reste"] if os.name == "nt" else [], 1, True))
+        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m)), code3, duree3 < 30, code4, duree4 < 15),
+                         (1, True, 0, ["reste"] if os.name == "nt" else [], 1, True, 1, True))
 
     def test_auteur_refuse_a_l_ecriture(self):
         """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu

@@ -114,3 +114,10 @@ limite s'écrit ici ; sinon elle ne vaut que pour `suite`.
   adoptées par l'adjudication de l'orchestrateur du 2026-10-10 06:24:31 UTC. Ordre des refus à la lecture : un
   enregistrement d'un outil d'avant OUT-2i ou OUT-2d précède aussi DETTES-T7 ; sans `tree.exclus`, il est refusé
   au premier contrôle (`champs`) ; `ancien outil` ne nomme que l'écart d'un enregistrement qui porte `tree.exclus`.
+
+## Ajout daté du contre-contrôle du lot DETTES-T7
+
+- *Ajout daté du 2026-10-15 12:42:06 UTC (`date -u` ; réserve R-3 ; SHOGEN-ENREG-DELAI-ARBRE-1)* : après les
+  `RELIQUAT` s de lecture, l'enfant direct est tué (`p.kill()`) avant d'être attendu : si l'arrêt de l'arbre a
+  échoué (sous Windows, `taskkill` refusé ; simulé par le cas R-3 du test du délai), l'attente ne dépend plus
+  de la fin de la commande.

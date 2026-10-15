@@ -264,7 +264,8 @@ def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
     descendant ne garde le tuyau ; à la sortie, son groupe l'est aussi (descendant resté : fork), avant tout nettoyage
     (POSIX ; sous Windows, rien après la sortie : PID réemployés). C-2 (G2) : après l'arrêt au délai, la sortie n'est
     plus lue que RELIQUAT s ; un descendant détaché de l'arbre (double fork, setsid) qui garde le tuyau n'est pas
-    attendu au-delà."""
+    attendu au-delà. Réserve R-3 du contre-contrôle : l'enfant direct est alors tué avant d'être attendu, même si
+    l'arrêt de l'arbre a échoué (taskkill refusé) : aucune attente sans borne."""
     p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          start_new_session=True, creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     try:
@@ -279,6 +280,7 @@ def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
         except subprocess.TimeoutExpired as e:      # C-2 : descendant détaché, hors de l'arbre, qui garde le tuyau
             p.stdin.close()
             p.stdout.close()
+            p.kill()                                # R-3 : l'enfant direct, même si l'arrêt de l'arbre a échoué
             p.wait()
             return e.output or b"", None
     finally:
