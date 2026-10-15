@@ -411,3 +411,9 @@ dépendent des tests du harnais qu'ils importent.
 > status --short`) ; telles qu'écrites, les commandes des points 4 (commit), 2 (poussée) et 3 (`pousser --acte` d'une
 > suppression) étaient refusées par le crochet. `tests/test_skills.py` compte 3 tests (`test_r8_crochet_garde_faits` :
 > crochet lancé sur un journal synthétique) ; plancher du job `controle-unittest` 113.
+
+> *Ajout daté du 2026-10-15 11:38:22 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-9 ; E14)* :
+> `garde_commun.py` (sha256 `b386dbd80acc775b0d6cafb42a311f03e80f78c0bf72fc039e375ae82063ae89`) : la date d'une ligne
+> se lit aussi en code ou dans une citation, l'heure seule restant masquée en code : une heure future écrite après une
+> date du jour en code (forme `` `AAAA-MM-JJ` HH:MM ``) n'était pas vue ; l'extrait se lit sur la ligne écrite.
+> `tests/test_garde_commun.py` compte 18 tests ; plancher du job `controle-unittest` 114.

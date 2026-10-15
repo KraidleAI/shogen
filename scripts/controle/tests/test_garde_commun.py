@@ -4,7 +4,8 @@ réelle reproduite, verts sur le cas sain. GF-1 : horloge et heures. E14 : vers 
 GF-4 : interdits (E19, LA-N08), racines, analyse d'un diff, disque (E4 : 222 Mio vus par un agent).
 GF-3 : citations (E16 : citation inexacte d'une ligne du JOURNAL ; LA-N08 : citation d'un interdit).
 GF-4b : lignes ajoutées de l'index, dans un dépôt git temporaire (tests/aide_garde.py), sans lire un interdit.
-Relecture G2 : C-5 (référence de citation écrite en code) ; C-11 (heures d'une plage)."""
+Relecture G2 : C-5 (référence de citation écrite en code) ; C-11 (heures d'une plage).
+Contre-contrôle : R-9 (date en code)."""
 import collections
 import os
 import tempfile
@@ -69,6 +70,14 @@ class Heures(unittest.TestCase):
         extrait = gc.horodatages_fautifs("le 2026-10-10 de 04:10 à 04:22", H)[0][2]
         self.assertEqual(extrait, "2026-10-10 de 04:10 à 04:22")
         self.assertEqual(codes("vers 19:5X, puis 21:XX"), [(1, "heure-approchee"), (1, "heure-approchee")])
+
+    def test_r9_date_en_code(self):
+        """R-9 : date du jour en code ou citée, heure future écrite hors du code : refus, extrait de la date à
+        l'heure ; date et heure dans le même code (extrait de journal) : rien."""
+        self.assertEqual(codes("ajout daté du `2026-10-10` 04:22 UTC"), [(1, "heure-future")])
+        self.assertEqual(codes(G + " lu le 2026-10-10 " + D + " à 04:22"), [(1, "heure-future")])
+        self.assertEqual(gc.horodatages_fautifs("`2026-10-10` 04:22", H)[0][2], "2026-10-10` 04:22")
+        self.assertEqual(codes("journal : `2026-10-10 04:22 démarrage`"), [])
 
     def test_horloge_lue_par_date_u(self):
         """L'horloge vient de `date -u` (faux `date` en tête du PATH), jamais de l'horloge de Python."""

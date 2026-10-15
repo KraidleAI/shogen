@@ -15,7 +15,8 @@ Relecture G2, C-3 : lignes ajoutées d'un index temporaire (env), préfixes a/ e
 configuration ; citations lues d'abord dans une surcouche (fichiers d'après un diff).
 Relecture G2, C-5 : la forme stricte admet la référence écrite en code, (`chemin:N`) ou (`chemin`:N).
 Relecture G2, C-11 : toute heure écrite dans les 25 caractères qui suivent une date du jour est jugée, la seconde
-heure d'une plage comprise (seule la première l'était) ; une heure approchée en X majuscule (19:5X) est vue."""
+heure d'une plage comprise (seule la première l'était) ; une heure approchée en X majuscule (19:5X) est vue.
+Contre-contrôle, R-9 : la date se lit même en code ou citée ; l'heure, en code, reste masquée."""
 import ast
 import fnmatch
 import functools
@@ -53,7 +54,7 @@ def horodatages_fautifs(texte, horloge):
     fautes, borne, jour = [], horloge + timedelta(seconds=TOLERANCE_S), horloge.strftime("%Y-%m-%d")
     for n, ligne in enumerate(texte.split(chr(10)), 1):
         nue = MASQUE.sub(lambda m: " " * len(m.group()), ligne)
-        dates = list(re.finditer(DATE, nue))
+        dates = list(re.finditer(DATE, ligne))      # date lue même en code ou citée (R-9)
         for m in HEURE.finditer(nue):
             d = next((d for d in reversed(dates) if d.end() <= m.start()), None)
             if not d or m.start() - d.end() > 25 or d.group(0) != jour:
@@ -62,7 +63,7 @@ def horodatages_fautifs(texte, horloge):
                 continue
             h = datetime.strptime(f"{d.group(0)} {m.group(1)}:{m.group(2)}:{m.group(3) or '00'}", "%Y-%m-%d %H:%M:%S")
             if h.replace(tzinfo=timezone.utc) > borne:
-                fautes.append((n, "heure-future", nue[d.start():m.end()].strip()))
+                fautes.append((n, "heure-future", ligne[d.start():m.end()].strip()))
         fautes += [(n, "heure-approchee", m.group(0)) for m in APPROCHEE.finditer(nue)]
     return fautes
 
