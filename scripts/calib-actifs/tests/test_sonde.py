@@ -27,13 +27,22 @@ class TestSonde(unittest.TestCase):
         avec un seuil d'une page, 13, ou le seul premier découpage, départ −1) : refus ; depuis −23 : T0 = −23,
         −7 = −23 + 16 : admise, série égale à la vérité ; échanges de −200 à −50 seulement : fenêtre muette admise
         (sondes en recul 25, 10, −20, −80, puis dichotomie : historique trouvé) ; puis sonde ajoutée hors recherche, ou
-        effacée : refus nommé. Mutations : sonde omise ; seuil strict, d'une page ou sur le seul premier découpage ;
-        T0 pris au départ de la sonde ; réponse à T0 admise ; fenêtre vide admise ; fenêtre muette refusée ; recul
-        linéaire ; recherche non vérifiée."""
+        effacée (bruts du dernier cas, « −23 ») : refus nommé. R-4 du contre-contrôle cc2 : depuis −22, T0 = −22, −7
+        avant −22 + 16 : refus (un seuil d'une minute de moins l'admettrait). R-1 du contre-contrôle cc2 : fenêtre
+        décalée de 100 minutes, historique depuis −57, ou plafond de 30 créneaux ancré 100 minutes avant start,
+        historique depuis −36 : seule la requête la plus tardive (double 33, [−68 ; −54] ; page 39, [−62 ; −33]) touche
+        l'historique, toutes les sondes (25, 10, −20, …, −999 ; portée décalée [x − 100 ; …]) reviennent vides : refus
+        (avant R-1 : admise, 40 minutes perdues). Mutations : sonde omise ; seuil strict, d'une page ou sur le seul
+        premier découpage ; T0 pris au départ de la sonde ; réponse à T0 admise ; fenêtre vide admise ; fenêtre muette
+        refusée ; recul linéaire ; recherche non vérifiée ; fenêtre servie sans sonde non vide admise (R-1) ; seuil
+        d'une minute de moins (R-4)."""
         avant = REFUS.format("fenêtre commencée moins d'une page après la première bougie servie")
         cas = [(lecture, "cpt", 100000, -200, 200, REFUS.format("réponse portant la première bougie de l'historique")),
                (lecture, "crenp", 100000, -200, 200, REFUS.format("aucune bougie servie")),
                (lecture, "exact", 0, -10, 200, avant), (lecture, "exact", 0, -20, 200, avant),
+               (lecture, "exact", 0, -22, 200, avant),                    # R-4 du contre-contrôle cc2 : bord du seuil
+               (lecture, "cren", 100, -57, 200, REFUS.format("bougies servies, aucune sonde non vide")),   # R-1
+               (lecture, "crenp", 100, -36, 200, REFUS.format("bougies servies, aucune sonde non vide")),
                (lecture, "exact", 0, -200, -50, ([], [], [])), (lecture, "exact", 0, -23, 200, ([], [], []))]
         for k, (f, mode, g, debut, fin, attendu) in enumerate(cas):
             with self.subTest(cas=k):

@@ -132,7 +132,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
     dernière] absente de la page : CA/format nommé par le motif (TRONQUEE pour une page `tronquee`, C-7 ; sinon
     DISCORDE ; demi-page : son motif) ; mêmes minutes aux valeurs différentes, un fichier du second découpage (motif
     DISCORDE) en cause : DISCORDE. `t0` (C-15) : (T0 ou None, aucune sonde non vide) ; une bougie au plus tard en
-    T0, ou aucune bougie servie ni sondée : CA/avant-historique."""
+    T0, ou aucune sonde non vide, la fenêtre servant des bougies ou non (R-1 du contre-contrôle cc2) :
+    CA/avant-historique."""
     out, vals, tous, controles = {}, {}, [], []
     try:
         for k, octets in enumerate(fichiers):
@@ -162,9 +163,10 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                 nom = motif if motif != TRONQUEE or tronquee(ts, *plafond[:3]) else DISCORDE
                 controles.append((min(ts + [plafond[5]]), plafond[2], set(ts), nom))
         tous.sort()
-        if t0 and (t0[1] if not tous else t0[0] is not None and tous[0] <= t0[0]):         # C-15
-            raise socle.Refus("CA/avant-historique", "réponse portant la première bougie de l'historique" if tous else
-                              "aucune bougie servie", actif, place=place)
+        if t0 and (t0[1] or tous and tous[0] <= t0[0]):                        # C-15 ; R-1 du contre-contrôle cc2
+            raise socle.Refus("CA/avant-historique", "aucune bougie servie" if not tous else "bougies servies, aucune "
+                              "sonde non vide" if t0[1] else "réponse portant la première bougie de l'historique",
+                              actif, place=place)
         for bas, derniere, recus, nom in controles:       # C-13 : bougie connue absente d'une réponse qui la couvre
             if any(t not in recus for t in tous[bisect.bisect_left(tous, bas):bisect.bisect_right(tous, derniere)]):
                 raise _refus(nom, place, actif)

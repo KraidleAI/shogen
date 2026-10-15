@@ -30,8 +30,9 @@ class TestSeries(unittest.TestCase):
     def test_charger(self):
         """Fichiers d'une (place, actif) lus, .partiel ignoré ; dossier vide : CA/format. Fenêtre de 300 minutes,
         pages de Coinbase du découpage (DETTES-T2, C-9 : 148 minutes utiles, en T0, T0 + 8880, T0 + 17760) et du second
-        (C-13 : décalé de 74 minutes, en T0 − 4440, T0 + 4440, T0 + 13320, T0 + 22200, la dernière vide), sonde vide en
-        recul depuis fin − 150 minutes jusqu'à l'historique fixé à T0 − 18000 : T0 + 9000, T0, T0 − 18000 (C-15).
+        (C-13 : décalé de 74 minutes, en T0 − 4440, T0 + 4440, T0 + 13320, T0 + 22200, la dernière vide), sondes vides
+        en recul depuis fin − 150 minutes, T0 + 9000 et T0, jusqu'à l'historique fixé à T0 − 18000, sonde non vide
+        (C-15 ; R-1 du contre-contrôle cc2 : sans sonde non vide, la fenêtre servie est refusée).
         Mutations :
         .partiel lu ; format de la place ignoré."""
         d = tempfile.mkdtemp(prefix="ca_ch_")
@@ -43,7 +44,7 @@ class TestSeries(unittest.TestCase):
                        (f"double-{T0 - 4440}.json", T0), (f"double-{T0 + 4440}.json", T0 + 8880),
                        (f"double-{T0 + 13320}.json", T0 + 17760), (f"double-{T0 + 22200}.json", None),
                        (f"sonde-{T0 + 9000}.json", None), (f"sonde-{T0}.json", None),
-                       (f"sonde-{T0 - 18000}.json", None)):
+                       (f"sonde-{T0 - 18000}.json", T0 - 18000)):
             with open(os.path.join(d, "principale", "coinbase", "ETH", nom), "w", encoding="ascii") as f:
                 f.write("[]" if t is None else f"[[{t}, 1, 2, 1, 1.5, 3]]")
         q = socle.json.loads(socle.json.dumps(P)) | {"historique": {"debut": T0 - 18000, "source": "tests"}}

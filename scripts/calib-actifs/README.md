@@ -34,10 +34,14 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   minute de la page, est redemandée en deux demi-pages (`<page>.1.json` et `.2.json`), au même débit, qui la
   remplacent au chargement ; une page d'un seul point n'est jamais redemandée.
   Sonde de première bougie (C-15, couverture double) : sondes de ⌊`pas`/2⌋ créneaux, la première en fin − ⌊`pas`/2⌋
-  minutes, puis dichotomie depuis `historique.debut` (2009-01-03, avant toute cotation) jusqu'à la plus précoce non
-  vide (`sonde-<x>.json`, environ 24 par paire et par fenêtre, rejouées au chargement) ; T0 = sa première bougie.
+  minutes, puis, tant qu'elles reviennent vides, en recul de ⌊`pas`/2⌋ (2^j − 1) minutes jusqu'à `historique.debut`
+  (2009-01-03, avant toute cotation), enfin dichotomie depuis `historique.debut` jusqu'à la plus précoce non vide
+  (`sonde-<x>.json`, environ 24 par paire et par fenêtre, rejouées au chargement) ; T0 = sa première bougie.
   CA/avant-historique : requête de la fenêtre partant moins de `pas` − ⌊`pas`/2⌋ + 1 minutes après T0 ; réponse
-  portant une bougie au plus tard en T0 (plafond ancré avant le début de l'historique) ; aucune bougie servie.
+  portant une bougie au plus tard en T0 (plafond ancré avant le début de l'historique) ; aucune sonde non vide, que
+  la fenêtre serve des bougies ou non (R-1 du contre-contrôle cc2 : un décalage, ou un plafond ancré avant start, de
+  plus que la fenêtre rend toutes les sondes vides quand l'historique commence entre leur portée et celle de la
+  dernière requête, qui sert alors seule des bougies, toutes hors de la fenêtre).
   Limite résiduelle mesurée (L-C13-2, sans item) : un décalage ou un retard de plus d'une demi-page au-delà de la fin
   n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété,
   fenêtres de 1 à 10 minutes ; une fenêtre du lot (87 pages ou plus par découpage) le verrait dès un seul échange dans
