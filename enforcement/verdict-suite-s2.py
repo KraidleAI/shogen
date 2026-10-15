@@ -41,6 +41,10 @@ importlib.machinery.EXTENSION_SUFFIXES ; liens de dossiers suivis) est refusé a
 le prendrait à la place de la source relue, ou à côté d'elle (LE-11 et LE-13 de la revue). Limite : du code compilé
 chargé autrement (écrit pendant le run hors d'un __pycache__, archive, dossier hors de la racine mis dans sys.path
 par un test) n'est pas vu ; la lecture humaine du diff des tests reste nécessaire.
+SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1 (lot DETTES-T7 ; épreuve de forge du 2026-10-10, sondes en fixtures sous
+enforcement/tests/fixtures/sondes-forge/) : `residus` nomme les formes de gates.yml que la forge refuse et que `etapes`
+lisait (N-12, N-14, LC-02, LC-13) ; `etapes` rend alors None. La forme K (`job`, `gabarit`, constantes du cas K-02) vit
+ici, partagée par le runner et par l'enregistreur de rôle, qui l'exige avant de rendre une ligne (faille LC-03).
 Usage : python3 -B verdict-suite-s2.py [dossier] [--aucun-saut] [--egal] [--plancher N] ; sortie 0 conforme, 1 refus
 (motifs sur stderr), 3 erreur."""
 import os                   # SCRIPT-MASQUE-1 (OUT-2d) : os et sys sont chargés au démarrage ; le dossier du script
@@ -165,6 +169,48 @@ PREMIER = re.compile("(name|on|permissions|jobs):(?: .*)?")       # seules clés
 SEPARATEURS = "".join(map(chr, (11, 12, 13, 28, 29, 30, 133, 8232, 8233)))      # fins de ligne autres que LF
 JOB, ETAPE = {"name", "runs-on", "timeout-minutes", "steps"}, {"name", "shell", "run"}  # clés admises
 LIBRES = ("python3 --version", f"unset {VARIABLE}")      # seules autres lignes admises dans le bloc de la ligne
+HORS_YAML = {*range(9), 11, 12, *range(14, 32), *range(127, 133), *range(134, 160), *range(55296, 57344), 65534,
+             65535}                             # ANALYSEUR-RESIDUS-1 : caractères hors c-printable de YAML 1.2
+CLE_JOB = re.compile("  [A-Za-z_][A-Za-z0-9_-]*:")                                 # N-12 : seule forme d'une clé de job
+BLOC = re.compile(" *(?:- +)*[^ #][^#]*?: +[|>][-+0-9]*(?: +#.*)?")                 # LC-02 : clé qui ouvre un bloc
+ANCRE = re.compile(" *(?:- +)*(?:[^ #&*][^#]*?(?:: +|, *|[{[] *))?[&*]")            # LC-13 : ancre ou alias en tête
+
+
+def residus(texte: str) -> list:
+    """SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1 (lot DETTES-T7) : refus nommés du texte de gates.yml, formes refusées par la
+    forge (runs du 2026-10-10) ; liste vide : aucune. N-14 : caractère hors c-printable de YAML (HORS_YAML) ou fin de
+    ligne autre que LF (SEPARATEURS). N-12 : ligne d'indentation 1 à 3 sous `jobs:` hors de la forme `  nom:` exacte
+    (guillemets, espace avant les deux-points, clé explicite) ou répétée. LC-02 : après un bloc `|` ou `>` ouvert par
+    une clé de colonne k, première ligne hors du bloc et hors commentaire plus indentée que k. LC-13 : ancre ou alias en
+    tête d'une clé ou d'une valeur, hors bloc et hors commentaire (AN1, de types valides, que la forge admet, compris :
+    serrage). Refuse plus que la forge ; ne voit pas toute autre invalidité du fichier (workflows-yaml.py, job g1)."""
+    lignes, refus, vus = texte.split(chr(10)), [], set()
+    hors = sorted({f"U+{ord(c):04X}" for c in texte if ord(c) in HORS_YAML or c in SEPARATEURS})
+    refus += [f"N-14 : caractère hors c-printable de YAML ou fin de ligne autre que LF {hors[:5]}"] if hors else []
+    sous_jobs, cle, contenu, ferme = False, None, None, None
+    for i, x in enumerate(lignes, 1):
+        n, t = len(x) - len(x.lstrip(" ")), x.strip(" ")
+        if not t:
+            continue
+        if cle is not None:                             # bloc | ou > ouvert par une clé de colonne `cle`
+            contenu = n if contenu is None and n > cle else contenu
+            if contenu is not None and n >= contenu:
+                continue                                # ligne du bloc, commentaire compris
+            ferme, cle, contenu = cle, None, None
+        if t[0] == "#":
+            continue
+        if ferme is not None and n > ferme:
+            refus.append(f"LC-02 : l.{i} plus indentée que la clé (colonne {ferme}) du bloc clos avant elle")
+        ferme = None
+        if n == 0:
+            sous_jobs = x.startswith("jobs:")
+        elif sous_jobs and n < 4:
+            refus += [f"N-12 : l.{i} clé de job hors de la forme `  nom:`, ou répétée"] if x in vus or not (
+                CLE_JOB.fullmatch(x)) else []
+            vus.add(x)
+        refus += [f"LC-13 : l.{i} ancre ou alias"] if ANCRE.match(x) else []
+        cle = len(x) - len(x.lstrip(" -")) if BLOC.fullmatch(x) else None
+    return refus
 
 
 def etapes(texte: str, job: str):
@@ -174,7 +220,9 @@ def etapes(texte: str, job: str):
     `env:` ou `working-directory` est exclue. Clé de job hors de JOB, clé répétée, ligne d'indentation inattendue,
     commentaire entre une clé et sa suite : aucune étape admise ([]). Job absent ou répété, ligne de premier niveau
     hors de PREMIER (`defaults`, `env`, clé entre guillemets ou suivie d'une espace…) ou clé répétée, fin de ligne
-    autre que LF : None."""
+    autre que LF, `residus` non vide (ANALYSEUR-RESIDUS-1) : None."""
+    if residus(texte):
+        return None
     lignes = texte.split(chr(10))
     hauts = [PREMIER.fullmatch(x) for x in lignes if x[:1] not in ("", " ", "#")]
     noms = [m[1] for m in hauts if m]                       # clés de premier niveau reconnues
@@ -214,6 +262,50 @@ def lignes_du_job(texte: str, job: str, motif: str):
     pas = etapes(texte, job)
     return None if pas is None else [x for b in pas if b for x in b if re.fullmatch(motif, x) and all(
         y in LIBRES or re.fullmatch(motif, y) for y in b)]
+
+
+RUNNER = "python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"    # forme K (ANALYSEUR-RESIDUS-1) : du runner,
+ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1",
+          "run: " + RUNNER)                    # où elle était, à ici : partagée avec l'enregistreur, jamais recopiée
+LIBRE = "[0-9A-Za-z].*"      # CC2-1 : valeur libre en scalaire simple, jamais un guillemet qui avalerait des lignes
+GABARIT = ("    name: " + LIBRE, "    " + re.escape(ETAPES[0]), "    timeout-minutes: [1-9][0-9]*", "    steps:",
+           "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false",
+           "      - name: " + LIBRE, "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: " + LIBRE,
+           "        shell: bash", "        run: [|]")
+FETCH = "          fetch-depth: 0"   # CB-18v (Q-T4-11) : historique complet du job sim-bis, git archive de f35a70c
+
+
+def job(texte, nom):
+    """Lignes brutes du job `nom` du texte de gates.yml, indentation comprise : de sa clé (exclue) à la première ligne
+    d'indentation inférieure à 4 qui n'est ni vide ni un commentaire ; lignes vides et commentaires d'indentation 8 au
+    plus omis (aucun n'est une ligne d'un bloc `run:`, à l'indentation 10) ; [] s'il manque."""
+    lignes, sortie = texte.split(chr(10)), []
+    for x in lignes[lignes.index(f"  {nom}:") + 1:] if f"  {nom}:" in lignes else []:
+        n, t = len(x) - len(x.lstrip(" ")), x.strip()
+        if t and n < 4 and t[0] != "#":
+            break
+        sortie += [x] if t and (n > 8 or t[0] != "#") else []
+    return sortie
+
+
+def gabarit(texte, nom):
+    """CC-1 du contre-contrôle de CB-18, remède (a) : les lignes brutes du job (`job`), à indentation exacte, suivent
+    GABARIT ligne à ligne, puis ne sont plus que des lignes d'indentation 10 exactement, celles du bloc de la troisième
+    étape. Soit, sur ces lignes et dans cet ordre : `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, puis
+    trois étapes et rien d'autre : le checkout épinglé, son `with:` réduit à `persist-credentials: false` ; le runner
+    (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
+    plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite. CC2-1 : les trois `name` sont des scalaires
+    simples (premier caractère alphanumérique : ni guillemet, ni bloc, ni ancre, ni flux), `timeout-minutes` un entier ;
+    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit. CB-18v (Q-T4-11) et
+    CB-18w (O-2) : dans le seul job sim-bis-unittest, la ligne FETCH (`fetch-depth: 0`, valeur exacte) suit
+    `persist-credentials: false`, exigée ; l'adaptateur oracle_r1 y extrait f35a70c par git archive."""
+    b = job(texte, nom)
+    if nom == "sim-bis-unittest":
+        if b[7:8] != [FETCH]:
+            return False
+        del b[7]
+    return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
+        re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
 
 
 def main(argv: list) -> int:
