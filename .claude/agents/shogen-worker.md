@@ -161,3 +161,8 @@ tout brief le reprend.
   `enforcement/verdict-suite-s2.py` depuis DT7-d) : au dépassement, une campagne arrête aussi le groupe de chacun
   des descendants, relevés par parenté (`ps -A -o pid=,ppid=,pgid=`) avant l'arrêt de l'enfant direct, et les
   compte au relevé de fin ; `scripts/controle/mutants.py` le fait.
+- **Errata de ce bloc** (ajout daté du 2026-10-10 07:21:47 UTC, relecture G2 du lot DETTES-T7, C-6) : l'exception de la
+  règle 3 a la forme des l.18-22 du G0 de PLAN-S2BIS (`docs/adr-0029/G0-lot-PLAN-S2BIS.md` ; la l.22 achève
+  l'épinglage), non des seules l.18-21 ; sous 3.10, la suite S2 échoue par trois causes mesurées
+  (`hashlib.file_digest` et `datetime.fromisoformat` d'une date en `Z` dans `tools/rendu_unique.py`, format
+  verbeux de unittest 3.11+ attendu par deux tests), non par un seul test (errata de `s2-harness/README.md`).
