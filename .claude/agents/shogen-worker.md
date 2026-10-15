@@ -26,14 +26,6 @@ la partie 2, `docs/adr-0028/PLAN-PARTIE-2.md` §5 point 3).
 3. **Pré-enregistrement (ADR-0028 annexe D)** : fixtures seulement (D.4 a) ;
    tu ne poses jamais `SHOGEN_S2_CAMPAGNE_CONTROL` ; tu n'ouvres aucune
    pièce de la liste D.2 (repère par sha256, jamais d'affichage).
-   Exception (ajout daté du 2026-10-10 04:12:28 UTC, lot DETTES-T7 ;
-   SHOGEN-FICHE-WORKER-POSTEXEC-2) : après l'exécution unique, le G0 d'un
-   lot peut accorder que les scripts du lot, et eux seuls, lisent les
-   journaux scellés (forme du G0 de PLAN-S2BIS, l.18-21) ; personne
-   n'affiche, ne liste ni ne copie un journal ; leurs sha256 sont contrôlés
-   contre le bloc machine du paquet avant usage ; code et paramètres sont
-   épinglés au JOURNAL avant l'exécution. Sans exception écrite au G0 du
-   lot : fixtures seulement.
 4. **Tests d'abord** : valeurs de référence indépendantes du code, échec
    montré avant correction, une mutation par test ; la suite
    `s2-harness` reste verte à chaque pas
@@ -166,3 +158,18 @@ tout brief le reprend.
   l'épinglage), non des seules l.18-21 ; sous 3.10, la suite S2 échoue par trois causes mesurées
   (`hashlib.file_digest` et `datetime.fromisoformat` d'une date en `Z` dans `tools/rendu_unique.py`, format
   verbeux de unittest 3.11+ attendu par deux tests), non par un seul test (errata de `s2-harness/README.md`).
+
+## Exception à la règle 3 (déplacement daté du 2026-10-10 08:31:02 UTC, lot DETTES-T7, DT7-t)
+
+Déplacée ici depuis la règle 3, octets inchangés, pour qu'aucune ligne de la fiche citée par numéro ne bouge :
+deux pièces datées et scellées renvoient aux l.75-89 (`docs/adr-0028/revue-dettes5/G2-transcrit.md` l.264,
+`docs/adr-0028/revue-dettes5-codeql/G2-transcrit.md` l.625 ; mesure L-G2 de la relecture G2 du lot DETTES-T7).
+
+   Exception (ajout daté du 2026-10-10 04:12:28 UTC, lot DETTES-T7 ;
+   SHOGEN-FICHE-WORKER-POSTEXEC-2) : après l'exécution unique, le G0 d'un
+   lot peut accorder que les scripts du lot, et eux seuls, lisent les
+   journaux scellés (forme du G0 de PLAN-S2BIS, l.18-21) ; personne
+   n'affiche, ne liste ni ne copie un journal ; leurs sha256 sont contrôlés
+   contre le bloc machine du paquet avant usage ; code et paramètres sont
+   épinglés au JOURNAL avant l'exécution. Sans exception écrite au G0 du
+   lot : fixtures seulement.
