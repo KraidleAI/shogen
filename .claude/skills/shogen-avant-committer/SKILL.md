@@ -16,7 +16,8 @@ Erreurs visées : E1, E8, E9, E10, E13, E14, E16, E21, LA-N04, LA-N05 (liste de 
    `Source-Sha: <sha256>` par source (`sha256sum <source>`) et la ligne `Diff-Id: <id>`.
 3. Vérification complète puis sceau, d'une seule commande :
    `<vérification> && python3 -I -B scripts/controle/avant_acte.py sceller`.
-4. Commit : `python3 -I -B scripts/controle/avant_acte.py commit --message <m> --source <adjudication> --diff <d>
+4. Commit : `git diff --cached --stat` (index relu, que le crochet GARDE-FAITS du dépôt exige avant tout commit),
+   puis `python3 -I -B scripts/controle/avant_acte.py commit --message <m> --source <adjudication> --diff <d>
    --id <id> && git commit -q -F <m>`. Un décalage voulu d'un fichier cité s'écrit au message :
    `Décalage admis : <chemin>` (journalisé en contournement).
 5. Versement, avant `xtask` : `SHA256SUMS` écrit depuis le dossier des pièces (`sha256sum <pièces>`), puis

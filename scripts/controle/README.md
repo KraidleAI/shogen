@@ -400,3 +400,14 @@ dépendent des tests du harnais qu'ils importent.
 > Mio (racine fausse, voisine de `/` : `/root`, `/usr`, le scratchpad entier) ; ces racines étaient parcourues et lues
 > en entier, leurs `.md` jugés, des extraits imprimés aux refus. `tests/test_avant_acte.py` compte 41 tests ; plancher
 > du job `controle-unittest` 112.
+
+> *Ajout daté du 2026-10-15 11:38:22 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-8 ; articulation avec le
+> crochet GARDE-FAITS)* : `.claude/skills/shogen-avant-committer/SKILL.md` (sha256
+> `9f049982f6a4f07919d10ea99fb35c83aa85e95019dc1478f89aaed34d51e3d9`) et
+> `.claude/skills/shogen-avant-pousser/SKILL.md` (sha256
+> `e808a465fc824873eb85ba025196253936658f4b61230b73cfc42a4dd2263b9a`) : chaque commande qui commet, pousse ou contrôle
+> une poussée est précédée, dans son point, de la lecture que le crochet GARDE-FAITS du dépôt
+> (`.claude/hooks/garde_faits.py`, R3) exige (`git diff --cached --stat`, `git log --oneline origin/<b>..HEAD`, `git
+> status --short`) ; telles qu'écrites, les commandes des points 4 (commit), 2 (poussée) et 3 (`pousser --acte` d'une
+> suppression) étaient refusées par le crochet. `tests/test_skills.py` compte 3 tests (`test_r8_crochet_garde_faits` :
+> crochet lancé sur un journal synthétique) ; plancher du job `controle-unittest` 113.
