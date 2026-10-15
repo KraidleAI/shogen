@@ -22,12 +22,12 @@ IMAGE = {"usr/share/keyrings/debian-archive-keyring.pgp": "",           # image 
          "etc/apt/sources.list": "deb http://miroir.example/debian trixie main" + NL,
          "etc/apt/sources.list.d/fournisseur.list": "deb http://agent.example/apt stable main" + NL,
          "etc/ssh/sshd_config.d/50-cloud-init.conf": "PasswordAuthentication yes" + NL}
-ETAPES = ["sources", "paquets", "comptes", "observateur", "ssh", "mises_a_jour"]
+ETAPES = ["sources", "paquets", "comptes", "observateur", "ssh", "mises_a_jour", "pare_feu"]
 GARDES = {"usr/share/keyrings/debian-archive-keyring.pgp", "etc/ssh/sshd_config.d/50-cloud-init.conf"}
 PRODUITS = {"etc/apt/sources.list.disabled", "etc/apt/sources.list.d/fournisseur.list.disabled",
             "etc/apt/sources.list.d/debian.sources", "home/intervention/.ssh/authorized_keys",
             "etc/shogen/observateur.conf", "etc/ssh/sshd_config.d/00-shogen.conf",
-            "etc/apt/apt.conf.d/90shogen-securite"}
+            "etc/apt/apt.conf.d/90shogen-securite", "etc/nftables.conf", "etc/nftables.d/shogen-observateur.nft"}
 SSHD = [["PermitRootLogin", "no"], ["PasswordAuthentication", "no"], ["KbdInteractiveAuthentication", "no"],
         ["PermitEmptyPasswords", "no"], ["PubkeyAuthentication", "yes"], ["AuthenticationMethods", "publickey"],
         ["AllowUsers", "intervention"], ["DisableForwarding", "yes"]]
@@ -54,7 +54,9 @@ def commandes(o):
             "getent passwd intervention", "useradd --user-group --create-home --shell /bin/bash intervention",
             "chown -R intervention:intervention /home/intervention/.ssh",
             "chown root:shogen /etc/shogen/observateur.conf", "sshd -t", "systemctl try-reload-or-restart ssh.service",
-            "systemctl enable apt-daily.timer apt-daily-upgrade.timer"]
+            "systemctl enable apt-daily.timer apt-daily-upgrade.timer",
+            *("getent ahostsv4 " + n for n in [*NTP, "u1.your-storagebox.de"]), "nft -c -f /etc/nftables.conf",
+            "systemctl enable nftables.service", "systemctl restart nftables.service"]
 
 
 def pare_feu(texte):
@@ -235,6 +237,30 @@ class PremierDemarrage(Essai):
         self.assertEqual([chaines[n][2] for n in ("entree", "sortie", "transit")], [ENTREE, SORTIE, []])
         self.assertEqual([set(r.split("{")[1].split("}")[0].replace(",", " ").split()) for r in chaines["sortie"][2]
                           if "dport 53" in r and "{" in r], [TEMOINS])
+
+    def test_tdp2_commun_embarque_et_ensembles(self):
+        resolveurs = {"o1": "0.0.0.0/0", "o2": "9.9.9.9,149.112.112.112", "o3": "8.8.8.8,8.8.4.4",
+                      "o4": "203.0.113.53,203.0.113.54"}                    # ADR-0029 l.82 ; O1 récursif (Q-D-07)
+        for o, r in resolveurs.items():
+            with self.subTest(o=o):
+                code, _s, _e, racine = self.lancer(self.parametres(o))
+                self.assertEqual(code, 0)
+                self.assertEqual(self.lire(racine, "etc/nftables.conf", mode="rb"), self.lire(NFT, mode="rb"))
+                self.assertEqual(self.lire(racine, "etc/nftables.d/shogen-observateur.nft").split(NL)[1:], [
+                    "add element inet shogen resolveurs { " + r + " }",
+                    "add element inet shogen ntp { 192.0.2.11,192.0.2.12,192.0.2.13,192.0.2.14 }",
+                    "add element inet shogen sauvegarde { 192.0.2.23 }", ""])
+
+    def test_tdp2_nom_non_resolu_refuse(self):
+        for nom in ("ntppool2.time.nl", "u1.your-storagebox.de"):
+            with self.subTest(nom=nom):
+                dns = {k: v for k, v in DNS.items() if k != nom}
+                code, _s, erreur, racine = self.lancer(self.parametres("o2"), dns=dns)
+                self.assertEqual(code, 3)
+                self.assertIn("PARE-FEU/résolution : " + nom, erreur)
+                self.assertEqual(self.fichiers(racine) & {"etc/nftables.conf", "etc/nftables.d/shogen-observateur.nft"},
+                                 set())
+                self.assertNotIn("systemctl restart nftables.service", self.journal(racine))
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ CLE_INTERVENTION=""       # clé publique ssh-ed25519 de l'investisseur, sur une
 set -euo pipefail
 umask 022
 export LC_ALL=C DEBIAN_FRONTEND=noninteractive PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SERVEURS_NTP="sth1.nts.netnod.se gbg1.nts.netnod.se ntppool1.time.nl ntppool2.time.nl"    # décision 4 de DB-0
 R=""
 if [ "$#" -eq 2 ] && [ "$1" = --essai ]; then
     R="$(cd "$2" && pwd -P)" || R=""
@@ -146,6 +147,90 @@ EOF
     systemctl enable apt-daily.timer apt-daily-upgrade.timer
 }
 
+adresses() {    # adresses IPv4 du nom $1 par le résolveur du système, jointes par des virgules ; refus si aucune
+    local a
+    a="$(getent ahostsv4 "$1" | awk '{ print $1 }' | sort -u | paste -sd , -)" || a=""
+    [ -n "$a" ] || { echo "premier-demarrage : PARE-FEU/résolution : $1" >&2; exit 3; }
+    echo "$a"
+}
+
+etape_pare_feu() {      # E-D-05, décision 3, Q-D-07 : commun embarqué (égal à s2bis/deploi/nftables.conf), ensembles
+    local r ntp="" n sauvegarde
+    case "$FAMILLE_RESOLVEUR" in
+        unbound) r=0.0.0.0/0 ;;                         # O1 récursif : toute autorité (Q-D-07)
+        quad9) r=9.9.9.9,149.112.112.112 ;;             # ADR-0029 l.82
+        google) r=8.8.8.8,8.8.4.4 ;;                    # ADR-0029 l.82
+        fournisseur) r="${RESOLVEUR_FOURNISSEUR// /,}" ;;
+    esac
+    for n in $SERVEURS_NTP; do ntp="$ntp${ntp:+,}$(adresses "$n")"; done
+    sauvegarde="$(adresses "${ADRESSE_SAUVEGARDE#*@}")"
+    ecrire /etc/nftables.conf 0644 <<'NFT'
+#!/usr/sbin/nft -f
+# Shōgen S2-bis, pare-feu commun des quatre observateurs (DEPLOI-BIS, DB-1 ; ADR-0029 l.243 ; PROPOSITION §4.2
+# E-D-05 ; décision 3 de DB-0 ; Q-D-07) : refus par défaut dans les deux sens, IPv6 refusé, IPv4 seul admis.
+# Les ensembles d'observateur (résolveur, serveurs NTP, espace de sauvegarde) sont remplis par /etc/nftables.d/*.nft,
+# écrit au premier démarrage et jamais versé ; sans ce fichier, ils restent vides : refus.
+flush ruleset
+
+table inet shogen {
+	set resolveurs {
+		type ipv4_addr
+		flags interval
+	}
+
+	set ntp {
+		type ipv4_addr
+	}
+
+	set sauvegarde {
+		type ipv4_addr
+	}
+
+	chain entree {
+		type filter hook input priority filter; policy drop;
+		iif "lo" accept
+		meta nfproto ipv6 drop
+		ct state established,related accept
+		ct state invalid drop
+		udp sport 67 udp dport 68 accept  # DHCP : réponses au renouvellement du bail
+		tcp dport 22 accept  # SSH, clé seule (E-D-03)
+	}
+
+	chain sortie {
+		type filter hook output priority filter; policy drop;
+		oif "lo" accept
+		meta nfproto ipv6 drop
+		ct state established,related accept
+		ct state invalid drop
+		udp sport 68 udp dport 67 accept  # DHCP : renouvellement du bail
+		ip daddr 169.254.169.254 tcp dport 80 meta skuid 0 accept  # métadonnées du fournisseur (cloud-init, root)
+		tcp dport 443 accept  # HTTPS : sources, archive Debian, signal de vie, horodatage
+		ip daddr { 198.41.0.4, 192.36.148.17, 193.0.14.129 } udp dport 53 accept  # témoins D-4 (ADR-0029 l.109)
+		ip daddr @resolveurs udp dport 53 accept
+		ip daddr @resolveurs tcp dport 53 accept
+		ip daddr @ntp udp dport 123 accept
+		ip daddr @ntp tcp dport 4460 accept  # NTS-KE (RFC 8915)
+		ip daddr @sauvegarde tcp dport 23 accept  # rsync sur SSH vers l'espace de sauvegarde (port 23)
+	}
+
+	chain transit {
+		type filter hook forward priority filter; policy drop;
+	}
+}
+
+include "/etc/nftables.d/*.nft"
+NFT
+    ecrire /etc/nftables.d/shogen-observateur.nft 0644 <<EOF
+# Ensembles d'observateur du pare-feu, écrits au premier démarrage : jamais versés.
+add element inet shogen resolveurs { $r }
+add element inet shogen ntp { $ntp }
+add element inet shogen sauvegarde { $sauvegarde }
+EOF
+    nft -c -f "$R/etc/nftables.conf"
+    systemctl enable nftables.service
+    systemctl restart nftables.service
+}
+
 etape() { echo "premier-demarrage : étape $1"; "etape_$1"; }
 verifier_parametres
 etape sources
@@ -154,8 +239,10 @@ etape comptes
 etape observateur
 etape ssh
 etape mises_a_jour
-# Points d'entrée suivants (PROPOSITION §4.3) : horloge (DB-2, E-D-06, Q-D-06), résolveur par famille (DB-2, E-D-07,
-# Q-D-05), code au commit scellé (DB-2, E-D-08, Q-D-01), descripteur et smoke (DB-2, E-D-13, E-D-14) ; unités et
-# minuteries (DB-3, E-D-09) ; sauvegarde, échange des têtes, signal de vie, alerte disque (DB-4, E-D-10, E-D-11) ;
-# empreintes de rejouabilité (DB-5, E-D-02).
+# Point d'entrée DB-2, avant le pare-feu dont les ensembles en dépendent (décision 3 : noms résolus par le résolveur de
+# l'observateur) : horloge (E-D-06, Q-D-06) et résolveur par famille (E-D-07, Q-D-05).
+etape pare_feu
+# Points d'entrée suivants (PROPOSITION §4.3) : code au commit scellé (DB-2, E-D-08, Q-D-01), descripteur et smoke
+# (DB-2, E-D-13, E-D-14) ; unités et minuteries (DB-3, E-D-09) ; sauvegarde, échange des têtes, signal de vie, alerte
+# disque (DB-4, E-D-10, E-D-11) ; empreintes de rejouabilité (DB-5, E-D-02).
 echo "premier-demarrage : fin"
