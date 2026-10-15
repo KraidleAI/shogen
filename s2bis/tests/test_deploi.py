@@ -22,6 +22,21 @@ IMAGE = {"usr/share/keyrings/debian-archive-keyring.pgp": "",           # image 
          "etc/apt/sources.list": "deb http://miroir.example/debian trixie main" + NL,
          "etc/apt/sources.list.d/fournisseur.list": "deb http://agent.example/apt stable main" + NL,
          "etc/ssh/sshd_config.d/50-cloud-init.conf": "PasswordAuthentication yes" + NL}
+ETAPES = ["sources", "paquets", "comptes", "observateur"]
+GARDES = {"usr/share/keyrings/debian-archive-keyring.pgp", "etc/ssh/sshd_config.d/50-cloud-init.conf"}
+PRODUITS = {"etc/apt/sources.list.disabled", "etc/apt/sources.list.d/fournisseur.list.disabled",
+            "etc/apt/sources.list.d/debian.sources", "home/intervention/.ssh/authorized_keys",
+            "etc/shogen/observateur.conf"}
+
+
+def commandes(o):
+    """Commandes système attendues de l'observateur o, dans l'ordre (racine factice retirée des chemins)."""
+    return ["apt-get update", "apt-get install -y --no-install-recommends chrony nftables python3 rsync "
+            "unattended-upgrades" + " unbound" * (o == "o1"), "getent passwd shogen",
+            "useradd --system --user-group --home-dir /var/lib/shogen --create-home --shell /usr/sbin/nologin shogen",
+            "getent passwd intervention", "useradd --user-group --create-home --shell /bin/bash intervention",
+            "chown -R intervention:intervention /home/intervention/.ssh",
+            "chown root:shogen /etc/shogen/observateur.conf"]
 
 
 class Essai(unittest.TestCase):
@@ -113,6 +128,44 @@ class PremierDemarrage(Essai):
         self.assertFalse(tient("#" * (borne + 1)))                 # témoin : la borne refuse au-delà
         self.assertTrue(tient(self.rempli(self.parametres("o4", **{k: "x" * 200 for k in (
             "FOURNISSEUR", "REGION", "ADRESSE_SURVEILLANCE", "ADRESSE_SAUVEGARDE", "CLE_INTERVENTION")}))))
+
+    def test_tdp1_essai_quatre_observateurs(self):
+        for o in OBS:
+            with self.subTest(o=o):
+                code, sortie, erreur, racine = self.lancer(self.parametres(o))
+                self.assertEqual((code, erreur), (0, ""))
+                self.assertEqual(sortie.splitlines(), [f"premier-demarrage : étape {e}" for e in ETAPES]
+                                 + ["premier-demarrage : fin"])
+                self.assertEqual(self.journal(racine), commandes(o))
+                self.assertEqual(self.fichiers(racine), PRODUITS | GARDES)
+
+    def test_tdp1_parametres_gardes_et_cle(self):
+        p = self.parametres("o4")
+        code, _s, _e, racine = self.lancer(p)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.lire(racine, "etc/shogen/observateur.conf"), "".join(f'{k}="{p[k]}"' + NL for k in (
+            "OBSERVATEUR", "FOURNISSEUR", "REGION", "FAMILLE_RESOLVEUR", "RESOLVEUR_FOURNISSEUR",
+            "ADRESSE_SURVEILLANCE", "ADRESSE_SAUVEGARDE")))
+        self.assertEqual(self.lire(racine, "home/intervention/.ssh/authorized_keys"), CLE + NL)
+        self.assertEqual([os.stat(os.path.join(racine, c)).st_mode & 0o777 for c in (
+            "etc/shogen/observateur.conf", "home/intervention/.ssh", "home/intervention/.ssh/authorized_keys")],
+            [0o640, 0o700, 0o600])
+
+    def test_tdp1_sources_https_et_trousseau(self):
+        bloc = "Types: deb{0}URIs: https://deb.debian.org/{1}{0}Suites: {2}{0}Components: main{0}Signed-By: {3}{0}"
+        sans = {k: v for k, v in IMAGE.items() if not k.startswith("usr/")}
+        for ext in ("pgp", "gpg"):
+            with self.subTest(ext=ext):
+                cle = "/usr/share/keyrings/debian-archive-keyring." + ext
+                code, _s, _e, racine = self.lancer(self.parametres("o2"), {**sans, cle[1:]: ""})
+                self.assertEqual(code, 0)
+                self.assertEqual(self.lire(racine, "etc/apt/sources.list.d/debian.sources"), bloc.format(
+                    NL, "debian", "trixie", cle) + NL + bloc.format(NL, "debian-security", "trixie-security", cle))
+                self.assertEqual([self.lire(racine, c + ".disabled") for c in sans if c.startswith("etc/apt/")],
+                                 [IMAGE["etc/apt/sources.list"], IMAGE["etc/apt/sources.list.d/fournisseur.list"]])
+        code, sortie, erreur, racine = self.lancer(self.parametres("o2"), sans)
+        self.assertEqual((code, self.journal(racine), self.fichiers(racine)), (3, [], set(sans)))
+        self.assertIn("APT/trousseau", erreur)
 
 
 if __name__ == "__main__":

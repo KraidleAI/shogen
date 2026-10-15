@@ -57,7 +57,71 @@ verifier_parametres() {     # E-D-01 : tout est contrôlé avant le premier chan
     [[ $CLE_INTERVENTION =~ $cle ]] || refuser CLE_INTERVENTION "clé publique ssh-ed25519"
 }
 
+ecrire() {      # ecrire <chemin du système> <mode> : l'entrée standard sous la racine (vide hors essai), par renommage
+    mkdir -p "$R$(dirname "$1")"
+    cat > "$R$1.nouveau"
+    chmod "$2" "$R$1.nouveau"
+    mv -f "$R$1.nouveau" "$R$1"
+}
+
+etape_sources() {       # E-D-04, E-D-12, décision 1 : l'archive Debian seule, en HTTPS (le pare-feu ne laisse que 443)
+    local cle=/usr/share/keyrings/debian-archive-keyring.pgp f
+    [ -f "$R$cle" ] || cle=/usr/share/keyrings/debian-archive-keyring.gpg
+    [ -f "$R$cle" ] || { echo "premier-demarrage : APT/trousseau Debian absent" >&2; exit 3; }
+    for f in "$R/etc/apt/sources.list" "$R"/etc/apt/sources.list.d/*.list "$R"/etc/apt/sources.list.d/*.sources; do
+        if [ -f "$f" ] && [ "$f" != "$R/etc/apt/sources.list.d/debian.sources" ]; then mv -f "$f" "$f.disabled"; fi
+    done
+    ecrire /etc/apt/sources.list.d/debian.sources 0644 <<EOF
+Types: deb
+URIs: https://deb.debian.org/debian
+Suites: trixie
+Components: main
+Signed-By: $cle
+
+Types: deb
+URIs: https://deb.debian.org/debian-security
+Suites: trixie-security
+Components: main
+Signed-By: $cle
+EOF
+}
+
+etape_paquets() {       # E-D-04 et décision 1 : paquets de la distribution ; unbound pour la famille unbound (O1) seule
+    local p=(chrony nftables python3 rsync unattended-upgrades)
+    [ "$FAMILLE_RESOLVEUR" != unbound ] || p+=(unbound)
+    apt-get update
+    apt-get install -y --no-install-recommends "${p[@]}"
+}
+
+etape_comptes() {       # E-D-03 : compte de service sans droit d'administration ; compte d'intervention, clé seule
+    local service=(--system --user-group --home-dir /var/lib/shogen --create-home --shell /usr/sbin/nologin shogen)
+    getent passwd shogen > /dev/null || useradd "${service[@]}"
+    getent passwd intervention > /dev/null || useradd --user-group --create-home --shell /bin/bash intervention
+    mkdir -p "$R/home/intervention"
+    install -d -m 0700 "$R/home/intervention/.ssh"
+    echo "$CLE_INTERVENTION" | ecrire /home/intervention/.ssh/authorized_keys 0600
+    chown -R intervention:intervention "$R/home/intervention/.ssh"
+}
+
+etape_observateur() {   # E-D-01 : paramètres gardés pour les étapes suivantes (DB-2 à DB-5), lisibles du service seul
+    ecrire /etc/shogen/observateur.conf 0640 <<EOF
+OBSERVATEUR="$OBSERVATEUR"
+FOURNISSEUR="$FOURNISSEUR"
+REGION="$REGION"
+FAMILLE_RESOLVEUR="$FAMILLE_RESOLVEUR"
+RESOLVEUR_FOURNISSEUR="$RESOLVEUR_FOURNISSEUR"
+ADRESSE_SURVEILLANCE="$ADRESSE_SURVEILLANCE"
+ADRESSE_SAUVEGARDE="$ADRESSE_SAUVEGARDE"
+EOF
+    chown root:shogen "$R/etc/shogen/observateur.conf"
+}
+
+etape() { echo "premier-demarrage : étape $1"; "etape_$1"; }
 verifier_parametres
+etape sources
+etape paquets
+etape comptes
+etape observateur
 # Points d'entrée suivants (PROPOSITION §4.3) : horloge (DB-2, E-D-06, Q-D-06), résolveur par famille (DB-2, E-D-07,
 # Q-D-05), code au commit scellé (DB-2, E-D-08, Q-D-01), descripteur et smoke (DB-2, E-D-13, E-D-14) ; unités et
 # minuteries (DB-3, E-D-09) ; sauvegarde, échange des têtes, signal de vie, alerte disque (DB-4, E-D-10, E-D-11) ;
