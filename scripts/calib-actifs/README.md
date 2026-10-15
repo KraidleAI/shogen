@@ -49,10 +49,11 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété
   du générateur, fenêtres de 1 à 10 minutes, dont 23 à chevauchement 0, configuration absente des places du lot en
   couverture double (c = 1) ; la propriété du contre-contrôle cc2 (24 000 cas) trouve 11 pertes de queue, fenêtres
-  jusqu'à 27 minutes, et 29 en marché mince (densité 0,3 ou moins, fenêtres jusqu'à 95 minutes) ; une fenêtre du lot
-  (87 pages ou plus par découpage) le verrait dès un seul échange dans une fin de page. En miroir (R-2 du
-  contre-contrôle cc2), un décalage vers l'avant de plus d'une demi-page mais de moins d'une requête n'est pas vu au
-  début de la fenêtre si tous les débuts de page sont sans échange.
+  jusqu'à 27 minutes, et 29 autres hors de ce compte : 28 en marché mince (densité 0,3 ou moins, fenêtres jusqu'à 95
+  minutes) et 1 à densité 1 dont toutes les fins de page des deux découpages sont muettes (fenêtre de 15 minutes, 5
+  échangées) ; une fenêtre du lot (87 pages ou plus par découpage) le verrait dès un seul échange dans une fin de
+  page. En miroir (R-2 du contre-contrôle cc2), un décalage vers l'avant de plus d'une demi-page mais de moins d'une
+  requête n'est pas vu au début de la fenêtre si tous les débuts de page sont sans échange.
   Résidu de R-1 et R-2 (propriété cc2) : 66 pertes vers l'avant ; 64 où rien n'est servi pour la fenêtre (le
   décalage porte toutes les requêtes au-delà de la fin des données), 1 miroir ci-dessus (fenêtre d'une minute), 1 en
   marché mince (densité 0,1 ; décalage de 58 minutes, plus long que la fenêtre de 28 : toutes les réponses décalées
