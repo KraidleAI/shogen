@@ -5,6 +5,7 @@ numéro de son test (T-DP-n de la PROPOSITION §4.4, décision 5 de DB-0). Valeu
 pièces (ADR-0029, RAPPORT-DB0, index Debian lus à DB-0), jamais lues dans le script."""
 import base64
 import os
+import string
 import struct
 import subprocess
 import tempfile
@@ -226,7 +227,9 @@ class PremierDemarrage(Essai):
         """Bloc de la clé (E-D-01, DB1-q) : 51 octets, 68 caractères ; les 25 premiers sont fixes, le 26e porte les deux
         derniers bits de la longueur 32 (nuls) puis quatre bits de la clé : A à P seulement. Clés vraies, 26e caractère
         A, N et P : admises, posées telles quelles. Le bloc de TEST 1 au 26e caractère hors de A à P (Q : longueur 33) :
-        refus nommé, rien ne change."""
+        refus nommé, rien ne change. Les 64 valeurs du 26e caractère, sur un bloc dont les 42 derniers portent
+        « + » et « / » (image sans trousseau) : arrêt APT/trousseau exactement pour celles de longueur décodée
+        32, refus nommé sinon."""
         vraies = [bloc_ed25519(c) for c in CLES_ED25519]
         self.assertEqual([b[25] for b in vraies], ["A", "N", "P"])
         for b in vraies:
@@ -242,6 +245,17 @@ class PremierDemarrage(Essai):
                 code, sortie, erreur, racine = self.lancer(self.parametres("o2", CLE_INTERVENTION=cle))
                 self.assertEqual((code, sortie, self.journal(racine), self.fichiers(racine)), (2, "", [], set(IMAGE)))
                 self.assertIn("PARAMETRE/CLE_INTERVENTION ", erreur)
+        sans = {k: v for k, v in IMAGE.items() if not k.startswith("usr/")}
+        plein = bloc_ed25519("ff" * 32)[:26] + "+" + bloc_ed25519("ff" * 32)[27:]      # « + », puis 41 « / »
+        for c in string.ascii_uppercase + string.ascii_lowercase + string.digits + "+/":
+            b = plein[:25] + c + plein[26:]
+            n = struct.unpack(">I", base64.b64decode(b)[15:19])[0]       # longueur lue : 32 pour A à P seuls
+            with self.subTest(c=c, longueur=n):
+                code, sortie, erreur, racine = self.lancer(self.parametres("o2", CLE_INTERVENTION="ssh-ed25519 " + b),
+                                                           sans)
+                attendu = (3, "premier-demarrage : étape sources" + NL) if n == 32 else (2, "")
+                self.assertEqual((code, sortie, self.journal(racine), self.fichiers(racine)), (*attendu, [], set(sans)))
+                self.assertIn("APT/trousseau" if n == 32 else "PARAMETRE/CLE_INTERVENTION ", erreur)
 
     def test_tdp1_temporaires_nes_0600(self):
         """Écriture par renommage : chaque temporaire naît 0600, même si un lancement interrompu en a laissé un lisible
