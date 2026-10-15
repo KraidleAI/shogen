@@ -158,8 +158,9 @@ class TestOracleRecord(unittest.TestCase):
         six = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]    # C-6 : suite, puis D.4 b
         for n in six:
             Path(d, f"{n}.out").write_bytes(n.encode())
-        runs = [{"nom": n, "arbre": "s2-harness", "commande": [n], "exit": 0, "tests_avec_variable": [],
-                 "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(n.encode()).hexdigest()}} for n in six]
+        runs = [{"nom": n, "arbre": "s2-harness", "commande": [sys.executable, *(["-B", "-c"] if n == "suite" else [
+            "-I"]), n], "exit": 0, "tests_avec_variable": [], "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(
+                n.encode()).hexdigest()}} for n in six]               # formes de l'outil courant (ANCIEN-OUTIL-1)
         rendu = copie(rendu1, "rendu.json", runs=runs)
         sert = {"chemin": os.path.basename(g2), "sha256": sha[g2]}
         for chemin, role in ((g2, "G2"), (rendu, "rendu"), (copie(g2, "sert.json", served_from=sert), "G2")):
@@ -774,6 +775,25 @@ class TestOracleRecord(unittest.TestCase):
                                                                                           "^refus [(]masque[)] : "):
                 orc.verifier(p, "G2", commit, depot_)
         self.assertEqual(orc.verifier(temoin, "G2", self.c1)["tree"]["commit"], self.c1)
+
+    def test_verifier_refuse_l_enregistrement_d_un_outil_anterieur(self):
+        """SHOGEN-S2BIS-ENREG-ANCIEN-OUTIL-1 (lot DETTES-T7, Q-3 du générateur) : la lecture refuse (ancien outil) un
+        run `suite` lancé sans l'amorçage (-m unittest, outil d'avant OUT-2i), une commande de production ou de JOBS
+        lancée sans -I (outil d'avant OUT-2d), une commande qui n'est pas une liste (chaîne, entier) ; l'enregistrement
+        de l'outil courant reste conforme. Rougit si : contrôle absent, forme de `suite` ou de -I non lue, nom hors de
+        COMMANDES jugé."""
+        d = tempfile.mkdtemp(dir=self.d)
+        g2 = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(g2, "G2", self.c1)["runs"][0]["commande"][1:3], ["-B", "-c"])
+        moins_m = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]   # avant OUT-2i
+        for nom, f in (("moins-m", lambda r: r["runs"][0].update(commande=moins_m)),
+                       ("sans-I", lambda r: r["runs"][0].update(nom="j28", commande=[sys.executable, "-B", "x"])),
+                       ("chaine", lambda r: r["runs"][0].update(commande=" ".join(moins_m))),
+                       ("entier", lambda r: r["runs"][0].update(commande=5))):
+            with self.subTest(copie=nom), self.assertRaisesRegex(ValueError, "^refus [(]ancien outil[)] : "):
+                orc.verifier(self.copie(d, g2, f"{nom}.json", f), "G2", self.c1)
+        hors = self.copie(d, g2, "hors.json", lambda r: r["runs"][0].update(nom="essai", commande=[sys.executable]))
+        self.assertEqual(orc.verifier(hors, "G2", self.c1)["runs"][0]["nom"], "essai")      # nom hors de COMMANDES
 
     def test_suite_par_amorce_jugee_sur_le_compte_reel(self):
         """SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i ; LF-06 de la revue de la vague 2) : la commande `suite` passe par

@@ -38,7 +38,9 @@ interdit des briefs (prédicat `interdit` de INTERDITS, liste unique, jamais rec
 nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte. SHOGEN-S2BIS-ANALYSEUR-
 RESIDUS-1 (lot DETTES-T7, faille LC-03 du run 38015225784) : la ligne d'un job n'est lue que si le gates.yml n'a aucun
 résidu (`residus` de VERIF) et que le job suit la forme K (`gabarit` de VERIF, celui du cas K-02 du runner).
-SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : au dépassement, l'arbre entier de la commande est arrêté (`lancer`)."""
+SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : au dépassement, l'arbre entier de la commande est arrêté (`lancer`).
+SHOGEN-S2BIS-ENREG-ANCIEN-OUTIL-1 (lot DETTES-T7, Q-3 du générateur) : la lecture refuse (ancien outil) un run lancé
+autrement que par l'outil courant : `suite` sans amorçage (avant OUT-2i), autre commande sans -I (avant OUT-2d)."""
 from __future__ import annotations
 
 import argparse
@@ -431,7 +433,8 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     sha256 de chaque sortie recalculé,
     masque (OUT-2f : tree.sha256 sans entrée au nom d'un module standard à la racine de la suite d'un run, s2-harness
     pour `suite` et la production, dossier de la suite pour JOBS, ni fichier compilé), paquet.sha256 et runs (suite,
-    puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou
+    puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, ancien outil
+    (ANCIEN-OUTIL-1 : `suite` lancée par -c, l'amorçage ; toute autre commande de COMMANDES par -I), served_from nul, ou
     chemin et sha256 d'un enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
     def exige(ok, controle, detail=""):
         if not ok:
@@ -486,6 +489,11 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
         exige(noms == ["suite", *PRODUCTION], "runs", f" : {noms}, attendu {['suite', *PRODUCTION]}")
     else:
         exige((rec["paquet"]["sha256"], rec["sceau"]["genTime"]) == (None, None), "nuls hors rendu")
+    vieux = [r["nom"] for r in rec["runs"] if not isinstance(r["commande"], list) or (
+        r["commande"][1:3] != ["-B", "-c"] if r["nom"] == "suite" else r["nom"] in COMMANDES and r["commande"][1:2] != [
+            "-I"])]                                  # ANCIEN-OUTIL-1 : forme des commandes depuis OUT-2d et OUT-2i
+    exige(not vieux, "ancien outil", f" : {vieux[:3]} lancé(s) sans l'amorçage (suite, OUT-2i) ou sans -I (OUT-2d) : "
+          "enregistrement d'un outil antérieur, à refaire avec l'outil courant")
     sf = rec["served_from"]
     if sf is not None:
         p = os.path.join(racine, str(sf.get("chemin"))) if isinstance(sf, dict) else ""
