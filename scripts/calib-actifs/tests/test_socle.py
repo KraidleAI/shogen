@@ -66,8 +66,9 @@ class TestSocle(unittest.TestCase):
         """Place hors des unités, places non triées, N_min au-delà du nombre de places, dernière transaction hors des
         places horodatées, place sans série, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée,
         strates sans le dimanche ; DETTES-T2 : double chevauchement égal au pas (Coinbase), chevauchement hors pages,
-        voisins négatifs (OKX) ou hors mensuels (Kraken), page sans créneau (pas 1) : CA/parametres. Mutation : chaque
-        contrôle de cohérence retiré à son tour."""
+        voisins négatifs (OKX) ou hors mensuels (Kraken), page sans créneau (pas 1), couverture 3, double hors pages ou
+        à demi-page nulle : CA/parametres. Bords, à la main : second découpage à 2 minutes utiles ; aucune demi-page
+        d'une page d'un point (C-14). Mutation : chaque contrôle de cohérence retiré à son tour."""
         def a(cle, actif, valeur):
             return lambda p: p["lectures"]["A"][cle].update({actif: valeur})
         cas = [a("places", "USDC", ["binance", "bitfinex", "bitstamp", "kraken", "okx"]),
@@ -83,11 +84,21 @@ class TestSocle(unittest.TestCase):
                lambda p: p["series"]["coinbase"].update(chevauchement=-1),      # C-4 de la G2 : chevauchement négatif
                lambda p: p["series"]["coinbase"].update(chevauchement=75),      # C-12 : 150 créneaux, 0 minute utile
                lambda p: p["series"]["bitstamp"].update(pas=4),                 # C-12 : 2 créneaux, 0 minute utile
-               lambda p: p["series"]["coinbase"].update(pas=1, chevauchement=0)]   # C-12 : pas 1, aucun créneau
+               lambda p: p["series"]["bitfinex"].update(chevauchement=2500),    # C-12 en couverture simple : 2c = k
+               lambda p: p["series"]["coinbase"].update(pas=1, chevauchement=0),   # C-12 : pas 1, aucun créneau
+               lambda p: p["series"]["coinbase"].update(couverture=3),        # C-13 : couverture 1 ou 2 seulement,
+               lambda p: p["series"]["kraken"].update(couverture=2),          # double hors pages,
+               lambda p: p["series"]["coinbase"].update(pas=6, couverture=2)]  # demi-page nulle (1 minute utile)
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
         bord = socle.lire(ecrire_prm(self, lambda p: p["series"]["coinbase"].update(chevauchement=74)))   # C-12 : 2
         self.assertEqual(socle.pages(bord, "coinbase", {"debut": 0, "fin": 240})[1], (120, 240, -4320, 4620))  # utiles
+        bord = json.loads(json.dumps(socle.lire()))                           # C-13 (cohérent : pas 8, c = 1) :
+        bord["series"]["coinbase"].update(pas=8, couverture=2)
+        doubles = getattr(socle, "doubles", lambda *_a: "absente")          # avant C-13 : rouge par assertion
+        self.assertEqual(doubles(bord, "coinbase", {"debut": 0, "fin": 120}), [   # 2 utiles, demi-page 1 minute
+            (-60, 60, -120, 60), (60, 180, 0, 180)])
+        self.assertEqual(socle.demis(bord, "bitfinex", 600, 600, 660), [])          # C-14 : page d'un point
 
     def test_epingle_tau_sigma(self):
         """T-CA-SOC-1 : sha256 du vrai fichier par sha256sum égal à l'épingle, chemin rendu ; copie à un octet altéré

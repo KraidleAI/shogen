@@ -49,12 +49,14 @@ class TestFormes(unittest.TestCase):
         identique : gardée une fois ; minute 6 dans la page 0 (clôture altérée) et minute 14 dans la dernière :
         écartées ; minute 8 à clôture ou volume différent dans les pages 4 et 8, minute 3 différente dans les pages 0 et
         4 (chevauchement de début) : refus nommé ; double dans une page : refus « minute en double » ; page hors
-        découpage ou absente : refus. Mutations : doublon identique refusé ; contradictoire admis ; volume non comparé ;
-        double dans une page admis ; filtre à la fenêtre ou depuis le début de page ; plan libre."""
+        découpage ou absente : refus ; couverture simple (C-13 à part). Mutations : doublon identique refusé ;
+        contradictoire admis ; volume non comparé ; double dans une page admis ; filtre à la fenêtre ou depuis le début
+        de page ; plan libre."""
         fen = {"debut": W0, "fin": W0 + 840}
         m, rep = marche(fen), os.path.join("principale", "coinbase", "ETH")
         m5 = m | {W0 + 390: ("1.5", "1")}             # C-5 de la G2 : temps non rond hors de la page 0 ; C-7 : page 0
-        # de 3 bougies (sous le plafond), une avant le départ, aucune à sa dernière minute : admise (minute 3 en page 4)
+        # sous le plafond, une bougie avant le départ, minute 3 servie : admise ; sans la minute 3 (servie en page 4) :
+        # couverture discordante (C-13)
         base = {f"page-{W0 + 60 * a}.json": [W0 + 60 * i for i in range(a, b)]
                 for a, b in ((0, 5), (4, 9), (8, 13), (12, 15))}
         base[f"page-{W0}.json"].append(W0 + 360)
@@ -68,13 +70,15 @@ class TestFormes(unittest.TestCase):
                ({f"page-{W0 + 60}.json": [W0 + 60]}, {}, plan), ({p8: None}, {}, plan),
                ({f"page-{W0}.json": base[f"page-{W0}.json"] + [W0 + 390]}, {},
                 refus.format("temps hors fenêtre ou hors minute")),
-               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60], p4: [W0 + 180] + base[p4]}, {}, ([], [], [])),  # C-7
+               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60, W0 + 180], p4: [W0 + 180] + base[p4]}, {}, ([], [], [])),
+               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60], p4: [W0 + 180] + base[p4]}, {},
+                refus.format("couverture double discordante")),
                ({f"page-{W0}.json": base[f"page-{W0}.json"] + [W0 + 1200, W0 + 1260]}, {},  # C-9 : 7 bougies dès le
                 refus.format("réponse de plus de bougies que de créneaux demandés"))]          # départ, 6 créneaux
         for k, (pages, alterees, attendu) in enumerate(cas):
             with self.subTest(cas=k):
                 prm, d, _p = local(self, "http://127.0.0.1:9")
-                prm["series"]["coinbase"].update(pas=12, chevauchement=1)
+                prm["series"]["coinbase"].update(pas=12, chevauchement=1, couverture=1)
                 os.makedirs(os.path.join(d, rep))
                 for nom, ts in (base | pages).items():
                     if ts is not None:

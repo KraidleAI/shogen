@@ -77,7 +77,8 @@ SCHEMA = {"lot": str, "rattachement": str,
           | {"facteur": "dec", "source": str},
           "oracles_attendus": {"tau": _par_actif("dec"), "sigma_s": _par_actif(int), "source": str},
           "series": dict.fromkeys(PLACES, {"format": str, "acces": "acces", "pas": int, "chevauchement": int,
-                                         "voisins": int, "intervalle_ms": int, "url": str, "paires": "paires"})
+                                         "couverture": int, "voisins": int, "intervalle_ms": int, "url": str,
+                                         "paires": "paires"})
           | {"source": str},
           "kraken_sha256": _par_actif(str) | {"source": str},
           "oracle_sh": {"debut": int, "fin": int, "actives": [_actives], "concurrences": [_concurrences],
@@ -138,6 +139,7 @@ def coherent(p: dict) -> bool:
         k, c = (s["pas"] // 2 if s["acces"] == "pages" else 1), s["chevauchement"]   # demi-requêtes sous pas ; sinon 0
         ok = ok and s["voisins"] >= 0 and 0 <= 2 * c < k and (k + 1) // 2 + 2 * c < max(s["pas"], 2)
         ok = ok and (s["voisins"] == 0 or s["acces"] in ("mensuel", "mensuel_checksum"))      # C-3 de la G2
+        ok = ok and (s["couverture"] == 1 or s["couverture"] == 2 and s["acces"] == "pages" and k - 2 * c >= 2)  # C-13
     return ok
 
 
@@ -228,12 +230,23 @@ def pages(prm: dict, place: str, fen: dict) -> list:
             for d in range(fen["debut"], fen["fin"], u)]
 
 
+def doubles(prm: dict, place: str, fen: dict) -> list:
+    """C-13 : second découpage d'une place à couverture double, pages de pages() décalées d'une demi-page h (moitié
+    entière des minutes utiles), de début − h à fin + h au moins, non coupées à la fenêtre ; [] en couverture simple."""
+    s, c = prm["series"][place], prm["series"][place]["chevauchement"]
+    u = 60 * (s["pas"] // 2 - 2 * c)
+    h = 60 * (u // 120)
+    return [(d, d + u, d - 60 * c, d + u + 60 * (c - 1))
+            for d in range(fen["debut"] - h, fen["fin"] + h, u)] if s["couverture"] == 2 else []
+
+
 def demis(prm: dict, place: str, depart: int, borne: int, fin: int) -> list:
     """C-8 : demi-requêtes d'une page suspecte, cœurs [départ ; m] et [m + 60 ; borne] (m au milieu des n points),
-    élargis de c minutes de chaque côté : [(départ, borne, minute à atteindre)] ; la seconde doit atteindre fin − 60."""
+    élargis de c minutes de chaque côté : [(départ, borne, minute à atteindre)] ; la seconde doit atteindre fin − 60.
+    C-14 : page d'un seul point : aucune ([])."""
     c, n = prm["series"][place]["chevauchement"], (borne - depart) // 60 + 1
     m = depart + 60 * ((n + 1) // 2 - 1)
-    return [(depart - 60 * c, m + 60 * c, m), (m + 60 - 60 * c, borne + 60 * c, fin - 60)]
+    return [(depart - 60 * c, m + 60 * c, m), (m + 60 - 60 * c, borne + 60 * c, fin - 60)] if n > 1 else []
 
 
 def strate(t: int, prm: dict) -> str:

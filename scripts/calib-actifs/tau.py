@@ -223,15 +223,19 @@ def corps(prm: dict, res: dict) -> list:
 
 def completude(prm: dict, actif: str, nom: str, fen: dict, series: dict, bruts: str) -> list:
     """Minutes reçues sur attendues de chaque place d'un actif sur une fenêtre, au total et par page pour une place
-    paginée, avec le nombre de pages redemandées (DECISION de FORMES-API-1, pt 5 ; C-8) ; jamais décisif."""
+    paginée, avec le nombre de pages redemandées (DECISION de FORMES-API-1, pt 5 ; C-8) et, en couverture double, le
+    nombre de pages du second découpage, toutes concordantes (une discordance est un refus, C-13) ; jamais décisif."""
     out = []
     for p, s in series.items():
         c = bougies.comptes(prm, p, fen, s)
         x = (f"[{actif}] descriptif : minutes reçues sur attendues, {p} ({nom}) : total {sum(r for _a, r, _e in c)}/"
              f"{sum(e for _a, _r, e in c)}")
         if prm["series"][p]["acces"] == "pages":
-            n = sum(f.endswith(".1.json") for f in os.listdir(os.path.join(bruts, nom, p, actif)))
-            x += f" ; pages redemandées {n} ; par page " + " ; ".join(f"{a} {r}/{e}" for a, r, e in c)
+            fs = os.listdir(os.path.join(bruts, nom, p, actif))
+            x += f" ; pages redemandées {sum(f.endswith('.1.json') for f in fs)}"
+            if prm["series"][p]["couverture"] == 2:
+                x += f" ; seconde couverture {sum(f.startswith('double-') and f.count('.') == 1 for f in fs)} pages"
+            x += " ; par page " + " ; ".join(f"{a} {r}/{e}" for a, r, e in c)
         out.append(x)
     return out
 

@@ -181,10 +181,12 @@ def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str
     """API paginée d'une (place, actif) : découpage de socle.pages (requête de départ à borne, `pas` bougies au plus,
     chevauchement de chaque côté ; la première et la dernière peuvent demander une minute hors fenêtre, écartée au
     chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste. C-8 : page suspecte de
-    troncature (bougies.suspecte) redemandée en deux demi-pages (socle.demis), page-<début>.1.json et .2.json."""
+    troncature (bougies.suspecte) redemandée en deux demi-pages (socle.demis), page-<début>.1.json et .2.json. C-13 :
+    puis le second découpage (socle.doubles), double-<début>.json, de même."""
     s = prm["series"][place]
-    for debut, fin, depart, borne in socle.pages(prm, place, fen):
-        rel = os.path.join(nom, place, actif, f"page-{debut}.json")
+    for prefixe, debut, fin, depart, borne in ([("page", *x) for x in socle.pages(prm, place, fen)]
+                                               + [("double", *x) for x in socle.doubles(prm, place, fen)]):
+        rel = os.path.join(nom, place, actif, f"{prefixe}-{debut}.json")
         requete(prm, man, rel, place, actif, depart, borne, debit)
         with open(os.path.join(man.bruts, rel), "rb") as f:
             suspecte = bougies.suspecte(s["format"], f.read(), s["pas"], depart, fin - 60)
