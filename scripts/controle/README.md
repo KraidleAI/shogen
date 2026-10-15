@@ -81,3 +81,13 @@ dépendent des tests du harnais qu'ils importent.
 > erreur E14 de l'orchestrateur) et une heure écrite `HH:Mx` ou `HH:xx` (`heure-approchee`) ; une date d'un autre jour
 > n'est pas jugée. `tests/test_garde_commun.py` (6 tests ; horloge fixée par un faux `date` en tête du PATH), plancher
 > du job `controle-unittest` 43.
+
+> *Ajout daté du 2026-10-10 05:37:56 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-4)* : `garde_commun.py` (sha256
+> `08595b043757aeb65fe417de44199f9bebcc81d47c0c88c62ce7ad5384a5519d`) : interdits sans nouvelle copie de la liste
+> (`INTERDITS` de `enforcement/docs-sha256sums.py`, lus avec `ast` ; noms de D.2 : `motifs` de `fm11.py`, lus sans
+> exécuter `fm11.py` ni afficher un motif), vus dans toute copie (composants consécutifs, casse pliée, liens suivis)
+> et tout `*.jsonl` ; les motifs de D.2 ne jugent que la partie du chemin sous le dernier composant `scratchpad`, le
+> chemin du scratchpad d'une session pouvant en porter un (mesuré le 2026-10-10). `racine_dangereuse` (`/`, le dépôt
+> ou un ancêtre, un dossier `docs`, un interdit) ; `analyser_diff` (lignes ajoutées et blocs d'un diff de git, avec ou
+> sans contexte) ; `etat_disque` : refus sous 3 Gio libres, avertissement sous 6, `--min-go` ne fait que serrer
+> (erreur E4). `tests/test_garde_commun.py` compte 11 tests, plancher du job `controle-unittest` 48.
