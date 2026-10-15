@@ -14,14 +14,21 @@ chaque source, une ligne Source-Sha: <sha256> du message égale à son sha256 au
 Source-Sha sans source égale (E8 : message écrit avant la clôture de la source, retouchée ensuite ; remplace la date de
 fichier, avis c.2) ; C3, verdicts, nombres de passes, identifiants SHOGEN-…, G-n, C-n, R-n, Q-n, L-n, E-n, O-n, I-n
 et sha courts du message (hors pieds Source-Sha, Diff-Id, Co-Authored-By, Claude-Session, Décalage admis) lus dans
-les sources, un sha court absent des sources résolu par git (E8, LA-N03)."""
+les sources, un sha court absent des sources résolu par git (E8, LA-N03).
+GF-6 : commit C4, heures du message et des lignes ajoutées des .md (E14) ; C5, citations des mêmes textes, forme
+stricte refusée si fausse, autres formes en avertissement (E16) ; C6, --diff D... : HEAD plus les diffs nommés, dans
+l'ordre, donne l'arbre de l'index (LA-N04) ; C7, aucun bloc ne décale une ligne existante d'un fichier de
+garde/lignes-citees.txt, sauf ligne Décalage admis : <chemin> du message, journalisée en contournement (E21) ; C9,
+--id ID : ligne Diff-Id: ID dans le message."""
 import argparse
+import fnmatch
 import hashlib
 import importlib.util
 import os
 import re
 import subprocess
 import sys
+import tempfile
 
 
 def _module(nom):
@@ -40,14 +47,16 @@ NOMBRES = {"un": "1", "une": "1", "deux": "2", "trois": "3", "quatre": "4", "cin
 IDENT = re.compile("(?<![A-Za-z0-9-])(SHOGEN-[A-Z0-9]+(?:-[A-Z0-9]+)*|[GCRQLEOI]-[0-9]+)(?![A-Za-z0-9-])")
 SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]{7,40})(?![A-Za-z0-9…-])")
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
+CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 
 
 class Erreur(Exception):
     """Erreur de l'outil : sortie 3, jamais un refus."""
 
 
-def git(depot, *args):
-    p = subprocess.run(["git", "-C", depot, "-c", "core.quotePath=false", *args], capture_output=True, text=True)
+def git(depot, *args, env=None):
+    p = subprocess.run(["git", "-C", depot, "-c", "core.quotePath=false", *args], capture_output=True, text=True,
+                       env=env)
     if p.returncode:
         raise Erreur(f"git {args[0]} : sortie {p.returncode}")
     return p.stdout
@@ -119,6 +128,92 @@ def commit(a, fautes):
     for genre, x in manques:
         fautes.append(("refus", "C3", f"{genre} du message absent des sources : {x} (E8)",
                        "reprendre les mots de l'adjudication et de la ligne d'annexe relues", "-"))
+    fichiers, ecartes = GC.lignes_ajoutees(a.depot)
+    if ecartes:
+        fautes.append(("avertissement", "C4", f"{ecartes} fichier(s) indexé(s) sous un interdit, non lus", "", "-"))
+    textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
+    heures_et_citations(a.depot, [("message", texte)] + textes, fautes)
+    if a.diff:
+        diffs_nommes(a, fautes)
+    cites(a.depot, texte, fichiers, fautes)
+    if a.id and f"Diff-Id: {a.id}" not in texte.split(chr(10)):
+        fautes.append(("refus", "C9", f"le message ne porte pas la ligne Diff-Id: {a.id}", "l'ajouter au message", "-"))
+
+
+def place(ajouts):
+    """Lignes ajoutées posées à leur numéro, les autres vides : chaque faute porte le vrai numéro de ligne."""
+    lignes = [""] * max([n for n, _x in ajouts] or [0])
+    for n, x in ajouts:
+        lignes[n - 1] = x
+    return chr(10).join(lignes)
+
+
+def heures_et_citations(depot, textes, fautes):
+    """C4 (E14) et C5 (E16) sur des textes nommés."""
+    h = GC.maintenant()
+    for nom, t in textes:
+        for n, code, x in GC.horodatages_fautifs(t, h):
+            fautes.append(("refus", "C4", f"{code} à {nom}:{n} : {x} (E14)", "lire date -u, puis récrire l'heure", "-"))
+        refus, avert = GC.citations(t, depot)
+        for n, code, ref in refus:
+            fautes.append(("refus", "C5", f"{code} à {nom}:{n} ({ref}) (E16)",
+                           "ouvrir la ligne citée, la copier mot pour mot", "-"))
+        for n, code, ref in avert:
+            fautes.append(("avertissement", "C5", f"{code} à {nom}:{n} ({ref})", "", "-"))
+
+
+def diffs_nommes(a, fautes):
+    """C6 (LA-N04) : dans un index temporaire, HEAD plus les diffs nommés, dans l'ordre, égale l'arbre de l'index."""
+    with tempfile.TemporaryDirectory() as d:
+        env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
+        git(a.depot, "read-tree", "HEAD", env=env)
+        try:
+            for x in a.diff:
+                git(a.depot, "apply", "--cached", os.path.abspath(x), env=env)
+            egal = git(a.depot, "write-tree", env=env) == git(a.depot, "write-tree")
+        except Erreur:
+            egal = False
+    if not egal:
+        fautes.append(("refus", "C6", "l'index n'est pas HEAD plus les diffs nommés, dans l'ordre (LA-N04)",
+                       "retirer de l'index ce qui n'est pas dans les diffs nommés, ou nommer le diff manquant", "-"))
+
+
+def decalage(blocs, longueur):
+    """Première ligne existante (numéro d'avant) qu'un bloc décale, sinon None : un ajout après la dernière ligne et
+    un remplacement à nombre de lignes égal n'en décalent aucune (E21)."""
+    pos = ecart = 0
+    for a, b, _c, _d, lignes in blocs:
+        debut = a - 1 if b else a
+        if debut > pos and ecart:
+            return pos + 1
+        pos = debut
+        for x in lignes:
+            if x[0] == " " and ecart:
+                return pos + 1
+            pos += x[0] != "+"
+            ecart += (x[0] == "+") - (x[0] == "-")
+    return pos + 1 if pos < longueur and ecart else None
+
+
+def cites(depot, texte, fichiers, fautes):
+    """C7 (E21) sur les fichiers de garde/lignes-citees.txt ; ligne Décalage admis : <chemin> du message : admis,
+    journalisé en contournement."""
+    with open(CITES, encoding="utf-8") as f:
+        motifs = [x.strip() for x in f if x.strip() and not x.startswith("#")]
+    for f in fichiers:
+        chemin = f["avant"]
+        if not chemin or not any(fnmatch.fnmatchcase(chemin, m) for m in motifs):
+            continue
+        contenu = git(depot, "cat-file", "-p", "HEAD:" + chemin)
+        ligne = decalage(f["blocs"], contenu.count(chr(10)) + (contenu[-1:] not in ("", chr(10))))
+        if ligne is None:
+            continue
+        if "Décalage admis : " + chemin in texte.split(chr(10)):
+            fautes.append(("admis", "C7", f"{chemin} : ligne {ligne} décalée, admis par le message", "",
+                           "decalage-admis"))
+        else:
+            fautes.append(("refus", "C7", f"{chemin} : un bloc décale la ligne {ligne} et les suivantes (E21)",
+                           "ajouter en fin ; décalage voulu : ligne Décalage admis : " + chemin + " au message", "-"))
 
 
 COMMANDES = {"sceller": sceller, "commit": commit}
@@ -143,6 +238,8 @@ def main(argv=None):
     c = sp.add_parser("commit")
     c.add_argument("--message", required=True)
     c.add_argument("--source", action="append", required=True)
+    c.add_argument("--diff", action="append", default=[])
+    c.add_argument("--id")
     try:
         a = p.parse_args(argv)
     except SystemExit as e:

@@ -147,3 +147,13 @@ dépendent des tests du harnais qu'ils importent.
 > hors pieds (`Source-Sha`, `Diff-Id`, `Co-Authored-By`, `Claude-Session`, `Décalage admis`), lus dans les sources ;
 > un sha court absent des sources doit se résoudre en commit. `tests/test_avant_acte.py` compte 6 tests ; plancher du
 > job `controle-unittest` 63.
+
+> *Ajout daté du 2026-10-10 06:17:36 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-6 ; erreurs E14, E16, E21, LA-N04)* :
+> `avant_acte.py` (sha256 `f922bcc36fd3a4aa3b18f132888a1b6a346c89c1f1be8f87b8e73e6bf80b48f8`), `commit` complété : C4,
+> heures du message et des lignes ajoutées des `.md` (un `.py` porte des heures d'essai, non jugées) ; C5, citations
+> des mêmes textes (forme stricte fausse : refus ; autres formes : avertissement) ; C6, `--diff D...` : HEAD plus les
+> diffs nommés, dans l'ordre, égale l'arbre de l'index ; C7, aucun bloc ne décale une ligne existante d'un fichier de
+> `garde/lignes-citees.txt` (sha256 `a1fc278bff87efe9e94a2bb74cd67114002bfd815bb5b7409b65bd2093db0b16`), sauf une
+> ligne `Décalage admis : <chemin>` du message, admise et journalisée en contournement ; C9, `--id ID` : ligne
+> `Diff-Id: ID` du message ; un fichier indexé sous un interdit n'est jamais lu (avertissement).
+> `tests/test_avant_acte.py` compte 10 tests ; plancher du job `controle-unittest` 67.

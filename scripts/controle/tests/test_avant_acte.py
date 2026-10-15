@@ -2,7 +2,9 @@
 dépôt du projet ; rouges sur l'erreur réelle reproduite, verts sur le cas sain. GF-5 : sceller (LA-N05 : pièce
 retouchée après la vérification, commit sans verdict vert sur le contenu exact), contrat de sortie, journal.
 GF-5b : commit C1 (sceau), C2 (Source-Sha ; E8 : message écrit avant la clôture de la source), C3 (E8 : « trois
-passes » contre deux ; verdicts, identifiants et sha courts lus dans les sources ou résolus par git)."""
+passes » contre deux ; verdicts, identifiants et sha courts lus dans les sources ou résolus par git).
+GF-6 : commit C4 (E14, heures), C5 (E16, citations), C6 (LA-N04, index égal aux diffs nommés), C7 (E21, aucun bloc
+qui décale une ligne d'un fichier cité par numéro), C9 (Diff-Id)."""
 import contextlib
 import hashlib
 import io
@@ -88,7 +90,7 @@ class Sceau(Depot):
         self.assertTrue(all(re.fullmatch("20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", x[0]) for x in j))
 
 
-class Commit(Depot):
+class Source(Depot):
     def setUp(self):
         super().setUp()
         self.adj = os.path.join(self.tmp, "ADJUDICATION.md")
@@ -104,6 +106,8 @@ class Commit(Depot):
     def commit(self, m):
         return self.lancer("commit", "--message", m, "--source", self.adj)
 
+
+class Commit(Source):
     def test_la_n05_commit_sans_sceau(self):
         """LA-N05, C1 : commit sans sceau refusé ; vérification puis sceau : admis ; pièce retouchée après : refusé."""
         m = self.message("x : contre-contrôle CONFORME en deux passes")
@@ -147,3 +151,65 @@ class Commit(Depot):
                          "base " + tete[:9] + ", SHOGEN-FUZZ-DISTILLATION-1 ; Deux passes", "", "Diff-Id: R-9",
                          "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"])
         self.assertEqual(self.commit(self.message(corps)), (0, ""))
+
+
+
+class CommitSuite(Source):
+    CORPS = "x : contre-contrôle CONFORME en deux passes"
+
+    def verifier(self, fichiers, corps=CORPS, *argv):
+        """Indexe `fichiers`, scelle, puis lance commit avec un message écrit depuis la source."""
+        self.indexer(fichiers)
+        self.lancer("sceller")
+        return self.lancer("commit", "--message", self.message(corps), "--source", self.adj, *argv)
+
+    def test_e14_e16_lignes_ajoutees(self):
+        """E14 (04:22 écrit à 04:14) dans une ligne ajoutée d'un .md, non d'un .py, et dans le message : refus C4 ;
+        E16, citation stricte inexacte ajoutée : refus C5 ; forme libre : avertissement, sortie 0, journal ; fichier
+        indexé sous un interdit : jamais lu, avertissement."""
+        faux = os.path.join(self.tmp, "faux")
+        ag.ecrire(faux, {"date": "#!/bin/sh" + NL + "echo 2026-10-10T04:14:00Z" + NL})
+        os.chmod(os.path.join(faux, "date"), 0o755)
+        os.environ["PATH"] = faux + os.pathsep + os.environ["PATH"]
+        code, sortie = self.verifier({"a.md": "un" + NL + "page du 2026-10-10 04:22" + NL, "c.py": "2026-10-10 04:22",
+                                      "docs/rapports/r.md": "2026-10-10 04:22"})
+        self.assertEqual((code, sortie.count("REFUS C4 ")), (1, 1))
+        self.assertIn("REFUS C4 : heure-future à a.md:2 : 2026-10-10 04:22", sortie)
+        self.assertIn("AVERTISSEMENT C4 : 1 fichier(s) indexé(s) sous un interdit, non lus", sortie)
+        ag.git(self.d, self.env, "rm", "-q", "-f", "docs/rapports/r.md")
+        code, sortie = self.verifier({"a.md": "un" + NL, "b.md": "b"}, "x : CONFORME en deux passes, 2026-10-10 04:22")
+        self.assertEqual((code, sortie[:9]), (1, "REFUS C4 "))
+        cit = chr(171) + " Q-FUZZ-1 routée vers les advisors " + chr(187)
+        code, sortie = self.verifier({"c.md": cit + " (a.md:1)" + NL})
+        self.assertEqual((code, sortie[:9]), (1, "REFUS C5 "))
+        code, sortie = self.verifier({"c.md": "x" + NL + cit + " (JOURNAL l.1)" + NL})
+        self.assertEqual((code, sortie.startswith("AVERTISSEMENT C5 : citation-libre")), (0, True))
+        self.assertEqual(self.journal()[-1][1:], ["commit", "C5", "avertissement", "-"])
+
+    def test_la_n04_diffs_nommes(self):
+        """LA-N04 : deux diffs indexés, un seul nommé : refus C6 ; les deux nommés, dans l'ordre : admis."""
+        self.indexer({"a.md": "un" + NL + "deux" + NL, "z.md": "z" + NL})
+        diffs = []
+        for nom in ("a.md", "z.md"):
+            ag.ecrire(self.tmp, {nom + ".diff": ag.git(self.d, self.env, "diff", "--cached", "HEAD", "--", nom)})
+            diffs.append(os.path.join(self.tmp, nom + ".diff"))
+        self.assertEqual(self.verifier({}, self.CORPS, "--diff", diffs[1])[1][:9], "REFUS C6 ")
+        self.assertEqual(self.verifier({}, self.CORPS, "--diff", diffs[0], "--diff", diffs[1]), (0, ""))
+
+    def test_e21_fichier_cite(self):
+        """E21 : insertion au milieu d'un fichier cité par numéro (JOURNAL.md) : refus C7 ; remplacement à nombre de
+        lignes égal et ajout en fin : admis ; décalage écrit dans le message : admis, journal contourne."""
+        self.indexer({"JOURNAL.md": NL.join(["l1", "l2", "l3", ""])})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "journal")
+        code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "neuf", "l2", "l3", ""])})
+        self.assertEqual((code, sortie[:9]), (1, "REFUS C7 "))
+        self.assertEqual(self.verifier({"JOURNAL.md": NL.join(["l1", "L2", "l3", "fin", ""])}), (0, ""))
+        code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "neuf", "L2", "l3", "fin", ""])},
+                                     self.CORPS + NL + NL + "Décalage admis : JOURNAL.md")
+        self.assertEqual((code, sortie[:9]), (0, "ADMIS C7 "))
+        self.assertEqual(self.journal()[-1][1:], ["commit", "C7", "admis", "decalage-admis"])
+
+    def test_diff_id(self):
+        """C9 : ligne Diff-Id exigée quand --id est donné."""
+        self.assertEqual(self.verifier({"a.md": "id" + NL}, self.CORPS, "--id", "GF-6")[1][:9], "REFUS C9 ")
+        self.assertEqual(self.verifier({}, self.CORPS + NL + NL + "Diff-Id: GF-6", "--id", "GF-6"), (0, ""))

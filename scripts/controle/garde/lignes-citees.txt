@@ -1,0 +1,13 @@
+# Fichiers cités par numéro de ligne (lot GARDE-FOUS-ORCH, GF-6 ; erreur E21) : un bloc qui décale une ligne existante
+# y est refusé par avant_acte.py (commit C7, diff) ; admis : ajout en fin, remplacement à nombre de lignes égal. Un
+# décalage voulu s'écrit dans le message de commit, sur une ligne : Décalage admis : <chemin>. Motifs fnmatch, chemins
+# depuis la racine du dépôt ; une ligne par motif.
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md
+docs/adr-0028/ANNEXE-B-items.md
+docs/adr-0028/CP2-S2.md
+docs/adr-0028/G0-lots-DETTES.md
+docs/17-*
+JOURNAL.md
+scripts/controle/README.md
+scripts/controle/garde/*
+.claude/agents/*.md
