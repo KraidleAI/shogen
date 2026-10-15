@@ -10,7 +10,7 @@ import unittest
 
 NL = chr(10)
 DEPLOI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploi")
-SCRIPT = os.path.join(DEPLOI, "premier-demarrage.sh")
+SCRIPT, NFT = (os.path.join(DEPLOI, n) for n in ("premier-demarrage.sh", "nftables.conf"))
 CLE = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEssaiDB1EssaiDB1EssaiDB1EssaiDB1EssaiDB1Ess investisseur@poste"
 OBS = {"o1": ("hetzner", "hel1", "unbound", ""), "o2": ("ovhcloud", "gra", "quad9", ""),     # décision 2 de DB-0
        "o3": ("digitalocean", "ams3", "google", ""),
@@ -35,6 +35,15 @@ APT = ['APT::Periodic::Update-Package-Lists "1";', 'APT::Periodic::Unattended-Up
        "#clear Unattended-Upgrade::Allowed-Origins;", "#clear Unattended-Upgrade::Origins-Pattern;",
        'Unattended-Upgrade::Origins-Pattern { "origin=Debian,codename=trixie-security,label=Debian-Security"; };',
        'Unattended-Upgrade::Automatic-Reboot "false";']        # Origin, Label, Codename : InRelease de trixie-security
+ENTREE = ['iif "lo" accept', "meta nfproto ipv6 drop", "ct state established,related accept", "ct state invalid drop",
+          "udp sport 67 udp dport 68 accept", "tcp dport 22 accept"]
+SORTIE = ['oif "lo" accept', "meta nfproto ipv6 drop", "ct state established,related accept", "ct state invalid drop",
+          "udp sport 68 udp dport 67 accept", "ip daddr 169.254.169.254 tcp dport 80 meta skuid 0 accept",
+          "tcp dport 443 accept", "ip daddr { 198.41.0.4, 192.36.148.17, 193.0.14.129 } udp dport 53 accept",
+          "ip daddr @resolveurs udp dport 53 accept", "ip daddr @resolveurs tcp dport 53 accept",
+          "ip daddr @ntp udp dport 123 accept", "ip daddr @ntp tcp dport 4460 accept",
+          "ip daddr @sauvegarde tcp dport 23 accept"]
+TEMOINS = {"198.41.0.4", "192.36.148.17", "193.0.14.129"}     # témoins D-4, ADR-0029 l.109
 
 
 def commandes(o):
@@ -46,6 +55,25 @@ def commandes(o):
             "chown -R intervention:intervention /home/intervention/.ssh",
             "chown root:shogen /etc/shogen/observateur.conf", "sshd -t", "systemctl try-reload-or-restart ssh.service",
             "systemctl enable apt-daily.timer apt-daily-upgrade.timer"]
+
+
+def pare_feu(texte):
+    """(tables, {chaîne : [crochet, politique, règles]}) d'un fichier nftables, commentaires et blancs retirés."""
+    tables, chaines, nom = [], {}, None
+    for ligne in texte.splitlines():
+        t = " ".join(ligne.split("#")[0].split())
+        if t.startswith("table "):
+            tables.append(t)
+        elif t.startswith("chain "):
+            nom = t.split()[1]
+            chaines[nom] = [None, None, []]
+        elif nom and t == "}":
+            nom = None
+        elif nom and t.startswith("type filter hook "):
+            chaines[nom][:2] = [t.split()[3], t.split()[-1]]
+        elif nom and t:
+            chaines[nom][2].append(t)
+    return tables, chaines
 
 
 class Essai(unittest.TestCase):
@@ -190,6 +218,23 @@ class PremierDemarrage(Essai):
         self.assertEqual([x.strip() for x in self.lire(racine, "etc/apt/apt.conf.d/90shogen-securite").split(NL)
                           if x.strip() and not x.startswith("//")], APT)
         self.assertEqual(os.listdir(os.path.join(racine, "etc/apt/apt.conf.d")), ["90shogen-securite"])
+
+    def test_tdp2_refus_par_defaut_ipv4_et_ipv6(self):
+        texte = self.lire(NFT)
+        lignes = [t for t in (" ".join(x.split("#")[0].split()) for x in texte.split(NL)) if t]
+        self.assertEqual((lignes[0], lignes[-1]), ("flush ruleset", 'include "/etc/nftables.d/*.nft"'))
+        tables, chaines = pare_feu(texte)
+        self.assertEqual(tables, ["table inet shogen {"])         # inet : IPv4 et IPv6 passent par les mêmes chaînes
+        self.assertEqual({n: c[:2] for n, c in chaines.items()},
+                         {"entree": ["input", "drop;"], "sortie": ["output", "drop;"], "transit": ["forward", "drop;"]})
+        self.assertEqual([chaines[n][2][:2] for n in ("entree", "sortie")],
+                         [['iif "lo" accept', "meta nfproto ipv6 drop"], ['oif "lo" accept', "meta nfproto ipv6 drop"]])
+
+    def test_tdp2_regles_exactes(self):
+        _t, chaines = pare_feu(self.lire(NFT))
+        self.assertEqual([chaines[n][2] for n in ("entree", "sortie", "transit")], [ENTREE, SORTIE, []])
+        self.assertEqual([set(r.split("{")[1].split("}")[0].replace(",", " ").split()) for r in chaines["sortie"][2]
+                          if "dport 53" in r and "{" in r], [TEMOINS])
 
 
 if __name__ == "__main__":
