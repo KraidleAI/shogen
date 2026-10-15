@@ -130,6 +130,9 @@ tout brief le reprend.
   étiquette inchangée ; pour chaque paramètre passé sous étiquette, une fixture où sa valeur diffère de toute source
   concurrente, avec une garde d'attendu qui prouve que la fixture sépare (maximum au milieu des mesures, garde isolée
   par cas, tous les sites d'un même paramètre, W ≠ 1 pour chaque destinataire).
+- **Outil commun** (ajout daté du 2026-10-10 05:02:06 UTC, lot DETTES-T7, DT7-f) : `scripts/controle/mutants.py`
+  classe chaque mutant par la commande du job, sous la borne, groupes de processus arrêtés et relevé `ps` de fin ; il
+  se lance depuis un arbre relu, à part de la copie qu'il mute (usage : sa docstring et `scripts/controle/README.md`).
 - **Processus orphelins** (SHOGEN-MUTANTS-ORPHELINS-1) : une campagne lance chaque run dans un groupe de processus
   neuf (`start_new_session=True`) et l'arrête, au dépassement, par `os.killpg` sur le groupe entier, jamais sur
   l'enfant direct seul ; à la fin, un relevé `ps` consigne qu'aucun processus de ses groupes ne reste (écart E-CA3-1

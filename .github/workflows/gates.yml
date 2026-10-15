@@ -346,6 +346,7 @@ jobs:
     # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (10 tests, dont 2 de la relecture G2 et 1 de
     # l'adjudication C-10), plancher 26 → 36.
     # Correctif DT5-24 (2026-10-10, alerte CodeQL de la PR n° 11 : retour arrière exponentiel) : un test, plancher 37.
+    # Lot DETTES-T7, DT7-f (2026-10-10, recalé 2026-10-15) : cas de l'outil commun des mutants (scripts/controle/mutants.py), plancher 117.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -361,4 +362,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 115
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 117

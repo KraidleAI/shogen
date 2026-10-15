@@ -424,3 +424,15 @@ dépendent des tests du harnais qu'ils importent.
 > messages de commit du projet sont écrits sans accents) : un message qui l'écrivait contre des sources NON-CONFORME
 > passait, le verdict n'étant pas lu. `tests/test_avant_acte.py` compte 42 tests ; plancher du job `controle-unittest`
 > 115.
+
+> *Ajout daté du 2026-10-15 21:17:22 UTC (`date -u` ; lot DETTES-T7, DT7-f ; SHOGEN-S2BIS-MUT-COMMANDE-1,
+> SHOGEN-MUTANTS-ORPHELINS-1)* : `mutants.py`, outil commun des campagnes de mutants (bibliothèque standard, POSIX) :
+> chaque mutant (fichier, texte avant présent une fois, texte après) est posé dans une copie, puis classé par la
+> commande du job qui porte le code muté, lue dans le `gates.yml` de la copie par l'analyseur unique du vérificateur
+> (étapes `run:` dans l'ordre, runner d'abord, `bash -eo pipefail` comme la forge), sous une borne de temps (300 s par
+> défaut) : tué (sortie 1, ou les codes de `--tue`), vivant (0), FATAL (borne, sortie hors contrat, mutant
+> inapplicable ; jamais compté tué). Chaque étape tourne dans un groupe de processus neuf, arrêté en entier après elle
+> (`os.killpg`) ; la campagne finit par un relevé `ps` de ses groupes, vide exigé. Témoin d'abord (job sans mutant
+> vivant), copie rendue à ses octets après chaque mutant, diff et sortie de chaque mutant versés dans `--sortie`.
+> L'outil se lance depuis un arbre relu, à part de la copie qu'il mute. Cas : `tests/test_mutants.py` (deux tests ;
+> plancher du job `controle-unittest` 39).
