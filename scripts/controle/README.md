@@ -194,3 +194,13 @@ dépendent des tests du harnais qu'ils importent.
 > qui portent `CACHEDIR.TAG` (cibles cargo), à profondeur 4 au plus, sans entrer dans `docs`, `.git` ni un interdit,
 > sans suivre de lien, avec leur taille ; rien n'est effacé ; racine refusée : `/`, le dépôt ou un ancêtre, un dossier
 > `docs`, un interdit. `tests/test_avant_acte.py` compte 20 tests ; plancher du job `controle-unittest` 77.
+
+> *Ajout daté du 2026-10-10 06:44:41 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-9 ; erreurs E3, E8, LA-N04, LA-N05)* :
+> `gabarits/chaine.sh` (sha256 `b762b754164dd253da8f4671d04b71c58e85cf98a53196489f4762598b2531f7`), modèle de chaîne
+> de commits, à copier par lot et à lancer détaché avec un délai (`setsid nohup timeout 6600 bash chaine.sh`) : plan
+> d'une ligne par commit (`id|diffs|message|sources`), contrôle du disque au départ, arbre propre exigé, `git apply
+> --index` des diffs du pas, `verif <id> && avant_acte.py sceller` (vérification complète : xtask, `cargo test -p
+> xtask` à la cible par défaut, lignes `python3 -B enforcement/` de `gates.yml`, lint R-1), `avant_acte.py commit …
+> --diff … --id <id> && git commit -q -F <message>`, reprise par la ligne `Diff-Id:`, arrêt nommé au premier refus ;
+> la chaîne n'écrit jamais un message. Un arrêt laisse le pas appliqué à l'index : le retirer avant de relancer.
+> `tests/test_gabarit_chaine.py` (5 tests, `verif` remplacée par un faux) ; plancher du job `controle-unittest` 82.
