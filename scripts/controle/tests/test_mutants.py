@@ -34,6 +34,18 @@ def lancer(d: str, mutants: list, *plus, gates=GATES, job="essai") -> tuple:
     return p.returncode, [json.loads(x) for x in p.stdout.splitlines()], p.stderr, c
 
 
+def vit(chemin: str) -> bool:
+    """Processus dont le numéro est écrit dans `chemin` encore vivant (zombie : mort ; fichier absent : False ; ps
+    POSIX) ; réserve R-2."""
+    try:
+        with open(chemin, encoding="utf-8") as f:
+            pid = f.read()
+    except OSError:
+        return False
+    etat = subprocess.run(["ps", "-o", "stat=", "-p", pid], capture_output=True, text=True).stdout.strip()
+    return bool(etat) and not etat.startswith("Z")
+
+
 def tuer(chemin: str) -> None:
     """Descendant détaché du cas M7 (numéro écrit dans `chemin`) arrêté s'il vit encore (G2 du lot DETTES-T7)."""
     with contextlib.suppress(OSError, ValueError):
@@ -47,10 +59,13 @@ class Mutants(unittest.TestCase):
         sortie 3, texte avant absent ; --tue 3 : tué ; copie rendue ; diff et sortie versés ; relevé ps vide.
         G2 du lot DETTES-T7 (C-1) : à la borne, petit-enfant parti dans sa propre session, comme la suite que lance le
         vérificateur (M6), arrêté avec son groupe ; descendant détaché qui garde le tuyau (M7) attendu RELIQUAT s au
-        plus ; mutant de gates.yml (M8) classé par la ligne qu'il écrit, étapes relues sur la copie mutée."""
+        plus ; mutant de gates.yml (M8) classé par la ligne qu'il écrit, étapes relues sur la copie mutée.
+        Réserve R-2 du contre-contrôle (Linux, moissonneur) : enfant d'une autre session resté après une sortie
+        normale (M9) et descendant détaché, parent sorti, à la borne (M10) : arrêtés avant la fin de la campagne."""
         p = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, p, True)
-        self.addCleanup(tuer, os.path.join(p, "pid"))
+        for n in ("pid", "pid9", "pid10"):
+            self.addCleanup(tuer, os.path.join(p, n))
         with tempfile.TemporaryDirectory() as d:
             marque, marque2 = os.path.join(d, "marque"), os.path.join(d, "marque2")
             enfant = repr(f"import pathlib, time; time.sleep(3); pathlib.Path({marque!r}).touch()")
@@ -61,6 +76,14 @@ class Mutants(unittest.TestCase):
             detache = NL.join(["import os, time", "if os.fork() == 0:", "    os.setsid()", "    if os.fork() == 0:",
                                f"        open({os.path.join(p, 'pid')!r}, 'w').write(str(os.getpid()))",
                                "        time.sleep(90)", "    os._exit(0)", "sys.exit(0)"])
+            dort30 = ("subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'], "
+                      "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL{})")
+            p9, p10 = os.path.join(p, "pid9"), os.path.join(p, "pid10")
+            reste = NL.join(["import subprocess", "q = " + dort30.format(", start_new_session=True"),
+                             f"with open({p9!r}, 'w') as w:", "    w.write(str(q.pid))", "sys.exit(0)"])
+            orphelin = NL.join(["import os, subprocess, time", "f = os.fork()", "if f == 0:", "    os.setsid()",
+                                "    q = " + dort30.format(""), f"    with open({p10!r}, 'w') as w:",
+                                "        w.write(str(q.pid))", "    os._exit(0)", "os.waitpid(f, 0)", "time.sleep(60)"])
             m = [{"id": "M1", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": "sys.exit(1)"},
                  {"id": "M2", "fichier": "cible.py", "avant": "import sys", "apres": "import sys  # neutre"},
                  {"id": "M3", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": dort},
@@ -69,13 +92,19 @@ class Mutants(unittest.TestCase):
                  {"id": "M6", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": session},
                  {"id": "M7", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": detache},
                  {"id": "M8", "fichier": ".github/workflows/gates.yml", "avant": "run: echo premier",
-                  "apres": "run: exit 1"}]
+                  "apres": "run: exit 1"},
+                 {"id": "M9", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": reste},
+                 {"id": "M10", "fichier": "cible.py", "avant": "sys.exit(0)", "apres": orphelin}]
             debut = time.monotonic()
             code, lignes, err, c = lancer(d, m, "--borne", "2")
             self.assertEqual((code, time.monotonic() - debut < 40, [(x["id"], x["classement"], len(x["etapes"])) for x
                                                                      in lignes]), (0, True, [
                 ("témoin", "vivant", 2), ("M1", "tué", 2), ("M2", "vivant", 2), ("M3", "FATAL", 2), ("M4", "FATAL", 2),
-                ("M5", "FATAL", 0), ("M6", "FATAL", 2), ("M7", "FATAL", 2), ("M8", "tué", 1)]), err)
+                ("M5", "FATAL", 0), ("M6", "FATAL", 2), ("M7", "FATAL", 2), ("M8", "tué", 1), ("M9", "vivant", 2),
+                ("M10", "FATAL", 2)]), err)
+            if sys.platform.startswith("linux"):        # R-2 : moissonneur ; ailleurs, limite écrite au README
+                self.assertEqual([(os.path.exists(n), vit(n)) for n in (p9, p10)], [(True, False), (True, False)],
+                                 "orphelin d'une étape vivant après la campagne")
             self.assertEqual([x["etapes"][1][0] for x in lignes[:5]], [0, 1, 0, None, 3])
             for nom, attendu in (("M1.diff", NL.join(["-sys.exit(0)", "+sys.exit(1)", ""])), ("M2.out", NL.join([
                     "premier", "fin", ""]))):

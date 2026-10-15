@@ -454,3 +454,12 @@ dépendent des tests du harnais qu'ils importent.
 > brutes du job ; avant R-1, toute première étape non admise passait pour le checkout (étape `if:` qui échouerait
 > sur la forge, autre action, `with:` autre : mesure du contre-contrôle). Cas : refus `tete-if`, `tete-action`,
 > `tete-with` et `fetch-depth: 0` admis, dans `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).
+>
+> *Ajout daté du 2026-10-15 23:21:37 UTC (`date -u` ; contre-contrôle du lot DETTES-T7, réserve R-2 ;
+> SHOGEN-MUTANTS-ORPHELINS-1)* : sous Linux, l'outil se déclare moissonneur de ses descendants
+> (`prctl(PR_SET_CHILD_SUBREAPER)`) ; après chaque étape, à la borne comme à la sortie normale, tout descendant
+> vivant, orphelin compris (double fork, `setsid`, parent sorti), est arrêté jusqu'au dernier (`balayer`), et le
+> relevé de fin le dit ; avant R-2, un tel descendant survivait à la campagne sous un relevé vide, et un enfant né
+> entre le relevé `ps` et l'arrêt pouvait échapper (mesures du contre-contrôle). Hors de Linux (POSIX sans
+> moissonneur), la limite de C-1 demeure : un descendant détaché n'est pas suivi. Cas : M9 et M10 de
+> `tests/test_mutants.py` (toujours deux tests ; plancher 117 inchangé).

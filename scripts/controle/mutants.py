@@ -9,13 +9,17 @@ groupes de tous les descendants de l'étape (relevé ps par parenté : la suite 
 session depuis DT7-d) sont arrêtés et comptés au relevé de fin ; la sortie n'est plus attendue que RELIQUAT s
 (descendant détaché qui garde le tuyau) ; la première étape du job est le checkout, exigé ; les étapes sont
 relues sur la copie mutée (mutant de gates.yml classé par la ligne qu'il écrit ; illisibles : FATAL). Réserve R-1
-du contre-contrôle : ce checkout est celui du gabarit K, lu sur les lignes brutes du job, jamais une autre étape."""
+du contre-contrôle : ce checkout est celui du gabarit K, lu sur les lignes brutes du job, jamais une autre étape.
+Réserve R-2 : sous Linux, l'outil est moissonneur de ses descendants (`moissonneur`) ; après chaque étape, à la borne
+comme à la sortie, tout descendant vivant, orphelin compris (double fork, setsid, parent sorti), est arrêté par
+`balayer` jusqu'au dernier, et le relevé de fin exige qu'il n'en reste aucun."""
 import os                   # garde en tête (SHOGEN-S2BIS-GARDE-EN-TETE-1) : le dossier du script quitte sys.path
 import sys                  # avant tout autre import (un json.py posé à côté ne serait jamais lu)
 if sys.path and os.path.realpath(sys.path[0]) == os.path.dirname(os.path.realpath(__file__)):
     del sys.path[0]
 import argparse
 import contextlib
+import ctypes
 import difflib
 import hashlib
 import importlib.util
@@ -30,6 +34,7 @@ VERIF = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abs
                      "verdict-suite-s2.py")                 # analyseur unique des étapes, jamais recopié
 ENV = {k: v for k, v in os.environ.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}        # variable scellée jamais passée
 RELIQUAT = 5.0      # s de lecture après l'arrêt des groupes à la borne (descendant détaché : plus attendu, C-1)
+PASSES = 50         # passes au plus de `balayer` (réserve R-2) : au-delà, des descendants renaissent, erreur
 
 
 def etapes(copie: str, job: str) -> list:
@@ -65,6 +70,46 @@ def descendants(racine: int) -> set:
     return {racine} | {y[2] for y in t if y[0] in arbre}
 
 
+def moissonneur() -> bool:
+    """Réserve R-2 du contre-contrôle : sous Linux, prctl(PR_SET_CHILD_SUBREAPER, 1) : tout orphelin d'une étape est
+    rattaché à l'outil, donc vu par parenté depuis lui ; ailleurs, ou refus du noyau : False (limite du README)."""
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        return ctypes.CDLL(None, use_errno=True).prctl(36, ctypes.c_ulong(1), ctypes.c_ulong(0), ctypes.c_ulong(0),
+                                                       ctypes.c_ulong(0)) == 0
+    except (OSError, AttributeError):
+        return False
+
+
+def balayer(groupes: set, garde: int) -> None:
+    """Réserve R-2 : descendants vivants de l'outil hors de son groupe (orphelins rattachés compris) arrêtés par
+    groupe, groupes comptés au relevé de fin ; zombies rattachés recueillis, sauf `garde` (l'enfant direct qu'attend
+    Popen) ; jusqu'à ce qu'il n'en reste aucun, en PASSES passes au plus (sinon ValueError, sortie 3)."""
+    for _ in range(PASSES):
+        t = [tuple(y.split()) for y in subprocess.run(["ps", "-A", "-o", "pid=,ppid=,pgid=,stat="],
+                                                      capture_output=True, text=True, check=True).stdout.splitlines()]
+        t = [(int(a), int(b), int(c), s) for a, b, c, s in t]
+        arbre, plus = {os.getpid()}, None
+        while plus != set():
+            plus = {y[0] for y in t if y[1] in arbre} - arbre
+            arbre |= plus
+        for y in t:                                       # zombies rattachés à l'outil : recueillis
+            if y[1] == os.getpid() and y[3].startswith("Z") and y[0] != garde:
+                with contextlib.suppress(ChildProcessError):
+                    os.waitpid(y[0], os.WNOHANG)
+        vivants = {y[2] for y in t if y[0] in arbre - {os.getpid()} and not y[3].startswith("Z")
+                   and y[2] != os.getpgrp()}               # le groupe de l'outil n'a que ps : jamais arrêté
+        if not vivants:
+            return
+        groupes |= vivants
+        for g in vivants:
+            with contextlib.suppress(ProcessLookupError, PermissionError):
+                os.killpg(g, signal.SIGKILL)
+        time.sleep(0.05)
+    raise ValueError(f"balayage : descendants de l'outil encore vivants après {PASSES} passes")
+
+
 def jouer(x, pas: list, groupes: set, dossier: str) -> tuple:
     """(classement, motif, [(code, durée, sha256 de sa sortie)] par étape, octets) du job sur la copie."""
     fin, vus, sortie = time.monotonic() + x.borne, [], b""
@@ -85,6 +130,8 @@ def jouer(x, pas: list, groupes: set, dossier: str) -> tuple:
         for g in {y for y in cibles if y > 1} - {os.getpgrp()}:      # groupes entiers, jamais l'enfant direct seul :
             with contextlib.suppress(ProcessLookupError, PermissionError):     # à la borne, ou descendant resté
                 os.killpg(g, signal.SIGKILL)                         # après la sortie
+        if x.moissonneur:
+            balayer(groupes, p.pid)                 # R-2 : orphelins rattachés à l'outil, arrêtés jusqu'au dernier
         if code is None:
             try:
                 octets = p.communicate(timeout=RELIQUAT)[0]
@@ -139,6 +186,7 @@ def main(argv: list) -> int:
     a.add_argument("copie"), a.add_argument("job"), a.add_argument("mutants"), a.add_argument("--sortie", required=True)
     a.add_argument("--borne", type=float, default=300.0), a.add_argument("--tue", type=int, action="append")
     x, groupes, dossier = a.parse_args(argv), set(), tempfile.mkdtemp(prefix="mutants_")
+    x.moissonneur = moissonneur()                   # R-2 : avant toute étape
     try:
         pas = etapes(x.copie, x.job)
         with open(x.mutants, encoding="utf-8") as f:
@@ -149,6 +197,8 @@ def main(argv: list) -> int:
             print(json.dumps({**m, "classement": r[0], "motif": r[1], "etapes": r[2]}, ensure_ascii=False), flush=True)
             if m["id"] == "témoin" and r[0] != "vivant":
                 raise ValueError("témoin non vivant : campagne arrêtée")
+        if x.moissonneur:
+            balayer(groupes, 0)                     # R-2 : aucun descendant vivant de l'outil à la fin
         lignes = subprocess.run(["ps", "-eo", "pid=,pgid=,stat="], capture_output=True, text=True, check=True).stdout
         restes = [y for y in (z.split() for z in lignes.splitlines()) if len(y) == 3 and int(y[1]) in groupes
                   and not y[2].startswith("Z")]             # zombies exclus
@@ -159,7 +209,9 @@ def main(argv: list) -> int:
         return 3
     finally:
         shutil.rmtree(dossier, ignore_errors=True)
-    print(f"mutants : relevé ps de fin : aucun processus des {len(groupes)} groupes de la campagne", file=sys.stderr)
+    print(f"mutants : relevé ps de fin : aucun processus des {len(groupes)} groupes de la campagne" + (
+        ", aucun descendant vivant de l'outil (moissonneur)" if x.moissonneur else
+        " (moissonneur absent : un descendant détaché n'est pas suivi)"), file=sys.stderr)
     return 0
 
 
