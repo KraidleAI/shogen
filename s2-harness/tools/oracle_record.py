@@ -304,12 +304,13 @@ def resume(exclus: list) -> dict:
 def extraire(depot: str, sha: str, arbre: str) -> tuple:
     """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend ({chemin : sha256} par
     fichier extrait, chemins exclus triés). EXTRACTION-INTERDITS-1 : un membre d'un emplacement interdit, ou un lien
-    qui y mène, n'est ni écrit ni haché."""
+    qui y mène (vers un fichier, ou vers le dossier lui-même : C-3 de la G2), n'est ni écrit ni haché."""
     exclu, garde, hors = interdit(), [], []
     with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
         for m in t.getmembers():
             cible = posixpath.normpath(posixpath.join(posixpath.dirname(m.name), m.linkname)) if m.issym() else ""
-            (hors if exclu(m.name + "/" * m.isdir()) or cible and exclu(cible) else garde).append(m)
+            (hors if exclu(m.name + "/" * m.isdir()) or cible and (exclu(cible) or exclu(cible + "/")) else garde
+             ).append(m)
         try:
             t.extractall(arbre, members=garde, filter="data")
         except tarfile.FilterError as e:

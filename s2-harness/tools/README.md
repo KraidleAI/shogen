@@ -103,3 +103,9 @@ limite s'écrit ici ; sinon elle ne vaut que pour `suite`.
   délai, l'outil ne lit plus la sortie que `RELIQUAT` s (5 s). Un descendant détaché de son parent (double fork,
   `setsid`) qui garde le tuyau n'est pas attendu au-delà : il reste vivant et sa sortie au-delà est perdue (avant
   C-2, il était attendu sans borne : mesure M-D1 de la relecture, 90 s d'attente pour un descendant de 90 s).
+- *Ajout daté du 2026-10-10 07:19:46 UTC (correction C-3 ; SHOGEN-ENREG-EXTRACTION-INTERDITS-1)* : un lien qui mène au
+  dossier d'un emplacement interdit lui-même (`docs/x -> rapports`, cible sans barre finale, que le prédicat seul
+  ne voit pas) est exclu comme un lien vers un fichier interdit ; avant C-3, il était écrit, pendant, et le hachage
+  échouait (mesure M-B1 de la relecture). Limite : un lien qui n'y mène qu'à travers un autre lien
+  (`a -> b/d.md`, `b -> rapports`) est écrit, pendant ; le hachage échoue alors (`FileNotFoundError`, sortie 2) :
+  aucun enregistrement, aucun fichier interdit écrit (mesure M-B2).

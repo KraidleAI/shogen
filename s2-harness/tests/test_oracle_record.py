@@ -321,16 +321,19 @@ class TestOracleRecord(unittest.TestCase):
         n'est écrit ni haché ; tree.exclus consigne leur nombre et le sha256 de leur liste triée, jamais leurs noms ;
         --verifier refuse un tree.sha256 qui porte un chemin interdit, et, avec le dépôt, un tree.exclus autre que
         celui de la ré-extraction. Rougit si : liste recopiée ou incomplète, .jsonl ou casse oubliés, fichier interdit
-        écrit ou haché, lien vers un interdit gardé, tree.exclus absent ou non vérifié, liste illisible admise."""
+        écrit ou haché, lien vers un interdit gardé, tree.exclus absent ou non vérifié, liste illisible admise. G2 du
+        lot DETTES-T7 (C-3) : un lien vers le dossier interdit lui-même (cible sans barre finale) est exclu aussi."""
         d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-interdits"), "claude-opus-5-5"
         interdits = ["Docs/Rapports/i.md", "docs/15-a.md", "docs/16-b.md", "docs/adr-0025/e.md",
                      "docs/adr-0028/execution/g/h.md", "docs/adr-0028/monark-m009a/f.txt", "docs/pocket-report/c.md",
-                     "docs/rapports/d.md", "docs/vers-interdit", "x/journal.jsonl", "y.JSONL/z.txt"]   # triés
+                     "docs/rapports/d.md", "docs/vers-dossier", "docs/vers-interdit", "x/journal.jsonl",
+                     "y.JSONL/z.txt"]   # triés
         permis = {**OK, **{k: b"permis" for k in ("docs/150.md", "docs/adr-0028/autre.md", "docs/rapports.md",
                                                      "z.jsonl.txt", "docs/vers-permis")}}
         list(depot(dep, [{k: v for k, v in permis.items() if k != "docs/vers-permis"}, {
-            k: b"interdit" for k in interdits if k != "docs/vers-interdit"}]))
-        for lien, cible in (("docs/vers-interdit", b"rapports/d.md"), ("docs/vers-permis", b"150.md")):
+            k: b"interdit" for k in interdits if k not in ("docs/vers-interdit", "docs/vers-dossier")}]))
+        for lien, cible in (("docs/vers-interdit", b"rapports/d.md"), ("docs/vers-permis", b"150.md"),
+                            ("docs/vers-dossier", b"rapports")):
             blob = g(dep, "hash-object", "-w", "--stdin", entree=cible)     # liens relatifs posés par la plomberie git
             g(dep, "update-index", "--add", "--cacheinfo", f"120000,{blob},{lien}")
         g(dep, "commit", "-q", "-m", "liens")
@@ -343,7 +346,8 @@ class TestOracleRecord(unittest.TestCase):
                                           interdits))
         for r in ("docs/rapports", "docs/adr-0025", "docs/adr-0028/execution", "docs/pocket-report", "y.JSONL"):
             self.assertFalse(os.path.exists(os.path.join(arbre, r)), r)
-        attendu = {"nombre": 11, "sha256": hashlib.sha256(chr(10).join(interdits).encode()).hexdigest()}
+        self.assertFalse(os.path.lexists(os.path.join(arbre, "docs", "vers-dossier")), "lien vers le dossier écrit")
+        attendu = {"nombre": 12, "sha256": hashlib.sha256(chr(10).join(interdits).encode()).hexdigest()}
         chemin = orc.enregistrer(d, "G2", a, dep, c)[0]
         rec = orc.verifier(chemin, "G2", c, dep)
         self.assertEqual((rec["exit"], rec["tree"]["exclus"], set(rec["tree"]["sha256"])), (0, attendu, set(permis)))
@@ -360,7 +364,7 @@ class TestOracleRecord(unittest.TestCase):
         Path(autre).write_text(source.replace('"docs/rapports/", ', ""), encoding="utf-8")
         with mock.patch.object(orc, "INTERDITS", autre):
             self.assertEqual(orc.extraire(dep, c, os.path.join(d, "arbre-2"))[1], [y for y in interdits if y not in (
-                "Docs/Rapports/i.md", "docs/rapports/d.md", "docs/vers-interdit")])     # la liste partagée fait foi
+                "Docs/Rapports/i.md", "docs/rapports/d.md", "docs/vers-dossier", "docs/vers-interdit")])   # partagée
         with mock.patch.object(orc, "INTERDITS", os.path.join(d, "absent.py")), self.assertRaisesRegex(
                 ValueError, r"— refus$"):
             orc.extraire(dep, c, os.path.join(d, "arbre-3"))
