@@ -57,3 +57,44 @@ DigitalOcean) ; SHOGEN-S2BIS-TSA-CERTIGNA-1 : volets lus fermés, volet URL et a
 propre premier appel `gpg`, absent avant et après, contrôlé) est admis ; les briefs suivants posent `GNUPGHOME` sous le
 TMPDIR du dossier. Les actes de l'investisseur ajoutés par l'adjudication sont au dossier des actes (§11 du rapport de
 DB-0) ; le texte validé de ce G0 reste tel quel.
+
+*Ajout daté du 2026-10-10 04:39:03 UTC (heure lue par `date -u` à la dernière écriture du texte ; lot DEPLOI-BIS,
+sous-lot DB-1, diff DB1-g ; adjudication de l'orchestrateur sur DB-1, 2026-10-10 04:33:52 UTC : questions Q-1 à Q-6 du
+générateur adoptées dans la forme de l'avis OPS de l'advisor `claude-fable-5-1`, §3 ; chaque phrase relue contre le code
+de DB1-b à DB1-f)* : (1) **E-D-01** : les paramètres en tête du script sont l'identité o (`OBSERVATEUR`), le
+fournisseur, la région, la famille de résolveur, le résolveur du fournisseur (`RESOLVEUR_FOURNISSEUR`, une à quatre
+adresses IPv4, famille fournisseur seule, celle d'O4), les adresses de surveillance et de sauvegarde et la clé publique
+d'intervention (`CLE_INTERVENTION`, `ssh-ed25519`) ; tous sont vides au dépôt, collés par l'investisseur et jamais
+versés ; chacun est contrôlé avant le premier changement, refus et arrêt sinon ; tous sauf la clé sont gardés dans
+`/etc/shogen/observateur.conf` (0640, root:shogen), seule interface des paramètres pour DB-2 à DB-5, qui ne se copie
+jamais hors de l'observateur (la copie horaire de DB-4 doit l'exclure) ; la clé est le seul contenu du fichier
+`authorized_keys` du compte `intervention` (0600) (Q-1, Q-6). (2) **E-D-03** : compte de service `shogen`, compte
+système sans shell (`/usr/sbin/nologin`) ni groupe ajouté ; compte de connexion `intervention`, sans droit
+d'administration (aucun groupe ajouté, aucun fichier sudoers), clé `ssh-ed25519` seule ; réglages de sshd dans
+`/etc/ssh/sshd_config.d/00-shogen.conf`, nommé pour être lu avant les fichiers de l'image (constat par `sshd -T` au
+smoke de DB-2) : `PermitRootLogin no`, `PasswordAuthentication no`, `KbdInteractiveAuthentication no`,
+`PermitEmptyPasswords no`, `PubkeyAuthentication yes`, `AuthenticationMethods publickey`, `AllowUsers intervention`,
+`DisableForwarding yes`, contrôlés par `sshd -t` avant rechargement ; le script ne supprime ni ne verrouille les comptes
+de l'image, à qui `AllowUsers` ferme SSH ; N2 et N3 passent par la console du fournisseur (Q-1 ; JOURNAL l.382, q. 6 :
+« l'investisseur seul, un agent au cas par cas sur son accord écrit »). (3) **E-D-04** : source APT unique, l'archive
+Debian en HTTPS (`https://deb.debian.org/debian`, suite `trixie` ; `https://deb.debian.org/debian-security`, suite
+`trixie-security` ; composant `main`), signée par le trousseau `debian-archive-keyring` (`.pgp`, sinon `.gpg` ; arrêt
+sans trousseau) ; les autres fichiers de sources de l'image sont désactivés (renommés `*.disabled`) ; `trixie-updates`
+n'est pas posée (décision 1 : sécurité seule) ; les paquets s'installent sans leurs recommandés (Q-2). (4) **T-DP-2** se
+lit désormais : refus par défaut en entrée, sortie et transit ; boucle locale admise ; IPv6 jeté hors de la boucle
+locale (Q-D-07) ; `established,related` admis, `invalid` jeté ; sortant, exactement : TCP/443 vers tout, UDP/53 vers les
+trois témoins D-4, UDP et TCP/53 vers l'ensemble `resolveurs` (toute destination pour la famille unbound, celle d'O1),
+UDP/123 et TCP/4460 vers l'ensemble `ntp`, TCP/23 vers l'ensemble `sauvegarde` (décision 3), UDP 68→67 (bail DHCP),
+TCP/80 vers 169.254.169.254 pour root seul (métadonnées du fournisseur) ; entrant, exactement : TCP/22 et UDP 67→68 ;
+mutants : tout le sortant ouvert, un témoin oublié, IPv6 admis ; ce texte remplace « exactement 443/tcp … Entrant : SSH
+seul » (Q-3). (5) **Décision 3**, précision : le jeu commun est embarqué dans le script, égal octet pour octet à
+`s2bis/deploi/nftables.conf` (test) ; les ensembles d'observateur s'écrivent au premier démarrage dans
+`/etc/nftables.d/shogen-observateur.nft`, jamais versé : `resolveurs` par famille (unbound : toute destination ; quad9
+et google : les adresses de l.82 ; fournisseur : les adresses collées), `ntp` et `sauvegarde` par les adresses IPv4 des
+quatre serveurs de la décision 4 et de l'hôte de `ADRESSE_SAUVEGARDE`, résolues une seule fois, par `getent` ; un nom
+non résolu arrête le script avant toute écriture du pare-feu ; le jeu passe `nft -c`, puis le service nftables est
+activé et relancé ; l'étape résolveur de DB-2 se place avant l'étape pare-feu, pour que ces noms soient résolus par le
+résolveur de l'observateur ; une minuterie de DB-3 rafraîchira les ensembles par nom (SHOGEN-S2BIS-PAREFEU-NOMS-1) ; le
+smoke de DB-2 constatera les adresses NTS négociées (Q-4, Q-5). (6) **E-D-22**, constat (e) : un N2 volontaire sur
+chaque observateur, après lequel le bail DHCP et la lecture des métadonnées du fournisseur sont constatés (L-5). Le
+texte validé de ce G0 reste tel quel.
