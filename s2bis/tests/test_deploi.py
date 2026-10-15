@@ -45,13 +45,13 @@ APT = ['APT::Periodic::Update-Package-Lists "1";', 'APT::Periodic::Unattended-Up
        'Unattended-Upgrade::Origins-Pattern { "origin=Debian,codename=trixie-security,label=Debian-Security"; };',
        'Unattended-Upgrade::Automatic-Reboot "false";']        # Origin, Label, Codename : InRelease de trixie-security
 ENTREE = ['iif "lo" accept', "meta nfproto ipv6 drop", "ct state established,related accept", "ct state invalid drop",
-          "udp sport 67 udp dport 68 accept", "tcp dport 22 accept"]
+          "udp sport 67 udp dport 68 accept", "tcp dport 22 accept", "drop"]
 SORTIE = ['oif "lo" accept', "meta nfproto ipv6 drop", "ct state established,related accept", "ct state invalid drop",
           "udp sport 68 udp dport 67 accept", "ip daddr 169.254.169.254 tcp dport 80 meta skuid 0 accept",
           "tcp dport 443 accept", "ip daddr { 198.41.0.4, 192.36.148.17, 193.0.14.129 } udp dport 53 accept",
           "ip daddr @resolveurs udp dport 53 accept", "ip daddr @resolveurs tcp dport 53 accept",
           "ip daddr @ntp udp dport 123 accept", "ip daddr @ntp tcp dport 4460 accept",
-          "ip daddr @sauvegarde tcp dport 23 accept"]
+          "ip daddr @sauvegarde tcp dport 23 accept", "drop"]
 TEMOINS = {"198.41.0.4", "192.36.148.17", "193.0.14.129"}     # témoins D-4, ADR-0029 l.109
 
 
@@ -354,7 +354,7 @@ class PremierDemarrage(Essai):
 
     def test_tdp2_regles_exactes(self):
         _d, _e, chaines = pare_feu(self.lire(NFT))
-        self.assertEqual([chaines[n][2] for n in ("entree", "sortie", "transit")], [ENTREE, SORTIE, []])
+        self.assertEqual([chaines[n][2] for n in ("entree", "sortie", "transit")], [ENTREE, SORTIE, ["drop"]])
         self.assertEqual([set(r.split("{")[1].split("}")[0].replace(",", " ").split()) for r in chaines["sortie"][2]
                           if "dport 53" in r and "{" in r], [TEMOINS])
 
