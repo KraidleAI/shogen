@@ -26,6 +26,14 @@ la partie 2, `docs/adr-0028/PLAN-PARTIE-2.md` §5 point 3).
 3. **Pré-enregistrement (ADR-0028 annexe D)** : fixtures seulement (D.4 a) ;
    tu ne poses jamais `SHOGEN_S2_CAMPAGNE_CONTROL` ; tu n'ouvres aucune
    pièce de la liste D.2 (repère par sha256, jamais d'affichage).
+   Exception (ajout daté du 2026-10-10 04:12:28 UTC, lot DETTES-T7 ;
+   SHOGEN-FICHE-WORKER-POSTEXEC-2) : après l'exécution unique, le G0 d'un
+   lot peut accorder que les scripts du lot, et eux seuls, lisent les
+   journaux scellés (forme du G0 de PLAN-S2BIS, l.18-21) ; personne
+   n'affiche, ne liste ni ne copie un journal ; leurs sha256 sont contrôlés
+   contre le bloc machine du paquet avant usage ; code et paramètres sont
+   épinglés au JOURNAL avant l'exécution. Sans exception écrite au G0 du
+   lot : fixtures seulement.
 4. **Tests d'abord** : valeurs de référence indépendantes du code, échec
    montré avant correction, une mutation par test ; la suite
    `s2-harness` reste verte à chaque pas
@@ -85,3 +93,63 @@ commande qui porte un regex, une campagne de mutants, une tâche longue ou un sc
   concaténation dans l'ordre de la série) : `oracle_record.py` refuse `--paquet-sha256` hors du rôle `rendu`.
   L'enregistrement atteste alors la base et la suite lancée sur elle, non les diffs : il se vérifie à
   `<commit relu>`, et seul le rapport G2 le relie aux diffs.
+
+## Consignes de gabarit, suite (ajout daté du 2026-10-10 04:12:28 UTC, lot DETTES-T7 ; ADR-0028 annexe B)
+
+Aucun gabarit de brief n'est versé au dépôt : ce bloc en tient lieu (précédent : SHOGEN-G2-ENREG-ROLE-1, B.89), et
+tout brief le reprend.
+
+- **Cible cargo** (SHOGEN-HARNAIS-CIBLE-PARTAGEE-1 ; règle I-1 du lot FUZZ, B.93) : chaque copie a sa propre cible
+  cargo ; deux copies qui partagent un `CARGO_TARGET_DIR` testent le code de l'autre sans recompiler (mesuré au lot
+  SG5-INTERDITS). Tout rejeu de `cargo test` comprend au moins une exécution avec la cible cargo par défaut de la
+  copie (sans `CARGO_TARGET_DIR`), comme la forge : une cible hors de la copie a caché le défaut R-1 du lot FUZZ.
+- **TMPDIR** (SHOGEN-WORKER-TMPDIR-1) : un `TMPDIR` dédié par copie, sous le dossier du lot, est posé pour toute
+  commande de test ; sans lui, `tempfile` écrit sous `/tmp`, hors du dossier du lot (E-1 du G1 de PLAN-S2BIS).
+- **Note de reprise** (SHOGEN-HARNAIS-COMPACTION-TRANSCRIPT-1) : le `NOTES.md` du lot suffit seul à un successeur ;
+  après une compaction de contexte, aucune note ne renvoie à une transcription `*.jsonl` (pièce interdite) et aucune
+  reprise ne s'y lit.
+- **Isolement réseau** (SHOGEN-HARNAIS-UNSHARE-LO-1) : la suite s2bis tourne sous sa propre garde
+  (`s2bis/tests/__init__.py`). Sous `unshare -n`, l'interface `lo` reste éteinte quand l'hôte n'a pas la commande
+  `ip`, et `test_boucle_locale_permise` échoue par artefact d'isolement : allumer `lo` dans l'espace isolé avant la
+  suite (ioctl `SIOCSIFFLAGS`, bibliothèque standard), ou lancer la suite hors de cet espace.
+- **Critère de vert** (SHOGEN-WORKER-WERROR-IGNORE-1) : sous `-X dev -W error`, une suite est verte si son code de
+  sortie est 0 et si sa sortie ne porte aucune ligne `Exception ignored` ni `Warning` : une exception levée dans un
+  finaliseur s'imprime sans changer le code de sortie.
+- **Garde en tête** (SHOGEN-S2BIS-GARDE-EN-TETE-1) : la garde d'un script de preuve (retrait de son dossier de
+  `sys.path`, refus de la variable scellée) est sa première instruction ; sous 3.13, l'affichage d'une exception
+  levée avant elle importe `re` depuis le dossier du script.
+- **Python de PLAN-S2BIS** (SHOGEN-PLAN-S2BIS-2-PY310-1) : un lot qui réemploie `scripts/plan-s2bis/commun.py`
+  (épinglé) tourne sous Python 3.11 à 3.13 ; 3.10 ne l'importe pas (`hashlib.file_digest`, ajouté en 3.11 ; limite
+  écrite au README de `scripts/plan-s2bis-2/`) : son brief ne demande jamais 3.10.
+- **Mutants, commande du job** (SHOGEN-S2BIS-MUT-COMMANDE-1) : chaque mutant se classe par la commande du job qui
+  porte le code muté, telle qu'écrite dans `gates.yml` (suite entière, runner d'abord), sous une borne de temps
+  (300 s par défaut) ; un dépassement est FATAL, jamais compté tué ; une assertion sur une grande structure échoue
+  vite (I-8 de RB-1) ; un réviseur verse tous les mutants qu'il cite (diff, sortie, classement).
+- **Site d'appel et étiquettes** (SHOGEN-MUTANTS-SITE-APPEL-1, volet SHOGEN-SIM-BIS-MUT-EQUIV-FIXTURE-1) : une
+  campagne mute aussi le site d'appel de chaque fonction partagée et la source des données passées sous une
+  étiquette inchangée ; pour chaque paramètre passé sous étiquette, une fixture où sa valeur diffère de toute source
+  concurrente, avec une garde d'attendu qui prouve que la fixture sépare (maximum au milieu des mesures, garde isolée
+  par cas, tous les sites d'un même paramètre, W ≠ 1 pour chaque destinataire).
+- **Processus orphelins** (SHOGEN-MUTANTS-ORPHELINS-1) : une campagne lance chaque run dans un groupe de processus
+  neuf (`start_new_session=True`) et l'arrête, au dépassement, par `os.killpg` sur le groupe entier, jamais sur
+  l'enfant direct seul ; à la fin, un relevé `ps` consigne qu'aucun processus de ses groupes ne reste (écart E-CA3-1
+  du lot CALIB-ACTIFS).
+- **Citations** (versement de DETTES-T5, B.92) : un message d'outil, une sortie de commande ou un extrait de journal
+  se cite en code (`…`), jamais entre « » ; les « » sont réservés aux citations d'une source détenue au registre
+  `biblio/`.
+- **Chemins git** (ajout daté du 2026-10-10 06:28:38 UTC, lot DETTES-T7, phase 2 ; écart E-1 du générateur) : toute
+  commande git qui liste ou compare des chemins (`git diff`, `--numstat`, `--name-only`, `--stat`, `git ls-files`,
+  `git read-tree`) est limitée à une liste explicite de chemins, jamais lancée sur tout l'arbre d'une copie creuse
+  ou d'un index reconstruit : un index bâti sans les bits skip-worktree a fait imprimer les noms des fichiers des
+  emplacements interdits et écrit leur contenu dans un diff.
+- **Sorties de travail** (ajout daté du 2026-10-10 06:28:38 UTC, lot DETTES-T7, phase 2 ; écart E-6) : aucune sortie
+  de travail n'est nommée `*.jsonl` (des lignes JSON s'écrivent dans un `.txt`) : un réviseur tenu par l'interdit de
+  tout `*.jsonl` doit pouvoir l'ouvrir.
+- **Listes sous `docs/`** (ajout daté du 2026-10-10 06:28:38 UTC, lot DETTES-T7, phase 2 ; écart E-10) : aucune
+  liste par motif sur `docs/` (glob du shell, `ls`, `find`), même dans une copie creuse, même pour contrôler une
+  absence ; l'absence des emplacements interdits se lit dans la configuration de la copie
+  (`git sparse-checkout list`).
+- **Matrice des versions** (ajout daté du 2026-10-10 06:28:38 UTC, lot DETTES-T7, phase 2 ; SHOGEN-S2-SUITE-PY310-1,
+  adjudication du 2026-10-10) : la suite S2 (`s2-harness`) se joue sous Python 3.11 à 3.13, jamais sous 3.10
+  (`hashlib.file_digest` de `tools/rendu_unique.py`, format verbeux de unittest 3.11+ attendu par un test ; errata
+  de `s2-harness/README.md`), comme `scripts/plan-s2bis/commun.py` (consigne Python de PLAN-S2BIS ci-dessus).
