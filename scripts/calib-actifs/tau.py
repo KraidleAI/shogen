@@ -98,6 +98,9 @@ def calcul_actif(prm: dict, actif: str, series: dict, fen: dict, btc: dict) -> d
     for p, s in series.items():
         c, a = bougies.derniers(s, fen)
         closes[p], ages[p] = rationnels(c), a
+    vides = [p for p in sorted(series) if all(x is None for x in closes[p])]           # Q-DT2-11 de DETTES-T2
+    if vides:
+        raise socle.Refus("CA/population", "place sans minute active dans la fenêtre", actif, place=vides[0])
     pop, mode = sigma.population(prm, actif), lec["modes"][actif]
     terme, detail = sigma.troisieme_terme(prm, {p: ages[p] for p in pop}, strates)
     sig, cel = sigma.sigmas(prm, actif, btc, terme, mode), None

@@ -69,7 +69,9 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   jamais décisifs ;
 - `bougies.py` : six lecteurs, normalisation, dernier prix connu et âges, oracle d'exécution de SH §4 ;
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
-- `tau.py` : population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son
+- `tau.py` : place de la lecture sans minute active dans la fenêtre (rien de servi, ou minutes toutes sans échange) :
+  CA/population, avant tout calcul (Q-DT2-11 : sans elle, Coinbase vide passait, σ des places horodatées changé) ;
+  population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son
   contrôle, descriptifs, septembre, sorties ; point d'entrée du calcul ;
 - `lancer.sh` : lanceur unique (épingle, étape réseau, passes A et B, identité, copie) ;
 - `cadence.py` : relevé de cadence des agrégateurs (Q-CA-11 modifiée), hors du lanceur.

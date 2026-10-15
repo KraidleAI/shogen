@@ -80,15 +80,17 @@ class TestCouverture(unittest.TestCase):
         réponse après sa fin, rien dans la fenêtre ; avant R-2 : admise vide, 40 minutes perdues) : refus nommé.
         Mutations : second découpage omis ; non décalé ; non chargé ; contrôle de couverture retiré ; valeurs non
         comparées ; bougies d'avant le départ non comptées comme preuve ; réponse entièrement après la fin admise (R-2).
+        DT2-p (marge de R-2) : décalée d'une minute vers l'avant, minutes 0 à 13 sans échange : la page 0 ne sert que la
+        minute 14, sa borne + c (chevauchement) : admise, série égale à la vérité ; mutation : marge c retirée.
         """
         noms = sorted([f"{x}-{W0 + d + 780 * k}.json" for x, d in (("page", 0), ("double", -360)) for k in range(4)] + [
             f"sonde-{W0 + 60 * x}.json" for x in (25, -487, -231, -103, -167, -199, -215, -207, -211, -213, -214)])
         cas = {"exact": lambda m: lecture(m, "exact"), "recentes": lambda m: lecture(m, "recentes"),
-               "cren-1": lambda m: lecture(m, "cren", 1)}
+               "cren-1": lambda m: lecture(m, "cren", 1), "avant-1": lambda m: lecture(m, "cren", -1)}
         for nom, f in cas.items():
             with self.subTest(nom=nom):
                 vus, fichiers, r = self.acquis(FEN, f, pas=30, chevauchement=1, couverture=2,
-                                               sans=(11, 12) if nom == "recentes" else ())
+                                               sans={"recentes": (11, 12), "avant-1": range(14)}.get(nom, ()))
                 self.assertEqual(r, ([], [], []))
                 if nom == "exact":
                     self.assertEqual((vus, fichiers), ([19, 0], noms))

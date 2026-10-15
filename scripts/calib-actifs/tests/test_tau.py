@@ -6,6 +6,8 @@ from fractions import Fraction as F
 
 import socle
 import tau
+from tests import synthetiques as sy
+from tests.test_formes import essai
 
 P = socle.lire()
 
@@ -20,6 +22,23 @@ def cas(prix, ages=None, n_min=4, exclusion=None, strates=("calme",)):
 
 
 class TestTau(unittest.TestCase):
+    def test_place_vide(self):
+        """Q-DT2-11 : place de la lecture sans minute active dans la fenêtre (série vide : fenêtre admise où rien n'est
+        servi ; ou minutes toutes sans échange) : CA/population nommée par la place, avant tout calcul. Sans la garde,
+        coinbase vide passe (σ des places horodatées d'ETH et d'USDT de 180 à 90 s sur ce banc ; USDT n'est couvert
+        par l'oracle de SH §4 que par ses concurrences). Place dont seule la première minute est sans échange :
+        admise. Mutations : garde retirée ; place refusée dès une minute indéfinie."""
+        muet = {t: (Decimal(1), False) for t in socle.minutes(sy.FEN)}
+        for a, p, s in (("ETH", "coinbase", {}), ("USDT", "coinbase", {}), ("USDT", "bitstamp", muet),
+                        ("USDC", "bitstamp", {}), ("ETH", "binance", {})):
+            with self.subTest(actif=a, place=p):
+                self.assertEqual(essai(lambda: tau.calcul_actif(P, a, sy.series(P, a) | {p: s}, sy.FEN, sy.BTC)),
+                                 "REFUS CA/population : place sans minute active dans la fenêtre ; "
+                                 f"actif {a} ; place {p}")
+        s = sy.series(P, "ETH")
+        s["kraken"] = s["kraken"] | {sy.FEN["debut"]: (Decimal(1), False)}      # première minute sans échange : admise
+        self.assertEqual(type(essai(lambda: tau.calcul_actif(P, "ETH", s, sy.FEN, sy.BTC))), dict)
+
     def test_mediane_leave_one_out(self):
         """T-CA-TAU-1 : quatre places à 100, 101, 102 et 110 : pour 110, médiane des autres 101, écart 9/101 ; pour
         100, médiane 102, écart 2/102 ; 101 : 1/102 ; 102 : 1/101. Cinq places 100, 101, 103, 110, 120 : pour 120,
