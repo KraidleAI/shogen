@@ -21,6 +21,7 @@ acte() { "$PYTHON" -I -B "$OUTILS/avant_acte.py" --depot "$DEPOT" "$@"; }
 # cargo par défaut de la copie (règle I-1), lignes python3 -B enforcement/ de gates.yml, lint R-1 et ses cas. Appelée
 # par verif && sceller, la fonction tourne hors de set -e : chaque pas sort en 1 à son échec (relecture G2, C-1) ;
 # cargo tourne sans CARGO_TARGET_DIR ni CARGO_BUILD_TARGET_DIR, à la cible par défaut (E5, règle I-1 ; C-15).
+# Une étape écrite « - run: python3 -B enforcement/… » est lancée aussi (contre-contrôle, R-6).
 verif() {
   local j sans="-u CARGO_TARGET_DIR -u CARGO_BUILD_TARGET_DIR"
   j="$(dirname "$PLAN")/verif-$1"
@@ -28,8 +29,8 @@ verif() {
     timeout "$DELAI" env $sans cargo --locked xtask verify > "$j-xtask.log" 2>&1 || true
     grep -F "VERDICT GLOBAL : VERT" "$j-xtask.log" > /dev/null || exit 1
     timeout "$DELAI" env $sans cargo --locked test -p xtask > "$j-cargo.log" 2>&1 || exit 1
-    grep -E '^ *(run: )?(/usr/bin/)?python3 -B enforcement/' .github/workflows/gates.yml | sed -E 's/^ *(run: )?//' |
-      while read -r ligne; do
+    grep -E '^ *(- )?(run: )?(/usr/bin/)?python3 -B enforcement/' .github/workflows/gates.yml |
+      sed -E 's/^ *(- )?(run: )?//' | while read -r ligne; do
         env -u SHOGEN_S2_CAMPAGNE_CONTROL timeout "$DELAI" bash -c "$ligne" < /dev/null > /dev/null 2>&1 || exit 1
       done || exit 1
     timeout "$DELAI" bash enforcement/tests/run-fixtures-model-pinning.sh < /dev/null > /dev/null 2>&1 || exit 1

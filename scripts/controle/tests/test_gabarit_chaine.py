@@ -2,7 +2,8 @@
 bash dans un dépôt git temporaire isolé (tests/aide_garde.py). La fonction verif, propre à chaque lot, est remplacée
 par un faux réglé par ROUGE (id dont la vérification est rouge) ; le reste du modèle tourne tel quel.
 Relecture G2, C-1 : VerifDuModele lance la fonction verif telle qu'écrite (cargo et portes factices) ; C-15 : cargo
-à la cible par défaut même si l'environnement pose CARGO_TARGET_DIR."""
+à la cible par défaut même si l'environnement pose CARGO_TARGET_DIR.
+Contre-contrôle : R-6 (étape écrite « - run: python3 … »)."""
 import hashlib
 import os
 import re
@@ -126,6 +127,7 @@ class VerifDuModele(unittest.TestCase):
     def fichiers(self):
         lancer = "exec python3 -B enforcement/porte.py "
         portes = "".join(f"        run: python3 -B enforcement/porte.py {x}" + NL for x in ("mange", "porte"))
+        portes += "      - run: python3 -B enforcement/porte.py tiret" + NL      # forme en tiret (R-6)
         return {"a.md": "un" + NL, "enforcement/porte.py": self.PORTE, ".github/workflows/gates.yml": portes,
                 "enforcement/tests/run-fixtures-model-pinning.sh": lancer + "cas" + NL,
                 "enforcement/lint-model-pinning.sh": lancer + "lint" + NL}
@@ -135,7 +137,7 @@ class VerifDuModele(unittest.TestCase):
         (verdict de xtask, cargo test, ligne de gates.yml, même après une ligne qui lit l'entrée standard, cas du lint,
         lint), arrête la chaîne avant le sceau et le commit (le pas arrêté est retiré de l'index avant la relance) ;
         tout vert : un commit. C-15 (E5, règle I-1) : CARGO_TARGET_DIR posé dans l'environnement ne déplace pas la
-        cible de cargo (le cargo factice échoue s'il la voit)."""
+        cible de cargo (le cargo factice échoue s'il la voit). R-6 : étape de gates.yml écrite « - run: »."""
         with tempfile.TemporaryDirectory() as t:
             d, env = ag.depot(t, self.fichiers())
             ag.ecrire(t, {"bin/cargo": self.CARGO, "ADJ.md": "CONFORME en deux passes." + NL,
@@ -151,7 +153,7 @@ class VerifDuModele(unittest.TestCase):
             ag.ecrire(t, {"d1.diff": ag.git(copie, env, "diff", "--cached", "HEAD"), "m1.txt": message,
                           "plan": f"X-1|{t}/d1.diff|{t}/m1.txt|{t}/ADJ.md" + NL})
             chemin = os.path.join(t, "bin") + os.pathsep + env["PATH"]
-            for rouge in ("xtask", "cargo", "porte", "cas", "lint", ""):
+            for rouge in ("xtask", "cargo", "porte", "tiret", "cas", "lint", ""):
                 variables = dict(env, DEPOT=d, PLAN=os.path.join(t, "plan"), CC=os.path.join(t, "cc.md"), OUTILS=ICI,
                                  PYTHON=sys.executable, ROUGE_A=rouge, PATH=chemin,
                                  CARGO_TARGET_DIR=os.path.join(t, "ailleurs"))

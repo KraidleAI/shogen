@@ -387,3 +387,9 @@ dépendent des tests du harnais qu'ils importent.
 > aussi un plan dont deux pas portent le même `Diff-Id` : le modèle commettait le premier et sautait le second (déjà
 > commis) sans rien dire, chaîne sortie 0. `tests/test_avant_acte.py` compte 40 tests ; plancher du job
 > `controle-unittest` 111.
+
+> *Ajout daté du 2026-10-15 11:36:06 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-6 ; LA-N05)* :
+> `gabarits/chaine.sh` (sha256 `fe3f3d8bd396d1f9cde33abedb84bc20c73afb456b9e1b4932cbbbb94e13a80a`) : `verif` lance
+> aussi une étape de `gates.yml` écrite `- run: python3 -B enforcement/…` (forme courante des workflows), que son
+> motif sautait : une telle étape rouge laissait sceller et commettre le pas. `tests/test_gabarit_chaine.py` compte 8
+> tests (`test_c1_verif_reelle` : étape en tiret) ; plancher du job `controle-unittest` inchangé, 111.
