@@ -60,7 +60,8 @@ verifier_parametres() {     # E-D-01 : tout est contrôlé avant le premier chan
         *) refuser FAMILLE_RESOLVEUR "unbound, quad9, google ou fournisseur" ;;
     esac
     [[ $ADRESSE_SURVEILLANCE =~ $https ]] || refuser ADRESSE_SURVEILLANCE "adresse https"
-    [[ $ADRESSE_SAUVEGARDE =~ ^[a-z0-9-]+@[a-z0-9.-]+$ ]] || refuser ADRESSE_SAUVEGARDE "compte@hôte"
+    # compte@hôte : une lettre ou un chiffre en tête de chacun (un tiret en tête serait une option de getent)
+    [[ $ADRESSE_SAUVEGARDE =~ ^[a-z0-9][a-z0-9-]*@[a-z0-9][a-z0-9.-]*$ ]] || refuser ADRESSE_SAUVEGARDE "compte@hôte"
     [[ $CLE_INTERVENTION =~ $cle ]] || refuser CLE_INTERVENTION "clé publique ssh-ed25519"
 }
 
