@@ -18,7 +18,7 @@ Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu com
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
 noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
 ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
-passe N des sources)."""
+passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit)."""
 import contextlib
 import difflib
 import fnmatch
@@ -630,6 +630,21 @@ class PlanDeChaine(Depot):
         for cc in (os.path.join(self.tmp, "cc.md"), rapport):
             ag.ecrire(self.tmp, {"cc.md": "GROUPES : FZ-x+FZ-i" + NL})
             self.assertEqual(self.lancer("chaine", "--plan", plan, "--cc", cc)[1][:9], "REFUS G1 ", cc)
+
+    def test_c17_diff_id_deja_porte(self):
+        """C-17 : un pas dont le Diff-Id est déjà porté par le commit d'un autre lot (C-1, nom courant des corrections)
+        : refus G4 (la reprise du modèle sauterait ce pas sans rien dire) ; même message (reprise après arrêt) :
+        admis."""
+        ag.ecrire(self.d, {"x.md": "x" + NL})
+        ag.git(self.d, self.env, "add", "-A")
+        ag.git(self.d, self.env, "commit", "-q", "-m", "autre lot : correction" + NL + NL + "Diff-Id: C-1")
+        m = os.path.join(self.tmp, "m.txt")
+        ag.ecrire(self.tmp, {"m.txt": "ce lot : correction" + NL + NL + "Diff-Id: C-1" + NL,
+                             "cc.md": "GROUPES : aucun" + NL, "plan": f"C-1|/s/a.diff|{m}|/s/ADJ.md" + NL})
+        argv = ["chaine", "--plan", os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md")]
+        self.assertEqual(self.lancer(*argv)[1][:9], "REFUS G4 ")
+        ag.ecrire(self.tmp, {"m.txt": "autre lot : correction" + NL + NL + "Diff-Id: C-1" + NL})
+        self.assertEqual(self.lancer(*argv), (0, ""))
 
     def test_e25_duree(self):
         """E25 : 23 commits à 6 min par défaut (138 min) en lancement lié : refus G3, lancement détaché donné ;

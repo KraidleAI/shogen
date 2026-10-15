@@ -55,7 +55,9 @@ Relecture G2, C-8 : verser refuse /, le dépôt et ses ancêtres (erreur, aucun 
 interdit (V0) et ne lit que des fichiers ordinaires (V5).
 Relecture G2, C-9 : une exception du journal (après la sous-commande) sort en 3, jamais en 1.
 Relecture G2, C-16 : C3 lit aussi dans les sources « passe N » (N passes faites), hors négation (sans, aucune, pas
-de)."""
+de).
+Relecture G2, C-17 : chaine G4, un Diff-Id du plan déjà porté par un commit d'un autre message est refusé (la reprise
+du modèle sauterait le pas)."""
 import argparse
 import fnmatch
 import hashlib
@@ -519,6 +521,16 @@ def chaine(a, fautes):
         for g in [g for g in groupes if set(g) & pas and not set(g) <= pas]:
             fautes.append(("refus", "G2", f"le pas {ligne.split('|')[0]} coupe le groupe {'+'.join(g)} (E11)",
                            "commettre le groupe en un seul pas", "-"))
+    nettoye = lambda t: subprocess.run(["git", "stripspace"], input=t, capture_output=True, text=True).stdout
+    for ligne in plan:
+        ident, message = ligne.split("|")[0], ligne.split("|")[2]
+        for h in git(a.depot, "log", "--format=%H", "-F", f"--grep=Diff-Id: {ident}", "HEAD").split():
+            corps = git(a.depot, "log", "-1", "--format=%B", h)
+            ecrit = nettoye(lire(message).decode("utf-8")) if f"Diff-Id: {ident}" in corps.split(chr(10)) else None
+            if ecrit is not None and nettoye(corps) != ecrit:
+                fautes.append(("refus", "G4", f"Diff-Id: {ident} déjà porté par {h[:12]}, d'un autre message : la "
+                               "reprise sauterait ce pas", "donner au pas un identifiant propre au lot", "-"))
+                break
 
 
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,

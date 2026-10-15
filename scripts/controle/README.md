@@ -342,3 +342,10 @@ dépendent des tests du harnais qu'ils importent.
 > de DETTES-T6 n'écrit que `passe 2` et `sans passe 3`, et le message réel de DT6-d (`en deux passes`) était refusé
 > à tort ; le message réel de DT5-22 (`en trois passes`, erreur E8) reste refusé. `tests/test_avant_acte.py` compte
 > 34 tests ; plancher du job `controle-unittest` 104.
+
+> *Ajout daté du 2026-10-10 09:30:21 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-17 ; erreurs LA-N04, E11)* :
+> `avant_acte.py` (sha256 `531673a8033bfd991a282be6d744467c9b64f88803579b4583810f35c34067e9`) : `chaine`
+> G4, un `Diff-Id` du plan déjà porté par un commit dont le message diffère de celui du plan (après `git
+> stripspace`) est refusé : la reprise du modèle, qui lit tout l'historique, sautait ce pas sans rien dire (un nom
+> courant comme `C-1` d'un autre lot suffisait) ; même message, reprise après un arrêt : admis.
+> `tests/test_avant_acte.py` compte 35 tests ; plancher du job `controle-unittest` 105.
