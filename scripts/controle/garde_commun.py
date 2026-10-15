@@ -7,7 +7,9 @@ d'une heure plus tard que l'horloge + TOLERANCE_S, sans mot de PLAN dans les 40 
 une heure écrite HH:Mx ou HH:xx. Une date d'un autre jour n'est pas jugée (échéance, veille). Limite : une heure
 écrite sans sa date, ou une heure passée fausse, n'est pas vue.
 GF-4 : interdits (E19, LA-N08 ; une seule source, jamais un nom de D.2 affiché), racines, analyse des lignes ajoutées
-d'un diff, disque (E4 : refus sous 3 Gio libres, avertissement sous 6, avis Q-13 adopté)."""
+d'un diff, disque (E4 : refus sous 3 Gio libres, avertissement sous 6, avis Q-13 adopté).
+GF-3 : citations (E16, LA-N08) ; seule la forme stricte « … » (chemin:N) est refusée, les autres formes donnent un
+avertissement compté au journal (avis c.4 adopté), à durcir après mesure."""
 import ast
 import fnmatch
 import functools
@@ -27,6 +29,12 @@ MASQUE = re.compile("`[^`]*`|«[^»]*»")
 RACINE_OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEUILS_GIO = (3, 6)
 ENTETE = re.compile("@@ -([0-9]+)(?:,([0-9]+))? [+]([0-9]+)(?:,([0-9]+))? @@")
+ESPACE = "[ " + chr(160) + "]?"
+STRICTE = re.compile("«([^«»]+)»" + ESPACE + "[(]([^ ():]+):([0-9]+)(?:-([0-9]+))?[)]")
+LIBRE = re.compile("«([^«»]+)»" + ESPACE + "[(]([^():]*?) ?l[.] ?([0-9]+)(?:-([0-9]+))?[)]")
+ALIAS = {"JOURNAL": "JOURNAL.md", "annexe B": "docs/adr-0028/ANNEXE-B-items.md",
+         "ADR-0028": "docs/adr-0028/ADR-0028-decisions-sortie-S2.md"}
+COUPE = re.compile("|".join(map(re.escape, ["[…]", "[...]", "…", "..."])))
 
 
 def maintenant():
@@ -136,3 +144,50 @@ def etat_disque(chemin="/", min_gio=None):
     if libre < max(SEUILS_GIO[0], min_gio or 0):
         return "refus", libre
     return ("avertissement" if libre < SEUILS_GIO[1] else "ok"), libre
+
+
+def plier(t):
+    """Texte comparable : apostrophes et guillemets courbes pliés, `*` et accents graves retirés, blancs réduits."""
+    return " ".join(t.translate({0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"', 0x2A: None, 0x60: None}).split())
+
+
+def citation_lue(racine, chemin, n, m, citation):
+    """None si la citation se lit dans l'ordre entre les lignes n-2 et m+2 du fichier, sinon le code de la faute ;
+    un chemin interdit n'est jamais ouvert."""
+    p = os.path.join(racine, chemin)
+    if chemin_interdit(p):
+        return "citation-interdite"
+    if not os.path.isfile(p):
+        return "reference-introuvable"
+    with open(p, encoding="utf-8", errors="replace") as f:
+        lignes = f.read().split(chr(10))
+    lignes = lignes[:-1] if lignes[-1] == "" else lignes
+    if not 1 <= n <= m <= len(lignes):
+        return "reference-hors-fichier"
+    zone, pos = plier(" ".join(lignes[max(0, n - 3):m + 2])), 0
+    for fragment in map(plier, COUPE.split(citation)):
+        pos = zone.find(fragment, pos) if fragment else pos
+        if pos < 0:
+            return "citation-absente"
+        pos += len(fragment)
+    return None
+
+
+def citations(texte, racine):
+    """(refus, avertissements), listes de (ligne, code, référence). Forme stricte « … » (chemin:N) ou (chemin:N-M) :
+    refus si la citation ne se lit pas, si la ligne sort du fichier ou si le fichier est interdit ; chemin introuvable :
+    avertissement. Forme libre « … » (nom l.N), nom résolu par ALIAS : avertissement (citation-libre, ou
+    citation-libre-absente), refus si le fichier est interdit."""
+    refus, avert = [], []
+    for forme, motif in (("stricte", STRICTE), ("libre", LIBRE)):
+        for x in motif.finditer(texte):
+            ligne, nom = texte.count(chr(10), 0, x.start()) + 1, x[2].strip()
+            chemin, n = ALIAS.get(nom, nom), int(x[3])
+            code = citation_lue(racine, chemin, n, int(x[4] or n), x[1])
+            if code == "citation-interdite" or (forme == "stricte" and code not in (None, "reference-introuvable")):
+                refus.append((ligne, code, "une référence interdite" if code == "citation-interdite" else nom))
+            elif forme == "stricte" and code:
+                avert.append((ligne, code, nom))
+            elif forme == "libre":
+                avert.append((ligne, "citation-libre-absente" if code == "citation-absente" else "citation-libre", nom))
+    return refus, avert

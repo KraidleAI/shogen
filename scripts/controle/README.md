@@ -108,3 +108,13 @@ dépendent des tests du harnais qu'ils importent.
 > (propre sous `-X dev -W error`). Usage : `python3 -I -B scripts/controle/presg5.py <racine du dépôt>
 > <fichier.md>...`. `tests/test_presg5.py` compte 5 tests (erreur E9 reproduite : message d'outil anglais entre
 > guillemets français, sortie 1) ; plancher du job `controle-unittest` 53.
+
+> *Ajout daté du 2026-10-10 05:52:05 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-3 ; erreurs E16 et LA-N08)* :
+> `garde_commun.py` (sha256 `a7b1f09d73da5d0635605fbe79c7a590c596b4c69a582598a4c423735d888e31`) : `citations(texte,
+> racine)`. Forme stricte, citation entre guillemets français suivie de `(chemin:N)` ou `(chemin:N-M)` : refus si la
+> citation ne se lit pas mot pour mot, fragments coupés aux points de suspension et dans l'ordre, entre les lignes N-2
+> et M+2 (apostrophes et guillemets courbes pliés, blancs réduits), si la ligne sort du fichier, ou si le fichier est
+> interdit (jamais ouvert ni nommé) ; chemin introuvable : avertissement. Forme libre `(nom l.N)` (nom résolu par
+> `ALIAS` : JOURNAL, annexe B, ADR-0028) : avertissement compté (`citation-libre`, `citation-libre-absente`), à durcir
+> après mesure (avis c.4 adopté). `tests/test_garde_commun.py` compte 14 tests ; plancher du job `controle-unittest`
+> 56.

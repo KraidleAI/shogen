@@ -1,7 +1,8 @@
 """Cas de garde_commun.py (lot GARDE-FOUS-ORCH ; G0 docs/adr-0028/G0-lots-DETTES.md, ajout GF-0), rouges sur l'erreur
 réelle reproduite, verts sur le cas sain. GF-1 : horloge et heures. E14 : vers 04:18 et 04:22 écrits à 04:14 ; le
 2026-10-02 : une heure écrite 19:5x. L'horloge est fixée par un faux `date` dans le PATH, jamais par une variable.
-GF-4 : interdits (E19, LA-N08), racines, analyse d'un diff, disque (E4 : 222 Mio vus par un agent)."""
+GF-4 : interdits (E19, LA-N08), racines, analyse d'un diff, disque (E4 : 222 Mio vus par un agent).
+GF-3 : citations (E16 : citation inexacte d'une ligne du JOURNAL ; LA-N08 : citation d'un interdit)."""
 import collections
 import os
 import tempfile
@@ -10,6 +11,13 @@ from datetime import datetime, timezone
 from unittest import mock
 
 import garde_commun as gc
+
+
+def ag_ecrire(d, fichiers):
+    for chemin, texte in fichiers.items():
+        os.makedirs(os.path.dirname(os.path.join(d, chemin)), exist_ok=True)
+        with open(os.path.join(d, chemin), "w", encoding="utf-8") as f:
+            f.write(texte)
 
 NL = chr(10)
 H = datetime(2026, 10, 10, 4, 14, tzinfo=timezone.utc)      # E14 : il était 04:14:00
@@ -116,3 +124,48 @@ class Disque(unittest.TestCase):
         for gio, mini, attendu in cas:
             with mock.patch.object(gc.shutil, "disk_usage", return_value=usage(1, 1, int(gio * 2 ** 30))):
                 self.assertEqual(gc.etat_disque("/", mini)[0], attendu, (gio, mini))
+
+
+G, D = chr(171), chr(187)
+JOURNAL = NL.join(["l." + str(i) for i in range(1, 143)] + [
+    "les questions techniques routées vers les advisors : Q-FUZZ-1 rangée parmi elles", "suite de la phrase",
+    "ligne 145", "ligne 146 l’apostrophe courbe", ""])
+
+
+class Citations(unittest.TestCase):
+    def juger(self, texte, brut=False):
+        with tempfile.TemporaryDirectory() as d:
+            ag_ecrire(d, {"JOURNAL.md": JOURNAL, "docs/rapports/a.md/x": "", "b.md": "un" + NL})
+            refus, avert = gc.citations(texte, d)
+        return (refus, avert) if brut else ([(n, c) for n, c, _r in refus], [(n, c) for n, c, _r in avert])
+
+    def test_e16_forme_stricte_refusee(self):
+        """E16 : citation inexacte d'une ligne du JOURNAL, forme stricte : refus ; forme de E16 (JOURNAL l.143) :
+        avertissement compté (avis c.4 adopté)."""
+        cit = G + " Q-FUZZ-1 routée vers les advisors " + D
+        self.assertEqual(self.juger(cit + " (JOURNAL.md:143)"), ([(1, "citation-absente")], []))
+        self.assertEqual(self.juger("x" + NL + cit + " (JOURNAL l.143)"), ([], [(2, "citation-libre-absente")]))
+
+    def test_citations_exactes(self):
+        """Mot pour mot, entre les lignes N-2 et M+2, fragments coupés par points de suspension dans l'ordre,
+        apostrophe courbe contre droite, sur deux lignes ; forme libre exacte : avertissement citation-libre."""
+        textes = [G + " questions techniques routées " + D + " (JOURNAL.md:143)",
+                  G + " routées vers […] rangée parmi " + D + " (JOURNAL.md:143-144)",
+                  G + " phrase ligne 145 " + D + " (JOURNAL.md:143)", G + " l'apostrophe " + D + " (JOURNAL.md:144)",
+                  G + " rangée parmi" + NL + "elles suite " + D + " (JOURNAL.md:143)"]
+        for t in textes:
+            self.assertEqual(self.juger(t), ([], []), t)
+        self.assertEqual(self.juger(G + " suite de la phrase " + D + " (JOURNAL l.144)"), ([], [(1, "citation-libre")]))
+
+    def test_citations_fausses(self):
+        """Hors de la fenêtre, fragments dans le désordre, ligne hors du fichier : refus ; chemin introuvable :
+        avertissement ; LA-N08 : citation d'un interdit refusée sans ouverture (le chemin est un dossier)."""
+        cas = [(G + " ligne 146 " + D + " (JOURNAL.md:143)", "citation-absente"),
+               (G + " rangée parmi […] questions techniques " + D + " (JOURNAL.md:143)", "citation-absente"),
+               (G + " questionstechniques " + D + " (JOURNAL.md:143)", "citation-absente"),
+               (G + " un " + D + " (b.md:2)", "reference-hors-fichier"),
+               (G + " texte du rapport " + D + " (docs/rapports/a.md:3)", "citation-interdite")]
+        for t, code in cas:
+            self.assertEqual(self.juger(t), ([(1, code)], []), t)
+        self.assertEqual(self.juger(G + " un " + D + " (absent.md:1)"), ([], [(1, "reference-introuvable")]))
+        self.assertNotIn("rapports", repr(self.juger(G + " x " + D + " (docs/rapports/a.md:1)", brut=True)))
