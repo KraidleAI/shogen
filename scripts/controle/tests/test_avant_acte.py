@@ -16,7 +16,8 @@ chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de
 GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
 diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
-noms de GROUPES pris au plan, gabarit à remplir)."""
+noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interdits jamais parcourus, fichiers
+ordinaires)."""
 import contextlib
 import difflib
 import hashlib
@@ -366,6 +367,30 @@ class Versement(Depot):
         self.assertEqual((code, sortie[:9]), (1, "REFUS V2 "))
         self.assertEqual(self.verser({"a.md": "court", "b.md": "court"})[1][:9], "REFUS V2 ")
         self.assertEqual(self.verser({"a.md": self.ADJ[:400], "b.md": "x " + self.ADJ[:400]}), (0, ""))
+
+    def test_c8_racine_et_parcours(self):
+        """C-8 : dossier de pièces égal au dépôt ou à l'un de ses ancêtres : erreur 3, aucun parcours ; dossier interdit
+        dans les pièces : refus V0, jamais parcouru (aucun chemin sous lui jugé) ; fichier interdit (*.jsonl) : refus
+        V0, jamais ouvert ; lien brisé (fichier non ordinaire, comme un tube) : refus V5, jamais ouvert."""
+        for racine in (self.d, self.tmp):
+            vus = []
+            with mock.patch.object(avant_acte.os, "walk", lambda r, *x, **k: vus.append(r) or iter(())):
+                code = self.lancer("verser", "--pieces", racine)[0]
+            self.assertEqual((code, vus), (3, []), racine)
+        h = hashlib.sha256(b"a").hexdigest()
+        ag.ecrire(self.p, {"a.md": "a", "SHA256SUMS": h + "  a.md" + NL, "docs/rapports/sous/x.md": "x"})
+        with mock.patch.object(avant_acte.GC, "chemin_interdit", wraps=avant_acte.GC.chemin_interdit) as juge:
+            code, sortie = self.lancer("verser", "--pieces", self.p)
+        self.assertEqual((code, sortie[:9]), (1, "REFUS V0 "))
+        self.assertEqual([c for c in juge.call_args_list if "sous" in str(c)], [])
+        shutil.rmtree(os.path.join(self.p, "docs"))
+        ag.ecrire(self.p, {"journal.jsonl": "x"})
+        self.assertEqual(self.lancer("verser", "--pieces", self.p)[1][:9], "REFUS V0 ")
+        os.remove(os.path.join(self.p, "journal.jsonl"))
+        os.symlink(os.path.join(self.tmp, "absent"), os.path.join(self.p, "lien.md"))
+        code, sortie = self.lancer("verser", "--pieces", self.p)
+        v5 = "REFUS V5 : 1 fichier(s) non ordinaire(s) (lien brisé, tube, appareil) : non lus ; à faire : les retirer"
+        self.assertEqual((code, sortie.split(NL)[0]), (1, v5))
 
     def test_sommes_chemins_heures(self):
         """V4 : SHA256SUMS écrit avec ./, ligne fausse, pièce non listée, absent : refus ; V3 : chemin absolu du

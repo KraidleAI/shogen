@@ -50,7 +50,9 @@ Relecture G2, C-3 : diff lu comme git l'applique (format du diff indifférent : 
 (G5) lus dans l'état d'après le diff.
 Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT à -X PUT avant les motifs.
 Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme dossier (imprimé avec sa barre).
-Relecture G2, C-7 : chaine G1, chaque nom de GROUPES (hors la valeur aucun) nomme un diff du plan."""
+Relecture G2, C-7 : chaine G1, chaque nom de GROUPES (hors la valeur aucun) nomme un diff du plan.
+Relecture G2, C-8 : verser refuse /, le dépôt et ses ancêtres (erreur, aucun parcours), ne parcourt jamais un dossier
+interdit (V0) et ne lit que des fichiers ordinaires (V5)."""
 import argparse
 import fnmatch
 import hashlib
@@ -335,16 +337,28 @@ def verser(a, fautes):
     racine = os.path.abspath(a.pieces)
     if not os.path.isdir(racine) or GC.chemin_interdit(racine):
         raise Erreur("dossier de pièces absent ou interdit (non lu)")
-    pieces, ecartes = {}, 0
+    reel, depot = os.path.realpath(racine), os.path.realpath(a.depot)
+    if depot == reel or depot.startswith(reel.rstrip(os.sep) + os.sep):
+        raise Erreur("dossier de pièces refusé : /, le dépôt ou l'un de ses ancêtres (jamais parcouru)")
+    pieces, ecartes, autres = {}, 0, 0
     for base, dossiers, fichiers in os.walk(racine):
-        dossiers.sort()
+        caches = {x for x in dossiers if GC.chemin_interdit(os.path.join(base, x))}
+        ecartes += len(caches)
+        dossiers[:] = sorted(set(dossiers) - caches)
         for x in sorted(fichiers):
-            if GC.chemin_interdit(os.path.join(base, x)):
+            p = os.path.join(base, x)
+            if GC.chemin_interdit(p):
                 ecartes += 1
+            elif not os.path.isfile(p):
+                autres += 1
             else:
-                pieces[os.path.relpath(os.path.join(base, x), racine)] = lire(os.path.join(base, x))
+                pieces[os.path.relpath(p, racine)] = lire(p)
     if ecartes:
-        fautes.append(("refus", "V0", f"{ecartes} fichier(s) sous un interdit : ni lus ni nommés", "les retirer", "-"))
+        fautes.append(("refus", "V0", f"{ecartes} fichier(s) ou dossier(s) sous un interdit : ni lus, ni parcourus, "
+                       "ni nommés", "les retirer", "-"))
+    if autres:
+        fautes.append(("refus", "V5", f"{autres} fichier(s) non ordinaire(s) (lien brisé, tube, appareil) : non lus",
+                       "les retirer", "-"))
     vues, md = {}, {r: b.decode("utf-8") for r, b in pieces.items() if r.endswith(".md")}
     for r, b in pieces.items():
         h = hashlib.sha256(b).hexdigest()

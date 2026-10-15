@@ -294,3 +294,10 @@ dépendent des tests du harnais qu'ils importent.
 > `gabarits/rapport-cc.md` (sha256 `10537176d1ee3bb75d1c849a12546cbd5b0a71139a8587fcf74ca4893c917cc5`) : la
 > ligne fixe est à remplir (`<à remplir : aucun, ou les groupes>`, refusée en G1), au lieu de `aucun` par défaut.
 > `tests/test_avant_acte.py` compte 30 tests ; plancher du job `controle-unittest` 98.
+
+> *Ajout daté du 2026-10-10 09:00:09 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-8 ; erreurs E19, E24)* :
+> `avant_acte.py` (sha256 `2fccbfb9d0606f29f3344ae7524b1345c62aee10d803aeb6ae4fe8c0a44c8485`) : `verser`
+> refuse en erreur un dossier de pièces égal à `/`, au dépôt ou à l'un de ses ancêtres, avant tout parcours (il
+> parcourait et lisait tout fichier non interdit) ; un dossier interdit des pièces n'est jamais parcouru (V0 : il
+> était listé) ; un fichier non ordinaire (lien brisé, tube, appareil) n'est jamais ouvert (V5 : un tube bloquait
+> l'outil). `tests/test_avant_acte.py` compte 31 tests ; plancher du job `controle-unittest` 99.
