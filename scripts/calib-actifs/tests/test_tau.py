@@ -27,10 +27,14 @@ class TestTau(unittest.TestCase):
         servi ; ou minutes toutes sans échange) : CA/population nommée par la place, avant tout calcul. Sans la garde,
         coinbase vide passe (σ des places horodatées d'ETH et d'USDT de 180 à 90 s sur ce banc ; USDT n'est couvert
         par l'oracle de SH §4 que par ses concurrences). Place dont seule la première minute est sans échange :
-        admise. Mutations : garde retirée ; place refusée dès une minute indéfinie."""
+        admise. R-6 du contre-contrôle cc2 : bord exact, une seule minute active, la dernière : admise ; okx vide
+        (dernière place de l'ordre trié) : refus ; binance et okx vides : refus nommé par binance ; place vide et BTC
+        absents : la garde, avant tout calcul (sans place vide : CA/btc). Mutations : garde retirée ; place refusée
+        dès une minute indéfinie ; seuil de deux minutes actives ; dernière place non contrôlée ; dernière place vide
+        nommée ; garde après le calcul de σ."""
         muet = {t: (Decimal(1), False) for t in socle.minutes(sy.FEN)}
         for a, p, s in (("ETH", "coinbase", {}), ("USDT", "coinbase", {}), ("USDT", "bitstamp", muet),
-                        ("USDC", "bitstamp", {}), ("ETH", "binance", {})):
+                        ("USDC", "bitstamp", {}), ("ETH", "binance", {}), ("ETH", "okx", {})):
             with self.subTest(actif=a, place=p):
                 self.assertEqual(essai(lambda: tau.calcul_actif(P, a, sy.series(P, a) | {p: s}, sy.FEN, sy.BTC)),
                                  "REFUS CA/population : place sans minute active dans la fenêtre ; "
@@ -38,6 +42,13 @@ class TestTau(unittest.TestCase):
         s = sy.series(P, "ETH")
         s["kraken"] = s["kraken"] | {sy.FEN["debut"]: (Decimal(1), False)}      # première minute sans échange : admise
         self.assertEqual(type(essai(lambda: tau.calcul_actif(P, "ETH", s, sy.FEN, sy.BTC))), dict)
+        s["kraken"] = {t: (Decimal(100), t == sy.FEN["fin"] - 60) for t in socle.minutes(sy.FEN)}   # R-6 : bord exact
+        self.assertEqual(type(essai(lambda: tau.calcul_actif(P, "ETH", s, sy.FEN, sy.BTC))), dict)
+        vide = "REFUS CA/population : place sans minute active dans la fenêtre ; actif ETH ; place "
+        s = sy.series(P, "ETH") | {"binance": {}, "okx": {}}                  # R-6 : deux places vides
+        self.assertEqual(essai(lambda: tau.calcul_actif(P, "ETH", s, sy.FEN, sy.BTC)), vide + "binance")
+        s = sy.series(P, "ETH") | {"coinbase": {}}                            # R-6 : avant tout calcul (BTC absents)
+        self.assertEqual(essai(lambda: tau.calcul_actif(P, "ETH", s, sy.FEN, {})), vide + "coinbase")
 
     def test_mediane_leave_one_out(self):
         """T-CA-TAU-1 : quatre places à 100, 101, 102 et 110 : pour 110, médiane des autres 101, écart 9/101 ; pour
