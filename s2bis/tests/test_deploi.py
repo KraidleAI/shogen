@@ -103,8 +103,9 @@ class Essai(unittest.TestCase):
             texte = texte.replace(NL + k + '=""', NL + k + '="' + v + '"')
         return texte
 
-    def lancer(self, params, image=IMAGE, dns=DNS):
-        """(code, sortie, erreur, racine) du script rempli de `params`, en essai sur une racine factice neuve."""
+    def lancer(self, params, image=IMAGE, dns=DNS, env=None, avant=None):
+        """(code, sortie, erreur, racine) du script rempli de `params`, en essai sur une racine factice neuve ; `env`
+        complète l'environnement du script ; `avant(racine)` prépare la racine après l'image."""
         racine, script = tempfile.mkdtemp(dir=self.tmp), os.path.join(tempfile.mkdtemp(dir=self.tmp), "script.sh")
         resolution = "".join(f"ahostsv4 {n} {a}" + NL for n, a in dns.items())
         for chemin, texte in {**image, "essai.getent": resolution}.items():
@@ -113,8 +114,10 @@ class Essai(unittest.TestCase):
                 f.write(texte)
         with open(script, "w", encoding="utf-8") as f:
             f.write(self.rempli(params))
+        if avant:
+            avant(racine)
         p = subprocess.run(["bash", script, "--essai", racine], capture_output=True, timeout=120,
-                           env={"PATH": "/usr/bin:/bin", "LC_ALL": "C"})
+                           env={"PATH": "/usr/bin:/bin", "LC_ALL": "C", **(env or {})})
         return p.returncode, p.stdout.decode("utf-8"), p.stderr.decode("utf-8"), racine
 
     def fichiers(self, racine):
@@ -190,6 +193,27 @@ class PremierDemarrage(Essai):
         self.assertEqual([os.stat(os.path.join(racine, c)).st_mode & 0o777 for c in (
             "etc/shogen/observateur.conf", "home/intervention/.ssh", "home/intervention/.ssh/authorized_keys")],
             [0o640, 0o700, 0o600])
+
+    def test_tdp1_temporaires_nes_0600(self):
+        """Écriture par renommage : chaque temporaire naît 0600, même si un lancement interrompu en a laissé un lisible
+        de tous, puis prend son mode ; observateur.conf porte l'adresse secrète du signal de vie (Q-6). Une fonction
+        chmod exportée relève le mode de chaque temporaire juste avant son chmod."""
+        trace, reste = os.path.join(self.tmp, "modes"), "etc/shogen/observateur.conf.nouveau"
+        chmod = '() { stat -c "%a %n" "$2" >> "$DB1_TRACE"; command chmod "$@"; }'
+
+        def laisser(racine):
+            os.makedirs(os.path.join(racine, "etc/shogen"))
+            with open(os.path.join(racine, reste), "w", encoding="utf-8") as f:
+                f.write("ancien" + NL)
+            os.chmod(os.path.join(racine, reste), 0o644)
+        code, _s, _e, racine = self.lancer(self.parametres("o4"), env={"BASH_FUNC_chmod%%": chmod, "DB1_TRACE": trace},
+                                           avant=laisser)
+        self.assertEqual(code, 0)
+        self.assertEqual(self.lire(trace).replace(os.path.realpath(racine), "").splitlines(), [
+            "600 /" + c + ".nouveau" for c in (
+                "etc/apt/sources.list.d/debian.sources", "home/intervention/.ssh/authorized_keys",
+                "etc/shogen/observateur.conf", "etc/ssh/sshd_config.d/00-shogen.conf",
+                "etc/apt/apt.conf.d/90shogen-securite", "etc/nftables.conf", "etc/nftables.d/shogen-observateur.nft")])
 
     def test_tdp1_sources_https_et_trousseau(self):
         bloc = "Types: deb{0}URIs: https://deb.debian.org/{1}{0}Suites: {2}{0}Components: main{0}Signed-By: {3}{0}"

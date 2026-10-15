@@ -60,8 +60,9 @@ verifier_parametres() {     # E-D-01 : tout est contrôlé avant le premier chan
 }
 
 ecrire() {      # ecrire <chemin du système> <mode> : l'entrée standard sous la racine (vide hors essai), par renommage
-    mkdir -p "$R$(dirname "$1")"
-    cat > "$R$1.nouveau"
+    mkdir -p "$R$(dirname "$1")"                # le temporaire naît 0600, même après un lancement interrompu : rien
+    rm -f "$R$1.nouveau"                        # de lisible par autrui avant le mode final (observateur.conf, Q-6)
+    (umask 077 && cat > "$R$1.nouveau")
     chmod "$2" "$R$1.nouveau"
     mv -f "$R$1.nouveau" "$R$1"
 }
