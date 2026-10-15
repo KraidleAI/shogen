@@ -5,7 +5,7 @@
 # blob source). Porté du blob 457565f (adb2213:enforcement/lint-model-pinning.sh),
 # identique à celui du commit 0b4f3f9 de l'amont VibeGates.
 # Liste blanche : roster des décisions 133, 267 et 280 et décision du fondateur du 2026-10-08 (Haiku 5.5, rôles
-# de signal ; annexe B, bloc B.76) : CLAUDE.md l.23-49, point 7. Elle vit ici, sur une ligne ; la changer demande
+# de signal ; annexe B, bloc B.76) : CLAUDE.md l.23-55, point 7. Elle vit ici, sur une ligne ; la changer demande
 # un lot (lot LINT-HAIKU : G0 docs/adr-0028/G0-lot-LINT-HAIKU.md). L'identifiant banni le 2026-08-14
 # (docs/DECISIONS.md l.2965-2968) est construit à l'exécution : ce dossier n'en porte
 # jamais le littéral.
