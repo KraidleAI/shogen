@@ -45,8 +45,10 @@ fi
 refuser() { echo "premier-demarrage : PARAMETRE/$1 : $2" >&2; exit 2; }
 verifier_parametres() {     # E-D-01 : tout est contrôlé avant le premier changement ; refus et arrêt sinon
     # Octet IPv4 de 0 à 255 sans zéro de tête (nft et getaddrinfo lisent 010 en octal : 8) ; clé : bloc ed25519 de 68
-    # caractères, en-tête fixe (type ssh-ed25519, clé de 32 octets) puis 43 caractères.
-    local o='(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])' cle='^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI[A-Za-z0-9+/]{43}'
+    # caractères (51 octets) : 25 fixes (type ssh-ed25519, longueur 32 hors ses deux derniers bits), un 26e de A à P
+    # (ces deux bits, nuls, puis quatre bits de la clé ; Q y lirait la longueur 33), puis 42.
+    local o='(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])'
+    local cle='^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI[A-P][A-Za-z0-9+/]{42}'
     local ip4="$o([.]$o){3}" https='^https://[a-z0-9.-]+(/[A-Za-z0-9._-]+)+$' nom='^[a-z0-9-]{1,32}$'
     local liste="^$ip4( $ip4){0,3}$" cle="$cle( [A-Za-z0-9@._-]+)?$"
     [[ $OBSERVATEUR =~ ^o[1-4]$ ]] || refuser OBSERVATEUR "o1 à o4"

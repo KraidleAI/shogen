@@ -3,7 +3,9 @@ script I de premier démarrage (s2bis/deploi/premier-demarrage.sh), lancé en mo
 privilège ni réseau (apt-get, systemctl et les commandes système y sont des enregistreurs) ; chaque méthode porte le
 numéro de son test (T-DP-n de la PROPOSITION §4.4, décision 5 de DB-0). Valeurs attendues écrites ici depuis les
 pièces (ADR-0029, RAPPORT-DB0, index Debian lus à DB-0), jamais lues dans le script."""
+import base64
 import os
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -12,6 +14,12 @@ NL = chr(10)
 DEPLOI = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "deploi")
 SCRIPT, NFT = (os.path.join(DEPLOI, n) for n in ("premier-demarrage.sh", "nftables.conf"))
 CLE = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEssaiDB1EssaiDB1EssaiDB1EssaiDB1EssaiDB1Ess investisseur@poste"
+# Clés publiques ed25519 vraies, 32 octets (DB1-q ; ssh-keygen absent de l'hôte : points calculés hors réseau par la
+# génération de clé de la RFC 8032) : graine SHA-256 de « shogen DB1-q A 6 », puis les clés publiques des vecteurs
+# TEST 1 et TEST 3 de la RFC 8032 ; 26e caractère de leur bloc : A, N et P.
+CLES_ED25519 = ("05667db36b6d3a8d1dd0927a7cd84360bedbb1ec791f2d0fb50d7d07f7cef89a",
+                "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+                "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025")
 OBS = {"o1": ("hetzner", "hel1", "unbound", ""), "o2": ("ovhcloud", "gra", "quad9", ""),     # décision 2 de DB-0
        "o3": ("digitalocean", "ams3", "google", ""),
        "o4": ("linode", "sg-sin-2", "fournisseur", "203.0.113.53 203.0.113.54")}
@@ -82,6 +90,13 @@ def pare_feu(texte):
         elif t:
             dehors.append(t)
     return dehors, ensembles, chaines
+
+
+def bloc_ed25519(cle):
+    """Bloc base64 d'une clé ssh-ed25519, construit octet par octet : longueur sur 4 octets et chaîne « ssh-ed25519 »,
+    longueur sur 4 octets et clé publique de 32 octets (hexadécimal) ; 51 octets, 68 caractères."""
+    octets = bytes.fromhex(cle)
+    return base64.b64encode(struct.pack(">I", 11) + b"ssh-ed25519" + struct.pack(">I", len(octets)) + octets).decode()
 
 
 class Essai(unittest.TestCase):
@@ -205,6 +220,27 @@ class PremierDemarrage(Essai):
         self.assertEqual([os.stat(os.path.join(racine, c)).st_mode & 0o777 for c in (
             "etc/shogen/observateur.conf", "home/intervention/.ssh", "home/intervention/.ssh/authorized_keys",
             "etc/shogen", "etc/nftables.d")], [0o640, 0o700, 0o600, 0o755, 0o755])
+
+    def test_tdp1_cle_bloc_ed25519_exact(self):
+        """Bloc de la clé (E-D-01, DB1-q) : 51 octets, 68 caractères ; les 25 premiers sont fixes, le 26e porte les deux
+        derniers bits de la longueur 32 (nuls) puis quatre bits de la clé : A à P seulement. Clés vraies, 26e caractère
+        A, N et P : admises, posées telles quelles. Le bloc de TEST 1 au 26e caractère hors de A à P (Q : longueur 33) :
+        refus nommé, rien ne change."""
+        vraies = [bloc_ed25519(c) for c in CLES_ED25519]
+        self.assertEqual([b[25] for b in vraies], ["A", "N", "P"])
+        for b in vraies:
+            cle = "ssh-ed25519 " + b + " investisseur@poste"
+            with self.subTest(cle=cle):
+                code, _s, erreur, racine = self.lancer(self.parametres("o2", CLE_INTERVENTION=cle))
+                self.assertEqual((code, erreur), (0, ""))
+                self.assertEqual(self.lire(racine, "home/intervention/.ssh/authorized_keys"), cle + NL)
+        self.assertEqual(struct.unpack(">I", base64.b64decode(vraies[1][:25] + "Q" + vraies[1][26:])[15:19]), (33,))
+        for c in "QZgz09+/":
+            cle = "ssh-ed25519 " + vraies[1][:25] + c + vraies[1][26:] + " investisseur@poste"
+            with self.subTest(cle=cle):
+                code, sortie, erreur, racine = self.lancer(self.parametres("o2", CLE_INTERVENTION=cle))
+                self.assertEqual((code, sortie, self.journal(racine), self.fichiers(racine)), (2, "", [], set(IMAGE)))
+                self.assertIn("PARAMETRE/CLE_INTERVENTION ", erreur)
 
     def test_tdp1_temporaires_nes_0600(self):
         """Écriture par renommage : chaque temporaire naît 0600, même si un lancement interrompu en a laissé un lisible
