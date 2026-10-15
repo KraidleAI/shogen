@@ -249,3 +249,15 @@ dépendent des tests du harnais qu'ils importent.
 > P1 et P2 jugeaient HEAD seule : une branche B en avance sur une tête scellée, porteuse d'un commit non vérifié
 > ou d'un `docs/15-*`, passait. `tests/test_avant_acte.py` compte 24 tests (`test_c2_branche_autre_que_la_tete`) ;
 > plancher du job `controle-unittest` 91.
+
+> *Ajout daté du 2026-10-10 08:52:48 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-3 ; erreurs E9, E16, E21)* :
+> `avant_acte.py` (sha256 `7f3818d79c1db7d5184bbe74637db57f26d03cb290eb9fd57d843f3fdb2eda95`) et
+> `garde_commun.py` (sha256 `03820cef512866f929b3ce2e9f5af54c0b6673ba0018de71bdf56cd052341984`) : `diff` lit
+> le diff comme git l'applique : D1 sur les chemins de `git apply --numstat` et des en-têtes, avant toute
+> application ; puis HEAD plus le diff, dans un index temporaire, est analysé par `git diff -U0` comme au `commit` :
+> un diff sans en-tête `diff --git` (`diff -u`) ou à préfixes de `diff.mnemonicPrefix` n'échappe plus à C4, C5, C7
+> ni G5. Citations (C5) et corpus de `presg5.py` (G5) lus dans l'état d'après le diff : une citation anglaise que
+> le diff inscrit à `biblio/INDEX.md` n'est plus refusée (DT14-a et DT14-b, commis : 65 faux refus G5 avant cette
+> correction), une citation de l'ancien texte d'une ligne changée l'est. `lignes_ajoutees` force les préfixes a/ et
+> b/ (au `commit`, un dépôt réglé en `diff.mnemonicPrefix` désarmait C7). `tests/test_avant_acte.py` compte 27
+> tests ; plancher du job `controle-unittest` 94.

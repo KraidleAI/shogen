@@ -14,8 +14,10 @@ GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : d
 GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du contre-contrôle annonçait ; E25 :
 chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
 GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
-Relecture G2 : C-2 (pousser, branche poussée égale à HEAD)."""
+Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
+diff)."""
 import contextlib
+import difflib
 import hashlib
 import io
 import os
@@ -229,6 +231,15 @@ class CommitSuite(Source):
         self.assertEqual((code, sortie[:9]), (0, "ADMIS C7 "))
         self.assertEqual(self.journal()[-1][1:], ["commit", "C7", "admis", "decalage-admis"])
 
+    def test_c3_prefixes_de_la_configuration(self):
+        """C-3 : dépôt réglé en diff.mnemonicPrefix (préfixes c/ et i/) : commit lit toujours a/ et b/ ; une insertion
+        au milieu d'un fichier cité : refus C7."""
+        self.indexer({"JOURNAL.md": NL.join(["l1", "l2", "l3", ""])})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "journal")
+        ag.git(self.d, self.env, "config", "diff.mnemonicPrefix", "true")
+        code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "neuf", "l2", "l3", ""])})
+        self.assertEqual((code, sortie[:9]), (1, "REFUS C7 "))
+
     def test_diff_id(self):
         """C9 : ligne Diff-Id exigée quand --id est donné."""
         self.assertEqual(self.verifier({"a.md": "id" + NL}, self.CORPS, "--id", "GF-6")[1][:9], "REFUS C9 ")
@@ -279,6 +290,38 @@ class DiffDeWorker(Source):
                               "REFUS G5 : n.md:2 : fatal: not a git")]:
             code, sortie = self.diff_de({"n.md": "x" + NL + ligne + NL})
             self.assertEqual((code, sortie[:len(refus)]), (1, refus), ligne)
+
+    def test_c3_etat_d_apres_le_diff(self):
+        """C-3 : citations et corpus de presg5 lus dans l'état d'après le diff : une citation anglaise inscrite à
+        biblio/INDEX.md par le même diff (forme de DT14-a, commis) et la citation d'une ligne que le diff ajoute :
+        admises ; la citation de l'ancien texte d'une ligne que le diff change : refus C5."""
+        g, d = chr(171), chr(187)
+        cit = g + " the estimator is consistent with the observed data " + d
+        fichiers = {"biblio/INDEX.md": "# index" + NL + "Source : " + cit + NL, "n.md": "x" + NL + cit + NL}
+        self.assertEqual(self.diff_de(fichiers), (0, ""))
+        fichiers = {"JOURNAL.md": NL.join(["l1", "l2", "l3", "l4", "l5", "l6 neuve", ""]),
+                    "n.md": g + " l6 neuve " + d + " (JOURNAL.md:6)" + NL}
+        self.assertEqual(self.diff_de(fichiers), (0, ""))
+        fichiers = {"JOURNAL.md": NL.join(["l1", "L2 changée", "l3", "l4", "l5", ""]),
+                    "n.md": g + " l2 " + d + " (JOURNAL.md:2)" + NL}
+        code, sortie = self.diff_de(fichiers)
+        self.assertEqual((code, sortie[:36]), (1, "REFUS C5 : citation-absente à n.md:1"))
+
+    def test_c3_format_du_diff(self):
+        """C-3 : diff lu comme git l'applique : une insertion au milieu de JOURNAL.md écrite en diff -u (sans en-tête
+        diff --git) ou avec les préfixes de diff.mnemonicPrefix : refus C7, comme en diff de git."""
+        avant, apres = NL.join(["l1", "l2", "l3", "l4", "l5", ""]), NL.join(["l1", "neuf", "l2", "l3", "l4", "l5", ""])
+        lignes = difflib.unified_diff(avant.splitlines(True), apres.splitlines(True), "a/JOURNAL.md", "b/JOURNAL.md")
+        ag.ecrire(self.tmp, {"w.diff": "".join(lignes)})
+        self.assertEqual(self.lancer("diff", "--fichier", self.w)[1][:9], "REFUS C7 ")
+        c = os.path.join(self.tmp, "copie")
+        shutil.rmtree(c, ignore_errors=True)
+        shutil.copytree(self.d, c)
+        ag.ecrire(c, {"JOURNAL.md": apres})
+        ag.git(c, self.env, "add", "-A")
+        mnemonique = ag.git(c, self.env, "-c", "diff.mnemonicPrefix=true", "diff", "--cached", "HEAD")
+        ag.ecrire(self.tmp, {"w.diff": mnemonique})
+        self.assertEqual(self.lancer("diff", "--fichier", self.w)[1][:9], "REFUS C7 ")
 
     def test_e1_interdit_tete(self):
         """E1 : workflow du diff illisible en YAML : refus C8 ; fichier du diff sous un interdit : refus, jamais

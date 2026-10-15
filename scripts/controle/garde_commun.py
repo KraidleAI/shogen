@@ -10,7 +10,9 @@ GF-4 : interdits (E19, LA-N08 ; une seule source, jamais un nom de D.2 affiché)
 d'un diff, disque (E4 : refus sous 3 Gio libres, avertissement sous 6, avis Q-13 adopté).
 GF-3 : citations (E16, LA-N08) ; seule la forme stricte « … » (chemin:N) est refusée, les autres formes donnent un
 avertissement compté au journal (avis c.4 adopté), à durcir après mesure.
-GF-4b : lignes ajoutées de l'index (git diff --cached), noms d'abord, contenu des seuls chemins admis."""
+GF-4b : lignes ajoutées de l'index (git diff --cached), noms d'abord, contenu des seuls chemins admis.
+Relecture G2, C-3 : lignes ajoutées d'un index temporaire (env), préfixes a/ et b/ forcés quelle que soit la
+configuration ; citations lues d'abord dans une surcouche (fichiers d'après un diff)."""
 import ast
 import fnmatch
 import functools
@@ -144,13 +146,16 @@ def git(depot, *args, env=None):
                           check=True, env=env).stdout
 
 
-def lignes_ajoutees(depot):
-    """Lignes ajoutées de l'index par rapport à HEAD, hors interdits : noms d'abord, puis diff des seuls chemins admis
-    (le contenu d'un interdit n'est jamais lu) ; rend (fichiers analysés, nombre de fichiers écartés)."""
-    noms = [x for x in git(depot, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD").split(chr(0)) if x]
+def lignes_ajoutees(depot, env=None):
+    """Lignes ajoutées de l'index (ou de l'index temporaire d'env) par rapport à HEAD, hors interdits : noms d'abord,
+    puis diff des seuls chemins admis (le contenu d'un interdit n'est jamais lu), préfixes a/ et b/ forcés ; rend
+    (fichiers analysés, nombre de fichiers écartés)."""
+    noms = git(depot, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", env=env).split(chr(0))
+    noms = [x for x in noms if x]
     admis = [x for x in noms if not chemin_interdit(os.path.join(depot, x))]
-    texte = git(depot, "diff", "--cached", "--no-renames", "--no-color", "--no-ext-diff", "-U0", "HEAD", "--",
-                *[":(literal)" + x for x in admis]) if admis else ""
+    texte = git(depot, "diff", "--cached", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
+                "--src-prefix=a/", "--dst-prefix=b/", "-U0", "HEAD", "--", *[":(literal)" + x for x in admis],
+                env=env) if admis else ""
     return analyser_diff(texte), len(noms) - len(admis)
 
 
@@ -167,12 +172,13 @@ def plier(t):
     return " ".join(t.translate({0x2018: "'", 0x2019: "'", 0x201C: '"', 0x201D: '"', 0x2A: None, 0x60: None}).split())
 
 
-def citation_lue(racine, chemin, n, m, citation):
+def citation_lue(racine, chemin, n, m, citation, surcouche=None):
     """None si la citation se lit dans l'ordre entre les lignes n-2 et m+2 du fichier, sinon le code de la faute ;
-    un chemin interdit n'est jamais ouvert."""
-    p = os.path.join(racine, chemin)
-    if chemin_interdit(p):
+    un chemin interdit n'est jamais ouvert ; le fichier de la surcouche (état d'après un diff) passe avant."""
+    p, s = os.path.join(racine, chemin), os.path.join(surcouche or racine, chemin)
+    if chemin_interdit(p) or chemin_interdit(s):
         return "citation-interdite"
+    p = s if os.path.isfile(s) else p
     if not os.path.isfile(p):
         return "reference-introuvable"
     with open(p, encoding="utf-8", errors="replace") as f:
@@ -189,7 +195,7 @@ def citation_lue(racine, chemin, n, m, citation):
     return None
 
 
-def citations(texte, racine):
+def citations(texte, racine, surcouche=None):
     """(refus, avertissements), listes de (ligne, code, référence). Forme stricte « … » (chemin:N) ou (chemin:N-M) :
     refus si la citation ne se lit pas, si la ligne sort du fichier ou si le fichier est interdit ; chemin introuvable :
     avertissement. Forme libre « … » (nom l.N), nom résolu par ALIAS : avertissement (citation-libre, ou
@@ -199,7 +205,7 @@ def citations(texte, racine):
         for x in motif.finditer(texte):
             ligne, nom = texte.count(chr(10), 0, x.start()) + 1, x[2].strip()
             chemin, n = ALIAS.get(nom, nom), int(x[3])
-            code = citation_lue(racine, chemin, n, int(x[4] or n), x[1])
+            code = citation_lue(racine, chemin, n, int(x[4] or n), x[1], surcouche)
             if code == "citation-interdite" or (forme == "stricte" and code not in (None, "reference-introuvable")):
                 refus.append((ligne, code, "une référence interdite" if code == "citation-interdite" else nom))
             elif forme == "stricte" and code:

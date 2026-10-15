@@ -44,7 +44,10 @@ ensemble ; un nom seul ne groupe rien) ; G2, aucun pas du plan ne commet une par
 nommé par son fichier, sans .diff) ; G3, durée estimée (pas × durée mesurée d'un pas, 6 min par défaut) au-delà de
 BORNE_LIEE min sans --detache : lancement lié refusé, lancement détaché donné.
 GF-10b : toute exception d'une sous-commande sort en 3 (ligne ERREUR), jamais en 1, qui est un refus.
-Relecture G2, C-2 : pousser P3, la branche poussée (refs/heads/B, que pousse git push NOM B) est HEAD."""
+Relecture G2, C-2 : pousser P3, la branche poussée (refs/heads/B, que pousse git push NOM B) est HEAD.
+Relecture G2, C-3 : diff lu comme git l'applique (format du diff indifférent : D1 sur les chemins de git apply
+--numstat et des en-têtes, puis analyse de HEAD plus le diff par git diff -U0) ; citations (C5) et corpus de presg5
+(G5) lus dans l'état d'après le diff."""
 import argparse
 import fnmatch
 import hashlib
@@ -177,13 +180,13 @@ def place(ajouts):
     return chr(10).join(lignes)
 
 
-def heures_et_citations(depot, textes, fautes):
-    """C4 (E14) et C5 (E16) sur des textes nommés."""
+def heures_et_citations(depot, textes, fautes, surcouche=None):
+    """C4 (E14) et C5 (E16) sur des textes nommés ; surcouche : fichiers d'après un diff, lus avant ceux du dépôt."""
     h = GC.maintenant()
     for nom, t in textes:
         for n, code, x in GC.horodatages_fautifs(t, h):
             fautes.append(("refus", "C4", f"{code} à {nom}:{n} : {x} (E14)", "lire date -u, puis récrire l'heure", "-"))
-        refus, avert = GC.citations(t, depot)
+        refus, avert = GC.citations(t, depot, surcouche)
         for n, code, ref in refus:
             fautes.append(("refus", "C5", f"{code} à {nom}:{n} ({ref}) (E16)",
                            "ouvrir la ligne citée, la copier mot pour mot", "-"))
@@ -276,24 +279,50 @@ def presg5(depot, textes, fautes):
                                "mettre le texte anglais ou le message d'outil en code", "-"))
 
 
+def chemins_du_patch(depot, texte, fichier):
+    """Chemins qu'un patch nomme, lus sans rien appliquer : en-têtes (diff --git, ---, +++, rename, copy) et chemins de
+    git apply --numstat (préfixes ôtés comme à l'application, quel que soit le format du diff)."""
+    noms = {c for f in GC.analyser_diff(texte) for c in (f["avant"], f["apres"]) if c}
+    entetes = [x for x in texte.split(chr(10)) if x.startswith(("rename ", "copy ")) and x.count(" ") > 1]
+    noms |= {x.split(" ", 2)[2] for x in entetes}
+    numstat = git(depot, "apply", "--numstat", "-z", os.path.abspath(fichier))
+    noms |= {x.split(chr(9))[-1] for x in numstat.split(chr(0))}
+    return {x for x in noms if x}
+
+
 def diff(a, fautes):
-    fichiers = GC.analyser_diff(lire(a.fichier).decode("utf-8"))
-    if any(c and GC.chemin_interdit(os.path.join(a.depot, c)) for f in fichiers for c in (f["avant"], f["apres"])):
-        fautes.append(("refus", "D1", "fichier(s) du diff sous un interdit : ni lus ni nommés",
-                       "retirer ces fichiers du diff", "-"))
+    interdit = ("refus", "D1", "fichier(s) du diff sous un interdit : ni lus ni nommés", "retirer ces fichiers du diff",
+                "-")
+    try:
+        noms = chemins_du_patch(a.depot, lire(a.fichier).decode("utf-8"), a.fichier)
+    except Erreur:
+        noms = None
+    if noms and any(GC.chemin_interdit(os.path.join(a.depot, c)) for c in noms):
+        fautes.append(interdit)
         return
     with tempfile.TemporaryDirectory() as d:
         env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
         git(a.depot, "read-tree", "HEAD", env=env)
         try:
+            if noms is None:
+                raise Erreur("patch illisible par git apply --numstat")
             git(a.depot, "apply", "--cached", os.path.abspath(a.fichier), env=env)
         except Erreur:
             fautes.append(("refus", "D2", "le diff ne s'applique pas sur la tête du dépôt (base ancienne ?)",
                            "refaire le diff sur la tête du moment", "-"))
             return
+        fichiers, ecartes = GC.lignes_ajoutees(a.depot, env)
+        if ecartes:
+            fautes.append(interdit)
+            return
+        apres = os.path.join(d, "apres")
+        biblio = [x for x in git(a.depot, "ls-files", "-z", "--", "biblio", env=env).split(chr(0)) if x.count("/") == 1]
+        touches = sorted({f["apres"] for f in fichiers if f["apres"]} | set(biblio))
+        if touches:
+            git(a.depot, "checkout-index", "--prefix=" + apres + os.sep, "--", *touches, env=env)
         textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
-        heures_et_citations(a.depot, textes, fautes)
-        presg5(a.depot, textes, fautes)
+        heures_et_citations(a.depot, textes, fautes, apres)
+        presg5(apres, textes, fautes)
         cites(a.depot, "", fichiers, fautes)
         workflows(a.depot, fichiers, fautes, env)
 
