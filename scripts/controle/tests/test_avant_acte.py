@@ -15,7 +15,8 @@ GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du
 chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
 GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
-diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers)."""
+diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17) ; C-6 (existe : casse, dossiers) ; C-7 (chaine :
+noms de GROUPES pris au plan, gabarit à remplir)."""
 import contextlib
 import difflib
 import hashlib
@@ -536,11 +537,27 @@ class PlanDeChaine(Depot):
         admis ; rapport sans ligne GROUPES, avec deux, ou ligne illisible : refus G1 ; GROUPES : aucun : admis."""
         code, sortie = self.juger("GROUPES : FZ-x+FZ-i", ["FZ-a"], ["FZ-x"], ["FZ-i", "FZ-g"])
         self.assertEqual((code, sortie[:9], "FZ-x+FZ-i" in sortie), (1, "REFUS G2 ", True))
-        self.assertEqual(self.juger("GROUPES : FZ-x+FZ-i ; FZ-g+FZ-h", ["FZ-a"], ["FZ-x", "FZ-i"]), (0, ""))
+        self.assertEqual(self.juger("GROUPES : FZ-x+FZ-i ; FZ-g+FZ-h", ["FZ-a"], ["FZ-x", "FZ-i"], ["FZ-g", "FZ-h"]),
+                         (0, ""))
         self.assertEqual(self.juger("Groupes : voir le tableau", ["FZ-x"])[1][:9], "REFUS G1 ")
         self.assertEqual(self.juger("GROUPES : FZ-x+", ["FZ-x"])[1][:9], "REFUS G1 ")
         self.assertEqual(self.juger("GROUPES : aucun" + NL + "GROUPES : FZ-x+FZ-i", ["FZ-x"])[1][:9], "REFUS G1 ")
         self.assertEqual(self.juger("GROUPES : aucun", ["FZ-x"], ["FZ-i"]), (0, ""))
+
+    def test_c7_noms_du_plan_et_gabarit(self):
+        """C-7 : E11 sous d'autres formes : noms de GROUPES écrits autrement qu'au plan (casse, suffixe .diff, diffs du
+        plan en .patch, préfixe de série) : refus G1, le groupe n'est plus ignoré ; rapport tiré du gabarit sans
+        remplir sa ligne GROUPES : refus G1."""
+        for groupes, pas in [("GROUPES : fz-x+fz-i", [["FZ-x"], ["FZ-i"]]), ("GROUPES : FZ-x.diff+FZ-i.diff",
+                             [["FZ-x"], ["FZ-i"]]), ("GROUPES : FZ-x+FZ-i", [["01-FZ-x"], ["02-FZ-i"]])]:
+            self.assertEqual(self.juger(groupes, *pas)[1][:9], "REFUS G1 ", groupes)
+        plan = os.path.join(self.tmp, "plan")
+        lignes = [f"P-{i}|/s/FZ-{x}.patch|/s/m.txt|/s/ADJ.md" for i, x in enumerate("xi")]
+        ag.ecrire(self.tmp, {"plan": NL.join(lignes) + NL})
+        rapport = os.path.join(os.path.dirname(os.path.abspath(avant_acte.__file__)), "gabarits", "rapport-cc.md")
+        for cc in (os.path.join(self.tmp, "cc.md"), rapport):
+            ag.ecrire(self.tmp, {"cc.md": "GROUPES : FZ-x+FZ-i" + NL})
+            self.assertEqual(self.lancer("chaine", "--plan", plan, "--cc", cc)[1][:9], "REFUS G1 ", cc)
 
     def test_e25_duree(self):
         """E25 : 23 commits à 6 min par défaut (138 min) en lancement lié : refus G3, lancement détaché donné ;

@@ -14,7 +14,7 @@ fixe, lue par `avant_acte.py chaine` avant tout pas (erreur E11), une seule par 
 vert seul, sinon les groupes séparés par des points-virgules, les diffs d'un groupe joints par `+` (nom du fichier du
 diff sans `.diff`), par exemple `GROUPES : FZ-x+FZ-i`.
 
-GROUPES : aucun
+GROUPES : <à remplir : aucun, ou les groupes>
 
 ## Verdict
 

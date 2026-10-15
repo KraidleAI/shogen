@@ -286,3 +286,11 @@ dépendent des tests du harnais qu'ils importent.
 > écrit dans une autre casse ou un nom de dossier sortaient en X1, absence fausse. Le refus X1 nomme ce qui n'est pas
 > cherché : fichiers ignorés par git et interdits. `tests/test_avant_acte.py` compte 29 tests ; plancher du job
 > `controle-unittest` 97.
+
+> *Ajout daté du 2026-10-10 08:58:13 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-7 ; erreur E11)* :
+> `avant_acte.py` (sha256 `59c2149d8740d9960dc4a1c2f64614ff1ca9cc8ba7e2e2e1a03f4d7c62b38638`) : `chaine` G1,
+> chaque nom de la ligne `GROUPES :` (hors la valeur `aucun`) nomme un diff du plan ; un nom écrit autrement (casse,
+> suffixe `.diff`, diffs du plan en `.patch`, préfixe de série) faisait ignorer le groupe sans refus.
+> `gabarits/rapport-cc.md` (sha256 `10537176d1ee3bb75d1c849a12546cbd5b0a71139a8587fcf74ca4893c917cc5`) : la
+> ligne fixe est à remplir (`<à remplir : aucun, ou les groupes>`, refusée en G1), au lieu de `aucun` par défaut.
+> `tests/test_avant_acte.py` compte 30 tests ; plancher du job `controle-unittest` 98.

@@ -49,7 +49,8 @@ Relecture G2, C-3 : diff lu comme git l'applique (format du diff indifférent : 
 --numstat et des en-têtes, puis analyse de HEAD plus le diff par git diff -U0) ; citations (C5) et corpus de presg5
 (G5) lus dans l'état d'après le diff.
 Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT à -X PUT avant les motifs.
-Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme dossier (imprimé avec sa barre)."""
+Relecture G2, C-6 : existe cherche le nom en toute casse, comme fichier ou comme dossier (imprimé avec sa barre).
+Relecture G2, C-7 : chaine G1, chaque nom de GROUPES (hors la valeur aucun) nomme un diff du plan."""
 import argparse
 import fnmatch
 import hashlib
@@ -483,6 +484,12 @@ def chaine(a, fautes):
     if any(not all(re.fullmatch("[A-Za-z0-9._-]+", x) for x in g) for g in groupes):
         fautes.append(("refus", "G1", "le rapport de contre-contrôle ne porte pas une seule ligne GROUPES : lisible",
                        "ajouter la ligne fixe du gabarit rapport-cc.md (GROUPES : aucun, ou A+B ; C+D)", "-"))
+        return
+    noms = {os.path.basename(d).removesuffix(".diff") for ligne in plan for d in ligne.split("|")[1].split(",")}
+    inconnus = [] if valeur == "aucun" else sorted({x for g in groupes for x in g} - noms)
+    if inconnus:
+        fautes.append(("refus", "G1", f"GROUPES nomme des diffs absents du plan : {', '.join(inconnus)} (E11)",
+                       "nommer chaque diff du groupe par son fichier, sans .diff, comme au plan", "-"))
         return
     for ligne in plan:
         pas = {os.path.basename(d).removesuffix(".diff") for d in ligne.split("|")[1].split(",")}
