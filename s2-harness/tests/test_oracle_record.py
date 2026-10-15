@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -395,6 +396,35 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual((p.returncode, m.returncode, "--verifier" in m.stderr), (1, 2, True))
         self.assertEqual(json.loads(Path(p.stdout.strip()).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
 
+
+    def test_delai_arrete_l_arbre_entier(self):
+        """SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : test qui lance deux petits-enfants, l'un dans son groupe,
+        l'autre parti dans sa propre session (comme la suite lancée par le vérificateur), qui dorment 3 s puis posent
+        une marque, et dort 20 s, sous un délai de 1 s : l'enregistreur rend la main au délai, aucune marque posée ;
+        descendant resté après la sortie normale de la suite (stdio coupés, comme un fork) : arrêté avec le groupe,
+        sauf sous Windows (aucun arrêt après la sortie : PID réemployés). Rougit si : enfant direct seul arrêté,
+        descendant d'une autre session non suivi, aucun arrêt après la sortie."""
+        d, m, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-arbre")
+        marquer = "import os, sys, time; time.sleep(3); open(os.path.join(*sys.argv[1:]), 'w').close()"
+        lancer = "subprocess.Popen([sys.executable, '-c', " + repr(marquer) + ", os.environ['ORACLE_ESSAI_MARQUES'], "
+
+        def suite(*corps):
+            return {**OK, "s2-harness/tests/test_t.py": chr(10).join([
+                "import os, subprocess, sys, time, unittest", "", "", "class T(unittest.TestCase):",
+                "    def test_a(self):", *corps, ""]).encode()}
+        long_, reste = depot(dep, [suite("        for i, s in enumerate((False, True)):",
+                                         "            " + lancer + "str(i)], start_new_session=s)",
+                                         "        time.sleep(20)"),
+                                   suite("        " + lancer + "'reste'], stdin=subprocess.DEVNULL, "
+                                         "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)")])
+        with mock.patch.dict(os.environ, {"ORACLE_ESSAI_MARQUES": m}):
+            debut = time.monotonic()
+            code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, long_, delai=1)[1]
+            duree = time.monotonic() - debut
+            code2 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, reste)[1]
+        time.sleep(4)                                   # chaque marque serait posée 3 s après son lancement
+        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m))),
+                         (1, True, 0, ["reste"] if os.name == "nt" else []))
 
     def test_auteur_refuse_a_l_ecriture(self):
         """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu

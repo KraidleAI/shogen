@@ -37,7 +37,8 @@ SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : l'extraction n'écrit ni n
 interdit des briefs (prédicat `interdit` de INTERDITS, liste unique, jamais recopiée) ; tree.exclus consigne leur
 nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte. SHOGEN-S2BIS-ANALYSEUR-
 RESIDUS-1 (lot DETTES-T7, faille LC-03 du run 38015225784) : la ligne d'un job n'est lue que si le gates.yml n'a aucun
-résidu (`residus` de VERIF) et que le job suit la forme K (`gabarit` de VERIF, celui du cas K-02 du runner)."""
+résidu (`residus` de VERIF) et que le job suit la forme K (`gabarit` de VERIF, celui du cas K-02 du runner).
+SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : au dépassement, l'arbre entier de la commande est arrêté (`lancer`)."""
 from __future__ import annotations
 
 import argparse
@@ -53,6 +54,7 @@ import re
 import runpy
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -225,6 +227,53 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     return trouves[0].split()[1:]
 
 
+def arreter(groupes):
+    """Groupes de processus `groupes` arrêtés (SIGKILL), jamais celui de l'outil ni 0 ou 1 ; déjà vides : rien
+    (POSIX)."""
+    for g in {x for x in groupes if x > 1} - {os.getpgrp()}:
+        try:
+            os.killpg(g, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def groupes(racine: int) -> set:
+    """Groupe de `racine` et groupes de tous ses descendants vivants, lus par `ps -A -o pid=,ppid=,pgid=` (champs
+    POSIX) : un descendant parti dans sa propre session (la suite du vérificateur) est suivi par son parent ; ps
+    illisible : le seul groupe de `racine`."""
+    try:
+        t = [tuple(map(int, x.split())) for x in subprocess.run(["ps", "-A", "-o", "pid=,ppid=,pgid="],
+                                                                capture_output=True, text=True).stdout.splitlines()]
+    except (OSError, ValueError):
+        return {racine}
+    arbre, plus = {racine}, None
+    while plus != set():
+        plus = {x[0] for x in t if len(x) == 3 and x[1] in arbre} - arbre
+        arbre |= plus
+    return {racine} | {x[2] for x in t if len(x) == 3 and x[0] in arbre}
+
+
+def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
+    """SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : (octets, code ; None au dépassement) de `cmd`, lancée dans un
+    groupe de processus neuf (POSIX : start_new_session ; Windows : CREATE_NEW_PROCESS_GROUP), `entree` sur stdin
+    (None : vide). Au dépassement, l'arbre entier est arrêté (POSIX : `groupes` ; Windows : taskkill /T /F), aucun
+    descendant ne garde le tuyau ; à la sortie, son groupe l'est aussi (descendant resté : fork), avant tout nettoyage
+    (POSIX ; sous Windows, rien après la sortie : PID réemployés)."""
+    p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         start_new_session=True, creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    try:
+        return p.communicate(entree, timeout=delai)[0], p.returncode
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
+        else:
+            arreter(groupes(p.pid))
+        return p.communicate()[0], None
+    finally:
+        if os.name != "nt":
+            arreter({p.pid})
+
+
 def interdit():
     """SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : prédicat `interdit` de INTERDITS (préfixes des
     emplacements interdits des briefs, tout composant en .jsonl, casse pliée), exécuté depuis sa source, jamais
@@ -324,13 +373,12 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
             sortie = f"{nom}.{i}-{c}.out"
             n, t = (secrets.token_hex(16), tempfile.mkdtemp(prefix="oracle_compte_")) if c == "suite" else (None, None)
             try:                                     # OUT-2i : nonce et dossier du compte sur stdin, comme le job
-                p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, timeout=delai, input=n and f"{n} {t}{chr(10)}".encode())
-                octets, code = compte_reel(verif, p.stdout, t, n) if n and p.returncode == 0 else (p.stdout,
-                                                                                                    p.returncode)
-            except subprocess.TimeoutExpired as e:
-                octets, code = (e.stdout or b"") + (f"\n[oracle_record] délai maximal de {delai:g} s dépassé : "
-                                                    f"commande arrêtée, exit {EXIT_DELAI}\n").encode(), EXIT_DELAI
+                octets, code = lancer(cmd, os.path.join(arbre, sous), delai, n and f"{n} {t}{chr(10)}".encode())
+                if code is None:                     # DELAI-ARBRE-1 : l'arbre entier est arrêté
+                    octets, code = octets + (f"{chr(10)}[oracle_record] délai maximal de {delai:g} s dépassé : "
+                                             f"commande arrêtée, exit {EXIT_DELAI}{chr(10)}").encode(), EXIT_DELAI
+                elif n and code == 0:
+                    octets, code = compte_reel(verif, octets, t, n)
             finally:
                 if t:
                     shutil.rmtree(t, ignore_errors=True)

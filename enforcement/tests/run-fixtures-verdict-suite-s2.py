@@ -73,6 +73,7 @@ import secrets
 import shutil
 import subprocess
 import tempfile
+import time
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 GY = os.path.join(ICI, "..", "..", ".github", "workflows", "gates.yml")
@@ -197,7 +198,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 151                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 152                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -368,6 +369,20 @@ try:
     cas("F-15 .pyc vert et marqué écrit pendant le run dans tests/__pycache__, source rouge : jamais lu, sortie 1",
         [] if (r, os.path.exists(MARQUE_C)) == (1, False) else [f"code {r}, .pyc lu : {os.path.exists(MARQUE_C)}"],
         None)
+    MARQUE_F, CHEMIN_T = os.path.join(W, "F-16-marque"), os.path.join(W, "F-16-t")   # LEURRE-FORK-TMP-1 (DETTES-T7)
+    r = v.main([forgee("F-16", *ROUGE, "    def test_z(self):", "        t = __import__('__main__').t",
+                       f"        open({CHEMIN_T!r}, 'w').write(t)", "        " + FORGE, "        sys.stderr.flush()",
+                       "        if os.fork():", "            os._exit(0)",
+                       "        n = os.open(os.devnull, os.O_WRONLY)",
+                       "        os.dup2(n, 1)", "        os.dup2(n, 2)", "        __import__('time').sleep(1.5)",
+                       "        os.makedirs(os.path.join(t, 'reste'))", f"        open({MARQUE_F!r}, 'w').close()",
+                       "        os._exit(0)"), *DEUX])
+    time.sleep(3)                                       # le descendant aurait recréé le dossier du compte à 1,5 s
+    with open(CHEMIN_T, encoding="utf-8") as f:
+        t = f.read()
+    cas("F-16 leurre de fork LE-05 : descendant arrêté avec le groupe de la suite, dossier du compte effacé, sortie 1",
+        [] if (r, os.path.exists(MARQUE_F), os.path.exists(t)) == (1, False, False) else [
+            f"code {r}, marque {os.path.exists(MARQUE_F)}, dossier {os.path.exists(t)}"], None)
     MARQUE_P, AILLEURS = os.path.join(W, "P-marque"), os.path.join(W, "P-ailleurs")     # SUITE-CODE-COMPILE-1 (OUT-2h)
     os.makedirs(AILLEURS)                                     # dossier hors de toute racine, qui porte une extension
     open(os.path.join(AILLEURS, "aide.so"), "w").close()
@@ -509,9 +524,10 @@ try:
             d, "..", "verdict-suite-s2.py")), doraise=True,
                            invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
     APRES = ("atexit.py", "contextlib.py", "importlib/__init__.py", "io.py", "json.py", "py_compile.py", "re.py",
-             "secrets.py", "shutil.py", "subprocess.py", "tempfile.py")      # I-01 : chaque import qui suit la garde,
-    # dans l'ordre du fichier (C-1 de la revue de la vague 2) ; atexit (intégré) et io (préchargé) ne sont jamais
-    # cherchés dans sys.path (mesuré sous 3.10 à 3.13), posés pour que la liste suive les imports
+             "secrets.py", "shutil.py", "subprocess.py", "tempfile.py", "time.py")   # I-01 : chaque import qui suit
+    # la garde, dans l'ordre du fichier (C-1 de la revue de la vague 2 ; time : DETTES-T7) ; atexit et time (intégrés)
+    # et io (préchargé) ne sont jamais cherchés dans sys.path (mesuré sous 3.10 à 3.13), posés pour que la liste suive
+    # les imports
     for nom, rc, motif, corps, avant in (     # SCRIPT-MASQUE-1 (OUT-2d) : rien de posé à côté n'est exécuté
             ("I-01 json.py, et chaque module importé après la garde, posés à côté du runner (« 999 ok », os._exit(0))"
              " : jamais importés, runner en sortie 3", 3, "vérificateur illisible", ILLISIBLE,
@@ -531,7 +547,7 @@ try:
     MARQUE4, D4 = os.path.join(W, "I-04", "marque"), os.path.join(W, "I-04")
     d = factice(os.path.join(W, "I-04", "s"), "    def test_x(self):" + chr(10) + "        self.fail()", n=1)
     shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), D4)
-    for x in ("importlib/__init__", "re", "secrets", "shutil", "subprocess", "tempfile"):     # importlib : OUT-2h
+    for x in ("importlib/__init__", "re", "secrets", "shutil", "signal", "subprocess", "tempfile"):   # signal : DT7
         m = x.split("/")[0]
         voisin(x + ".py", "import os, sys", f"open({MARQUE4!r}, 'a').close()", "sys.path[:] = [p for p in sys.path if "
                f"os.path.realpath(p) != os.path.realpath({D4!r})]", f"del sys.modules[{m!r}]", f"import {m}")(D4)
@@ -540,9 +556,9 @@ try:
     # Python, importe re depuis le dossier du script ; 3.10 à 3.12 non : mesuré)
     p = None if sys.argv[1:] == ["--copie"] else subprocess.run([sys.executable, "-B", os.path.join(
         D4, "verdict-suite-s2.py"), d, *s2bis], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    cas("I-04 importlib/, re.py, secrets.py, shutil.py, subprocess.py, tempfile.py posés à côté du vérificateur lancé "
-        "en script (suite rouge) : jamais importés", [] if p is None or not os.path.exists(MARQUE4) else [
-            f"importé, sortie {p.returncode}"], None)                               # la sortie n'est pas jugée (E-4)
+    cas("I-04 importlib/, re.py, secrets.py, shutil.py, signal.py, subprocess.py, tempfile.py posés à côté du "
+        "vérificateur lancé en script (suite rouge) : jamais importés", [] if p is None or not os.path.exists(
+            MARQUE4) else [f"importé, sortie {p.returncode}"], None)         # la sortie n'est pas jugée (E-4)
 finally:
     shutil.rmtree(W)
 

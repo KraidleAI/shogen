@@ -252,22 +252,29 @@ def sortie(f: dict) -> str:
     return os.path.join(os.path.dirname(f["depot"]), "sortie")
 
 
-def faux_runs(echec=None, pendant=lambda nom: None) -> tuple:
-    """Runs de l'enregistreur (commandes lancées par sys.executable) remplacés : sortie factice, code 1 au run echec,
-    pendant(nom) appelé avant chaque run ; git et openssl passent au vrai subprocess.run. Rend (patch, runs lancés)."""
-    vrai, lances = subprocess.run, []
+def faux_runs(f, echec=None, pendant=lambda nom: None) -> tuple:
+    """Runs de l'enregistreur remplacés : sortie factice, code 1 au run echec, pendant(nom) appelé avant chaque run ;
+    git et openssl ne passent pas par lui. Lot DETTES-T7 (SHOGEN-ENREG-DELAI-ARBRE-1) : l'enregistreur lance chaque
+    commande par `lancer` (groupe de processus), remplacé ici dans son module et dans celui de la copie f["ru"]. Rend
+    (patch, runs lancés)."""
+    lances = []
 
-    def faux(cmd, *a, **k):
-        if cmd[0] != sys.executable:
-            return vrai(cmd, *a, **k)
+    def faux(cmd, cwd, delai, entree):
         lances.append("suite" if "discover" in cmd else cmd[cmd.index("--produire") + 1])
         pendant(lances[-1])
-        if lances[-1] == "suite" and k.get("input"):     # OUT-2i : compte réel d'AMORCE, au nonce reçu sur stdin
-            n, t = k["input"].decode("utf-8").rstrip(chr(10)).split(" ", 1)
-            with open(os.path.join(t, "compte"), "x", encoding="utf-8") as f:
-                f.write(f"{n} 1 0 0 0 0 0")
-        return subprocess.CompletedProcess(cmd, int(lances[-1] == echec), f"sortie factice {lances[-1]}\n".encode())
-    return mock.patch.object(subprocess, "run", faux), lances
+        if lances[-1] == "suite" and entree:            # OUT-2i : compte réel d'AMORCE, au nonce reçu sur stdin
+            n, t = entree.decode("utf-8").rstrip(chr(10)).split(" ", 1)
+            with open(os.path.join(t, "compte"), "x", encoding="utf-8") as c:
+                c.write(f"{n} 1 0 0 0 0 0")
+        return f"sortie factice {lances[-1]}{chr(10)}".encode(), int(lances[-1] == echec)
+
+    @contextlib.contextmanager
+    def actif():
+        with contextlib.ExitStack() as pile:
+            for m in {id(x): x for x in (ru.orc, f.get("ru", ru).orc)}.values():
+                pile.enter_context(mock.patch.object(m, "lancer", faux))
+            yield
+    return actif(), lances
 
 
 def affichage(cible: str, chemin: str) -> str:
@@ -353,7 +360,7 @@ class TestProduction(unittest.TestCase):
             epingler(f)
             parent = os.path.dirname(f["depot"])
             avant = sorted(os.listdir(parent))
-            p, lances = faux_runs(echec, pendant)
+            p, lances = faux_runs(f, echec, pendant)
             with p, autre:
                 code, out, err = lancer(f)
             runs = [] if nom == "extraction" else RUNS[:RUNS.index(echec) + 1] if echec else RUNS
@@ -365,7 +372,7 @@ class TestProduction(unittest.TestCase):
                                "extraction": "factice", "renommage": "factice"}.get(
                     nom, f"run en échec : [('{nom}', 1)]"), err)
         f = monter(tempfile.mkdtemp())
-        p, lances = faux_runs()
+        p, lances = faux_runs(f)
         with p:
             code, out, err = lancer(f)
         self.assertEqual((code, out, lances, os.path.exists(sortie(f))), (2, "", [], False))
@@ -379,7 +386,7 @@ class TestProduction(unittest.TestCase):
         epingler(f)
         parent = os.path.dirname(f["depot"])
         avant = sorted(os.listdir(parent))
-        p, lances = faux_runs(pendant=lambda nom: nom == "raw" and os.makedirs(sortie(f)))
+        p, lances = faux_runs(f, pendant=lambda nom: nom == "raw" and os.makedirs(sortie(f)))
         with p:
             code, out, err = lancer(f)
         self.assertEqual((code, out, lances, sorted(os.listdir(parent)), os.listdir(sortie(f))),
@@ -392,7 +399,7 @@ class TestProduction(unittest.TestCase):
         aucun run, parent toujours absent. Rougit si le temporaire est créé hors du try (exception non rattrapée)."""
         f = monter(tempfile.mkdtemp())
         epingler(f)
-        cible, (p, lances) = os.path.join(os.path.dirname(f["depot"]), "absent", "sortie"), faux_runs()
+        cible, (p, lances) = os.path.join(os.path.dirname(f["depot"]), "absent", "sortie"), faux_runs(f)
         out, err = io.StringIO(), io.StringIO()
         with p, contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = ru.main(["--depot", f["depot"], "--paquet", f["paquet"], "--journaux", f["journaux"], "--sommes",
@@ -408,7 +415,7 @@ class TestProduction(unittest.TestCase):
         si : écrasement, motif non écrit, autre répertoire, contenu imprimé."""
         f = monter(tempfile.mkdtemp())
         epingler(f)
-        p, _ = faux_runs()
+        p, _ = faux_runs(f)
         with p:
             self.assertEqual(lancer(f)[0], 0)
             premiere = fichiers(sortie(f))
@@ -448,7 +455,7 @@ class TestProduction(unittest.TestCase):
         x = g(f["depot"], "rev-parse", "HEAD")
         y = poser(f["depot"], {"JOURNAL.md": b"- rien\n", "s2-harness/shogen_s2/m.py": b"x = 2\n"})
         a = argparse.Namespace(deviation=None, auteur="claude-opus-5-5", journaux=f["journaux"], sortie=sortie(f))
-        p, _ = faux_runs()
+        p, _ = faux_runs(f)
         with p, contextlib.redirect_stdout(io.StringIO()):
             code = ru.produire_tout(c, a, sortie(f))
         self.assertEqual((refus, code, x != y), ([], 0, True))
@@ -464,7 +471,7 @@ class TestProduction(unittest.TestCase):
         x = subprocess.run([OPENSSL, "ts", "-reply", "-in", os.path.join(f["depot"], SCEAU, "paquet.tsr"), "-text"],
                            capture_output=True, text=True).stdout.split("Time stamp: ")[1].split("\n")[0]
         jeton = datetime.strptime(x, "%b %d %H:%M:%S %Y GMT").strftime("%Y-%m-%dT%H:%M:%SZ")
-        p, _ = faux_runs()
+        p, _ = faux_runs(f)
         with p, mock.patch.dict(ru.PREFIXES, pref):
             self.assertEqual(lancer(f)[0], 0)
         (chemin,) = glob.glob(os.path.join(sortie(f), "*.json"))
