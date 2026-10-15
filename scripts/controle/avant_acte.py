@@ -63,7 +63,8 @@ du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais e
 Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev-list HEAD --not --remotes=NOM).
 Contre-contrôle, R-3 : pousser --acte ramène aussi les guillemets du shell, les blancs répétés et les options de git
 placées avant la sous-commande.
-Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité."""
+Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité.
+Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un pas du plan."""
 import argparse
 import contextlib
 import fnmatch
@@ -544,6 +545,12 @@ def chaine(a, fautes):
         for g in [g for g in groupes if set(g) & pas and not set(g) <= pas]:
             fautes.append(("refus", "G2", f"le pas {ligne.split('|')[0]} coupe le groupe {'+'.join(g)} (E11)",
                            "commettre le groupe en un seul pas", "-"))
+    ids = [ligne.split("|")[0] for ligne in plan]
+    doubles = sorted({x for x in ids if ids.count(x) > 1})      # contre-contrôle, R-5
+    if doubles:
+        fautes.append(("refus", "G4", f"Diff-Id porté par plus d'un pas du plan : {', '.join(doubles)} (la "
+                       "reprise sauterait les suivants sans rien dire)", "donner à chaque pas un identifiant propre",
+                       "-"))
     nettoye = lambda t: subprocess.run(["git", "stripspace"], input=t, capture_output=True, text=True).stdout
     for ligne in plan:
         ident, message = ligne.split("|")[0], ligne.split("|")[2]

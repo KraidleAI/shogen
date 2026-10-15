@@ -381,3 +381,9 @@ dépendent des tests du harnais qu'ils importent.
 > part), au `commit` et au `diff` ; voulu : ligne `Décalage admis : <chemin>` du message, journalisée en
 > contournement. Un fichier cité retiré ou renommé passait sans refus. `tests/test_avant_acte.py` compte 39 tests ;
 > plancher du job `controle-unittest` 110.
+
+> *Ajout daté du 2026-10-15 11:35:58 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-5 ; LA-N04, E11)* :
+> `avant_acte.py` (sha256 `47602814a5e604ed88e152e984bfdfb92e3b4095168230bb9b6be7575e1398ab`) : `chaine` G4 refuse
+> aussi un plan dont deux pas portent le même `Diff-Id` : le modèle commettait le premier et sautait le second (déjà
+> commis) sans rien dire, chaîne sortie 0. `tests/test_avant_acte.py` compte 40 tests ; plancher du job
+> `controle-unittest` 111.

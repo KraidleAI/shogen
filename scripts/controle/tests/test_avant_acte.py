@@ -21,7 +21,7 @@ ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités
 passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
 sortie standard fermée : 3).
 Contre-contrôle : R-2 (pousser, historique de la plage) ; R-3 (pousser --acte, actes écrits autrement).
-Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé)."""
+Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé). ; R-5 (chaine : Diff-Id en double au plan)."""
 import contextlib
 import difflib
 import fnmatch
@@ -716,6 +716,17 @@ class PlanDeChaine(Depot):
         argv = ["chaine", "--plan", os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md")]
         self.assertEqual(self.lancer(*argv)[1][:9], "REFUS G4 ")
         ag.ecrire(self.tmp, {"m.txt": "autre lot : correction" + NL + NL + "Diff-Id: C-1" + NL})
+        self.assertEqual(self.lancer(*argv), (0, ""))
+
+    def test_r5_diff_id_en_double_au_plan(self):
+        """R-5 : deux pas du plan au même Diff-Id : refus G4 (le modèle commettait le premier et sautait le
+        second, déjà commis, sans rien dire) ; identifiants propres : admis."""
+        un, deux = "X-1|/s/a.diff|/s/m1.txt|/s/ADJ.md" + NL, "|/s/b.diff|/s/m2.txt|/s/ADJ.md" + NL
+        ag.ecrire(self.tmp, {"cc.md": "GROUPES : aucun" + NL, "plan": un + "X-1" + deux})
+        argv = ["chaine", "--plan", os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md")]
+        code, sortie = self.lancer(*argv)
+        self.assertEqual((code, sortie[:9], "X-1" in sortie), (1, "REFUS G4 ", True))
+        ag.ecrire(self.tmp, {"plan": un + "X-2" + deux})
         self.assertEqual(self.lancer(*argv), (0, ""))
 
     def test_e25_duree(self):
