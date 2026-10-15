@@ -29,6 +29,9 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   modèle du plafond : une bougie servie par n'importe quel fichier entre la première bougie de la réponse (ou le début
   de sa page) et la dernière minute de sa page, absente de la réponse : CA/format (« couverture double discordante » ;
   « fin de page tronquée » pour une page du premier découpage suspecte au sens de C-7 ; demi-page : son motif).
+  Réponse dont toutes les bougies suivent la fin demandée et son chevauchement (décalage vers l'avant, R-2 du
+  contre-contrôle cc2 ; un décalage plus long que la fenêtre la laisserait vide sans preuve) : CA/format nommé ; une
+  bougie isolée après la fin reste écartée (pt 2 de la décision).
   Binance et Kraken restent stricts.
   Garde (C-7, C-8, C-14) : une réponse d'au moins `pas` bougies, dont une avant le départ et aucune à la dernière
   minute de la page, est redemandée en deux demi-pages (`<page>.1.json` et `.2.json`), au même débit, qui la
@@ -45,7 +48,8 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   Limite résiduelle mesurée (L-C13-2, sans item) : un décalage ou un retard de plus d'une demi-page au-delà de la fin
   n'est pas vu si toutes les fins de page des deux découpages sont sans échange : 32 cas sur 60 000 dans la propriété,
   fenêtres de 1 à 10 minutes ; une fenêtre du lot (87 pages ou plus par découpage) le verrait dès un seul échange dans
-  une fin de page.
+  une fin de page. En miroir (R-2 du contre-contrôle cc2), un décalage vers l'avant de plus d'une demi-page mais
+  de moins d'une requête n'est pas vu au début de la fenêtre si tous les débuts de page sont sans échange.
   OKX : mensuels découpés en UTC+8, établi sur pièce (DECISION de FORMES-API-1, ajout daté du 2026-10-09 19:51:45 UTC :
   le mensuel ETH-USDT de 2026-09 va du 2026-08-31 16:00 au 2026-09-30 15:59 UTC) ; `voisins` 1, le mois précédent et
   le suivant sont acquis, seules les minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est

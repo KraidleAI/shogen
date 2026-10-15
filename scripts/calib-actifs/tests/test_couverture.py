@@ -19,6 +19,7 @@ from tests.test_pages import series as urls
 FEN = {"debut": W0, "fin": W0 + 40 * 60}
 REP = os.path.join("principale", "coinbase", "ETH")
 DISCORDE = "REFUS CA/format : couverture double discordante ; actif ETH ; place coinbase"
+APRES = "REFUS CA/format : réponse entièrement après la fin demandée et son chevauchement ; actif ETH ; place coinbase"
 
 
 def lecture(m, mode, g=0, faux=None, vues=None):
@@ -75,8 +76,11 @@ class TestCouverture(unittest.TestCase):
         −199, −215, −207, −211, −213, −214 ; première bougie en −200). Fenêtre décalée de 2 minutes (la page 0 du second
         découpage perd la minute 6, servie par la page 0 du premier) ; plafond de 30 bougies ou de 30 créneaux ancré
         100 minutes avant start (toute réponse avant son départ) ; clôture différente à la minute 10 dans le second
-        découpage : refus nommé. Mutations : second découpage omis ; non décalé ; non chargé ; contrôle de couverture
-        retiré ; valeurs non comparées ; bougies d'avant le départ non comptées comme preuve."""
+        découpage : refus nommé. R-2 du contre-contrôle cc2 : fenêtre décalée de 100 minutes vers l'avant (toute
+        réponse après sa fin, rien dans la fenêtre ; avant R-2 : admise vide, 40 minutes perdues) : refus nommé.
+        Mutations : second découpage omis ; non décalé ; non chargé ; contrôle de couverture retiré ; valeurs non
+        comparées ; bougies d'avant le départ non comptées comme preuve ; réponse entièrement après la fin admise (R-2).
+        """
         noms = sorted([f"{x}-{W0 + d + 780 * k}.json" for x, d in (("page", 0), ("double", -360)) for k in range(4)] + [
             f"sonde-{W0 + 60 * x}.json" for x in (25, -487, -231, -103, -167, -199, -215, -207, -211, -213, -214)])
         cas = {"exact": lambda m: lecture(m, "exact"), "recentes": lambda m: lecture(m, "recentes"),
@@ -89,10 +93,12 @@ class TestCouverture(unittest.TestCase):
                 if nom == "exact":
                     self.assertEqual((vus, fichiers), ([19, 0], noms))
         cas = {"cren-2": lambda m: lecture(m, "cren", 2), "cpt-100": lambda m: lecture(m, "cpt", 100),
-               "crenp-100": lambda m: lecture(m, "crenp", 100), "faux": lambda m: lecture(m, "exact", faux=10)}
+               "crenp-100": lambda m: lecture(m, "crenp", 100), "faux": lambda m: lecture(m, "exact", faux=10),
+               "avant-100": lambda m: lecture(m, "cren", -100)}
         for nom, f in cas.items():
             with self.subTest(nom=nom):
-                self.assertEqual(self.acquis(FEN, f, pas=30, chevauchement=1, couverture=2)[2], DISCORDE)
+                self.assertEqual(self.acquis(FEN, f, pas=30, chevauchement=1, couverture=2)[2], DISCORDE if nom !=
+                                 "avant-100" else APRES)
 
     def test_aucune_demi_requete_vide(self):
         """C-14 : couverture simple, chevauchement 0, pas 30 (15 minutes utiles), fenêtre de 16 minutes : pages 0 et 15

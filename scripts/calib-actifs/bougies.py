@@ -95,6 +95,7 @@ TRONQUEE = "réponse plafonnée ancrée avant le départ : fin de page tronquée
 INCOHERENTE = "demi-page redemandée plafonnée et tronquée"
 TROP = "réponse de plus de bougies que de créneaux demandés"
 DISCORDE = "couverture double discordante"
+APRES = "réponse entièrement après la fin demandée et son chevauchement"
 
 
 def tronquee(ts: list, pas: int, depart: int, derniere: int) -> bool:
@@ -133,7 +134,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
     DISCORDE ; demi-page : son motif) ; mêmes minutes aux valeurs différentes, un fichier du second découpage (motif
     DISCORDE) en cause : DISCORDE. `t0` (C-15) : (T0 ou None, aucune sonde non vide) ; une bougie au plus tard en
     T0, ou aucune sonde non vide, la fenêtre servant des bougies ou non (R-1 du contre-contrôle cc2) :
-    CA/avant-historique."""
+    CA/avant-historique. Réponse dont toutes les bougies suivent borne + c (c = cœur − départ ; décalage vers
+    l'avant) : CA/format (R-2 du contre-contrôle cc2)."""
     out, vals, tous, controles = {}, {}, [], []
     try:
         for k, octets in enumerate(fichiers):
@@ -159,6 +161,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                 out[t] = (c, v > 0)
             if plafond and sum(t >= plafond[1] for t in ts) > (plafond[4] - plafond[1]) // 60 + 1:   # C-9
                 raise _refus(TROP, place, actif)
+            if plafond and ts and min(ts) > plafond[4] + plafond[5] - plafond[1]:      # R-2 du contre-contrôle cc2
+                raise _refus(APRES, place, actif)
             if plafond:
                 nom = motif if motif != TRONQUEE or tronquee(ts, *plafond[:3]) else DISCORDE
                 controles.append((min(ts + [plafond[5]]), plafond[2], set(ts), nom))
