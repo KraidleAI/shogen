@@ -96,3 +96,10 @@ ligne par variable :
   `PYTHONTRACEMALLOC`, `PYTHONPYCACHEPREFIX`, `PYTHONUNBUFFERED`…) : non rendue.
 Règle : une variable ajoutée à la matrice des versions entre d'abord à `drapeaux` (par un lot, avec son test), ou sa
 limite s'écrit ici ; sinon elle ne vaut que pour `suite`.
+
+## Ajouts datés de la relecture G2 du lot DETTES-T7
+
+- *Ajout daté du 2026-10-10 07:18:55 UTC (correction C-2 ; SHOGEN-ENREG-DELAI-ARBRE-1)* : après l'arrêt de l'arbre au
+  délai, l'outil ne lit plus la sortie que `RELIQUAT` s (5 s). Un descendant détaché de son parent (double fork,
+  `setsid`) qui garde le tuyau n'est pas attendu au-delà : il reste vivant et sa sortie au-delà est perdue (avant
+  C-2, il était attendu sans borne : mesure M-D1 de la relecture, 90 s d'attente pour un descendant de 90 s).

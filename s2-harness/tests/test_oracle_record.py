@@ -404,8 +404,11 @@ class TestOracleRecord(unittest.TestCase):
         une marque, et dort 20 s, sous un délai de 1 s : l'enregistreur rend la main au délai, aucune marque posée ;
         descendant resté après la sortie normale de la suite (stdio coupés, comme un fork) : arrêté avec le groupe,
         sauf sous Windows (aucun arrêt après la sortie : PID réemployés). Rougit si : enfant direct seul arrêté,
-        descendant d'une autre session non suivi, aucun arrêt après la sortie."""
+        descendant d'une autre session non suivi, aucun arrêt après la sortie. G2 du lot DETTES-T7 (C-2) : petit-enfant
+        détaché (double fork, setsid) qui garde le tuyau et dort 90 s, suite sortie en 0, délai de 1 s : l'enregistreur
+        rend la main RELIQUAT s après l'arrêt de l'arbre, sans l'attendre. Rougit si : sortie attendue sans borne."""
         d, m, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-arbre")
+        p = os.path.join(tempfile.mkdtemp(dir=self.d), "pid")
         marquer = "import os, sys, time; time.sleep(3); open(os.path.join(*sys.argv[1:]), 'w').close()"
         lancer = "subprocess.Popen([sys.executable, '-c', " + repr(marquer) + ", os.environ['ORACLE_ESSAI_MARQUES'], "
 
@@ -413,19 +416,30 @@ class TestOracleRecord(unittest.TestCase):
             return {**OK, "s2-harness/tests/test_t.py": chr(10).join([
                 "import os, subprocess, sys, time, unittest", "", "", "class T(unittest.TestCase):",
                 "    def test_a(self):", *corps, ""]).encode()}
-        long_, reste = depot(dep, [suite("        for i, s in enumerate((False, True)):",
+        long_, reste, detache = depot(dep, [suite("        for i, s in enumerate((False, True)):",
                                          "            " + lancer + "str(i)], start_new_session=s)",
                                          "        time.sleep(20)"),
                                    suite("        " + lancer + "'reste'], stdin=subprocess.DEVNULL, "
-                                         "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)")])
-        with mock.patch.dict(os.environ, {"ORACLE_ESSAI_MARQUES": m}):
+                                         "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)"),
+                                   suite("        if os.fork() == 0:", "            os.setsid()",
+                                         "            if os.fork() == 0:", "                e = os.environ",
+                                         "                open(e['ORACLE_ESSAI_PID'], 'w').write(str(os.getpid()))",
+                                         "                time.sleep(90)", "            os._exit(0)")])
+        with mock.patch.dict(os.environ, {"ORACLE_ESSAI_MARQUES": m, "ORACLE_ESSAI_PID": p}):
             debut = time.monotonic()
             code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, long_, delai=1)[1]
             duree = time.monotonic() - debut
             code2 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, reste)[1]
+            debut = time.monotonic()
+            code3 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, detache, delai=1)[1]
+            duree3 = time.monotonic() - debut
+        try:                                            # descendant détaché, que l'outil ne suit pas : arrêté ici
+            os.kill(int(Path(p).read_text(encoding="utf-8")), 9)
+        except (OSError, ValueError):
+            pass
         time.sleep(4)                                   # chaque marque serait posée 3 s après son lancement
-        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m))),
-                         (1, True, 0, ["reste"] if os.name == "nt" else []))
+        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m)), code3, duree3 < 30),
+                         (1, True, 0, ["reste"] if os.name == "nt" else [], 1, True))
 
     def test_auteur_refuse_a_l_ecriture(self):
         """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu

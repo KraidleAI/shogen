@@ -87,6 +87,8 @@ VERIF_COMMIT = "enforcement/verdict-suite-s2.py"     # vérificateur que lance l
 INTERDITS = os.path.join(os.path.dirname(LINT), "docs-sha256sums.py")   # emplacements interdits : liste unique (DT4-a)
 DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
 EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
+RELIQUAT = 5            # s de lecture après l'arrêt de l'arbre au délai ; au-delà, un descendant détaché qui garde le
+                        # tuyau n'est plus attendu (DELAI-ARBRE-1, relecture G2 du lot DETTES-T7, C-2)
 COMPILES = (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES)     # règle de `compiles` de VERIF
 
 
@@ -260,7 +262,9 @@ def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
     groupe de processus neuf (POSIX : start_new_session ; Windows : CREATE_NEW_PROCESS_GROUP), `entree` sur stdin
     (None : vide). Au dépassement, l'arbre entier est arrêté (POSIX : `groupes` ; Windows : taskkill /T /F), aucun
     descendant ne garde le tuyau ; à la sortie, son groupe l'est aussi (descendant resté : fork), avant tout nettoyage
-    (POSIX ; sous Windows, rien après la sortie : PID réemployés)."""
+    (POSIX ; sous Windows, rien après la sortie : PID réemployés). C-2 (G2) : après l'arrêt au délai, la sortie n'est
+    plus lue que RELIQUAT s ; un descendant détaché de l'arbre (double fork, setsid) qui garde le tuyau n'est pas
+    attendu au-delà."""
     p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          start_new_session=True, creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
     try:
@@ -270,7 +274,13 @@ def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
             subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
         else:
             arreter(groupes(p.pid))
-        return p.communicate()[0], None
+        try:
+            return p.communicate(timeout=RELIQUAT)[0], None
+        except subprocess.TimeoutExpired as e:      # C-2 : descendant détaché, hors de l'arbre, qui garde le tuyau
+            p.stdin.close()
+            p.stdout.close()
+            p.wait()
+            return e.output or b"", None
     finally:
         if os.name != "nt":
             arreter({p.pid})
