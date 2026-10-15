@@ -109,3 +109,8 @@ limite s'écrit ici ; sinon elle ne vaut que pour `suite`.
   échouait (mesure M-B1 de la relecture). Limite : un lien qui n'y mène qu'à travers un autre lien
   (`a -> b/d.md`, `b -> rapports`) est écrit, pendant ; le hachage échoue alors (`FileNotFoundError`, sortie 2) :
   aucun enregistrement, aucun fichier interdit écrit (mesure M-B2).
+- *Ajout daté du 2026-10-10 07:20:01 UTC (correction C-4 ; SHOGEN-S2BIS-ENREG-ANCIEN-OUTIL-1,
+  SHOGEN-S2BIS-DRAPEAUX-LIMITES-1)* : Q-3 et Q-5 du générateur, notées plus haut comme décisions proposées, sont
+  adoptées par l'adjudication de l'orchestrateur du 2026-10-10 06:24:31 UTC. Ordre des refus à la lecture : un
+  enregistrement d'un outil d'avant OUT-2i ou OUT-2d précède aussi DETTES-T7 ; sans `tree.exclus`, il est refusé
+  au premier contrôle (`champs`) ; `ancien outil` ne nomme que l'écart d'un enregistrement qui porte `tree.exclus`.
