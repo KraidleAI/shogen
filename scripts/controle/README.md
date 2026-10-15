@@ -226,3 +226,9 @@ dépendent des tests du harnais qu'ils importent.
 > `tests/test_skills.py` (2 tests) : en-tête (name égal au dossier, description de forme commune, aucune clé model),
 > sous-commandes et chemins cités existants, options exigées présentes, erreurs visées nommées, aucun marqueur de
 > dette nu ; plancher du job `controle-unittest` 88.
+
+> *Ajout daté du 2026-10-10 07:30:53 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-10b)* : `avant_acte.py` (sha256
+> `fd4cd2e666f24d1041f3595bc28ba1932a3b1a5c68d533b6a83bf6780cb8166d`) : toute exception d'une sous-commande sort en 3,
+> avec une ligne `ERREUR <sous-commande> : <type> : <message>` sur la sortie d'erreur ; jamais en 1, qui est un refus
+> (une ligne de plan illisible sortait en 1 avec une trace). `tests/test_avant_acte.py` compte 23 tests ; plancher du
+> job `controle-unittest` 89.

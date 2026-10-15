@@ -12,7 +12,8 @@ GF-8 : pousser (LA-N05 : poussée rouge ; ADR-0028 l.293 : docs 15/16 jamais au 
 mandataire refuse) et publier (E14 : heure future dans un texte publié ; secret ; chemin du scratchpad).
 GF-8b : existe (E15 : absence affirmée sans recherche du nom) et disque (E4 : disque presque plein, cibles cargo).
 GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du contre-contrôle annonçait ; E25 :
-chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min)."""
+chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
+GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus)."""
 import contextlib
 import hashlib
 import io
@@ -451,3 +452,13 @@ class PlanDeChaine(Depot):
         self.assertEqual(self.juger("GROUPES : aucun", *pas, options=["--detache"]), (0, ""))
         self.assertEqual(self.juger("GROUPES : aucun", *pas[:16]), (0, ""))
         self.assertEqual(self.juger("GROUPES : aucun", *pas[:13], options=["--duree-pas", "8"])[1][:9], "REFUS G3 ")
+
+    def test_exception_en_erreur(self):
+        """Ligne de plan illisible (sans champ de diffs) : exception de l'outil lancé en ligne de commande, sortie 3
+        et ligne ERREUR, jamais 1 (un refus) ni une trace ; fichier absent : 3."""
+        ag.ecrire(self.tmp, {"plan": "P-1 sans champs" + NL, "cc.md": "GROUPES : aucun" + NL})
+        argv = ["chaine", "--plan", os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md")]
+        p = subprocess.run([sys.executable, "-I", "-B", avant_acte.__file__, "--depot", self.d, *argv],
+                           capture_output=True, text=True, env=self.env, timeout=120)
+        self.assertEqual((p.returncode, p.stdout, p.stderr.startswith("ERREUR chaine : ")), (3, "", True))
+        self.assertEqual(self.lancer("publier", "--texte", os.path.join(self.tmp, "absent.md")), (3, ""))

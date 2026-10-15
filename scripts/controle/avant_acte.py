@@ -42,7 +42,8 @@ GF-9b : chaine --plan P --cc RAPPORT [--duree-pas MIN] [--detache], avant de lan
 rapport de contre-contrôle porte une seule ligne fixe GROUPES : (aucun, ou A+B ; C+D+E : diffs verts seulement
 ensemble ; un nom seul ne groupe rien) ; G2, aucun pas du plan ne commet une partie d'un groupe sans le reste (diff
 nommé par son fichier, sans .diff) ; G3, durée estimée (pas × durée mesurée d'un pas, 6 min par défaut) au-delà de
-BORNE_LIEE min sans --detache : lancement lié refusé, lancement détaché donné."""
+BORNE_LIEE min sans --detache : lancement lié refusé, lancement détaché donné.
+GF-10b : toute exception d'une sous-commande sort en 3 (ligne ERREUR), jamais en 1, qui est un refus."""
 import argparse
 import fnmatch
 import hashlib
@@ -497,8 +498,8 @@ def main(argv=None):
     fautes = []
     try:
         COMMANDES[a.cmd](a, fautes)
-    except (Erreur, OSError, UnicodeDecodeError, ValueError) as e:
-        print(f"ERREUR {a.cmd} : {e}", file=sys.stderr)
+    except Exception as e:      # erreur de l'outil, jamais un refus (contrat 0, 1, 3)
+        print(f"ERREUR {a.cmd} : {type(e).__name__} : {e}", file=sys.stderr)
         return 3
     for niveau, code, raison, geste, _c in fautes:
         print(f"{niveau.upper()} {code} : {raison}" + (f" ; à faire : {geste}" if geste else ""))
