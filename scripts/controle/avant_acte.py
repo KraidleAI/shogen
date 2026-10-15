@@ -60,7 +60,9 @@ Relecture G2, C-17 : chaine G4, un Diff-Id du plan déjà porté par un commit d
 du modèle sauterait le pas).
 Relecture G2, C-18 : un module frère illisible (installation abîmée), une exception hors des sous-commandes ou l'échec
 du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais en 1 (un refus) ni en 120.
-Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev-list HEAD --not --remotes=NOM)."""
+Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev-list HEAD --not --remotes=NOM).
+Contre-contrôle, R-3 : pousser --acte ramène aussi les guillemets du shell, les blancs répétés et les options de git
+placées avant la sous-commande."""
 import argparse
 import contextlib
 import fnmatch
@@ -412,7 +414,10 @@ def pousser(a, fautes):
     with open(HORS, encoding="utf-8") as f:
         regles = [x.split(" ", 1) for x in f.read().split(chr(10)) if x.strip() and not x.startswith("#")]
     if a.acte is not None:
-        acte = re.sub("(?:--method[ =]|-X ?)([A-Za-z]+)", lambda m: "-X " + m[1].upper(), a.acte)
+        acte = " ".join(a.acte.replace('"', " ").replace("'", " ").split())      # R-3
+        acte = re.sub("(^| )git(?: -[Cc] [^ ]+| --no-optional-locks| --(?:git-dir|work-tree)=[^ ]+)+ ",
+                      lambda m: m[1] + "git ", acte)
+        acte = re.sub("(?:--method[ =]|-X ?)([A-Za-z]+)", lambda m: "-X " + m[1].upper(), acte)
         if any(fnmatch.fnmatchcase(acte, m) for k, m in regles if k == "acte"):
             fautes.append(("refus", "P4", "acte sur la forge déjà refusé par le mandataire réseau (B.95, E17)",
                            "ne pas le retenter : le décrire pas à pas à l'investisseur", "-"))

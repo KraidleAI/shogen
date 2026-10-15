@@ -365,3 +365,12 @@ dépendent des tests du harnais qu'ils importent.
 > `garde/hors-distant.txt`) : un `docs/15-*` ajouté puis retiré avant la tête passait, l'arbre de la tête n'en portant
 > plus, alors que la poussée en porte le contenu (ADR-0028 l.293 : préfixes sans ces fichiers).
 > `tests/test_avant_acte.py` compte 37 tests ; plancher du job `controle-unittest` 108.
+
+> *Ajout daté du 2026-10-15 11:35:07 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-3 ; E17, B.92, B.95)* :
+> `avant_acte.py` (sha256 `eb3327f5a7ca9c88a7283817c4e954927e26556c34f161f19c930e2328b6b6c6`) et
+> `garde/hors-distant.txt` (sha256 `bc4bbc78dd41850607194159660a8fb115ce49eee0f0ca8da437795bdef4f547`) : `pousser
+> --acte` ramène aussi, avant les motifs, les guillemets du shell, les blancs répétés et les options de git placées
+> avant la sous-commande (`-C`, `-c`, `--git-dir`, `--work-tree`, `--no-optional-locks`) ; motifs ajoutés : refspec
+> `+:branche`, DELETE et POST sur la protection de branche (refus conservateur). Dix formes voisines des actes de B.92
+> et B.95 passaient (`git -C … push origin -d b`, `':b'`, méthode entre guillemets, DELETE de la protection).
+> `tests/test_avant_acte.py` compte 38 tests ; plancher du job `controle-unittest` 109.

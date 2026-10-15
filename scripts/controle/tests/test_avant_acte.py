@@ -20,7 +20,7 @@ noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interd
 ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
 passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
 sortie standard fermée : 3).
-Contre-contrôle : R-2 (pousser, historique de la plage)."""
+Contre-contrôle : R-2 (pousser, historique de la plage). ; R-3 (pousser --acte, actes écrits autrement)."""
 import contextlib
 import difflib
 import fnmatch
@@ -532,6 +532,22 @@ class Poussee(Depot):
         self.assertEqual((code, sortie[:9], "poche" in sortie), (1, "REFUS P2 ", False))
         ag.git(self.d, self.env, "update-ref", "refs/remotes/origin/main", "HEAD")
         self.assertEqual(self.pousser(), (0, ""))
+
+    def test_r3_actes_ecrits_autrement(self):
+        """R-3 : actes refusés écrits autrement (options de git avant push, guillemets du shell, blancs répétés,
+        +:branche, DELETE et POST sur la protection) : refus P4 ; poussées et lectures ordinaires écrites de même :
+        admises."""
+        refuses = ["git -C /d push origin -d essai/b", "git -C /d push origin --delete b",
+                   "git push origin ':essai/b'", "git push origin +:essai/b", 'git push origin ":refs/heads/b"',
+                   "gh api -X  DELETE repos/o/r/git/refs/heads/b", "gh api -X 'DELETE' repos/o/r/git/refs/heads/b",
+                   'gh api --method "PUT" repos/o/r/branches/main/protection',
+                   "gh api -X DELETE repos/o/r/branches/main/protection",
+                   "gh api -X POST repos/o/r/branches/main/protection/required_status_checks/contexts"]
+        for acte in refuses:
+            self.assertEqual(self.lancer("pousser", "--acte", acte)[1][:9], "REFUS P4 ", acte)
+        for acte in ["git -C /d push origin claude/x", "git push origin 'claude/x'", "git push origin HEAD:claude/x",
+                     'gh api "repos/o/r/branches/main/protection"']:
+            self.assertEqual(self.lancer("pousser", "--acte", acte), (0, ""), acte)
 
     def test_e17_actes_refuses(self):
         """E17 : écritures que le mandataire refuse (protection, réglages, suppression de branche) : refus P4 avant

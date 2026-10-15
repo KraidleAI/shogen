@@ -26,3 +26,12 @@ acte *repos/*-X PATCH*
 acte gh repo edit*
 acte git push* -d *
 acte git push* :*
+# Contre-contrôle du lot (R-3) : formes voisines des actes constatés (B.92, B.95), ramenées par l'outil avant les
+# motifs (guillemets du shell, blancs répétés, options de git avant la sous-commande : -C, -c, --git-dir,
+# --work-tree, --no-optional-locks) ; refspec de suppression forcée (+:branche) ; autres écritures de la protection
+# de branche (DELETE, POST) : refus conservateur, non constaté.
+acte git push* +:*
+acte *-X DELETE *protection*
+acte *protection*-X DELETE*
+acte *-X POST *protection*
+acte *protection*-X POST*
