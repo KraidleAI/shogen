@@ -20,7 +20,8 @@ noms de GROUPES pris au plan, gabarit à remplir) ; C-8 (verser : racine, interd
 ordinaires) ; C-9 (journal en erreur : sortie 3) ; C-12 (Q-10 : documents cités par numéro dans docs/17) ; C-16 (C3 :
 passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre commit) ; C-18 (module frère illisible,
 sortie standard fermée : 3).
-Contre-contrôle : R-2 (pousser, historique de la plage). ; R-3 (pousser --acte, actes écrits autrement)."""
+Contre-contrôle : R-2 (pousser, historique de la plage) ; R-3 (pousser --acte, actes écrits autrement).
+Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé)."""
 import contextlib
 import difflib
 import fnmatch
@@ -312,6 +313,23 @@ class CommitSuite(Source):
         ag.git(self.d, self.env, "config", "diff.mnemonicPrefix", "true")
         code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "neuf", "l2", "l3", ""])})
         self.assertEqual((code, sortie[:9]), (1, "REFUS C7 "))
+
+    def test_r4_fichier_cite_retire_ou_renomme(self):
+        """R-4 : fichier cité par numéro (JOURNAL.md) retiré, ou renommé : refus C7 au commit et au diff d'un
+        worker ; retrait voulu, écrit au message (Décalage admis) : admis."""
+        self.indexer({"JOURNAL.md": NL.join(["l1", "l2", "l3", ""]), "biblio/INDEX.md": "# index" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "journal")
+        for geste in (["rm", "-q", "JOURNAL.md"], ["mv", "JOURNAL.md", "JOURNAL-2026.md"]):
+            ag.git(self.d, self.env, *geste)
+            ag.ecrire(self.tmp, {"w.diff": ag.git(self.d, self.env, "diff", "--cached", "HEAD")})
+            code, sortie = self.verifier({})
+            self.assertEqual((code, sortie[:9]), (1, "REFUS C7 "), geste)
+            ag.git(self.d, self.env, "reset", "-q", "--hard", "HEAD")
+            code, sortie = self.lancer("diff", "--fichier", os.path.join(self.tmp, "w.diff"))
+            self.assertEqual((code, sortie[:9]), (1, "REFUS C7 "), geste)
+        ag.git(self.d, self.env, "rm", "-q", "JOURNAL.md")
+        code, sortie = self.verifier({}, self.CORPS + NL + NL + "Décalage admis : JOURNAL.md")
+        self.assertEqual((code, sortie[:9]), (0, "ADMIS C7 "))
 
     def test_diff_id(self):
         """C9 : ligne Diff-Id exigée quand --id est donné."""

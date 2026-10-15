@@ -62,7 +62,8 @@ Relecture G2, C-18 : un module frère illisible (installation abîmée), une exc
 du vidage final de la sortie standard (tube sans lecteur) sortent en 3, jamais en 1 (un refus) ni en 120.
 Contre-contrôle, R-2 : pousser P2 juge aussi chaque commit de la plage (git rev-list HEAD --not --remotes=NOM).
 Contre-contrôle, R-3 : pousser --acte ramène aussi les guillemets du shell, les blancs répétés et les options de git
-placées avant la sous-commande."""
+placées avant la sous-commande.
+Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité."""
 import argparse
 import contextlib
 import fnmatch
@@ -262,15 +263,19 @@ def cites(depot, texte, fichiers, fautes):
         chemin = f["avant"]
         if not chemin or not any(fnmatch.fnmatchcase(chemin, m) for m in motifs):
             continue
-        contenu = git(depot, "cat-file", "-p", "HEAD:" + chemin)
-        ligne = decalage(f["blocs"], contenu.count(chr(10)) + (contenu[-1:] not in ("", chr(10))))
+        if f["apres"] is None:      # fichier cité retiré, ou renommé (--no-renames) : ses renvois tombent (R-4)
+            ligne, quoi = 1, "fichier retiré ou renommé, ses renvois par numéro ne mènent plus nulle part"
+        else:
+            contenu = git(depot, "cat-file", "-p", "HEAD:" + chemin)
+            ligne = decalage(f["blocs"], contenu.count(chr(10)) + (contenu[-1:] not in ("", chr(10))))
+            quoi = f"un bloc décale la ligne {ligne} et les suivantes"
         if ligne is None:
             continue
         if "Décalage admis : " + chemin in texte.split(chr(10)):
             fautes.append(("admis", "C7", f"{chemin} : ligne {ligne} décalée, admis par le message", "",
                            "decalage-admis"))
         else:
-            fautes.append(("refus", "C7", f"{chemin} : un bloc décale la ligne {ligne} et les suivantes (E21)",
+            fautes.append(("refus", "C7", f"{chemin} : {quoi} (E21)",
                            "ajouter en fin ; décalage voulu : ligne Décalage admis : " + chemin + " au message", "-"))
 
 

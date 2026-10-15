@@ -374,3 +374,10 @@ dépendent des tests du harnais qu'ils importent.
 > `+:branche`, DELETE et POST sur la protection de branche (refus conservateur). Dix formes voisines des actes de B.92
 > et B.95 passaient (`git -C … push origin -d b`, `':b'`, méthode entre guillemets, DELETE de la protection).
 > `tests/test_avant_acte.py` compte 38 tests ; plancher du job `controle-unittest` 109.
+
+> *Ajout daté du 2026-10-15 11:35:35 UTC (`date -u` ; lot GARDE-FOUS-ORCH, contre-contrôle, R-4 ; E21)* :
+> `avant_acte.py` (sha256 `22da65fb8e0b28732765ad8fea81b56add6ae7cedd0b43c56218ef0c21b264f9`) : C7 refuse aussi le
+> retrait ou le renommage d'un fichier de `garde/lignes-citees.txt` (ses renvois par numéro ne mènent plus nulle
+> part), au `commit` et au `diff` ; voulu : ligne `Décalage admis : <chemin>` du message, journalisée en
+> contournement. Un fichier cité retiré ou renommé passait sans refus. `tests/test_avant_acte.py` compte 39 tests ;
+> plancher du job `controle-unittest` 110.
