@@ -3,7 +3,8 @@ réelle reproduite, verts sur le cas sain. GF-1 : horloge et heures. E14 : vers 
 2026-10-02 : une heure écrite 19:5x. L'horloge est fixée par un faux `date` dans le PATH, jamais par une variable.
 GF-4 : interdits (E19, LA-N08), racines, analyse d'un diff, disque (E4 : 222 Mio vus par un agent).
 GF-3 : citations (E16 : citation inexacte d'une ligne du JOURNAL ; LA-N08 : citation d'un interdit).
-GF-4b : lignes ajoutées de l'index, dans un dépôt git temporaire (tests/aide_garde.py), sans lire un interdit."""
+GF-4b : lignes ajoutées de l'index, dans un dépôt git temporaire (tests/aide_garde.py), sans lire un interdit.
+Relecture G2 : C-5 (référence de citation écrite en code)."""
 import collections
 import os
 import tempfile
@@ -171,6 +172,15 @@ class Citations(unittest.TestCase):
         for t in textes:
             self.assertEqual(self.juger(t), ([], []), t)
         self.assertEqual(self.juger(G + " suite de la phrase " + D + " (JOURNAL l.144)"), ([], [(1, "citation-libre")]))
+
+    def test_c5_reference_en_code(self):
+        """C-5 : forme stricte écrite avec la référence en code (`chemin:N` ou `chemin`:N) : refus si la citation est
+        inexacte (E16), rien si elle est exacte ; forme libre au nom en code : nom résolu (avertissement)."""
+        cit = G + " Q-FUZZ-1 routée vers les advisors " + D
+        for ref in (" (`JOURNAL.md:143`)", " (`JOURNAL.md`:143)"):
+            self.assertEqual(self.juger(cit + ref), ([(1, "citation-absente")], []), ref)
+        self.assertEqual(self.juger(G + " questions techniques routées " + D + " (`JOURNAL.md:143`)"), ([], []))
+        self.assertEqual(self.juger(cit + " (`JOURNAL.md` l.143)"), ([], [(1, "citation-libre-absente")]))
 
     def test_citations_fausses(self):
         """Hors de la fenêtre, fragments dans le désordre, ligne hors du fichier : refus ; chemin introuvable :

@@ -12,7 +12,8 @@ GF-3 : citations (E16, LA-N08) ; seule la forme stricte « … » (chemin:N) est
 avertissement compté au journal (avis c.4 adopté), à durcir après mesure.
 GF-4b : lignes ajoutées de l'index (git diff --cached), noms d'abord, contenu des seuls chemins admis.
 Relecture G2, C-3 : lignes ajoutées d'un index temporaire (env), préfixes a/ et b/ forcés quelle que soit la
-configuration ; citations lues d'abord dans une surcouche (fichiers d'après un diff)."""
+configuration ; citations lues d'abord dans une surcouche (fichiers d'après un diff).
+Relecture G2, C-5 : la forme stricte admet la référence écrite en code, (`chemin:N`) ou (`chemin`:N)."""
 import ast
 import fnmatch
 import functools
@@ -33,7 +34,7 @@ RACINE_OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 SEUILS_GIO = (3, 6)
 ENTETE = re.compile("@@ -([0-9]+)(?:,([0-9]+))? [+]([0-9]+)(?:,([0-9]+))? @@")
 ESPACE = "[ " + chr(160) + "]?"
-STRICTE = re.compile("«([^«»]+)»" + ESPACE + "[(]([^ ():]+):([0-9]+)(?:-([0-9]+))?[)]")
+STRICTE = re.compile("«([^«»]+)»" + ESPACE + "[(]`?([^ ():`]+)`?:([0-9]+)(?:-([0-9]+))?`?[)]")
 LIBRE = re.compile("«([^«»]+)»" + ESPACE + "[(]([^():]*?) ?l[.] ?([0-9]+)(?:-([0-9]+))?[)]")
 ALIAS = {"JOURNAL": "JOURNAL.md", "annexe B": "docs/adr-0028/ANNEXE-B-items.md",
          "ADR-0028": "docs/adr-0028/ADR-0028-decisions-sortie-S2.md"}
@@ -203,7 +204,7 @@ def citations(texte, racine, surcouche=None):
     refus, avert = [], []
     for forme, motif in (("stricte", STRICTE), ("libre", LIBRE)):
         for x in motif.finditer(texte):
-            ligne, nom = texte.count(chr(10), 0, x.start()) + 1, x[2].strip()
+            ligne, nom = texte.count(chr(10), 0, x.start()) + 1, x[2].strip().strip("`")
             chemin, n = ALIAS.get(nom, nom), int(x[3])
             code = citation_lue(racine, chemin, n, int(x[4] or n), x[1], surcouche)
             if code == "citation-interdite" or (forme == "stricte" and code not in (None, "reference-introuvable")):

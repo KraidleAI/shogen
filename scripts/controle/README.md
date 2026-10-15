@@ -273,3 +273,9 @@ dépendent des tests du harnais qu'ils importent.
 > `--method=PUT` à `-X PUT` avant les motifs. `tests/test_avant_acte.py` compte 28 tests
 > (`test_c4_actes_voisins_et_sources` : sha256 des deux lignes sources rejoués) ; plancher du job
 > `controle-unittest` 95.
+
+> *Ajout daté du 2026-10-10 08:55:30 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-5 ; erreur E16)* :
+> `garde_commun.py` (sha256 `49eb836efe8a217cdbebf4331d50c548a6dbc3d24e115d976380d1dda834a238`) : la forme
+> stricte de citation admet la référence écrite en code, (`` `chemin:N` ``) ou (`` `chemin`:N ``), forme courante du
+> projet, qui n'était vue ni en refus ni en avertissement ; le nom d'une forme libre perd ses accents graves.
+> `tests/test_garde_commun.py` compte 16 tests ; plancher du job `controle-unittest` 96.
