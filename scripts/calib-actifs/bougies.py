@@ -93,6 +93,7 @@ LECTEURS = {"binance": _binance, "bitfinex": _bitfinex, "bitstamp": _bitstamp, "
 
 TRONQUEE = "réponse plafonnée ancrée avant le départ : fin de page tronquée"
 INCOHERENTE = "demi-page redemandée plafonnée et tronquée"
+TROP = "réponse de plus de bougies que de créneaux demandés"
 
 
 def tronquee(ts: list, pas: int, depart: int, derniere: int) -> bool:
@@ -114,8 +115,10 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
     [(a, b)] par fichier (FORMES-API-1, pts 2 et 3) : hors de [a ; b) ∩ [debut ; fin) écartée ; minute de deux
     fichiers aux mêmes clôture et volume (chevauchement) gardée une fois, aux valeurs différentes : CA/format. `garde`
     (mois voisins, C-1 de la G2) : une minute hors fenêtre n'est écartée que dans [garde[0] ; garde[1]).
-    Page (a, b, pas, départ, dernière, motif) : `tronquee` (C-7, C-8) : CA/format nommé par le motif."""
-    out, vals = {}, {}
+    Page (a, b, pas, départ, dernière, motif, borne) : `tronquee` (C-7, C-8) : CA/format nommé par le motif ; plus
+    de bougies à partir du départ que de créneaux de [départ ; borne] : CA/format (C-9). Une réponse `tronquee` n'est
+    refusée que sur preuve : une bougie d'un des fichiers dans ]sa dernière bougie ; sa dernière minute] (C-9)."""
+    out, vals, tous, suspects = {}, {}, set(), []
     try:
         for k, octets in enumerate(fichiers):
             a, b, *plafond = fenetres[k] if fenetres else (fen["debut"], fen["fin"])
@@ -123,6 +126,7 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
             for t, cloture, volume in LECTEURS[format_](octets):
                 c, v = Decimal(cloture), Decimal(volume)
                 ts.append(t)
+                tous.add(t)
                 if not (c.is_finite() and v.is_finite() and c >= 0 <= v):
                     raise _refus("nombre non fini ou négatif", place, actif)
                 dehors = not a <= t < b
@@ -136,8 +140,13 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                     raise _refus("minute en double aux valeurs différentes", place, actif)
                 vus.add(t)
                 out[t] = (c, v > 0)
+            if plafond and sum(t >= plafond[1] for t in ts) > (plafond[4] - plafond[1]) // 60 + 1:   # C-9
+                raise _refus(TROP, place, actif)
             if plafond and tronquee(ts, *plafond[:3]):
-                raise _refus(plafond[3], place, actif)
+                suspects.append((max(ts), plafond[2], plafond[3]))
+        for derniere_bougie, derniere, motif in suspects:              # troncature prouvée par un fichier du lot
+            if any(derniere_bougie < t <= derniere for t in tous):
+                raise _refus(motif, place, actif)
     except Forme as e:
         raise _refus(str(e), place, actif) from None
     except (ValueError, KeyError, IndexError, TypeError, InvalidOperation, zipfile.BadZipFile) as e:
@@ -172,11 +181,12 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
     if s["acces"] == "pages":
         plan = {}
         for a, b, dep, borne in socle.pages(prm, place, fen):
-            plan[f"page-{a}.json"] = (dep, borne + 60, s["pas"], dep, b - 60, TRONQUEE)
+            plan[f"page-{a}.json"] = (dep, borne + 60, s["pas"], dep, b - 60, TRONQUEE, borne)
             if f"page-{a}.1.json" in noms or f"page-{a}.2.json" in noms:          # C-8 : demi-pages redemandées
                 plan[f"page-{a}.json"] = (dep, borne + 60)
                 for k, (dk, bk, dern) in enumerate(socle.demis(prm, place, dep, borne, b), 1):     # filtre de la demi
-                    plan[f"page-{a}.{k}.json"] = (max(dk, dep), min(bk, borne) + 60, s["pas"], dk, dern, INCOHERENTE)
+                    plan[f"page-{a}.{k}.json"] = (max(dk, dep), min(bk, borne) + 60, s["pas"], dk, dern, INCOHERENTE,
+                                                  bk)
         if set(plan) != set(noms):
             raise _refus("pages différentes du découpage de la fenêtre", place, actif)
         fenetres = [plan[x] for x in noms]

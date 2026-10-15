@@ -12,23 +12,32 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   strates, planchers des oracles, quantile et règle de grille (Q-CA-13), écriture `.partiel` ;
 - `acquerir.py` : étape réseau ; mensuels de Binance (`.CHECKSUM`) et d'OKX, archive de Kraken lue par plages, pages de
   Coinbase, Bitstamp et Bitfinex à débit borné, manifeste et reprise ;
-- formes des API (SHOGEN-CALIB-FORMES-API-1, DETTES-T2 ; décision sur `RAPPORT.md`) : aucun pari sur une borne non
-  écrite. `pas` = bougies par requête au plus ; `chevauchement` 1 (Coinbase, Bitstamp : inclusion de `start` et de
-  `end` non écrite), une minute demandée de chaque côté de la page ; Bitfinex (bornes incluses, [lu]) : 0.
-  Chargement : fichiers exactement les pages de `socle.pages` ; bougie hors de la fenêtre de sa page (Coinbase : qui
-  précède `start` ; minute qui suit la fenêtre) écartée ; une minute servie par deux pages aux mêmes valeurs est
-  gardée une fois, aux valeurs différentes : CA/format nommé. Binance et Kraken restent stricts.
-  Une réponse de page de `pas` bougies dont une précède le départ et aucune n'atteint la dernière minute de la page
-  (C-7) est redemandée en deux demi-pages (`page-<début>.1.json` et `.2.json`, C-8), qui la remplacent au chargement
-  et sont comptées aux lignes de complétude ; refus CA/format si une demi-réponse est elle-même tronquée ou si la page
-  suspecte n'a pas ses demi-pages.
+- formes des API (SHOGEN-CALIB-FORMES-API-1, DETTES-T2 ; décision sur `RAPPORT.md` et ses ajouts datés) : aucun
+  pari sur une borne ou un plafond non écrits.
+  Demi-capacité (C-9) : une page ne demande jamais plus de ⌊`pas`/2⌋ créneaux, chevauchement compris (`pas` = maximum
+  de la place, [lu] : Coinbase 300, Bitstamp 1000, Bitfinex 10000) ; `chevauchement` 1 pour Coinbase et Bitstamp
+  (inclusion de `start` et de `end` non écrite : une minute de chaque côté, 148 et 498 minutes utiles), 0 pour
+  Bitfinex (bornes incluses, [lu] ; 5000 minutes). Sous toute lecture où le plafond vaut `pas` (bougies ou créneaux,
+  ancré au début, à la fin, ou au plus ⌈`pas`/2⌉ minutes avant `start`), une réponse n'est donc jamais coupée.
+  Chargement : fichiers exactement les pages de `socle.pages` ; bougie hors de la fenêtre de sa page (bougies qui
+  précèdent `start`, minute qui suit la fenêtre) écartée ; minute servie deux fois aux mêmes valeurs gardée une fois,
+  aux valeurs différentes : CA/format nommé ; réponse de plus de bougies, à partir du départ, que de créneaux
+  demandés : CA/format nommé. Binance et Kraken restent stricts.
+  Garde (C-7, C-8) : une réponse d'au moins `pas` bougies, dont une avant le départ et aucune à la dernière minute de
+  la page, est redemandée en deux demi-pages (`page-<début>.1.json` et `.2.json`), au même débit, qui la remplacent au
+  chargement ; elle n'est refusée (CA/format : fin de page tronquée, ou demi-page redemandée plafonnée et tronquée)
+  que sur preuve, si un fichier acquis porte une bougie entre sa dernière bougie et la dernière minute à couvrir ;
+  sans preuve, ces minutes sont sans échange (lecture « les `pas` plus récentes jusqu'à `end` »).
+  Limites (vérification de C-9, propriété du contre-contrôle rejouée) : un serveur qui décalerait sa fenêtre de
+  quelques minutes quel que soit le plafond, ou ancrerait son plafond plus de ⌈`pas`/2⌉ minutes avant `start`, peut
+  faire perdre des minutes sans refus ; les lignes de complétude le montreraient (déficit systématique par page).
   OKX (alignement UTC ou UTC+8 non écrit) : `voisins` 1, le mois précédent et le suivant sont acquis, seules les
   minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est refusée ; le mois qui suit la
   fenêtre descriptive (2026-10) n'est publié qu'après sa fin : jusque-là, l'acquisition sort en code 4 sur
   `REFUS CA/acquisition : mensuel 2026-10 non obtenu (téléchargement impossible (HTTPError)) ; un mensuel n'est publié
   qu'après la fin de son mois ; actif ETH ; place okx`.
   `calib_actifs.txt` porte, après septembre, les minutes reçues sur attendues de chaque place et de chaque fenêtre, au
-  total et par page (une perte systématique se voit), jamais décisives ;
+  total et par page, et le nombre de pages redemandées (une perte systématique se voit), jamais décisifs ;
 - `bougies.py` : six lecteurs, normalisation, dernier prix connu et âges, oracle d'exécution de SH §4 ;
 - `sigma.py` : σ par classe, troisième terme (P99 des âges par cellule, places à horodatage de dernière transaction) ;
 - `tau.py` : population et médiane leave-one-out, τ des places, des agrégateurs et des oracles, fragment et son

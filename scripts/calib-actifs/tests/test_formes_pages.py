@@ -3,7 +3,8 @@ du lot contre le serveur local, qui simule chaque sémantique de bornes que la p
 fin inclus ou exclus, bougies qui précèdent start, rejet au-delà de `pas` points ; Bitstamp : end prioritaire, fin
 incluse ou exclue, ou start prioritaire, début inclus ou exclu, rejet au-delà de `pas` ; Bitfinex : bornes incluses,
 tronqué à `pas`), puis chargement : série égale minute pour minute à la vérité. Paramètres de la fixture distincts
-d'une place à l'autre (pas 5, 9, 4 ; chevauchement 1, 2, 0), puis ceux du lot."""
+d'une place à l'autre (pas 10, 18, 8, soit 5, 9 et 4 créneaux par page, C-9 ; chevauchement 1, 2, 0), puis ceux du
+lot."""
 import datetime
 import json
 import os
@@ -17,7 +18,7 @@ from tests.test_acquerir import local
 from tests.test_formes import W0, ecart, essai, marche, verite
 from tests.test_pages import series as urls
 
-FIXTURE = {"coinbase": (5, 1), "bitstamp": (9, 2), "bitfinex": (4, 0)}             # (pas, chevauchement)
+FIXTURE = {"coinbase": (10, 1), "bitstamp": (18, 2), "bitfinex": (8, 0)}             # (pas, chevauchement)
 
 
 def t_iso(x):
@@ -88,21 +89,21 @@ class TestFormesPages(unittest.TestCase):
         """Pour chaque place paginée et chaque sémantique : série égale à la vérité (aucune minute manquante, en trop
         ou différente) et pages du découpage, à la main. Fixture, 14 minutes : Coinbase pages en 0, 3, 6, 9, 12 (3
         minutes utiles + 1 de chaque côté), Bitstamp en 0, 5, 10 (5 + 2 + 2), Bitfinex en 0, 4, 8, 12 (sans
-        chevauchement). Lot, 1 200 minutes : Coinbase 0, 298, 596, 894, 1192 ; Bitstamp 0, 998 ; Bitfinex une page. Le
+        chevauchement). Lot, 1 200 minutes, C-9 : Coinbase par 148, Bitstamp 0, 498, 996 ; Bitfinex une page. Le
         code d'avant perd en silence la dernière minute de chaque page de Coinbase sous « fin exclue », la première
         sous « début exclu » (Q-DT2-1 : la première de la fenêtre avec le seul chevauchement de fin). Mutations :
         chevauchement ignoré ou d'un seul côté ; n faux ; filtre retiré ou à la fenêtre entière ; fenêtre de page non
         bornée à la fenêtre ; doublon identique refusé ; chevauchement ou pas lu à une autre place.
         Comptes par page (DECISION pt 5) : reçues et attendues à la main (règle du marché) ; mutations : attendues ou
         reçues fausses, dernière page mal bornée. C-7 et C-8 : « fin exclue, avant » (plafond ancré avant le départ,
-        sans la dernière minute propre, sans échange : minute 2 de la fixture, 1199 du lot) : page redemandée en deux
-        demi-pages, admise ; plafond ancré `pas` minutes avant start : demi-réponses elles aussi tronquées : refus
+        sans la dernière minute propre, sans échange : minute 2 de la fixture, 443 et 1199 du lot) : page redemandée en
+        deux demi-pages, admise ; plafond ancré `pas` minutes avant start : demi-réponses elles aussi tronquées : refus
         nommé ; mutations : contrôle retiré, plafond ignoré."""
         cas = [("coinbase", ("incluses", "fin-exclue", "avant", "fin-exclue avant", "debut-exclu",
                              "debut-exclu fin-exclue", "tronquee"), [0, 3, 6, 9, 12, 14],
-                [0, 298, 596, 894, 1192, 1200]),
+                [0, 148, 296, 444, 592, 740, 888, 1036, 1184, 1200]),
                ("bitstamp", ("incluses", "fin-exclue", "depuis-start", "depuis-start debut-exclu"), [0, 5, 10, 14],
-                [0, 998, 1200]),
+                [0, 498, 996, 1200]),
                ("bitfinex", ("incluses",), [0, 4, 8, 12, 14], [0, 1200])]
         tronque = "REFUS CA/format : demi-page redemandée plafonnée et tronquée ; actif ETH ; place coinbase"
         for place, sems, b_fixture, b_lot in cas:
@@ -111,9 +112,9 @@ class TestFormesPages(unittest.TestCase):
                     with self.subTest(place=place, sem=sem, fixture=fixture):
                         fen = {"debut": W0, "fin": W0 + 60 * n}
                         pages = [f"page-{W0 + 60 * a}.json" for a in bornes[:-1]]
-                        if sem == "fin-exclue avant":                # C-8 : page 0 (fixture) ou 1192 (lot) redemandée
-                            p = pages[0 if fixture else -1][:-5]
-                            pages = sorted(pages + [p + ".1.json", p + ".2.json"])
+                        if sem == "fin-exclue avant":                # C-8 : page 0 (fixture), 296 et 1184 (lot)
+                            pages = sorted(pages + [f"page-{W0 + 60 * a}.{k}.json" for a in ((0,) if fixture else (
+                                296, 1184)) for k in (1, 2)])
                         attendu = (([], [], []), pages, pages_attendues(bornes, place == "bitstamp"))
                         obtenu = self.acquis(place, sem, fen, fixture)
                         self.assertEqual(obtenu, tronque if sem == "tronquee" else attendu)

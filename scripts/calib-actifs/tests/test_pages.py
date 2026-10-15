@@ -27,15 +27,16 @@ def series(prm, base):
 
 class TestPages(unittest.TestCase):
     def test_pages_bornees(self):
-        """700 minutes, DETTES-T2 : Coinbase, 298 minutes utiles + 1 de chaque côté : 23:59-04:58, 04:57-09:56,
-        09:55-11:40 UTC ; Bitstamp, une page, n = 702, de 1775001540 à 1775043600 ; Bitfinex en ms, sans chevauchement,
-        fin 1775043540 ; Coinbase repris : aucune requête ; deux attentes de 0,34 s. Mutations : borne de page fausse ;
-        pas faux ; n faux ; reprise ; débit."""
+        """700 minutes, DETTES-T2 et C-9 (créneaux ≤ pas / 2) : Coinbase, 148 minutes utiles + 1 de chaque côté :
+        23:59-02:28, 02:27-04:56, 04:55-07:24, 07:23-09:52, 09:51-11:40 UTC ; Bitstamp, 498 minutes utiles : n = 500 de
+        1775001540 à 1775031480, puis n = 204 de 1775031420 à 1775043600 ; Bitfinex en ms, une page, fin 1775043540 ;
+        Coinbase repris : aucune requête ; attentes : 4 de 0,34 s, 1 de 0,2 s. Mutations : borne de page fausse ; pas
+        faux ; n faux ; reprise ; débit."""
         fen = {"debut": T0, "fin": T0 + 700 * 60}
-        attendus = ["/c/ETH-USD?start=2026-03-31T23:59:00Z&end=2026-04-01T04:58:00Z",
-                    "/c/ETH-USD?start=2026-04-01T04:57:00Z&end=2026-04-01T09:56:00Z",
-                    "/c/ETH-USD?start=2026-04-01T09:55:00Z&end=2026-04-01T11:40:00Z",
-                    "/s/ethusd?n=702&start=1775001540&end=1775043600",
+        attendus = [f"/c/ETH-USD?start=2026-0{a}:00Z&end=2026-04-01T{b}:00Z" for a, b in (
+            ("3-31T23:59", "02:28"), ("4-01T02:27", "04:56"), ("4-01T04:55", "07:24"), ("4-01T07:23", "09:52"),
+            ("4-01T09:51", "11:40"))] + ["/s/ethusd?n=500&start=1775001540&end=1775031480",
+                                         "/s/ethusd?n=204&start=1775031420&end=1775043600",
                     "/f/tETHUSD?start=1775001600000&end=1775043540000"]
         horloge, acquerir.HORLOGE = acquerir.HORLOGE, lambda: 100.0
         self.addCleanup(setattr, acquerir, "HORLOGE", horloge)
@@ -44,9 +45,9 @@ class TestPages(unittest.TestCase):
             series(prm, s.base)
             for place in ("coinbase", "bitstamp", "bitfinex", "coinbase"):
                 acquerir.pages(prm, acquerir.Manifeste(d), "principale", fen, place, "ETH", acquerir.Debit())
-        self.assertEqual((s.vus, pauses), (attendus, [0.34, 0.34]))
+        self.assertEqual((s.vus, pauses), (attendus, [0.34] * 4 + [0.2]))
         self.assertEqual(sorted(os.listdir(os.path.join(d, "principale", "coinbase", "ETH"))),
-                         ["page-1775001600.json", "page-1775019480.json", "page-1775037360.json"])
+                         [f"page-{x}.json" for x in (1775001600, 1775010480, 1775019360, 1775028240, 1775037120)])
 
     def test_debit(self):
         """Horloge factice : coinbase à 100 s, 100,1 s, puis bitfinex et coinbase à 100,3 s, intervalle 340 ms :

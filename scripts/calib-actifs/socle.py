@@ -134,8 +134,9 @@ def coherent(p: dict) -> bool:
             ok = ok and (lec["modes"][a] == "calibre" or a in F3)
             ok = ok and all(a in p["series"].get(x, {}).get("paires", {}) for x in pl)
     ok = ok and all(x in p["fenetre_descriptive"]["sans"] for x in PLACES if p["series"][x]["acces"] == "archive")
-    for s in (p["series"][x] for x in PLACES):              # pages : 0 <= 2 chevauchement < pas ; sinon 0
-        ok = ok and s["voisins"] >= 0 and 0 <= 2 * s["chevauchement"] < (s["pas"] if s["acces"] == "pages" else 1)
+    for s in (p["series"][x] for x in PLACES):              # C-12 : pages : 0 <= 2c < ⌊pas/2⌋ (créneaux, C-9),
+        k, c = (s["pas"] // 2 if s["acces"] == "pages" else 1), s["chevauchement"]   # demi-requêtes sous pas ; sinon 0
+        ok = ok and s["voisins"] >= 0 and 0 <= 2 * c < k and (k + 1) // 2 + 2 * c < max(s["pas"], 2)
         ok = ok and (s["voisins"] == 0 or s["acces"] in ("mensuel", "mensuel_checksum"))      # C-3 de la G2
     return ok
 
@@ -217,11 +218,12 @@ def minutes(fen: dict) -> range:
 
 
 def pages(prm: dict, place: str, fen: dict) -> list:
-    """Découpage d'une place paginée (DECISION de FORMES-API-1, pt 1 et ajout daté) : [(début, fin, départ, borne)] ;
-    page [début ; fin) de `pas` − 2c minutes au plus (c = chevauchement) ; requête de départ = début − 60c à borne =
-    fin − 60 + 60c (`pas` bougies : début et fin − 60 servis, bornes incluses ou non) ; filtre [départ ; borne + 60)."""
+    """Découpage d'une place paginée (DECISION de FORMES-API-1, pt 1, ajouts datés, C-9) : [(début, fin, départ,
+    borne)] ; page [début ; fin) de ⌊pas/2⌋ − 2c minutes au plus (c = chevauchement) ; requête de départ = début − 60c
+    à borne = fin − 60 + 60c, ⌊pas/2⌋ créneaux au plus (moitié du maximum : jamais plafonnée ; début et fin − 60 servis,
+    bornes incluses ou non) ; filtre [départ ; borne + 60)."""
     c = prm["series"][place]["chevauchement"]
-    u = 60 * (prm["series"][place]["pas"] - 2 * c)
+    u = 60 * (prm["series"][place]["pas"] // 2 - 2 * c)
     return [(d, min(d + u, fen["fin"]), d - 60 * c, min(d + u, fen["fin"]) + 60 * (c - 1))
             for d in range(fen["debut"], fen["fin"], u)]
 

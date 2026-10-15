@@ -28,19 +28,19 @@ class TestSeries(unittest.TestCase):
         self.assertEqual((c, a), ([None, 10, 11, 11, 11, 14], [None, 0, 0, 1, 2, 0]))
 
     def test_charger(self):
-        """Fichiers d'une (place, actif) lus, .partiel ignoré ; dossier vide : CA/format. Fenêtre de 600 minutes,
-        pages de Coinbase du découpage (DETTES-T2 : 298 minutes utiles, en T0, T0 + 17880, T0 + 35760). Mutations :
+        """Fichiers d'une (place, actif) lus, .partiel ignoré ; dossier vide : CA/format. Fenêtre de 300 minutes,
+        pages de Coinbase du découpage (DETTES-T2, C-9 : 148 minutes utiles, en T0, T0 + 8880, T0 + 17760). Mutations :
         .partiel lu ; format de la place ignoré."""
         d = tempfile.mkdtemp(prefix="ca_ch_")
         self.addCleanup(shutil.rmtree, d, True)
         os.makedirs(os.path.join(d, "principale", "coinbase", "ETH"))
-        fen = {"debut": T0, "fin": T0 + 36000}
-        for nom, t in ((f"page-{T0}.json", T0), (f"page-{T0 + 17880}.json", T0 + 17880),
-                       (f"page-{T0 + 35760}.json", T0 + 35760), (f"page-{T0 + 35760}.json.partiel", T0 + 60)):
+        fen = {"debut": T0, "fin": T0 + 18000}
+        for nom, t in ((f"page-{T0}.json", T0), (f"page-{T0 + 8880}.json", T0 + 8880),
+                       (f"page-{T0 + 17760}.json", T0 + 17760), (f"page-{T0 + 17760}.json.partiel", T0 + 60)):
             with open(os.path.join(d, "principale", "coinbase", "ETH", nom), "w", encoding="ascii") as f:
                 f.write(f"[[{t}, 1, 2, 1, 1.5, 3]]")
         self.assertEqual(sorted(bougies.charger(P, d, "principale", "coinbase", "ETH", fen)),
-                         [T0, T0 + 17880, T0 + 35760])
+                         [T0, T0 + 8880, T0 + 17760])
         with self.assertRaises(socle.Refus) as r:
             bougies.charger(P, d, "principale", "coinbase", "USDT", P["fenetre"])
         self.assertEqual(r.exception.code, "CA/format")

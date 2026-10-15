@@ -66,8 +66,8 @@ class TestSocle(unittest.TestCase):
         """Place hors des unités, places non triées, N_min au-delà du nombre de places, dernière transaction hors des
         places horodatées, place sans série, planchers seuls pour ETH (F2), lecture inconnue, fenêtre non alignée,
         strates sans le dimanche ; DETTES-T2 : double chevauchement égal au pas (Coinbase), chevauchement hors pages,
-        voisins négatifs (OKX) ou hors mensuels (Kraken) : CA/parametres. Mutation : chaque contrôle de cohérence retiré
-        à son tour."""
+        voisins négatifs (OKX) ou hors mensuels (Kraken), page sans créneau (pas 1) : CA/parametres. Mutation : chaque
+        contrôle de cohérence retiré à son tour."""
         def a(cle, actif, valeur):
             return lambda p: p["lectures"]["A"][cle].update({actif: valeur})
         cas = [a("places", "USDC", ["binance", "bitfinex", "bitstamp", "kraken", "okx"]),
@@ -80,9 +80,14 @@ class TestSocle(unittest.TestCase):
                lambda p: p["series"]["coinbase"].update(chevauchement=150),
                lambda p: p["series"]["kraken"].update(chevauchement=1),
                lambda p: p["series"]["okx"].update(voisins=-1), lambda p: p["series"]["kraken"].update(voisins=1),
-               lambda p: p["series"]["coinbase"].update(chevauchement=-1)]      # C-4 de la G2 : chevauchement négatif
+               lambda p: p["series"]["coinbase"].update(chevauchement=-1),      # C-4 de la G2 : chevauchement négatif
+               lambda p: p["series"]["coinbase"].update(chevauchement=75),      # C-12 : 150 créneaux, 0 minute utile
+               lambda p: p["series"]["bitstamp"].update(pas=4),                 # C-12 : 2 créneaux, 0 minute utile
+               lambda p: p["series"]["coinbase"].update(pas=1, chevauchement=0)]   # C-12 : pas 1, aucun créneau
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
+        bord = socle.lire(ecrire_prm(self, lambda p: p["series"]["coinbase"].update(chevauchement=74)))   # C-12 : 2
+        self.assertEqual(socle.pages(bord, "coinbase", {"debut": 0, "fin": 240})[1], (120, 240, -4320, 4620))  # utiles
 
     def test_epingle_tau_sigma(self):
         """T-CA-SOC-1 : sha256 du vrai fichier par sha256sum égal à l'épingle, chemin rendu ; copie à un octet altéré

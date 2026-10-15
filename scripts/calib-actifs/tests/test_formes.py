@@ -44,7 +44,7 @@ def ecart(obtenu, attendu):
 
 class TestFormes(unittest.TestCase):
     def test_doublons_et_decoupage(self):
-        """DECISION pts 2 et 3, pages de Coinbase écrites à la main (pas 6, chevauchement 1 ; pages en 0, 4, 8, 12 ;
+        """DECISION pts 2 et 3, pages de Coinbase à la main (pas 12, 6 créneaux, chevauchement 1, pages 0, 4, 8, 12 ;
         fenêtres de filtre [-1 ; 5), [3 ; 9), [7 ; 13), [11 ; 14)) : minute de chevauchement servie deux fois,
         identique : gardée une fois ; minute 6 dans la page 0 (clôture altérée) et minute 14 dans la dernière :
         écartées ; minute 8 à clôture ou volume différent dans les pages 4 et 8, minute 3 différente dans les pages 0 et
@@ -68,11 +68,13 @@ class TestFormes(unittest.TestCase):
                ({f"page-{W0 + 60}.json": [W0 + 60]}, {}, plan), ({p8: None}, {}, plan),
                ({f"page-{W0}.json": base[f"page-{W0}.json"] + [W0 + 390]}, {},
                 refus.format("temps hors fenêtre ou hors minute")),
-               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60], p4: [W0 + 180] + base[p4]}, {}, ([], [], []))]  # C-7
+               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60], p4: [W0 + 180] + base[p4]}, {}, ([], [], [])),  # C-7
+               ({f"page-{W0}.json": base[f"page-{W0}.json"] + [W0 + 1200, W0 + 1260]}, {},  # C-9 : 7 bougies dès le
+                refus.format("réponse de plus de bougies que de créneaux demandés"))]          # départ, 6 créneaux
         for k, (pages, alterees, attendu) in enumerate(cas):
             with self.subTest(cas=k):
                 prm, d, _p = local(self, "http://127.0.0.1:9")
-                prm["series"]["coinbase"].update(pas=6, chevauchement=1)
+                prm["series"]["coinbase"].update(pas=12, chevauchement=1)
                 os.makedirs(os.path.join(d, rep))
                 for nom, ts in (base | pages).items():
                     if ts is not None:
