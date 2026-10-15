@@ -15,7 +15,7 @@ GF-9b : chaine (E11 : chaîne lancée avec un diff rouge seul, que le tableau du
 chaîne de 23 commits, environ 126 min, lancée en tâche liée sous la borne de 120 min).
 GF-10b : contrat de sortie, toute exception de l'outil rendue en 3, jamais en 1 (un refus).
 Relecture G2 : C-2 (pousser, branche poussée égale à HEAD) ; C-3 (diff lu comme git l'applique, état d'après le
-diff)."""
+diff) ; C-4 (sources de garde/hors-distant.txt, actes voisins de E17)."""
 import contextlib
 import difflib
 import hashlib
@@ -432,6 +432,34 @@ class Poussee(Depot):
         self.assertEqual(self.lancer("pousser", "--acte", "gh api repos/o/r/branches/main/protection"), (0, ""))
         self.assertEqual(self.lancer("pousser", "--acte", "docs/15-x"), (0, ""))
         self.assertEqual(self.lancer("pousser")[0], 3)
+
+    def test_c4_actes_voisins_et_sources(self):
+        """C-4 : même acte refusé écrit autrement (méthode après le chemin, -XPUT, --method=PUT, gh repo edit), et la
+        suppression de branche telle que B.92 la constate (écriture de l'API) ou par le protocole git (-d, :branche) :
+        refus P4 ; lectures et poussées ordinaires admises ; lignes sources (ADR-0028 l.293, annexe B l.1568) égales,
+        par sha256, à celles que cite garde/hors-distant.txt."""
+        refuses = ["gh api repos/o/r/branches/main/protection -X PUT --input p.json",
+                   "gh api -XPUT repos/o/r/branches/main/protection",
+                   "gh api --method=PUT repos/o/r/branches/m/protection",
+                   "gh api repos/o/r -X PATCH -f x=y", "gh repo edit o/r --enable-auto-merge",
+                   "gh api -X DELETE repos/o/r/git/refs/heads/essai/analyseur-residus",
+                   "gh api --method DELETE repos/o/r/git/refs/heads/essai/b",
+                   "gh api repos/o/r/git/refs/heads/b -X DELETE",
+                   "git push origin -d essai/analyseur-residus", "git push -d origin b", "git push origin :essai/b"]
+        for acte in refuses:
+            self.assertEqual(self.lancer("pousser", "--acte", acte)[1][:9], "REFUS P4 ", acte)
+        for acte in ["git push origin claude/x", "git push -u origin claude/x", "gh api repos/o/r/git/refs/heads/b",
+                     "gh api repos/o/r/branches/main/protection"]:
+            self.assertEqual(self.lancer("pousser", "--acte", acte), (0, ""), acte)
+        racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        with open(avant_acte.HORS, encoding="utf-8") as f:
+            texte = f.read()
+        sources = (("docs/adr-0028/ADR-0028-decisions-sortie-S2.md", 293), ("docs/adr-0028/ANNEXE-B-items.md", 1568))
+        for chemin, n in sources:
+            with open(os.path.join(racine, chemin), "rb") as f:
+                ligne = f.read().split(NL.encode())[n - 1] + NL.encode()
+            self.assertIn(f"{chemin} l.{n}", texte.replace(NL + "# ", " "), chemin)
+            self.assertIn(hashlib.sha256(ligne).hexdigest(), texte, chemin)
 
     def test_e14_publier(self):
         """E14 : heure future dans un texte publié (04:22 à 04:14) : refus C4 ; motif de secret de la gate G3 : refus,

@@ -47,7 +47,8 @@ GF-10b : toute exception d'une sous-commande sort en 3 (ligne ERREUR), jamais en
 Relecture G2, C-2 : pousser P3, la branche poussée (refs/heads/B, que pousse git push NOM B) est HEAD.
 Relecture G2, C-3 : diff lu comme git l'applique (format du diff indifférent : D1 sur les chemins de git apply
 --numstat et des en-têtes, puis analyse de HEAD plus le diff par git diff -U0) ; citations (C5) et corpus de presg5
-(G5) lus dans l'état d'après le diff."""
+(G5) lus dans l'état d'après le diff.
+Relecture G2, C-4 : pousser --acte ramène -XPUT, --method PUT et --method=PUT à -X PUT avant les motifs."""
 import argparse
 import fnmatch
 import hashlib
@@ -376,7 +377,8 @@ def pousser(a, fautes):
     with open(HORS, encoding="utf-8") as f:
         regles = [x.split(" ", 1) for x in f.read().split(chr(10)) if x.strip() and not x.startswith("#")]
     if a.acte is not None:
-        if any(fnmatch.fnmatchcase(a.acte, m) for k, m in regles if k == "acte"):
+        acte = re.sub("(?:--method[ =]|-X ?)([A-Za-z]+)", lambda m: "-X " + m[1].upper(), a.acte)
+        if any(fnmatch.fnmatchcase(acte, m) for k, m in regles if k == "acte"):
             fautes.append(("refus", "P4", "acte sur la forge déjà refusé par le mandataire réseau (B.95, E17)",
                            "ne pas le retenter : le décrire pas à pas à l'investisseur", "-"))
         return

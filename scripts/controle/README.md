@@ -261,3 +261,15 @@ dépendent des tests du harnais qu'ils importent.
 > correction), une citation de l'ancien texte d'une ligne changée l'est. `lignes_ajoutees` force les préfixes a/ et
 > b/ (au `commit`, un dépôt réglé en `diff.mnemonicPrefix` désarmait C7). `tests/test_avant_acte.py` compte 27
 > tests ; plancher du job `controle-unittest` 94.
+
+> *Ajout daté du 2026-10-10 08:54:33 UTC (`date -u` ; lot GARDE-FOUS-ORCH, relecture G2, C-4 ; Q-4, erreur E17)* :
+> `garde/hors-distant.txt` (sha256 `02db356c2493521d58e1af6caca1b80c9c59717e07cb3c7f4bd3c473cf131cfe`) : la
+> suppression de branche se fonde sur l'annexe B, B.92 (`docs/adr-0028/ANNEXE-B-items.md` l.1568, sha256 de la
+> ligne écrit au fichier : réponse 403 du mandataire à la suppression de la branche jetable `essai/analyseur-residus`
+> par une écriture de l'API), non sur E17 ; les trois lignes de commentaire sont récrites à nombre égal, le reste
+> ajouté en fin. Motifs ajoutés : suppression par l'API (forme constatée) et par le protocole git (`-d`,
+> `:branche`), méthode après le chemin, `gh repo edit`. `avant_acte.py` (sha256
+> `917eb65c700f1dcd080da331e7f459737adba29c6a2f1624589e7db397a391a3`) ramène `-XPUT`, `--method PUT` et
+> `--method=PUT` à `-X PUT` avant les motifs. `tests/test_avant_acte.py` compte 28 tests
+> (`test_c4_actes_voisins_et_sources` : sha256 des deux lignes sources rejoués) ; plancher du job
+> `controle-unittest` 95.

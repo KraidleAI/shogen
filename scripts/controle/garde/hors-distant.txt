@@ -5,11 +5,24 @@
 # l'autorise pas ; [...] le push éventuel se limite aux préfixes sans ces fichiers.
 chemin docs/15-*
 chemin docs/16-*
-# Écritures sur la forge refusées par le mandataire réseau : HTTP 403 sur la protection de branche et sur les réglages
-# du dépôt, constatés le 2026-10-10 (annexe B, bloc B.95 ; la lecture est admise) ; suppression de branche refusée
-# selon la liste des erreurs de l'orchestrateur (E17), à confirmer. Motifs fnmatch sur le texte de l'acte.
+# Écritures sur la forge refusées par le mandataire réseau (HTTP 403 ; la lecture est admise) : protection de branche
+# et réglages du dépôt, le 2026-10-10 (annexe B, B.95 ; docs/adr-0028/forge-pr11/refus-mandataire.txt) ; suppression
+# de branche par l'API, le 2026-10-10 (annexe B, B.92 : source exacte en fin de fichier). Motifs fnmatch de l'acte.
 acte *-X PUT *protection*
 acte *--method PUT *protection*
 acte *-X PATCH *repos/*
 acte *--method PATCH *repos/*
 acte git push*--delete*
+# Relecture G2 du lot (C-4, Q-4) : la suppression refusée est celle de la branche jetable essai/analyseur-residus, par
+# une écriture de l'API (réponse 403 du mandataire), docs/adr-0028/ANNEXE-B-items.md l.1568 (B.92) ; sha256 de la
+# ligne entière, saut de ligne compris : 0c3a9bfc1a2dc935fb255d980882722799bbdd1ab59a51963558366cc4282196 ; et non E17
+# [2nd]. Même requête écrite autrement : méthode après le chemin, -XPUT, --method=PUT (ramenés à -X PUT par l'outil),
+# gh repo edit (réglages) ; suppression d'une branche par le protocole git (-d, :branche) : refus conservateur, non
+# constaté.
+acte *-X DELETE *git/refs/*
+acte *git/refs/*-X DELETE*
+acte *protection*-X PUT*
+acte *repos/*-X PATCH*
+acte gh repo edit*
+acte git push* -d *
+acte git push* :*
