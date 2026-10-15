@@ -126,3 +126,13 @@ dépendent des tests du harnais qu'ils importent.
 > dépôts git temporaires isolés de la configuration de l'hôte (ni configuration globale ni système : ni crochet ni
 > signature), jamais le dépôt du projet. `tests/test_garde_commun.py` compte 15 tests ; plancher du job
 > `controle-unittest` 57.
+
+> *Ajout daté du 2026-10-10 06:01:41 UTC (`date -u` ; lot GARDE-FOUS-ORCH, GF-5 ; erreur LA-N05)* : `avant_acte.py`
+> (sha256 `2666baf289bc3e7a419f3abeeed2a771890805a5d5ed1eceef8e25e6308e514b`), contrôles avant l'acte : `python3 -I -B
+> scripts/controle/avant_acte.py [--depot D] <sous-commande>` ; sorties 0 conforme, 1 refus (une ligne `REFUS <code> :
+> <raison> ; à faire : <geste>` par faute), 3 erreur ; journal non versionné `<git-path shogen-garde>/journal.tsv` :
+> heure de `date -u`, sous-commande, code, niveau, colonne `contourne` (avis b.5 adopté), une ligne par refus,
+> avertissement ou contournement, une ligne conforme sinon. `sceller`, derrière la vérification complète
+> (`<vérification> && avant_acte.py sceller`) : sceau sous la clé sha256 de HEAD et de l'arbre de l'index, ou de
+> `HEAD^{tree}` avec `--tete` ; refusé (S1) si un chemin est hors de l'index ou non suivi, ou, avec `--tete`, non
+> commis. `tests/test_avant_acte.py` (3 tests) ; plancher du job `controle-unittest` 60.
