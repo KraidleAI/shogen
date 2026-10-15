@@ -79,7 +79,8 @@ class TestSocle(unittest.TestCase):
                lambda p: p["strates"].update(stress=[5]), lambda p: p["fenetre_descriptive"].update(sans=["okx"]),
                lambda p: p["series"]["coinbase"].update(chevauchement=150),
                lambda p: p["series"]["kraken"].update(chevauchement=1),
-               lambda p: p["series"]["okx"].update(voisins=-1), lambda p: p["series"]["kraken"].update(voisins=1)]
+               lambda p: p["series"]["okx"].update(voisins=-1), lambda p: p["series"]["kraken"].update(voisins=1),
+               lambda p: p["series"]["coinbase"].update(chevauchement=-1)]      # C-4 de la G2 : chevauchement négatif
         for modif in cas:
             self.assertRefus("CA/parametres", socle.lire, ecrire_prm(self, modif))
 

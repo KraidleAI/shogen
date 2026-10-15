@@ -53,6 +53,8 @@ class TestFormes(unittest.TestCase):
         double dans une page admis ; filtre à la fenêtre ou depuis le début de page ; plan libre."""
         fen = {"debut": W0, "fin": W0 + 840}
         m, rep = marche(fen), os.path.join("principale", "coinbase", "ETH")
+        m5 = m | {W0 + 390: ("1.5", "1")}             # C-5 de la G2 : temps non rond hors de la page 0 ; C-7 : page 0
+        # de 3 bougies (sous le plafond), une avant le départ, aucune à sa dernière minute : admise (minute 3 en page 4)
         base = {f"page-{W0 + 60 * a}.json": [W0 + 60 * i for i in range(a, b)]
                 for a, b in ((0, 5), (4, 9), (8, 13), (12, 15))}
         base[f"page-{W0}.json"].append(W0 + 360)
@@ -63,7 +65,10 @@ class TestFormes(unittest.TestCase):
         cas = [({}, {}, ([], [], [])), ({}, {(p8, W0 + 480): ("9.99", v8)}, vd), ({}, {(p8, W0 + 480): (c8, "7")}, vd),
                ({p4: base[p4] + [W0 + 300]}, {}, refus.format("minute en double")),
                ({p4: [W0 + 180] + base[p4]}, {(p4, W0 + 180): ("9.99", "1")}, vd),
-               ({f"page-{W0 + 60}.json": [W0 + 60]}, {}, plan), ({p8: None}, {}, plan)]
+               ({f"page-{W0 + 60}.json": [W0 + 60]}, {}, plan), ({p8: None}, {}, plan),
+               ({f"page-{W0}.json": base[f"page-{W0}.json"] + [W0 + 390]}, {},
+                refus.format("temps hors fenêtre ou hors minute")),
+               ({f"page-{W0}.json": [W0 - 120, W0, W0 + 60], p4: [W0 + 180] + base[p4]}, {}, ([], [], []))]  # C-7
         for k, (pages, alterees, attendu) in enumerate(cas):
             with self.subTest(cas=k):
                 prm, d, _p = local(self, "http://127.0.0.1:9")
@@ -71,7 +76,8 @@ class TestFormes(unittest.TestCase):
                 os.makedirs(os.path.join(d, rep))
                 for nom, ts in (base | pages).items():
                     if ts is not None:
-                        rangs = [[t, 1, 2, 0.5, *(altere | alterees).get((nom, t), m[t])] for t in ts if m[t][1] != "0"]
+                        rangs = [[t, 1, 2, 0.5, *(altere | alterees).get((nom, t), m5[t])]
+                                 for t in ts if m5[t][1] != "0"]
                         with open(os.path.join(d, rep, nom), "w", encoding="ascii") as f:
                             f.write(json.dumps(rangs).replace('"', ""))
                 obtenu = essai(lambda: bougies.charger(prm, d, "principale", "coinbase", "ETH", fen))

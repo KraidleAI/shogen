@@ -96,14 +96,16 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
     dans un fichier : CA/format (E-CA-16). Sans `fenetres` : hors de [debut ; fin) ou double : CA/format. `fenetres`
     [(a, b)] par fichier (FORMES-API-1, pts 2 et 3) : hors de [a ; b) ∩ [debut ; fin) écartée ; minute de deux
     fichiers aux mêmes clôture et volume (chevauchement) gardée une fois, aux valeurs différentes : CA/format. `garde`
-    (mois voisins, C-1 de la G2) : une minute hors fenêtre n'est écartée que dans [garde[0] ; garde[1])."""
+    (mois voisins, C-1 de la G2) : une minute hors fenêtre n'est écartée que dans [garde[0] ; garde[1]).
+    Page (a, b, pas, fin) : réponse de `pas` bougies, une avant a, aucune à fin − 60 ou après : CA/format (C-7)."""
     out, vals = {}, {}
     try:
         for k, octets in enumerate(fichiers):
-            a, b = fenetres[k] if fenetres else (fen["debut"], fen["fin"])
-            a, b, vus = max(a, fen["debut"]), min(b, fen["fin"]), set()
+            a, b, *plafond = fenetres[k] if fenetres else (fen["debut"], fen["fin"])
+            depart, a, b, vus, ts = a, max(a, fen["debut"]), min(b, fen["fin"]), set(), []
             for t, cloture, volume in LECTEURS[format_](octets):
                 c, v = Decimal(cloture), Decimal(volume)
+                ts.append(t)
                 if not (c.is_finite() and v.is_finite() and c >= 0 <= v):
                     raise _refus("nombre non fini ou négatif", place, actif)
                 dehors = not a <= t < b
@@ -117,6 +119,8 @@ def serie(format_: str, fichiers: list, fen: dict, place=None, actif=None, fenet
                     raise _refus("minute en double aux valeurs différentes", place, actif)
                 vus.add(t)
                 out[t] = (c, v > 0)
+            if plafond and len(ts) == plafond[0] and min(ts) < depart and max(ts) < plafond[1] - 60:
+                raise _refus("réponse plafonnée ancrée avant le départ : fin de page tronquée", place, actif)
     except Forme as e:
         raise _refus(str(e), place, actif) from None
     except (ValueError, KeyError, IndexError, TypeError, InvalidOperation, zipfile.BadZipFile) as e:
@@ -149,7 +153,7 @@ def charger(prm: dict, bruts: str, nom: str, place: str, actif: str, fen: dict) 
     if not noms:
         raise _refus("aucun fichier acquis", place, actif)
     if s["acces"] == "pages":
-        plan = {f"page-{a}.json": (depart, borne + 60) for a, _b, depart, borne in socle.pages(prm, place, fen)}
+        plan = {f"page-{a}.json": (dep, borne + 60, s["pas"], b) for a, b, dep, borne in socle.pages(prm, place, fen)}
         if set(plan) != set(noms):
             raise _refus("pages différentes du découpage de la fenêtre", place, actif)
         fenetres = [plan[x] for x in noms]

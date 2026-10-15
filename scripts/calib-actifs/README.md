@@ -18,6 +18,8 @@ calibration d'ETH, d'USDC et d'USDT sur historiques publics ; ne lit aucune donn
   Chargement : fichiers exactement les pages de `socle.pages` ; bougie hors de la fenêtre de sa page (Coinbase : qui
   précède `start` ; minute qui suit la fenêtre) écartée ; une minute servie par deux pages aux mêmes valeurs est
   gardée une fois, aux valeurs différentes : CA/format nommé. Binance et Kraken restent stricts.
+  Une réponse de page de `pas` bougies dont une précède le départ et aucune n'atteint la dernière minute de la page
+  est refusée (CA/format, fin de page tronquée, C-7 de la G2).
   OKX (alignement UTC ou UTC+8 non écrit) : `voisins` 1, le mois précédent et le suivant sont acquis, seules les
   minutes de la fenêtre sont gardées, une minute hors des mois acquis (± 14 h) est refusée ; le mois qui suit la
   fenêtre descriptive (2026-10) n'est publié qu'après sa fin : jusque-là, l'acquisition sort en code 4 sur
