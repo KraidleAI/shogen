@@ -82,6 +82,9 @@ class TestCouverture(unittest.TestCase):
         comparées ; bougies d'avant le départ non comptées comme preuve ; réponse entièrement après la fin admise (R-2).
         DT2-p (marge de R-2) : décalée d'une minute vers l'avant, minutes 0 à 13 sans échange : la page 0 ne sert que la
         minute 14, sa borne + c (chevauchement) : admise, série égale à la vérité ; mutation : marge c retirée.
+        R-8 du contre-contrôle cc2 (marge selon c ; Bitfinex, paginée, a c = 0 dans le lot) : couverture simple,
+        chevauchement 0, fenêtre d'une page de 15 minutes sans échange, décalée d'une minute vers l'avant : la page 0
+        ne sert que la minute 15, après sa borne (14) + c (0) : refus nommé ; mutation : marge fixée à une minute.
         """
         noms = sorted([f"{x}-{W0 + d + 780 * k}.json" for x, d in (("page", 0), ("double", -360)) for k in range(4)] + [
             f"sonde-{W0 + 60 * x}.json" for x in (25, -487, -231, -103, -167, -199, -215, -207, -211, -213, -214)])
@@ -101,6 +104,8 @@ class TestCouverture(unittest.TestCase):
             with self.subTest(nom=nom):
                 self.assertEqual(self.acquis(FEN, f, pas=30, chevauchement=1, couverture=2)[2], DISCORDE if nom !=
                                  "avant-100" else APRES)
+        self.assertEqual(self.acquis({"debut": W0, "fin": W0 + 900}, lambda m: lecture(m, "cren", -1), pas=30,
+                                     chevauchement=0, couverture=1, sans=range(15))[2], APRES)      # R-8 : c = 0
 
     def test_aucune_demi_requete_vide(self):
         """C-14 : couverture simple, chevauchement 0, pas 30 (15 minutes utiles), fenêtre de 16 minutes : pages 0 et 15
