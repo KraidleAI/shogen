@@ -23,7 +23,8 @@ Règles PreToolUse (R1 à R6) :
      (#123, PR n° 123, pull/123) dans un .md, un message de commit, une PR, un texte écrit par le shell :
      il doit avoir été affiché par un outil (tool_result, attachment, queue-operation) ; le texte tapé par
      l'agent et les refus de ce crochet ne comptent pas.
-Crochets Stop et SubagentStop (R6) : le dernier texte de l'agent ne porte aucun nombre de trois chiffres ou plus,
+Crochets Stop et SubagentStop (R6) : le dernier texte de l'agent ne porte aucun nombre de trois chiffres ou plus (ni, E29, aucun
+nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille de route : jours, semaines, %, observateurs, …),
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
 du même tour, laisser passer et le consigner (fichier d'état sous le dossier de la session).
 Journal des décisions : <dossier de session>/garde-faits.log (une ligne par refus et par passage consigné).
@@ -40,6 +41,8 @@ MARQUE = "GARDE-FAITS"
 HEX_ID = re.compile(r"(?<![0-9a-fA-F])([0-9a-f]{7,40})(?![0-9a-fA-F])")
 PR_NUM = re.compile(r"(?:(?<![\w/])#|\bPR\s*(?:n°|no\.?|#)?\s*|pull/|pulls/)(\d{1,6})\b", re.I)
 NOMBRE = re.compile(r"(?<![\w.,])(\d{1,3}(?:[   ,]\d{3})+(?:[.,]\d+)?|\d+[.,]\d+|\d{3,})(?![\w])")
+# E29 (2026-10-15) : un nombre d un ou deux chiffres suivi d une unite ou d une grandeur de la feuille de route est un fait
+NOMBRE_UNITE = re.compile(r"(?<![\w.,])(\d{1,2})(?=\s*(?:%|jours?|semaines?|mois|heures?|minutes?|ans?|années?|observateurs?|actifs?|commits?|fenêtres?|pas|tests?|hôtes?|unités?|sources?|pages?|citations?|lignes?|items?|lots?|diffs?|machines?|places?|classes?|strates?|étapes?)\b)", re.I)
 LECTURE_SHELL = re.compile(r"\b(cat|tail|head|less|more|diff|grep|awk|sed\s+-n|git\s+show|sha256sum\s+-c|wc)\b")
 REDIR = re.compile(r"(?<![<>])(>>?|\btee(?:\s+-a)?)\s+(?!&)(['\"]?)([^\s'\"|;&]+)\2")
 SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\"|;&]+)\1\s*(?:[;&|]|$)")
@@ -327,6 +330,10 @@ def stop(entree, sous_agent):
     for m in NOMBRE.findall(dernier):
         fs = formes_nombre(m)
         if fs & corpus_norm or any(f.replace(".", "") in corpus_plat for f in fs) or m in corpus:
+            continue
+        manquants.append(m)
+    for m in NOMBRE_UNITE.findall(dernier):
+        if re.search(r"(?<![\d.,])" + m + r"(?![\d])", corpus) or m in manquants:
             continue
         manquants.append(m)
     if not manquants:

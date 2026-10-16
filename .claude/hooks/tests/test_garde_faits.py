@@ -176,6 +176,19 @@ class R6_Stop(Base):
         with open(os.path.join(self.dossier, "garde-faits.log"), encoding="utf-8") as f:
             self.assertIn("PASSAGE", f.read())
 
+    def test_refuse_duree_de_memoire_E29(self):
+        self.ecrire_journal([entree_resultat("git status : propre"), entree_texte("Pendant les 28 jours de collecte, le travail continue.")])
+        err = self.refuse("Stop")
+        self.assertIn("28", err)
+
+    def test_permis_duree_lue_E29(self):
+        self.ecrire_journal([entree_resultat("(e) ... 16 semaines donnent 0,91"), entree_texte("La collecte dure 16 semaines.")])
+        self.permet("Stop")
+
+    def test_permis_petit_nombre_sans_unite(self):
+        self.ecrire_journal([entree_resultat("ok"), entree_texte("Point 3 de la liste, pas 7 de la chaîne DT7-l, section 2 du plan.")])
+        self.permet("Stop")
+
     def test_permis_nombres_affiches(self):
         self.ecrire_journal([entree_resultat("n = 1715 ; phi = 0.901"), entree_texte("Résultat : 1 715 fenêtres et 0,901.")])
         self.permet("Stop")
