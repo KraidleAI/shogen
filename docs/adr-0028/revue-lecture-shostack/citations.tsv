@@ -1,0 +1,92 @@
+id	citation	page_attendue	page_trouvee	occurrences	mots	trouvee_une_fois_bonne_page_25_mots_max
+Q01	which is the first of four major activities involved in threat modeling	4	4	1	12	oui
+Q02	The other three include finding threats, addressing them, and then checking your work.	4	4	1	13	oui
+Q03	Have we looked at each element of the diagram?	28	28	1	9	oui
+Q04	Do we have a test case per threat?	28	28	1	8	oui
+Q10	It’s difficult to know when you’re done brainstorming	34	34	1	8	oui
+Q11	Centering on one of those is preferable to using approaches that attempt to combine them	34	34	1	15	oui
+Q12	Talking about human threat agents can help make the threats real.	40	40	1	11	oui
+Q13	I recommend against using attackers as the center of your threat modeling process.	41	41	1	13	oui
+Q14	I am fond of software-centric approaches because you should expect software developers to understand the software they’re developing.	43	43	1	18	oui
+Q15	problems tend to follow the data flow, not the control flow	44	44	1	11	oui
+Q16	What enables good threat models is clarity about what boundaries exist and how those boundaries are to be protected.	50	50	1	19	oui
+Q17	threats tend to cluster around trust boundaries and complex parsing, but may appear anywhere that information is under the control of an attacker	51	51	1	23	oui
+Q18	If you can’t tell a story about the software without editing the diagram, then it’s not accurate.	54	54	1	17	oui
+Q19	All ways data can arrive should be shown.	55	55	1	8	oui
+Q21	create an appropriate tracking item to ensure that you recheck your diagrams at a good time	56	56	1	16	oui
+Q30	The STRIDE threats are the opposite of some of the properties you would like your system to have: authenticity, integrity, non-repudiation, confidentiality, availability, and authorization	62	62	1	25	oui
+Q31	STRIDE was not intended as, nor is it generally useful for, categorization.	64	64	1	12	oui
+Q32	The goal of STRIDE is to help you find attacks.	64	64	1	10	oui
+Q33	even if there is a mitigation in place, that mitigation is a testable feature, and you should ensure that you have a test case	64	64	1	24	oui
+Q34	STRIDE-per-element makes STRIDE more prescriptive by observing that certain threats are more prevalent with certain elements of a diagram.	78	78	1	19	oui
+Q35	it’s worth analyzing whether the table covers the set of issues you care about	79	79	1	14	oui
+Q36	if you want to focus on the most likely issues, however, it will likely be a distraction	79	79	1	17	oui
+Q37	When you have a threat per checkbox in the STRIDE-per-element table, you are doing reasonably well.	79	79	1	16	oui
+Q38	There are three ways to judge whether you’re done finding threats with STRIDE.	85	85	1	13	oui
+Q39	Not having met these criteria will tell you that you’re not done, but having met them is not a guarantee of completeness.	85	85	1	22	oui
+Q40	both of these criterion will be reached before you’ve found all threats	85	85	1	12	oui
+Q41	If you don’t have logs, don’t retain logs, or can’t analyze logs, repudiation threats are hard to dispute.	69	69	1	18	oui
+Q42	There are a variety of ways to learn secrets about who’s talking to whom, including watching DNS	72	72	1	17	oui
+Q43	data flows on a single machine can still be attacked, particularly when the machine is shared by cloud co-tenants	72	72	1	19	oui
+Q44	Compromise TLD, registrar or DNS operator	65	65	1	6	oui
+Q50	expect to have about five threats per diagram element	128	128	1	9	oui
+Q51	You have a diagram or diagrams that everyone agrees represents the system.	128	128	1	12	oui
+Q52	you should start from the highest-level view you can build of the entire system	129	129	1	14	oui
+Q53	If you don’t have a preference, try starting from what crosses trust boundaries, as threats tend to cluster there.	130	130	1	19	oui
+Q54	Therefore, you should find threats breadth-first.	131	131	1	6	oui
+Q55	or possibly longer if the data the system holds is particularly sensitive	127	127	1	12	oui
+Q56	the column headers are Diagram Element, Threat Type, Threat, and Bug ID/Title	133	133	1	12	oui
+Q57	You can check your work by validating that the expected threats are all present in the table.	133	133	1	17	oui
+Q58	ensure that you’re not assuming your way into a problem	135	135	1	10	oui
+Q59	The impact if it’s wrong	135	135	1	5	oui
+Q60	When they need to do so	136	136	1	6	oui
+Q61	Residual risk to users or operators	138	138	1	6	oui
+Q62	What is out of scope—and why	138	138	1	6	oui
+Q63	Across the Internet, each side must treat the other as untrusted.	141	141	1	11	oui
+Q64	Document what security checks you perform, and the checks you expect callers to perform for themselves.	142	142	1	16	oui
+Q65	It should end with a set of security bugs being filed	143	143	1	11	oui
+Q66	subject to an information disclosure threat via a subpoena or other legal demand	139	139	1	13	oui
+Q67	The attacker gets to choose where to go, so you need to defend everywhere.	132	132	1	14	oui
+Q70	develop at least two tests per threat	190	190	1	7	oui
+Q71	The model actually matches reality closely enough.	195	195	1	7	oui
+Q72	Everything in the threat list is addressed and the threat model portion of the test plan is complete.	195	195	1	18	oui
+Q74	you need to check whether your model is close enough to reality to be useful	195	195	1	15	oui
+Q75	Have you gone through each threat, and decided on a strategy and a tactic for addressing it?	196	196	1	17	oui
+Q76	bugs act as an exit point from threat modeling	196	196	1	9	oui
+Q77	write those things down, and testers should test the assumptions	198	198	1	10	oui
+Q78	documenting as you go is easier, constrained, and helps those who review the threat models	198	198	1	15	oui
+Q79	you might have additional tables for accepted risks (see Table 10-3) and transferred risks (see Table 10-4)	199	199	1	17	oui
+Q80	In tracking accepted risks, the key deliverable is an understanding of the risks you’re accepting	200	200	1	15	oui
+Q81	Who accepted it	200	200	1	3	oui
+Q82	Why you can’t fix it	201	201	1	5	oui
+Q83	Are the dependencies up to date with security fixes?	194	194	1	9	oui
+Q90	Trusted parties can betray the people who trust them.	342	342	1	9	oui
+Q91	Mallory can also tap into the network but is willing and able to create, destroy, or modify communication content.	342	342	1	19	oui
+Q92	ask yourself, do you want to rely on that party to behave in a trustworthy way, and what’s the downside if they betray you?	342	342	1	24	oui
+Q93	embedding a symmetric key in your code. That key is available to everyone with a debugger.	349	349	1	16	oui
+Q94	default chain to any of the 100 or so roots in the Windows Root Certificate Store	349	349	1	16	oui
+Q95	store them securely, and revoke or expire them appropriately	349	349	1	9	oui
+Q96	with software deciding that only a small set of certificate issuers will be allowed to issue certificates	347	347	1	17	oui
+Q97	Key rotation is generally desirable, as it limits exposure to undetected compromise	347	347	1	12	oui
+Q98	Convergence builds on the idea of memory by sharing the key that various participants see	347	347	1	15	oui
+Q99	These are attacks against protocols, executed by a MITM.	344	344	1	9	oui
+Q100	such negotiation explodes your attack surface, your analysis work, your future compatibility work, and your test plan	346	346	1	17	oui
+Q101	If you have multiple authentication options, then the attacker gets to choose the weakest one to attack.	346	346	1	17	oui
+Q102	the proofs may or may not cover the same things that you’re worried about	340	340	1	14	oui
+Q103	most proofs rest on a set of implicit assumptions	340	340	1	9	oui
+Q104	The trusted party is the one who can betray you, and minimizing trust (who can betray you) is a good engineering goal.	351	351	1	22	oui
+Q105	A replay attack is one in which Mallory captures messages and resends them.	344	344	1	13	oui
+Q106	It is almost always a mistake to assume that Mallory can’t do this because of any non-cryptographic reason.	343	343	1	18	oui
+Q107	Eve is an eavesdropper. She is able to tap into the network between Alice and Bob	341	341	1	16	oui
+Q108	If you do not have a plan and test suite for upgrades, you almost certainly will end up being unable to securely upgrade.	346	346	1	23	oui
+Q110	consider how each element of the product, process, or system might come under attack by a motivated skeptic	477	477	1	18	oui
+Q111	This section lays out four sets of attackers	478	478	1	8	oui
+Q112	organized crime, state affiliated, and activists	478	478	1	6	oui
+Q113	Partners and competitors come under this category.	479	479	1	7	oui
+Q114	Legal adversary	479	479	1	2	oui
+Q115	Information partner	480	480	1	2	oui
+Q117	clusters best when using two key axes: Motivation and Skill	481	481	1	10	oui
+Q118	highly trusted by the organization, usually has access to bookkeeping functions and/or systems	493	493	1	13	oui
+Q119	Modified DNS entries for a ticket agency’s computers.	495	495	1	8	oui
+Q120	Modified the random number generator in an OEM software image	499	499	1	10	oui
+Q37b	If you circle around and consider threats against your mitigations (or ways to bypass them) you’ll be doing pretty well.	80	80	1	20	oui
