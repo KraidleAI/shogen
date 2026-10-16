@@ -1092,6 +1092,12 @@ L'acte d'E1 et l'avis des pairs' sont lus ; « this quotation is English and is 
 @@@ docs/adr-0028/ANNEXE-B-items.md
 | SHOGEN-EXEMPLE-1 | objet | SHOGEN-MENTION-1 |
 | 9 | ligne sans identifiant en tête | SHOGEN-MENTION-2 |
+@@@ docs/RENVOIS-LIGNES.tsv
+# registre synthétique des renvois (une ligne de commentaire)
+renvoi\tjeton\tcible\tecrit\tlignes\tempreinte\tcommit
+docs/17-modele-de-menace.md:4\tcrates/exemple.rs:2-3\tcrates/exemple.rs\t2-3\t2-3\t849ab6324f790f2f\t0000000
+docs/17-modele-de-menace.md:4\tcrates/LISEZMOI:1\tcrates/LISEZMOI\t1\t1\t38e9b1de50176b4a\t0000000
+docs/17-modele-de-menace.md:12\tcrates/exemple.rs:1\tcrates/exemple.rs\t1\t1\t4bb546d3a6668da1\t0000000
 @@@ docs/source.md
 Selon lui, une phrase française de la source, citée telle quelle, fait foi.
 @@@ crates/exemple.rs
@@ -1118,7 +1124,7 @@ fn notes_sg9_vert(cas: &str, ajout: &str) -> String {
     let rapport = xtask::sg9::executer(&racine);
     rapport.imprimer();
     assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
-    assert_eq!((rapport.examines, rapport.presents), (4, 4), "couverture");
+    assert_eq!((rapport.examines, rapport.presents), (5, 5), "couverture");
     rapport.notes.join("\n")
 }
 
