@@ -71,9 +71,9 @@ def controler(gabarit: str, rapport: str, doc09: str = DOC09) -> list:
     motifs, vals = mots(rapport, doc09), valeurs(gabarit, rapport)
     if isinstance(vals, str):
         return motifs + [vals]
-    vides, noms = sorted({n for n, v in vals if v == f"<{n}>"}), {n for n, _ in vals}
-    if vides:
-        return motifs + ([] if len(vides) == len(noms) else [f"champs ni tous remplis ni tous vides ; vides : {vides}"])
+    vides, pleins = sorted({n for n, v in vals if v == f"<{n}>"}), [n for n, v in vals if v != f"<{n}>"]
+    if vides:      # occurrences, non noms : un champ répété rempli une seule fois n'est pas vide (G2, C-1)
+        return motifs + ([] if not pleins else [f"champs ni tous remplis ni tous vides ; vides : {vides}"])
     empreintes, d = {n.split(".", 1)[1] for n, _ in vals if n.startswith("sha256.")}, {}
     for n, v in vals:
         genre = n.split(".", 1)[0]

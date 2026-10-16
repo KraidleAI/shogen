@@ -62,6 +62,7 @@ class GabaritControle(unittest.TestCase):
     def test_champs_et_texte_fixe(self):
         self.assertEqual(lancer(G, remplir()), (0, ""))
         for rapport, motif in ((remplir(libre_client="<libre.client>"), "ni tous remplis ni tous vides"),
+                               (G.replace("fin `<libre.client>`", "fin `Acme 3, R1`"), "ni tous remplis ni tous vides"),
                                (remplir().replace("- k :", "- K :"), "changé ou absent après <libre.client>"),
                                (remplir().replace("# R", "# X"), "changé avant le premier champ"),
                                (remplir().replace("fin `Acme`", "fin `Beta`"), "<libre.client> : deux valeurs"),
