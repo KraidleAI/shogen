@@ -1531,8 +1531,10 @@ fn mutant_couverture_sg9_registre_des_renvois_absent() {
 }
 
 /// Sûreté (relecture G2 de DETTES-T15, C-3) : une entrée qui nomme un emplacement interdit, en cible ou en document
-/// citant, est refusée sans lecture. Sans ce refus, la gate lisait la ligne citante et hachait les lignes citées : ces
-/// deux entrées, justes, passaient (empreinte de « ligne » : fe9d9907da5ee9a7, `sha256sum` hors du code).
+/// citant, est refusée sans lecture. Sans ce refus, la gate lisait la ligne citante et hachait les lignes citées : les
+/// deux premières entrées, justes, passaient (empreinte de « ligne » : fe9d9907da5ee9a7, `sha256sum` hors du code).
+/// Dans les deux dernières, le fichier interdit rougirait l'entrée s'il était lu (empreinte, jeton) : une lecture
+/// faite avant le refus ajoute une violation (contre-contrôle de DETTES-T15, R-1, mutant M01).
 #[test]
 fn mutant_sg9_registre_emplacement_interdit_jamais_lu() {
     let cas = [
@@ -1544,6 +1546,16 @@ fn mutant_sg9_registre_emplacement_interdit_jamais_lu() {
         (
             "",
             "Lu : exemple.rs l.2.\n",
+            "docs/rapports/factice.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t0000000\n",
+        ),
+        (
+            "Lu : factice.md l.1.\n",
+            "autre\n",
+            "docs/journal.md:3\tfactice.md l.1\tdocs/rapports/factice.md\t1\t1\tfe9d9907da5ee9a7\t0000000\n",
+        ),
+        (
+            "",
+            "sans le jeton\n",
             "docs/rapports/factice.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t0000000\n",
         ),
     ];
