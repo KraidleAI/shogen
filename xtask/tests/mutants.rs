@@ -919,6 +919,149 @@ fn mutant_sg5_interdits_casse_et_jsonl() {
 }
 
 // ---------------------------------------------------------------------------
+// S-G5 et commentaires HTML (lot DETTES-T15 ; SHOGEN-SG5-COMMENTAIRE-HTML-1, adjudication de DETTES-T14, Q-6 (i)) : un
+// commentaire `<!-- … -->` d'une page détenue n'est pas du texte affiché. Fixture minimale, de la forme de la page NIST
+// §1.3.5.15 du 2026-10-09 (règle retirée de la section affichée, restée en commentaire, balises comprises), non copiée.
+// ---------------------------------------------------------------------------
+
+/// La phrase témoin de l'arbre documentaire, suivie de `suite` : une page détenue `biblio/artefact-a.html`.
+fn page_detenue(suite: &str) -> String {
+    format!("<p>this quotation is present in the corpus and it is checked by the gate</p>\n{suite}")
+}
+
+/// S-G5 sur l'arbre documentaire, `biblio/<artefact>` réécrit, docs/note.md augmenté de la citation « `citation` ».
+fn sg5_page(cas: &str, artefact: &str, contenu: &str, citation: &str) -> Rapport {
+    let racine = arbre_documentaire(cas);
+    ecrire(&racine, &format!("biblio/{artefact}"), contenu);
+    ajouter(
+        &racine,
+        "docs/note.md",
+        &format!("\nUne citation : « {citation} ».\n"),
+    );
+    let rapport = xtask::sg5::executer(&racine);
+    rapport.imprimer();
+    rapport
+}
+
+const REGLE_RETIREE: &str = "the rule that is kept only in this comment is not shown to the reader";
+const AFFICHEE: &str = "the sentence after the comment is shown to the reader and it is found";
+
+/// La forme NIST : en-tête et paragraphe balisés dans le commentaire, premier `>` à moins de 300 octets de `<!--`.
+fn commentaire_nist() -> String {
+    let remplissage = "the padding of this section is long and it has no tag in it. ".repeat(6);
+    format!(
+        "<!-- <h3>Definition</h3>\n<p>{REGLE_RETIREE}.</p>\n<p>{remplissage}</p> -->\n<p>{AFFICHEE}.</p>\n"
+    )
+}
+
+#[test]
+fn mutant_sg5_commentaire_html_regle_retiree_de_la_page() {
+    let page = page_detenue(&commentaire_nist());
+    let rapport = sg5_page(
+        "sg5-commentaire-nist",
+        "artefact-a.html",
+        &page,
+        REGLE_RETIREE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Commentaire de plus de 300 octets sans balise (le débalisage le gardait entier), en `.html`, `.htm` et `.md`.
+#[test]
+fn mutant_sg5_commentaire_html_long_sans_balise() {
+    let long = format!(
+        "<!-- {REGLE_RETIREE} ; {} -->\n",
+        "and it has no tag. ".repeat(20)
+    );
+    let cas = [
+        ("artefact-a.html", page_detenue(&long)),
+        ("artefact-d.htm", long.clone()),
+        ("artefact-c.md", long.clone()),
+    ];
+    for (artefact, contenu) in cas {
+        let rapport = sg5_page(
+            &format!("sg5-long-{artefact}"),
+            artefact,
+            &contenu,
+            REGLE_RETIREE,
+        );
+        exiger_rouge(&rapport, "citation introuvable");
+    }
+}
+
+/// Commentaire jamais fermé : le reste du fichier n'est pas affiché (tokenisation HTML, fin de fichier en commentaire).
+#[test]
+fn mutant_sg5_commentaire_html_jamais_ferme() {
+    let ouvert = format!("<p>debut</p><!-- jamais ferme\n<p>{AFFICHEE}.</p>\n");
+    let rapport = sg5_page(
+        "sg5-commentaire-ouvert",
+        "artefact-a.html",
+        &page_detenue(&ouvert),
+        AFFICHEE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// `<!---!>` ne ferme pas le commentaire (en HTML, `-!>` au début n'est pas une fin) : il court jusqu'à `-->`.
+#[test]
+fn mutant_sg5_commentaire_html_fausse_fermeture() {
+    let page = format!("<!---!><p>{REGLE_RETIREE}.</p> -->\n<p>suite</p>\n");
+    let rapport = sg5_page(
+        "sg5-fausse-fermeture",
+        "artefact-a.html",
+        &page_detenue(&page),
+        REGLE_RETIREE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Le texte affiché reste au corpus : après un commentaire NIST, après `<!-->` et `<!--->` (commentaires vides, fermés
+/// tout de suite), après `--!>` (fermeture admise par la tokenisation HTML) et après `<!-xy>`, qui n'est pas `<!--`.
+#[test]
+fn temoin_sg5_commentaire_html_texte_affiche_garde() {
+    let pages = [
+        commentaire_nist(),
+        format!("<!--><p>{AFFICHEE}.</p>\n"),
+        format!("<!---><p>{AFFICHEE}.</p>\n"),
+        format!("<!-- x --!><p>{AFFICHEE}.</p>\n<!-- y -->\n"),
+        format!("<!-xy><p>{AFFICHEE}.</p>\n<!-- z -->\n"),
+    ];
+    for (rang, page) in pages.iter().enumerate() {
+        let rapport = sg5_page(
+            &format!("sg5-affiche-{rang}"),
+            "artefact-a.html",
+            &page_detenue(page),
+            AFFICHEE,
+        );
+        assert!(
+            rapport.vert(),
+            "page {rang} : texte affiché perdu :\n{}",
+            motifs(&rapport)
+        );
+    }
+}
+
+/// Hors HTML (texte brut), `<!--` n'ouvre rien : la phrase d'un long « commentaire » de `.txt` reste au corpus.
+#[test]
+fn temoin_sg5_commentaire_hors_html_reste_au_corpus() {
+    let texte = format!(
+        "<!-- {REGLE_RETIREE} ; {} -->\n",
+        "and it has no tag. ".repeat(20)
+    );
+    let rapport = sg5_page(
+        "sg5-commentaire-txt",
+        "artefact-b.txt",
+        &texte,
+        REGLE_RETIREE,
+    );
+    assert!(
+        rapport.vert(),
+        "texte brut retiré à tort :\n{}",
+        motifs(&rapport)
+    );
+}
+
+// ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
 // ajoute UNE forme fautive et exige le ROUGE pour son motif ; les survivants de la revue G2 d'E1 (résidu en

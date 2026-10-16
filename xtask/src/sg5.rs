@@ -19,6 +19,11 @@
 //! local plus large que le corpus CI, et les rares citations que
 //! l'extraction perd (ligature sans mapping) vivent à l'INDEX.
 //!
+//! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1) : une
+//! page HTML ou Markdown entre au corpus sans ses commentaires `<!-- … -->`,
+//! ôtés avant le débalisage — une citation d'un texte retiré d'une page,
+//! resté en commentaire, est introuvable.
+//!
 //! **La leçon de couverture, assumée en deux régimes** : le régime est
 //! détecté en comparant les octets présents au **compte déclaré à
 //! l'en-tête d'INDEX** (revue G2 du 2026-08-13, bloquante 1b — l'ancienne
@@ -77,6 +82,12 @@ const OCCURRENCES_MINIMALES: usize = 2;
 const EXTENSIONS_TEXTE: &[&str] = &[
     "html", "htm", "txt", "md", "sidecar", "json", "xml", "rs", "toml", "yml", "yaml", "lock",
 ];
+
+/// Extensions des pages rendues (HTML, et Markdown, dont le rendu cache aussi
+/// ces commentaires) : leurs commentaires `<!-- … -->` ne sont pas du texte
+/// affiché et sortent du corpus (`retirer_commentaires`). Ailleurs (texte
+/// brut, code, données), `<!--` n'ouvre rien.
+const EXTENSIONS_A_COMMENTAIRES: &[&str] = &["html", "htm", "md"];
 
 /// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
 /// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
@@ -176,7 +187,12 @@ pub fn executer(racine: &Path) -> Rapport {
                 }
                 match std::fs::read(&chemin) {
                     Ok(brut) => {
-                        let texte = String::from_utf8_lossy(&brut);
+                        let brut = String::from_utf8_lossy(&brut);
+                        let texte = if EXTENSIONS_A_COMMENTAIRES.contains(&extension.as_str()) {
+                            retirer_commentaires(&brut)
+                        } else {
+                            brut.into_owned()
+                        };
                         let depagine = retirer_pagination_rfc(&texte);
                         corpus.push(normaliser_pour_recherche(&retirer_balises(&depagine)));
                         octets_presents = octets_presents.saturating_add(1);
@@ -398,6 +414,35 @@ fn retirer_pagination_rfc(texte: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Retire les commentaires d'une page (SHOGEN-SG5-COMMENTAIRE-HTML-1) : de
+/// `<!--` à sa fin selon la tokenisation HTML (WHATWG, états du commentaire),
+/// `>` ou `->` tout de suite (commentaire vide), sinon le premier `-->` ou
+/// `--!>` ; sans fin, jusqu'au bout du texte, que le navigateur n'affiche
+/// plus. Lecture sans analyseur : un `<!--` dans une valeur d'attribut, un
+/// script ou un bloc de code ouvre aussi un commentaire (texte ôté en trop,
+/// jamais gardé en trop). Appliqué au corpus seulement, avant le débalisage.
+fn retirer_commentaires(texte: &str) -> String {
+    let mut sortie = String::with_capacity(texte.len());
+    let mut reste = texte;
+    while let Some(ouverture) = reste.find("<!--") {
+        sortie.push_str(reste.get(..ouverture).unwrap_or(""));
+        let corps = reste.get(ouverture.saturating_add(4)..).unwrap_or("");
+        let fin = if corps.starts_with('>') {
+            Some(1)
+        } else if corps.starts_with("->") {
+            Some(2)
+        } else {
+            ["-->", "--!>"]
+                .iter()
+                .filter_map(|marque| corps.find(marque).map(|p| p.saturating_add(marque.len())))
+                .min()
+        };
+        reste = fin.and_then(|n| corps.get(n..)).unwrap_or("");
+    }
+    sortie.push_str(reste);
+    sortie
 }
 
 /// Retire les balises `<…>` d'un texte de corpus HTML : une citation d'une
