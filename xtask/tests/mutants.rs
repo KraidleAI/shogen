@@ -1110,6 +1110,12 @@ pages_sg5! {
     temoin_sg5_script_dans_un_commentaire: format!("<!-- <script> --><p>{AFFICHEE}.</p>"), AFFICHEE => false,
     temoin_sg5_commentaire_texte_colle_garde: format!("<!-- x -->{AFFICHEE}."), AFFICHEE => false,
     temoin_sg5_commentaire_trois_tirets: format!("<!-- a ---><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    // Relecture G2 de DT15-g à k, C-5 : dans l'état échappé (après `<!--`), la fermante appropriée clôt le script
+    // (WHATWG 13.2.5.23 à 13.2.5.25) ; RAWTEXT (`style`) n'a pas d'état échappé (13.2.5.3, 13.2.5.12 à 13.2.5.14).
+    temoin_sg5_script_echappe_clos_par_sa_fermante:
+        format!("<script><!-- x</script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_style_sans_etat_echappe:
+        format!("<style><!-- <script></style><p>{AFFICHEE}.</p>"), AFFICHEE => false,
 }
 
 // S-G5, commentaires factices (lot DETTES-T15, DT15-h ; limite L-6 fermée) : `<!` sans `--` et `</` suivi d'un
@@ -1462,6 +1468,20 @@ mutants_registre! {
     mutant_sg9_registre_en_double: R, "\tabcdef0\n",
         "\tabcdef0\ndocs/journal.md:2\tancien.rs l.7\tcrates/ancien.rs\t7\t-\t03744d41bdab3b8d\tabcdef0\n"
         => "en double",
+}
+
+/// L'empreinte se compare sur ses 16 chiffres (relecture G2 de DETTES-T15, C-5) : « ligne 1012 » et « ligne 16091 »
+/// ont les mêmes 8 premiers chiffres, 834d10b8, non les 16 (`sha256sum` hors du code : 834d10b8940e1b2b et
+/// 834d10b8c7149b9b).
+#[test]
+fn mutant_sg9_registre_empreinte_comparee_sur_seize_chiffres() {
+    let racine = arbre_menace("registre-seize-chiffres");
+    remplacer(&racine, EXEMPLE, "ligne 1\n", "ligne 16091\n");
+    remplacer(&racine, R, "\t4bb546d3a6668da1\t", "\t834d10b8940e1b2b\t");
+    exiger_rouge(
+        &xtask::sg9::executer(&racine),
+        "texte cité changé ou déplacé",
+    );
 }
 
 #[test]
