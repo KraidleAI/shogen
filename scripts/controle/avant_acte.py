@@ -96,7 +96,10 @@ B2, un constat relayé (le CC, la G2, le réviseur, un lot nommé… a relevé, 
 ligne ou la suivante une référence fichier et ligne (chemin:N, chemin l.N, JOURNAL l.N ; E22). B3, faisabilité (E23) :
 chaque chemin:N se lit (fichier présent, ligne dans le fichier) ; chaque chemin entre accents graves de base connue
 (absolu, ou premier composant présent à la racine du dépôt) existe, hors ligne qui dit le produire ; chaque sha court
-(hors sha256) est un commit ; chaque sous-commande avant_acte.py nommée existe ; les interdits ne sont jamais lus."""
+(hors sha256) est un commit ; chaque sous-commande avant_acte.py nommée existe ; les interdits ne sont jamais lus.
+RX (E12), à commit (index), diff (HEAD plus le diff) et pousser (plage poussée) : chaque motif ajouté
+(garde_commun.motifs_ajoutes) passe garde_commun.motifs_suspects ; forme exponentielle : refus, sauf ligne qui porte
+redos-admis (journalisée en contournement) ; motif illisible : avertissement."""
 import argparse
 import contextlib
 import fnmatch
@@ -283,6 +286,7 @@ def commit(a, fautes):
         diffs_nommes(a, fautes)
     cites(a.depot, texte, fichiers, fautes)
     workflows(a.depot, fichiers, fautes, racine=a.racine)
+    motifs(fichiers, fautes)
     if a.id and f"Diff-Id: {a.id}" not in texte.split(chr(10)):
         fautes.append(("refus", "C9", f"le message ne porte pas la ligne Diff-Id: {a.id}", "l'ajouter au message", "-"))
 
@@ -482,6 +486,19 @@ def workflows(depot, fichiers, fautes, env=None, racine=None):
         raise Erreur(f"enforcement/workflows-yaml.py : sortie {p.returncode}")
 
 
+def motifs(fichiers, fautes):
+    """RX (E12) : motifs des lignes ajoutées à retour arrière exponentiel ; admis par redos-admis sur la ligne."""
+    for chemin, n, motif, ligne in GC.motifs_ajoutes(fichiers):
+        codes = GC.motifs_suspects(motif)
+        if codes == ["motif-illisible"]:
+            fautes.append(("avertissement", "RX", f"{chemin}:{n} : motif illisible par re, non jugé", "", "-"))
+        elif codes and "redos-admis" in ligne:
+            fautes.append(("admis", "RX", f"{chemin}:{n} : {', '.join(codes)}, admis par redos-admis", "", "redos-admis"))
+        elif codes:
+            fautes.append(("refus", "RX", f"{chemin}:{n} : motif à retour arrière exponentiel ({', '.join(codes)}) "
+                           "(E12)", "réécrire sans répétition ambiguë (forme de DT5-24 : séparateur obligatoire entre "
+                           "deux répétitions) ; motif voulu : redos-admis et sa raison sur la ligne", "-"))
+
 
 def presg5(depot, textes, fautes):
     """S-G5 approché par presg5.py (E9) : fragment anglais entre guillemets français, introuvable dans biblio/."""
@@ -541,6 +558,7 @@ def diff(a, fautes):
         presg5(apres, textes, fautes)
         cites(a.depot, "", fichiers, fautes, env)
         workflows(a.depot, fichiers, fautes, env, a.racine)
+        motifs(fichiers, fautes)
 
 
 
@@ -684,6 +702,7 @@ def pousser(a, fautes):
         env = dict(os.environ, GIT_INDEX_FILE=os.path.join(d, "index"))
         git(a.depot, "read-tree", "HEAD", env=env)
         workflows(a.depot, [{"apres": x, "avant": None} for x in noms if x], fautes, env)
+    motifs(GC.lignes_ajoutees(a.depot, plage=(base, "HEAD"))[0], fautes)      # RX sur la plage poussée (E12)
 
 
 def publier(a, fautes):

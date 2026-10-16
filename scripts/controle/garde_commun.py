@@ -32,15 +32,21 @@ longueur variable en queue du corps dont les caractères peuvent commencer le co
 `(a+)+`, motif de DT5 cité par E12), une alternative de largeur variable en queue dont la fin des branches longues peut
 commencer le corps (`(a|aa)*`), ou deux branches d'une alternative du corps que rien ne sépare à leurs premières
 positions connues (alternatives ambiguës) ; caractères jugés sur l'ASCII, é et l'espace insécable ; prudent : un motif
-sûr peut être signalé (`(?:a+b|ac)*`)."""
+sûr peut être signalé (`(?:a+b|ac)*`). `_absorbe` : répétition variable du corps qui peut lire tout ce qui la suit
+et un début du corps (`(.*,)*`). `motifs_ajoutes` : motifs des lignes ajoutées d'un diff analysé (premier
+argument littéral, entier sur la ligne, d'un appel re.compile, match, search… en .py ; valeur d'une clé regex, pattern
+ou motif et argument entre guillemets de grep, egrep ou rg en .yml) ; un motif construit par concaténation n'est pas lu.
+`lignes_ajoutees(depot, plage=(base, tete))` : lignes ajoutées d'une plage de commits (poussée), mêmes règles."""
 import ast
 import fnmatch
 import functools
 import importlib
+import io
 import os
 import re
 import shutil
 import subprocess
+import tokenize
 import warnings
 from datetime import datetime, timedelta, timezone
 
@@ -203,16 +209,17 @@ def git(depot, *args, env=None):
                           check=True, env=env).stdout
 
 
-def lignes_ajoutees(depot, env=None, racine=None):
-    """Lignes ajoutées de l'index (ou de l'index temporaire d'env) par rapport à HEAD, hors interdits : noms d'abord,
-    puis diff des seuls chemins admis (le contenu d'un interdit n'est jamais lu), préfixes a/ et b/ forcés ; rend
-    (fichiers analysés, nombre de fichiers écartés) ; racine : arbre où juger les interdits (dépôt jetable, L-12)."""
-    noms = git(depot, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", env=env).split(chr(0))
+def lignes_ajoutees(depot, env=None, racine=None, plage=None):
+    """Lignes ajoutées de l'index (ou de l'index temporaire d'env) par rapport à HEAD, ou de la plage (base, tête),
+    hors interdits : noms d'abord, puis diff des seuls chemins admis (le contenu d'un interdit n'est jamais lu),
+    préfixes a/ et b/ forcés ; rend (fichiers analysés, nombre de fichiers écartés) ; racine : arbre où juger les
+    interdits (dépôt jetable, L-12)."""
+    sel = list(plage) if plage else ["--cached", "HEAD"]
+    noms = git(depot, "diff", "--no-renames", "--name-only", "-z", *sel, env=env).split(chr(0))
     noms = [x for x in noms if x]
     admis = [x for x in noms if not chemin_interdit(os.path.join(racine or depot, x))]
-    texte = git(depot, "diff", "--cached", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
-                "--src-prefix=a/", "--dst-prefix=b/", "-U0", "HEAD", "--", *[":(literal)" + x for x in admis],
-                env=env) if admis else ""
+    texte = git(depot, "diff", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv", "--src-prefix=a/",
+                "--dst-prefix=b/", "-U0", *sel, "--", *[":(literal)" + x for x in admis], env=env) if admis else ""
     return analyser_diff(texte), len(noms) - len(admis)
 
 
@@ -317,6 +324,10 @@ CATEGORIES = {"DIGIT": str.isdigit, "SPACE": str.isspace, "WORD": lambda c: c.is
               "LINEBREAK": lambda c: c == chr(10)}
 UN = ("LITERAL", "NOT_LITERAL", "ANY", "IN")      # nœuds d'un caractère
 REPETE = ("MAX_REPEAT", "MIN_REPEAT")              # répétitions qui reviennent en arrière (possessives exclues)
+APPEL_RE = re.compile("(?<![A-Za-z0-9_.])re[.](?:compile|match|search|fullmatch|findall|finditer|sub|subn|split)[(]")
+CLE_YAML = re.compile("^[ -]*[A-Za-z_-]*(?:regex|pattern|motif)s?: *(.+)$")
+GREP = re.compile("(?<![A-Za-z0-9_-])(?:grep|egrep|rg)(?: +-[A-Za-z]+)* +(?:'([^']+)'|" + chr(34) + "([^" + chr(34)
+                  + "]+)" + chr(34) + ")")
 
 
 def _jeu(o, av):
@@ -425,6 +436,18 @@ def _ambigues(seq):
     return False
 
 
+def _deplie(seq):
+    return [x for op, av in seq for x in (_deplie(av[-1]) if str(op) == "SUBPATTERN" else [(op, av)])]
+
+
+def _absorbe(seq, debut):
+    """Répétition variable du corps (groupes simples dépliés) qui peut lire tout ce qui la suit dans le corps et un
+    début du corps : une itération peut en contenir plusieurs (`(.*,)*`)."""
+    plat = _deplie(seq)
+    return any(str(op) in REPETE and av[1] > av[0] and _tous(plat[k + 1:]) <= _tous(av[2]) and _tous(av[2]) & debut
+               for k, (op, av) in enumerate(plat))
+
+
 def motifs_suspects(motif):
     """Codes des formes à retour arrière exponentiel du motif (E12) : quantificateurs-imbriques,
     alternatives-ambigues, sous une répétition de borne haute > 10 ; motif-illisible si l'analyseur le refuse."""
@@ -442,4 +465,36 @@ def motifs_suspects(motif):
                 debut = _premiers(av[2])[0]
                 codes |= {code for code, fin in _queues(av[2]) if fin & debut}
                 codes |= {"alternatives-ambigues"} if _ambigues(av[2]) else set()
+                codes |= {"quantificateurs-imbriques"} if _absorbe(av[2], debut) else set()
     return sorted(codes)
+
+
+def _litteral(reste):
+    """Premier argument de l'appel s'il est fait de littéraux de chaîne suivis de , ou ) sur la ligne, sinon None."""
+    vus = []
+    try:
+        for jeton in tokenize.generate_tokens(io.StringIO(reste).readline):
+            if jeton.type != tokenize.STRING:
+                return "".join(vus) if vus and jeton.string in (",", ")") else None
+            x = ast.literal_eval(jeton.string)
+            vus.append(x.decode("latin-1") if isinstance(x, bytes) else x)
+    except (tokenize.TokenError, SyntaxError, ValueError):
+        return None
+    return None
+
+
+def motifs_ajoutes(fichiers):
+    """[(chemin, ligne, motif, texte de la ligne)] des motifs écrits aux lignes ajoutées d'un diff analysé (E12)."""
+    out = []
+    for f in fichiers:
+        chemin = f["apres"] or ""
+        for n, x in f["ajouts"]:
+            if chemin.endswith(".py"):
+                vus = [_litteral(x[m.end():]) for m in APPEL_RE.finditer(x)]
+            elif chemin.endswith((".yml", ".yaml")):
+                cle = CLE_YAML.match(x)
+                vus = [m[1] or m[2] for m in GREP.finditer(x)] + ([cle[1].strip().strip("'" + chr(34))] if cle else [])
+            else:
+                vus = []
+            out += [(chemin, n, m, x) for m in vus if m]
+    return out
