@@ -49,7 +49,7 @@ lecture ; C, service, outil ou monnaie nommé, non mesuré ; D, projet connexe n
 ## 2. Ce que chaque source mesurée lira sur elle (groupe A)
 
 Toutes les valeurs sont de la strate calme puis de la strate de stress, au J28, « tel qu'observé par cet instrument
-(hôte, DNS et réseau du harnais compris) » (b. l.51-52) ; un écart est une panne, une staleness ou un hors-enveloppe
+(hôte, DNS et réseau du harnais compris) » (b. l.51-52) ; un écart est une lecture en échec, une staleness ou un hors-enveloppe
 de la lecture faite par le harnais (b. l.120-122).
 
 | source | écarts au J28 (b. l.325-335 ; panne / stale / horsE / nonÉv) | hôte et axe ASN (b. l.350-358, l.384-387) | autres mentions nominatives |

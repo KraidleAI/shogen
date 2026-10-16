@@ -10,7 +10,7 @@
 > paquet scellé, rendus, sceau, enregistrements, scripts) sont au dépôt privé du projet et
 > ne sont pas publiées ; le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur demande, sous accord (section
 > « Reproduire », « Ce qui n'est pas public »). Le verdict, les valeurs, les limites, les déviations déclarées, le
-> pré-enregistrement, le sceau et la procédure de reproduction sont repris ; aucun nombre n'est changé ni ajouté.
+> pré-enregistrement, le sceau et la procédure de reproduction sont repris ; aucun nombre n'est changé ni ajouté, hors les dates des ajouts datés du 2026-10-15.
 >
 > **Statut** : rapport rédigé le 2026-10-04 (UTC) par un rédacteur frais (modèle `claude-opus-5-5`), qui n'a écrit ni
 > le code d'analyse, ni le paquet de pré-enregistrement, ni les rendus. Il rend compte de ce que les rendus de
