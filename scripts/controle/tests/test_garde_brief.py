@@ -4,7 +4,8 @@ SHOGEN-GARDE-OUTIL-E6-E7-E12-E13-1, SHOGEN-GARDE-OUTIL-E22-E23-E24-1), dans des 
 E6 : brief FUZZ qui citait SHOGEN-E1-XTASK-REFS-1 ouvert, fermé par XR-1 à XR-4 (annexe B l.819-822 et l.1583, lignes
 copiées à l'octet dans ANNEXE_E6). E24 : brief DETTES-T7 sans la règle des commandes git à chemins explicites.
 E22 : message de reprise de DT6 (phase 4) qui relayait le test instable de DB-1 sans sa référence. E23 : acte écrit
-sans vérifier que l'outil, le fichier ou le commit nommés existent (copie au Drive de la décision Q-A)."""
+sans vérifier que l'outil, le fichier ou le commit nommés existent (copie au Drive de la décision Q-A). E7 : lapsus
+« deux gardes » (il y en avait trois) : compte d'un brief jamais affiché par un outil (crochet GARDE-FAITS, R5)."""
 import contextlib
 import io
 import json
@@ -158,3 +159,40 @@ class Brief(unittest.TestCase):
         code, err = self.crochet("Brief : " + os.path.join(self.tmp, "BRIEF-absent.md"))
         self.assertEqual((code, "R11 : la consigne nomme un brief absent" in err), (2, True), err)
         self.assertEqual(self.crochet("Aucun fichier à lire."), (0, ""))
+
+
+class Comptes(unittest.TestCase):
+    """E7 : comptes à unité d'un brief écrit (Write, Edit, redirection du shell), jugés par le crochet GARDE-FAITS (R5)
+    contre les sorties d'outils du journal synthétique (.txt)."""
+    def crochet(self, resultats, outil, entree):
+        with tempfile.TemporaryDirectory() as t:
+            j = os.path.join(t, "journal.txt")
+            with open(j, "w", encoding="utf-8") as f:
+                for r in resultats:
+                    f.write(json.dumps({"type": "assistant", "message": {"content": [
+                        {"type": "tool_use", "name": "Bash", "input": {"command": "true"}}]}}) + NL)
+                    f.write(json.dumps({"type": "user", "message": {"content": [
+                        {"type": "tool_result", "content": r}]}}) + NL)
+            e = {"hook_event_name": "PreToolUse", "transcript_path": j, "cwd": t, "tool_name": outil,
+                 "tool_input": entree}
+            p = subprocess.run([sys.executable, "-I", GARDE], input=json.dumps(e), capture_output=True, text=True,
+                               timeout=60)
+        return p.returncode, p.stderr
+
+    def test_e7_comptes_du_brief(self):
+        """E7 : « deux gardes » écrit dans un brief, l'outil a affiché trois gardes : refus ; affiché (en chiffres ou en
+        lettres, unité au pluriel ou en anglais) : permis ; Ran N contre Ran affiché ; borne ; fichier hors brief ;
+        Edit et heredoc du shell vers un BRIEF*.md."""
+        brief = {"file_path": "/x/BRIEF-CC.md", "content": "C-11 : vérifier les deux gardes de presg5 ; Ran 117 ; "
+                 "chaque diff ≤ 200 lignes ; 3 fichiers touchés." + NL}
+        sorties = ["Ran 117 tests in 2.1s", "trois gardes", "3 files changed"]
+        code, err = self.crochet(sorties, "Write", brief)
+        self.assertEqual((code, "« deux gardes »" in err, "E7" in err), (2, True, True), err)
+        self.assertEqual(self.crochet(sorties + ["2 gardes"], "Write", brief), (0, ""))
+        self.assertEqual(self.crochet(["Ran 116 tests", "2 gardes", "3 fichiers"], "Write", brief)[0], 2)
+        self.assertEqual(self.crochet([], "Write", dict(brief, file_path="/x/NOTES.md")), (0, ""))
+        self.assertEqual(self.crochet(["3 tests"], "Write", dict(brief, content="3 fichiers"))[0], 2)   # autre unité
+        self.assertEqual(self.crochet(["deux gardes"], "Edit", {"file_path": "/x/BRIEF.md", "old_string": "x",
+                                                                 "new_string": "les 2 gardes"}), (0, ""))
+        self.assertEqual(self.crochet([], "Bash", {"command": "cat > /x/BRIEF.md <<'F'" + NL + "5 mutants" + NL + "F"})[0],
+                         2)

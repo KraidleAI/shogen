@@ -413,5 +413,19 @@ class Releve(Crochet):
         self.assertEqual(commandes, ['python3 -I "$CLAUDE_PROJECT_DIR/.claude/hooks/garde_faits.py"'])
 
 
+class Serie(Crochet):
+    """Lot INTEGRATION-P2 : la règle E7 du groupe A (P2A-4, comptes d'un brief écrit par le shell) lit les fichiers
+    écrits sur l'acte de LN-6 (fc["ecrit"], GFB-2) ; posée sur l'ancienne variable cibles, que GFB-2 retire, toute
+    commande Bash sortait en erreur interne du crochet, acte permis sans contrôle (adjudication du groupe B, point 3)."""
+    def test_bash_juge_apres_la_serie(self):
+        """Après la série : une commande Bash interdite reste refusée (R3, commit sans état lu ; E7, compte d'un brief
+        écrit par le shell et jamais affiché) ; affiché, le compte passe ; une commande sans acte jugé passe sans
+        erreur interne."""
+        self.refus([], "git commit -q -m x", "R3")
+        self.refus([], "printf '5 mutants' > BRIEF-x.md", "E7")
+        self.permis(appel("true", resultat="5 mutants"), "printf '5 mutants' > BRIEF-x.md")
+        self.permis([], "ls")
+
+
 if __name__ == "__main__":
     unittest.main()

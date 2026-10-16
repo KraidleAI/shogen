@@ -22,7 +22,10 @@ Règles PreToolUse (R1 à R5, R11) :
   R5 écrire un identifiant de commit (7 à 40 hexadécimaux, lettres et chiffres mêlés) ou un numéro de PR
      (#123, PR n° 123, pull/123) dans un .md, un message de commit, une PR, un texte écrit par le shell :
      il doit avoir été affiché par un outil (tool_result, attachment, queue-operation) ; le texte tapé par
-     l'agent et les refus de ce crochet ne comptent pas.
+     l'agent et les refus de ce crochet ne comptent pas. Dans un brief (fichier BRIEF*.md écrit par Write, Edit,
+     MultiEdit ou une redirection du shell), chaque compte à unité (N tests, N fichiers, N lignes, N mutants, N cas,
+     N commits, N diffs, N gardes, N items, en chiffres ou de deux à douze en lettres ; Ran N) doit avoir été affiché
+     avec la même unité (E7) ; un compte précédé d'une borne (≤, au plus, moins de, chacun…) n'est pas jugé.
   R11 lancer un sous-agent ou un workflow dont la consigne nomme un fichier BRIEF*.md : le brief passe
      scripts/controle/avant_acte.py brief (items de l'annexe B, E6 ; constats relayés, E22 ; faisabilité, E23 ;
      règle git, E24), avec --fiche <subagent_type> si la fiche existe ; brief absolu absent : refus ; erreur de
@@ -82,6 +85,13 @@ REDIR = re.compile(r"(?<![<>])(>>?|\btee(?:\s+-a)?)\s+(?!&)(['\"]?)([^\s'\"|;&]+
 SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\"|;&]+)\1\s*(?:[;&|]|$)")
 PY_W = re.compile(r"open\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"][wa]")
 RM = re.compile(r"\brm\s+(?:-[a-zA-Z]*\s+)*(['\"]?)([^\s'\"|;&]+)\1")
+NOMBRES = {"deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6, "sept": 7, "huit": 8, "neuf": 9, "dix": 10,
+           "onze": 11, "douze": 12}
+UNITES = {"file": "fichier", "line": "ligne", "case": "cas", "cas": "cas"}
+COMPTE = re.compile("(?i)(?<![0-9A-Za-zà-ÿ.,/-])([0-9]+|" + "|".join(NOMBRES) + ") (tests?|fichiers?|files?|lignes?"
+                    "|lines?|mutants?|cas|cases?|commits?|diffs?|gardes?|items?)(?![A-Za-zà-ÿ])"
+                    "|(?<![A-Za-z])Ran ([0-9]+)(?![0-9])")
+BORNE = re.compile("(?i)(?:≤|≥|<|>|au plus|au moins|moins de|plus de|jusqu'à|jusqu’à|maximum|minimum|chacun) ?$")
 BRIEF_NOMME = re.compile("(?:[^ " + chr(9) + chr(10) + "\"'`<>|;,()]*/)?BRIEF[^ " + chr(9) + chr(10) + "\"'`<>|;,()/]*[.]md")
 OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # racine du dépôt du crochet
 GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
@@ -574,6 +584,7 @@ def pre_tool_use(entree):
     faits, appels, agent, humain = faits_et_appels(entrees)
     cmds = commandes_git_recentes(appels)
     textes_ecrits = []     # textes où un identifiant écrit doit avoir été affiché (R5)
+    briefs_ecrits = []     # textes de BRIEF*.md où un compte écrit doit avoir été affiché (R5, E7)
 
     if nom == "Bash":
         c = inp.get("command", "")
@@ -594,6 +605,8 @@ def pre_tool_use(entree):
                 refuser(f"R2 : écrire dans un fichier existant exige sa lecture avant (Read, cat, tail…) : {abs_c}")
             if os.path.isfile(abs_c) and abs_c.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
                 textes_ecrits.append(c)
+        if any(re.fullmatch("BRIEF.*[.]md", os.path.basename(x)) for x in fc["ecrit"]):
+            briefs_ecrits.append(c)
         # R3 : commit et push (sous-commandes de git lues sur les actes)
         if "commit" in fc["git"]:
             if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|diff)\b"):
@@ -627,6 +640,8 @@ def pre_tool_use(entree):
         fp = inp.get("file_path", "")
         if fp.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
             textes_ecrits.append(inp.get("new_string", "") or inp.get("content", "") or json.dumps(inp.get("edits", []), ensure_ascii=False))
+            if re.fullmatch("BRIEF.*[.]md", os.path.basename(fp)):
+                briefs_ecrits.append(textes_ecrits[-1])
     elif nom in ("Agent", "Workflow", "SendMessage"):
         p = json.dumps(inp, ensure_ascii=False)
         # R4 : lancer un sous-agent sur un arbre
@@ -666,7 +681,23 @@ def pre_tool_use(entree):
             for p in PR_NUM.findall(txt):
                 if p not in prs:
                     refuser(f"R5 : le numéro de PR « {p} » n'a été affiché par aucun outil dans le journal de cet agent ; lis-le avant de l'écrire.")
+    if briefs_ecrits:      # R5, comptes d'un brief (E7)
+        vus = {(n, u) for txt in faits + humain for n, u, _x in comptes(txt, bornes=False)}
+        for n, u, brut in [x for txt in briefs_ecrits for x in comptes(txt)]:
+            if (n, u) not in vus:
+                refuser(f"R5 : le compte « {brut} » du brief n'a été affiché par aucun outil, avec son unité, dans le journal de cet agent (E7) ; affiche-le (printf '%s {u}s' $(…)) avant de l'écrire.")
     return 0
+
+
+def comptes(texte, bornes=True):
+    """[(nombre, unité, texte écrit)] des comptes à unité (E7) ; bornes : les comptes précédés d'une borne écartés."""
+    out = []
+    for m in COMPTE.finditer(texte):
+        if m[3] or not (bornes and BORNE.search(texte[max(0, m.start() - 12):m.start()])):
+            unite = "test" if m[3] else m[2].lower()
+            unite = UNITES.get(unite, UNITES.get(unite.rstrip("s"), unite.rstrip("s")))
+            out.append((int(m[3] or NOMBRES.get(m[1].lower(), m[1])), unite, m[0]))
+    return out
 
 
 def controler_briefs(inp, cwd):
