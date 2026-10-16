@@ -22,7 +22,9 @@ passe N des sources) ; C-17 (chaine G4 : Diff-Id déjà porté par un autre comm
 sortie standard fermée : 3).
 Contre-contrôle : R-2 (pousser, historique de la plage) ; R-3 (pousser --acte, actes écrits autrement).
 Contre-contrôle : R-4 (C7 : fichier cité retiré ou renommé) ; R-5 (chaine : Diff-Id en double au plan).
-Contre-contrôle : R-7 (verser : borne du dossier de pièces) ; R-10 (C3 : verdict avec réserves)."""
+Contre-contrôle : R-7 (verser : borne du dossier de pièces) ; R-10 (C3 : verdict avec réserves).
+Phase 2 : V6 et V7 (E28 : livre copié dans biblio/ sans rangée d'INDEX pendant qu'une chaîne committait) ; pgrep fixé
+par un faux en tête du PATH (sortie 1, aucune chaîne) sauf dans le cas qui lance une vraie chaîne d'essai."""
 import contextlib
 import difflib
 import fnmatch
@@ -34,6 +36,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import collections
 import unittest
 from unittest import mock
@@ -635,6 +638,14 @@ class Versement(Depot):
         super().setUp()
         ag.ecrire(self.d, {"biblio/INDEX.md": "# index" + NL})
         self.p = os.path.join(self.tmp, "versement", "revue-x")
+        self.pgrep("exit 1")
+
+    def pgrep(self, corps):
+        """Faux pgrep en tête du PATH : il garde ses arguments dans pgrep.args, puis exécute corps."""
+        f = os.path.join(self.tmp, "faux-pgrep")
+        ag.ecrire(f, {"pgrep": "#!/bin/sh" + NL + 'printf "%s\\n" "$@" > "' + f + '/pgrep.args"' + NL + corps + NL})
+        os.chmod(os.path.join(f, "pgrep"), 0o755)
+        os.environ["PATH"] = f + os.pathsep + os.environ["PATH"]
 
     def verser(self, pieces, sommes=None):
         """Pièces écrites dans un dossier du scratchpad, SHA256SUMS écrit depuis le dossier (forme exigée), sauf
@@ -694,6 +705,51 @@ class Versement(Depot):
                 code = self.lancer("verser", "--pieces", self.p)[0]
             self.assertEqual((code, lus), (3, []), borne)
         self.assertEqual(self.lancer("verser", "--pieces", self.p)[1][:9], "REFUS V4 ")
+
+    def test_e28_biblio_sans_rangee(self):
+        """Cas réel E28 : livre copié dans biblio/ sans rangée d'INDEX (S-G6 rouge : compte 204 contre 205, artefact
+        sans entrée) : refus V6, mention et compte ; rangée et compte remesuré dans le même état : sortie 0 ; sidecar
+        hors compte ; corpus partiel tout nommé : sortie 0 ; sous-dossier : refus V6."""
+        pieces = {"a.md": "x" + NL}
+        tete = lambda n: f"# Registre{NL}**{n} artefacts détenus** au 2026-10-15{NL}| `a.pdf` | a |{NL}"
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(1), "biblio/a.pdf": "a", "biblio/a.pdf.sidecar": "s"})
+        self.assertEqual(self.verser(pieces), (0, ""))
+        ag.ecrire(self.d, {"biblio/shostack-2014.pdf": "livre"})
+        code, sortie = self.verser(pieces)
+        self.assertEqual((code, [x[:9] for x in sortie.split(NL) if x]), (1, ["REFUS V6 ", "REFUS V6 "]), sortie)
+        self.assertIn("shostack-2014.pdf", sortie)
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(2) + "| `shostack-2014.pdf` | livre |" + NL})
+        self.assertEqual(self.verser(pieces), (0, ""))
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(3) + "| `shostack-2014.pdf` | livre |" + NL})
+        self.assertEqual(self.verser(pieces), (0, ""))
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(1) + "| `shostack-2014.pdf` | livre |" + NL})
+        self.assertEqual(self.verser(pieces)[1][:9], "REFUS V6 ")
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(2) + "| shostack-2014.pdf, `xshostack-2014.pdf` | livre |" + NL})
+        self.assertEqual(self.verser(pieces)[1][:9], "REFUS V6 ")          # mention non délimitée (S-G6)
+        ag.ecrire(self.d, {"biblio/INDEX.md": tete(2) + "| `shostack-2014.pdf` | livre |" + NL, "biblio/s/x": "x"})
+        self.assertEqual(self.verser(pieces)[1][:9], "REFUS V6 ")
+
+    def test_e28_versement_pendant_une_chaine(self):
+        """Cas réel E28 : versement pendant qu'une chaîne committait : refus V7 ; motif passé à pgrep -f, ancré ; une
+        vraie chaîne d'essai (bash chaine_*.sh) est vue, et refusée, un shell qui nomme la chaîne sans la lancer ne
+        l'est pas ; pgrep en erreur : 3."""
+        pieces = {"a.md": "x" + NL}
+        self.pgrep("exit 0")
+        self.assertEqual(self.verser(pieces)[1][:9], "REFUS V7 ")
+        with open(os.path.join(self.tmp, "faux-pgrep", "pgrep.args"), encoding="utf-8") as f:
+            self.assertEqual(f.read().split(NL)[:2], ["-f", avant_acte.MOTIF_CHAINE])
+        self.pgrep("exit 3")
+        self.assertEqual(self.verser(pieces)[0], 3)
+        os.environ["PATH"] = os.pathsep.join(x for x in os.environ["PATH"].split(os.pathsep) if "faux-pgrep" not in x)
+        script = os.path.join(self.tmp, f"chaine_essai_{os.getpid()}.sh")
+        ag.ecrire(self.tmp, {os.path.basename(script): "sleep 30" + NL})
+        for cmd, vu in ((["bash", "-c", f"sleep 30; : bash {script}"], False), (["bash", script], True)):
+            p = subprocess.Popen(cmd, start_new_session=True)
+            self.addCleanup(lambda p=p: (os.killpg(p.pid, 9), p.wait()))
+            time.sleep(0.5)                 # l'hôte peut porter une vraie chaîne : seul le PID de l'essai est jugé
+            pids = subprocess.run(["pgrep", "-f", avant_acte.MOTIF_CHAINE], capture_output=True, text=True).stdout
+            self.assertEqual(str(p.pid) in pids.split(), vu, cmd)
+        self.assertEqual(self.verser(pieces)[1][:9], "REFUS V7 ")
 
     def test_sommes_chemins_heures(self):
         """V4 : SHA256SUMS écrit avec ./, ligne fausse, pièce non listée, absent : refus ; V3 : chemin absolu du

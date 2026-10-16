@@ -81,7 +81,13 @@ cible, lignes, empreinte) : un renvoi qui répondait à son empreinte à HEAD et
 (à nombre de lignes égal compris), sauf empreinte mise à jour dans le même diff ; empreinte du registre.
 Phase 2, L-12, Q-5 : --lecture-seule (diff et commit seulement) : git tourne dans un dépôt jetable de TMPDIR (git clone
 --shared --no-checkout, HEAD du dépôt lu, son index copié pour commit) ; fichiers, sceaux et outils lus dans le dépôt
-lu, rien n'y est écrit ; le journal va au dépôt jetable (perdu avec lui)."""
+lu, rien n'y est écrit ; le journal va au dépôt jetable (perdu avec lui).
+Phase 2 (E28, SHOGEN-GARDE-OUTIL-E26-E27-E28-1) : verser V6, chaque fichier de biblio/ du dépôt (hors INDEX.md et
+*.sidecar, répertoire plat) nommé `nom` dans biblio/INDEX.md de l'arbre de travail (la rangée va dans le même diff que
+l'octet), compte « N artefacts détenus » des 500 premiers octets égal au compte réel, sauf corpus partiel tout nommé
+(forme de S-G6, xtask/src/sg6.rs) ; V7, refus pendant qu'une chaîne de commits tourne : pgrep -f ancré
+(MOTIF_CHAINE, bash ou sh qui lance chaine.sh ou chaine_*.sh ; ancré, il ne reconnaît pas le shell qui le lance) ;
+pgrep en erreur : 3."""
 import argparse
 import contextlib
 import fnmatch
@@ -126,6 +132,7 @@ REGISTRE = "docs/RENVOIS-LIGNES.tsv"
 EMPREINTE = re.compile("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})")
 BORNE_LIEE = 100
 PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
+MOTIF_CHAINE = "^(/usr/bin/|/bin/)?(bash|sh) ([^ ]*/)?chaine(_[^ /]*)?[.]sh( |$)"     # V7 (E28), ancré
 
 
 class Erreur(Exception):
@@ -552,6 +559,10 @@ def verser(a, fautes):
                     raise Erreur(f"dossier de pièces de plus de {PIECES_MAX} fichiers ou {OCTETS_MAX >> 20} Mio : "
                                  "racine fausse ? (aucun fichier lu)")
     pieces = {r: lire(p) for r, p in pieces.items()}
+    if chaine_active():
+        fautes.append(("refus", "V7", "une chaîne de commits tourne : aucun versement pendant qu'elle lit l'arbre "
+                       "(E28)", "attendre sa fin (sondage du PID), puis verser", "-"))
+    biblio(a.depot, fautes)
     if ecartes:
         fautes.append(("refus", "V0", f"{ecartes} fichier(s) ou dossier(s) sous un interdit : ni lus, ni parcourus, "
                        "ni nommés", "les retirer", "-"))
@@ -586,6 +597,38 @@ def verser(a, fautes):
     heures_et_citations(a.depot, textes, fautes)
     presg5(a.depot, textes, fautes)
 
+
+
+def biblio(depot, fautes):
+    """V6 (E28) : octets de biblio/ sans rangée d'INDEX, ou compte d'en-tête faux (forme de S-G6)."""
+    d = os.path.join(depot, "biblio")
+    if not os.path.isdir(d):
+        return
+    noms = sorted(os.listdir(d))
+    if any(os.path.isdir(os.path.join(d, x)) for x in noms):
+        fautes.append(("refus", "V6", "sous-dossier dans biblio/ : le registre suppose un répertoire plat (S-G6)",
+                       "ranger l'octet à plat dans biblio/", "-"))
+    artefacts = [x for x in noms if x != "INDEX.md" and not x.casefold().endswith(".sidecar")
+                 and os.path.isfile(os.path.join(d, x))]
+    index = lire(os.path.join(d, "INDEX.md")) if os.path.isfile(os.path.join(d, "INDEX.md")) else b""
+    sans = [x for x in artefacts if f"`{x}`".encode() not in index]
+    if sans:
+        fautes.append(("refus", "V6", f"{len(sans)} octet(s) de biblio/ sans rangée d'INDEX : "
+                       f"{', '.join(sans[:5])} (E28)", "ajouter la rangée `nom` à biblio/INDEX.md dans le même "
+                       "diff que l'octet", "-"))
+    m = re.search("([0-9]+) artefacts détenus", index[:500].decode("utf-8", "ignore"))
+    declare = int(m.group(1)) if m else None
+    if artefacts and declare != len(artefacts) and not (declare and len(artefacts) < declare and not sans):
+        fautes.append(("refus", "V6", f"compte d'en-tête de biblio/INDEX.md ({declare}) différent du compte réel "
+                       f"({len(artefacts)}) (E28, S-G6)", "remesurer « N artefacts détenus » dans le même diff", "-"))
+
+
+def chaine_active():
+    """V7 (E28) : vrai si une chaîne de commits tourne (pgrep -f MOTIF_CHAINE) ; pgrep hors de 0 et 1 : erreur."""
+    p = subprocess.run(["pgrep", "-f", MOTIF_CHAINE], capture_output=True, text=True)
+    if p.returncode not in (0, 1):
+        raise Erreur(f"pgrep : sortie {p.returncode}")
+    return p.returncode == 0
 
 
 def pousser(a, fautes):
