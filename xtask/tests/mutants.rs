@@ -1218,9 +1218,64 @@ pages_sg5! {
     mutant_sg5_titre_apres_svg_referme: format!(
         "<svg></svg><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
     ), REGLE_RETIREE => true,
-    temoin_sg5_textarea_commentaire_affiche: format!("<textarea><!-- {AFFICHEE}. --></textarea>"), AFFICHEE => false,
-    temoin_sg5_plaintext_affiche_jusqu_au_bout: format!("<plaintext><!-- {AFFICHEE}."), AFFICHEE => false,
+    temoin_sg5_textarea_texte_affiche: format!("<textarea>{AFFICHEE}.</textarea><p>x</p>"), AFFICHEE => false,
+    temoin_sg5_plaintext_affiche_jusqu_au_bout: format!("<plaintext>a</plaintext> {AFFICHEE}."), AFFICHEE => false,
     temoin_sg5_titre_texte_affiche: format!("<title>{AFFICHEE}.</title><p>x</p>"), AFFICHEE => false,
+}
+
+// S-G5, trois lectures du texte brut (contre-contrôle de DETTES-T15, R-3) : la construction de l'arbre décide si un
+// `title`, un `textarea`, un `iframe`… bascule la tokenisation (élément HTML) ou non (contenu SVG ou MathML, balise
+// ignorée) ; le corpus perd ce qu'une des trois lectures ôte. Pages lues d'après la page WHATWG du 2026-10-14 : les
+// formes 1 à 6 étaient ôtées par la série et gardées par C-6 seul ; 7 à 9, gardées par les deux ; 10, par la série
+// et par la lecture brute partout, ôtée par C-6.
+
+pages_sg5! {
+    mutant_sg5_textarea_commentaire_ote_en_trop:
+        format!("<textarea><!-- {REGLE_RETIREE} --></textarea><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_1_svg_valeur_nue_barre:
+        format!("<svg width=10/><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_2_fermante_math_dans_svg:
+        format!("<svg></math><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_3_iframe_commentaire:
+        format!("<iframe><!-- {REGLE_RETIREE} --></iframe><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_4_noframes_commentaire:
+        format!("<noframes><!-- {REGLE_RETIREE} --></noframes><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_5_iframe_jamais_ferme:
+        format!("<iframe src=x><p>a</p><script>var s = 1; {REGLE_RETIREE}</script>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_6_titre_ignore_en_colonnes:
+        format!("<template><col><title><!-- {REGLE_RETIREE} --></title></template><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_7_sortie_de_svg_par_p: format!(
+        "<svg><p><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_8_point_d_integration: format!(
+        "<svg><foreignObject><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_9_fermante_div_hors_svg: format!(
+        "<div><svg></div><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_10_titre_svg_puis_titre_html: format!(
+        "<svg><title><!-- </title><script> --></title></svg><title></script><!--</title>\
+         <script>var s = 1; /*-->{REGLE_RETIREE}*/</script>"
+    ), REGLE_RETIREE => true,
+}
+
+/// Markdown (R-3) : un `<title>` ou un `<iframe>` écrit dans un extrait de code n'ouvre aucun texte brut au
+/// rendu ; lu comme un vrai, il gardait jusqu'au bout du fichier les commentaires et les scripts qui suivent.
+#[test]
+fn mutant_sg5_lectures_markdown_extrait_de_code() {
+    let cas = [
+        format!("Set the `<title>` of the page.\n\n<!-- {REGLE_RETIREE} -->\n\nEnd.\n"),
+        format!("Use an `<iframe>` here.\n\n<script>var s = 1; {REGLE_RETIREE}</script>\n\nEnd.\n"),
+    ];
+    for (rang, page) in cas.iter().enumerate() {
+        let rapport = sg5_page(
+            &format!("sg5-md-extrait-{rang}"),
+            "artefact-c.md",
+            page,
+            REGLE_RETIREE,
+        );
+        exiger_rouge(&rapport, "citation introuvable");
+    }
 }
 
 // S-G5, éléments de texte brut que C-6 ne testait pas (contre-contrôle de DETTES-T15, R-2 ; mutants M08 à M10) : un

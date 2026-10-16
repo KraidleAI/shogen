@@ -425,38 +425,88 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// traitement (DT15-h), éléments `script` et `style` jusqu'à la fermante qui
 /// les clôt (DT15-g). Une balise
 /// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
-/// d'attribut n'ouvre rien (DT15-k) ; le contenu d'un élément de texte brut
-/// (`TEXTE_BRUT`) est recopié tel quel : un `<!--` ou un `<script` écrit dans un
-/// `title` ou un `textarea` n'ouvre rien (relecture G2, C-6). Ce qu'un script
-/// ou une interaction peut montrer (`template`, `noscript`, attribut `hidden`,
-/// CSS) reste. Lecture sans analyseur : texte ôté en trop (bloc de code
-/// Markdown, balise écrite dans un `textarea`), jamais gardé en trop, hors de
-/// deux cas. Un contenu SVG ou MathML, lu ici comme du HTML : un `</script` ou
-/// un `</style` écrit dans un commentaire, une section CDATA ou une valeur
-/// d'attribut à l'intérieur d'un tel script ou style l'y clôt trop tôt. Un
+/// d'attribut n'ouvre rien (DT15-k). Un élément de texte brut (`TEXTE_BRUT`)
+/// bascule la tokenisation selon la construction de l'arbre, que cette lecture
+/// ne suit pas : élément HTML, son contenu est du texte, où un `<!--` ou un
+/// `<script` n'ouvre rien (relecture G2, C-6) ; même nom dans un contenu SVG ou
+/// MathML, ou balise que la construction ignore, il reste au balisage. La page
+/// est lue trois fois (`Lecture`) et garde ce que les trois lectures gardent
+/// (contre-contrôle de DETTES-T15, R-3) : jamais plus que la série sans C-6, ni
+/// que C-6. Ce qu'un script ou une interaction peut montrer (`template`,
+/// `noscript`, attribut `hidden`, CSS) reste. Lecture sans analyseur : texte
+/// ôté en trop (bloc de code Markdown, balise ou ouvreur écrits dans un
+/// `textarea` ou un `title`), jamais gardé en trop, hors de trois cas. Un
+/// contenu SVG ou MathML, lu ici comme du HTML (un `</script` ou un `</style`
+/// écrit dans un commentaire, une section CDATA ou une valeur d'attribut à
+/// l'intérieur d'un tel script ou style l'y clôt trop tôt) ; un élément de texte
+/// brut HTML écrit dans le `title` d'un SVG, point d'intégration, y est lu comme
+/// du balisage. Un
 /// ouvreur écrit dans un extrait ou un bloc de code Markdown, que le rendu
-/// affiche, et dont la fin tomberait dans une construction vraie. Temps linéaire.
+/// affiche, et dont la fin tomberait dans une construction vraie. Le texte d'un
+/// `iframe`, d'un `noembed`, d'un `noframes` ou d'une page à cadres, que la page
+/// n'affiche pas. Temps linéaire (trois balayages).
 /// Appliqué au corpus seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
+    let lectures = [Lecture::Balisage, Lecture::Brut, Lecture::BrutHorsEtranger]
+        .map(|lecture| gardes_d_une_lecture(texte, lecture));
     let mut sortie = String::with_capacity(texte.len());
-    let mut reste = texte;
+    let mut debut = None;
+    for i in 0..=texte.len() {
+        let garde = lectures
+            .iter()
+            .all(|gardes| gardes.get(i).copied().unwrap_or(false));
+        match (garde, debut) {
+            (true, None) => debut = Some(i),
+            (false, Some(d)) => {
+                sortie.push_str(texte.get(d..i).unwrap_or(""));
+                debut = None;
+            }
+            _ => {}
+        }
+    }
+    sortie
+}
+
+/// Les trois lectures du contenu d'un élément `TEXTE_BRUT` (contre-contrôle de
+/// DETTES-T15, R-3) : comme du balisage (la série sans C-6), comme du texte
+/// partout, comme du texte hors d'un contenu `svg` ou `math` (C-6).
+#[derive(Clone, Copy)]
+enum Lecture {
+    Balisage,
+    Brut,
+    BrutHorsEtranger,
+}
+
+/// Octets qu'une lecture garde, balises comprises (pour le débalisage).
+fn gardes_d_une_lecture(texte: &str, lecture: Lecture) -> Vec<bool> {
+    let mut gardes = vec![true; texte.len()];
     let mut etranger = 0usize;
-    while let Some(ouverture) = reste.find('<') {
-        sortie.push_str(reste.get(..ouverture).unwrap_or(""));
-        let suite = reste.get(ouverture..).unwrap_or("");
-        let (gardee, longueur) = match longueur_non_affichee(suite) {
-            Some(longueur) => (0, longueur),
+    let mut i = 0usize;
+    while let Some(o) = texte.get(i..).and_then(|reste| reste.find('<')) {
+        let ouverture = i.saturating_add(o);
+        let suite = texte.get(ouverture..).unwrap_or("");
+        let longueur = match longueur_non_affichee(suite) {
+            Some(longueur) => {
+                let fin = ouverture.saturating_add(longueur).min(texte.len());
+                if let Some(ote) = gardes.get_mut(ouverture..fin) {
+                    ote.fill(false);
+                }
+                longueur
+            }
             None => {
-                let lue = longueur_de_balise(suite.as_bytes()).unwrap_or(1);
-                let longueur = lue.saturating_add(texte_brut(suite.as_bytes(), lue, &mut etranger));
-                (longueur, longueur)
+                let t = suite.as_bytes();
+                let lue = longueur_de_balise(t).unwrap_or(1);
+                let contenu = match lecture {
+                    Lecture::Balisage => 0,
+                    Lecture::Brut => texte_brut(t, lue, None),
+                    Lecture::BrutHorsEtranger => texte_brut(t, lue, Some(&mut etranger)),
+                };
+                lue.saturating_add(contenu)
             }
         };
-        sortie.push_str(suite.get(..gardee).unwrap_or(""));
-        reste = suite.get(longueur..).unwrap_or("");
+        i = ouverture.saturating_add(longueur.max(1));
     }
-    sortie.push_str(reste);
-    sortie
+    gardes
 }
 
 /// Éléments dont la construction de l'arbre bascule la tokenisation (WHATWG,
@@ -477,22 +527,24 @@ const TEXTE_BRUT: [&str; 7] = [
 
 /// Longueur du contenu de texte brut qui suit une balise `TEXTE_BRUT` longue de
 /// `lue` octets (relecture G2 de DETTES-T15, C-6) ; 0 après toute autre balise,
-/// et dans un contenu `svg` ou `math` (profondeur `etranger`, tenue ici), où ces
-/// éléments ne basculent pas la tokenisation.
-fn texte_brut(t: &[u8], lue: usize, etranger: &mut usize) -> usize {
-    let auto_fermee = t.get(..lue).is_some_and(|b| b.ends_with(b"/>"));
-    if balise(t, 0, "<svg") || balise(t, 0, "<math") {
-        *etranger = etranger.saturating_add(usize::from(!auto_fermee));
-        return 0;
+/// et, si la profondeur `etranger` est tenue (lecture C-6), dans un contenu
+/// `svg` ou `math`, où ces éléments ne basculent pas la tokenisation.
+fn texte_brut(t: &[u8], lue: usize, etranger: Option<&mut usize>) -> usize {
+    if let Some(etranger) = etranger {
+        let auto_fermee = t.get(..lue).is_some_and(|b| b.ends_with(b"/>"));
+        if balise(t, 0, "<svg") || balise(t, 0, "<math") {
+            *etranger = etranger.saturating_add(usize::from(!auto_fermee));
+            return 0;
+        }
+        if balise(t, 0, "</svg") || balise(t, 0, "</math") {
+            *etranger = etranger.saturating_sub(1);
+            return 0;
+        }
+        if *etranger > 0 {
+            return 0;
+        }
     }
-    if balise(t, 0, "</svg") || balise(t, 0, "</math") {
-        *etranger = etranger.saturating_sub(1);
-        return 0;
-    }
-    let Some(nom) = TEXTE_BRUT
-        .iter()
-        .find(|nom| *etranger == 0 && balise(t, 0, nom))
-    else {
+    let Some(nom) = TEXTE_BRUT.iter().find(|nom| balise(t, 0, nom)) else {
         return 0;
     };
     let fermante = format!("</{}", nom.get(1..).unwrap_or(""));
