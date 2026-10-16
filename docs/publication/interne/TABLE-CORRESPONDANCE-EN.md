@@ -1,10 +1,10 @@
 # Table de correspondance, section par section (fr → en) — lot DOCS11-EN
 
-Générée par `controle_en.py --table` depuis l'alignement des unités (une unité : titre, paragraphe, élément de liste, ligne de table, bloc de code ou paragraphe de citation). Source sha256 `c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561` ; traduction sha256 `60f7dc7a7b6784a2d528e5d5f2ffe1798bef20b20c12156be688e92a7b2021d6`. Les deux paragraphes d'en-tête ajoutés (brief, point 6) et le glossaire final ne figurent pas ici : ce sont des ajouts déclarés, contrôlés à part (contrôles 10 et 11).
+Générée par `controle_en.py --table` depuis l'alignement des unités (une unité : titre, paragraphe, élément de liste, ligne de table, bloc de code ou paragraphe de citation). Source sha256 `5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6` ; traduction sha256 `34d5b233ad684fe6bdf3a1ebf3c6f389d0239591b41cf12e4ebe2e8ea4b2c10d`. Les deux paragraphes d'en-tête ajoutés (brief, point 6) et le glossaire final ne figurent pas ici : ce sont des ajouts déclarés, contrôlés à part (contrôles 10 et 11).
 
 | # | titre français (l.) | titre anglais (l.) | unités : para / liste / table / code / bloc | nombres (composites) fr = en | nombres identiques par unité | citations gardées | citations traduites | gloses |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Les mesures pilotes S2 — rapport de la campagne (exécution unique du 2026-10-04) (l.1) | The S2 pilot measurements — campaign report (single execution of 2026-10-04) (l.1) | 0 / 0 / 0 / 0 / 4 | 22 = 22 | oui | 0 | 2 | 0 |
+| 1 | Les mesures pilotes S2 — rapport de la campagne (exécution unique du 2026-10-04) (l.1) | The S2 pilot measurements — campaign report (single execution of 2026-10-04) (l.1) | 0 / 0 / 0 / 0 / 4 | 23 = 23 | oui | 0 | 2 | 0 |
 | 2 | 1. Résumé (l.30) | 1. Summary (l.15) | 7 / 4 / 0 / 0 / 0 | 101 = 101 | oui | 5 | 12 | 7 |
 | 3 | Conventions de lecture et lexique (l.84) | Reading conventions and lexicon (l.36) | 3 / 18 / 9 / 0 / 0 | 81 = 81 | oui | 2 | 3 | 3 |
 | 4 | 2. Instrument et campagne (l.142) | 2. Instrument and campaign (l.74) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
@@ -22,8 +22,8 @@ Générée par `controle_en.py --table` depuis l'alignement des unités (une uni
 | 16 | 3.4 Famille de Bonferroni et prémisse de la borne (pt 7) (l.300) | 3.4 Bonferroni family and premise of the bound (pt 7) (l.188) | 2 / 0 / 0 / 1 / 0 | 43 = 43 | oui | 0 | 1 | 0 |
 | 17 | 3.5 Écarts par flux (bloc 3) (l.318) | 3.5 Anomalies per feed (block 3) (l.198) | 1 / 0 / 13 / 0 / 0 | 135 = 135 | oui | 1 | 0 | 2 |
 | 18 | 4. Drapeaux et R2 (blocs 5 et 6 du J28) (l.337) | 4. Flags and R2 (blocks 5 and 6 of J28) (l.216) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
-| 19 | 4.1 Tête de certificat (bloc 6), recopiée (l.339) | 4.1 Certificate head (block 6), copied (l.218) | 1 / 4 / 0 / 1 / 0 | 84 = 84 | oui | 5 | 0 | 5 |
-| 20 | 4.2 R2 en résumé (bloc 5) (l.379) | 4.2 R2 in summary (block 5) (l.249) | 0 / 5 / 0 / 0 / 0 | 35 = 35 | oui | 2 | 0 | 1 |
+| 19 | 4.1 Tête de certificat (bloc 6), recopiée (l.339) | 4.1 Certificate head (block 6), copied (l.218) | 1 / 4 / 0 / 1 / 0 | 88 = 88 | oui | 5 | 0 | 5 |
+| 20 | 4.2 R2 en résumé (bloc 5) (l.379) | 4.2 R2 in summary (block 5) (l.249) | 0 / 5 / 0 / 0 / 0 | 38 = 38 | oui | 2 | 0 | 1 |
 | 21 | 4.3 Divergences ASN pour des hôtes hors du pool (SHOGEN-ASN-DIVERGENCE-HORS-POOL-1, annexe B.44) (l.404) | 4.3 ASN divergences for hosts outside the pool (SHOGEN-ASN-DIVERGENCE-HORS-POOL-1, annex B.44) (l.257) | 1 / 0 / 0 / 0 / 0 | 10 = 10 | oui | 0 | 0 | 0 |
 | 22 | 4.4 Caveats du chemin de lecture (RPC) (l.412) | 4.4 Caveats of the reading path (RPC) (l.261) | 0 / 3 / 0 / 0 / 0 | 13 = 13 | oui | 1 | 0 | 1 |
 | 23 | 5. Descriptifs pré-enregistrés (annexe D.5, paquet §11), hors décision (l.423) | 5. Pre-registered descriptives (annex D.5, package §11), hors décision (l.267) | 1 / 0 / 0 / 0 / 0 | 3 = 3 | oui | 0 | 0 | 0 |
@@ -37,7 +37,7 @@ Générée par `controle_en.py --table` depuis l'alignement des unités (une uni
 | 31 | 7.2 J14 second (sensibilité « seconde coupe ») (l.589) | 7.2 Second J14 (« seconde coupe » sensitivity) (l.373) | 3 / 0 / 9 / 1 / 0 | 73 = 73 | oui | 3 | 0 | 1 |
 | 32 | 7.3 Strate poolée (exploratoire, hors famille, hors décision) (l.616) | 7.3 Pooled stratum (exploratory, outside the family, hors décision) (l.395) | 2 / 2 / 0 / 0 / 0 | 24 = 24 | oui | 1 | 0 | 1 |
 | 33 | 7.4 Sensibilité « plage incluse » (liste fermée, D2 pt 7) (l.629) | 7.4 « plage incluse » sensitivity (closed list, D2 pt 7) (l.404) | 1 / 4 / 6 / 1 / 0 | 64 = 64 | oui | 3 | 0 | 3 |
-| 34 | 7.5 L&M (bloc 4) (l.663) | 7.5 L&M (block 4) (l.424) | 2 / 0 / 8 / 0 / 0 | 51 = 51 | oui | 1 | 0 | 0 |
+| 34 | 7.5 L&M (bloc 4) (l.663) | 7.5 L&M (block 4) (l.424) | 2 / 0 / 8 / 0 / 0 | 58 = 58 | oui | 1 | 0 | 0 |
 | 35 | 7.6 Queues exactes (l.683) | 7.6 Exact tails (l.439) | 1 / 0 / 0 / 0 / 0 | 7 = 7 | oui | 0 | 0 | 0 |
 | 36 | 8. Contrôles de l'exécution (l.689) | 8. Checks of the execution (l.443) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
 | 37 | 8.1 Sceau (l.691) | 8.1 Seal (l.445) | 0 / 7 / 0 / 0 / 0 | 51 = 51 | oui | 1 | 2 | 1 |

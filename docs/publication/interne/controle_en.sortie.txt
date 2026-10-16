@@ -1,9 +1,9 @@
 === Contrôle de la traduction anglaise (lot DOCS11-EN) ===
-source     : /home/user/shogen/docs/publication/11-mesures-pilotes-public.md
-             sha256 c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561
+source     : 11-mesures-pilotes-public.md
+             sha256 5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6
 traduction : 11-pilot-measurements-public-en.md
-             sha256 60f7dc7a7b6784a2d528e5d5f2ffe1798bef20b20c12156be688e92a7b2021d6
-glossaire  : sha256 4beaf0643faad055eb87f66d5b7facbdc45823dbe14ded874cdd2335e844d76c
+             sha256 34d5b233ad684fe6bdf3a1ebf3c6f389d0239591b41cf12e4ebe2e8ea4b2c10d
+glossaire  : sha256 d909935c6cb5e9d15074ee35e9f5c55bcfd333bc2c3f25dcfad8016fec4f328f
 
 --- 1. Structure et alignement ---
   unités : source 410 ; traduction : corps 410, en-tête ajouté 2, glossaire final 116
@@ -11,10 +11,10 @@ glossaire  : sha256 4beaf0643faad055eb87f66d5b7facbdc45823dbe14ded874cdd2335e844
   => OK
 
 --- 2. Nombres (par unité, puis global) ---
-  composites : source 1037 distincts / 2491 occurrences ; traduction 1037 distincts / 2491 occurrences
-  suites de chiffres : source 806 distincts / 3785 occurrences ; traduction 806 distincts / 3785 occurrences
+  composites : source 1040 distincts / 2506 occurrences ; traduction 1040 distincts / 2506 occurrences
+  suites de chiffres : source 806 distincts / 3822 occurrences ; traduction 806 distincts / 3822 occurrences
   multiensemble global normalisé : inventés 0, perdus 0 — identique
-  nombres en lettres : source {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 44, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2} ; traduction {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 44, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2}
+  nombres en lettres : source {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 45, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2} ; traduction {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 45, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2}
   => OK
 
 --- 3. Citations ---
@@ -55,6 +55,6 @@ glossaire  : sha256 4beaf0643faad055eb87f66d5b7facbdc45823dbe14ded874cdd2335e844
 
 --- Informatif : rapport de longueur anglais / français par unité (hors [0,6 ; 1,5]) ---
 
-table de correspondance écrite : TABLE-CORRESPONDANCE-EN.md
+table de correspondance écrite : interne/TABLE-CORRESPONDANCE-EN.md
 
 VERDICT : CONFORME — onze contrôles sur onze (sortie 0)
