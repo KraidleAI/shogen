@@ -468,3 +468,13 @@ dépendent des tests du harnais qu'ils importent.
 > SHOGEN-S2BIS-MUT-COMMANDE-1)* : le classement FATAL d'un mutant de `gates.yml` qui rend les étapes
 > illisibles (C-1) a son cas : M11 (`if:` posé sur une étape : FATAL, aucune étape jouée) ; avant R-5, ce
 > classement pouvait devenir `tué` sans qu'aucun cas ne rougisse (mutant CC7 du contre-contrôle, vivant).
+
+> *Ajout daté du 2026-10-16 00:56:42 UTC (`date -u` ; lot DETTES-T15 ; SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1,
+> relecture G2 du correctif DT5-24, O-5 ; texte de DT15-f du 2026-10-10 08:45:35 UTC, plancher recalé sur la
+> tête `413321b`)* :
+> FLOTTANT de `enforcement/runners-epingles.py` ne prend une occurrence qu'au début d'une suite de caractères de
+> libellé (regard arrière) : temps linéaire, mêmes occurrences que l'ancienne forme (preuve du lot : partition
+> d'Unicode par le moteur, contrôles exhaustifs et aléatoire à trois voix, aucun écart, sous Python 3.10 à 3.13) ;
+> `tests/test_runners_epingles.py` compte 12 tests (un test de temps borné sur des libellés de 200 000 caractères),
+> plancher du job `controle-unittest` 118 ; le compte de 11 tests de l'ajout du 2026-10-10 03:35:43 UTC et les
+> planchers des ajouts suivants, jusqu'à 117 (ajout du 2026-10-15 23:45:31 UTC), précèdent ce lot.

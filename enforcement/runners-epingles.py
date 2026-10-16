@@ -20,7 +20,9 @@ import os
 import re
 import sys
 
-FLOTTANT = re.compile(r"[A-Za-z0-9_.-]*-latest(?![A-Za-z0-9_.])[A-Za-z0-9_.-]*", re.IGNORECASE)
+# Occurrence prise au début d'une suite de caractères de libellé seul (regard arrière) : chaque position hors d'un début
+# échoue en un pas, temps linéaire ; mêmes occurrences que sans l'ancre (SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1).
+FLOTTANT = re.compile(r"(?<![A-Za-z0-9_.-])[A-Za-z0-9_.-]*-latest(?![A-Za-z0-9_.])[A-Za-z0-9_.-]*", re.IGNORECASE)
 MATRICE = re.compile(r"matrix\s*\.\s*([A-Za-z_][A-Za-z0-9_-]*)", re.IGNORECASE)   # ${{ matrix.<clé> }} d'un runs-on
 # Mots séparés par des blancs, chacun lu d'un seul tenant : aucun découpage ambigu d'un mot, donc aucun retour
 # arrière exponentiel (alerte CodeQL de la PR n° 11) ; mêmes chaînes acceptées que la forme `(?:[&!]\S*\s*)*`.
