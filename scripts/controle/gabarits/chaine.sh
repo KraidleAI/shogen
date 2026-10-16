@@ -39,11 +39,11 @@ verif() {
 # --- fin de verif
 
 acte chaine --plan "$PLAN" --cc "$CC" ${DUREE_PAS:+--duree-pas "$DUREE_PAS"} ${DETACHE:+--detache}
-acte disque --min-go "${DISQUE_MIN_GO:-0}"
 while IFS='|' read -r -u 3 id diffs message sources; do
   [ -n "$id" ] || continue
   if git -C "$DEPOT" log --format=%B | grep -Fx "Diff-Id: $id" > /dev/null; then echo "déjà commis : $id"; continue; fi
   [ -z "$(git -C "$DEPOT" status --porcelain)" ] || { echo "arbre non propre avant $id : arrêt" >&2; exit 1; }
+  acte disque --min-go "${DISQUE_MIN_GO:-0}" || { echo "ROUGE disque avant $id (LN-1) : arrêt, rien appliqué" >&2; exit 1; }
   options=(--message "$message" --id "$id")
   for d in ${diffs//,/ }; do git -C "$DEPOT" apply --index "$d"; options+=(--diff "$d"); done
   for s in ${sources//,/ }; do options+=(--source "$s"); done

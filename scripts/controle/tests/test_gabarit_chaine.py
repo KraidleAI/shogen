@@ -64,7 +64,8 @@ class Chaine(unittest.TestCase):
 
     def lancer(self, **variables):
         env = dict(self.env, DEPOT=self.d, PLAN=os.path.join(self.tmp, "plan"), OUTILS=self.outils,
-                   PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"), **variables)
+                   PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"))
+        env.update(variables)
         p = subprocess.run(["bash", self.chaine], env=env, capture_output=True, text=True, timeout=300)
         self.erreur = p.stderr
         return p.returncode, re.findall("(?m)^Diff-Id: (.+)$", ag.git(self.d, self.env, "log", "--format=%B"))
@@ -114,6 +115,20 @@ class Chaine(unittest.TestCase):
         code, ids = self.lancer()
         etat = ag.git(self.d, self.env, "status", "--porcelain")
         self.assertEqual((code != 0, ids, etat), (True, [], "?? sale.md" + NL))
+
+    def test_ln1_disque_a_chaque_pas(self):
+        """LN-1 (SHOGEN-GARDE-DISQUE-CHAINE-1) : disque passé sous le seuil en route (au second contrôle : PYTHON
+        enveloppé qui serre --min-go à ce contrôle-là, outil réel) : ligne ROUGE disque avant X-2, X-1 seul commis,
+        rien d'appliqué pour X-2 (arbre propre)."""
+        compte = os.path.join(self.tmp, "compte")
+        ag.ecrire(self.tmp, {"py.sh": NL.join([
+            "#!/bin/sh", 'case " $* " in *" disque "*)', '  n=$(($(cat "$COMPTE" 2>/dev/null || echo 0) + 1))',
+            '  echo "$n" > "$COMPTE"', '  [ "$n" -lt 2 ] || exec "$VRAI" "$@" --min-go 1000000 ;;', "esac",
+            'exec "$VRAI" "$@"', ""])})
+        os.chmod(os.path.join(self.tmp, "py.sh"), 0o755)
+        code, ids = self.lancer(PYTHON=os.path.join(self.tmp, "py.sh"), VRAI=sys.executable, COMPTE=compte)
+        etat = ag.git(self.d, self.env, "status", "--porcelain")
+        self.assertEqual((code != 0, ids, "ROUGE disque avant X-2" in self.erreur, etat), (True, ["X-1"], True, ""))
 
     def test_l4_verif_versionnee(self):
         """L-4 (SHOGEN-GARDE-VERIF-VERSIONNEE-1) : le sceau porte le sha256 de declare -f verif de la chaîne qui a
