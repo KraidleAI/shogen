@@ -20,6 +20,13 @@ INTERDITS = {11: "Verified data", 14: "donnée vérifiée", 20: "cinq sources di
              39: "couverture élevée", 42: "build reproductible", 43: "chaîne sécurisée", 44: "SLSA niveau 3",
              45: "CI verte donc", 51: "publiquement vérifiable", 53: "zkTLS trustless", 54: "subject normalisé",
              55: "donc deux ressources"}
+VARIANTES = {11: ("validated", "guaranteed", "ensures", "safe", "validée"), 21: ("independent",), 22: ("guarantee",),
+             23: ("signed facts",), 24: ("donnée vraie", "dit vrai", "true data", "correct price"),
+             25: ("security level",), 26: ("7 sources",), 27: ("proves",), 28: ("nobody measures",),
+             29: ("enforced diversity",), 30: ("nos sources sont bonnes", "quality of a source", "our sources are"),
+             31: ("decentralized",), 38: ("cannot panic",), 39: ("high coverage",), 42: ("reproducible",),
+             43: ("secured",), 44: ("SLSA level 3",), 45: ("green, so",), 51: ("publicly verifiable",),
+             53: ("transport sans confiance",), 54: ("normalise l'URL",)}     # chaque alternative de MOTS (CC)
 PERMIS = "diversité mesurée ; modèle d'indépendance non rejeté ; vérifier une signature ; flux divers ; unsafe_code"
 
 
@@ -51,7 +58,7 @@ class GabaritControle(unittest.TestCase):
             self.assertEqual(bloc, doc04, g)
 
     def test_mots_interdits(self):
-        for ligne, phrase in INTERDITS.items():
+        for ligne, phrase in [*INTERDITS.items(), *((n, p) for n, ps in VARIANTES.items() for p in ps)]:
             with self.subTest(ligne=ligne):
                 texte = G.replace("# R", "# R " + phrase)
                 code, err = lancer(texte, texte)
@@ -68,7 +75,8 @@ class GabaritControle(unittest.TestCase):
                                (remplir().replace("fin `Acme`", "fin `Beta`"), "<libre.client> : deux valeurs"),
                                (remplir() + "ajout", "texte en trop"), (remplir(rendu_k=""), "valeur vide"),
                                (remplir(libre_client="Acme`\n- k : `x"), "texte en trop"),
-                               (remplir(libre_client="des sources indépendantes"), "(doc 09 l.21)")):
+                               (remplir(libre_client="des sources indépendantes"), "l.7 : locution (doc 09 l.21)"),
+                               (remplir(libre_client="sources indépendantes").replace("# R", "# X"), "(doc 09 l.21)")):
             code, err = lancer(G, rapport)
             self.assertEqual((code, motif in err), (1, True), (motif, err))
 
