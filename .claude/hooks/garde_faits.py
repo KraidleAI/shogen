@@ -38,7 +38,11 @@ pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance 
 R8 (E20) : create_pull_request refusé sans preuve que la forge lance des jobs sur ce dépôt : au journal, un résultat
 de mcp__github__actions_* (ou de gh run, gh api) du même owner/repo qui montre un run conclu success ou un job à
 runner_id non nul ; ou, au marqueur scripts/controle/garde/forge-actions.txt, la ligne owner/repo AAAA-MM-JJ du jour
-(date -u), écrite après constat."""
+(date -u), écrite après constat.
+R9 (E27) : seuil de coût avant Agent et Workflow : refus d'un workflow de plus de SEUIL_WORKFLOW agents (appels agent(
+du script ; nombre inconnu, boucle qui les multiplie : refus), ou d'un lancement qui porterait les sous-agents vivants
+(journal touché depuis VIVANT_S s) au-delà de SEUIL_VIVANTS ; sauf jeton FANOUT-AUTORISE (ou les mots fan out) écrit
+par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil)."""
 import importlib.util
 import json
 import os
@@ -78,6 +82,9 @@ def _acte_shell():
 
 AS = _acte_shell()
 RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SEUIL_WORKFLOW, SEUIL_VIVANTS, VIVANT_S = 3, 4, 300
+JETON = re.compile(r"FANOUT-AUTORISE|\bfan[ -]?out\b", re.I)
+RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
@@ -384,6 +391,47 @@ def forge_lance(entrees, owner, repo):
     return f"{cible} {jour_utc()}" in lignes
 
 
+def tour_humain(entrees):
+    """(indice, textes) du dernier message de l'humain (hors résultats d'outil, rappels du système et refus de ce
+    crochet), suivi des messages qu'il a mis en file après lui."""
+    idx, textes = None, []
+    for i, e in enumerate(entrees):
+        c = (e.get("message") or {}).get("content") if e.get("type") == "user" and not e.get("isMeta") else None
+        blocs = [c] if isinstance(c, str) else [b for b in c or [] if isinstance(b, dict) and b.get("type") == "text"]
+        txt = RAPPEL.sub("", "\n".join(contenus(b) for b in blocs))
+        outils = isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c)
+        if txt.strip() and MARQUE not in txt and not outils:
+            idx, textes = i, [txt]
+        elif idx is not None and e.get("type") == "attachment" and (e.get("attachment") or {}).get(
+                "type") == "queued_command":
+            textes.append(contenus(e.get("attachment")))
+    return idx, textes
+
+
+def agents_du_workflow(inp):
+    """Agents qu'un Workflow lance : appels agent( de son texte, ou liste agents ; None si inconnu (aucun compte, ou
+    boucle qui les multiplie)."""
+    t = json.dumps(inp, ensure_ascii=False)
+    n = len(re.findall(r"\bagent\s*\(", t))
+    if n and re.search(r"\b(for|while)\s*\(|\.(map|forEach|flatMap)\s*\(|Array\.from|\bfor\s+\w+\s+(of|in)\b", t):
+        return None
+    liste = inp.get("agents") if isinstance(inp, dict) else None
+    return n or (len(liste) if isinstance(liste, list) and liste else None)
+
+
+def agents_vivants(entree):
+    """Sous-agents de la session dont le journal a bougé depuis VIVANT_S secondes (identifiants distincts)."""
+    import time
+    tp = entree.get("transcript_path") or ""
+    d = os.path.join(tp[:-6] if tp.endswith(".jsonl") else os.path.dirname(tp), "subagents")
+    try:
+        noms = os.listdir(d)
+    except OSError:
+        return 0
+    return len({x.split(".")[0] for x in noms if x.startswith("agent-")
+                and time.time() - os.path.getmtime(os.path.join(d, x)) < VIVANT_S})
+
+
 def pre_tool_use(entree):
     nom = entree.get("tool_name", "")
     inp = entree.get("tool_input") or {}
@@ -452,6 +500,17 @@ def pre_tool_use(entree):
         if nom in ("Agent", "Workflow") and re.search(r"/home/user/shogen|dépôt|depot|worktree|git archive|\.git\b", p):
             if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|log)\b"):
                 refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
+        # R9 (E27) : seuil de coût
+        n = 1 if nom == "Agent" else agents_du_workflow(inp) if nom == "Workflow" else 0
+        vivants = agents_vivants(entree) if n else 0
+        if n is None or (nom == "Workflow" and n > SEUIL_WORKFLOW) or vivants + (n or 0) > SEUIL_VIVANTS:
+            tp = entree.get("transcript_path") or ""
+            session = entrees if chemin == tp else lire_queue(tp)
+            if not any(JETON.search(t) for t in tour_humain(session or [])[1]):
+                lances = "nombre d’agents illisible" if n is None else f"{n} agent(s) lancé(s)"
+                refuser(f"R9 (E27) : seuil de coût : {lances}, {vivants} vivant(s) (seuils : {SEUIL_WORKFLOW} par "
+                        f"workflow, {SEUIL_VIVANTS} vivants) ; faire en direct, ou attendre le jeton FANOUT-AUTORISE "
+                        "écrit par l'investisseur dans son message.")
         textes_ecrits.append(p)
     elif nom.startswith("mcp__github__") and nom.split("__")[-1] in ("create_pull_request", "add_issue_comment", "update_pull_request", "pull_request_review_write", "add_reply_to_pull_request_comment"):
         o, r = inp.get("owner", ""), inp.get("repo", "")

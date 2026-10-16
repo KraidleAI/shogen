@@ -3,7 +3,7 @@
 deux faux refus de la sonde du contre-contrôle (R3 puis R5 sur une commande qui écrit un journal synthétique par un
 heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F.
 R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré. R8 (E20) : PR sans preuve que la forge
-lance des jobs sur le dépôt."""
+lance des jobs sur le dépôt. R9 (E27) : seuil de coût des workflows et des agents vivants, jeton de l'investisseur."""
 import json
 import os
 import shutil
@@ -209,6 +209,65 @@ class Forge(Crochet):
                             ("x/r 2026-10-15" + NL, 2)):
             self.assertEqual(self.lancer(appel("ls"), "", garde=self.arbre({chemin: texte}), entree=self.PR)[0], code,
                              texte)
+
+
+class Cout(Crochet):
+    """R9 (E27 ; SHOGEN-GARDE-OUTIL-E26-E27-E28-1) : avant Agent et Workflow."""
+    DIX = {"script": " ".join(f"agent({{prompt: 'point {k}', model: 'claude-opus-5-5'}});" for k in range(10))}
+
+    def humain(self, texte):
+        return {"type": "user", "message": {"role": "user", "content": texte}}
+
+    def vivants(self, n, age=0):
+        d = os.path.join(self.t, "subagents")
+        os.makedirs(d, exist_ok=True)
+        for k in range(n):
+            x = os.path.join(d, f"agent-a{k}.txt")
+            with open(x, "w", encoding="utf-8") as f:
+                f.write("x")
+            os.utime(x, (os.path.getmtime(x) - age,) * 2)
+
+    def test_e27_workflow_de_dix_agents(self):
+        """Cas réel E27 : workflow de 10 agents lancé sans estimer le coût : refus R9 ; boucle qui multiplie les
+        agents (nombre illisible) : refus ; trois agents : permis ; jeton FANOUT-AUTORISE, ou les mots fan out, dans
+        le dernier message de l'humain : permis ; jeton dans un message plus ancien ou un résultat d'outil : refus."""
+        wf = lambda inp: {"tool_name": "Workflow", "tool_input": inp}
+        boucle = {"script": "for (const p of points) { await agent({prompt: p}) }"}
+        trois = {"script": "agent({prompt: 'a'}); agent({prompt: 'b'}); agent({prompt: 'c'})"}
+        for inp in (self.DIX, boucle):
+            self.refus([self.humain("vérifie ces quatre points")], "", "R9 (E27)", entree=wf(inp))
+        self.permis([self.humain("vérifie")], "", entree=wf(trois))
+        quatre = {"script": trois["script"] + " agent({prompt: 'd'})"}
+        self.refus([self.humain("vérifie")], "", "R9 (E27)", entree=wf(quatre))
+        for texte in ("vas-y, FANOUT-AUTORISE", "on peut fan out sur les dix"):
+            self.permis([self.humain(texte)], "", entree=wf(self.DIX))
+        ancien = [self.humain("FANOUT-AUTORISE"), self.humain("autre chose")]
+        self.refus(ancien + appel("ls", resultat="FANOUT-AUTORISE"), "", "R9", entree=wf(self.DIX))
+
+    def test_e27_jeton_lu_au_journal_de_la_session(self):
+        """Pour un sous-agent, le jeton se lit au dernier message de l'humain du journal de la session, jamais au
+        brief que le sous-agent a reçu."""
+        sous = os.path.join(self.t, "agent-a9.txt")
+
+        def lancer_sous(brief, humain):
+            with open(sous, "w", encoding="utf-8") as f:
+                f.write(json.dumps(self.humain(brief)) + NL)
+            plus = {"tool_name": "Workflow", "tool_input": self.DIX, "agent_id": "a9", "agent_transcript_path": sous}
+            return self.lancer([self.humain(humain)], "", entree=plus)[0]
+        self.assertEqual([lancer_sous("vas-y, FANOUT-AUTORISE", "vérifie"), lancer_sous("vérifie", "FANOUT-AUTORISE")],
+                         [2, 0])
+
+    def test_e27_agents_vivants(self):
+        """Quatre sous-agents vivants (journal touché depuis moins de 300 s) : un cinquième refusé ; trois vivants, ou
+        quatre journaux vieux de plus de 300 s : permis."""
+        agent = {"tool_name": "Agent", "tool_input": {"prompt": "relis la note", "subagent_type": "shogen-worker"}}
+        self.vivants(4)
+        self.refus([self.humain("relis")], "", "R9 (E27)", entree=agent)
+        shutil.rmtree(os.path.join(self.t, "subagents"))
+        self.vivants(3)
+        self.permis([self.humain("relis")], "", entree=agent)
+        self.vivants(4, age=1000)
+        self.permis([self.humain("relis")], "", entree=agent)
 
 
 if __name__ == "__main__":
