@@ -1,0 +1,142 @@
+# Registre des renvois par numéro de ligne (lot DETTES-T15 ; SHOGEN-REFS-LIGNE-CONTENU-1), contrôlé par S-G9 (a),
+# xtask/src/sg9.rs. Une ligne par renvoi, colonnes séparées par une tabulation : renvoi (fichier citant et sa ligne),
+# jeton (texte du renvoi dans cette ligne), cible, ecrit (ligne ou plage écrite), lignes (où le texte cité se trouve
+# aujourd'hui ; « - » s'il n'est plus dans l'arbre : le renvoi se lit alors à son commit seul), empreinte (16 premiers
+# chiffres hexadécimaux du SHA-256 des lignes citées, jointes par LF, au commit de lecture), commit (de lecture : base
+# que déclare le document citant ; docs/17 : cf696bd, ses ajouts datés : leur commit ; paquet scellé : 8b14567).
+# Rejeu d'une empreinte : git show <commit>:<cible> | sed -n '<a>,<b>p' | head -c -1 | sha256sum (16 chiffres).
+# Mise à jour par un lot revu ; aucune ligne d'un document cité n'est réécrite pour un renvoi.
+renvoi	jeton	cible	ecrit	lignes	empreinte	commit
+docs/17-modele-de-menace.md:3	docs/AUDIT-ENTREE.md:13	docs/AUDIT-ENTREE.md	13	13	15b308445006dcaf	cf696bd
+docs/17-modele-de-menace.md:3	docs/AUDIT-ENTREE.md:41	docs/AUDIT-ENTREE.md	41	41	fd63b9d84873b659	cf696bd
+docs/17-modele-de-menace.md:19	adapters/shogen-tlsn-verify/session/src/main.rs:13-16	adapters/shogen-tlsn-verify/session/src/main.rs	13-16	13-16	3d580bd4148cd340	cf696bd
+docs/17-modele-de-menace.md:19	biblio/INDEX.md:18	biblio/INDEX.md	18	18	0e8fb0469bd499a7	cf696bd
+docs/17-modele-de-menace.md:20	adapters/shogen-tlsn-verify/session/src/main.rs:29-35	adapters/shogen-tlsn-verify/session/src/main.rs	29-35	29-35	9af7a56935ab1b5d	cf696bd
+docs/17-modele-de-menace.md:25	docs/04-certificat-diversite.md:166-172	docs/04-certificat-diversite.md	166-172	166-172	9b6e9dab537d0201	cf696bd
+docs/17-modele-de-menace.md:26	biblio/INDEX.md:19	biblio/INDEX.md	19	19	b1fd81e83af187aa	cf696bd
+docs/17-modele-de-menace.md:59	adapters/shogen-tlsn-verify/session/src/main.rs:23-25	adapters/shogen-tlsn-verify/session/src/main.rs	23-25	23-25	9b4af0d4d79d1242	cf696bd
+docs/17-modele-de-menace.md:59	adapters/shogen-tlsn-verify/session/src/main.rs:328-333	adapters/shogen-tlsn-verify/session/src/main.rs	328-333	328-333	db75ce1cb52bb660	cf696bd
+docs/17-modele-de-menace.md:59	adapters/shogen-tlsn-verify/src/main.rs:243	adapters/shogen-tlsn-verify/src/main.rs	243	243	54b86d6a09df4b9e	cf696bd
+docs/17-modele-de-menace.md:59	adapters/shogen-tlsn-verify/src/main.rs:247-248	adapters/shogen-tlsn-verify/src/main.rs	247-248	247-248	98b2c062e62edb3c	cf696bd
+docs/17-modele-de-menace.md:59	crates/shogen-core/src/verification.rs:328-350	crates/shogen-core/src/verification.rs	328-350	328-350	89b191476e711de8	cf696bd
+docs/17-modele-de-menace.md:59	crates/shogen-verifier/src/main.rs:343-347	crates/shogen-verifier/src/main.rs	343-347	343-347	f4c46a98106d0b71	cf696bd
+docs/17-modele-de-menace.md:60	crates/shogen-verifier/src/main.rs:345	crates/shogen-verifier/src/main.rs	345	345	ad54c41ae25e17b2	cf696bd
+docs/17-modele-de-menace.md:60	docs/03-temoignage.md:10-16	docs/03-temoignage.md	10-16	10-16	47dd7433fa405821	cf696bd
+docs/17-modele-de-menace.md:60	docs/04-certificat-diversite.md:143-146	docs/04-certificat-diversite.md	143-146	143-146	85857fcb6a20ce92	cf696bd
+docs/17-modele-de-menace.md:60	docs/04-certificat-diversite.md:166-172	docs/04-certificat-diversite.md	166-172	166-172	9b6e9dab537d0201	cf696bd
+docs/17-modele-de-menace.md:60	docs/09-vocabulaire.md:24	docs/09-vocabulaire.md	24	24	3fb5dff2cd66315d	cf696bd
+docs/17-modele-de-menace.md:61	crates/shogen-core/src/verification.rs:352-360	crates/shogen-core/src/verification.rs	352-360	352-360	f5f82569e36e3e37	cf696bd
+docs/17-modele-de-menace.md:62	crates/shogen-core/src/verification.rs:376-384	crates/shogen-core/src/verification.rs	376-384	376-384	c30180723df31c87	cf696bd
+docs/17-modele-de-menace.md:62	crates/shogen-verifier/tests/temoignage_reel.rs:199	crates/shogen-verifier/tests/temoignage_reel.rs	199	199	117807abe367245a	cf696bd
+docs/17-modele-de-menace.md:62	crates/shogen-verifier/tests/temoignage_reel.rs:240	crates/shogen-verifier/tests/temoignage_reel.rs	240	240	e2c48993105f68cd	cf696bd
+docs/17-modele-de-menace.md:63	adapters/shogen-tlsn-verify/src/main.rs:59	adapters/shogen-tlsn-verify/src/main.rs	59	59	8deaa4d818f02edf	cf696bd
+docs/17-modele-de-menace.md:63	adapters/shogen-tlsn-verify/src/main.rs:61	adapters/shogen-tlsn-verify/src/main.rs	61	61	259da7bdb31abaea	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:294-308	crates/shogen-core/src/verification.rs	294-308	294-308	24632c10f7279f63	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:311-317	crates/shogen-core/src/verification.rs	311-317	311-317	bb107123c310d990	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:319-326	crates/shogen-core/src/verification.rs	319-326	319-326	b58dd7cdbac80da6	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:328-350	crates/shogen-core/src/verification.rs	328-350	328-350	89b191476e711de8	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:352-360	crates/shogen-core/src/verification.rs	352-360	352-360	f5f82569e36e3e37	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:362-374	crates/shogen-core/src/verification.rs	362-374	362-374	9265805f7b7349c5	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-core/src/verification.rs:376-384	crates/shogen-core/src/verification.rs	376-384	376-384	c30180723df31c87	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:167	crates/shogen-verifier/tests/temoignage_reel.rs	167	167	5dfcaa8d638261c2	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:199	crates/shogen-verifier/tests/temoignage_reel.rs	199	199	117807abe367245a	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:240	crates/shogen-verifier/tests/temoignage_reel.rs	240	240	e2c48993105f68cd	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:304	crates/shogen-verifier/tests/temoignage_reel.rs	304	304	b5872a28caa2634d	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:338	crates/shogen-verifier/tests/temoignage_reel.rs	338	338	820ef7689f689d25	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:363	crates/shogen-verifier/tests/temoignage_reel.rs	363	363	3802d3082a45e1c2	cf696bd
+docs/17-modele-de-menace.md:63	crates/shogen-verifier/tests/temoignage_reel.rs:399	crates/shogen-verifier/tests/temoignage_reel.rs	399	399	5bba029fd6a5df10	cf696bd
+docs/17-modele-de-menace.md:63	docs/13-temoignage-e2e-design.md:97	docs/13-temoignage-e2e-design.md	97	97	b2c93b821410a6a9	cf696bd
+docs/17-modele-de-menace.md:64	crates/shogen-core/src/verification.rs:362-374	crates/shogen-core/src/verification.rs	362-374	362-374	9265805f7b7349c5	cf696bd
+docs/17-modele-de-menace.md:64	crates/shogen-verifier/src/main.rs:345	crates/shogen-verifier/src/main.rs	345	345	ad54c41ae25e17b2	cf696bd
+docs/17-modele-de-menace.md:64	crates/shogen-verifier/tests/temoignage_canonique.rs:492	crates/shogen-verifier/tests/temoignage_canonique.rs	492	492	dfe8e0be7a5c112f	cf696bd
+docs/17-modele-de-menace.md:65	adapters/shogen-tlsn-verify/Cargo.toml:46	adapters/shogen-tlsn-verify/Cargo.toml	46	46	357fe1486b363959	cf696bd
+docs/17-modele-de-menace.md:65	adapters/shogen-tlsn-verify/src/main.rs:247-248	adapters/shogen-tlsn-verify/src/main.rs	247-248	247-248	98b2c062e62edb3c	cf696bd
+docs/17-modele-de-menace.md:65	biblio/INDEX.md:325-327	biblio/INDEX.md	325-327	325-327	ed8c0419f383bda5	cf696bd
+docs/17-modele-de-menace.md:65	biblio/INDEX.md:327	biblio/INDEX.md	327	327	d6dccb117f2b637f	cf696bd
+docs/17-modele-de-menace.md:65	crates/shogen-core/src/verification.rs:362-374	crates/shogen-core/src/verification.rs	362-374	362-374	9265805f7b7349c5	cf696bd
+docs/17-modele-de-menace.md:66	crates/shogen-core/src/verification.rs:352-360	crates/shogen-core/src/verification.rs	352-360	352-360	f5f82569e36e3e37	cf696bd
+docs/17-modele-de-menace.md:66	docs/03-temoignage.md:31	docs/03-temoignage.md	31	31	906f8b18f10e6265	cf696bd
+docs/17-modele-de-menace.md:67	.github/workflows/gates.yml:35	.github/workflows/gates.yml	35	-	60f5fed467f29e50	cf696bd
+docs/17-modele-de-menace.md:67	.github/workflows/squelette.yml:135	.github/workflows/squelette.yml	135	144	4224b53fc7e09d9d	cf696bd
+docs/17-modele-de-menace.md:67	.github/workflows/squelette.yml:55	.github/workflows/squelette.yml	55	64	bde56961e64d92c0	cf696bd
+docs/17-modele-de-menace.md:67	adapters/shogen-tlsn-verify/deny.toml:27-41	adapters/shogen-tlsn-verify/deny.toml	27-41	27-41	b24e87155121c25e	cf696bd
+docs/17-modele-de-menace.md:67	deny.toml:21-25	deny.toml	21-25	21-25	d71e13d83fa52540	cf696bd
+docs/17-modele-de-menace.md:67	deny.toml:65-71	deny.toml	65-71	65-71	fe77c00702b6297e	cf696bd
+docs/17-modele-de-menace.md:68	.gitignore:7-8	.gitignore	7-8	7-8	fcd0f74db423035a	cf696bd
+docs/17-modele-de-menace.md:69	JOURNAL.md:80	JOURNAL.md	80	80	b7554fca03a7c55e	cf696bd
+docs/17-modele-de-menace.md:69	docs/AUDIT-ENTREE.md:20	docs/AUDIT-ENTREE.md	20	20	aab5e5b6604e0bb4	cf696bd
+docs/17-modele-de-menace.md:70	CLAUDE.md:20-32	CLAUDE.md	20-32	-	aae11af1ec79848e	cf696bd
+docs/17-modele-de-menace.md:70	docs/G1-lot-B0-pool-analyse.md:155	docs/G1-lot-B0-pool-analyse.md	155	155	13f8231a0ab26400	cf696bd
+docs/17-modele-de-menace.md:70	docs/G1-lot-B0-pool-analyse.md:192-200	docs/G1-lot-B0-pool-analyse.md	192-200	192-200	ff6d1d0e3f6e97f5	cf696bd
+docs/17-modele-de-menace.md:74	crates/shogen-verifier/src/main.rs:345	crates/shogen-verifier/src/main.rs	345	345	ad54c41ae25e17b2	cf696bd
+docs/17-modele-de-menace.md:104	JOURNAL.md:80	JOURNAL.md	80	80	b7554fca03a7c55e	cf696bd
+docs/17-modele-de-menace.md:104	s2-harness/shogen_s2/records.py:72-101	s2-harness/shogen_s2/records.py	72-101	-	3ee2722c259aa698	cf696bd
+docs/17-modele-de-menace.md:105	.github/workflows/gates.yml:54-92	.github/workflows/gates.yml	54-92	-	32d1b968d1d3e4f2	cf696bd
+docs/17-modele-de-menace.md:106	s2-harness/tests/test_exclusion.py:242-244	s2-harness/tests/test_exclusion.py	242-244	270-272	eb4074ef341dea1c	cf696bd
+docs/17-modele-de-menace.md:106	s2-harness/tests/test_exclusion.py:269-271	s2-harness/tests/test_exclusion.py	269-271	297-299	8a437105f9daaf83	cf696bd
+docs/17-modele-de-menace.md:107	docs/AUDIT-ENTREE.md:20	docs/AUDIT-ENTREE.md	20	20	aab5e5b6604e0bb4	cf696bd
+docs/17-modele-de-menace.md:108	s2-harness/shogen_s2/collector.py:63-93	s2-harness/shogen_s2/collector.py	63-93	63-93	290d41743c2815af	cf696bd
+docs/17-modele-de-menace.md:108	s2-harness/shogen_s2/records.py:17-21	s2-harness/shogen_s2/records.py	17-21	19-23	f324eec7db038b97	cf696bd
+docs/17-modele-de-menace.md:113	.github/workflows/compagnon.yml:34	.github/workflows/compagnon.yml	34	-	ecfdfe91e3445df2	7bfff83
+docs/17-modele-de-menace.md:113	.github/workflows/gates.yml:144-192	.github/workflows/gates.yml	144-192	-	e3f3f880d829231d	7bfff83
+docs/17-modele-de-menace.md:113	.github/workflows/gates.yml:35	.github/workflows/gates.yml	35	-	60f5fed467f29e50	cf696bd
+docs/17-modele-de-menace.md:113	.github/workflows/gates.yml:54-92	.github/workflows/gates.yml	54-92	-	32d1b968d1d3e4f2	cf696bd
+docs/17-modele-de-menace.md:113	.github/workflows/squelette.yml:49	.github/workflows/squelette.yml	49	-	ecfdfe91e3445df2	7bfff83
+docs/17-modele-de-menace.md:113	.github/workflows/temoignage.yml:43	.github/workflows/temoignage.yml	43	-	ecfdfe91e3445df2	7bfff83
+docs/17-modele-de-menace.md:113	docs/adr-0028/ANNEXE-B-items.md:147	docs/adr-0028/ANNEXE-B-items.md	147	147	300a5a74aec10fbf	7bfff83
+docs/G1-lot-B-SEG-1-segment.md:5	annexe A (l.15	docs/adr-0028/ANNEXE-A-lots.md	15	19	4d2de3f0cd988c3c	0abc881
+docs/G1-lot-B-SEG-1-segment.md:136	ADR-0028-decisions-sortie-S2.md` l.56-57	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	56-57	58-59	252757342b8b1276	0abc881
+docs/G1-lot-B-SEG-1-segment.md:137	ADR-0028 l.35	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	35	37	9c5c076dc2955f58	0abc881
+docs/G1-lot-B-SEG-2-bloc1.md:244	ADR-0028 l.45-62	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	45-62	-	780e8b0b2e45a3be	b72509b
+docs/G1-lot-D5-AMEND-descriptifs.md:5	ADR-0028 §1 bis (l.63-180	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	63-180	64-181	6a9979b8c2be8f64	c61ebc5
+docs/G1-lot-DETTES-B2-corrections.md:157	ADR-0028 §4.11 l.287-301	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	287-301	-	f757d0bd5b1590fe	99d2aa4
+docs/G1-lot-DOCS-S2.md:31	ADR-0028-decisions-sortie-S2.md` (l.48	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	48	-	cd808ae35c7fe31b	fb089dc
+docs/G1-lot-DOCS-S2.md:67	doc 10 §5.4 (l.470-480	docs/10-mesures-pilotes-design.md	470-480	486-496	df638d4a10edbe87	fb089dc
+docs/G1-lot-E1-modele-de-menace.md:13	annexe A (l.32	docs/adr-0028/ANNEXE-A-lots.md	32	-	cde285e47b63142a	aa0afdc
+docs/G1-lot-POOLEE-strate-poolee.md:108	annexe A l.47	docs/adr-0028/ANNEXE-A-lots.md	47	63	956cdd79c5b1d0ff	40b4cfb
+docs/G1-lot-POOLEE-strate-poolee.md:240	ADR-0028 l.34	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	34	35	95a9280d5726a0f9	40b4cfb
+docs/G1-lot-SIM-NIVEAU.md:5	annexe A l.41	docs/adr-0028/ANNEXE-A-lots.md	41	83	82ad75a2c0d0fa34	f5b8269
+docs/G1-lot-SIM-NIVEAU.md:36	annexe A l.41	docs/adr-0028/ANNEXE-A-lots.md	41	83	82ad75a2c0d0fa34	f5b8269
+docs/G1-partie-2-etape-B-1.md:28	ADR-0028-decisions-sortie-S2.md` l.184-200	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	184-200	-	cc5148df31794f6c	34e096f
+docs/G1-partie-2-etape-B-3.md:29	ADR-0028-decisions-sortie-S2.md` l.202-207	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	202-207	203-208	2b9b06cc146cdb9e	d4db81d
+docs/G1-partie-3-R.md:46	doc 10 l.392-395	docs/10-mesures-pilotes-design.md	392-395	394-397	5cbd03b872bec94a	8b14567
+docs/G1-partie-3-R.md:138	doc 10 (l.478-483	docs/10-mesures-pilotes-design.md	478-483	480-485	4cf9b168213b258a	8b14567
+docs/G1-partie-3-R.md:191	doc 10 §6 (l.555-579	docs/10-mesures-pilotes-design.md	555-579	557-581	5248f10c8514473c	8b14567
+docs/G1-partie-3-R.md:210	doc 10 l.555-556	docs/10-mesures-pilotes-design.md	555-556	557-558	982d99d0d6c02765	8b14567
+docs/G1-partie-3-S.md:263	10-mesures-pilotes-design.md` l.463-482	docs/10-mesures-pilotes-design.md	463-482	465-484	0e1cc3e519501104	3414e0f
+docs/G2-lot-CORR.md:355	INDEX.md` l.3 et l.336	biblio/INDEX.md	3	-	bc845edeb21071a0	e25d840
+docs/G2-lot-DETTES-B1.md:203	ADR-0028 §4.11, l.291	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	291	292	1ad989b661f1b4f1	3e275a2
+docs/G2-lot-DETTES-B1.md:375	docs/11` §12 (l.992-1011	docs/11-mesures-pilotes.md	992-1011	1048-1067	07cdc10d05a65fb5	3e275a2
+docs/G2-lot-DETTES-B2.md:301	ADR-0028 §4.11 l.287-299	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	287-299	-	f49fb982e0273f96	3cc0892
+docs/G2-partie-2.md:443	ADR-0028-decisions-sortie-S2.md` l.1-328	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	1-328	-	a42daa2d477f2c17	37ea234
+docs/G2-partie-2.md:444	ANNEXE-A-lots.md` l.1-113	docs/adr-0028/ANNEXE-A-lots.md	1-113	-	a724387f2202b768	6eabaa4
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:35	doc 10 l.379-380	docs/10-mesures-pilotes-design.md	379-380	395-396	769648f826fa2d96	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:41	doc 10 l.386-388	docs/10-mesures-pilotes-design.md	386-388	402-404	b38d747a1adf3178	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:41	doc 10 l.535-537	docs/10-mesures-pilotes-design.md	535-537	551-553	bbc8bdf88b6324ac	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:41	doc 10 l.567-572	docs/10-mesures-pilotes-design.md	567-572	583-588	f51de0406290dc3f	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:44	doc 10 l.519-522	docs/10-mesures-pilotes-design.md	519-522	535-538	7f2c99c9c221191f	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:46	doc 10 l.521-522	docs/10-mesures-pilotes-design.md	521-522	537-538	26d69972d4fff18a	ce63fed
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:119	doc 10 l.567-572	docs/10-mesures-pilotes-design.md	567-572	583-588	f51de0406290dc3f	ce63fed
+docs/adr-0028/ANNEXE-A-lots.md:24	ADR-0028 l.56	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	56	58	8d6841153c230756	6f3b9a7
+docs/adr-0028/ANNEXE-B-items.md:56	doc 10 l.386-388	docs/10-mesures-pilotes-design.md	386-388	402-404	b38d747a1adf3178	ce63fed
+docs/adr-0028/ANNEXE-B-items.md:212	doc 10 l.645	docs/10-mesures-pilotes-design.md	645	647	15f9f8c1e6ff323d	b3a5a72
+docs/adr-0028/AVIS-G4-NOTAIRE.md:5	ADR-0028-decisions-sortie-S2.md` l.222-261	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	222-261	223-262	b3be2ec2126736b8	ab55f81
+docs/adr-0028/AVIS-G4-NOTAIRE.md:71	ADR-0028-decisions-sortie-S2.md:231	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	231	232	2e0fcec193d6a61a	ab55f81
+docs/adr-0028/AVIS-G4-NOTAIRE.md:72	ADR-0028-decisions-sortie-S2.md:257	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	257	258	17a881dc894ac862	ab55f81
+docs/adr-0028/CP1-PAQUET-2026-10-02.md:36	annexe A l.61-128	docs/adr-0028/ANNEXE-A-lots.md	61-128	-	659be09ab534c027	8b9536b
+docs/adr-0028/CP1-PAQUET-2026-10-02.md:101	doc 10 l.521-522	docs/10-mesures-pilotes-design.md	521-522	523-524	b239ac3baefc1307	8b9536b
+docs/adr-0028/CP1-PAQUET-2026-10-02.md:136	doc 10 l.392-395	docs/10-mesures-pilotes-design.md	392-395	394-397	5cbd03b872bec94a	8b9536b
+docs/adr-0028/G0-lot-D8a.md:25	ADR-0028-decisions-sortie-S2.md` l.93-101	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	93-101	-	4633b0070af9608d	fb089dc
+docs/adr-0028/G0-lot-D8a.md:35	ADR-0028 l.160	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	160	281	ebfe0ae35ea915b8	fb089dc
+docs/adr-0028/G0-lot-D8a.md:59	ADR-0028 l.101	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	101	222	d4a9d64b0b564c2b	fb089dc
+docs/adr-0028/G0-lot-D8a.md:62	ADR-0028 §6 l.188	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	188	315	a7032fa2c36309d5	fb089dc
+docs/adr-0028/G0-lot-D8a.md:372	ADR-0028 l.85	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	85	206	abc498b92e3f3ace	fb089dc
+docs/adr-0028/G0-lot-D8a.md:393	ADR-0028 l.188	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	188	315	a7032fa2c36309d5	fb089dc
+docs/adr-0028/G0-lot-D8a.md:413	ADR-0028 §4.11 l.171	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	171	292	1ad989b661f1b4f1	fb089dc
+docs/adr-0028/G0-lot-D8a.md:418	ADR-0028 §4.11 l.171	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	171	292	1ad989b661f1b4f1	fb089dc
+docs/adr-0028/G0-lot-D8a.md:424	ADR-0028 l.85	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	85	206	abc498b92e3f3ace	fb089dc
+docs/adr-0028/G2-RATTRAPAGE-R-A.md:61	ADR-0028-decisions-sortie-S2.md` l.1-327	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	1-327	-	a42daa2d477f2c17	e586c0b
+docs/adr-0028/INVENTAIRE-G2-RECALCUL.md:55	ANNEXE-A-lots.md` l.1-131	docs/adr-0028/ANNEXE-A-lots.md	1-131	-	70d5daef2fd5774c	35a601e
+docs/adr-0028/PAQUET-PREREG-S2.md:16	doc 10 §6 (l.555-579	docs/10-mesures-pilotes-design.md	555-579	557-581	5248f10c8514473c	8b14567
+docs/adr-0028/PAQUET-PREREG-S2.md:56	doc 10 l.379-380	docs/10-mesures-pilotes-design.md	379-380	381-382	a1d11483100a02a1	8b14567
+docs/adr-0028/PAQUET-PREREG-S2.md:63	doc 10 l.519-522	docs/10-mesures-pilotes-design.md	519-522	521-524	10a4bb8925720a99	8b14567
