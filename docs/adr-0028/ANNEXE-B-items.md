@@ -1878,3 +1878,14 @@ Items formés :
 | SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1 | les passages en `--lecture-seule` ne sont pas journalisés | orch. | prochain lot de contrôle | ligne de journal | générateur C |
 | SHOGEN-GARDE-DISQUE-DU-DEPOT-1 | le disque mesuré est `/`, non celui du dépôt | orch. | prochain lot de contrôle | `statvfs` du dépôt | G2 C |
 | SHOGEN-GARDE-CROCHET-MESSAGE-CHAINE-1 | `faits_et_appels` découpe un message humain à contenu chaîne caractère par caractère : R5 n'y voit ni identifiant ni compte | orch. | GARDE-FOUS phase 3 | lecture des deux formes du message | G2 A |
+
+## B.109 Amendement daté du 2026-10-16 12:48:15 UTC (heure produite par `date -u`) : correctif CQ-1 commis (alertes CodeQL de la PR n° 12 sur le crochet GARDE-FAITS)
+
+Commit `16ef72b`. Deux alertes « high » du contrôle `CodeQL` de la PR n° 12 (tête `c94fa9f`), dans du code de cette PR : `py/redos` sur `NOM_PROPRE` (`.claude/hooks/garde_faits.py`, règle R10) et `py/incomplete-url-substring-sanitization` sur la lecture d'une commande curl vers la forge. Correctif de l'orchestrateur (motif `(?:[A-Z][a-z0-9]*)+`, même langage, temps linéaire ; `hote_forge` par `urlsplit`), G2 neuve (`claude-opus-5-5`, Gate 0, FM-1.1 = 0) ACCEPTE-AVEC-CORRECTIONS C-1 à C-4, adoptées et appliquées à l'octet : C-1 (bloquante) `ValueError` d'`urlsplit` qui remontait en « acte permis sans contrôle » (un mot `http://[` faisait sauter R1 à R7 sur toute la commande) ; C-2 (bloquante) quatre formes réelles de lecture de la forge perdues (schéma en majuscules, sans schéma, point final, URL dans une variable) ; C-3 cas de test ; C-4 README. Clôture CONFORME sans passe 3. `tests/test_garde_codeql.py` 3 tests, plancher `controle-unittest` 174 → 177 ; mutants : M1 à M3 du générateur et K1 à K11 du réviseur tués. Pièces : `docs/adr-0028/revue-codeql-pr12/`.
+
+Items formés :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-MOTIFS-ARBRE-REDOS-1 | `motifs_suspects` (P2A-5) ne juge que les diffs reçus ; les motifs déjà dans l'arbre (dont `NOM_PROPRE`, phase 1) n'y passent jamais ; CodeQL l'a vu avant l'outil | orch. | prochain lot de contrôle | passage sur tous les `re.compile` de `scripts/controle/` et `.claude/hooks/`, un test | G2 CQ-1 |
+| SHOGEN-GARDE-ERREUR-INTERNE-1 | une erreur interne du crochet GARDE-FAITS permet l'acte (« acte permis sans contrôle ») : un mot adverse suffisait à faire sauter R1 à R7 | orch. | GARDE-FOUS phase 3 | sens sûr décidé par règle (refus pour R1 à R3 et R5 au moins), test | G2 CQ-1, C-1 |
