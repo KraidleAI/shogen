@@ -3,7 +3,9 @@ bash dans un dépôt git temporaire isolé (tests/aide_garde.py). La fonction ve
 par un faux réglé par ROUGE (id dont la vérification est rouge) ; le reste du modèle tourne tel quel.
 Relecture G2, C-1 : VerifDuModele lance la fonction verif telle qu'écrite (cargo et portes factices) ; C-15 : cargo
 à la cible par défaut même si l'environnement pose CARGO_TARGET_DIR.
-Contre-contrôle : R-6 (étape écrite « - run: python3 … »)."""
+Contre-contrôle : R-6 (étape écrite « - run: python3 … »).
+Phase 2, L-4 : le modèle tourne avec une copie des outils dont gabarits/chaine.sh porte le faux (fonction verif
+versionnée) ; une chaîne dont la verif diffère de la version des outils ne commet rien."""
 import hashlib
 import os
 import re
@@ -33,6 +35,12 @@ class Chaine(unittest.TestCase):
             modele = f.read()
         self.chaine = os.path.join(self.tmp, "chaine.sh")
         faux = modele[:modele.index("verif() {")] + FAUX + modele[modele.index("# --- fin"):]
+        self.outils = os.path.join(self.tmp, "outils", "scripts", "controle")
+        shutil.copytree(ICI, self.outils, ignore=shutil.ignore_patterns("tests", "sorties-fm11", "__pycache__"))
+        os.makedirs(os.path.join(self.tmp, "outils", "enforcement"))
+        shutil.copy(os.path.join(os.path.dirname(os.path.dirname(ICI)), "enforcement", "docs-sha256sums.py"),
+                    os.path.join(self.tmp, "outils", "enforcement"))
+        ag.ecrire(self.outils, {"gabarits/chaine.sh": faux})
         ag.ecrire(self.tmp, {"chaine.sh": faux, "ADJ.md": "Contre-contrôle CONFORME en deux passes." + NL})
         self.adj = os.path.join(self.tmp, "ADJ.md")
         copie = os.path.join(self.tmp, "copie")
@@ -55,8 +63,8 @@ class Chaine(unittest.TestCase):
                                                        f"Diff-Id: X-{i}", ""])})
 
     def lancer(self, **variables):
-        env = dict(self.env, DEPOT=self.d, PLAN=os.path.join(self.tmp, "plan"), OUTILS=ICI, PYTHON=sys.executable,
-                   CC=os.path.join(self.tmp, "cc.md"), **variables)
+        env = dict(self.env, DEPOT=self.d, PLAN=os.path.join(self.tmp, "plan"), OUTILS=self.outils,
+                   PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"), **variables)
         p = subprocess.run(["bash", self.chaine], env=env, capture_output=True, text=True, timeout=300)
         self.erreur = p.stderr
         return p.returncode, re.findall("(?m)^Diff-Id: (.+)$", ag.git(self.d, self.env, "log", "--format=%B"))
@@ -106,6 +114,27 @@ class Chaine(unittest.TestCase):
         code, ids = self.lancer()
         etat = ag.git(self.d, self.env, "status", "--porcelain")
         self.assertEqual((code != 0, ids, etat), (True, [], "?? sale.md" + NL))
+
+    def test_l4_verif_versionnee(self):
+        """L-4 (SHOGEN-GARDE-VERIF-VERSIONNEE-1) : le sceau porte le sha256 de declare -f verif de la chaîne qui a
+        tourné ; chaîne dont la fonction verif n'est pas celle de gabarits/chaine.sh des outils (vérification
+        affaiblie, toujours verte) : refus du commit, rien de commis ; chaîne à la verif versionnée : commise."""
+        with open(self.chaine, encoding="utf-8") as f:
+            texte = f.read()
+        ag.ecrire(self.tmp, {"chaine.sh": texte.replace(FAUX, "verif() { true; }" + NL)})
+        code, ids = self.lancer()
+        self.assertEqual((code != 0, ids, "refus du commit X-1" in self.erreur), (True, [], True))
+        ag.git(self.d, self.env, "rm", "-q", "-f", "b.md")
+        ag.ecrire(self.tmp, {"chaine.sh": texte})
+        self.assertEqual(self.lancer(), (0, ["X-2", "X-1"]))
+        p = subprocess.run(["bash", "-c", FAUX + "declare -f verif"], capture_output=True, text=True, timeout=60)
+        with mock.patch.dict(os.environ, self.env, clear=True):
+            sceaux = os.path.join(self.d, ".git", "shogen-garde", "sceaux")
+            lignes = set()
+            for s in os.listdir(sceaux):
+                with open(os.path.join(sceaux, s), encoding="utf-8") as f:
+                    lignes |= set(f)
+        self.assertIn("verif " + hashlib.sha256(p.stdout.encode()).hexdigest() + NL, lignes)
 
     def test_modele(self):
         """Le modèle se lit en bash ; sa vérification porte xtask, cargo test de xtask (règle I-1) et le lint R-1."""

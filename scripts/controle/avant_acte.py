@@ -71,7 +71,10 @@ Phase 2, L-1 : C4 refuse aussi une heure écrite sans sa date et, au commit et a
 antérieure à la dernière entrée datée du fichier à HEAD (garde_commun.dates_passees).
 Phase 2, L-3 : C3 attribue aussi chaque mot lu (verdict, passes, identifiant, sha court) au diff du message (Diff-Id,
 ou --id) : refus si les sources ne l'écrivent que dans des passages (paragraphe, rangée de tableau, point de liste) qui
-nomment d'autres diffs du même préfixe (plages N à M lues) et si les lignes ajoutées du diff ne le portent pas."""
+nomment d'autres diffs du même préfixe (plages N à M lues) et si les lignes ajoutées du diff ne le portent pas.
+Phase 2, L-4 : sceller --verif F (texte de declare -f verif, - : entrée standard) écrit au sceau la ligne verif
+<sha256> ; commit C1 refuse un sceau dont la ligne verif n'est pas l'empreinte de la fonction verif de
+gabarits/chaine.sh des outils (fonction versionnée, declare -f par bash) ; un sceau sans ligne verif n'est pas jugé."""
 import argparse
 import contextlib
 import fnmatch
@@ -110,6 +113,7 @@ SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
+MODELE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gabarits", "chaine.sh")
 BORNE_LIEE = 100
 PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
 
@@ -155,8 +159,25 @@ def sceller(a, fautes):
         fautes.append(("refus", "S1", f"{len(hors)} chemin(s) hors de l'index ou non suivi(s) (--tete : non commis)",
                        "indexer ou retirer, relancer la vérification complète, puis sceller", "-"))
         return
+    verif = None if a.verif is None else sys.stdin.buffer.read() if a.verif == "-" else lire(a.verif)
     with open(os.path.join(garde(a.depot, "sceaux"), cle(a.depot, a.tete)), "w", encoding="utf-8") as f:
         f.write(GC.maintenant().strftime("%Y-%m-%dT%H:%M:%SZ") + chr(10))
+        f.write("" if verif is None else "verif " + hashlib.sha256(verif).hexdigest() + chr(10))
+
+
+def empreinte_verif(chaine=MODELE):
+    """sha256 de declare -f verif (bash) de la fonction verif d'un modèle de chaîne, de verif() { à # --- fin de
+    verif (L-4)."""
+    lignes = lire(chaine).decode("utf-8").split(chr(10))
+    debut = [k for k, x in enumerate(lignes) if x.startswith("verif() {")]
+    fin = [k for k, x in enumerate(lignes) if x.startswith("# --- fin de verif") and debut and k > debut[0]]
+    if not fin:
+        raise Erreur("fonction verif introuvable dans le modèle de chaîne")
+    p = subprocess.run(["bash", "-c", 'eval "$1" && declare -f verif', "_", chr(10).join(lignes[debut[0]:fin[0]])],
+                       capture_output=True)
+    if p.returncode:
+        raise Erreur(f"bash : sortie {p.returncode} sur la fonction verif du modèle")
+    return hashlib.sha256(p.stdout).hexdigest()
 
 
 def passes(texte, source=False):
@@ -174,9 +195,17 @@ def resolu(depot, sha):
 
 def commit(a, fautes):
     texte, sources = lire(a.message).decode("utf-8"), [lire(s) for s in a.source]
-    if not os.path.exists(os.path.join(garde(a.depot, "sceaux"), cle(a.depot))):
+    sceau = os.path.join(garde(a.depot, "sceaux"), cle(a.depot))
+    if not os.path.exists(sceau):
         fautes.append(("refus", "C1", "aucun sceau pour cet index et cette tête (LA-N05)",
                        "relancer la vérification complète puis sceller : <vérification> && avant_acte.py sceller", "-"))
+    else:
+        with open(sceau, encoding="utf-8") as f:
+            v = [x[6:] for x in f.read().split(chr(10)) if x.startswith("verif ")]
+        if v and v[0] != empreinte_verif():
+            fautes.append(("refus", "C1", f"sceau d'une vérification ({v[0][:12]}…) autre que la fonction verif "
+                           "versionnée de gabarits/chaine.sh (L-4)", "relancer la chaîne copiée du modèle versionné, "
+                           "ou verser au modèle la vérification voulue par un diff relu", "-"))
     ecrits = set(re.findall("(?m)^Source-Sha: ([0-9a-f]{64})$", texte))
     reels = [hashlib.sha256(b).hexdigest() for b in sources]
     refaire = "relire la source finale et réécrire le message depuis elle, avec Source-Sha: <sha256 de la source>"
@@ -652,7 +681,9 @@ def parseur():
     p = argparse.ArgumentParser(prog="avant_acte.py", description=__doc__.split(chr(10))[0])
     p.add_argument("--depot", default=".")
     sp = p.add_subparsers(dest="cmd", required=True)
-    sp.add_parser("sceller").add_argument("--tete", action="store_true")
+    s = sp.add_parser("sceller")
+    s.add_argument("--tete", action="store_true")
+    s.add_argument("--verif")
     c = sp.add_parser("commit")
     c.add_argument("--message", required=True)
     c.add_argument("--source", action="append", required=True)

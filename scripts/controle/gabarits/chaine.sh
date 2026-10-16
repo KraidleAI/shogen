@@ -21,7 +21,7 @@ acte() { "$PYTHON" -I -B "$OUTILS/avant_acte.py" --depot "$DEPOT" "$@"; }
 # cargo par défaut de la copie (règle I-1), lignes python3 -B enforcement/ de gates.yml, lint R-1 et ses cas. Appelée
 # par verif && sceller, la fonction tourne hors de set -e : chaque pas sort en 1 à son échec (relecture G2, C-1) ;
 # cargo tourne sans CARGO_TARGET_DIR ni CARGO_BUILD_TARGET_DIR, à la cible par défaut (E5, règle I-1 ; C-15).
-# Une étape écrite « - run: python3 -B enforcement/… » est lancée aussi (contre-contrôle, R-6).
+# Étape « - run: python3 -B enforcement/… » lancée aussi (R-6) ; sceau au sha256 de declare -f verif, égal au modèle (L-4).
 verif() {
   local j sans="-u CARGO_TARGET_DIR -u CARGO_BUILD_TARGET_DIR"
   j="$(dirname "$PLAN")/verif-$1"
@@ -47,7 +47,7 @@ while IFS='|' read -r -u 3 id diffs message sources; do
   options=(--message "$message" --id "$id")
   for d in ${diffs//,/ }; do git -C "$DEPOT" apply --index "$d"; options+=(--diff "$d"); done
   for s in ${sources//,/ }; do options+=(--source "$s"); done
-  verif "$id" && acte sceller || { echo "vérification rouge avant $id : arrêt, rien de commis" >&2; exit 1; }
+  verif "$id" && declare -f verif | acte sceller --verif - || { echo "vérification rouge avant $id : arrêt, rien de commis" >&2; exit 1; }
   acte commit "${options[@]}" && git -C "$DEPOT" commit -q -F "$message" || { echo "refus du commit $id" >&2; exit 1; }
   git -C "$DEPOT" log --oneline -1
 done 3< "$PLAN"

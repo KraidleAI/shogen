@@ -202,6 +202,30 @@ class Commit(Source):
         self.indexer({"a.md": "un" + NL + "deux retouché" + NL})
         self.assertEqual(self.commit(m)[0], 1)
 
+    def test_l4_sceau_de_la_verif(self):
+        """L-4 (SHOGEN-GARDE-VERIF-VERSIONNEE-1) : sceller --verif (texte de declare -f verif, fichier ou entrée
+        standard) : ligne verif <sha256 du texte> au sceau ; commit : verif autre que celle de gabarits/chaine.sh des
+        outils : refus C1 ; la même : admis ; sceau sans ligne verif : non jugé."""
+        m = self.message("x : contre-contrôle CONFORME en deux passes")
+        modele = os.path.join(os.path.dirname(avant_acte.__file__), "gabarits", "chaine.sh")
+        p = subprocess.run(["bash", "-c", 'source <(sed -n "/^verif() {/,/^}/p" "$1"); declare -f verif', "_",
+                            modele], capture_output=True, text=True, timeout=60)
+        faux = "verif () " + NL + "{ " + NL + "    true" + NL + "}" + NL
+        ag.ecrire(self.tmp, {"v-faux": faux, "v-juste": p.stdout})
+        sceau = os.path.join(self.d, ".git", "shogen-garde", "sceaux", avant_acte.cle(self.d))
+        self.assertEqual(self.lancer("sceller", "--verif", os.path.join(self.tmp, "v-faux"))[0], 0)
+        with open(sceau, encoding="utf-8") as f:
+            self.assertEqual(f.read().split(NL)[1], "verif " + hashlib.sha256(faux.encode()).hexdigest())
+        self.assertEqual(self.commit(m)[1][:9], "REFUS C1 ")
+        self.assertEqual(self.lancer("sceller", "--verif", os.path.join(self.tmp, "v-juste"))[0], 0)
+        self.assertEqual(self.commit(m), (0, ""))
+        for texte, attendu in ((faux, 1), (p.stdout, 0)):
+            with mock.patch("sys.stdin", io.TextIOWrapper(io.BytesIO(texte.encode()))):
+                self.assertEqual(self.lancer("sceller", "--verif", "-")[0], 0)
+            self.assertEqual(self.commit(m)[0], attendu)
+        self.assertEqual(self.lancer("sceller")[0], 0)
+        self.assertEqual(self.commit(m), (0, ""))
+
     def test_e8_source_sha(self):
         """E8, C2 : message écrit avant la clôture (source retouchée ensuite) : refus, pour la source sans ligne et pour
         la ligne périmée ; message sans Source-Sha : refus ; réécrit depuis la source finale : admis ; source sous un
