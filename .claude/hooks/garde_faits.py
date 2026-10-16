@@ -42,7 +42,12 @@ runner_id non nul ; ou, au marqueur scripts/controle/garde/forge-actions.txt, la
 R9 (E27) : seuil de coût avant Agent et Workflow : refus d'un workflow de plus de SEUIL_WORKFLOW agents (appels agent(
 du script ; nombre inconnu, boucle qui les multiplie : refus), ou d'un lancement qui porterait les sous-agents vivants
 (journal touché depuis VIVANT_S s) au-delà de SEUIL_VIVANTS ; sauf jeton FANOUT-AUTORISE (ou les mots fan out) écrit
-par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil)."""
+par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil).
+R10 (E26) : UserPromptSubmit relève les noms propres du message (capitale hors début de phrase et mots courants,
+capitales internes, sigles, domaine d'un courriel) au JOURNAL et dans docs/publication/ (chemin:N: ligne), l'affiche
+en contexte et le garde (garde-faits.releve) ; au Stop, si le dernier message de l'humain porte un nom propre, une
+réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du tour (résultat d'outil, relevé) est
+refusée une fois (stop_hook_active : passage consigné)."""
 import importlib.util
 import json
 import os
@@ -84,6 +89,12 @@ AS = _acte_shell()
 RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEUIL_WORKFLOW, SEUIL_VIVANTS, VIVANT_S = 3, 4, 300
 JETON = re.compile(r"FANOUT-AUTORISE|\bfan[ -]?out\b", re.I)
+DOSSIERS = ("Pocket", "MONARK", "publication", "préavis", "procurement", "S2-bis")
+COMMUNS = {"le", "la", "les", "un", "une", "je", "tu", "il", "elle", "nous", "vous", "bonjour", "merci", "salut", "oui",
+           "non", "cordialement", "hello", "hi", "dear", "thanks", "thank", "best", "regards", "the", "this", "we",
+           "our", "utc", "api", "url", "pr", "ok", "json", "ci", "pdf", "http", "https", "readme"}
+NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
+                        r"(?![\w-])")
 RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
@@ -408,6 +419,72 @@ def tour_humain(entrees):
     return idx, textes
 
 
+def noms_propres(texte):
+    """Noms propres d'un message, douze au plus : capitale hors début de phrase et hors COMMUNS, capitales internes
+    (CoinGecko), sigles (MONARK), domaine d'une adresse (coingecko.com)."""
+    t, out = RAPPEL.sub("", texte), []
+    for m in NOM_PROPRE.finditer(t):
+        avant, mot = t[:m.start()].rstrip(" \t\"'«(*"), m.group(1)
+        simple = re.fullmatch(r"[A-ZÀ-Ý][a-zà-ÿ]+", mot)
+        if not (simple and (not avant or avant[-1] in ".!?:\n")) and mot.casefold() not in COMMUNS and mot not in out:
+            out.append(mot)
+    return (out + [d for d in dict.fromkeys(re.findall(r"@([A-Za-z0-9-]+)[.]", t)) if d not in out])[:12]
+
+
+def releve(noms):
+    """Lignes du JOURNAL et des .md et .txt de docs/publication/ qui portent chaque nom (casse ignorée), cinq par
+    nom."""
+    sources = [os.path.join(RACINE, "JOURNAL.md")]
+    for base, ds, fs in os.walk(os.path.join(RACINE, "docs", "publication")):
+        ds[:] = sorted(ds)
+        sources += [os.path.join(base, x) for x in sorted(fs) if x.endswith((".md", ".txt"))]
+    out = []
+    for nom in noms:
+        vus = [f"{os.path.relpath(x, RACINE)}:{n}: {ligne.strip()[:200]}" for x in sources
+               for n, ligne in enumerate(lire_texte(x).split("\n"), 1) if nom.casefold() in ligne.casefold()][:5]
+        out += vus or [f"{nom} : aucune ligne au JOURNAL ni sous docs/publication/"]
+    return out
+
+
+def soumission(entree):
+    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0."""
+    noms = noms_propres(entree.get("prompt") or "")
+    if not noms:
+        return 0
+    texte = (f"RELEVÉ (crochet du dépôt, E26) : noms propres du message : {', '.join(noms)}. Avant de rattacher ce "
+             "message à un dossier, lire ces lignes (grep -n) :\n" + "\n".join(releve(noms)))
+    try:
+        with open(os.path.join(os.path.dirname(entree.get("transcript_path") or "") or ".", "garde-faits.releve"), "w",
+                  encoding="utf-8") as f:
+            f.write(json.dumps(noms, ensure_ascii=False) + "\n" + texte)
+    except OSError:
+        pass
+    print(texte)
+    return 0
+
+
+def dossiers_sans_releve(entree):
+    """R10 (E26) : dossiers que le dernier texte du tour nomme sans relevé, si le message de l'humain porte un nom
+    propre ; au second arrêt (stop_hook_active), passage consigné, rien rendu."""
+    entrees = lire_queue(entree.get("transcript_path") or "") or []
+    i, humains = tour_humain(entrees)
+    noms = noms_propres("\n".join(humains)) if i is not None else []
+    faits, _appels, agent, _humain = faits_et_appels(entrees[i + 1:] if noms else [])
+    if not agent:
+        return []
+    garde = lire_texte(os.path.join(os.path.dirname(entree.get("transcript_path") or ""), "garde-faits.releve"))
+    if garde.split("\n", 1)[0] == json.dumps(noms_propres(humains[0]), ensure_ascii=False):
+        faits.append(garde)
+    vus = "\n".join(faits + humains).casefold()
+    manque = [d for d in DOSSIERS if re.search(r"(?<!\w)" + re.escape(d) + r"(?!\w)", agent[-1], re.I)
+              and d.casefold() not in vus]
+    if manque and entree.get("stop_hook_active"):
+        journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
+                    f"PASSAGE R10 au second arrêt : {manque}")
+        return []
+    return manque
+
+
 def agents_du_workflow(inp):
     """Agents qu'un Workflow lance : appels agent( de son texte, ou liste agents ; None si inconnu (aucun compte, ou
     boucle qui les multiplie)."""
@@ -608,8 +685,18 @@ def main():
     try:
         if ev == "PreToolUse":
             return pre_tool_use(entree)
+        if ev == "UserPromptSubmit":
+            return soumission(entree)
         if ev in ("Stop", "SubagentStop"):
-            return stop(entree, ev == "SubagentStop")
+            manque = dossiers_sans_releve(entree) if ev == "Stop" else []
+            code = stop(entree, ev == "SubagentStop")
+            if manque:
+                sys.stderr.write(f"{MARQUE} : REFUS. R10 (E26) : la réponse nomme {', '.join(manque)} sans relevé du "
+                                 "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
+                                 "docs/publication/), puis rattacher.\n")
+                journaliser(dossier, f"REFUS Stop R10 : {manque}")
+                return 2
+            return code
     except SystemExit as e:
         if e.code == 2:
             journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} agent={entree.get('agent_id', '')}")

@@ -3,7 +3,8 @@
 deux faux refus de la sonde du contre-contrôle (R3 puis R5 sur une commande qui écrit un journal synthétique par un
 heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F.
 R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré. R8 (E20) : PR sans preuve que la forge
-lance des jobs sur le dépôt. R9 (E27) : seuil de coût des workflows et des agents vivants, jeton de l'investisseur."""
+lance des jobs sur le dépôt. R9 (E27) : seuil de coût des workflows et des agents vivants, jeton de l'investisseur.
+R10 (E26) : relevé des noms propres d'un message au JOURNAL (UserPromptSubmit), dossier nommé sans relevé (Stop)."""
 import json
 import os
 import shutil
@@ -268,6 +269,69 @@ class Cout(Crochet):
         self.permis([self.humain("relis")], "", entree=agent)
         self.vivants(4, age=1000)
         self.permis([self.humain("relis")], "", entree=agent)
+
+
+class Releve(Crochet):
+    """R10 (E26 ; SHOGEN-GARDE-OUTIL-E26-E27-E28-1) : UserPromptSubmit et Stop."""
+    COURRIEL = ("Hi Shogen team," + NL + "Thanks for the heads-up about your report." + NL + "Regarding the outage "
+                "wording, we checked it at 10:00 UTC." + NL + "Best, Jane Doe, CoinGecko (jane@coingecko.com)")
+    JOURNAL = {"JOURNAL.md": "# Journal" + NL + "Préavis privés envoyés, CoinGecko par formulaire." + NL,
+               os.path.join("docs", "publication", "envoi-preavis", "REPONSE.md"): "Réponse de CoinGecko." + NL}
+
+    def evenement(self, garde, ev, avant, **plus):
+        j = os.path.join(self.t, "journal.txt")
+        with open(j, "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(e) + NL for e in avant)
+        e = {"hook_event_name": ev, "transcript_path": j, "cwd": self.t, **plus}
+        p = subprocess.run([sys.executable, "-I", garde], input=json.dumps(e), capture_output=True, text=True,
+                           timeout=60)
+        return p.returncode, p.stdout, p.stderr
+
+    def tour(self, reponse, *outils):
+        humain = {"type": "user", "message": {"role": "user", "content": self.COURRIEL}}
+        texte = {"type": "assistant", "uuid": "u1", "message": {"content": [{"type": "text", "text": reponse}]}}
+        return [humain, *[e for x in outils for e in x], texte]
+
+    def test_e26_courriel_rattache_sans_releve(self):
+        """Cas réel E26 : courriel de CoinGecko rattaché à Pocket sans recherche au JOURNAL : refus R10 au Stop ;
+        second arrêt (stop_hook_active) : passage consigné ; arrêt d'un sous-agent : non jugé."""
+        garde = self.arbre(self.JOURNAL)
+        code, _o, err = self.evenement(garde, "Stop", self.tour("C'est la réponse au rapport de Pocket."))
+        self.assertEqual((code, "R10 (E26)" in err, "Pocket" in err), (2, True, True), err)
+        self.assertEqual(self.evenement(garde, "Stop", self.tour("Rattaché à Pocket."), stop_hook_active=True)[0], 0)
+        ancien = outil("Bash", {"command": "grep -n Pocket JOURNAL.md"}, "55:## Session POKT (Pocket)", 1)
+        self.assertEqual(self.evenement(garde, "Stop", ancien + self.tour("Rattaché à Pocket."))[0], 2)  # tour d'avant
+        self.assertEqual(self.evenement(garde, "SubagentStop", self.tour("Rattaché à Pocket."), agent_id="a")[0], 0)
+        nomme = [{"type": "user", "message": {"content": "Jane de CoinGecko demande où en est Pocket."}},
+                 {"type": "assistant", "message": {"content": [{"type": "text", "text": "Pocket attend."}]}}]
+        self.assertEqual(self.evenement(garde, "Stop", nomme)[0], 0)          # le message nomme lui-même le dossier
+
+    def test_e26_releve_puis_rattachement(self):
+        """UserPromptSubmit : noms propres relevés (pas les mots de début de phrase ni les mots courants), lignes du
+        JOURNAL et de docs/publication/ affichées en contexte ; la réponse qui rattache au préavis (lu au relevé) passe,
+        celle qui rattache à Pocket (absent du relevé) reste refusée ; un grep -n du tour qui affiche Pocket suffit ;
+        message sans nom propre : rien relevé, réponse non jugée."""
+        garde = self.arbre(self.JOURNAL)
+        code, sortie, _e = self.evenement(garde, "UserPromptSubmit", [], prompt=self.COURRIEL)
+        self.assertEqual((code, sortie.split(NL)[0][:99]), (0, "RELEVÉ (crochet du dépôt, E26) : noms propres du "
+                         "message : Shogen, Jane, Doe, CoinGecko, coingecko."))
+        self.assertIn("JOURNAL.md:2: Préavis privés envoyés, CoinGecko", sortie)
+        self.assertIn(os.path.join("docs", "publication", "envoi-preavis", "REPONSE.md") + ":1:", sortie)
+        self.assertEqual(self.evenement(garde, "Stop", self.tour("Réponse au préavis de S2."))[0], 0)
+        self.assertEqual(self.evenement(garde, "Stop", self.tour("Réponse au rapport Pocket."))[0], 2)
+        grep = outil("Bash", {"command": "grep -n Pocket JOURNAL.md"}, "55:## Session POKT (Pocket)", 1)
+        self.assertEqual(self.evenement(garde, "Stop", self.tour("Réponse au rapport Pocket.", grep))[0], 0)
+        self.assertEqual(self.evenement(garde, "UserPromptSubmit", [], prompt="où en est la suite ?")[:2], (0, ""))
+        autre = [{"type": "user", "message": {"content": "Note de Paul Martin sur la suite."}},
+                 {"type": "assistant", "message": {"content": [{"type": "text", "text": "Réponse au préavis."}]}}]
+        self.assertEqual(self.evenement(garde, "Stop", autre)[0], 2)          # relevé d'un autre message : sans effet
+
+    def test_e26_crochet_branche(self):
+        """.claude/settings.json branche le crochet du dépôt sur UserPromptSubmit."""
+        with open(os.path.join(RACINE, ".claude", "settings.json"), encoding="utf-8") as f:
+            reglages = json.load(f)
+        commandes = [h["command"] for x in reglages["hooks"]["UserPromptSubmit"] for h in x["hooks"]]
+        self.assertEqual(commandes, ['python3 -I "$CLAUDE_PROJECT_DIR/.claude/hooks/garde_faits.py"'])
 
 
 if __name__ == "__main__":
