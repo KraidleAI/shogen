@@ -335,8 +335,9 @@ fn controle_renvois(r: &mut Rapport, racine: &Path, registre: &str, a_couvrir: &
             viol_r(r, i + 1, R_FORME);
             continue;
         };
-        // Sûreté (relecture G2 de DETTES-T15, C-3) : refus avant toute lecture ; la gate ne lit, ne cite ni ne hache
-        // aucun octet d'un emplacement interdit.
+        // Sûreté (relecture G2 de DETTES-T15, C-3) : refus avant toute lecture ; aucune entrée du registre ne fait
+        // lire, citer ni hacher un octet d'un emplacement interdit (la référence (a) de docs/17:70 n'en fait que
+        // compter les lignes, `controle_a`, adjudication Q-6 ; contre-contrôle, R-6).
         if crate::sg5::emplacement_interdit(e.citant) || crate::sg5::emplacement_interdit(e.cible) {
             viol_r(r, i + 1, R_INTERDIT);
             continue;
