@@ -1835,3 +1835,22 @@ Items formés :
 | item | constat | propriétaire | déclencheur | prix | origine |
 |---|---|---|---|---|---|
 | SHOGEN-REGISTRE-LIGNES-RECALAGE-1 | la colonne `lignes` du registre se périme à chaque lot qui touche une cible ; le recalage est manuel (DT15-b2) | orch. | prochain lot qui touche une cible du registre | `recaler_registre.py` lancé par la chaîne avant S-G9, ou S-G9 tolérant au déplacement à empreinte égale (décision) | DT15-b2 |
+
+## B.107 Amendement daté du 2026-10-16 07:39:39 UTC (heure produite par `date -u`) : lot PUBLICATION-S2-AMENDEMENTS commis — SHOGEN-PUBLICATION-S2-AMENDEMENTS-1 fermé
+
+Sept commits, `6fb8ec0` (PA-a) à `4bee9a8` (PA-g), dans l'ordre a, c, b, d, e, f, g, à la suite sans commit intercalé (L-9). Générateur `claude-opus-5-5` ; G2 neuve ACCEPTE (phase 1), ACCEPTE-AVEC-CORRECTIONS C-1 hors dépôt (phase 2 : cinq tests de l'outil `controle_public`, appliqués dans le dossier du lot) ; clôture CONFORME sans passe 3. Pièces : `docs/publication/interne/revue-amendements/`.
+
+- **(i)** `outage` devient `failed reading` aux l.23, 62, 90, 202 et 547 du rapport anglais et au glossaire (l.672, 714, 715) ; le sens ordinaire reste à la l.553 (Pyth) et dans la note de la l.714.
+- **(ii)** Note datée près de l'amont déclaré `binance → coingecko` (l.244, l.253) : une place parmi celles dont CoinGecko intègre les marchés, ni source unique ni source principale, sans effet sur aucun résultat ; le bloc 6 recopié est inchangé.
+- **(iii)** Phrase datée au §7.5 (l.437) : un φ élevé décrit des lectures manquées en même temps par le harnais, avec un seul observateur ; il n'établit pas de dépendance entre fournisseurs (renvois §2.7, §5.2, §11.1).
+- Version française mise en cohérence : « panne » du texte courant devient « lecture en échec » aux l.51, 120, 161 et 883 ; ajouts datés aux l.370, 393 et 681 ; étiquettes scellées inchangées. En-têtes EN l.7 et FR l.13 : les dates des ajouts datés du 2026-10-15 sont les seules valeurs numériques ajoutées (les ajouts portent aussi une heure, des renvois de section, le commit `ed479c5` et un chemin) ; `ACTEURS-NOMMES.md` l.52 mis en cohérence.
+- Aucune ligne décalée, aucune valeur ni aucun verdict changé ; citations « … » inchangées (151 EN, 146 FR). Contrôle de la traduction conforme 11/11 (glossaire, amendements A-8 et A-9) ; `controle_public` conforme 7/7 avec le contrat amendé (ajouts datés exclus du contrôle des nombres, table E-21 à E-28) ; sorties de contrôle régénérées (recette : source `docs/11-mesures-pilotes.md` à `2db4f40`, extraite hors dépôt). PDF reconstruit hors réseau, sha256 `aa3e580225c5de10fbbc688ba0904561cd01c4cfc7f0a06b118bfdcb43e2bfd7`, 17 pages : versement et envoi à CoinGecko = actes de l'investisseur ; le rapport reste « Draft — not published ».
+- Écart admis : la chaîne de rendu (Chromium) a tenté des connexions réseau de fond, en échec ; variante hors réseau retenue, sortie identique.
+
+Items formés :
+
+| item | constat | propriétaire | déclencheur | prix | origine |
+|---|---|---|---|---|---|
+| SHOGEN-PUBLICATION-S2-SYNC-DOCS11-1 | `docs/11` a reçu 49 lignes d'ajouts datés au commit `6c04e91`, absentes des deux versions publiques | orch., décision investisseur | avant la publication (2026-10-25) | porter les ajouts ou dire pourquoi non, dans les deux langues | L-3 |
+| SHOGEN-PUBLICATION-ACTEURS-RELEVE-1 | le relevé du §1 d'`ACTEURS-NOMMES.md` est périmé (Binance 26 → 32 mentions, CoinGecko 18 → 24 ; l.7 vise l'ancienne empreinte) | orch. | prochaine retouche du dossier interne | relevé régénéré par outil | L-7 |
+| SHOGEN-PUBLICATION-OUTILS-PUBLIC-VERSES-1 | les outils français du lot DOCS11-PUBLIC et `controle_public` amendé (avec C-1) ne sont pas versés au dépôt ; l.40 du glossaire dit encore « A-7 et A-8 » | orch. | prochain lot de publication | versement avec tests, empreinte du glossaire mise à jour | L-8, O-P2-2 |
