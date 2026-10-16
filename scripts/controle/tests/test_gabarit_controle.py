@@ -58,6 +58,13 @@ class GabaritControle(unittest.TestCase):
                 self.assertIn(nom, (RACINE / chemin).read_text(encoding="utf-8").split("\n")[int(n) - 1], (chemin, n))
             bloc = [x[2:] if x.startswith("> ") else x[1:] for x in texte.split("\n") if x.startswith(">")][-11:]
             self.assertEqual(bloc, doc04, g)
+        fr, en = ((GAB / f"RAPPORT-CONCENTRATION-POOL{s}.md").read_text(encoding="utf-8") for s in ("", "-EN"))
+        motif = r"<[a-z][a-z0-9-]*\.[a-z0-9-]+>"
+        champs = re.findall(motif, fr)
+        self.assertEqual((champs, len(champs), len(set(champs))), (re.findall(motif, en), 21, 19))
+        for t in (fr, en):      # seul k_eff est publié en tête (doc 04 l.172) : k nominal hors du §3 (CC, R-6)
+            self.assertNotIn("nominal", t.split("\n## 3.")[1].split("\n## 4.")[0].lower())
+            self.assertLess(t.index("<rendu.k-nominal>"), t.index("\n## 3."))
 
     def test_mots_interdits(self):
         for ligne, phrase in [*INTERDITS.items(), *((n, p) for n, ps in VARIANTES.items() for p in ps)]:

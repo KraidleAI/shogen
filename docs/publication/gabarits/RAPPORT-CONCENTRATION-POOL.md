@@ -18,6 +18,8 @@
   (`s2-harness/shogen_s2/r2.py:772` (`def compute_partition`)) ; k nominal = nombre d'hôtes distincts. L'adresse
   observée est celle de la couche de livraison (CDN, anycast), non de l'origine (résidu 1, `s2-harness/shogen_s2/r2.py:87`
   (`RESIDUS_ASN`)). k_eff n'est pas un compte d'indépendance.
+- **k nominal**, détail de méthode hors tête (doc 04 l.172 : seul k_eff est publié en tête), ligne `k nominal` du
+  bloc 6 (`s2-harness/shogen_s2/report.py:623` (`k nominal = `)) : `<rendu.k-nominal>`
 - **Partition ASN datée et cross-confirmée** : sonde par hôte (`s2-harness/shogen_s2/r2.py:345` (`def collect_asn`)),
   DNS-over-HTTPS puis RIPEstat et Team Cymru (`s2-harness/shogen_s2/r2.py:315` (`def resolve_host_real`)) ; seul un
   hôte dont les deux bases concordent fusionne, sinon singleton non confirmé et k_eff borne supérieure
@@ -29,7 +31,6 @@
 - **Hors de ce rapport** : la co-défaillance mesurée (R1, doc 04 §2) ; blocs 3 et 4 et drapeaux du bloc 6 non recopiés.
 
 ## 3. Tête (bloc 6 du rendu)
-- k nominal (`s2-harness/shogen_s2/report.py:623` (`k nominal = `)) : `<rendu.k-nominal>`
 - k_eff et sa note (`s2-harness/shogen_s2/report.py:631` (`k_eff     = `) ; borne supérieure :
   `s2-harness/shogen_s2/report.py:627` (`BORNE SUPÉRIEURE`)) : `<rendu.k-eff>`
 - Date de la partition (`s2-harness/shogen_s2/report.py:635` (`date de la partition`)) : `<rendu.date-partition>`

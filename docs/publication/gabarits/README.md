@@ -30,6 +30,7 @@ Un champ s'écrit entre chevrons, sous la forme type point nom. Le type dit d'o�
    (forme `[sha256.rendu l.12]`, ou `[sha256.rendu l.12-14]` pour une plage).
 4. Aucune prétention R1 tant que S2-bis n'a pas rendu : ni les blocs 3 et 4 du rendu, ni les drapeaux du bloc 6, ni
    aucune phrase sur la co-défaillance des flux ; k_eff n'est jamais lu comme un compte d'indépendance.
+   k nominal se lit au §2 (méthode), jamais en tête : seul k_eff est publié en tête (doc 04 l.172).
 5. La liste des axes non mesurés (§5 du gabarit) est un champ non optionnel (doc 04 l.129-139) : le champ propre au pool
    nomme au moins les hôtes non attribués et les flux retirés par D1, ou écrit qu'il n'y en a aucun.
 6. Aucune phrase réglementaire (DORA, MiCA) : aucun texte n'est détenu au registre `biblio/` (AVIS-PRODUIT-APRES-S2 §3).
