@@ -25,11 +25,15 @@ Règles PreToolUse (R1 à R5, R11) :
      l'agent et les refus de ce crochet ne comptent pas. Dans un brief (fichier BRIEF*.md écrit par Write, Edit,
      MultiEdit ou une redirection du shell), chaque compte à unité (N tests, N fichiers, N lignes, N mutants, N cas,
      N commits, N diffs, N gardes, N items, en chiffres ou de deux à douze en lettres ; Ran N) doit avoir été affiché
-     avec la même unité (E7) ; un compte précédé d'une borne (≤, au plus, moins de, chacun…) n'est pas jugé.
+     avec la même unité (E7) ; un compte précédé d'une borne (≤, au plus, moins de, chacun…) n'est pas jugé ; un
+     nombre affiché seul (ou suivi d'un nom) par une commande de comptage (wc, grep -c) vaut pour toute unité
+     (relecture G2 du groupe A, C-6 : un compte lu par grep -c ou wc -l est un compte lu).
   R11 lancer un sous-agent ou un workflow dont la consigne nomme un fichier BRIEF*.md : le brief passe
      scripts/controle/avant_acte.py brief (items de l'annexe B, E6 ; constats relayés, E22 ; faisabilité, E23 ;
      règle git, E24), avec --fiche <subagent_type> si la fiche existe ; brief absolu absent : refus ; erreur de
-     l'outil (sortie 3, délai) : acte permis, note sur stderr (lot GARDE-FOUS-ORCH, phase 2, groupe A).
+     l'outil (sortie 3, délai) : acte permis, note sur stderr (lot GARDE-FOUS-ORCH, phase 2, groupe A) ; une consigne
+     (prompt) de plus de CONSIGNE_MAX caractères qui ne nomme aucun BRIEF*.md : refus, le brief s'écrit dans un
+     fichier (relecture G2 du groupe A, C-5 : une consigne en ligne échappait à B1-B4).
 Crochets Stop et SubagentStop (R6) : le dernier texte de l'agent ne porte aucun nombre de trois chiffres ou plus (ni, E29, aucun
 nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille de route : jours, semaines, %, observateurs, …),
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
@@ -91,8 +95,11 @@ UNITES = {"file": "fichier", "line": "ligne", "case": "cas", "cas": "cas"}
 COMPTE = re.compile("(?i)(?<![0-9A-Za-zà-ÿ.,/-])([0-9]+|" + "|".join(NOMBRES) + ") (tests?|fichiers?|files?|lignes?"
                     "|lines?|mutants?|cas|cases?|commits?|diffs?|gardes?|items?)(?![A-Za-zà-ÿ])"
                     "|(?<![A-Za-z])Ran ([0-9]+)(?![0-9])")
+COMPTEUR = re.compile(r"\bwc\b|\bgrep\b[^|;&]*\s-[A-Za-z]*c")      # commandes de comptage (C-6)
+NU = re.compile(r"^ *(?:[^ :]+:)?([0-9]+)(?: +[^ ]+)? *$", re.M)      # ligne de wc ou de grep -c : N, N nom, nom:N
 BORNE = re.compile("(?i)(?:≤|≥|<|>|au plus|au moins|moins de|plus de|jusqu'à|jusqu’à|maximum|minimum|chacun) ?$")
 BRIEF_NOMME = re.compile("(?:[^ " + chr(9) + chr(10) + "\"'`<>|;,()]*/)?BRIEF[^ " + chr(9) + chr(10) + "\"'`<>|;,()/]*[.]md")
+CONSIGNE_MAX = 1500       # caractères d'une consigne sans fichier BRIEF*.md au-delà desquels R11 refuse (C-5)
 OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # racine du dépôt du crochet
 GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
 PY_PROCESSUS = re.compile(r"\b(subprocess|os\s*\.\s*(system|popen|exec\w*|spawn\w*|posix_spawn\w*)|pty\s*\.\s*spawn)\b")
@@ -683,9 +690,10 @@ def pre_tool_use(entree):
                     refuser(f"R5 : le numéro de PR « {p} » n'a été affiché par aucun outil dans le journal de cet agent ; lis-le avant de l'écrire.")
     if briefs_ecrits:      # R5, comptes d'un brief (E7)
         vus = {(n, u) for txt in faits + humain for n, u, _x in comptes(txt, bornes=False)}
+        nus = comptes_nus(entrees)
         for n, u, brut in [x for txt in briefs_ecrits for x in comptes(txt)]:
-            if (n, u) not in vus:
-                refuser(f"R5 : le compte « {brut} » du brief n'a été affiché par aucun outil, avec son unité, dans le journal de cet agent (E7) ; affiche-le (printf '%s {u}s' $(…)) avant de l'écrire.")
+            if (n, u) not in vus and n not in nus:
+                refuser(f"R5 : le compte « {brut} » du brief n'a été affiché par aucun outil, avec son unité, dans le journal de cet agent (E7) ; affiche-le (printf '%s {u}s' $(…), wc ou grep -c) avant de l'écrire.")
     return 0
 
 
@@ -700,12 +708,36 @@ def comptes(texte, bornes=True):
     return out
 
 
+def comptes_nus(entrees):
+    """Nombres affichés seuls sur leur ligne (ou suivis d'un nom, ou après nom:) par une commande de comptage (wc,
+    grep -c) : comptes lus sans unité, admis pour toute unité (C-6, E7). Résultat apparié à sa commande par l'id."""
+    ids, out = set(), set()
+    for e in entrees:
+        m = e.get("message")
+        if e.get("type") not in ("assistant", "user") or not isinstance(m, dict) or not isinstance(m.get("content"), list):
+            continue
+        for b in m["content"]:
+            if not isinstance(b, dict):
+                continue
+            entree = b.get("input") if isinstance(b.get("input"), dict) else {}
+            if b.get("type") == "tool_use" and b.get("id") and COMPTEUR.search(str(entree.get("command", ""))):
+                ids.add(b["id"])
+            elif b.get("type") == "tool_result" and b.get("tool_use_id") in ids and MARQUE not in contenus(b):
+                out |= {int(x) for x in NU.findall(contenus(b))}
+    return out
+
+
 def controler_briefs(inp, cwd):
     """R11 : chaque fichier BRIEF*.md nommé par la consigne passe avant_acte.py brief (dépôt : CLAUDE_PROJECT_DIR)."""
     depot = os.environ.get("CLAUDE_PROJECT_DIR") or OUTILS
     acte = os.path.join(OUTILS, "scripts", "controle", "avant_acte.py")
     textes = "\n".join(v for v in inp.values() if isinstance(v, str))
-    for nom_brief in sorted(set(BRIEF_NOMME.findall(textes))):
+    noms = sorted(set(BRIEF_NOMME.findall(textes)))
+    consigne = inp.get("prompt") if isinstance(inp.get("prompt"), str) else ""
+    if not noms and len(consigne) > CONSIGNE_MAX:
+        refuser(f"R11 : consigne de {len(consigne)} caractères sans fichier BRIEF*.md (plus de {CONSIGNE_MAX}) : écris le "
+                "brief dans un fichier BRIEF*.md, contrôlé par avant_acte.py brief (E6, E22, E23, E24), et nomme-le.")
+    for nom_brief in noms:
         chemin = resoudre(nom_brief, cwd)
         if not os.path.isfile(chemin):
             if os.path.isabs(nom_brief):

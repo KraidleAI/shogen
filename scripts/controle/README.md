@@ -603,3 +603,88 @@ dépendent des tests du harnais qu'ils importent.
 > Tests : `tests/test_garde_acte.py` 21 tests (cas des mutants vivants de la G2 compris,
 > C-8), `tests/test_avant_acte.py` 51 tests ; le groupe ajoute 23 tests ; plancher du job
 > `controle-unittest` 161.
+
+
+> *Ajout daté du 2026-10-16 11:35:43 UTC (`date -u` ; lot INTEGRATION-P2 : GARDE-FOUS-ORCH, phase 2, groupe A, pas INT-17 à INT-24 ;
+> annexe B, B.102 : SHOGEN-GARDE-OUTIL-E6-E7-E12-E13-1, SHOGEN-GARDE-OUTIL-E22-E23-E24-1 ; relecture G2 du groupe,
+> C-1 à C-8)* : un ajout pour le groupe. La règle du brief, nommée R7 aux pièces du groupe A, est R11 : R7 à R10 sont
+> les règles du groupe B.
+> - E6 : `garde_commun.py`, `etat_items` (avec `marque`) : état fermé ou ouvert de chaque item `SHOGEN-…` ou `MONARK-…`
+>   de l'annexe B, lu par marqueurs (fermé, clos, soldé, sans objet, non niés ; cellule de tableau ; en-tête d'items
+>   fermés ; reste ouvert, rouvert), dernière décision du texte ; tranché n'est pas lu. `avant_acte.py brief --texte F
+>   [--fiche NOM]` (`brief`), B1 : un item fermé à l'annexe B que le brief cite sans l'écrire fermé est refusé.
+> - E24 : B4, un brief qui nomme une commande git (options globales `-C`, `-c`, `--no-pager`, `--git-dir=`,
+>   `--work-tree=` comprises) porte lui-même la règle `liste explicite de chemins`, quelle que soit la fiche.
+> - E22, E23 : B2, un constat relayé (sujet : le CC, la G2, le réviseur, le contre-contrôleur, l'avis, un lot nommé ;
+>   singulier ou pluriel ; ou `selon`, `d'après`) porte sur sa ligne ou la suivante `chemin:N`, `chemin l.N` ou
+>   `JOURNAL l.N` ; B3 (`resoudre`, `faisable`) : chaque `chemin:N` et `chemin l.N` se lit, chaque chemin de base connue
+>   existe sauf sur une ligne qui dit le produire, chaque sha court est un commit, chaque sous-commande `avant_acte.py`
+>   nommée existe.
+> - R11 (crochet GARDE-FAITS, PreToolUse Agent et Workflow) : tout fichier `BRIEF*.md` que nomme la consigne passe
+>   `avant_acte.py brief` (dépôt : `CLAUDE_PROJECT_DIR`), refus sur sa sortie 1 ; brief absolu absent : refus ; une
+>   consigne `prompt` de plus de `CONSIGNE_MAX` (1500) caractères sans `BRIEF*.md` : refus ; sortie 3 ou délai :
+>   acte permis, note. Appelée après R4, avant R9. Skill `shogen-avant-lancer`, point 5.
+> - E7, R5 étendue : dans un `BRIEF*.md` écrit par Write, Edit, MultiEdit ou une redirection du shell, chaque compte à
+>   unité (tests, fichiers, lignes, mutants, cas, commits, diffs, gardes, items ; `Ran N`) a été affiché avec son
+>   unité, ou lu sans unité par `wc` ou `grep -c` (`comptes_nus`, résultat apparié à sa commande). Les fichiers écrits
+>   par le shell se lisent sur l'acte (LN-6) : `test_bash_juge_apres_la_serie` (`tests/test_garde_acte.py`) prouve
+>   qu'une commande Bash interdite reste refusée après la série, sans erreur interne du crochet.
+> - E12 : `garde_commun.py`, `motifs_suspects` (détecteur statique de retour arrière exponentiel sur l'arbre de
+>   l'analyseur de `re`, jeux de caractères clos par la casse sous IGNORECASE) et `motifs_ajoutes` ;
+>   `lignes_ajoutees(depot, env, racine, plage)` ; `avant_acte.py`, contrôle RX (`motifs`) à `commit`, `diff` et
+>   `pousser` ; ligne qui porte `redos-admis` : admis, journalisé.
+> - E13 : `avant_acte.py diff --fichier F --rapport R`, `suivi` : D3, toute fonction publique ajoutée à
+>   `scripts/controle/*.py` est nommée dans ce README d'après le diff ; D4, tout test ajouté est nommé au rapport R
+>   sur une ligne qui dit un mutant tué. Fonctions publiques ajoutées par la phase 2 et nommées ici ou plus haut :
+>   C : `passees`, `entree_datee`, `dates_passees`, `unites`, `nommes`, `attribuer`, `empreinte_verif`, `cites`,
+>   `empreintes`, `remplacees`, `jetable`, `workflows`, `lignes_ajoutees` ; B : `biblio`, `chaine_active` ; A : `brief`,
+>   `marque`, `etat_items`, `resoudre`, `faisable`, `motifs_suspects`, `motifs`, `motifs_ajoutes`, `suivi`.
+>
+> | règle | crochet | acte jugé | origine |
+> |---|---|---|---|
+> | R1 | PreToolUse Bash | effacer un worktree ou un clone : status et commits non poussés lus | phase 1 ; LN-6 |
+> | R2 | PreToolUse Bash | écrire dans un fichier existant par le shell : fichier lu avant | phase 1 ; acte lu (LN-6) |
+> | R3 | PreToolUse Bash | `git commit` : diff ou status lu ; `git push` : ce qui part lu | phase 1 ; acte lu (LN-6) |
+> | R4 | PreToolUse Agent, Workflow | consigne qui nomme un arbre git : état de l'arbre lu avant | phase 1 |
+> | R5 | PreToolUse | commit ou PR écrit : affiché avant ; comptes d'un brief | phase 1 ; E7 (A) |
+> | R6 | Stop, SubagentStop | nombres du dernier texte affichés par un outil | phase 1 ; E29 |
+> | R7 | PreToolUse Bash | sleep d'avant-plan ; pkill -f ou pgrep -f à motif non ancré | E18, E28 (B) |
+> | R8 | PreToolUse create_pull_request | preuve que la forge lance des jobs sur le dépôt | E20 (B) |
+> | R9 | PreToolUse Agent, Workflow | seuil de coût ; jeton FANOUT-AUTORISE | E27 (B) |
+> | R10 | UserPromptSubmit, Stop | relevé des noms propres ; dossier nommé sans relevé | E26 (B) |
+> | R11 | PreToolUse Agent, Workflow | brief : `avant_acte.py brief` ; consigne longue sans brief | E6, E22-E24 (A) |
+>
+> Cas de chaque règle (`tests/` du job `controle-unittest` ; R4 et R6 : cas hors CI de
+> `.claude/hooks/tests/test_garde_faits.py`) : R1 `test_r1_effacement_lu_sur_l_acte` ; R2
+> `test_r2_ecriture_lue_sur_l_acte` ; R3 `test_vrais_refus_restent`, `test_bash_juge_apres_la_serie` ; R4
+> `R4_SousAgent.test_refuse_sans_etat` ; R5 `test_r5_lit_le_message_et_le_fichier_de_f`, `test_e7_comptes_du_brief` ;
+> R6 `R6_Stop.test_refuse_nombre_non_affiche_puis_passe_au_second_arret`, `R6_Stop.test_refuse_duree_de_memoire_E29` ;
+> R7 `test_e18_sleep_d_avant_plan`, `test_e18_boucle_a_condition_de_sortie`, `test_e28_motif_non_ancre_se_reconnait` ;
+> R8 `test_e20_forge_sans_job`, `test_e20_marqueur_du_jour` ; R9 `test_e27_workflow_de_dix_agents`,
+> `test_e27_fan_out_dans_une_phrase_niee`, `test_e27_jeton_lu_au_journal_de_la_session`, `test_e27_agents_vivants` ;
+> R10 `test_e26_courriel_rattache_sans_releve`, `test_e26_releve_puis_rattachement`,
+> `test_e26_dossiers_lus_au_fichier`, `test_e26_crochet_branche` ; R11 `test_r11_crochet_agent`.
+>
+> Empreintes à l'état final de la série (pas INT-24) :
+>
+> | fichier | sha256 |
+> |---|---|
+> | `avant_acte.py` | `2cc267b4f93be377fdfc7614280b877b60b299ab09892f6325e855d7d59be1f8` |
+> | `garde_commun.py` | `c07b85d96a1c95ea68483539491e2b7e4c367466a972b055e2da95497c8fb41a` |
+> | `fm11.py` | `17caaa358ce471c8a9b734873f874794f8c97e66f0125fa05a9dc0cff04452b7` |
+> | `SHA256SUMS` | `631e302d48201b35c2ccdab6b1b65c76585c47e8da9cf91edcfbe55ee783bed4` |
+> | `gabarits/chaine.sh` | `0d07d39c2d0b809d0d8168931cfe0a40dc4f71277856338227d88f7b546fe511` |
+> | `garde/lignes-citees.txt` | `8b6cf5ab967ad7f77e9851a969428c898c8e0097d59b8247a646f56cdab6b8ae` |
+> | `garde/forge-actions.txt` | `0ce631b4c66783152afff919699f7d6f006aae7536a447fc014a37261a850ff9` |
+> | `garde/dossiers.txt` | `cd22558b07b70752428801ade3fa5f5f2c4f1f418df6087844008b07bb017fa8` |
+> | `.claude/hooks/garde_faits.py` | `4a5fcf2d479c1dc6fa937466cb2a8abe1d1b97b3876c1ddfa937784582306790` |
+> | `.claude/hooks/acte_shell.py` | `a74689b1d67eec7630a7c046e86a940c9697ebbf94645b2b72b25acf062b736d` |
+> | `.claude/settings.json` | `952f4a781c8837c13de413dc3b1e7a1cedbfd367b263708a0f2db486f8167bcc` |
+> | `.claude/skills/shogen-avant-committer/SKILL.md` | `50c2844f96d1ac7e7767c1a73f5c8a5dbb6638c25634b996cc15f30b064e1498` |
+> | `.claude/skills/shogen-avant-lancer/SKILL.md` | `57f5b4eee9e16ecb0807b094424ba4f2b5c3f980a3ba5c728ec1f773250ecef8` |
+> | `.claude/hooks/tests/test_garde_faits.py` | `ec7283fe85c1cdc84ff7d13dcbbef04a42fb1db5d8d72e552af5313490f4d1fc` |
+>
+> Tests : `tests/test_garde_brief.py` 7 tests, `tests/test_garde_regex.py`
+> 3 tests, `tests/test_garde_suivi.py` 2 tests,
+> `tests/test_garde_acte.py` 22 tests ; le groupe ajoute 13 tests (dont un de l'intégration) ;
+> plancher du job `controle-unittest` 174.

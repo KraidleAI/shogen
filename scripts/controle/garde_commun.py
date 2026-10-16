@@ -36,7 +36,12 @@ sûr peut être signalé (`(?:a+b|ac)*`). `_absorbe` : répétition variable du 
 et un début du corps (`(.*,)*`). `motifs_ajoutes` : motifs des lignes ajoutées d'un diff analysé (premier
 argument littéral, entier sur la ligne, d'un appel re.compile, match, search… en .py ; valeur d'une clé regex, pattern
 ou motif et argument entre guillemets de grep, egrep ou rg en .yml) ; un motif construit par concaténation n'est pas lu.
-`lignes_ajoutees(depot, plage=(base, tete))` : lignes ajoutées d'une plage de commits (poussée), mêmes règles."""
+`lignes_ajoutees(depot, plage=(base, tete))` : lignes ajoutées d'une plage de commits (poussée), mêmes règles.
+Relecture G2 du groupe A, C-1 (E6) : soldé et sans objet ferment aussi un item, comme fermé ou clos (annexe B à
+ec5d0eb : SHOGEN-SCEAU-OTS-1 l.1500, items soldés l.405) ; tranché n'en ferme pas (une question tranchée laisse son
+item ouvert).
+Relecture G2 du groupe A, C-7 (E12) : sous IGNORECASE (drapeau du motif ou groupe (?i:…)), les jeux de caractères
+sont clos par la casse (`(?i)(?:A+a+)+` était un faux vert, exponentiel mesuré)."""
 import ast
 import fnmatch
 import functools
@@ -280,7 +285,7 @@ def citations(texte, racine, surcouche=None):
 
 
 ITEM = re.compile("(?<![A-Za-z0-9-])((?:SHOGEN|MONARK)-[A-Z0-9]+(?:-[A-Z0-9]+)*)(?![A-Za-z0-9-])")
-CLOS = re.compile("(?i)(?<![a-zà-ÿ])(?:fermée?s?|clos|closes?)(?![a-zà-ÿ])")
+CLOS = re.compile("(?i)(?<![a-zà-ÿ])(?:fermée?s?|clos|closes?|soldée?s?|sans objet)(?![a-zà-ÿ])")
 ROUVRE = re.compile("(?i)(?<![a-zà-ÿ])(?:rouverte?s?|réouverte?s?|reste(?:nt)? [*]*ouverte?s?)(?![a-zà-ÿ])")
 NIE = re.compile("(?i)(?:non|pas|jamais|ni) [*]*$")
 EN_TETE = re.compile("(?i)(?<![a-zà-ÿ])(?:items?|fermetures)(?![a-zà-ÿ])[^:|]{0,300}?:")
@@ -324,6 +329,7 @@ CATEGORIES = {"DIGIT": str.isdigit, "SPACE": str.isspace, "WORD": lambda c: c.is
               "LINEBREAK": lambda c: c == chr(10)}
 UN = ("LITERAL", "NOT_LITERAL", "ANY", "IN")      # nœuds d'un caractère
 REPETE = ("MAX_REPEAT", "MIN_REPEAT")              # répétitions qui reviennent en arrière (possessives exclues)
+_CASSE = [False]                                   # motif jugé sous IGNORECASE (C-7), posé par motifs_suspects
 APPEL_RE = re.compile("(?<![A-Za-z0-9_.])re[.](?:compile|match|search|fullmatch|findall|finditer|sub|subn|split)[(]")
 CLE_YAML = re.compile("^[ -]*[A-Za-z_-]*(?:regex|pattern|motif)s?: *(.+)$")
 GREP = re.compile("(?<![A-Za-z0-9_-])(?:grep|egrep|rg)(?: +-[A-Za-z]+)* +(?:'([^']+)'|" + chr(34) + "([^" + chr(34)
@@ -331,7 +337,12 @@ GREP = re.compile("(?<![A-Za-z0-9_-])(?:grep|egrep|rg)(?: +-[A-Za-z]+)* +(?:'([^
 
 
 def _jeu(o, av):
-    """Caractères (sur UNIVERS) qu'un nœud d'un caractère accepte."""
+    """Caractères (sur UNIVERS) qu'un nœud d'un caractère accepte ; clos par la casse sous IGNORECASE (C-7)."""
+    s = _jeu_brut(o, av)
+    return s | {c.swapcase() for c in s if c.swapcase() in UNIVERS} if _CASSE[0] else s
+
+
+def _jeu_brut(o, av):
     if o != "IN":      # ANY : av vaut None, aucun caractère à lire
         return set(UNIVERS) if o == "ANY" else ({chr(av)} & UNIVERS or {"é"}) if o == "LITERAL" else set(
             UNIVERS - {chr(av)})
@@ -455,17 +466,27 @@ def motifs_suspects(motif):
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            pile, codes = [list(analyseur.parse(motif))], set()
+            arbre = analyseur.parse(motif)
     except Exception:
         return ["motif-illisible"]
-    while pile:
+    pile, codes = [list(arbre)], set()
+    plier = bool(getattr(getattr(arbre, "state", None), "flags", 0) & re.IGNORECASE)
+    while pile and not plier:      # groupe (?i:…) : SUBPATTERN dont les drapeaux ajoutés portent IGNORECASE
         for op, av in pile.pop():
+            plier = plier or str(op) == "SUBPATTERN" and bool(av[1] & re.IGNORECASE)
             pile += _enfants(str(op), av)
-            if str(op) in REPETE and (av[1] == analyseur.MAXREPEAT or av[1] > 10):
-                debut = _premiers(av[2])[0]
-                codes |= {code for code, fin in _queues(av[2]) if fin & debut}
-                codes |= {"alternatives-ambigues"} if _ambigues(av[2]) else set()
-                codes |= {"quantificateurs-imbriques"} if _absorbe(av[2], debut) else set()
+    pile, _CASSE[0] = [list(arbre)], plier
+    try:
+        while pile:
+            for op, av in pile.pop():
+                pile += _enfants(str(op), av)
+                if str(op) in REPETE and (av[1] == analyseur.MAXREPEAT or av[1] > 10):
+                    debut = _premiers(av[2])[0]
+                    codes |= {code for code, fin in _queues(av[2]) if fin & debut}
+                    codes |= {"alternatives-ambigues"} if _ambigues(av[2]) else set()
+                    codes |= {"quantificateurs-imbriques"} if _absorbe(av[2], debut) else set()
+    finally:
+        _CASSE[0] = False
     return sorted(codes)
 
 

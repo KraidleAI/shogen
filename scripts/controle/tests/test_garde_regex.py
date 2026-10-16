@@ -39,10 +39,11 @@ class Motifs(unittest.TestCase):
                     "(?=(a+)+b)": "quantificateurs-imbriques", "(a|aa)*$": "alternatives-ambigues",
                     "(?:a|b|ab)*": "alternatives-ambigues", "(ab|ab)*$": "alternatives-ambigues",
                     "(?:a+b|ac)*": "alternatives-ambigues", "(.+)+": "quantificateurs-imbriques",
-                    "(.*,)*": "quantificateurs-imbriques", "((?:.*),)*$": "quantificateurs-imbriques"}
+                    "(.*,)*": "quantificateurs-imbriques", "((?:.*),)*$": "quantificateurs-imbriques",
+                    "(?i)(?:A+a+)+$": "quantificateurs-imbriques", "x(?i:A+a+)+": "quantificateurs-imbriques"}
         self.assertEqual({m: gc.motifs_suspects(m) for m in signales}, {m: [c] for m, c in signales.items()})
         surs = ["SHOGEN-[A-Z0-9]+(?:-[A-Z0-9]+)*", "(?:[0-9a-f]{2})*", "(a+b)*", "(?:ab|a)*", "(?:x|xa)*",
-                "(?:foo|bar)*", "(a+){2,5}", "(?:xy|xz)*", "(?:[ab]c|a)*", "a.*b",
+                "(?:foo|bar)*", "(a+){2,5}", "(?:xy|xz)*", "(?:[ab]c|a)*", "a.*b", "(?:A+a+)+$",
                 B + "bgit(?:" + ESP + "+(?:-C" + ESP + "+" + S + "+|--no-optional-locks|--git-dir=" + S + "+))*"]
         self.assertEqual({m: gc.motifs_suspects(m) for m in surs}, {m: [] for m in surs})
         self.assertEqual(gc.motifs_suspects("(a"), ["motif-illisible"])

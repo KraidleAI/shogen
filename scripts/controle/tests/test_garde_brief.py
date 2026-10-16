@@ -54,6 +54,12 @@ class EtatItems(unittest.TestCase):
                          {"SHOGEN-A-1": "fermé", "SHOGEN-B-1": "fermé", "SHOGEN-C-1": "ouvert", "SHOGEN-D-1": "ouvert",
                           "SHOGEN-E-1": "ouvert", "SHOGEN-F-1": "ouvert", "SHOGEN-G-1": "fermé", "SHOGEN-H-1": "ouvert",
                           "MONARK-S2-I-1": "fermé"})
+        solde = NL.join(["- SHOGEN-SCEAU-OTS-1 **sans objet** : pour S2, l'absence d'ancre OpenTimestamps est une limite "
+                         "écrite.", "Items proposés par le G1 et soldés par décision au G0 §C (ajout daté) : "
+                         "SHOGEN-RENDU-ETIQUETTE-1 (Q4).", "", "SHOGEN-J-1 non soldé ; SHOGEN-K-1 tranché « non »."])
+        self.assertEqual({k: v[0] for k, v in gc.etat_items(solde).items()},      # relecture G2, C-1 (annexe l.1500, l.405)
+                         {"SHOGEN-SCEAU-OTS-1": "fermé", "SHOGEN-RENDU-ETIQUETTE-1": "fermé", "SHOGEN-J-1": "ouvert",
+                          "SHOGEN-K-1": "ouvert"})
 
 
 class Brief(unittest.TestCase):
@@ -93,15 +99,19 @@ class Brief(unittest.TestCase):
 
     def test_e24_git_sans_regle(self):
         """E24 : brief qui nomme une commande git (copie creuse, git diff --numstat) sans la règle : refus B4 ; la règle
-        au brief, ou à la fiche nommée par --fiche (lignes repliées) : conforme ; fiche sans la règle : refus ; fiche
-        absente ou nom hors forme : erreur 3 ; brief sans git : conforme."""
+        au brief : conforme ; à la seule fiche nommée par --fiche : refus qui nomme la fiche (C-2, décision de
+        l'orchestrateur : le brief la porte lui-même) ; fiche absente ou nom hors forme : erreur 3 ; options globales de
+        git : vues ; brief sans git : conforme."""
         texte = "Travaille sur une copie creuse ; compte les lignes par `git diff --numstat`." + NL
         code, sortie = self.brief(texte)
         self.assertEqual((code, sortie[:9]), (1, "REFUS B4 "))
         self.assertEqual(self.brief(texte + "Toute commande git est limitée à une liste explicite de chemins." + NL),
                          (0, ""))
-        self.assertEqual(self.brief(texte, "--fiche", "fiche-regle"), (0, ""))
+        code, sortie = self.brief(texte, "--fiche", "fiche-regle")
+        self.assertEqual((code, "lui-même" in sortie, "quelle que soit la fiche (fiche-regle)" in sortie), (1, True, True))
         self.assertEqual(self.brief(texte, "--fiche", "fiche-nue")[0], 1)
+        self.assertEqual([self.brief("Lister par `git " + x + " ls-files -- a`." + NL)[0]
+                          for x in ("--no-pager", "-c core.quotePath=false", "-C /x --git-dir=/x/.git")], [1, 1, 1])
         self.assertEqual([self.brief(texte, "--fiche", x)[0] for x in ("absente", "../agents/fiche-regle")], [3, 3])
         self.assertEqual(self.brief("Aucune commande à lancer." + NL), (0, ""))
         self.assertEqual(self.brief("Lis les commandes git du journal." + NL)[0], 1)
@@ -109,7 +119,7 @@ class Brief(unittest.TestCase):
     def test_e22_constat_relaye_sans_reference(self):
         """E22 : constat d'un autre lot relayé sans fichier ni ligne : refus B2 ; référence sur la ligne ou la suivante,
         forme entre guillemets ou en code (citée, non relayée), sujet sans verbe de relais : conforme ; selon la G2 :
-        refus."""
+        refus ; sujet au pluriel, contre-contrôleur, verbe au pluriel, d'après : refus (C-3)."""
         code, sortie = self.brief("Reprise de DT6, phase 4 : le contre-contrôle de DB-1 a relevé un test instable ; le "
                                   "stabiliser." + NL)
         self.assertEqual((code, sortie.split(" : ")[:2]), (1, ["REFUS B2", "l.1"]))
@@ -118,6 +128,9 @@ class Brief(unittest.TestCase):
                      "Forme visée : « la G2 a trouvé… », `le CC dit`.", "Le générateur écrit les diffs."):
             self.assertEqual(self.brief(sain + NL), (0, ""), sain)
         self.assertEqual(self.brief("Selon la G2, tout passe." + NL)[0], 1)
+        self.assertEqual([self.brief(x + NL)[0] for x in ("Le contre-contrôleur a relevé un test instable.", "Les "
+                          "réviseurs ont trouvé deux défauts.", "Les avis signalent un écart.", "D'après la G2, tout passe.")],
+                         [1, 1, 1, 1])
 
     def test_e23_faisabilite(self):
         """E23 : outil, fichier ou commit nommés absents, ligne hors du fichier, sous-commande inconnue : refus B3, un par
@@ -127,52 +140,69 @@ class Brief(unittest.TestCase):
             "Copier les octets au Drive par `scripts/copier_drive.py`.", "Relire notes/rapport.md:7 puis `/nulle/x.py`.",
             "Base : commit abc1234def.", "Lancer `avant_acte.py verifier`.", "Écrire `scripts/neuf.py`.",
             "Lire `scripts/outil.py`, notes/rapport.md:2-3, `sous/inconnu/x.md`, base " + tete + ".",
-            "sha256 `c3f34927467031d8` ; `docs/rapports/x.md` ; `scripts/` ; `-C/x`.", ""]))
+            "sha256 `c3f34927467031d8` ; `docs/rapports/x.md` ; `scripts/` ; `-C/x`.",
+            "Relire notes/rapport.md l.9, `notes/rapport.md` l.2-3, notes/absent.md l.1.", ""]))
         self.assertEqual((code, [x.split(" ; à faire")[0] for x in sortie.split(NL)[:-1]]), (1, [
             "REFUS B3 : l.1 : scripts/copier_drive.py absent (E23)",
             "REFUS B3 : l.2 : notes/rapport.md:7 hors du fichier (3 lignes) (E23)",
             "REFUS B3 : l.2 : /nulle/x.py absent (E23)",
             "REFUS B3 : l.3 : abc1234def n'est pas un commit du dépôt (E23)",
-            "REFUS B3 : l.4 : sous-commande avant_acte.py verifier inconnue (E23)"]))
+            "REFUS B3 : l.4 : sous-commande avant_acte.py verifier inconnue (E23)",
+            "REFUS B3 : l.8 : notes/rapport.md l.9 hors du fichier (3 lignes) (E23)",
+            "REFUS B3 : l.8 : notes/absent.md absent (E23)"]))
 
-    def crochet(self, consigne, fiche="fiche-regle"):
-        """(sortie, stderr) du crochet GARDE-FAITS sur un appel Agent, journal vide en .txt, dépôt du test en
-        CLAUDE_PROJECT_DIR."""
+    def crochet(self, consigne, fiche="fiche-regle", outil="Agent", champ="prompt"):
+        """(sortie, stderr) du crochet GARDE-FAITS sur un appel Agent (ou outil, consigne dans le champ nommé), journal
+        vide en .txt, dépôt du test en CLAUDE_PROJECT_DIR."""
         j = os.path.join(self.tmp, "journal.txt")
         open(j, "w", encoding="utf-8").close()
-        e = {"hook_event_name": "PreToolUse", "transcript_path": j, "cwd": self.tmp, "tool_name": "Agent",
-             "tool_input": {"prompt": consigne, "subagent_type": fiche, "description": "essai"}}
+        e = {"hook_event_name": "PreToolUse", "transcript_path": j, "cwd": self.tmp, "tool_name": outil,
+             "tool_input": {champ: consigne, "subagent_type": fiche, "description": "essai"}}
         p = subprocess.run([sys.executable, "-I", GARDE], input=json.dumps(e), capture_output=True, text=True,
                            timeout=60, env=dict(os.environ, CLAUDE_PROJECT_DIR=self.d))
         return p.returncode, p.stderr
 
     def test_r11_crochet_agent(self):
         """R11 : la consigne d'un agent nomme un brief (absolu ou relatif au dossier courant) qui échoue au contrôle :
-        refus du crochet, refus de l'outil recopiés ; brief conforme, ou règle git portée par la fiche du type d'agent :
-        permis ; brief absolu absent : refus ; consigne sans brief : permis."""
+        refus du crochet, refus de l'outil recopiés ; brief conforme : permis ; règle git portée par la seule fiche du
+        type d'agent : refus qui nomme la fiche (C-2) ; brief absolu absent : refus ; consigne courte sans brief :
+        permis ; consigne de plus de CONSIGNE_MAX caractères sans brief : refus, avec un brief nommé : jugée par lui (C-5)."""
         self.brief("Reprendre SHOGEN-E1-XTASK-REFS-1, ouvert ; `git diff --numstat`." + NL)
         code, err = self.crochet("Lis d'abord ton brief : " + os.path.join(self.tmp, "BRIEF.md") + ", puis exécute-le.")
-        self.assertEqual((code, err.count("REFUS B1"), "REFUS B4" in err), (2, 1, False), err)
+        self.assertEqual((code, err.count("REFUS B1"), "quelle que soit la fiche (fiche-regle)" in err), (2, 1, True), err)
         self.assertEqual(self.crochet("Brief : BRIEF.md", fiche="fiche-nue")[1].count("R11 : le brief"), 1)
-        self.brief("Reprendre SHOGEN-CI-RUNNERS-1 ; `git diff --numstat`." + NL)
-        self.assertEqual([self.crochet("Brief : BRIEF.md", fiche=x)[0] for x in ("fiche-regle", "fiche-nue")], [0, 2])
+        self.brief("Reprendre SHOGEN-CI-RUNNERS-1 ; `git diff --numstat`, limité à une liste explicite de chemins." + NL)
+        self.assertEqual([self.crochet("Brief : BRIEF.md", fiche=x)[0] for x in ("fiche-regle", "fiche-nue")], [0, 0])
         code, err = self.crochet("Brief : " + os.path.join(self.tmp, "BRIEF-absent.md"))
         self.assertEqual((code, "R11 : la consigne nomme un brief absent" in err), (2, True), err)
         self.assertEqual(self.crochet("Aucun fichier à lire."), (0, ""))
+        longue = "Consigne écrite en ligne. " * 58      # 1508 caractères
+        code, err = self.crochet(longue[:1500])
+        self.assertEqual((len(longue), code), (1508, 0), err)
+        code, err = self.crochet(longue)
+        self.assertEqual((code, "R11 : consigne de 1508 caractères sans fichier BRIEF*.md" in err), (2, True), err)
+        self.assertEqual(self.crochet(longue + " Brief : BRIEF.md")[0], 0)
+        with open(os.path.join(self.tmp, "BRIEF-KO.md"), "w", encoding="utf-8") as f:      # C-8 : Workflow, autre champ
+            f.write("Reprendre SHOGEN-E1-XTASK-REFS-1." + NL)
+        code, err = self.crochet("Brief : BRIEF-KO.md", outil="Workflow", champ="script")
+        self.assertEqual((code, "REFUS B1" in err), (2, True), err)
 
 
 class Comptes(unittest.TestCase):
     """E7 : comptes à unité d'un brief écrit (Write, Edit, redirection du shell), jugés par le crochet GARDE-FAITS (R5)
     contre les sorties d'outils du journal synthétique (.txt)."""
-    def crochet(self, resultats, outil, entree):
+    def crochet(self, resultats, outil, entree, humain=None):
         with tempfile.TemporaryDirectory() as t:
             j = os.path.join(t, "journal.txt")
             with open(j, "w", encoding="utf-8") as f:
-                for r in resultats:
+                if humain:      # message de l'humain, en bloc texte (C-8)
+                    f.write(json.dumps({"type": "user", "message": {"content": [{"type": "text", "text": humain}]}}) + NL)
+                for k, r in enumerate(resultats):      # sortie, ou (commande, sortie) ; résultat apparié par l'id
+                    cmd, r = r if isinstance(r, tuple) else ("true", r)
                     f.write(json.dumps({"type": "assistant", "message": {"content": [
-                        {"type": "tool_use", "name": "Bash", "input": {"command": "true"}}]}}) + NL)
+                        {"type": "tool_use", "id": f"t{k}", "name": "Bash", "input": {"command": cmd}}]}}) + NL)
                     f.write(json.dumps({"type": "user", "message": {"content": [
-                        {"type": "tool_result", "content": r}]}}) + NL)
+                        {"type": "tool_result", "tool_use_id": f"t{k}", "content": r}]}}) + NL)
             e = {"hook_event_name": "PreToolUse", "transcript_path": j, "cwd": t, "tool_name": outil,
                  "tool_input": entree}
             p = subprocess.run([sys.executable, "-I", GARDE], input=json.dumps(e), capture_output=True, text=True,
@@ -182,7 +212,8 @@ class Comptes(unittest.TestCase):
     def test_e7_comptes_du_brief(self):
         """E7 : « deux gardes » écrit dans un brief, l'outil a affiché trois gardes : refus ; affiché (en chiffres ou en
         lettres, unité au pluriel ou en anglais) : permis ; Ran N contre Ran affiché ; borne ; fichier hors brief ;
-        Edit et heredoc du shell vers un BRIEF*.md."""
+        Edit et heredoc du shell vers un BRIEF*.md ; compte lu sans unité par grep -c ou wc -l : permis, le même
+        nombre affiché par une autre commande : refus (C-6)."""
         brief = {"file_path": "/x/BRIEF-CC.md", "content": "C-11 : vérifier les deux gardes de presg5 ; Ran 117 ; "
                  "chaque diff ≤ 200 lignes ; 3 fichiers touchés." + NL}
         sorties = ["Ran 117 tests in 2.1s", "trois gardes", "3 files changed"]
@@ -196,3 +227,10 @@ class Comptes(unittest.TestCase):
                                                                  "new_string": "les 2 gardes"}), (0, ""))
         self.assertEqual(self.crochet([], "Bash", {"command": "cat > /x/BRIEF.md <<'F'" + NL + "5 mutants" + NL + "F"})[0],
                          2)
+        lu = dict(brief, content="Ajouter 12 tests ; relire 42 lignes ; 7 fichiers." + NL)
+        comptage = [("grep -c 'def test_' x.py", "12"), ("wc -l x.py", "42 x.py"), ("grep -c a d/*.py", "d/a.py:7")]
+        self.assertEqual(self.crochet(comptage, "Write", lu), (0, ""))
+        self.assertEqual(self.crochet([("cat x.py", "12")] + comptage[1:], "Write", lu)[0], 2)
+        quatre = dict(brief, content="Rejouer 4 mutants." + NL)
+        self.assertEqual([self.crochet([], "Write", quatre, humain=x)[0] for x in ("Rejoue 4 mutants.", "Rejoue 4 cas.")],
+                         [0, 2])      # compte tapé par l'humain, même unité (C-8)

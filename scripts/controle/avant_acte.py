@@ -102,7 +102,14 @@ RX (E12), à commit (index), diff (HEAD plus le diff) et pousser (plage poussée
 redos-admis (journalisée en contournement) ; motif illisible : avertissement.
 diff --rapport R (E13) : D3, toute fonction publique (def de premier niveau, sans _) ajoutée à scripts/controle/*.py
 est nommée dans scripts/controle/README.md d'après le diff ; D4, tout test ajouté (def test_… d'un .py sous tests/) est
-nommé dans le rapport R sur une ligne qui dit un mutant tué ; tests ajoutés sans --rapport : refus."""
+nommé dans le rapport R sur une ligne qui dit un mutant tué ; tests ajoutés sans --rapport : refus.
+Relecture G2 du groupe A, C-2 (E24, décision de l'orchestrateur) : B4 exige la règle dans le brief lui-même, quelle
+que soit la fiche (une fiche qui la porte ne suffit plus) ; --fiche vérifie seulement que la fiche existe et la nomme
+dans le refus ; une commande git précédée d'options globales (-C, -c, --no-pager, --git-dir=, --work-tree=) est vue.
+Relecture G2 du groupe A, C-3 (E22) : B2 lit aussi les sujets au pluriel et le contre-contrôleur, les verbes au pluriel
+(relèvent, signalent, constatent, rapportent) et les participes accordés, et d'après comme selon.
+Relecture G2 du groupe A, C-4 (E23) : B3 lit aussi chemin l.N et `chemin` l.N (plage l.N-M comprise), la forme de
+référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N."""
 import argparse
 import contextlib
 import fnmatch
@@ -840,19 +847,21 @@ def chaine(a, fautes):
 
 
 ANNEXE = os.path.join("docs", "adr-0028", "ANNEXE-B-items.md")
-GIT_NOMME = re.compile("(?<![A-Za-z0-9_./-])git(?: -C [^ ]+)? (?:diff|log|show|status|ls-files|ls-tree|read-tree|archive"
+GIT_NOMME = re.compile("(?<![A-Za-z0-9_./-])git(?: -[Cc] [^ ]+| --no-pager| --no-optional-locks"
+                       "| --(?:git-dir|work-tree)=[^ ]+)* (?:diff|log|show|status|ls-files|ls-tree|read-tree|archive"
                        "|apply|grep|rev-list|rev-parse|cat-file|blame|add|commit|checkout|restore|stash|reset|clone"
                        "|worktree)(?![A-Za-z-])|(?i:commandes? git)(?![A-Za-z-])")
 REGLE_GIT = "liste explicite de chemins"
-SUJET = ("(?:(?<![A-Za-zà-ÿ])(?i:le|la|les|l'|l’) ?(?i:cc|contre-contrôle|g2|relecture|réviseur|générateur|worker"
-         "|advisor|avis|lecteur|rapport|chercheur|validateur)|(?<![A-Za-z0-9-])[A-Z][A-Z0-9]+-[A-Z0-9]+(?:-[A-Z0-9]+)*)"
+SUJET = ("(?:(?<![A-Za-zà-ÿ])(?i:le|la|les|l'|l’) ?(?i:cc|contre-contrôle(?:ur)?|g2|relecture|réviseur|générateur"
+         "|worker|advisor|avis|lecteur|rapport|chercheur|validateur)s?|(?<![A-Za-z0-9-])[A-Z][A-Z0-9]+-[A-Z0-9]+"
+         "(?:-[A-Z0-9]+)*)"
          "(?![A-Za-zà-ÿ0-9-])")
-VERBE = ("(?<![a-zà-ÿ])(?i:dit|disent|trouvé|trouvés|relève|relevé|relevés|signale|signalé|constate|constaté|rapporte"
-         "|rapporté|mesuré|montré|noté)(?![a-zà-ÿ])")
-RELAIS = re.compile(SUJET + "[^.;:" + chr(10) + "]{0,40}?" + VERBE + "|(?<![a-zà-ÿ])(?i:selon) " + SUJET)
+VERBE = ("(?<![a-zà-ÿ])(?i:dit|disent|trouvée?s?|relève|relèvent|relevée?s?|signale|signalent|signalée?s?|constate"
+         "|constatent|constatée?s?|rapporte|rapportent|rapportée?s?|mesurée?s?|montrée?s?|notée?s?)(?![a-zà-ÿ])")
+RELAIS = re.compile(SUJET + "[^.;:" + chr(10) + "]{0,40}?" + VERBE + "|(?<![a-zà-ÿ])(?i:selon|d'après|d’après) " + SUJET)
 REF = re.compile("[A-Za-z0-9_-][.][A-Za-z0-9]+`?(?::| l[.] ?)[0-9]+|(?:JOURNAL|annexe B|ADR-[0-9]{4}) l[.] ?[0-9]+")
-REF_LIGNE = re.compile("(?<![A-Za-z0-9_./~-])((?:/|[.]?[A-Za-z0-9_-]+/)[A-Za-z0-9_./~-]*[.][A-Za-z0-9]+):([0-9]+)"
-                       "(?:-([0-9]+))?")
+REF_LIGNE = re.compile("(?<![A-Za-z0-9_./~-])((?:/|[.]?[A-Za-z0-9_-]+/)[A-Za-z0-9_./~-]*[.][A-Za-z0-9]+)(?::|`? l[.] ?)"
+                       "([0-9]+)(?:-([0-9]+))?")
 PRODUIRE = re.compile("(?i)(?<![a-zà-ÿ])(?:produire|produit|produits|créer|crée|créé|créés|écrire|écris|écrit|écrits"
                       "|ajouter|ajoute|ajouté|ajoutés|nouveau|nouvelle|nouveaux|neuf|neuve|poser|pose|posé|sortie"
                       "|sorties|verser|versé|à faire)(?![a-zà-ÿ])")
@@ -899,13 +908,12 @@ def faisable(a, texte, fautes):
 
 
 def brief(a, fautes):
-    """B1 (E6) et B4 (E24) sur le brief F ; --fiche NOM : fiche .claude/agents/NOM.md lue avec lui (B4)."""
-    texte, fiche = lire(a.texte).decode("utf-8"), ""
+    """B1 (E6) et B4 (E24) sur le brief F ; --fiche NOM : fiche .claude/agents/NOM.md, qui doit exister (C-2)."""
+    texte = lire(a.texte).decode("utf-8")
     if a.fiche:
         chemin = os.path.join(a.depot, ".claude", "agents", a.fiche + ".md")
         if not re.fullmatch("[a-z0-9-]+", a.fiche) or not os.path.isfile(chemin):
             raise Erreur(f"brief --fiche : fiche {a.fiche} absente de .claude/agents/")
-        fiche = lire(chemin).decode("utf-8")
     etats, propres = GC.etat_items(lire(os.path.join(a.depot, ANNEXE)).decode("utf-8")), GC.etat_items(texte)
     for item in sorted(propres):
         etat, n = etats.get(item, (None, 0))
@@ -914,9 +922,10 @@ def brief(a, fautes):
         elif etat == "fermé" and propres[item][0] != "fermé":
             fautes.append(("refus", "B1", f"{item} cité ouvert ; fermé à l'annexe B l.{n} (E6)",
                            "relire la ligne de l'annexe, retirer l'item du brief ou l'écrire fermé", "-"))
-    if GIT_NOMME.search(texte) and REGLE_GIT not in GC.plier(texte + chr(10) + fiche):
-        fautes.append(("refus", "B4", "le brief nomme une commande git sans la règle « toute commande git limitée à une "
-                       "liste explicite de chemins », ni lui ni sa fiche (E24)",
+    if GIT_NOMME.search(texte) and REGLE_GIT not in GC.plier(texte):      # le brief lui-même (C-2)
+        fautes.append(("refus", "B4", "le brief nomme une commande git sans porter lui-même la règle « toute commande "
+                       "git limitée à une liste explicite de chemins » ; elle vaut pour tout brief, quelle que soit la "
+                       f"fiche ({a.fiche or 'aucune'}) : une fiche qui la porte ne suffit pas (E24)",
                        "ajouter la règle au brief : toute commande git qui liste ou compare des chemins est limitée à "
                        "une liste explicite de chemins", "-"))
     lignes = texte.split(chr(10)) + [""]
