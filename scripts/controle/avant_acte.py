@@ -68,7 +68,10 @@ Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un p
 Contre-contrôle, R-7 : verser compte fichiers et octets avant toute lecture (borne).
 Contre-contrôle, R-10 : C3 lit aussi le verdict CONFORME-AVEC-RÉSERVES, accentué ou non.
 Phase 2, L-1 : C4 refuse aussi une heure écrite sans sa date et, au commit et au diff, une entrée datée ajoutée d'un .md
-antérieure à la dernière entrée datée du fichier à HEAD (garde_commun.dates_passees)."""
+antérieure à la dernière entrée datée du fichier à HEAD (garde_commun.dates_passees).
+Phase 2, L-3 : C3 attribue aussi chaque mot lu (verdict, passes, identifiant, sha court) au diff du message (Diff-Id,
+ou --id) : refus si les sources ne l'écrivent que dans des passages (paragraphe, rangée de tableau, point de liste) qui
+nomment d'autres diffs du même préfixe (plages N à M lues) et si les lignes ajoutées du diff ne le portent pas."""
 import argparse
 import contextlib
 import fnmatch
@@ -195,6 +198,12 @@ def commit(a, fautes):
         fautes.append(("refus", "C3", f"{genre} du message absent des sources : {x} (E8)",
                        "reprendre les mots de l'adjudication et de la ligne d'annexe relues", "-"))
     fichiers, ecartes = GC.lignes_ajoutees(a.depot)
+    ident = a.id or next((x[9:].strip() for x in texte.split(chr(10)) if x.startswith("Diff-Id: ")), None)
+    if ident and "-" in ident:
+        juges = [("verdict", verdicts), ("nombre de passes", lambda u: passes(u, source=True)),
+                 ("identifiant", lambda u: set(IDENT.findall(u))), ("sha court", lambda u: set(SHA.findall(u)))]
+        ajoute = chr(10).join(x for f in fichiers for _n, x in f["ajouts"])
+        attribuer(ident, corps, [b.decode("utf-8", "replace") for b in sources], ajoute, juges, fautes)
     if ecartes:
         fautes.append(("avertissement", "C4", f"{ecartes} fichier(s) indexé(s) sous un interdit, non lus", "", "-"))
     textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
@@ -206,6 +215,44 @@ def commit(a, fautes):
     workflows(a.depot, fichiers, fautes)
     if a.id and f"Diff-Id: {a.id}" not in texte.split(chr(10)):
         fautes.append(("refus", "C9", f"le message ne porte pas la ligne Diff-Id: {a.id}", "l'ajouter au message", "-"))
+
+
+def unites(texte):
+    """Passages d'une source : paragraphes, chaque rangée de tableau, point de liste ou titre à part ; une ligne qui
+    ne commence par aucune marque continue le passage d'avant ; blancs et marques de citation > de tête ôtés."""
+    vus, cour = [], []
+    for x in texte.split(chr(10)):
+        x = re.sub("^[ >]*", "", x)
+        if not x or re.match("(?:[|#]|[-*+] |[0-9]+[.)] )", x):
+            vus, cour = vus + [chr(10).join(cour)] if cour else vus, []
+        if x:
+            cour.append(x)
+    return vus + ([chr(10).join(cour)] if cour else [])
+
+
+def nommes(unite, prefixe):
+    """(suffixes, plages) des diffs du préfixe nommés dans un passage ; plage N à M (ou a, au, …, ..) : nombres de tête
+    des deux bornes (GF-0 … GF-10b : 0 à 10)."""
+    e, bord = re.escape(prefixe), "(?<![A-Za-z0-9-])"
+    vus = set(re.findall(bord + e + "([0-9A-Za-z]+)(?![A-Za-z0-9-])", unite))
+    plages = re.findall(bord + e + "([0-9]+)[a-z]? ?(?:à|a|au|…|[.]{2,3}) ?" + e + "([0-9]+)[a-z]?(?![0-9A-Za-z-])", unite)
+    return vus, [(int(i), int(j)) for i, j in plages]
+
+
+def attribuer(ident, corps, sources, ajoute, juges, fautes):
+    """C3, L-3 : mot du message lu dans les sources, que seuls des passages qui nomment d'autres diffs du préfixe
+    de ident portent (sans ident, ni une plage qui le couvre), absent des lignes ajoutées : refus."""
+    prefixe, suffixe = ident.rsplit("-", 1)
+    tete = int(re.match("[0-9]*", suffixe)[0] or -1)
+    autre = lambda vus, plages: (vus - {suffixe} or plages) and suffixe not in vus and not any(
+        i <= tete <= j for i, j in plages)
+    passages = [(u, nommes(u, prefixe + "-")) for s in sources for u in unites(s)]
+    for genre, juge in juges:
+        for x in sorted(juge(corps)):
+            porteurs = [noms for u, noms in passages if x in juge(u)]
+            if porteurs and all(autre(*noms) for noms in porteurs) and x not in juge(ajoute):
+                fautes.append(("refus", "C3", f"attribué par les sources à un autre diff que {ident} : {genre} {x} "
+                               "(L-3)", "reprendre les mots du passage de la source qui nomme ce diff", "-"))
 
 
 def place(ajouts):

@@ -263,6 +263,41 @@ class PassesDesSources(Source):
         self.assertEqual(self.commit(self.message("x : CONFORME en deux passes"))[1][:9], "REFUS C3 ")
 
 
+class Attribution(Source):
+    SOURCE = NL.join(["Contre-contrôle CONFORME en deux passes ; G2 ACCEPTE-AVEC-CORRECTIONS, C-1 à C-3 adoptées.", "",
+                      "| C-1 | verdict lu (SHOGEN-GARDE-UN-1) | adoptée |",
+                      "| C-2 | heures (SHOGEN-GARDE-DEUX-1, Q-4) |", "  suite de la ligne (Q-9) ; | adoptée |",
+                      "| C-3 | sceau, commit 1234abcd | adoptée |", "| C-1, C-3 | SHOGEN-GARDE-PAIRE-1 |", "",
+                      "Série GF-2 … GF-5b : SHOGEN-GARDE-SERIE-1.", ""])
+
+    def juger(self, corps, ident="C-1", *argv):
+        ag.ecrire(self.tmp, {"ADJUDICATION.md": self.SOURCE})
+        self.lancer("sceller")
+        pied = NL + NL + "Diff-Id: " + ident if ident else ""
+        return self.lancer("commit", "--message", self.message(corps + pied), "--source", self.adj, *argv)
+
+    def test_l3_attribution_au_diff(self):
+        """L-3 (SHOGEN-GARDE-ATTRIBUTION-DIFF-1) : un mot du message (identifiant, sha court, verdict, passes) que les
+        sources n'écrivent que dans des passages qui nomment d'autres diffs (même préfixe que le Diff-Id, plages C-1 à
+        C-3 et GF-2 … GF-5b comprises, bornes incluses) : refus C3 ; passage qui nomme ce diff, ou aucun diff : admis ; mot présent dans les lignes
+        ajoutées du diff : admis ; sans Diff-Id (ni ligne, ni --id) : non jugé."""
+        refus = [("C-1 : heures (SHOGEN-GARDE-DEUX-1)", "C-1"), ("C-1 : Q-4", "C-1"), ("C-1 : sceau 1234abcd", "C-1"),
+                 ("x : contre-contrôle CONFORME en deux passes", "C-4"), ("C-3 : Q-9", "C-3"),
+                 ("x : SHOGEN-GARDE-SERIE-1", "GF-6"), ("x : SHOGEN-GARDE-SERIE-1", "GF-1b")]
+        for corps, ident in refus:
+            code, sortie = self.juger(corps, ident)
+            self.assertEqual((code, sortie[:30]), (1, "REFUS C3 : attribué par les so"), corps)
+        admis = [("C-1 : verdict lu (SHOGEN-GARDE-UN-1)", "C-1"), ("C-2 : SHOGEN-GARDE-DEUX-1, Q-4", "C-2"),
+                 ("C-2 : contre-contrôle CONFORME en deux passes, G2 ACCEPTE-AVEC-CORRECTIONS C-1 à C-3", "C-2"),
+                 ("x : heures (SHOGEN-GARDE-DEUX-1)", None), ("x : SHOGEN-GARDE-SERIE-1", "GF-2a"),
+                 ("x : SHOGEN-GARDE-SERIE-1", "GF-5"), ("C-1 : SHOGEN-GARDE-PAIRE-1", "C-1")]
+        for corps, ident in admis:
+            self.assertEqual(self.juger(corps, ident), (0, ""), corps)
+        self.assertEqual(self.juger("C-1 : Q-4", None, "--id", "C-1")[1][:9], "REFUS C3 ")
+        self.indexer({"a.md": "un" + NL + "deux, Q-4" + NL})
+        self.assertEqual(self.juger("C-1 : Q-4"), (0, ""))
+
+
 class CommitSuite(Source):
     CORPS = "x : contre-contrôle CONFORME en deux passes"
 
