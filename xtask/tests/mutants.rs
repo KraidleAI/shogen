@@ -1223,6 +1223,19 @@ pages_sg5! {
     temoin_sg5_titre_texte_affiche: format!("<title>{AFFICHEE}.</title><p>x</p>"), AFFICHEE => false,
 }
 
+// S-G5, page à cadres (contre-contrôle de DETTES-T15, R-4) : la construction de l'arbre ignore le texte qui suit
+// `<frameset>` (page WHATWG du 2026-10-14, modes « in frameset » et « after frameset ») ; ce qui le précède reste.
+
+pages_sg5! {
+    mutant_sg5_page_a_cadres_texte_ote: format!("<frameset>{REGLE_RETIREE}</frameset>"), REGLE_RETIREE => true,
+    mutant_sg5_page_a_cadres_noframes_ote: format!(
+        "<FRAMESET cols=\"50%\"><noframes>{REGLE_RETIREE}</noframes></FRAMESET>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_page_a_cadres_titre_garde:
+        format!("<title>{AFFICHEE}.</title><frameset><frame src=a></frameset>"), AFFICHEE => false,
+    temoin_sg5_page_a_cadres_nom_voisin: format!("<framesets>{AFFICHEE}.</framesets>"), AFFICHEE => false,
+}
+
 // S-G5, trois lectures du texte brut (contre-contrôle de DETTES-T15, R-3) : la construction de l'arbre décide si un
 // `title`, un `textarea`, un `iframe`… bascule la tokenisation (élément HTML) ou non (contenu SVG ou MathML, balise
 // ignorée) ; le corpus perd ce qu'une des trois lectures ôte. Pages lues d'après la page WHATWG du 2026-10-14 : les

@@ -423,7 +423,8 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// à droite comme la tokenisation HTML (WHATWG) : commentaires
 /// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices et instructions de
 /// traitement (DT15-h), éléments `script` et `style` jusqu'à la fermante qui
-/// les clôt (DT15-g). Une balise
+/// les clôt (DT15-g), et tout ce qui suit `<frameset>` (contre-contrôle de
+/// DETTES-T15, R-4). Une balise
 /// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
 /// d'attribut n'ouvre rien (DT15-k). Un élément de texte brut (`TEXTE_BRUT`)
 /// bascule la tokenisation selon la construction de l'arbre, que cette lecture
@@ -443,8 +444,8 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// du balisage. Un
 /// ouvreur écrit dans un extrait ou un bloc de code Markdown, que le rendu
 /// affiche, et dont la fin tomberait dans une construction vraie. Le texte d'un
-/// `iframe`, d'un `noembed`, d'un `noframes` ou d'une page à cadres, que la page
-/// n'affiche pas. Temps linéaire (trois balayages).
+/// `iframe`, d'un `noembed` ou d'un `noframes` hors d'une page à cadres, que la
+/// page n'affiche pas. Temps linéaire (trois balayages).
 /// Appliqué au corpus seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
     let lectures = [Lecture::Balisage, Lecture::Brut, Lecture::BrutHorsEtranger]
@@ -563,6 +564,13 @@ fn texte_brut(t: &[u8], lue: usize, etranger: Option<&mut usize>) -> usize {
 fn longueur_non_affichee(suite: &str) -> Option<usize> {
     if let Some(corps) = suite.strip_prefix("<!--") {
         return Some(fin_de_commentaire(corps).saturating_add(4));
+    }
+    // Page à cadres (contre-contrôle de DETTES-T15, R-4) : après `<frameset>`, la construction de l'arbre ignore tout
+    // caractère autre qu'un blanc et toute balise hors `html`, `frameset`, `frame` et `noframes` (modes « in
+    // frameset », « after frameset » et « after after frameset ») ; `noframes` est du texte brut. Ôté jusqu'au bout
+    // du texte : sens sûr si la balise est ignorée (corps déjà commencé, extrait de code Markdown).
+    if balise(suite.as_bytes(), 0, "<frameset") {
+        return Some(suite.len());
     }
     // Commentaire factice (DT15-h) : `<!` sans `--`, ou `</` suivi d'un
     // caractère qui n'est ni une lettre ASCII ni `>` ; instruction de traitement :
