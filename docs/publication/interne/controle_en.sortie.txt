@@ -1,24 +1,24 @@
 === Contrôle de la traduction anglaise (lot DOCS11-EN) ===
 source     : 11-mesures-pilotes-public.md
-             sha256 5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6
+             sha256 3ca9f599ef8d6ace69163c9c1d3e2ee8fa3effb118d75b181185f2eb54ee6a8b
 traduction : 11-pilot-measurements-public-en.md
-             sha256 34d5b233ad684fe6bdf3a1ebf3c6f389d0239591b41cf12e4ebe2e8ea4b2c10d
-glossaire  : sha256 d909935c6cb5e9d15074ee35e9f5c55bcfd333bc2c3f25dcfad8016fec4f328f
+             sha256 36133b08a39cb63d4d4114261ada085b1b8750ae513d367a61bb1dd7068a3d0a
+glossaire  : sha256 13f280c321949f0f7ed349b9a16c6ba2214bc3a89ffae5244562e1691a9f4fc2
 
 --- 1. Structure et alignement ---
-  unités : source 410 ; traduction : corps 410, en-tête ajouté 2, glossaire final 116
-  titres alignés : 58 ; blocs de code : 9 ; lignes de table : 133
+  unités : source 417 ; traduction : corps 417, en-tête ajouté 2, glossaire final 116
+  titres alignés : 59 ; blocs de code : 9 ; lignes de table : 133
   => OK
 
 --- 2. Nombres (par unité, puis global) ---
-  composites : source 1040 distincts / 2506 occurrences ; traduction 1040 distincts / 2506 occurrences
-  suites de chiffres : source 806 distincts / 3822 occurrences ; traduction 806 distincts / 3822 occurrences
+  composites : source 1070 distincts / 2582 occurrences ; traduction 1070 distincts / 2582 occurrences
+  suites de chiffres : source 820 distincts / 3938 occurrences ; traduction 820 distincts / 3938 occurrences
   multiensemble global normalisé : inventés 0, perdus 0 — identique
-  nombres en lettres : source {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 45, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2} ; traduction {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 45, '2e': 15, '3': 6, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2}
+  nombres en lettres : source {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 46, '2e': 15, '3': 7, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2} ; traduction {'0': 1, '1/2': 1, '10': 2, '14': 1, '1er': 15, '2': 46, '2e': 15, '3': 7, '4': 8, '5': 4, '6': 1, '7': 4, '8': 2}
   => OK
 
 --- 3. Citations ---
-  source : 120 citations « … » de premier niveau, 96 distinctes ; traduction (corps) : 78 gardées « … », 43 traduites “ … ”
+  source : 126 citations « … » de premier niveau, 101 distinctes ; traduction (corps) : 78 gardées « … », 49 traduites “ … ”
   => OK
 
 --- 4. Gloses (première occurrence) ---

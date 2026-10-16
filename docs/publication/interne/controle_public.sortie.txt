@@ -1,26 +1,26 @@
 === Contrôle du brouillon public (lot DOCS11-PUBLIC) ===
-source    : ../../11-mesures-pilotes.2db4f40.md
-            sha256 fcf93b87f95eb793d565232cb488ccffc504ae7cb9fe045cee737c6e876353b7
+source    : ../../11-mesures-pilotes.md
+            sha256 10f368da15cd20d348f1a940794f8d6bb238453208de1812deede3a12ad252c9
 brouillon : ../11-mesures-pilotes-public.md
-            sha256 5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6
+            sha256 3ca9f599ef8d6ace69163c9c1d3e2ee8fa3effb118d75b181185f2eb54ee6a8b
 table     : TABLE-CORRESPONDANCE.md
-            sha256 ee8f87a40c12aab334c84fc8b6de77c413d92e48e4b2973674e4c3e83c17b5e2
+            sha256 efc20558622d4a594666fa16e9251b0c3388a8bf9d293ce55be18d3edace70db
 
 --- 1. Nombres (aucun inventé, aucun ajouté) ---
-  contrat amendé le 2026-10-15 (adjudication, décision 2) : ajouts datés exclus du compte : E-24 (2026-10-15), E-25 (2026-10-15), E-26 (2026-10-15) ; mentions de date exclues : E-28
-  composite : source 1051 distincts / 2564 occurrences ; brouillon 1047 distincts / 2557 occurrences
+  contrat amendé le 2026-10-15 et le 2026-10-16 (ajouts datés en suffixe ou en tête) : ajouts datés exclus du compte : E-24 (2026-10-15), E-25 (2026-10-15), E-26 (2026-10-15), E-29 (2026-10-16) ; mentions de date exclues : E-28, E-32
+  composite : source 1079 distincts / 2637 occurrences ; brouillon 1075 distincts / 2630 occurrences
   groupe : source 44 distincts / 66 occurrences ; brouillon 44 distincts / 66 occurrences
-  chiffres : source 814 distincts / 3859 occurrences ; brouillon 811 distincts / 3851 occurrences
+  chiffres : source 828 distincts / 3966 occurrences ; brouillon 825 distincts / 3958 occurrences
   inventés (absents de la source) : 0
   ajoutés (plus fréquents que dans la source) : 0
   retirés (moins fréquents que dans la source ; à rapprocher de la table) : 11
     retiré chiffres « 0025 » : source 2, brouillon 0
     retiré chiffres « 04924 » : source 1, brouillon 0
-    retiré chiffres « 1 » : source 372, brouillon 371
-    retiré chiffres « 2 » : source 259, brouillon 256
+    retiré chiffres « 1 » : source 386, brouillon 385
+    retiré chiffres « 2 » : source 269, brouillon 266
     retiré chiffres « 90684 » : source 1, brouillon 0
-    retiré composite « 1 » : source 107, brouillon 106
-    retiré composite « 2 » : source 58, brouillon 57
+    retiré composite « 1 » : source 110, brouillon 109
+    retiré composite « 2 » : source 60, brouillon 59
     retiré composite « 90684fb2 » : source 1, brouillon 0
     retiré composite « ADR-0025 » : source 2, brouillon 0
     retiré composite « D.2 » : source 1, brouillon 0
@@ -72,11 +72,12 @@ table     : TABLE-CORRESPONDANCE.md
   motifs présents dans le brouillon : 0 => OK
 
 --- 3. Registre du doc 09 (S-G4 et extension) ---
-  occurrences dans la source : 4 (dont admises : 3)
+  occurrences dans la source : 5 (dont admises : 3)
     source l.71 « validé » INTERDITE : validé ; priorité, « Position d'abord (Recommandé) ». Le JOURNAL y note que la bifurcation D9 suit la branche
     source l.162 « k sources (10 sources) » admise : | calme | pyth, cas (a) | « ok = 0 / 24585 lectures, n = 24585 » | « 10 sources / 11 flux » | J28 l.42, l.44 |
     source l.163 « k sources (10 sources) » admise : | stress | pyth, cas (a) | « ok = 0 / 11397 lectures, n = 11397 » | « 10 sources / 11 flux » | J28 l.43, l.45 …
     source l.866 « validé » admise : validé le texte et le format, pas les valeurs. À l'exécution, les journaux téléchargés leur sont égaux (§8.3).
+    source l.1096 « garanti » INTERDITE : pas garanti, et la correction sous dépendance reste ouverte (candidats : fixed-b, Künsch 1989) ; (2) la page f…
   occurrences dans le brouillon : 3 (dont admises : 3)
     brouillon l.172 « k sources (10 sources) » admise — §2.2 : sortie imprimée recopiée (J28 l.44), colonne « k nominal_s » : citation verbatim, k nominal nommé : | calme | pyth, cas (a) | « ok = 0 / 24585 lectures, n = 24585 » | « 10 sources / 11 flux » | J28 l.42, l.44 |
     brouillon l.173 « k sources (10 sources) » admise — §2.2 : sortie imprimée recopiée (J28 l.45), colonne « k nominal_s » : citation verbatim, k nominal nommé : | stress | pyth, cas (a) | « ok = 0 / 11397 lectures, n = 11397 » | « 10 sources / 11 flux » | J28 l.43, l.45 …
@@ -126,21 +127,21 @@ table     : TABLE-CORRESPONDANCE.md
   => OK
 
 --- 5. Sections modifiées contre sections déclarées par la table ---
-  sections de la source : 58 ; du brouillon : 58
-  modifiées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Conventions de lecture et lexique, titre
-  déclarées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Conventions de lecture et lexique, titre
-  sections identiques à l'octet : 41 sur 58
-  rejeu de la table sur la source (28 retouches, chacune exactement une fois) : brouillon identique à l'octet
+  sections de la source : 59 ; du brouillon : 59
+  modifiées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Ajouts datés en fin de document, Conventions de lecture et lexique, titre
+  déclarées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Ajouts datés en fin de document, Conventions de lecture et lexique, titre
+  sections identiques à l'octet : 41 sur 59
+  rejeu de la table sur la source (32 retouches, chacune exactement une fois) : brouillon identique à l'octet
   => OK
 
 --- 6. Structure ---
-  clés de titres, même ordre : oui (58 / 58)
+  clés de titres, même ordre : oui (59 / 59)
   clôtures de code : source 18, brouillon 18
   lignes de table : source 134, brouillon 134
   => OK
 
 --- 7. Citations « … » (parité avec la gate S-G5) ---
-  citations : source 146, brouillon 146
+  citations : source 152, brouillon 152
     nouvelle ou modifiée (française) : « Reproduire »
     nouvelle ou modifiée (française) : « Ce qui n'est pas public »
     nouvelle ou modifiée (française) : « motif de l'exclusion (harnais dégradé, / […]) : causalité non établie »

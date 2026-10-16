@@ -642,5 +642,70 @@ class TestMain(unittest.TestCase):
         self.cas("| flux | feed |  |", "| flux | feeds |  |", "11. glossaire")
 
 
+# Contrat du 2026-10-16 (lot SYNC-DOCS11, adjudication de l'orchestrateur, L-3) : une section d'ajouts datés, ouverte
+# par le titre AJOUTS_FIN_TITRE, peut suivre le glossaire final ; elle est alignée sur la fin de la source et soumise
+# aux mêmes contrôles que le corps. Valeurs attendues posées à la main.
+SOURCE_FIN = SOURCE + NL.join(["## Ajouts", "", "Ajout 7 et 2,5.", ""])
+QUEUE_EN = NL.join(["## Additions", "", "Addition 7 and 2.5.", ""])
+TRAD_FIN = TRAD + QUEUE_EN
+
+
+def donnees_fin(**changes):
+    d = donnees_mini(TITRES=donnees_mini().TITRES + [("## Ajouts", "## Additions")],
+                     SOURCE_SHA256=hashlib.sha256(SOURCE_FIN.encode("utf-8")).hexdigest(),
+                     AJOUTS_FIN_TITRE="## Additions")
+    for cle, valeur in changes.items():
+        setattr(d, cle, valeur)
+    return d
+
+
+class TestAjoutsDatesApresGlossaire(unittest.TestCase):
+    def lancer(self, trad, d=None, source=SOURCE_FIN):
+        with tempfile.TemporaryDirectory() as dossier:
+            s = TestMain.ecrire(self, dossier, "s.md", source)
+            t = TestMain.ecrire(self, dossier, "t.md", trad)
+            code, sortie = TestMain.lancer(self, [s, t], d or donnees_fin())
+        lignes = [l for l in sortie.split(NL) if l.startswith("VERDICT")]
+        return code, (lignes[0] if lignes else sortie[-300:])
+
+    def test_section_apres_glossaire_conforme(self):
+        self.assertEqual(self.lancer(TRAD_FIN)[0], 0)
+
+    def test_sans_titre_declare_refusee(self):
+        d = donnees_fin()
+        del d.AJOUTS_FIN_TITRE
+        code, verdict = self.lancer(TRAD_FIN, d)
+        self.assertEqual(code, 1)
+        self.assertIn("11. glossaire final", verdict)
+
+    def test_autre_titre_apres_glossaire_refuse(self):
+        code, verdict = self.lancer(remplacer(TRAD_FIN, "## Additions", "## Other"))
+        self.assertEqual(code, 1)
+        self.assertIn("11. glossaire final", verdict)
+
+    def test_nombres_de_la_section_controles(self):
+        code, verdict = self.lancer(remplacer(TRAD_FIN, "Addition 7 and", "Addition 8 and"))
+        self.assertEqual(code, 1)
+        self.assertIn("2. nombres", verdict)
+
+    def test_registre_de_la_section_controle(self):
+        code, verdict = self.lancer(remplacer(TRAD_FIN, "and 2.5.", "and 2.5, guaranteed."))
+        self.assertEqual(code, 1)
+        self.assertIn("7. registre", verdict)
+
+    def test_corps_comprend_la_section_sans_le_glossaire(self):
+        corps = ce.corps(TRAD_FIN, donnees_fin())
+        self.assertIn("Addition 7 and 2.5.", corps)
+        self.assertNotIn("### B. Terms", corps)
+        self.assertIn("## 1. Section", corps)
+
+    def test_separer_section_hors_glossaire(self):
+        corps, entete, glossaire, pb = ce.separer(ce.unites(TRAD_FIN), donnees_fin())
+        self.assertEqual(pb, [])
+        self.assertEqual([u.texte for u in corps[-2:]], ["## Additions", "Addition 7 and 2.5."])
+        self.assertEqual(glossaire[0].texte, "## Glossary (French → English)")
+        self.assertNotIn("## Additions", [u.texte for u in glossaire])
+
+
 if __name__ == "__main__":
     unittest.main()

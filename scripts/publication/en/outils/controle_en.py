@@ -27,6 +27,11 @@ Onze contrôles, tous bloquants :
   10. en-tête anglais (brief, point 6) ;
   11. glossaire final : tables identiques au glossaire fixé.
 
+Contrat amendé le 2026-10-16 (lot SYNC-DOCS11, SHOGEN-PUBLICATION-S2-SYNC-DOCS11-1 ; adjudication de l'orchestrateur,
+L-3) : une section d'ajouts datés peut suivre le glossaire final si son titre est celui que déclarent les données
+(AJOUTS_FIN_TITRE) ; elle n'est pas du glossaire (contrôle 11) : elle est alignée sur la fin de la source et soumise à
+tous les contrôles du corps (1 à 9). Sans ce titre déclaré, toute unité après les deux tables reste refusée.
+
 Contrat de sortie : 0 tous les contrôles passent ; 1 au moins un échoue ; 3 erreur fatale (entrée illisible,
 glossaire incohérent avec la source, document malformé : bloc de code ou guillemet non fermé, accent grave impair).
 
@@ -566,11 +571,14 @@ def residus_francais(texte, libelles):
 # --- Séparation de la traduction : en-tête ajouté, corps, glossaire final ------------------------------------------
 
 def corps(texte, donnees):
-    """Texte de la traduction jusqu'au titre du glossaire final (exclu)."""
+    """Texte de la traduction jusqu'au titre du glossaire final (exclu), suivi de la section d'ajouts datés qui suit le
+    glossaire, si les données la déclarent (AJOUTS_FIN_TITRE ; contrat du 2026-10-16)."""
     lignes = texte.split(NL)
+    queue = getattr(donnees, "AJOUTS_FIN_TITRE", None)
     for i, ligne in enumerate(lignes):
         if ligne == donnees.GLOSSAIRE_TITRE:
-            return NL.join(lignes[:i])
+            suite = next((j for j in range(i + 1, len(lignes)) if queue and lignes[j] == queue), None)
+            return NL.join(lignes[:i] + (lignes[suite:] if suite is not None else []))
     return texte
 
 
@@ -590,8 +598,11 @@ def separer(unites_en, donnees):
             entete.append(unites_en[2])
     if len(entete) != 2:
         problemes.append("en-tête anglais absent ou mal placé (deux paragraphes de citation après le titre)")
-    corps_unites = unites_en[:1] + unites_en[1 + len(entete):fin]
-    return corps_unites, entete, unites_en[fin:], problemes
+    queue = getattr(donnees, "AJOUTS_FIN_TITRE", None)
+    fin_glossaire = next((i for i in range(fin, len(unites_en)) if unites_en[i].genre == "titre"
+                          and unites_en[i].texte == queue), len(unites_en))
+    corps_unites = unites_en[:1] + unites_en[1 + len(entete):fin] + unites_en[fin_glossaire:]
+    return corps_unites, entete, unites_en[fin:fin_glossaire], problemes
 
 
 def aligner(unites_fr, unites_en, donnees):

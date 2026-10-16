@@ -1,10 +1,10 @@
 # Table de correspondance, section par section (fr → en) — lot DOCS11-EN
 
-Générée par `controle_en.py --table` depuis l'alignement des unités (une unité : titre, paragraphe, élément de liste, ligne de table, bloc de code ou paragraphe de citation). Source sha256 `5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6` ; traduction sha256 `34d5b233ad684fe6bdf3a1ebf3c6f389d0239591b41cf12e4ebe2e8ea4b2c10d`. Les deux paragraphes d'en-tête ajoutés (brief, point 6) et le glossaire final ne figurent pas ici : ce sont des ajouts déclarés, contrôlés à part (contrôles 10 et 11).
+Générée par `controle_en.py --table` depuis l'alignement des unités (une unité : titre, paragraphe, élément de liste, ligne de table, bloc de code ou paragraphe de citation). Source sha256 `3ca9f599ef8d6ace69163c9c1d3e2ee8fa3effb118d75b181185f2eb54ee6a8b` ; traduction sha256 `36133b08a39cb63d4d4114261ada085b1b8750ae513d367a61bb1dd7068a3d0a`. Les deux paragraphes d'en-tête ajoutés (brief, point 6) et le glossaire final ne figurent pas ici : ce sont des ajouts déclarés, contrôlés à part (contrôles 10 et 11).
 
 | # | titre français (l.) | titre anglais (l.) | unités : para / liste / table / code / bloc | nombres (composites) fr = en | nombres identiques par unité | citations gardées | citations traduites | gloses |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Les mesures pilotes S2 — rapport de la campagne (exécution unique du 2026-10-04) (l.1) | The S2 pilot measurements — campaign report (single execution of 2026-10-04) (l.1) | 0 / 0 / 0 / 0 / 4 | 23 = 23 | oui | 0 | 2 | 0 |
+| 1 | Les mesures pilotes S2 — rapport de la campagne (exécution unique du 2026-10-04) (l.1) | The S2 pilot measurements — campaign report (single execution of 2026-10-04) (l.1) | 0 / 0 / 0 / 0 / 4 | 24 = 24 | oui | 0 | 2 | 0 |
 | 2 | 1. Résumé (l.30) | 1. Summary (l.15) | 7 / 4 / 0 / 0 / 0 | 101 = 101 | oui | 5 | 12 | 7 |
 | 3 | Conventions de lecture et lexique (l.84) | Reading conventions and lexicon (l.36) | 3 / 18 / 9 / 0 / 0 | 81 = 81 | oui | 2 | 3 | 3 |
 | 4 | 2. Instrument et campagne (l.142) | 2. Instrument and campaign (l.74) | 0 / 0 / 0 / 0 / 0 | 0 = 0 | oui | 0 | 0 | 0 |
@@ -62,3 +62,4 @@ Générée par `controle_en.py --table` depuis l'alignement des unités (une uni
 | 56 | 11. Analyses ajoutées après le pré-enregistrement : non faites à la date du rapport (l.986) | 11. Analyses added after the pre-registration: not done at the date of the report (l.589) | 1 / 0 / 10 / 0 / 0 | 41 = 41 | oui | 2 | 4 | 1 |
 | 57 | 11.1 Ajout daté du 2026-10-04 : analyses faites après le pré-enregistrement (lot POST-PREREG), hors décision (l.1002) | 11.1 Addition dated 2026-10-04: analyses done after the pre-registration (POST-PREREG work package), hors décision (l.604) | 4 / 0 / 13 / 0 / 0 | 166 = 166 | oui | 4 | 2 | 1 |
 | 58 | 12. Reproduire (l.1058) | 12. Reproduce (l.628) | 0 / 6 / 0 / 0 / 2 | 65 = 65 | oui | 0 | 2 | 0 |
+| 59 | Ajouts datés en fin de document (l.1083) | Dated additions at the end of the document (l.762) | 2 / 4 / 0 / 0 / 0 | 75 = 75 | oui | 0 | 6 | 0 |
