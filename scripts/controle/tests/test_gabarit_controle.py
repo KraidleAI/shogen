@@ -67,6 +67,7 @@ class GabaritControle(unittest.TestCase):
                                (remplir().replace("# R", "# X"), "changé avant le premier champ"),
                                (remplir().replace("fin `Acme`", "fin `Beta`"), "<libre.client> : deux valeurs"),
                                (remplir() + "ajout", "texte en trop"), (remplir(rendu_k=""), "valeur vide"),
+                               (remplir(libre_client="Acme`\n- k : `x"), "texte en trop"),
                                (remplir(libre_client="des sources indépendantes"), "(doc 09 l.21)")):
             code, err = lancer(G, rapport)
             self.assertEqual((code, motif in err), (1, True), (motif, err))
@@ -78,6 +79,8 @@ class GabaritControle(unittest.TestCase):
                                ({"libre_client": "Acme 3"}, "nombre sans empreinte"),
                                ({"libre_client": "Acme 3 [sha256.autre]"}, "nombre sans empreinte"),
                                ({"libre_client": "Acme [sha256.autre]"}, "empreinte inconnue"),
+                               ({"libre_client": "Acme 3\n[sha256.rendu]"}, "nombre sans empreinte"),
+                               ({"libre_client": "Acme\nR1"}, "prétention R1"),
                                ({"libre_client": "Acme, R1 mesuré"}, "prétention R1")):
             code, err = lancer(G, remplir(**valeurs))
             self.assertEqual((code, motif in err), (1, True), (motif, err))
