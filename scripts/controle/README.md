@@ -435,7 +435,7 @@ dépendent des tests du harnais qu'ils importent.
 > (`os.killpg`) ; la campagne finit par un relevé `ps` de ses groupes, vide exigé. Témoin d'abord (job sans mutant
 > vivant), copie rendue à ses octets après chaque mutant, diff et sortie de chaque mutant versés dans `--sortie`.
 > L'outil se lance depuis un arbre relu, à part de la copie qu'il mute. Cas : `tests/test_mutants.py` (deux tests ;
-> plancher du job `controle-unittest` 39).
+> plancher du job `controle-unittest` 117).
 >
 > *Ajout daté du 2026-10-15 22:04:01 UTC (`date -u` ; relecture G2 du lot DETTES-T7, correction C-1 ;
 > SHOGEN-MUTANTS-ORPHELINS-1, SHOGEN-S2BIS-MUT-COMMANDE-1)* : à la borne, `mutants.py` arrête aussi le groupe de
