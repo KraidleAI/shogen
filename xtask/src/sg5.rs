@@ -425,23 +425,30 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// traitement (DT15-h), éléments `script` et `style` jusqu'à la fermante qui
 /// les clôt (DT15-g). Une balise
 /// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
-/// d'attribut n'ouvre rien (DT15-k). Ce qu'un script ou une interaction peut
-/// montrer (`template`, attribut `hidden`, CSS) reste. Lecture sans analyseur :
-/// texte ôté en trop (bloc de code Markdown), jamais gardé en trop, hors d'un
-/// contenu SVG ou MathML, lu ici comme du HTML : un `</script` ou un `</style`
-/// écrit dans un commentaire, une section CDATA ou une valeur d'attribut à
-/// l'intérieur d'un tel script ou style l'y clôt trop tôt ; temps linéaire.
+/// d'attribut n'ouvre rien (DT15-k) ; le contenu d'un élément de texte brut
+/// (`TEXTE_BRUT`) est recopié tel quel : un `<!--` ou un `<script` écrit dans un
+/// `title` ou un `textarea` n'ouvre rien (relecture G2, C-6). Ce qu'un script
+/// ou une interaction peut montrer (`template`, `noscript`, attribut `hidden`,
+/// CSS) reste. Lecture sans analyseur : texte ôté en trop (bloc de code
+/// Markdown, balise écrite dans un `textarea`), jamais gardé en trop, hors de
+/// deux cas. Un contenu SVG ou MathML, lu ici comme du HTML : un `</script` ou
+/// un `</style` écrit dans un commentaire, une section CDATA ou une valeur
+/// d'attribut à l'intérieur d'un tel script ou style l'y clôt trop tôt. Un
+/// ouvreur écrit dans un extrait ou un bloc de code Markdown, que le rendu
+/// affiche, et dont la fin tomberait dans une construction vraie. Temps linéaire.
 /// Appliqué au corpus seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
+    let mut etranger = 0usize;
     while let Some(ouverture) = reste.find('<') {
         sortie.push_str(reste.get(..ouverture).unwrap_or(""));
         let suite = reste.get(ouverture..).unwrap_or("");
         let (gardee, longueur) = match longueur_non_affichee(suite) {
             Some(longueur) => (0, longueur),
             None => {
-                let longueur = longueur_de_balise(suite.as_bytes()).unwrap_or(1);
+                let lue = longueur_de_balise(suite.as_bytes()).unwrap_or(1);
+                let longueur = lue.saturating_add(texte_brut(suite.as_bytes(), lue, &mut etranger));
                 (longueur, longueur)
             }
         };
@@ -450,6 +457,53 @@ fn retirer_non_affiche(texte: &str) -> String {
     }
     sortie.push_str(reste);
     sortie
+}
+
+/// Éléments dont la construction de l'arbre bascule la tokenisation (WHATWG,
+/// algorithmes « generic RCDATA » et « generic raw text ») : RCDATA (`title`,
+/// `textarea`) et RAWTEXT (`xmp`, `iframe`, `noembed`, `noframes`) jusqu'à leur
+/// fermante, PLAINTEXT (`plaintext`) jusqu'au bout du texte. Leur contenu est du
+/// texte : ni commentaire ni script n'y commence. `noscript` reste lu comme du
+/// balisage (lecture sans script, celle qui l'affiche).
+const TEXTE_BRUT: [&str; 7] = [
+    "<title",
+    "<textarea",
+    "<xmp",
+    "<iframe",
+    "<noembed",
+    "<noframes",
+    "<plaintext",
+];
+
+/// Longueur du contenu de texte brut qui suit une balise `TEXTE_BRUT` longue de
+/// `lue` octets (relecture G2 de DETTES-T15, C-6) ; 0 après toute autre balise,
+/// et dans un contenu `svg` ou `math` (profondeur `etranger`, tenue ici), où ces
+/// éléments ne basculent pas la tokenisation.
+fn texte_brut(t: &[u8], lue: usize, etranger: &mut usize) -> usize {
+    let auto_fermee = t.get(..lue).is_some_and(|b| b.ends_with(b"/>"));
+    if balise(t, 0, "<svg") || balise(t, 0, "<math") {
+        *etranger = etranger.saturating_add(usize::from(!auto_fermee));
+        return 0;
+    }
+    if balise(t, 0, "</svg") || balise(t, 0, "</math") {
+        *etranger = etranger.saturating_sub(1);
+        return 0;
+    }
+    let Some(nom) = TEXTE_BRUT
+        .iter()
+        .find(|nom| *etranger == 0 && balise(t, 0, nom))
+    else {
+        return 0;
+    };
+    let fermante = format!("</{}", nom.get(1..).unwrap_or(""));
+    let fin = if *nom == "<plaintext" {
+        t.len()
+    } else {
+        (lue..t.len())
+            .find(|i| balise(t, *i, &fermante))
+            .unwrap_or(t.len())
+    };
+    fin.saturating_sub(lue)
 }
 
 /// Longueur, depuis son `<`, d'une construction jamais affichée (jusqu'au bout

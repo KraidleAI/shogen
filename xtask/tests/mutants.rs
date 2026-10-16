@@ -1196,6 +1196,33 @@ pages_sg5! {
         format!(r#"<a title="<script>">{AFFICHEE}.</a>"#), AFFICHEE => false,
 }
 
+// S-G5, éléments de texte brut (relecture G2 de DETTES-T15, C-6) : la construction de l'arbre bascule la tokenisation
+// en RCDATA (`title`, `textarea`), RAWTEXT (`xmp`, `iframe`, `noembed`, `noframes`) ou PLAINTEXT (`plaintext`) ; un
+// `<!--` ou un `<script` y est du texte. Lu comme un ouvreur, il pouvait se clore dans une construction vraie et en
+// laisser la fin au corpus (faux vert). Dans `svg` ou `math`, `title` reste du balisage.
+
+pages_sg5! {
+    mutant_sg5_titre_ouvreur_clos_dans_un_script: format!(
+        "<title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_textarea_script_clos_dans_un_commentaire:
+        format!("<textarea><script></textarea><!-- </script> {REGLE_RETIREE} --><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_iframe_ouvreur_clos_dans_un_style: format!(
+        "<iframe><!--</iframe><style>p {{ content: \"-->{REGLE_RETIREE}\" }}</style><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_titre_svg_commentaire_ote:
+        format!("<svg><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_titre_apres_svg_auto_ferme: format!(
+        "<svg/><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_titre_apres_svg_referme: format!(
+        "<svg></svg><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_textarea_commentaire_affiche: format!("<textarea><!-- {AFFICHEE}. --></textarea>"), AFFICHEE => false,
+    temoin_sg5_plaintext_affiche_jusqu_au_bout: format!("<plaintext><!-- {AFFICHEE}."), AFFICHEE => false,
+    temoin_sg5_titre_texte_affiche: format!("<title>{AFFICHEE}.</title><p>x</p>"), AFFICHEE => false,
+}
+
 /// Hors HTML aussi (texte brut), une balise se lit jusqu'à son vrai `>`, sans borne : son attribut sort du corpus.
 #[test]
 fn mutant_sg5_attribut_long_ote_hors_html() {
