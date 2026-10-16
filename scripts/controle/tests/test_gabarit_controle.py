@@ -36,6 +36,8 @@ def lancer(gabarit, rapport, *options):
             (pathlib.Path(d) / nom).write_bytes(texte.encode("utf-8"))
         p = subprocess.run([sys.executable, "-B", str(OUTIL), d + "/g.md", d + "/r.md", *options], capture_output=True,
                            text=True, timeout=60)
+    if p.stdout != {0: "conforme\n", 1: "refus\n"}.get(p.returncode, ""):     # verdict écrit (CC)
+        raise AssertionError(f"sortie standard {p.stdout!r} pour le code {p.returncode}")
     return p.returncode, p.stderr
 
 
@@ -103,5 +105,9 @@ class GabaritControle(unittest.TestCase):
             (pathlib.Path(d) / "09.md").write_bytes((RACINE / "docs" / "09-vocabulaire.md").read_bytes().replace(
                 "**sécurisée**".encode("utf-8"), b"x"))
             self.assertEqual(lancer(G, G, "--doc09", d + "/09.md")[0], 3)
+            (pathlib.Path(d) / "exact.md").write_bytes((RACINE / "docs" / "09-vocabulaire.md").read_bytes())
+            (pathlib.Path(d) / "decale.md").write_bytes(b"\n" + (pathlib.Path(d) / "exact.md").read_bytes())
+            self.assertEqual(lancer(G, G, "--doc09", d + "/exact.md"), (0, ""))      # option lue (CC)
+            self.assertEqual(lancer(G, G, "--doc09", d + "/decale.md")[0], 3)      # ancre à sa ligne (CC)
         self.assertEqual(lancer("`<a.b><c.d>`", "`<a.b><c.d>`")[0], 3)
         self.assertEqual(lancer(G, G, "--autre")[0], 3)
