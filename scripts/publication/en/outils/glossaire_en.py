@@ -4,7 +4,7 @@
 Rattachement : brief du lot DOCS11-EN (sha256 cfe6c0d5…0e69), points 3, 4, 6 et 7 ; JOURNAL, entrée du 2026-10-04
 15:16:03 UTC (lot DOCS11-EN lancé) ; G0 docs/adr-0029/G0-lots-S2BIS.md (ligne DOCS11-PUBLIC) ; annexe B.57 d'ADR-0028.
 
-Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 f5eddc6a…9d11 (amendement A-8 ; avant : c101998b…6561, retouche E-19 du lot
+Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 5de6e716…08b6 (amendements A-8 et A-9 ; avant : c101998b…6561, retouche E-19 du lot
 DOCS11-PUBLIC ; version précédente 4de98654…7688). L'empreinte complète est épinglée plus bas (SOURCE_SHA256).
 
 Ce module ne porte que des données ; le contrôle (controle_en.py) les lit. Toute retouche après la fixation est
@@ -39,7 +39,7 @@ Aucune barre oblique inverse n'est écrite dans ce fichier (SHOGEN-HARNAIS-ECHAP
 
 # --- Source décrite par ce glossaire (amendements A-7 et A-8) : toute autre source arrête le contrôle -----------------
 
-SOURCE_SHA256 = "f5eddc6a157f45295f2e1498a382915b4c776e20ac12922bec5aa4a28d0a9d11"
+SOURCE_SHA256 = "5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6"
 
 # --- En-tête propre à la version anglaise (brief, point 6) ----------------------------------------------------------
 
@@ -519,3 +519,7 @@ EXCEPTIONS_REGISTRE = [
 # ordinaire (panne d'un fournisseur, §9.3 pt 8) garde « outage ». Nouvelle source française (ajouts datés aux §4.1,
 # §4.2 (c) et §7.5 ; « panne » du texte courant devient « lecture en échec », étiquettes scellées inchangées) :
 # empreinte épinglée plus haut (SOURCE_SHA256). Note écrite en fin de fichier : aucune ligne ne se décale.
+
+# Amendement A-9 (2026-10-15T21:33:46Z, horloge lue par `date -u` ; même lot, phase 2, décision 2 de l'adjudication de
+# l'orchestrateur du 2026-10-15) : l'en-tête de la source française (l.13) dit que les dates des ajouts datés
+# du 2026-10-15 sont les seuls nombres ajoutés ; empreinte de la source épinglée à nouveau (SOURCE_SHA256, l.7).
