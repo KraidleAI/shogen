@@ -87,7 +87,11 @@ Phase 2 (E28, SHOGEN-GARDE-OUTIL-E26-E27-E28-1) : verser V6, chaque fichier de b
 l'octet), compte « N artefacts détenus » des 500 premiers octets égal au compte réel, sauf corpus partiel tout nommé
 (forme de S-G6, xtask/src/sg6.rs) ; V7, refus pendant qu'une chaîne de commits tourne : pgrep -f ancré
 (MOTIF_CHAINE, bash ou sh qui lance chaine.sh ou chaine_*.sh ; ancré, il ne reconnaît pas le shell qui le lance) ;
-pgrep en erreur : 3."""
+pgrep en erreur : 3.
+Phase 2, groupe A : brief --texte F [--fiche NOM], avant de lancer un agent (crochet GARDE-FAITS R11) : B1, tout item
+SHOGEN-… ou MONARK-… du brief est ouvert à l'annexe B (garde_commun.etat_items), sauf si le brief l'écrit fermé ; absent
+de l'annexe : avertissement (E6) ; B4, un brief qui nomme une commande git porte, lui ou la fiche NOM
+(.claude/agents/NOM.md), la règle des commandes git limitées à une « liste explicite de chemins » (E24)."""
 import argparse
 import contextlib
 import fnmatch
@@ -778,8 +782,38 @@ def chaine(a, fautes):
                 break
 
 
+ANNEXE = os.path.join("docs", "adr-0028", "ANNEXE-B-items.md")
+GIT_NOMME = re.compile("(?<![A-Za-z0-9_./-])git(?: -C [^ ]+)? (?:diff|log|show|status|ls-files|ls-tree|read-tree|archive"
+                       "|apply|grep|rev-list|rev-parse|cat-file|blame|add|commit|checkout|restore|stash|reset|clone"
+                       "|worktree)(?![A-Za-z-])|(?i:commandes? git)(?![A-Za-z-])")
+REGLE_GIT = "liste explicite de chemins"
+
+
+def brief(a, fautes):
+    """B1 (E6) et B4 (E24) sur le brief F ; --fiche NOM : fiche .claude/agents/NOM.md lue avec lui (B4)."""
+    texte, fiche = lire(a.texte).decode("utf-8"), ""
+    if a.fiche:
+        chemin = os.path.join(a.depot, ".claude", "agents", a.fiche + ".md")
+        if not re.fullmatch("[a-z0-9-]+", a.fiche) or not os.path.isfile(chemin):
+            raise Erreur(f"brief --fiche : fiche {a.fiche} absente de .claude/agents/")
+        fiche = lire(chemin).decode("utf-8")
+    etats, propres = GC.etat_items(lire(os.path.join(a.depot, ANNEXE)).decode("utf-8")), GC.etat_items(texte)
+    for item in sorted(propres):
+        etat, n = etats.get(item, (None, 0))
+        if etat is None:
+            fautes.append(("avertissement", "B1", f"{item} absent de l'annexe B", "", "-"))
+        elif etat == "fermé" and propres[item][0] != "fermé":
+            fautes.append(("refus", "B1", f"{item} cité ouvert ; fermé à l'annexe B l.{n} (E6)",
+                           "relire la ligne de l'annexe, retirer l'item du brief ou l'écrire fermé", "-"))
+    if GIT_NOMME.search(texte) and REGLE_GIT not in GC.plier(texte + chr(10) + fiche):
+        fautes.append(("refus", "B4", "le brief nomme une commande git sans la règle « toute commande git limitée à une "
+                       "liste explicite de chemins », ni lui ni sa fiche (E24)",
+                       "ajouter la règle au brief : toute commande git qui liste ou compare des chemins est limitée à "
+                       "une liste explicite de chemins", "-"))
+
+
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
-             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine}
+             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief}
 
 
 def journal(a, fautes):
@@ -822,6 +856,9 @@ def parseur():
     s.add_argument("--cc", required=True)
     s.add_argument("--duree-pas", type=float, default=6)
     s.add_argument("--detache", action="store_true")
+    s = sp.add_parser("brief")
+    s.add_argument("--texte", required=True)
+    s.add_argument("--fiche")
     return p
 
 

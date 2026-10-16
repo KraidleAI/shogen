@@ -20,7 +20,12 @@ Contre-contrôle, R-9 : la date se lit même en code ou citée ; l'heure, en cod
 Phase 2, L-1 (SHOGEN-GARDE-DATE-PASSEE-1) : heure-sans-date, toute heure jugée qui ne suit pas une date à 25 caractères
 au plus ; `dates_passees`, heure-passee, une entrée datée ajoutée (titre ou ligne qui commence par la date et l'heure,
 ou par un mot en capitale suivi de « daté du ») antérieure à la dernière entrée datée du fichier ou d'une entrée
-ajoutée avant elle (même jour sans heure : non jugée)."""
+ajoutée avant elle (même jour sans heure : non jugée).
+Phase 2, groupe A (E6) : `etat_items`, état fermé ou ouvert de chaque item SHOGEN-… ou MONARK-… d'un texte (l'annexe
+B), lu par marqueurs : mot fermé ou clos non nié dans les FENETRE caractères qui suivent l'item (sans traverser une
+barre de tableau, un point-virgule ni un autre item), cellule d'une ligne de tableau dont la première cellule nomme
+l'item, ou portée d'un en-tête « Items fermés … : » jusqu'à la fin du paragraphe ou un autre en-tête ; reste ouvert,
+rouvert : ouvert. La dernière décision du texte l'emporte ; un item sans décision est ouvert."""
 import ast
 import fnmatch
 import functools
@@ -256,3 +261,43 @@ def citations(texte, racine, surcouche=None):
             elif forme == "libre":
                 avert.append((ligne, "citation-libre-absente" if code == "citation-absente" else "citation-libre", nom))
     return refus, avert
+
+
+ITEM = re.compile("(?<![A-Za-z0-9-])((?:SHOGEN|MONARK)-[A-Z0-9]+(?:-[A-Z0-9]+)*)(?![A-Za-z0-9-])")
+CLOS = re.compile("(?i)(?<![a-zà-ÿ])(?:fermée?s?|clos|closes?)(?![a-zà-ÿ])")
+ROUVRE = re.compile("(?i)(?<![a-zà-ÿ])(?:rouverte?s?|réouverte?s?|reste(?:nt)? [*]*ouverte?s?)(?![a-zà-ÿ])")
+NIE = re.compile("(?i)(?:non|pas|jamais|ni) [*]*$")
+EN_TETE = re.compile("(?i)(?<![a-zà-ÿ])(?:items?|fermetures)(?![a-zà-ÿ])[^:|]{0,300}?:")
+FENETRE = 50
+
+
+def marque(texte):
+    """fermé, ouvert ou None : premier marqueur non nié du texte (fermé, clos ; reste ouvert, rouvert)."""
+    for m in sorted([*CLOS.finditer(texte), *ROUVRE.finditer(texte)], key=lambda m: m.start()):
+        ferme = CLOS.fullmatch(m[0]) is not None
+        if not (ferme and NIE.search(texte[max(0, m.start() - 10):m.start()])):
+            return "fermé" if ferme else "ouvert"
+    return None
+
+
+def etat_items(texte):
+    """{item: (état, ligne de la décision)} : voir la docstring du module (E6)."""
+    etats, portee = {}, None
+    for n, ligne in enumerate(texte.split(chr(10)), 1):
+        if not ligne.strip() or ligne.startswith(("#", "|")):
+            portee = None
+        if ligne.startswith("|"):
+            cellules = [c.strip().strip("*").strip() for c in ligne.strip().strip("|").split("|")]
+            if any(CLOS.match(c) for c in cellules[1:]):
+                etats.update((i, ("fermé", n)) for i in ITEM.findall(cellules[0]))
+        evts = [(m.end(), 0, m) for m in EN_TETE.finditer(ligne)] + [(m.start(), 1, m) for m in ROUVRE.finditer(ligne)]
+        for pos, genre, m in sorted(evts + [(m.start(), 2, m) for m in ITEM.finditer(ligne)], key=lambda x: x[0]):
+            if genre == 0:
+                portee = "fermé" if marque(m[0]) == "fermé" or m[0].lower().startswith("fermetures") else None
+            elif genre == 1:
+                portee = None
+            else:
+                suite = re.split("[|;]|" + ITEM.pattern, ligne[m.end():m.end() + FENETRE])[0]
+                etat = marque(suite) or portee
+                etats[m[1]] = (etat, n) if etat else etats.get(m[1], ("ouvert", n))
+    return etats
