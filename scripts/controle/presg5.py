@@ -4,7 +4,9 @@ inchangé : fragment anglais d'au moins 15 octets entre guillemets français, in
 octets texte de biblio/. Changements : fonction introuvables(racine, fichiers) ; sorties 0 (aucun fragment), 1 (au
 moins un), 3 (erreur, biblio/INDEX.md absent compris) ; fichiers ouverts par `with` ; chemin interdit jamais ouvert
 ni nommé (garde_commun), la racine comprise (relecture G2, C-10). Relecture G2, C-18 : module frère ou interdits
-illisibles (installation abîmée), sortie standard fermée : 3, jamais 1 (qui dit un fragment introuvable).
+illisibles (installation abîmée), sortie standard fermée : 3, jamais 1 (qui dit un fragment introuvable). Lot
+DETTES-T15, DT15-m (port de DT15-i ; SHOGEN-PRESG5-QUADRATIQUE-1) : `retirer_balises` et `scinder_crochets` lisent par
+indices, fermant cherché dans la seule fenêtre : temps linéaire, mêmes sorties.
 
 Usage : python3 -I -B presg5.py <racine du dépôt> <fichier.md>...
 Imprime chemin:ligne et le fragment anglais introuvable, puis le compte, comme l'outil d'origine.
@@ -69,18 +71,16 @@ def normaliser(t):
 
 
 def retirer_balises(t):
-    out, reste = [], t
-    while "<" in reste:
-        i = reste.find("<")
-        out.append(reste[:i])
-        apres = reste[i:]
-        j = apres[1:].find(">")
-        if 0 <= j <= 300:
-            reste = apres[j + 2:]
-        else:
+    """Une balise `<…>` de 300 caractères au plus ; par indices, sans recopier le reste du texte à chaque balise, et
+    fermant cherché dans la seule fenêtre : temps linéaire (SHOGEN-PRESG5-QUADRATIQUE-1, lot DETTES-T15)."""
+    out, i = [], 0
+    while (k := t.find("<", i)) >= 0:
+        out.append(t[i:k])
+        j = t.find(">", k + 1, k + 302)
+        if j < 0:
             out.append("<")
-            reste = apres[1:]
-    out.append(reste)
+        i = k + 1 if j < 0 else j + 1
+    out.append(t[i:])
     return "".join(out)
 
 
@@ -95,19 +95,15 @@ def retirer_pagination_rfc(t):
 
 
 def scinder_crochets(t):
-    out, reste = [], t
-    while "[" in reste:
-        i = reste.find("[")
-        out.append(reste[:i])
-        apres = reste[i:]
-        j = apres[1:].find("]")
-        if 0 <= j <= 30:
-            out.append("…")
-            reste = apres[j + 2:]
-        else:
-            out.append("[")
-            reste = apres[1:]
-    out.append(reste)
+    """Une insertion `[…]` de 30 caractères au plus devient une élision ; même lecture par indices que
+    `retirer_balises`."""
+    out, i = [], 0
+    while (k := t.find("[", i)) >= 0:
+        out.append(t[i:k])
+        j = t.find("]", k + 1, k + 32)
+        out.append("[" if j < 0 else "…")
+        i = k + 1 if j < 0 else j + 1
+    out.append(t[i:])
     return "".join(out)
 
 

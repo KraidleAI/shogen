@@ -349,6 +349,8 @@ jobs:
     # Lot DETTES-T7, DT7-f (2026-10-10, recalé 2026-10-15) : cas de l'outil commun des mutants (scripts/controle/mutants.py), plancher 117.
     # Lot DETTES-T15 (2026-10-10, SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1 : FLOTTANT quadratique) : un test de temps
     # borné, plancher 118 (117 à la tête `413321b`, plus un ; recalé par la relecture G2 du 2026-10-15).
+    # Lot DETTES-T15, DT15-m (2026-10-16, SHOGEN-PRESG5-QUADRATIQUE-1 : presg5.py en temps linéaire) : trois tests,
+    # plancher 121.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -364,4 +366,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 118
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 121

@@ -478,3 +478,10 @@ dépendent des tests du harnais qu'ils importent.
 > `tests/test_runners_epingles.py` compte 12 tests (un test de temps borné sur des libellés de 200 000 caractères),
 > plancher du job `controle-unittest` 118 ; le compte de 11 tests de l'ajout du 2026-10-10 03:35:43 UTC et les
 > planchers des ajouts suivants, jusqu'à 117 (ajout du 2026-10-15 23:45:31 UTC), précèdent ce lot.
+
+> *Ajout daté du 2026-10-16 03:55:54 UTC (`date -u` ; lot DETTES-T15, DT15-m ; SHOGEN-PRESG5-QUADRATIQUE-1, port de
+> DT15-i)* : `presg5.py` lit les balises et les crochets par indices, le fermant cherché dans la seule fenêtre (300
+> et 30 caractères) : temps linéaire, mêmes sorties (sortie dorée de `tests/test_presg5.py` inchangée ; sur le corpus
+> du dépôt, mêmes textes et mêmes lignes avant et après, le corpus lu en 5 s au lieu de 991 s).
+> `tests/test_presg5_lineaire.py` compte 3 tests (deux tests de temps bornés à 20 s sur 8 000 000 de caractères,
+> rouges sur l'ancienne lecture ; des valeurs de référence) ; plancher du job `controle-unittest` 121.
