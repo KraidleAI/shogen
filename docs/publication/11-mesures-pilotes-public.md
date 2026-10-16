@@ -4,13 +4,13 @@
 > (ADR-0028 §4, pt 4 ; D9), qui attend son feu vert écrit, donné après lecture. Par rapport au rapport source, les
 > chemins de poste local, les noms de dépôts privés, les identifiants de session ou d'agent, les renvois à des pièces ou
 > dossiers exclus de toute diffusion et des mentions de gouvernance interne sans objet pour un lecteur extérieur sont
-> retirés ou remplacés par une phrase neutre ; une formule est mise au registre du vocabulaire du projet. Sur décision
+> retirés ou remplacés par une phrase neutre ; deux formules sont mises au registre du vocabulaire du projet. Sur décision
 > de l'investisseur, le constat sur Pyth et une consigne de l'investisseur sont reformulés en termes factuels et
 > neutres. La publication porte sur ce rapport seul : les autres pièces citées (journal du projet, ADR et annexes,
 > paquet scellé, rendus, sceau, enregistrements, scripts) sont au dépôt privé du projet et
 > ne sont pas publiées ; le paquet scellé, le sceau, les rendus, les enregistrements et les scripts sont remis sur demande, sous accord (section
 > « Reproduire », « Ce qui n'est pas public »). Le verdict, les valeurs, les limites, les déviations déclarées, le
-> pré-enregistrement, le sceau et la procédure de reproduction sont repris ; aucun nombre n'est changé ni ajouté, hors les dates des ajouts datés du 2026-10-15.
+> pré-enregistrement, le sceau et la procédure de reproduction sont repris ; aucun nombre n'est changé ni ajouté, hors les dates des ajouts datés du 2026-10-15 et du 2026-10-16.
 >
 > **Statut** : rapport rédigé le 2026-10-04 (UTC) par un rédacteur frais (modèle `claude-opus-5-5`), qui n'a écrit ni
 > le code d'analyse, ni le paquet de pré-enregistrement, ni les rendus. Il rend compte de ce que les rendus de
