@@ -28,7 +28,12 @@ nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille 
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
 du même tour, laisser passer et le consigner (fichier d'état sous le dossier de la session).
 Journal des décisions : <dossier de session>/garde-faits.log (une ligne par refus et par passage consigné).
-Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisible (jamais un refus aveugle)."""
+Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisible (jamais un refus aveugle).
+Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et le texte de R5 se lisent sur les actes
+de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
+d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
+pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr)."""
+import importlib.util
 import json
 import os
 import re
@@ -49,6 +54,23 @@ SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\
 PY_W = re.compile(r"open\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"][wa]")
 RM = re.compile(r"\brm\s+(?:-[a-zA-Z]*\s+)*(['\"]?)([^\s'\"|;&]+)\1")
 GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
+
+
+def _acte_shell():
+    """acte_shell.py, voisin, chargé par son chemin (sous -I), sans bytecode écrit dans l'arbre ; None s'il manque ou
+    ne se charge pas (motifs)."""
+    sys.dont_write_bytecode = True
+    try:
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "acte_shell.py")
+        spec = importlib.util.spec_from_file_location("acte_shell", chemin)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+    except Exception:
+        return None
+
+
+AS = _acte_shell()
 
 
 def lire_queue(chemin):
@@ -223,6 +245,85 @@ def journal_de_l_agent(entree):
     return tp, os.path.dirname(tp)
 
 
+def fichiers_sed(mots):
+    """Fichiers qu'un sed -i (ou --in-place) récrit, sinon [] : le script (premier mot, sauf -e ou -f) n'en est pas."""
+    if not any(m.startswith("--in-place") or m[:1] == "-" and m[1:2] != "-" and "i" in m for m in mots[1:]):
+        return []
+    out, script, k = [], False, 1
+    while k < len(mots):
+        m = mots[k]
+        script |= m in ("-e", "-f", "--expression", "--file") or m.startswith(("--expression=", "--file="))
+        if m in ("-e", "-f", "--expression", "--file"):
+            k += 1
+        elif not m.startswith("-") or m == "-":
+            out.append(m)
+        k += 1
+    return out if script else out[1:]
+
+
+def messages_commit(args, corps, cwd):
+    """Textes des messages d'un git commit : -m, --message, groupées (-am) ou collées ; fichier de -F et --file lu
+    (-F - : corps du heredoc)."""
+    out, k = [], 0
+    while k < len(args):
+        m, opt, v = args[k], None, None
+        if m.startswith(("--message=", "--file=")):
+            opt, v = m[2], m.split("=", 1)[1]
+        elif m in ("--message", "--file"):
+            opt, v, k = m[2], args[k + 1] if k + 1 < len(args) else "", k + 1
+        elif m[:1] == "-" and m[1:2] != "-" and re.search("[mF]", m[1:]):
+            p = re.search("[mF]", m[1:]).start() + 1
+            opt, v = m[p].lower(), m[p + 1:] or (args[k + 1] if k + 1 < len(args) else "")
+            k += 0 if m[p + 1:] else 1
+        if opt == "m":
+            out.append(v)
+        elif opt == "f":
+            out.append("\n".join(corps) if v == "-" else lire_texte(resoudre(v, cwd)))
+        k += 1
+    return out
+
+
+def lire_texte(chemin):
+    try:
+        with open(chemin, encoding="utf-8", errors="replace") as f:
+            return f.read(1_000_000)
+    except OSError:
+        return ""
+
+
+def faits_de_la_commande(c, cwd, fond=False):
+    """Ce que fait la commande : rm (cibles d'un rm récursif), worktree (git worktree remove), ecrit (fichiers écrits),
+    git (sous-commandes), messages (textes que R5 juge pour un commit), forge (gh, curl vers l'API). Lu sur les actes
+    (LN-6) ; par les motifs d'avant si shlex ne lit pas la commande (sens sûr)."""
+    actes = AS.analyser(c, fond) if AS else None
+    if actes is None:
+        g = GIT_CMD.search(c)
+        return {"rm": [m.group(2) for m in RM.finditer(c)] if re.search(r"\brm\s+-[a-zA-Z]*[rR]", c) else [],
+                "worktree": "git worktree remove" in c, "git": {g.group(1)} if g else set(), "messages": [c],
+                "ecrit": [m.group(3) for m in REDIR.finditer(c)] + [m.group(2) for m in SED_I.finditer(c)]
+                + PY_W.findall(c),
+                "forge": bool(re.search(r"\bgh\s+pr\s+(create|comment|review|merge)|pull_request", c)), "actes": None}
+    f = {"rm": [], "worktree": False, "git": set(), "messages": [], "ecrit": [], "forge": False, "actes": actes}
+    for a in actes:
+        m, p = a["mots"], a["prog"]
+        f["ecrit"] += [x for op, x in a["redirs"] if ">" in op and not op.endswith("&")]
+        f["ecrit"] += [x for code in a["python"] for x in PY_W.findall(code)]
+        if p == "rm" and {"r", "R", "--recursive"} & AS.options_courtes(m):
+            f["rm"] += [x for x in m[1:] if not x.startswith("-")]
+        elif p == "tee":
+            f["ecrit"] += [x for x in m[1:] if not x.startswith("-")]
+        elif p == "sed":
+            f["ecrit"] += fichiers_sed(m)
+        elif p == "git":
+            sous, reste = AS.git_sous_commande(m)
+            f["git"].add(sous)
+            f["worktree"] |= sous == "worktree" and reste[:1] == ["remove"]
+            f["messages"] += messages_commit(reste, a["corps"], cwd) if sous == "commit" else []
+        elif p == "gh" and m[1:2] in (["pr"], ["issue"], ["api"], ["release"]) or p == "curl" and "api.github.com" in c:
+            f["forge"] = True
+    return f
+
+
 def pre_tool_use(entree):
     nom = entree.get("tool_name", "")
     inp = entree.get("tool_input") or {}
@@ -238,34 +339,32 @@ def pre_tool_use(entree):
 
     if nom == "Bash":
         c = inp.get("command", "")
+        fc = faits_de_la_commande(c, cwd, bool(inp.get("run_in_background")))
         # R1 : effacer un worktree ou un clone
-        cibles_rm = [resoudre(m.group(2), cwd) for m in RM.finditer(c)] if re.search(r"\brm\s+-[a-zA-Z]*[rR]", c) else []
-        if "git worktree remove" in c or any(os.path.isdir(os.path.join(p, ".git")) or os.path.isfile(os.path.join(p, ".git")) for p in cibles_rm):
+        cibles_rm = [resoudre(x, cwd) for x in fc["rm"]]
+        if fc["worktree"] or any(os.path.exists(os.path.join(p, ".git")) for p in cibles_rm):
             if not a_lu(cmds, r"\bgit(\s+-C\s+\S+)?\s+status\b"):
                 refuser("R1 : effacer un arbre git exige « git status » lu avant, dans les derniers appels de cet agent.")
             if not a_lu(cmds, r"\bgit(\s+-C\s+\S+)?\s+(log|rev-list)\b.*(origin/\S+\.\.|@\{u\}\.\.|--not\s+--remotes|\.\.HEAD)"):
                 refuser("R1 : effacer un arbre git exige ses commits non poussés lus avant (git log origin/<branche>..HEAD).")
         # R2 : écrire dans un fichier existant par le shell
-        cibles = [m.group(3) for m in REDIR.finditer(c)] + [m.group(2) for m in SED_I.finditer(c)] + PY_W.findall(c)
-        for cib in cibles:
-            if cib in ("/dev/null", "/dev/stderr", "/dev/stdout") or cib.startswith("&"):
+        for cib in fc["ecrit"]:
+            if not cib or cib in ("/dev/null", "/dev/stderr", "/dev/stdout") or cib.startswith("&"):
                 continue
             abs_c = resoudre(cib, cwd)
             if os.path.isfile(abs_c) and not fichier_lu_avant(abs_c, appels, cwd):
                 refuser(f"R2 : écrire dans un fichier existant exige sa lecture avant (Read, cat, tail…) : {abs_c}")
             if os.path.isfile(abs_c) and abs_c.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
                 textes_ecrits.append(c)
-        # R3 : commit et push
-        g = GIT_CMD.search(c)
-        sub = g.group(1) if g else ""
-        if sub == "commit":
+        # R3 : commit et push (sous-commandes de git lues sur les actes)
+        if "commit" in fc["git"]:
             if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|diff)\b"):
                 refuser("R3 : « git commit » exige le diff ou le status de l'arbre lu avant, dans les derniers appels de cet agent.")
-            textes_ecrits.append(c)
-        if sub == "push":
+            textes_ecrits += fc["messages"]
+        if "push" in fc["git"]:
             if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+((log|rev-list)\b.*origin|status\b|ls-remote\b)"):
                 refuser("R3 : « git push » exige ce qui part lu avant (git log origin/<branche>..HEAD, git status ou ls-remote).")
-        if re.search(r"\bgh\s+pr\s+(create|comment|review|merge)|pull_request", c):
+        if fc["forge"]:
             textes_ecrits.append(c)
     elif nom in ("Edit", "MultiEdit", "Write"):
         fp = inp.get("file_path", "")
