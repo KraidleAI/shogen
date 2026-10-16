@@ -1129,6 +1129,35 @@ pages_sg5! {
         format!("<!DOCTYPE html><?xml version=\"1\"?></ x><!x><p>{AFFICHEE}.</p><p>y</p>"), AFFICHEE => false,
 }
 
+// S-G5, balises de script et de style (lot DETTES-T15, DT15-j) : la balise ouvrante ou fermante d'un script ou d'un
+// style se clôt à son `>` hors des valeurs d'attribut entre guillemets (tokenisation HTML) ; une fermante écrite dans
+// une valeur d'attribut ne clôt rien, une valeur jamais refermée court jusqu'au bout du texte.
+
+pages_sg5! {
+    mutant_sg5_script_ouvrante_guillemets:
+        format!(r#"<script data-x="a></script>">{REGLE_RETIREE}</script><p>x</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_style_ouvrante_apostrophes:
+        format!(r#"<style title='a></style>'>{REGLE_RETIREE}</style><p>x</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_fermante_guillemets:
+        format!(r#"<script>x</script data-x=">{REGLE_RETIREE}"><p>y</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_guillemets_apres_blancs:
+        format!(r#"<script a = "b></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_guillemet_jamais_ferme:
+        format!(r#"<script a="b></script><p>{REGLE_RETIREE}</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_valeur_nue_puis_guillemets:
+        format!(r#"<script a=b c="d></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_barre_puis_guillemets:
+        format!(r#"<script/a="b></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    temoin_sg5_script_guillemet_dans_un_nom: format!(r#"<script a"b>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_egal_avant_le_nom: format!(r#"<script ="b>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_guillemet_dans_une_valeur_nue:
+        format!(r#"<script a=b"c>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_valeur_entre_guillemets_close:
+        format!(r#"<script a="b>c">x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_fermante_guillemets_texte_suivant:
+        format!(r#"<script>x</script a=">"><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+}
+
 // ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant

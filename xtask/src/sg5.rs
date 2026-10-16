@@ -424,7 +424,10 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// `script` et `style` jusqu'à la fermante qui les clôt (DT15-g). Ce qu'un
 /// script ou une interaction peut montrer (`template`, attribut `hidden`, CSS)
 /// reste. Lecture sans analyseur : texte ôté en trop (valeur d'attribut, bloc
-/// de code Markdown), jamais gardé en trop ; temps linéaire. Appliqué au corpus
+/// de code Markdown), jamais gardé en trop, hors d'un contenu SVG ou MathML,
+/// lu ici comme du HTML : un `</script` ou un `</style` écrit dans un
+/// commentaire, une section CDATA ou une valeur d'attribut à l'intérieur d'un
+/// tel script ou style l'y clôt trop tôt ; temps linéaire. Appliqué au corpus
 /// seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
@@ -460,7 +463,7 @@ fn longueur_non_affichee(suite: &str) -> Option<usize> {
     [("<script", "</script"), ("<style", "</style")]
         .into_iter()
         .find(|(ouvrante, _)| balise(suite.as_bytes(), 0, ouvrante))
-        .map(|(_, fermante)| fin_d_element(suite, fermante))
+        .map(|(ouvrante, fermante)| fin_d_element(suite, ouvrante, fermante))
 }
 
 /// Fin d'un commentaire, dans son corps : `>` ou `->` tout de suite
@@ -497,22 +500,22 @@ fn balise(t: &[u8], i: usize, motif: &str) -> bool {
         && t.get(fin).is_none_or(|o| b"\t\n\x0c\r />".contains(o))
 }
 
-/// Fin d'un élément `script` ou `style`, depuis son `<` : après le `>` de la
-/// fermante qui le clôt, sinon le bout du texte. `style` se clôt à sa première
+/// Fin d'un élément `script` ou `style`, depuis son `<` : après la fermante
+/// qui le clôt, sinon le bout du texte. `style` se clôt à sa première
 /// fermante ; `script` suit les états de la tokenisation : après `<!--`, un
-/// `<script` fait ignorer les fermantes jusqu'à `-->`.
-fn fin_d_element(suite: &str, fermante: &str) -> usize {
+/// `<script` fait ignorer les fermantes jusqu'à `-->`. Ouvrante et fermante
+/// se lisent jusqu'à leur vrai `>` (`fin_de_balise`, DT15-j).
+fn fin_d_element(suite: &str, ouvrante: &str, fermante: &str) -> usize {
     let t = suite.as_bytes();
-    let script = fermante == "</script";
-    let mut i = suite.find('>').unwrap_or(t.len());
+    let script = ouvrante == "<script";
+    let mut i = fin_de_balise(t, ouvrante.len());
     let mut etat = 0u8; // 0 : données ; 1 : échappé, après `<!--` ; 2 : doublement échappé
     while i < t.len() {
         if script && etat > 0 && t.get(i..i.saturating_add(3)) == Some(b"-->".as_slice()) {
             etat = 0;
         } else if balise(t, i, fermante) {
             if etat < 2 {
-                let fin = suite.get(i..).and_then(|r| r.find('>'));
-                return fin.map_or(t.len(), |q| i.saturating_add(q).saturating_add(1));
+                return fin_de_balise(t, i.saturating_add(fermante.len()));
             }
             etat = 1;
         } else if script && etat == 0 && t.get(i..i.saturating_add(4)) == Some(b"<!--".as_slice()) {
@@ -522,6 +525,50 @@ fn fin_d_element(suite: &str, fermante: &str) -> usize {
         } else if script && etat == 1 && balise(t, i, "<script") {
             etat = 2;
         }
+        i = i.saturating_add(1);
+    }
+    t.len()
+}
+
+/// Fin d'une balise ouvrante ou fermante de `script` ou de `style`, depuis
+/// l'octet qui suit son nom : après le `>` qui la clôt hors des valeurs
+/// d'attribut entre guillemets, selon les états de la balise dans la
+/// tokenisation (nom, attribut, valeur) ; sans ce `>`, le bout du texte, qu'une
+/// balise inachevée n'affiche pas (DT15-j).
+fn fin_de_balise(t: &[u8], depuis: usize) -> usize {
+    #[derive(Clone, Copy)]
+    enum Etat {
+        Nom,
+        AvantAttribut,
+        Attribut,
+        ApresAttribut,
+        AvantValeur,
+        Valeur,
+    }
+    let mut etat = Etat::Nom;
+    let mut i = depuis;
+    while let Some(&o) = t.get(i) {
+        let blanc = o.is_ascii_whitespace();
+        etat = match (etat, o) {
+            (_, b'>') => return i.saturating_add(1),
+            (Etat::AvantValeur, b'"' | b'\'') => {
+                let valeur = t.get(i.saturating_add(1)..).unwrap_or_default();
+                let Some(q) = valeur.iter().position(|&x| x == o) else {
+                    return t.len();
+                };
+                i = i.saturating_add(q).saturating_add(1);
+                Etat::AvantAttribut
+            }
+            (Etat::AvantValeur, _) if blanc => Etat::AvantValeur,
+            (Etat::AvantValeur | Etat::Valeur, _) if !blanc => Etat::Valeur,
+            (Etat::Valeur, _) => Etat::AvantAttribut,
+            (_, b'/') => Etat::AvantAttribut,
+            (Etat::Attribut | Etat::ApresAttribut, b'=') => Etat::AvantValeur,
+            (Etat::Attribut | Etat::ApresAttribut, _) if blanc => Etat::ApresAttribut,
+            (Etat::Nom, _) if !blanc => Etat::Nom,
+            (_, _) if blanc => Etat::AvantAttribut,
+            (_, _) => Etat::Attribut,
+        };
         i = i.saturating_add(1);
     }
     t.len()
