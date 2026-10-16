@@ -1,0 +1,4 @@
+# Marqueur de la forge (crochet GARDE-FAITS du dépôt, R8 ; erreur E20 ; lot GARDE-FOUS-ORCH, phase 2) : une ligne
+# owner/repo AAAA-MM-JJ par constat que la forge lance des jobs sur ce dépôt (run conclu success, job à runner_id non
+# nul), datée du jour du constat (date -u) ; une ligne d'un autre jour ne vaut rien. Sans ligne du jour, la preuve se
+# lit au journal de l'agent (résultat de mcp__github__actions_list, gh run ou gh api du même dépôt).

@@ -34,7 +34,11 @@ de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redir
 d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
 pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr).
 R7 (E18, E28) : refus d'un sleep d'avant-plan (hors boucle until, hors arrière-plan : &, run_in_background) et d'un
-pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance porte le motif : il se reconnaît)."""
+pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance porte le motif : il se reconnaît).
+R8 (E20) : create_pull_request refusé sans preuve que la forge lance des jobs sur ce dépôt : au journal, un résultat
+de mcp__github__actions_* (ou de gh run, gh api) du même owner/repo qui montre un run conclu success ou un job à
+runner_id non nul ; ou, au marqueur scripts/controle/garde/forge-actions.txt, la ligne owner/repo AAAA-MM-JJ du jour
+(date -u), écrite après constat."""
 import importlib.util
 import json
 import os
@@ -73,6 +77,8 @@ def _acte_shell():
 
 
 AS = _acte_shell()
+RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
 def lire_queue(chemin):
@@ -346,6 +352,38 @@ def faits_de_la_commande(c, cwd, fond=False):
     return f
 
 
+def appels_resultats(entrees):
+    """[(nom, entrée, texte du résultat)] : appels d'outil appariés à leur résultat par l'identifiant d'appel."""
+    blocs = lambda genre: [b for e in entrees if e.get("type") == genre for b in (e.get("message") or {}).get(
+        "content") or [] if isinstance(b, dict)]      # noqa: E731
+    res = {b.get("tool_use_id"): contenus(b) for b in blocs("user") if b.get("type") == "tool_result"}
+    return [(b.get("name", ""), b.get("input") or {}, res.get(b.get("id"), "")) for b in blocs("assistant")
+            if b.get("type") == "tool_use"]
+
+
+def jour_utc():
+    """Date du jour lue par date -u (les cas la fixent par un faux date en tête du PATH)."""
+    import subprocess
+    return subprocess.run(["date", "-u", "+%Y-%m-%d"], capture_output=True, text=True, timeout=10).stdout.strip()
+
+
+def forge_lance(entrees, owner, repo):
+    """Vrai si le journal ou le marqueur du jour montre que la forge lance des jobs sur owner/repo (R8, E20)."""
+    cible = f"{owner}/{repo}".casefold()
+    for nom, inp, txt in appels_resultats(entrees):
+        if MARQUE in txt or not FORGE_JOB.search(txt):
+            continue
+        depot = f"{inp.get('owner', '')}/{inp.get('repo', '')}".casefold()
+        if nom.startswith("mcp__github__actions_") and depot == cible:
+            return True
+        c = inp.get("command", "") if nom == "Bash" else ""
+        if re.search(r"\bgh\s+(run|api)\b", c) and cible in c.casefold():
+            return True
+    marqueur = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "forge-actions.txt"))
+    lignes = {x.strip().casefold() for x in marqueur.split("\n") if x.strip() and not x.startswith("#")}
+    return f"{cible} {jour_utc()}" in lignes
+
+
 def pre_tool_use(entree):
     nom = entree.get("tool_name", "")
     inp = entree.get("tool_input") or {}
@@ -416,6 +454,12 @@ def pre_tool_use(entree):
                 refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
         textes_ecrits.append(p)
     elif nom.startswith("mcp__github__") and nom.split("__")[-1] in ("create_pull_request", "add_issue_comment", "update_pull_request", "pull_request_review_write", "add_reply_to_pull_request_comment"):
+        o, r = inp.get("owner", ""), inp.get("repo", "")
+        if nom.endswith("__create_pull_request") and not forge_lance(entrees, o, r):
+            refuser(f"R8 (E20) : aucune preuve que la forge lance des jobs sur {o}/{r} (dépôt privé : runner_id 0, "
+                    "échec en 2 s) ; lire mcp__github__actions_list de ce dépôt (un run conclu success, un job à "
+                    "runner_id non nul), ou écrire après constat la ligne owner/repo AAAA-MM-JJ du jour dans "
+                    "scripts/controle/garde/forge-actions.txt.")
         textes_ecrits.append(json.dumps(inp, ensure_ascii=False))
 
     # R5 : identifiants de commit et numéros de PR écrits

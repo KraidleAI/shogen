@@ -2,7 +2,8 @@
 (nom en .txt), lot GARDE-FOUS-ORCH phase 2. LN-6 (SHOGEN-GARDE-CROCHET-ACTE-1) : l'acte est jugé, non le texte ; les
 deux faux refus de la sonde du contre-contrôle (R3 puis R5 sur une commande qui écrit un journal synthétique par un
 heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F.
-R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré."""
+R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré. R8 (E20) : PR sans preuve que la forge
+lance des jobs sur le dépôt."""
 import json
 import os
 import shutil
@@ -20,6 +21,13 @@ SONDE = NL.join(["python3 - <<'EOF'", "import json", "e = {'type': 'assistant', 
                  "open('journal-sonde.txt', 'w').write(json.dumps(e) + ' " + FICTIF + "')", "EOF"])
 
 
+def outil(nom, inp, resultat, i):
+    """Appel d'outil et résultat appariés par l'identifiant d'appel, comme au journal de Claude Code."""
+    a = {"type": "assistant", "message": {"content": [{"type": "tool_use", "id": f"t{i}", "name": nom, "input": inp}]}}
+    r = {"type": "tool_result", "tool_use_id": f"t{i}", "content": resultat}
+    return [a, {"type": "user", "message": {"content": [r]}}]
+
+
 def appel(cmd, nom="Bash", resultat=""):
     """Deux entrées de journal : l'appel d'outil et son résultat affiché."""
     a = {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": nom, "input": {"command": cmd}}]}}
@@ -34,6 +42,19 @@ class Crochet(unittest.TestCase):
         self.notes = os.path.join(self.t, "NOTES.md")
         with open(self.notes, "w", encoding="utf-8") as f:
             f.write("note" + NL)
+
+    def arbre(self, fichiers):
+        """Copie du crochet (et de son voisin) dans un arbre temporaire, avec les fichiers {chemin: texte} ; rend son
+        chemin."""
+        a = os.path.join(self.t, "arbre")
+        os.makedirs(os.path.join(a, ".claude", "hooks"), exist_ok=True)
+        for x in ("garde_faits.py", "acte_shell.py"):
+            shutil.copy(os.path.join(os.path.dirname(GARDE), x), os.path.join(a, ".claude", "hooks"))
+        for chemin, texte in fichiers.items():
+            os.makedirs(os.path.dirname(os.path.join(a, chemin)), exist_ok=True)
+            with open(os.path.join(a, chemin), "w", encoding="utf-8") as f:
+                f.write(texte)
+        return os.path.join(a, ".claude", "hooks", "garde_faits.py")
 
     def lancer(self, avant, cmd, garde=GARDE, entree=None):
         """Sortie et stderr du crochet sur l'appel Bash cmd après les entrées avant."""
@@ -150,6 +171,44 @@ class AttenteEtMotif(Crochet):
         for cmd in ("pgrep -f '^bash chaine_gf.sh'", "pgrep chaine_gf", "pkill -f -- '^bash x'", "pgrep -fu0 '^x'",
                     "pgrep -f 2>/dev/null '^bash x'"):
             self.permis(appel("ls"), cmd)
+
+
+class Forge(Crochet):
+    """R8 (E20 ; SHOGEN-GARDE-OUTIL-E18-E20-1) : avant mcp__github__create_pull_request."""
+    PR = {"tool_name": "mcp__github__create_pull_request",
+          "tool_input": {"owner": "o", "repo": "r", "title": "t", "head": "b", "base": "main"}}
+    LISTE = {"method": "list_workflow_runs", "owner": "o", "repo": "r"}
+
+    def test_e20_forge_sans_job(self):
+        """Cas réel E20 : dépôt privé, la forge ne lance aucun job (runner_id 0, échec en 2 s) : refus R8, avant
+        tout comme après une lecture qui le montre ; run conclu success, ou job à runner_id non nul, lu pour ce
+        dépôt (outil MCP ou gh run) : permis ; lu pour un autre dépôt : refus."""
+        echec = '{"workflow_runs": [{"status": "completed", "conclusion": "failure", "runner_id": 0}]}'
+        self.refus(appel("ls"), "", "R8 (E20)", entree=self.PR)
+        self.refus(outil("mcp__github__actions_list", self.LISTE, echec, 1), "", "R8 (E20)", entree=self.PR)
+        vu = outil("mcp__github__actions_list", self.LISTE, '{"jobs": [{"runner_id": 17, "status": "completed"}]}', 1)
+        self.permis(vu, "", entree=self.PR)
+        gh = outil("Bash", {"command": "gh run list -R o/r"}, "completed\tsuccess\tgates", 2)
+        self.permis(gh, "", entree=self.PR)
+        autre = dict(self.LISTE, repo="autre")
+        self.refus(outil("mcp__github__actions_list", autre, '"conclusion": "success"', 1), "", "R8", entree=self.PR)
+
+    def test_e20_marqueur_du_jour(self):
+        """Marqueur scripts/controle/garde/forge-actions.txt : ligne o/r du jour (date -u, fixée par un faux date) :
+        permis ; ligne d'un autre jour, ou d'un autre dépôt : refus."""
+        faux = os.path.join(self.t, "faux")
+        os.makedirs(faux)
+        with open(os.path.join(faux, "date"), "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh" + NL + "echo 2026-10-15" + NL)
+        os.chmod(os.path.join(faux, "date"), 0o755)
+        chemin = os.path.join("scripts", "controle", "garde", "forge-actions.txt")
+        ancien = os.environ["PATH"]
+        os.environ["PATH"] = faux + os.pathsep + ancien
+        self.addCleanup(os.environ.__setitem__, "PATH", ancien)
+        for texte, code in (("# entête" + NL + "o/r 2026-10-15" + NL, 0), ("o/r 2026-10-14" + NL, 2),
+                            ("x/r 2026-10-15" + NL, 2)):
+            self.assertEqual(self.lancer(appel("ls"), "", garde=self.arbre({chemin: texte}), entree=self.PR)[0], code,
+                             texte)
 
 
 if __name__ == "__main__":
