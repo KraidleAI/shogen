@@ -39,9 +39,11 @@ class Heures(unittest.TestCase):
         self.assertEqual(gc.horodatages_fautifs(texte, H)[1][2], "2026-10-10 04:22")
 
     def test_heure_approchee(self):
-        """2026-10-02 : 19:5x écrit hors guillemets ; 21:2x et 19:xx aussi ; 19:50 et 1:5x (pas une heure) non."""
+        """2026-10-02 : 19:5x écrit hors guillemets ; 21:2x et 19:xx aussi ; 19:50 et 1:5x (pas une heure) non
+        (19:50, écrite sans sa date, est vue autrement : L-1)."""
         texte = NL.join(["le 2026-10-02 vers 19:5x UTC", "à 21:2x puis 19:xx", "à 19:50, version 1:5x"])
-        self.assertEqual(codes(texte), [(1, "heure-approchee"), (2, "heure-approchee"), (2, "heure-approchee")])
+        self.assertEqual(codes(texte), [(1, "heure-approchee"), (2, "heure-approchee"), (2, "heure-approchee"),
+                                        (3, "heure-sans-date")])
 
     def test_borne_tolerance(self):
         """Tolérance de 120 s : 04:16 et 04:16:00 admis à 04:14:00, 04:16:01 refusé ; secondes lues."""
@@ -78,6 +80,34 @@ class Heures(unittest.TestCase):
         self.assertEqual(codes(G + " lu le 2026-10-10 " + D + " à 04:22"), [(1, "heure-future")])
         self.assertEqual(gc.horodatages_fautifs("`2026-10-10` 04:22", H)[0][2], "2026-10-10` 04:22")
         self.assertEqual(codes("journal : `2026-10-10 04:22 démarrage`"), [])
+
+    def test_l1_heure_sans_date(self):
+        """L-1 (SHOGEN-GARDE-DATE-PASSEE-1) : heure écrite sans sa date (E14 : « vers 04:18 »), avant sa date, ou plus
+        de 25 caractères après elle : refus heure-sans-date, extrait de l'heure ; heure en code ou citée, heure datée
+        d'un autre jour : rien."""
+        texte = NL.join(["Refus du mandataire vers 04:18 UTC.", "04:22 le 2026-10-10",
+                         "le 2026-10-09, après la relance de la chaîne, à 23:59", "le 2026-10-09 à 23:59",
+                         "`04:22` et " + G + " vers 04:18 " + D])
+        self.assertEqual(codes(texte), [(1, "heure-sans-date"), (2, "heure-sans-date"), (3, "heure-sans-date")])
+        self.assertEqual(gc.horodatages_fautifs(texte, H)[0][2], "04:18")
+
+    def test_l1_entree_datee_anterieure(self):
+        """L-1 : entrée datée ajoutée (« Ajout daté du », « Amendement daté du », titre ou ligne qui commence par la
+        date et l'heure) antérieure à la dernière entrée datée du fichier, ou à une entrée ajoutée avant elle : refus
+        heure-passee ; même heure, date seule du même jour, renvoi à un ajout passé (minuscule, ou en milieu de
+        ligne), ligne de tableau, autre texte : rien."""
+        avant = NL.join(["## B.1 Amendement daté du 2026-10-10 04:10:00 UTC", "texte du 2026-10-01 09:00",
+                         "> **2026-10-10 04:12:30 UTC — entrée** suite", ""])
+        ajouts = [(4, "> *Ajout daté du 2026-10-10 04:11:59 UTC* : x"), (5, "> **2026-10-10 04:12:30 UTC — égale**"),
+                  (6, "*Erratum daté du 2026-10-10* : date seule"), (7, "l'ajout daté du 2026-10-09 23:00 disait"),
+                  (8, "| 2026-10-01 09:00 | ligne |"), (9, "## B.2 Amendement daté du 2026-10-09 23:00 UTC"),
+                  (10, "> *Ajout daté du `2026-10-10` à 04:13 UTC*"), (11, "> **2026-10-10 04:12:59 UTC — avant**"),
+                  (12, "voir l'Ajout daté du 2026-10-09 23:00 (renvoi)")]
+        fautes = gc.dates_passees(avant, ajouts)
+        self.assertEqual([(n, c) for n, c, _x in fautes], [(4, "heure-passee"), (9, "heure-passee"),
+                                                           (11, "heure-passee")])
+        self.assertEqual(fautes[0][2], "Ajout daté du 2026-10-10 04:11:59")
+        self.assertEqual(gc.dates_passees("", [(1, "> **2026-10-10 04:00 UTC — première**")]), [])
 
     def test_horloge_lue_par_date_u(self):
         """L'horloge vient de `date -u` (faux `date` en tête du PATH), jamais de l'horloge de Python."""

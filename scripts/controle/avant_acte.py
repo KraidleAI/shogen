@@ -66,7 +66,9 @@ placées avant la sous-commande.
 Contre-contrôle, R-4 : C7 refuse aussi le retrait ou le renommage d'un fichier cité.
 Contre-contrôle, R-5 : chaine G4 refuse aussi un Diff-Id porté par plus d'un pas du plan.
 Contre-contrôle, R-7 : verser compte fichiers et octets avant toute lecture (borne).
-Contre-contrôle, R-10 : C3 lit aussi le verdict CONFORME-AVEC-RÉSERVES, accentué ou non."""
+Contre-contrôle, R-10 : C3 lit aussi le verdict CONFORME-AVEC-RÉSERVES, accentué ou non.
+Phase 2, L-1 : C4 refuse aussi une heure écrite sans sa date et, au commit et au diff, une entrée datée ajoutée d'un .md
+antérieure à la dernière entrée datée du fichier à HEAD (garde_commun.dates_passees)."""
 import argparse
 import contextlib
 import fnmatch
@@ -197,6 +199,7 @@ def commit(a, fautes):
         fautes.append(("avertissement", "C4", f"{ecartes} fichier(s) indexé(s) sous un interdit, non lus", "", "-"))
     textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
     heures_et_citations(a.depot, [("message", texte)] + textes, fautes)
+    passees(a.depot, fichiers, fautes)
     if a.diff:
         diffs_nommes(a, fautes)
     cites(a.depot, texte, fichiers, fautes)
@@ -225,6 +228,15 @@ def heures_et_citations(depot, textes, fautes, surcouche=None):
                            "ouvrir la ligne citée, la copier mot pour mot", "-"))
         for n, code, ref in avert:
             fautes.append(("avertissement", "C5", f"{code} à {nom}:{n} ({ref})", "", "-"))
+
+
+def passees(depot, fichiers, fautes):
+    """C4 (L-1) : entrée datée ajoutée d'un .md antérieure à la dernière entrée datée du fichier à HEAD."""
+    for f in [f for f in fichiers if (f["apres"] or "").endswith(".md")]:
+        avant = git(depot, "cat-file", "-p", "HEAD:" + f["avant"]) if f["avant"] else ""
+        for n, code, x in GC.dates_passees(avant, f["ajouts"]):
+            fautes.append(("refus", "C4", f"{code} à {f['apres']}:{n} : {x} (L-1)",
+                           "lire date -u, puis dater l'entrée du moment, en fin de fichier", "-"))
 
 
 def diffs_nommes(a, fautes):
@@ -359,6 +371,7 @@ def diff(a, fautes):
             git(a.depot, "checkout-index", "--prefix=" + apres + os.sep, "--", *touches, env=env)
         textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
         heures_et_citations(a.depot, textes, fautes, apres)
+        passees(a.depot, fichiers, fautes)
         presg5(apres, textes, fautes)
         cites(a.depot, "", fichiers, fautes)
         workflows(a.depot, fichiers, fautes, env)

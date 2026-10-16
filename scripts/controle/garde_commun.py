@@ -5,7 +5,7 @@ tests la fixent par un faux `date` en tête du PATH. `horodatages_fautifs` juge 
 et hors guillemets français : heure-future, une date du jour suivie (25 caractères au plus, sans autre date entre)
 d'une heure plus tard que l'horloge + TOLERANCE_S, sans mot de PLAN dans les 40 caractères d'avant ; heure-approchee,
 une heure écrite HH:Mx ou HH:xx. Une date d'un autre jour n'est pas jugée (échéance, veille). Limite : une heure
-écrite sans sa date, ou une heure passée fausse, n'est pas vue.
+passée fausse hors d'une entrée datée n'est pas vue (heure sans sa date : vue depuis la phase 2, ci-dessous).
 GF-4 : interdits (E19, LA-N08 ; une seule source, jamais un nom de D.2 affiché), racines, analyse des lignes ajoutées
 d'un diff, disque (E4 : refus sous 3 Gio libres, avertissement sous 6, avis Q-13 adopté).
 GF-3 : citations (E16, LA-N08) ; seule la forme stricte « … » (chemin:N) est refusée, les autres formes donnent un
@@ -16,7 +16,11 @@ configuration ; citations lues d'abord dans une surcouche (fichiers d'après un 
 Relecture G2, C-5 : la forme stricte admet la référence écrite en code, (`chemin:N`) ou (`chemin`:N).
 Relecture G2, C-11 : toute heure écrite dans les 25 caractères qui suivent une date du jour est jugée, la seconde
 heure d'une plage comprise (seule la première l'était) ; une heure approchée en X majuscule (19:5X) est vue.
-Contre-contrôle, R-9 : la date se lit même en code ou citée ; l'heure, en code, reste masquée."""
+Contre-contrôle, R-9 : la date se lit même en code ou citée ; l'heure, en code, reste masquée.
+Phase 2, L-1 (SHOGEN-GARDE-DATE-PASSEE-1) : heure-sans-date, toute heure jugée qui ne suit pas une date à 25 caractères
+au plus ; `dates_passees`, heure-passee, une entrée datée ajoutée (titre ou ligne qui commence par la date et l'heure,
+ou par un mot en capitale suivi de « daté du ») antérieure à la dernière entrée datée du fichier ou d'une entrée
+ajoutée avant elle (même jour sans heure : non jugée)."""
 import ast
 import fnmatch
 import functools
@@ -40,6 +44,9 @@ STRICTE = re.compile("«([^«»]+)»" + ESPACE + "[(]`?([^ ():`]+)`?:([0-9]+)(?:
 LIBRE = re.compile("«([^«»]+)»" + ESPACE + "[(]([^():]*?) ?l[.] ?([0-9]+)(?:-([0-9]+))?[)]")
 ALIAS = {"JOURNAL": "JOURNAL.md", "annexe B": "docs/adr-0028/ANNEXE-B-items.md",
          "ADR-0028": "docs/adr-0028/ADR-0028-decisions-sortie-S2.md"}
+HHMM = "(?:[ T](?:à )?([01][0-9]|2[0-3]):([0-5][0-9])(?::([0-5][0-9]))?)"
+ENTREE = re.compile("^[>*#_ -]*(?P<x>(" + DATE + ")" + HHMM + ")|^[^a-zà-ÿ|]*(?P<y>[A-Z][a-zéèê]+ dat[ée]e? du `?("
+                    + DATE + ")`?" + HHMM + "?)")
 COUPE = re.compile("|".join(map(re.escape, ["[…]", "[...]", "…", "..."])))
 
 
@@ -57,7 +64,10 @@ def horodatages_fautifs(texte, horloge):
         dates = list(re.finditer(DATE, ligne))      # date lue même en code ou citée (R-9)
         for m in HEURE.finditer(nue):
             d = next((d for d in reversed(dates) if d.end() <= m.start()), None)
-            if not d or m.start() - d.end() > 25 or d.group(0) != jour:
+            if not d or m.start() - d.end() > 25:
+                fautes.append((n, "heure-sans-date", m.group(0)))
+                continue
+            if d.group(0) != jour:
                 continue
             if PLAN.search(nue[max(0, d.start() - 40):d.start()]):
                 continue
@@ -65,6 +75,32 @@ def horodatages_fautifs(texte, horloge):
             if h.replace(tzinfo=timezone.utc) > borne:
                 fautes.append((n, "heure-future", ligne[d.start():m.end()].strip()))
         fautes += [(n, "heure-approchee", m.group(0)) for m in APPROCHEE.finditer(nue)]
+    return fautes
+
+
+def entree_datee(ligne):
+    """(extrait, (date, (h, m, s) ou None)) d'une entrée datée, sinon None."""
+    m = ENTREE.match(ligne)
+    if not m:
+        return None
+    g = m.groups()[1:5] if m["x"] else m.groups()[6:10]
+    return m["x"] or m["y"], (g[0], tuple(int(x or 0) for x in g[1:]) if g[1] else None)
+
+
+def dates_passees(avant, ajouts):
+    """[(ligne, heure-passee, extrait)] : entrées datées ajoutées (ajouts [(n, texte)]) antérieures à la dernière entrée
+    datée du texte d'avant ou d'une entrée ajoutée avant elle ; date seule : jugée sur le jour seulement."""
+    fautes, cle = [], lambda k: (k[0], k[1] or (-1,))
+    vues = [e[1] for e in map(entree_datee, avant.split(chr(10))) if e]
+    ref = max(vues, key=cle, default=None)
+    for n, x in sorted(ajouts):
+        e = entree_datee(x)
+        if not e:
+            continue
+        k = e[1]
+        if ref and (k[0] < ref[0] or (k[0] == ref[0] and k[1] and ref[1] and k[1] < ref[1])):
+            fautes.append((n, "heure-passee", e[0]))
+        ref = max([k] + ([ref] if ref else []), key=cle)
     return fautes
 
 

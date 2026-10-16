@@ -395,6 +395,25 @@ class DiffDeWorker(Source):
             code, sortie = self.diff_de({"n.md": "x" + NL + ligne + NL})
             self.assertEqual((code, sortie[:len(refus)]), (1, refus), ligne)
 
+    def test_l1_entree_datee_anterieure(self):
+        """L-1 (SHOGEN-GARDE-DATE-PASSEE-1) : ajout daté antérieur au dernier ajout daté du fichier, au diff d'un worker
+        et au commit : refus C4 heure-passee ; ajout daté du moment : admis."""
+        self.horloge("2026-10-10T04:14:00Z")
+        base = "> *Ajout daté du 2026-10-10 04:10:00 UTC* : x" + NL
+        self.indexer({"R.md": base})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "r")
+        refus = "REFUS C4 : heure-passee à R.md:3 : Ajout daté du 2026-10-10 04:05:00"
+        faux = base + NL + "> *Ajout daté du 2026-10-10 04:05:00 UTC* : y" + NL
+        juste = base + NL + "> **2026-10-10 04:13 UTC**" + NL
+        code, sortie = self.diff_de({"R.md": faux})
+        self.assertEqual((code, sortie[:len(refus)]), (1, refus))
+        self.assertEqual(self.diff_de({"R.md": juste}), (0, ""))
+        for texte, attendu in ((faux, (1, refus)), (juste, (0, ""))):
+            self.indexer({"R.md": texte})
+            self.lancer("sceller")
+            code, sortie = self.commit(self.message("x : contre-contrôle CONFORME en deux passes"))
+            self.assertEqual((code, sortie[:len(attendu[1])]), attendu)
+
     def test_c3_etat_d_apres_le_diff(self):
         """C-3 : citations et corpus de presg5 lus dans l'état d'après le diff : une citation anglaise inscrite à
         biblio/INDEX.md par le même diff (forme de DT14-a, commis) et la citation d'une ligne que le diff ajoute :
