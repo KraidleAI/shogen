@@ -1098,6 +1098,14 @@ renvoi\tjeton\tcible\tecrit\tlignes\tempreinte\tcommit
 docs/17-modele-de-menace.md:4\tcrates/exemple.rs:2-3\tcrates/exemple.rs\t2-3\t2-3\t849ab6324f790f2f\t0000000
 docs/17-modele-de-menace.md:4\tcrates/LISEZMOI:1\tcrates/LISEZMOI\t1\t1\t38e9b1de50176b4a\t0000000
 docs/17-modele-de-menace.md:12\tcrates/exemple.rs:1\tcrates/exemple.rs\t1\t1\t4bb546d3a6668da1\t0000000
+docs/adr-0028/PAQUET-PREREG-S2.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t8b14567
+docs/journal.md:1\texemple.rs l.3\tcrates/exemple.rs\t3\t3\tbe9b4817a9d4792f\t0000000
+docs/journal.md:2\tancien.rs l.7\tcrates/ancien.rs\t7\t-\t03744d41bdab3b8d\tabcdef0
+@@@ docs/journal.md
+Lu : exemple.rs l.3 (dernière ligne).
+Lu aussi : ancien.rs l.7 (fichier retiré depuis).
+@@@ docs/adr-0028/PAQUET-PREREG-S2.md
+Repère : exemple.rs l.2 (lu au commit de scellement).
 @@@ docs/source.md
 Selon lui, une phrase française de la source, citée telle quelle, fait foi.
 @@@ crates/exemple.rs
@@ -1250,4 +1258,110 @@ mutants_sg9! {
     mutant_sg9_f_ipv4: "\nHôte 192.0.2.1 contacté.\n" => "adresse IP",
     mutant_sg9_f_ipv6: "\nHôte 2001:db8::1 contacté.\n" => "adresse IP",
     mutant_sg9_f_adresse_electronique: "\nÉcrire à quelqu.un@example.org.\n" => "adresse électronique",
+}
+
+// S-G9 (a), registre des renvois (lot DETTES-T15 ; SHOGEN-REFS-LIGNE-CONTENU-1, adjudication de DETTES-T14, Q-6 (ii)) :
+// une référence désigne encore le texte qu'elle citait. Empreintes de l'arbre synthétique calculées hors du code
+// (`sha256sum`, 16 premiers chiffres) : « ligne 2⏎ligne 3 » 849ab632…, « fichier sans extension » 38e9b1de…,
+// « ligne 1 » 4bb546d3…, « ligne 2 » 27fbd56e…, « ligne 3 » be9b4817….
+
+/// S-G9 sur l'arbre synthétique où `fichier` a vu `avant` remplacé par `apres` : ROUGE exigé, pour `attendu`.
+fn exiger_rouge_sg9_remplace(cas: &str, fichier: &str, avant: &str, apres: &str, attendu: &str) {
+    let racine = arbre_menace(cas);
+    remplacer(&racine, fichier, avant, apres);
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+/// Un test par mutant : un seul remplacement dans un fichier de l'arbre, un seul motif exigé.
+macro_rules! mutants_registre {
+    ($($nom:ident : $fichier:expr, $avant:expr, $apres:expr => $attendu:expr),* $(,)?) => {
+        $(#[test] fn $nom() { exiger_rouge_sg9_remplace(stringify!($nom), $fichier, $avant, $apres, $attendu); })*
+    };
+}
+
+const R: &str = "docs/RENVOIS-LIGNES.tsv";
+const EXEMPLE: &str = "crates/exemple.rs";
+
+mutants_registre! {
+    mutant_sg9_a_insertion_au_milieu_du_fichier_cite:
+        EXEMPLE, "ligne 1\n", "ligne 1\nligne 1 bis\n" => "texte cité changé ou déplacé",
+    mutant_sg9_a_ligne_citee_reecrite_sur_place: EXEMPLE, "ligne 2", "ligne deux" => "texte cité changé ou déplacé",
+    mutant_sg9_registre_jeton_hors_de_sa_ligne: R, "docs/journal.md:1\t", "docs/journal.md:2\t" => "jeton absent",
+    mutant_sg9_registre_numero_absent_du_jeton: R, "\t3\t3\tbe9b", "\t13\t3\tbe9b" => "jeton absent",
+    mutant_sg9_registre_empreinte_hors_forme: R, "be9b4817a9d4792f", "be9b4817a9d4792" => "hors forme",
+    mutant_sg9_registre_colonne_manquante: R, "\t-\t03744d41bdab3b8d", "\t03744d41bdab3b8d" => "hors forme",
+    mutant_sg9_registre_entete: R, "renvoi\tjeton", "renvois\tjeton" => "hors forme",
+    mutant_sg9_registre_lignes_hors_du_fichier:
+        R, "\t3\t3\tbe9b", "\t3\t4\tbe9b" => "lignes actuelles hors du fichier",
+    mutant_sg9_registre_ligne_zero: R, "\t3\t3\tbe9b", "\t3\t0\tbe9b" => "hors forme",
+    mutant_sg9_registre_fin_de_plage_seule: R, "\t2-3\t2-3\t", "\t3\t2-3\t" => "jeton absent",
+    mutant_sg9_registre_debut_de_plage_seul: R, "\t2-3\t2-3\t", "\t2\t2-3\t" => "jeton absent",
+    mutant_sg9_registre_commit_court: R, "\tabcdef0\n", "\tabc\n" => "hors forme",
+    mutant_sg9_registre_scelle_hors_de_son_commit: R, "\t8b14567\n", "\t0000000\n" => "document scellé",
+    mutant_sg9_registre_entree_orpheline: R, ":12\tcrates/exemple.rs:1", ":12\texemple.rs:1" => "sans référence (a)",
+    mutant_sg9_registre_en_double: R, "\tabcdef0\n",
+        "\tabcdef0\ndocs/journal.md:2\tancien.rs l.7\tcrates/ancien.rs\t7\t-\t03744d41bdab3b8d\tabcdef0\n"
+        => "en double",
+}
+
+#[test]
+fn mutant_sg9_a_reference_sans_entree_au_registre() {
+    exiger_rouge_sg9(
+        "sans-entree",
+        "\nVoir `crates/exemple.rs:3`.\n",
+        "sans entrée au registre des renvois",
+    );
+}
+
+#[test]
+fn mutant_couverture_sg9_registre_des_renvois_absent() {
+    let racine = arbre_menace("registre-absent");
+    std::fs::remove_file(racine.join(R)).expect("suppression du registre");
+    exiger_rouge(
+        &xtask::sg9::executer(&racine),
+        "fichier absent : docs/RENVOIS-LIGNES.tsv",
+    );
+}
+
+/// Témoin : sans octets versés ni emplacement interdit, l'entrée épinglée est listée ; `biblio/` peuplée, la référence
+/// à un sidecar (octets non versionnés) et celle d'un emplacement interdit n'ont pas d'entrée et sont listées.
+#[test]
+fn temoin_sg9_registre_epinglees_et_bornes_listees() {
+    let notes = notes_sg9_vert("registre-temoin", "");
+    assert!(
+        notes.contains("6 entrée(s), 5 texte(s) cité(s) retrouvé(s)"),
+        "{notes}"
+    );
+    assert!(
+        notes.contains("1 épinglée(s) à leur commit") && notes.contains("[docs/journal.md:2]"),
+        "{notes}"
+    );
+    let racine = arbre_menace("registre-bornes");
+    ecrire(&racine, "biblio/source.pdf.sidecar", &"x\n".repeat(9));
+    ecrire(&racine, "docs/rapports/factice.md", "ligne\n");
+    ajouter(
+        &racine,
+        xtask::sg9::PERIMETRE,
+        "\nVoir `docs/rapports/factice.md:1`.\n",
+    );
+    let rapport = xtask::sg9::executer(&racine);
+    let notes = rapport.notes.join("\n");
+    assert!(rapport.vert(), "{}", motifs(&rapport));
+    let bornes = "plage seule) : [biblio/source.pdf.sidecar:9, docs/rapports/factice.md:1]";
+    assert!(notes.contains(bornes), "{notes}");
+}
+
+/// Une même référence deux fois sur une ligne de docs/17 : une seule entrée la couvre.
+#[test]
+fn temoin_sg9_registre_reference_double_sur_une_ligne() {
+    let racine = arbre_menace("registre-double");
+    ajouter(
+        &racine,
+        xtask::sg9::PERIMETRE,
+        "\nVoir `crates/exemple.rs:1` et `crates/exemple.rs:1`.\n",
+    );
+    let entree = "docs/17-modele-de-menace.md:15\tcrates/exemple.rs:1\tcrates/exemple.rs\t1\t1\t4bb546d3a6668da1";
+    ajouter(&racine, R, &format!("{entree}\t0000000\n"));
+    let rapport = xtask::sg9::executer(&racine);
+    assert!(rapport.vert(), "{}", motifs(&rapport));
 }
