@@ -4,7 +4,7 @@
 Rattachement : brief du lot DOCS11-EN (sha256 cfe6c0d5…0e69), points 3, 4, 6 et 7 ; JOURNAL, entrée du 2026-10-04
 15:16:03 UTC (lot DOCS11-EN lancé) ; G0 docs/adr-0029/G0-lots-S2BIS.md (ligne DOCS11-PUBLIC) ; annexe B.57 d'ADR-0028.
 
-Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 5de6e716…08b6 (amendements A-8 et A-9 ; avant : c101998b…6561, retouche E-19 du lot
+Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 3ca9f599…6a8b (amendements A-8 à A-10 ; avant : 5de6e716…08b6, puis c101998b…6561, E-19 du lot
 DOCS11-PUBLIC ; version précédente 4de98654…7688). L'empreinte complète est épinglée plus bas (SOURCE_SHA256).
 
 Ce module ne porte que des données ; le contrôle (controle_en.py) les lit. Toute retouche après la fixation est
@@ -37,9 +37,9 @@ texte ; P-31 à P-33 ajoutés, pour que le contrôle exige les passages retouch�
 Aucune barre oblique inverse n'est écrite dans ce fichier (SHOGEN-HARNAIS-ECHAPPEMENTS-1).
 """
 
-# --- Source décrite par ce glossaire (amendements A-7 et A-8) : toute autre source arrête le contrôle -----------------
+# --- Source décrite par ce glossaire (amendements A-7 à A-10) : toute autre source arrête le contrôle ---------------
 
-SOURCE_SHA256 = "5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6"
+SOURCE_SHA256 = "3ca9f599ef8d6ace69163c9c1d3e2ee8fa3effb118d75b181185f2eb54ee6a8b"
 
 # --- En-tête propre à la version anglaise (brief, point 6) ----------------------------------------------------------
 
@@ -523,3 +523,21 @@ EXCEPTIONS_REGISTRE = [
 # Amendement A-9 (2026-10-15T21:33:46Z, horloge lue par `date -u` ; même lot, phase 2, décision 2 de l'adjudication de
 # l'orchestrateur du 2026-10-15) : l'en-tête de la source française (l.13) dit que les dates des ajouts datés
 # du 2026-10-15 sont les seuls nombres ajoutés ; empreinte de la source épinglée à nouveau (SOURCE_SHA256, l.7).
+
+# Amendement A-10 (2026-10-16T18:30:32Z, horloge lue par `date -u` ; lot SYNC-DOCS11, SHOGEN-PUBLICATION-S2-SYNC-DOCS11-1 ;
+# adjudication de l'orchestrateur, L-1 et L-3) : nouvelle source française (section « Ajouts datés en fin de document »
+# portée de docs/11, retouches E-29 et E-30 ; en-tête l.7 et l.13, retouches E-31 et E-32) ; empreinte épinglée plus
+# haut (SOURCE_SHA256, l.7 et l.42). La section anglaise suit le glossaire final : son titre est déclaré par
+# AJOUTS_FIN_TITRE (contrat du 2026-10-16 de controle_en.py) ; les cinq citations anglaises d'origine de la section
+# (C-43 à C-47) sont rendues entre guillemets anglais, à l'identique. En-tête anglais l.5 (place du glossaire, sans
+# chiffre) et l.7 (deux formules, dates des ajouts datés). Notes et données en fin de fichier : aucune ligne ne se décale.
+AJOUTS_FIN_TITRE = "## Dated additions at the end of the document"
+TITRES.append(("## Ajouts datés en fin de document", AJOUTS_FIN_TITRE))
+CITATIONS_TRADUITES += [
+    ("C-43", "without loss of generality", "without loss of generality", "Croux et Dehon 2010 (anglais d'origine)"),
+    ("C-44", "not from the individual observations", "not from the individual observations",
+     "NIST/SEMATECH e-Handbook §1.3.5.15 (anglais d'origine)"),
+    ("C-45", "worst-case", "worst-case", "Horowitz et Manski (anglais d'origine)"),
+    ("C-46", "sharp", "sharp", "Horowitz et Manski (anglais d'origine)"),
+    ("C-47", "Revised: June 1999", "Revised: June 1999", "Horowitz et Manski, version d'auteur (anglais d'origine)"),
+]
