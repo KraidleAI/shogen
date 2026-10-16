@@ -48,7 +48,7 @@ calme et ≈ 211 en stress. Côté R2, l'axe ASN a été observé : la partition
 k nominal = 10 hôtes (J28 l.435779-435780) ; le drapeau 1 est faux dans les deux strates et le drapeau 2 est éteint
 (J28 l.435794-435795).
 
-**Ce que ce verdict permet de dire.** Sur 24 585 fenêtres calmes et 11 397 fenêtres de week-end, axes panne, staleness
+**Ce que ce verdict permet de dire.** Sur 24 585 fenêtres calmes et 11 397 fenêtres de week-end, axes lecture en échec, staleness
 et hors-enveloppe, tel qu'observé par cet instrument (hôte, DNS et réseau du harnais compris) : le modèle binomial à
 fenêtres indépendantes est rejeté dans les deux strates (énoncé scellé de la discordance) ; la règle pré-enregistrée,
 qui exige aussi z_bloc,s ≥ 2,33, rend NE REJETTE PAS dans les deux strates, si bien que « R1 rejette (s) » n'est énoncé
@@ -117,7 +117,7 @@ dossier ; doc 04, doc 08, doc 09, doc 10 = `docs/04-certificat-diversite.md`, `d
   d'échange, agrégateur ou oracle) ; deux flux peuvent partager un hôte (`www.okx.com`). Le pool configuré compte
   12 flux.
 - **Fenêtre** : minute de la grille UTC (w = 60 s) ; dans chaque fenêtre, chaque flux compte pour une lecture.
-- **Écart** (doc 10 §5.2) : un flux est en écart dans une fenêtre s'il est en panne (lecture absente, statut non `ok`
+- **Écart** (doc 10 §5.2) : un flux est en écart dans une fenêtre s'il a une lecture en échec (lecture absente, statut non `ok`
   ou prix absent), en staleness (horodatage porté plus vieux que σ_classe) ou hors enveloppe (écart relatif à la
   médiane des autres flux au-delà de τ_classe, avec au moins quatre répondantes).
 - **n, K** : nombre de fenêtres analysées d'une strate ; nombre de ces fenêtres où au moins deux flux sont en écart.
@@ -158,7 +158,7 @@ dossier ; doc 04, doc 08, doc 09, doc 10 = `docs/04-certificat-diversite.md`, `d
 | `oracle_chainlink` | chainlink | `10695.0` | `0.0165` |
 | `oracle_pyth` | pyth | `33.0` | `0.0015` |
 
-- Définition d'écart imprimée (J28 l.435448) : par fenêtre et par flux du pool d'analyse, précédence panne >
+- Définition d'écart imprimée (J28 l.435448) : par fenêtre et par flux du pool d'analyse, précédence lecture en échec >
   staleness > hors-enveloppe ; K = fenêtres à au moins deux écarts. Résidu imprimé : staleness « fail-open » pour
   binance, kraken et bitfinex, qui ne portent pas d'horodatage (l.435464).
 - Hôtes : les 11 flux du pool d'analyse sont servis par 10 hôtes distincts (« k nominal = 10 (hôtes distincts du
@@ -367,7 +367,7 @@ Lignes J28 l.435779 à l.435797, recopiées par extraction (`sed -n '435779,4357
   (AS16509), `api.gemini.com` (AS14618), `www.bitstamp.net` (AS19551). Date : relevés `asn_attribution` retenus,
   dernier par hôte, entre 2026-09-28T01:17:55Z et 01:18:02Z, 10 hôtes sur 10 (l.435781). Les arêtes `basis:doc`
   (binance → coingecko, coinbase → pyth, coingecko → defillama) sont des amonts déclarés : elles ne fusionnent pas
-  (ADR-0008, rappelé l.435786-435788).
+  (ADR-0008, rappelé l.435786-435788). *Ajout daté du 2026-10-15 20:37:28 UTC* : l'arête binance → coingecko enregistre seulement que Binance est l'une des places dont CoinGecko intègre les marchés (`coingecko.com/en/exchanges/binance` ; champ `relation` de l'arête dans `s2-harness/shogen_s2/r2.py` au commit de collecte `ed479c5`) ; elle n'implique pas que Binance soit la seule source de CoinGecko ni sa source principale, et elle n'a d'effet sur aucun résultat.
 - **k_eff = 4, k nominal = 10** (hôtes distincts du pool, l.435779-435780) ; k nominal_s = 11 flux dans chaque strate,
   « comparaison hétérogène déclarée » (l.435797). k_eff n'est pas un compte d'indépendance : c'est le nombre de classes
   de la partition R2 constatée (doc 10 §5.6) ; z n'est jamais composé dans k_eff.
@@ -390,7 +390,7 @@ Lignes J28 l.435779 à l.435797, recopiées par extraction (`sed -n '435779,4357
   Aucune paire n'est fusionnée sur cet axe : la liste des copies exactes du recalcul tiers est vide (RT l.10991). Les
   statistiques par paire (ρ_raw, ρ_resid, T, T_Δ, co-aberrance, décalage) sont descriptives ; l'écart de peg USDT/USD
   est porté par ρ_resid (J28 l.47). La dépendance sérielle sur cet axe est hors portée (SHOGEN-CONTENU-DEP-1, §11).
-- **(c) Axe méthode** (l.435754-435764) : cinq entrées `basis:doc` (trois arêtes d'amont : binance → coingecko, coinbase → pyth, coingecko → defillama ; deux déclarations d'estimateur : coingecko, pyth), qui déclenchent (b) et ne partitionnent pas.
+- **(c) Axe méthode** (l.435754-435764) : cinq entrées `basis:doc` (trois arêtes d'amont : binance → coingecko, coinbase → pyth, coingecko → defillama ; deux déclarations d'estimateur : coingecko, pyth), qui déclenchent (b) et ne partitionnent pas. *Ajout daté du 2026-10-15 20:37:28 UTC* : l'arête binance → coingecko enregistre seulement que Binance est l'une des places dont CoinGecko intègre les marchés ; elle n'implique ni source unique ni source principale, et elle n'a d'effet sur aucun résultat (§4.1).
 - **(d) Corrélations entre clusters** : le rendu imprime « aucun cluster à ≥ 2 flux (1) → tout reste au φ par paire de
   flux (bloc 4) » (l.435767). Le JSON du recalcul tiers porte, pour le J28, `"cluster_pairs": {}` et
   `"n_multi_clusters": 1` (RT l.10985-10987). [constat du rapport] Le libellé se lit mal à côté du bloc 6, qui nomme un
@@ -678,7 +678,7 @@ Les φ les plus élevés sont, en calme, kraken×bitfinex et okx_ticker×okx_ind
 l.435548) ; en stress, coingecko×chainlink (≈ 0,901 ; l.435614), kraken×bitfinex (≈ 0,763 ; l.435621),
 defillama×chainlink (≈ 0,691 ; l.435613) et coingecko×defillama (≈ 0,686 ; l.435612). Cinq φ sont négatifs en stress,
 aucun en calme (l.435662-435666). Ce sont des descriptifs : aucune significativité par paire (D3), aucune dépendance
-de paire établie. **Hors décision ; ne change pas le verdict.**
+de paire établie. **Hors décision ; ne change pas le verdict.** *Ajout daté du 2026-10-15 20:37:28 UTC* : comme les écarts sont presque tous des lectures en échec (§9.3 pt 2), un φ élevé entre deux flux décrit des lectures que le harnais n'a pas obtenues dans les mêmes fenêtres, avec un seul observateur (un hôte de collecte et un résolveur DNS par relevé, §2.7) ; il n'établit pas une dépendance entre les fournisseurs. Voir aussi le §5.2 (composition de K par lectures `panne_transport`) et le §11.1 (concentration de K dans les démarrages dont la sonde ASN porte un `resolve_failed` : compatible avec un mode commun de l'observateur, sans l'établir).
 
 ### 7.6 Queues exactes
 
@@ -880,7 +880,7 @@ par scripts (`extraire_tables.py`, `extraire_d5.py`, `extraire_hd.py`, `table_li
 1. [constat du rapport] Le verdict se joue en entier sur le plancher d'erreur-type : z_s ≈ 20,8 et ≈ 28,5, mais
    FIV_s ≈ 115 et ≈ 266 ramènent z_bloc,s sous 2,33 (§3.1). La règle ne départage pas co-défaillance des sources et
    dépendance sérielle des fenêtres : c'est l'énoncé scellé de la discordance.
-2. [constat du rapport] Les écarts comptés sont presque tous des pannes : en calme, 1 443 des 1 451 écarts (4 de
+2. [constat du rapport] Les écarts comptés sont presque tous des lectures en échec : en calme, 1 443 des 1 451 écarts (4 de
    staleness, 4 hors-enveloppe) ; en stress, 691 des 693 (2 de staleness, aucun hors-enveloppe) [calc, sommes du
    bloc 3, égales à Σ mⱼ du bloc 4]. K est formé, à une fenêtre près, de fenêtres à au moins deux lectures
    `panne_transport` (§5.2). Ces comptes décrivent ; ils n'identifient pas de cause.
