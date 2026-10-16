@@ -44,7 +44,7 @@ class GabaritControle(unittest.TestCase):
             texte = (GAB / g).read_text(encoding="utf-8")
             self.assertEqual(lancer(texte, texte), (0, ""), g)
             cites = re.findall(r"`(s2-harness/[^`]+?):(\d+)`\s*\(`([^`]+)`\)", texte)
-            self.assertEqual(len(cites), 25, g)
+            self.assertEqual(len(cites), 26, g)
             for chemin, n, nom in cites:
                 self.assertIn(nom, (RACINE / chemin).read_text(encoding="utf-8").split("\n")[int(n) - 1], (chemin, n))
             bloc = [x[2:] if x.startswith("> ") else x[1:] for x in texte.split("\n") if x.startswith(">")][-11:]

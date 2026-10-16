@@ -10,7 +10,8 @@
 - Pool configuré, ligne `pool` du bloc 1 du rendu (`s2-harness/shogen_s2/report.py:203` (`{key:24} = {params[key]}`)) :
   `<rendu.pool>` ; les flux sans lecture `ok` en sortent (ADR-0028 D1, `s2-harness/shogen_s2/report.py:268`
   (`pool_analyse_retrait`)), la partition ne porte que le pool d'analyse.
-- Segment, ligne `segment` du bloc 1 (`s2-harness/shogen_s2/report.py:224` (`{'segment':24}`)) : `<rendu.segment>`
+- Segment et plages exclues, ligne `segment` du bloc 1 (`s2-harness/shogen_s2/report.py:224` (`{'segment':24}`)), puis
+  chaque ligne `exclusion_window_start` (`s2-harness/shogen_s2/report.py:232` (`exclusion_window_start`)) : `<rendu.segment>`
 
 ## 2. Méthode
 - **k_eff côté livraison** : nombre de classes de la partition des hôtes par les recouvrements R2 mesurés
@@ -79,14 +80,16 @@ déclarations R3, publiées, jamais comptées. Propres à ce pool (hôtes non at
 ## 6. Recette de recalcul hors ligne
 Empreintes : `control.jsonl` `<sha256.control>` ; `journal.jsonl` `<sha256.journal>` ; `raw.jsonl` `<sha256.raw>` ;
 rendu (sortie de la commande 3) `<sha256.rendu>`. Commit du harnais `<commit.harnais>` ; Python `<version.python>`.
-Variables : `J` (dossier des trois journaux), `DEPOT` (dépôt), `H` (extraction), `S` (sortie).
+Variables : `J` (dossier des trois journaux), `DEPOT` (dépôt), `H` (extraction), `S` (sortie), `O` (options du rendu).
 ```bash
 cd "$J" && sha256sum control.jsonl journal.jsonl raw.jsonl        # 1. égal aux empreintes
 git -C "$DEPOT" archive <commit.harnais> s2-harness | tar -x -C "$H"     # 2. extraction du commit
-cd "$H/s2-harness" && env -u SHOGEN_S2_CAMPAGNE_CONTROL python3 -B -m shogen_s2.report "$J" > "$S/rendu.txt"  # 3.
+cd "$H/s2-harness" && env -u SHOGEN_S2_CAMPAGNE_CONTROL python3 -B -m shogen_s2.report "$J" $O > "$S/rendu.txt"  # 3.
 sha256sum "$S/rendu.txt"                                           # 4. égal à l'empreinte du rendu
 ```
-Commande 3 : `s2-harness/shogen_s2/report.py:755` (`def main`), segment par `--segment-from` et `--segment-to` ; R2 y est
+Commande 3 : `s2-harness/shogen_s2/report.py:755` (`def main`) ; `O` se lit au champ du segment (§1) : `--segment-from`
+avec `--segment-to` ou `--segment-n-fixe` (ligne `segment`), puis un `--exclude-window-start-range` par ligne
+`exclusion_window_start`, dans leur ordre ; `O` est vide sans segment ni plage. R2 y est
 calculé par `s2-harness/shogen_s2/r2.py:1030` (`def compute_r2`), comme au point d'entrée recalculable `s2-harness/shogen_s2/r2.py:1068`
 (`def recompute_r2_from_journal`). Journaux du pool client seulement, jamais ceux scellés de S2 (SHOGEN-RENDU-CLI-REPORT-1).
 
