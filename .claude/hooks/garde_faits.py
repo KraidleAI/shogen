@@ -10,7 +10,7 @@ Entrée : JSON sur stdin (session_id, transcript_path, cwd, tool_name, tool_inpu
 Journal lu : celui de l'agent qui agit ; pour un sous-agent, <dossier de session>/subagents/agent-<agent_id>.jsonl.
 Seule la fin du journal est lue (QUEUE octets), il devient très gros.
 
-Règles PreToolUse (R1 à R6) :
+Règles PreToolUse (R1 à R5, R11) :
   R1 effacer un worktree ou un clone (rm -rf, git worktree remove) : « git status » et « git log origin/… ..HEAD »
      (ou @{u}..HEAD, --not --remotes) lus avant ;
   R2 écrire dans un fichier existant par le shell (>, >>, tee, sed -i, python open 'w'/'a', Add-Content) :
@@ -23,6 +23,10 @@ Règles PreToolUse (R1 à R6) :
      (#123, PR n° 123, pull/123) dans un .md, un message de commit, une PR, un texte écrit par le shell :
      il doit avoir été affiché par un outil (tool_result, attachment, queue-operation) ; le texte tapé par
      l'agent et les refus de ce crochet ne comptent pas.
+  R11 lancer un sous-agent ou un workflow dont la consigne nomme un fichier BRIEF*.md : le brief passe
+     scripts/controle/avant_acte.py brief (items de l'annexe B, E6 ; constats relayés, E22 ; faisabilité, E23 ;
+     règle git, E24), avec --fiche <subagent_type> si la fiche existe ; brief absolu absent : refus ; erreur de
+     l'outil (sortie 3, délai) : acte permis, note sur stderr (lot GARDE-FOUS-ORCH, phase 2, groupe A).
 Crochets Stop et SubagentStop (R6) : le dernier texte de l'agent ne porte aucun nombre de trois chiffres ou plus (ni, E29, aucun
 nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille de route : jours, semaines, %, observateurs, …),
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
@@ -61,6 +65,7 @@ import importlib.util
 import json
 import os
 import re
+import subprocess
 import sys
 
 QUEUE = 6_000_000          # octets lus en fin de journal (faits affichés)
@@ -77,6 +82,8 @@ REDIR = re.compile(r"(?<![<>])(>>?|\btee(?:\s+-a)?)\s+(?!&)(['\"]?)([^\s'\"|;&]+
 SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\"|;&]+)\1\s*(?:[;&|]|$)")
 PY_W = re.compile(r"open\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"][wa]")
 RM = re.compile(r"\brm\s+(?:-[a-zA-Z]*\s+)*(['\"]?)([^\s'\"|;&]+)\1")
+BRIEF_NOMME = re.compile("(?:[^ " + chr(9) + chr(10) + "\"'`<>|;,()]*/)?BRIEF[^ " + chr(9) + chr(10) + "\"'`<>|;,()/]*[.]md")
+OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # racine du dépôt du crochet
 GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
 PY_PROCESSUS = re.compile(r"\b(subprocess|os\s*\.\s*(system|popen|exec\w*|spawn\w*|posix_spawn\w*)|pty\s*\.\s*spawn)\b")
 
@@ -626,6 +633,8 @@ def pre_tool_use(entree):
         if nom in ("Agent", "Workflow") and re.search(r"/home/user/shogen|dépôt|depot|worktree|git archive|\.git\b", p):
             if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|log)\b"):
                 refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
+        if nom in ("Agent", "Workflow"):
+            controler_briefs(inp, cwd)      # R11
         # R9 (E27) : seuil de coût
         n = 1 if nom == "Agent" else agents_du_workflow(inp) if nom == "Workflow" else 0
         vivants = agents_vivants(entree) if n else 0
@@ -658,6 +667,33 @@ def pre_tool_use(entree):
                 if p not in prs:
                     refuser(f"R5 : le numéro de PR « {p} » n'a été affiché par aucun outil dans le journal de cet agent ; lis-le avant de l'écrire.")
     return 0
+
+
+def controler_briefs(inp, cwd):
+    """R11 : chaque fichier BRIEF*.md nommé par la consigne passe avant_acte.py brief (dépôt : CLAUDE_PROJECT_DIR)."""
+    depot = os.environ.get("CLAUDE_PROJECT_DIR") or OUTILS
+    acte = os.path.join(OUTILS, "scripts", "controle", "avant_acte.py")
+    textes = "\n".join(v for v in inp.values() if isinstance(v, str))
+    for nom_brief in sorted(set(BRIEF_NOMME.findall(textes))):
+        chemin = resoudre(nom_brief, cwd)
+        if not os.path.isfile(chemin):
+            if os.path.isabs(nom_brief):
+                refuser(f"R11 : la consigne nomme un brief absent : {chemin} ; écris-le, ou corrige le chemin.")
+            continue
+        cmd = [sys.executable, "-I", "-B", acte, "--depot", depot, "brief", "--texte", chemin]
+        fiche = inp.get("subagent_type") or ""
+        if re.fullmatch("[a-z0-9-]+", fiche) and os.path.isfile(os.path.join(depot, ".claude", "agents", fiche + ".md")):
+            cmd += ["--fiche", fiche]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            sys.stderr.write(f"{MARQUE} : R11 non contrôlé ({e!r}) ; acte permis.\n")
+            continue
+        if p.returncode == 1:
+            refus = [x for x in p.stdout.splitlines() if x.startswith("REFUS")]
+            refuser(f"R11 : le brief {chemin} échoue à avant_acte.py brief : " + " | ".join(refus[:6]))
+        elif p.returncode:
+            sys.stderr.write(f"{MARQUE} : R11 : avant_acte.py brief, sortie {p.returncode} ; acte permis.\n")
 
 
 def formes_nombre(s):

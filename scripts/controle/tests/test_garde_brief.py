@@ -7,7 +7,10 @@ E22 : message de reprise de DT6 (phase 4) qui relayait le test instable de DB-1 
 sans vérifier que l'outil, le fichier ou le commit nommés existent (copie au Drive de la décision Q-A)."""
 import contextlib
 import io
+import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -30,6 +33,8 @@ ANNEXE_E6 = NL.join([
 LIGNE_1583 = ("- SHOGEN-E1-XTASK-REFS-1 : déjà fermé par XR-1 à XR-4 (lot DETTES-B2) ; la preuve rejouée par le générateur "
               "à `094fa5d` (8 neutralisations de S-G9, toutes tuées) est versée avec le rapport.")
 ANNEXE = os.path.join("docs", "adr-0028", "ANNEXE-B-items.md")
+RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+GARDE = os.path.join(RACINE, ".claude", "hooks", "garde_faits.py")      # crochet GARDE-FAITS du dépôt (R11)
 
 
 class EtatItems(unittest.TestCase):
@@ -128,3 +133,28 @@ class Brief(unittest.TestCase):
             "REFUS B3 : l.2 : /nulle/x.py absent (E23)",
             "REFUS B3 : l.3 : abc1234def n'est pas un commit du dépôt (E23)",
             "REFUS B3 : l.4 : sous-commande avant_acte.py verifier inconnue (E23)"]))
+
+    def crochet(self, consigne, fiche="fiche-regle"):
+        """(sortie, stderr) du crochet GARDE-FAITS sur un appel Agent, journal vide en .txt, dépôt du test en
+        CLAUDE_PROJECT_DIR."""
+        j = os.path.join(self.tmp, "journal.txt")
+        open(j, "w", encoding="utf-8").close()
+        e = {"hook_event_name": "PreToolUse", "transcript_path": j, "cwd": self.tmp, "tool_name": "Agent",
+             "tool_input": {"prompt": consigne, "subagent_type": fiche, "description": "essai"}}
+        p = subprocess.run([sys.executable, "-I", GARDE], input=json.dumps(e), capture_output=True, text=True,
+                           timeout=60, env=dict(os.environ, CLAUDE_PROJECT_DIR=self.d))
+        return p.returncode, p.stderr
+
+    def test_r11_crochet_agent(self):
+        """R11 : la consigne d'un agent nomme un brief (absolu ou relatif au dossier courant) qui échoue au contrôle :
+        refus du crochet, refus de l'outil recopiés ; brief conforme, ou règle git portée par la fiche du type d'agent :
+        permis ; brief absolu absent : refus ; consigne sans brief : permis."""
+        self.brief("Reprendre SHOGEN-E1-XTASK-REFS-1, ouvert ; `git diff --numstat`." + NL)
+        code, err = self.crochet("Lis d'abord ton brief : " + os.path.join(self.tmp, "BRIEF.md") + ", puis exécute-le.")
+        self.assertEqual((code, err.count("REFUS B1"), "REFUS B4" in err), (2, 1, False), err)
+        self.assertEqual(self.crochet("Brief : BRIEF.md", fiche="fiche-nue")[1].count("R11 : le brief"), 1)
+        self.brief("Reprendre SHOGEN-CI-RUNNERS-1 ; `git diff --numstat`." + NL)
+        self.assertEqual([self.crochet("Brief : BRIEF.md", fiche=x)[0] for x in ("fiche-regle", "fiche-nue")], [0, 2])
+        code, err = self.crochet("Brief : " + os.path.join(self.tmp, "BRIEF-absent.md"))
+        self.assertEqual((code, "R11 : la consigne nomme un brief absent" in err), (2, True), err)
+        self.assertEqual(self.crochet("Aucun fichier à lire."), (0, ""))
