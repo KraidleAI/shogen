@@ -4,7 +4,7 @@
 Rattachement : brief du lot DOCS11-EN (sha256 cfe6c0d5…0e69), points 3, 4, 6 et 7 ; JOURNAL, entrée du 2026-10-04
 15:16:03 UTC (lot DOCS11-EN lancé) ; G0 docs/adr-0029/G0-lots-S2BIS.md (ligne DOCS11-PUBLIC) ; annexe B.57 d'ADR-0028.
 
-Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 c101998b…6561 (retouche E-19 du lot
+Source traduite : docs/publication/11-mesures-pilotes-public.md, sha256 f5eddc6a…9d11 (amendement A-8 ; avant : c101998b…6561, retouche E-19 du lot
 DOCS11-PUBLIC ; version précédente 4de98654…7688). L'empreinte complète est épinglée plus bas (SOURCE_SHA256).
 
 Ce module ne porte que des données ; le contrôle (controle_en.py) les lit. Toute retouche après la fixation est
@@ -37,9 +37,9 @@ texte ; P-31 à P-33 ajoutés, pour que le contrôle exige les passages retouch�
 Aucune barre oblique inverse n'est écrite dans ce fichier (SHOGEN-HARNAIS-ECHAPPEMENTS-1).
 """
 
-# --- Source décrite par ce glossaire (amendement A-7) : toute autre source arrête le contrôle -------------------------
+# --- Source décrite par ce glossaire (amendements A-7 et A-8) : toute autre source arrête le contrôle -----------------
 
-SOURCE_SHA256 = "c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561"
+SOURCE_SHA256 = "f5eddc6a157f45295f2e1498a382915b4c776e20ac12922bec5aa4a28d0a9d11"
 
 # --- En-tête propre à la version anglaise (brief, point 6) ----------------------------------------------------------
 
@@ -183,7 +183,7 @@ GLOSES = [
     ("G-24", "« aucune strate ne rejette ; strate(s) testée(s) : calme, stress »",
      "no stratum rejects; stratum(s) tested: calm, stress", "sortie imprimée"),
     ("G-25", "« nonÉv »", "not evaluable", "colonne du bloc 3"),
-    ("G-26", "(panne / stale / horsE / nonÉv)", "outage / stale / out-of-envelope / not evaluable",
+    ("G-26", "(panne / stale / horsE / nonÉv)", "failed reading / stale / out-of-envelope / not evaluable",
      "colonnes du bloc 3"),
     ("G-27", "« côté livraison »", "delivery side", "sortie imprimée"),
     ("G-28", "« comparaison hétérogène déclarée »", "heterogeneous comparison declared", "sortie imprimée"),
@@ -447,10 +447,10 @@ TERMES = [
     ("flux", "feed", "a reading of the BTC/USD (or BTC/USDT) price served by a source"),
     ("source ; place (d'échange) ; agrégateur ; oracle", "source ; exchange ; aggregator ; oracle", ""),
     ("hôte ; hôte de collecte", "host ; collection host", ""),
-    ("panne", "outage", "status panne_transport kept as printed"),
+    ("panne", "failed reading", "status panne_transport kept as printed; ordinary sense (outage of a provider, §9.3 pt 8): outage"),
     ("écart (doc 10 §5.2) ; en écart ; co-écart ; taux d'écart",
      "anomaly ; anomalous ; co-anomaly ; anomaly rate",
-     "a feed is anomalous in a window if in outage, stale or out of envelope"),
+     "a feed is anomalous in a window if it has a failed reading, is stale or out of envelope"),
     ("écart (sens courant) ; écart déclaré (à un texte) ; écart (contrôle d'horloge)",
      "difference, gap ; declared departure ; offset",
      "offset: clock-check sense (§9.2 pt 17), as in the median offset of §11.1"),
@@ -512,3 +512,10 @@ EXCEPTIONS_REGISTRE = [
      "glose d'une sortie imprimée recopiée (J28 l.44, l.45), colonne « k nominal_s » : k nominal nommé par la "
      "colonne (même exception que le lot DOCS11-PUBLIC)"),
 ]
+
+# Amendement A-8 (2026-10-15T20:37:28Z, horloge lue par `date -u` ; lot PUBLICATION-S2-AMENDEMENTS,
+# SHOGEN-PUBLICATION-S2-AMENDEMENTS-1, annexe B.98 d'ADR-0028) : « outage » devient « failed reading » là où le mot
+# désigne une lecture que le harnais n'a pas obtenue (glose G-26 ; termes « panne » et « écart ») ; le sens
+# ordinaire (panne d'un fournisseur, §9.3 pt 8) garde « outage ». Nouvelle source française (ajouts datés aux §4.1,
+# §4.2 (c) et §7.5 ; « panne » du texte courant devient « lecture en échec », étiquettes scellées inchangées) :
+# empreinte épinglée plus haut (SOURCE_SHA256). Note écrite en fin de fichier : aucune ligne ne se décale.
