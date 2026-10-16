@@ -5,7 +5,8 @@
 # chiffres hexadécimaux du SHA-256 des lignes citées, jointes par LF, au commit de lecture), commit (de lecture : base
 # que déclare le document citant ; docs/17 : cf696bd, ses ajouts datés : leur commit ; paquet scellé : 8b14567 ; renvoi
 # recopié d'un autre document : commit de lecture de celui-ci, paquet l.56 et l.63 et CP1 l.101 : ADR-0028, ce63fed).
-# Rejeu d'une empreinte : git show <commit>:<cible> | sed -n '<a>,<b>p' | head -c -1 | sha256sum (16 chiffres).
+# Rejeu d'une empreinte : git show <commit>:<cible> | sed -n '<a>,<b>p' | head -c -1 | sha256sum (16 chiffres),
+# <a>,<b> étant la plage ecrit ; aux lignes actuelles : sed -n '<c>,<d>p' <cible> | head -c -1 | sha256sum, <c>,<d> = lignes.
 # Mise à jour par un lot revu ; aucune ligne d'un document cité n'est réécrite pour un renvoi.
 renvoi	jeton	cible	ecrit	lignes	empreinte	commit
 docs/17-modele-de-menace.md:3	docs/AUDIT-ENTREE.md:13	docs/AUDIT-ENTREE.md	13	13	15b308445006dcaf	cf696bd
