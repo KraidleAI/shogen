@@ -1158,6 +1158,68 @@ pages_sg5! {
         format!(r#"<script>x</script a=">"><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
 }
 
+// S-G5, débalisage (lot DETTES-T15, DT15-k ; Q-8 et Q-9) : une balise est ce que la tokenisation HTML lit comme telle
+// (`<` ou `</` suivi d'une lettre ASCII), lue jusqu'à son vrai `>`, guillemets compris, sans borne de longueur ; tout
+// autre `<` est du texte. Le texte des attributs ne reste jamais au corpus, et la recherche du `>` est linéaire. Dans
+// une page rendue, une balise se lit aussi entière avant tout le reste : un `<!--` ou un `<script` écrit dans une
+// valeur d'attribut n'ouvre rien.
+
+pages_sg5! {
+    mutant_sg5_attribut_long_ote:
+        format!(r#"<p title="{REGLE_RETIREE} ; {}">x</p>"#, "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_attribut_chevron_entre_guillemets:
+        format!(r#"<a title="a > {REGLE_RETIREE}">x</a>"#), REGLE_RETIREE => true,
+    mutant_sg5_attribut_chevron_entre_apostrophes:
+        format!(r#"<a title='a > {REGLE_RETIREE}'>x</a>"#), REGLE_RETIREE => true,
+    mutant_sg5_balise_jamais_close: format!(r#"<p>x</p><img alt="{REGLE_RETIREE}"#), REGLE_RETIREE => true,
+    mutant_sg5_fermante_attribut_long:
+        format!(r#"<p>x</p data-x="{REGLE_RETIREE} ; {}">"#, "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    temoin_sg5_chevron_de_texte_garde:
+        String::from("<p>the gate keeps the sign in a < b and it is found</p>"),
+        "the gate keeps the sign in a < b and it is found" => false,
+    temoin_sg5_chevron_lettre_non_ascii_garde: format!("<p>x <é {AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_texte_entre_balises_garde: format!(r#"<p class="a">{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_texte_apres_la_derniere_balise_garde: format!(r#"<p class="a">x</p>{AFFICHEE}."#), AFFICHEE => false,
+    temoin_sg5_fermante_vide_otee:
+        String::from("<p>the gate keeps this sentence whole when an empty end tag</> sits inside it</p>"),
+        "the gate keeps this sentence whole when an empty end tag sits inside it" => false,
+    temoin_sg5_commentaire_dans_un_attribut_n_ouvre_rien:
+        format!(r#"<a title="<!--">{AFFICHEE}.</a><p>x</p><!-- y -->"#), AFFICHEE => false,
+    temoin_sg5_script_dans_un_attribut_n_ouvre_rien:
+        format!(r#"<a title="<script>">{AFFICHEE}.</a>"#), AFFICHEE => false,
+}
+
+/// Hors HTML aussi (texte brut), une balise se lit jusqu'à son vrai `>`, sans borne : son attribut sort du corpus.
+#[test]
+fn mutant_sg5_attribut_long_ote_hors_html() {
+    let texte = format!(
+        r#"<p title="{REGLE_RETIREE} ; {}">x</p>"#,
+        "and it has no tag. ".repeat(20)
+    );
+    let rapport = sg5_page("sg5-attribut-txt", "artefact-b.txt", &texte, REGLE_RETIREE);
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Recherche du `>` linéaire (Q-9) : une page de 4 000 002 octets de `x < y `, sans `>`, se juge en moins de 10 s.
+/// L'état j relisait la fin du texte à chaque `<`.
+#[test]
+fn mutant_sg5_debalisage_en_temps_lineaire() {
+    let racine = arbre_documentaire("sg5-debalisage-lineaire");
+    ecrire(
+        &racine,
+        "biblio/artefact-a.html",
+        &page_detenue(&"x < y ".repeat(666_667)),
+    );
+    let (envoi, reception) = std::sync::mpsc::channel();
+    std::thread::spawn(move || envoi.send(xtask::sg5::executer(&racine).vert()));
+    assert!(
+        reception
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .is_ok(),
+        "S-G5 : plus de 10 s pour une page de 4 000 002 octets"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant

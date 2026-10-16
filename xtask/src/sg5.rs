@@ -421,25 +421,30 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 /// Ôte d'une page ce qu'elle ne donne jamais à lire, en un balayage de gauche
 /// à droite comme la tokenisation HTML (WHATWG) : commentaires
 /// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices (DT15-h) et éléments
-/// `script` et `style` jusqu'à la fermante qui les clôt (DT15-g). Ce qu'un
-/// script ou une interaction peut montrer (`template`, attribut `hidden`, CSS)
-/// reste. Lecture sans analyseur : texte ôté en trop (valeur d'attribut, bloc
-/// de code Markdown), jamais gardé en trop, hors d'un contenu SVG ou MathML,
-/// lu ici comme du HTML : un `</script` ou un `</style` écrit dans un
-/// commentaire, une section CDATA ou une valeur d'attribut à l'intérieur d'un
-/// tel script ou style l'y clôt trop tôt ; temps linéaire. Appliqué au corpus
-/// seulement, avant le débalisage.
+/// `script` et `style` jusqu'à la fermante qui les clôt (DT15-g). Une balise
+/// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
+/// d'attribut n'ouvre rien (DT15-k). Ce qu'un script ou une interaction peut
+/// montrer (`template`, attribut `hidden`, CSS) reste. Lecture sans analyseur :
+/// texte ôté en trop (bloc de code Markdown), jamais gardé en trop, hors d'un
+/// contenu SVG ou MathML, lu ici comme du HTML : un `</script` ou un `</style`
+/// écrit dans un commentaire, une section CDATA ou une valeur d'attribut à
+/// l'intérieur d'un tel script ou style l'y clôt trop tôt ; temps linéaire.
+/// Appliqué au corpus seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
     while let Some(ouverture) = reste.find('<') {
         sortie.push_str(reste.get(..ouverture).unwrap_or(""));
         let suite = reste.get(ouverture..).unwrap_or("");
-        let longueur = longueur_non_affichee(suite);
-        if longueur.is_none() {
-            sortie.push('<');
-        }
-        reste = suite.get(longueur.unwrap_or(1)..).unwrap_or("");
+        let (gardee, longueur) = match longueur_non_affichee(suite) {
+            Some(longueur) => (0, longueur),
+            None => {
+                let longueur = longueur_de_balise(suite.as_bytes()).unwrap_or(1);
+                (longueur, longueur)
+            }
+        };
+        sortie.push_str(suite.get(..gardee).unwrap_or(""));
+        reste = suite.get(longueur..).unwrap_or("");
     }
     sortie.push_str(reste);
     sortie
@@ -530,11 +535,11 @@ fn fin_d_element(suite: &str, ouvrante: &str, fermante: &str) -> usize {
     t.len()
 }
 
-/// Fin d'une balise ouvrante ou fermante de `script` ou de `style`, depuis
-/// l'octet qui suit son nom : après le `>` qui la clôt hors des valeurs
-/// d'attribut entre guillemets, selon les états de la balise dans la
-/// tokenisation (nom, attribut, valeur) ; sans ce `>`, le bout du texte, qu'une
-/// balise inachevée n'affiche pas (DT15-j).
+/// Fin d'une balise ouvrante ou fermante, depuis son nom ou l'octet qui le
+/// suit : après le `>` qui la clôt hors des valeurs d'attribut entre
+/// guillemets, selon les états de la balise dans la tokenisation (nom,
+/// attribut, valeur) ; sans ce `>`, le bout du texte, qu'une balise inachevée
+/// n'affiche pas (DT15-j ; toute balise depuis DT15-k).
 fn fin_de_balise(t: &[u8], depuis: usize) -> usize {
     #[derive(Clone, Copy)]
     enum Etat {
@@ -574,27 +579,42 @@ fn fin_de_balise(t: &[u8], depuis: usize) -> usize {
     t.len()
 }
 
-/// Retire les balises `<…>` d'un texte de corpus HTML : une citation d'une
-/// page détenue traverse souvent une balise d'emphase en plein milieu de
-/// phrase. Appliqué au corpus seulement — jamais aux aiguilles.
+/// Retire les balises d'un texte de corpus : une citation d'une page détenue
+/// traverse souvent une balise d'emphase en plein milieu de phrase. Une balise
+/// est lue entière (`longueur_de_balise`), sans borne de longueur : le texte
+/// de ses attributs ne reste jamais au corpus (DT15-k, Q-8) ; tout autre `<`
+/// est du texte. Chaque octet est lu une fois : temps linéaire (Q-9). Appliqué
+/// au corpus seulement — jamais aux aiguilles.
 fn retirer_balises(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
     while let Some(ouverture) = reste.find('<') {
-        let (avant, apres) = reste.split_at(ouverture);
-        sortie.push_str(avant);
-        match apres.get(1..).and_then(|suite| suite.find('>')) {
-            Some(fermeture) if fermeture <= 300 => {
-                reste = apres.get(fermeture.saturating_add(2)..).unwrap_or("");
-            }
-            _ => {
-                sortie.push('<');
-                reste = apres.get(1..).unwrap_or("");
-            }
+        sortie.push_str(reste.get(..ouverture).unwrap_or(""));
+        let suite = reste.get(ouverture..).unwrap_or("");
+        let longueur = longueur_de_balise(suite.as_bytes());
+        if longueur.is_none() {
+            sortie.push('<');
         }
+        reste = suite.get(longueur.unwrap_or(1)..).unwrap_or("");
     }
     sortie.push_str(reste);
     sortie
+}
+
+/// Longueur, depuis son `<`, d'une balise que la tokenisation HTML lit comme
+/// telle : `<` ou `</` suivi d'une lettre ASCII, jusqu'à son vrai `>`
+/// (`fin_de_balise`), ou `</>`, qu'elle ignore ; `None` pour un `<` de texte.
+fn longueur_de_balise(suite: &[u8]) -> Option<usize> {
+    let lettre = |o: Option<&u8>| o.is_some_and(u8::is_ascii_alphabetic);
+    if lettre(suite.get(1)) {
+        Some(fin_de_balise(suite, 1))
+    } else if suite.get(1) == Some(&b'/') && lettre(suite.get(2)) {
+        Some(fin_de_balise(suite, 2))
+    } else if suite.get(1..3) == Some(b"/>".as_slice()) {
+        Some(3)
+    } else {
+        None
+    }
 }
 
 /// Heuristique de langue : le corpus détenu est anglophone ; un fragment
