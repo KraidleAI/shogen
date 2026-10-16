@@ -2,7 +2,9 @@
 SHOGEN-GARDE-OUTIL-E6-E7-E12-E13-1, SHOGEN-GARDE-OUTIL-E22-E23-E24-1), dans des dépôts git temporaires isolés
 (tests/aide_garde.py), jamais le dépôt du projet ; rouges sur l'erreur réelle reproduite, verts sur le cas sain.
 E6 : brief FUZZ qui citait SHOGEN-E1-XTASK-REFS-1 ouvert, fermé par XR-1 à XR-4 (annexe B l.819-822 et l.1583, lignes
-copiées à l'octet dans ANNEXE_E6). E24 : brief DETTES-T7 sans la règle des commandes git à chemins explicites."""
+copiées à l'octet dans ANNEXE_E6). E24 : brief DETTES-T7 sans la règle des commandes git à chemins explicites.
+E22 : message de reprise de DT6 (phase 4) qui relayait le test instable de DB-1 sans sa référence. E23 : acte écrit
+sans vérifier que l'outil, le fichier ou le commit nommés existent (copie au Drive de la décision Q-A)."""
 import contextlib
 import io
 import os
@@ -56,7 +58,8 @@ class Brief(unittest.TestCase):
         self.d, self.env = ag.depot(self.tmp, {ANNEXE: ANNEXE_E6 + LIGNE_1583 + NL,
                                                ".claude/agents/fiche-regle.md": "Toute commande git qui liste ou "
                                                "compare des chemins est limitée à une liste" + NL + "explicite de "
-                                               "chemins." + NL, ".claude/agents/fiche-nue.md": "x" + NL})
+                                               "chemins." + NL, ".claude/agents/fiche-nue.md": "x" + NL,
+                                               "notes/rapport.md": "a" + NL + "b" + NL + "c" + NL, "scripts/outil.py": ""})
         env = mock.patch.dict(os.environ, self.env, clear=True)
         env.start()
         self.addCleanup(env.stop)
@@ -96,3 +99,32 @@ class Brief(unittest.TestCase):
         self.assertEqual([self.brief(texte, "--fiche", x)[0] for x in ("absente", "../agents/fiche-regle")], [3, 3])
         self.assertEqual(self.brief("Aucune commande à lancer." + NL), (0, ""))
         self.assertEqual(self.brief("Lis les commandes git du journal." + NL)[0], 1)
+
+    def test_e22_constat_relaye_sans_reference(self):
+        """E22 : constat d'un autre lot relayé sans fichier ni ligne : refus B2 ; référence sur la ligne ou la suivante,
+        forme entre guillemets ou en code (citée, non relayée), sujet sans verbe de relais : conforme ; selon la G2 :
+        refus."""
+        code, sortie = self.brief("Reprise de DT6, phase 4 : le contre-contrôle de DB-1 a relevé un test instable ; le "
+                                  "stabiliser." + NL)
+        self.assertEqual((code, sortie.split(" : ")[:2]), (1, ["REFUS B2", "l.1"]))
+        for sain in ("Le contre-contrôle de DB-1 a relevé un test instable (`notes/rapport.md:2`).",
+                     "Le contre-contrôle de DB-1 a relevé un test instable" + NL + "(notes/rapport.md l.3).",
+                     "Forme visée : « la G2 a trouvé… », `le CC dit`.", "Le générateur écrit les diffs."):
+            self.assertEqual(self.brief(sain + NL), (0, ""), sain)
+        self.assertEqual(self.brief("Selon la G2, tout passe." + NL)[0], 1)
+
+    def test_e23_faisabilite(self):
+        """E23 : outil, fichier ou commit nommés absents, ligne hors du fichier, sous-commande inconnue : refus B3, un par
+        nom ; chemin à produire, base inconnue, sha256 abrégé, interdit (jamais lu), noms présents : conformes."""
+        tete = ag.git(self.d, self.env, "rev-parse", "HEAD")[:12]
+        code, sortie = self.brief(NL.join([
+            "Copier les octets au Drive par `scripts/copier_drive.py`.", "Relire notes/rapport.md:7 puis `/nulle/x.py`.",
+            "Base : commit abc1234def.", "Lancer `avant_acte.py verifier`.", "Écrire `scripts/neuf.py`.",
+            "Lire `scripts/outil.py`, notes/rapport.md:2-3, `sous/inconnu/x.md`, base " + tete + ".",
+            "sha256 `c3f34927467031d8` ; `docs/rapports/x.md` ; `scripts/` ; `-C/x`.", ""]))
+        self.assertEqual((code, [x.split(" ; à faire")[0] for x in sortie.split(NL)[:-1]]), (1, [
+            "REFUS B3 : l.1 : scripts/copier_drive.py absent (E23)",
+            "REFUS B3 : l.2 : notes/rapport.md:7 hors du fichier (3 lignes) (E23)",
+            "REFUS B3 : l.2 : /nulle/x.py absent (E23)",
+            "REFUS B3 : l.3 : abc1234def n'est pas un commit du dépôt (E23)",
+            "REFUS B3 : l.4 : sous-commande avant_acte.py verifier inconnue (E23)"]))

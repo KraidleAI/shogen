@@ -91,7 +91,12 @@ pgrep en erreur : 3.
 Phase 2, groupe A : brief --texte F [--fiche NOM], avant de lancer un agent (crochet GARDE-FAITS R11) : B1, tout item
 SHOGEN-… ou MONARK-… du brief est ouvert à l'annexe B (garde_commun.etat_items), sauf si le brief l'écrit fermé ; absent
 de l'annexe : avertissement (E6) ; B4, un brief qui nomme une commande git porte, lui ou la fiche NOM
-(.claude/agents/NOM.md), la règle des commandes git limitées à une « liste explicite de chemins » (E24)."""
+(.claude/agents/NOM.md), la règle des commandes git limitées à une « liste explicite de chemins » (E24).
+B2, un constat relayé (le CC, la G2, le réviseur, un lot nommé… a relevé, a trouvé, dit… ; selon la G2) porte sur sa
+ligne ou la suivante une référence fichier et ligne (chemin:N, chemin l.N, JOURNAL l.N ; E22). B3, faisabilité (E23) :
+chaque chemin:N se lit (fichier présent, ligne dans le fichier) ; chaque chemin entre accents graves de base connue
+(absolu, ou premier composant présent à la racine du dépôt) existe, hors ligne qui dit le produire ; chaque sha court
+(hors sha256) est un commit ; chaque sous-commande avant_acte.py nommée existe ; les interdits ne sont jamais lus."""
 import argparse
 import contextlib
 import fnmatch
@@ -787,6 +792,58 @@ GIT_NOMME = re.compile("(?<![A-Za-z0-9_./-])git(?: -C [^ ]+)? (?:diff|log|show|s
                        "|apply|grep|rev-list|rev-parse|cat-file|blame|add|commit|checkout|restore|stash|reset|clone"
                        "|worktree)(?![A-Za-z-])|(?i:commandes? git)(?![A-Za-z-])")
 REGLE_GIT = "liste explicite de chemins"
+SUJET = ("(?:(?<![A-Za-zà-ÿ])(?i:le|la|les|l'|l’) ?(?i:cc|contre-contrôle|g2|relecture|réviseur|générateur|worker"
+         "|advisor|avis|lecteur|rapport|chercheur|validateur)|(?<![A-Za-z0-9-])[A-Z][A-Z0-9]+-[A-Z0-9]+(?:-[A-Z0-9]+)*)"
+         "(?![A-Za-zà-ÿ0-9-])")
+VERBE = ("(?<![a-zà-ÿ])(?i:dit|disent|trouvé|trouvés|relève|relevé|relevés|signale|signalé|constate|constaté|rapporte"
+         "|rapporté|mesuré|montré|noté)(?![a-zà-ÿ])")
+RELAIS = re.compile(SUJET + "[^.;:" + chr(10) + "]{0,40}?" + VERBE + "|(?<![a-zà-ÿ])(?i:selon) " + SUJET)
+REF = re.compile("[A-Za-z0-9_-][.][A-Za-z0-9]+`?(?::| l[.] ?)[0-9]+|(?:JOURNAL|annexe B|ADR-[0-9]{4}) l[.] ?[0-9]+")
+REF_LIGNE = re.compile("(?<![A-Za-z0-9_./~-])((?:/|[.]?[A-Za-z0-9_-]+/)[A-Za-z0-9_./~-]*[.][A-Za-z0-9]+):([0-9]+)"
+                       "(?:-([0-9]+))?")
+PRODUIRE = re.compile("(?i)(?<![a-zà-ÿ])(?:produire|produit|produits|créer|crée|créé|créés|écrire|écris|écrit|écrits"
+                      "|ajouter|ajoute|ajouté|ajoutés|nouveau|nouvelle|nouveaux|neuf|neuve|poser|pose|posé|sortie"
+                      "|sorties|verser|versé|à faire)(?![a-zà-ÿ])")
+
+
+def resoudre(depot, base, chemin):
+    """Chemin réel d'un nom du brief (absolu, ou sous le dépôt, le dossier du brief ou son parent) ; None si absent ou
+    interdit (jamais lu) ; '' si la base est inconnue (premier composant absent de la racine du dépôt)."""
+    essais = [chemin] if os.path.isabs(chemin) else [os.path.join(d, chemin) for d in (depot, base, os.path.dirname(base))]
+    if any(GC.chemin_interdit(x) for x in essais):
+        return None
+    trouve = next((x for x in essais if os.path.exists(x)), None)
+    connue = os.path.isabs(chemin) or os.path.exists(os.path.join(depot, chemin.split("/")[0]))
+    return trouve if trouve or not connue else ""
+
+
+def faisable(a, texte, fautes):
+    """B3 (E23) : chemins, lignes, commits et sous-commandes nommés par le brief."""
+    base, lignes = os.path.dirname(os.path.abspath(a.texte)), texte.split(chr(10))
+    for n, ligne in enumerate(lignes, 1):
+        for m in REF_LIGNE.finditer(ligne):
+            p = resoudre(a.depot, base, m[1])
+            if p and os.path.isfile(p):
+                with open(p, encoding="utf-8", errors="replace") as f:
+                    total = f.read().count(chr(10))
+                if not 1 <= int(m[2]) <= int(m[3] or m[2]) <= total:
+                    fautes.append(("refus", "B3", f"l.{n} : {m[0]} hors du fichier ({total} lignes) (E23)",
+                                   "relire le fichier et citer une ligne qui existe", "-"))
+            elif p == "" or (p and not os.path.isfile(p)):
+                fautes.append(("refus", "B3", f"l.{n} : {m[1]} absent (E23)", "nommer un fichier qui existe", "-"))
+        for x in re.findall("`([A-Za-z0-9_./~-]*/[A-Za-z0-9_./~-]*)`", ligne):
+            if x.startswith("-") or PRODUIRE.search(ligne) or resoudre(a.depot, base, x.rstrip("/")) != "":
+                continue
+            fautes.append(("refus", "B3", f"l.{n} : {x} absent (E23)",
+                           "vérifier le chemin (avant_acte.py existe <nom>) ou écrire qu'il est à produire", "-"))
+        for m in SHA.finditer(ligne):
+            if "sha256" not in ligne[max(0, m.start() - 16):m.start()] and not resolu(a.depot, m[1]):
+                fautes.append(("refus", "B3", f"l.{n} : {m[1]} n'est pas un commit du dépôt (E23)",
+                               "lire l'identifiant par git log avant de l'écrire", "-"))
+        for c in re.findall("avant_acte[.]py(?: --depot [^ ]+)? ([a-z]+)", ligne):
+            if c not in COMMANDES:
+                fautes.append(("refus", "B3", f"l.{n} : sous-commande avant_acte.py {c} inconnue (E23)",
+                               "nommer une sous-commande de avant_acte.py --help", "-"))
 
 
 def brief(a, fautes):
@@ -810,6 +867,12 @@ def brief(a, fautes):
                        "liste explicite de chemins », ni lui ni sa fiche (E24)",
                        "ajouter la règle au brief : toute commande git qui liste ou compare des chemins est limitée à "
                        "une liste explicite de chemins", "-"))
+    lignes = texte.split(chr(10)) + [""]
+    for n, ligne in enumerate(lignes[:-1], 1):
+        relais = RELAIS.search(GC.MASQUE.sub(lambda m: " " * len(m[0]), ligne))      # hors citations et code
+        if relais and not REF.search(ligne + " " + lignes[n]):
+            fautes.append(("refus", "B2", f"l.{n} : constat relayé sans fichier ni ligne : {relais[0]} (E22)", "citer la pièce du constat (chemin:N) ou le nommer exactement", "-"))
+    faisable(a, texte, fautes)
 
 
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
