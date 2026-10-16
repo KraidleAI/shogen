@@ -25,14 +25,23 @@ Phase 2, groupe A (E6) : `etat_items`, état fermé ou ouvert de chaque item SHO
 B), lu par marqueurs : mot fermé ou clos non nié dans les FENETRE caractères qui suivent l'item (sans traverser une
 barre de tableau, un point-virgule ni un autre item), cellule d'une ligne de tableau dont la première cellule nomme
 l'item, ou portée d'un en-tête « Items fermés … : » jusqu'à la fin du paragraphe ou un autre en-tête ; reste ouvert,
-rouvert : ouvert. La dernière décision du texte l'emporte ; un item sans décision est ouvert."""
+rouvert : ouvert. La dernière décision du texte l'emporte ; un item sans décision est ouvert.
+Phase 2, groupe A (E12) : `motifs_suspects`, détecteur statique de retour arrière exponentiel (arbre de l'analyseur de
+re, jamais d'exécution du motif ; avis c.1 de la revue) : sous une répétition de borne haute > 10, une répétition de
+longueur variable en queue du corps dont les caractères peuvent commencer le corps (quantificateurs imbriqués :
+`(a+)+`, motif de DT5 cité par E12), une alternative de largeur variable en queue dont la fin des branches longues peut
+commencer le corps (`(a|aa)*`), ou deux branches d'une alternative du corps que rien ne sépare à leurs premières
+positions connues (alternatives ambiguës) ; caractères jugés sur l'ASCII, é et l'espace insécable ; prudent : un motif
+sûr peut être signalé (`(?:a+b|ac)*`)."""
 import ast
 import fnmatch
 import functools
+import importlib
 import os
 import re
 import shutil
 import subprocess
+import warnings
 from datetime import datetime, timedelta, timezone
 
 TOLERANCE_S = 120
@@ -301,3 +310,136 @@ def etat_items(texte):
                 etat = marque(suite) or portee
                 etats[m[1]] = (etat, n) if etat else etats.get(m[1], ("ouvert", n))
     return etats
+
+
+UNIVERS = frozenset(map(chr, range(128))) | {"é", chr(160)}
+CATEGORIES = {"DIGIT": str.isdigit, "SPACE": str.isspace, "WORD": lambda c: c.isalnum() or c == "_",
+              "LINEBREAK": lambda c: c == chr(10)}
+UN = ("LITERAL", "NOT_LITERAL", "ANY", "IN")      # nœuds d'un caractère
+REPETE = ("MAX_REPEAT", "MIN_REPEAT")              # répétitions qui reviennent en arrière (possessives exclues)
+
+
+def _jeu(o, av):
+    """Caractères (sur UNIVERS) qu'un nœud d'un caractère accepte."""
+    if o != "IN":      # ANY : av vaut None, aucun caractère à lire
+        return set(UNIVERS) if o == "ANY" else ({chr(av)} & UNIVERS or {"é"}) if o == "LITERAL" else set(
+            UNIVERS - {chr(av)})
+    s, nie = set(), False
+    for op, x in av:
+        if str(op) in ("LITERAL", "RANGE"):
+            bas, haut = (x, x) if str(op) == "LITERAL" else x
+            s |= {c for c in UNIVERS if bas <= ord(c) <= haut} or {"é"}
+        elif str(op) == "CATEGORY":
+            nom = str(x).replace("CATEGORY_", "")
+            f = CATEGORIES.get(nom.replace("NOT_", ""), lambda c: True)
+            s |= {c for c in UNIVERS if f(c) != nom.startswith("NOT_")}
+        nie = nie or str(op) == "NEGATE"
+    return set(UNIVERS) - s if nie else s
+
+
+def _enfants(o, av):
+    """Sous-séquences d'un nœud de l'arbre."""
+    if o == "BRANCH":
+        return list(av[1])
+    if o == "GROUPREF_EXISTS":
+        return [x for x in av[1:] if x is not None]
+    return [av] if o == "ATOMIC_GROUP" else [av[-1]] if o in ("SUBPATTERN", "ASSERT", "ASSERT_NOT") + REPETE else []
+
+
+def _premiers(seq, sens=1):
+    """(caractères qui peuvent commencer seq, ou la finir avec sens=-1 ; seq peut être vide)."""
+    acc = set()
+    for op, av in list(seq)[::sens]:
+        o = str(op)
+        if o in UN:
+            return acc | _jeu(o, av), False
+        if o in ("AT", "ASSERT", "ASSERT_NOT"):
+            continue
+        parts = [_premiers(x, sens) for x in _enfants(o, av)] or [(set(UNIVERS), True)]      # renvoi : tout
+        acc |= set().union(*(p[0] for p in parts))
+        ou = o in ("BRANCH", "GROUPREF_EXISTS")
+        if not ((any if ou else all)(p[1] for p in parts) or (o.endswith("REPEAT") and av[0] == 0)):
+            return acc, False
+    return acc, True
+
+
+def _tous(seq):
+    """Caractères que seq peut consommer."""
+    return set().union(set(), *(_jeu(str(op), av) if str(op) in UN else _tous_noeud(str(op), av) for op, av in seq))
+
+
+def _tous_noeud(o, av):
+    return set() if o in ("ASSERT", "ASSERT_NOT") else set().union(set(), *(_tous(x) for x in _enfants(o, av)))
+
+
+def _queues(seq):
+    """(code, caractères de fin) des nœuds de longueur variable en queue de seq, suivis de nœuds qui peuvent être
+    vides : répétitions (tout leur corps), alternatives de largeurs différentes (fin des plus longues)."""
+    out = []
+    for op, av in reversed(list(seq)):
+        o = str(op)
+        if o in REPETE and av[1] > av[0]:
+            out.append(("quantificateurs-imbriques", _tous(av[2])))
+        largeurs = [x.getwidth() for x in av[1]] if o == "BRANCH" else []
+        if len(set(largeurs)) > 1:
+            court = min(lo for lo, _hi in largeurs)
+            out.append(("alternatives-ambigues", set().union(
+                *(_premiers(x, -1)[0] for x, (_lo, hi) in zip(av[1], largeurs) if hi > court))))
+        if o in REPETE + ("SUBPATTERN", "BRANCH"):
+            out += [q for x in _enfants(o, av) for q in _queues(x)]
+        if not _premiers([(op, av)])[1]:
+            return out
+    return out
+
+
+def _lineaire(seq, k=6):
+    """Caractères possibles aux k premières positions de seq ; None : inconnu au-delà (répétition, alternative)."""
+    out = []
+    for op, av in seq:
+        o = str(op)
+        if o in UN and len(out) < k:
+            out.append(_jeu(o, av))
+        elif o == "SUBPATTERN" and len(out) < k:
+            out += _lineaire(av[-1], k - len(out))
+            if out and out[-1] is None:
+                return out
+        elif o not in ("AT", "ASSERT", "ASSERT_NOT"):
+            debut, vide = _premiers([(op, av)])
+            return out + ([None] if vide or len(out) >= k else [debut, None])
+    return out
+
+
+def _ambigues(seq):
+    """Une alternative du corps (hors répétitions imbriquées) dont deux branches peuvent être vides, ou peuvent lire
+    un même début (rien ne les sépare aux premières positions connues ; un préfixe strict relève de _queues)."""
+    for op, av in seq:
+        if str(op) == "BRANCH":
+            lin = [(_lineaire(x), _premiers(x)[1]) for x in av[1]]
+            for i, (a, va) in enumerate(lin):
+                for b, vb in lin[:i]:
+                    ouvert = None in a[:len(b)] + b[:len(a)] or len(a) == len(b)
+                    if va and vb or a and b and ouvert and not any(x and y and not x & y for x, y in zip(a, b)):
+                        return True
+        if str(op) in ("SUBPATTERN", "BRANCH") and any(_ambigues(x) for x in _enfants(str(op), av)):
+            return True
+    return False
+
+
+def motifs_suspects(motif):
+    """Codes des formes à retour arrière exponentiel du motif (E12) : quantificateurs-imbriques,
+    alternatives-ambigues, sous une répétition de borne haute > 10 ; motif-illisible si l'analyseur le refuse."""
+    analyseur = getattr(re, "_parser", None) or importlib.import_module("sre_parse")      # 3.11+ ; 3.10
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            pile, codes = [list(analyseur.parse(motif))], set()
+    except Exception:
+        return ["motif-illisible"]
+    while pile:
+        for op, av in pile.pop():
+            pile += _enfants(str(op), av)
+            if str(op) in REPETE and (av[1] == analyseur.MAXREPEAT or av[1] > 10):
+                debut = _premiers(av[2])[0]
+                codes |= {code for code, fin in _queues(av[2]) if fin & debut}
+                codes |= {"alternatives-ambigues"} if _ambigues(av[2]) else set()
+    return sorted(codes)
