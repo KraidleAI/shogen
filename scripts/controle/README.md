@@ -494,3 +494,65 @@ dépendent des tests du harnais qu'ils importent.
 > chemin:ligne des deux gabarits relus contre le harnais ; doc 04 l.129-139 recopiées) ; plancher du job
 > `controle-unittest` 126. Un lot qui décale une ligne citée de `s2-harness/shogen_s2/report.py`, `r2.py` ou
 > `sources.py` fait échouer ce test : il met à jour les renvois des deux gabarits. Limites : docstring de l'outil.
+
+
+> *Ajout daté du 2026-10-16 09:03:03 UTC (`date -u` ; lot INTEGRATION-P2 : GARDE-FOUS-ORCH, phase 2, groupe C, pas INT-01 à INT-07 ;
+> annexe B, B.102 : SHOGEN-FM11-MOTIF-SESSION-1, SHOGEN-GARDE-DATE-PASSEE-1, SHOGEN-GARDE-ATTRIBUTION-DIFF-1,
+> SHOGEN-GARDE-VERIF-VERSIONNEE-1, SHOGEN-GARDE-DISQUE-CHAINE-1, SHOGEN-GARDE-LIGNE-REMPLACEE-1,
+> SHOGEN-GARDE-LECTURE-SEULE-1 ; relecture G2 du groupe, C-1 à C-4)* : un ajout pour le groupe ; empreintes au pas
+> INT-07 : `fm11.py` `17caaa358ce471c8a9b734873f874794f8c97e66f0125fa05a9dc0cff04452b7`,
+> `garde_commun.py` `8904ec0a1918ca4f29c54550a5bad7d9aa079a4867a08b1414b026d132b93f2a`,
+> `avant_acte.py` `25a3a8ddee0d4d35b21f98e21f9a99d6bb5a52ed89097d2cd88767390479f8ea`,
+> `gabarits/chaine.sh` `0d07d39c2d0b809d0d8168931cfe0a40dc4f71277856338227d88f7b546fe511`,
+> `garde/lignes-citees.txt` `8b6cf5ab967ad7f77e9851a969428c898c8e0097d59b8247a646f56cdab6b8ae`.
+> - FM-1.1 (Q-3) : le motif de la session de `fm11.py` (l.23 changée en place, l.4 intacte) ne compte plus
+>   l'identifiant de session écrit comme composant du chemin du scratchpad (`…/<projet>/<session>/scratchpad`), que
+>   porte toute transcription de la session ; nommée ailleurs (transcription, dossier de la session, dossier voisin du
+>   scratchpad), la session reste comptée. `SHA256SUMS` et la ligne de `fm11.py` de la table de tête mis à jour en
+>   place. Limites : un chemin qui ressort du scratchpad (`<session>/scratchpad/../…`) n'est pas compté ; une ligne
+>   `Claude-Session:` l'est.
+> - DATE-PASSEE (L-1, E14) : `garde_commun.py`, `horodatages_fautifs` refuse aussi une heure écrite sans sa date
+>   (heure-sans-date : aucune date dans les 25 caractères qui la précèdent ; code et guillemets français masqués) ;
+>   `dates_passees` (avec `entree_datee`) refuse une entrée datée ajoutée (ligne qui commence par la date et l'heure, ou
+>   par un mot en capitale suivi de `daté du`) antérieure à la dernière entrée datée du fichier à HEAD ou à une entrée
+>   ajoutée avant elle ; une date seule du même jour n'est pas jugée. `avant_acte.py`, C4 (`passees`) : aux .md du
+>   commit et du diff d'un worker. Les ajouts datés de ce README se posent donc en fin, datés du moment.
+> - ATTRIBUTION-DIFF (L-3, E8) : C3 attribue chaque mot qu'il lit au message (verdict, nombre de passes, identifiant,
+>   sha court) au diff que le message décrit (ligne `Diff-Id:`, ou `--id`) : sources coupées en passages (`unites`),
+>   diffs nommés par passage (`nommes`, plages `C-1 à C-18` et `GF-0 … GF-10b` lues), refus d'un mot que seuls des
+>   passages nommant d'autres diffs du même préfixe portent, sauf s'il est dans les lignes ajoutées du diff
+>   (`attribuer`). Limite : une plage à bornes en lettres (`DT15-a à DT15-m`) n'est pas lue (faux refus).
+> - VERIF-VERSIONNEE (L-4, LA-N05) : `sceller --verif F` (texte de `declare -f verif` ; `-` : entrée standard) écrit
+>   au sceau la ligne `verif <sha256>` ; `commit` refuse (C1) un sceau dont cette ligne n'est pas l'empreinte de la
+>   fonction `verif` de `gabarits/chaine.sh` des outils (`empreinte_verif`, de `verif() {` à `# --- fin de verif`,
+>   passée par `declare -f` de bash) ; le modèle scelle par `declare -f verif | acte sceller --verif -` (l.24 et l.50
+>   changées en place). Une chaîne copiée du modèle depuis L-4 dont la vérification diffère de celle du modèle scelle,
+>   mais ne commet plus. Un sceau sans ligne `verif` n'est pas jugé : vérification hors du modèle
+>   (`<vérification> && sceller` des skills), chaîne copiée d'un modèle antérieur à L-4, chaîne qui n'appelle pas
+>   `avant_acte.py`. Une chaîne propre à un lot prend la fonction du modèle :
+>   `source <(sed -n '/^verif() {/,/^# --- fin de verif/p' "$OUTILS/gabarits/chaine.sh")`. Une vérification propre à
+>   un lot se verse au modèle par un diff relu, commis au premier pas d'une chaîne copiée du modèle d'après ce diff
+>   (`OUTILS` dans le dépôt : la fonction comparée est celle de l'arbre après `git apply` ; une chaîne copiée du modèle
+>   d'avant est refusée en C1).
+> - DISQUE-CHAINE (LN-1 ; E4, E28) : le modèle de chaîne contrôle le disque à chaque pas, avant `git apply`
+>   (`acte disque --min-go "${DISQUE_MIN_GO:-0}"`, seuils lus dans `garde_commun.py`) ; un refus imprime
+>   `ROUGE disque avant <id> (LN-1) : arrêt, rien appliqué` et arrête la chaîne, l'arbre propre. Limite : le disque
+>   mesuré est `/`, non le système de fichiers du dépôt.
+> - LIGNE-REMPLACEE (L-13, E21) : C7 (`cites`) lit aussi les empreintes des renvois par numéro (`empreintes`) : rangées
+>   du registre `docs/RENVOIS-LIGNES.tsv` de l'état d'après (colonnes `cible`, `lignes`, `empreinte` ; `lignes` à `-`
+>   sautées ; en-tête ou rangée illisible : erreur 3) et lignes `<chemin>:<a>[-<b>] <empreinte>` de
+>   `garde/lignes-citees.txt` (ajout en fin : ADR-0028 l.293 et `fm11.py` l.4) ; sha256 des lignes jointes par LF,
+>   sans LF final, comparé sur la longueur écrite. Un renvoi qui répondait à HEAD et n'y répond plus après le diff est
+>   refusé, à nombre de lignes égal compris (`remplacees`), sauf empreinte mise à jour dans le même diff ; sans réponse
+>   ni avant ni après : avertissement. Registre lu par l'outil à la tête `ccc29190` : 110 renvois répondent, 0 non,
+>   23 hors de l'arbre (`lignes` à `-`) ; à la tête `9c04eec` : 111 répondent, 0 non, 23 hors de l'arbre.
+> - LECTURE-SEULE (L-12, Q-5) : `--lecture-seule`, avant la sous-commande, pour `diff` et `commit` seulement (autre
+>   sous-commande : erreur 3) : git tourne dans un dépôt jetable de `TMPDIR` (`jetable` : `git clone --shared
+>   --no-checkout`, HEAD du dépôt lu, son index copié pour `commit`) ; fichiers cités, lecteur YAML (`workflows`,
+>   paramètre `racine`), sceaux et interdits (`lignes_ajoutees`, paramètre `racine`) se lisent dans le dépôt lu, où
+>   rien n'est écrit ; le journal de ces passages va au dépôt jetable et se perd avec lui.
+>
+> Tests : `tests/test_fm11.py` 10 tests, `tests/test_garde_commun.py`
+> 20 tests, `tests/test_avant_acte.py` 49 tests,
+> `tests/test_gabarit_chaine.py` 10 tests ; le groupe ajoute 12 tests ; plancher du job
+> `controle-unittest` 138.

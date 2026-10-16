@@ -538,6 +538,52 @@ class DiffDeWorker(Source):
             code, sortie = self.commit(self.message("x : contre-contrôle CONFORME en deux passes"))
             self.assertEqual((code, sortie[:len(attendu[1])]), attendu)
 
+    def etat(self):
+        """Octets de chaque fichier du dépôt lu, .git compris (sha256 par chemin), et dossiers."""
+        vus = []
+        for base, dossiers, fichiers in os.walk(self.d):
+            vus += [(os.path.relpath(os.path.join(base, x), self.d), "dossier") for x in dossiers]
+            for x in fichiers:
+                with open(os.path.join(base, x), "rb") as f:
+                    vus.append((os.path.relpath(os.path.join(base, x), self.d), hashlib.sha256(f.read()).hexdigest()))
+        return sorted(vus)
+
+    def test_l12_rien_n_est_ecrit(self):
+        """L-12, Q-5 (SHOGEN-GARDE-LECTURE-SEULE-1) : --lecture-seule : diff d'un worker et commit tournent dans un
+        dépôt jetable (clone --shared) ; rien n'est écrit dans le dépôt lu (objets, journal, sceaux), mêmes verdicts
+        qu'en mode courant (refus C7, C5 et C8 du diff : fichiers cités et lecteur YAML du dépôt lu ; sceau du dépôt
+        lu exigé et lu par commit ; interdit vu par un lien de l'arbre lu) ; sans l'option, le dépôt lu
+        change ; autre sous-commande avec l'option : erreur 3."""
+        self.diff_de({"JOURNAL.md": NL.join(["l1", "l2", "neuf", "l3", "l4", "l5", ""])})
+        avant = self.etat()
+        seul = self.lancer("--lecture-seule", "diff", "--fichier", self.w)
+        self.assertEqual((seul[0], seul[1][:31], self.etat()), (1, "REFUS C7 : JOURNAL.md : un bloc", avant))
+        self.assertEqual(self.lancer("diff", "--fichier", self.w), seul)
+        self.assertNotEqual(self.etat(), avant)
+        g, d = chr(171), chr(187)
+        for fichiers, debut in (({"n.md": "x" + NL + g + " l9 " + d + " (JOURNAL.md:2)" + NL}, "REFUS C5 : citation-a"),
+                                ({".github/workflows/w.yml": "on: push" + NL + "# x" + NL}, "REFUS C8 ")):
+            self.diff_de(fichiers)
+            seul = self.lancer("--lecture-seule", "diff", "--fichier", self.w)
+            self.assertEqual((seul[0], seul[1][:len(debut)]), (1, debut))
+            self.assertEqual(self.lancer("diff", "--fichier", self.w), seul)
+        m = self.message("x : contre-contrôle CONFORME en deux passes")
+        self.indexer({"n.md": "neuf" + NL})
+        avant = self.etat()
+        commit = ["--lecture-seule", "commit", "--message", m, "--source", self.adj]
+        self.assertEqual((self.lancer(*commit)[1][:9], self.etat()), ("REFUS C1 ", avant))
+        self.assertEqual(self.lancer("sceller")[0], 0)
+        avant = self.etat()
+        self.assertEqual((self.lancer(*commit), self.etat()), ((0, ""), avant))
+        os.makedirs(os.path.join(self.d, "docs", "rapports"))
+        os.symlink(os.path.join(self.d, "docs", "rapports"), os.path.join(self.d, "lien"))
+        blob = subprocess.run(["git", "-C", self.d, "hash-object", "-w", "--stdin"], input="x" + NL, capture_output=True,
+                              text=True, env=self.env, check=True).stdout.strip()
+        ag.git(self.d, self.env, "update-index", "--add", "--cacheinfo", "100644," + blob + ",lien/x.md")
+        seul, courant = self.lancer(*commit), self.lancer(*commit[1:])
+        self.assertEqual((seul, "AVERTISSEMENT C4 : 1 fichier(s) indexé(s) sous un interdit" in seul[1]), (courant, True))
+        self.assertEqual(self.lancer("--lecture-seule", "sceller")[0], 3)
+
     def test_c3_etat_d_apres_le_diff(self):
         """C-3 : citations et corpus de presg5 lus dans l'état d'après le diff : une citation anglaise inscrite à
         biblio/INDEX.md par le même diff (forme de DT14-a, commis) et la citation d'une ligne que le diff ajoute :

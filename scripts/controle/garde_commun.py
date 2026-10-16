@@ -189,13 +189,13 @@ def git(depot, *args, env=None):
                           check=True, env=env).stdout
 
 
-def lignes_ajoutees(depot, env=None):
+def lignes_ajoutees(depot, env=None, racine=None):
     """Lignes ajoutées de l'index (ou de l'index temporaire d'env) par rapport à HEAD, hors interdits : noms d'abord,
     puis diff des seuls chemins admis (le contenu d'un interdit n'est jamais lu), préfixes a/ et b/ forcés ; rend
-    (fichiers analysés, nombre de fichiers écartés)."""
+    (fichiers analysés, nombre de fichiers écartés) ; racine : arbre où juger les interdits (dépôt jetable, L-12)."""
     noms = git(depot, "diff", "--cached", "--no-renames", "--name-only", "-z", "HEAD", env=env).split(chr(0))
     noms = [x for x in noms if x]
-    admis = [x for x in noms if not chemin_interdit(os.path.join(depot, x))]
+    admis = [x for x in noms if not chemin_interdit(os.path.join(racine or depot, x))]
     texte = git(depot, "diff", "--cached", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
                 "--src-prefix=a/", "--dst-prefix=b/", "-U0", "HEAD", "--", *[":(literal)" + x for x in admis],
                 env=env) if admis else ""

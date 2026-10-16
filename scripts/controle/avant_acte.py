@@ -78,7 +78,10 @@ gabarits/chaine.sh des outils (fonction versionnée, declare -f par bash) ; un s
 Phase 2, L-13 : C7 lit aussi les empreintes des lignes citées (lignes <chemin>:<a>[-<b>] <empreinte> de
 garde/lignes-citees.txt ; rangées du registre docs/RENVOIS-LIGNES.tsv de DETTES-T15, de l'état d'après, colonnes
 cible, lignes, empreinte) : un renvoi qui répondait à son empreinte à HEAD et n'y répond plus après le diff est refusé
-(à nombre de lignes égal compris), sauf empreinte mise à jour dans le même diff ; empreinte du registre."""
+(à nombre de lignes égal compris), sauf empreinte mise à jour dans le même diff ; empreinte du registre.
+Phase 2, L-12, Q-5 : --lecture-seule (diff et commit seulement) : git tourne dans un dépôt jetable de TMPDIR (git clone
+--shared --no-checkout, HEAD du dépôt lu, son index copié pour commit) ; fichiers, sceaux et outils lus dans le dépôt
+lu, rien n'y est écrit ; le journal va au dépôt jetable (perdu avec lui)."""
 import argparse
 import contextlib
 import fnmatch
@@ -86,6 +89,7 @@ import hashlib
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -141,6 +145,20 @@ def garde(depot, *sous):
     d = os.path.join(depot, git(depot, "rev-parse", "--git-path", "shogen-garde").strip(), *sous)
     os.makedirs(d, exist_ok=True)
     return d
+
+
+def jetable(source, dossier, index):
+    """Dépôt jetable dans dossier : clone --shared --no-checkout de source, HEAD détachée sur celle de source, index de
+    source copié si index ; source n'est que lue (L-12)."""
+    tete, cible = git(source, "rev-parse", "--verify", "HEAD").strip(), os.path.join(dossier, "depot")
+    p = subprocess.run(["git", "clone", "-q", "--shared", "--no-checkout", "--", source, cible], capture_output=True)
+    if p.returncode:
+        raise Erreur(f"git clone : sortie {p.returncode}")
+    git(cible, "update-ref", "--no-deref", "HEAD", tete)
+    if index:
+        shutil.copyfile(os.path.join(source, git(source, "rev-parse", "--git-path", "index").strip()),
+                        os.path.join(cible, git(cible, "rev-parse", "--git-path", "index").strip()))
+    return cible
 
 
 def lire(chemin):
@@ -201,7 +219,8 @@ def resolu(depot, sha):
 
 def commit(a, fautes):
     texte, sources = lire(a.message).decode("utf-8"), [lire(s) for s in a.source]
-    sceau = os.path.join(garde(a.depot, "sceaux"), cle(a.depot))
+    lieu = os.path.join(a.racine, git(a.racine, "rev-parse", "--git-path", "shogen-garde").strip(), "sceaux")
+    sceau = os.path.join(lieu if a.lecture_seule else garde(a.depot, "sceaux"), cle(a.depot))
     if not os.path.exists(sceau):
         fautes.append(("refus", "C1", "aucun sceau pour cet index et cette tête (LA-N05)",
                        "relancer la vérification complète puis sceller : <vérification> && avant_acte.py sceller", "-"))
@@ -232,7 +251,7 @@ def commit(a, fautes):
     for genre, x in manques:
         fautes.append(("refus", "C3", f"{genre} du message absent des sources : {x} (E8)",
                        "reprendre les mots de l'adjudication et de la ligne d'annexe relues", "-"))
-    fichiers, ecartes = GC.lignes_ajoutees(a.depot)
+    fichiers, ecartes = GC.lignes_ajoutees(a.depot, racine=a.racine)
     ident = a.id or next((x[9:].strip() for x in texte.split(chr(10)) if x.startswith("Diff-Id: ")), None)
     if ident and "-" in ident:
         juges = [("verdict", verdicts), ("nombre de passes", lambda u: passes(u, source=True)),
@@ -242,12 +261,12 @@ def commit(a, fautes):
     if ecartes:
         fautes.append(("avertissement", "C4", f"{ecartes} fichier(s) indexé(s) sous un interdit, non lus", "", "-"))
     textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
-    heures_et_citations(a.depot, [("message", texte)] + textes, fautes)
+    heures_et_citations(a.racine, [("message", texte)] + textes, fautes)
     passees(a.depot, fichiers, fautes)
     if a.diff:
         diffs_nommes(a, fautes)
     cites(a.depot, texte, fichiers, fautes)
-    workflows(a.depot, fichiers, fautes)
+    workflows(a.depot, fichiers, fautes, racine=a.racine)
     if a.id and f"Diff-Id: {a.id}" not in texte.split(chr(10)):
         fautes.append(("refus", "C9", f"le message ne porte pas la ligne Diff-Id: {a.id}", "l'ajouter au message", "-"))
 
@@ -428,12 +447,12 @@ def remplacees(depot, fichiers, decales, fautes, env=None):
                            "réponse à HEAD ni après le diff", "", "-"))
 
 
-def workflows(depot, fichiers, fautes, env=None):
+def workflows(depot, fichiers, fautes, env=None, racine=None):
     """C8 (E1) : un workflow touché : enforcement/workflows-yaml.py du dépôt lit les workflows de l'index, ou de
     l'index temporaire d'un diff (env)."""
     if not any((f["apres"] or f["avant"] or "").startswith(".github/workflows/") for f in fichiers):
         return
-    lecteur = os.path.join(depot, "enforcement", "workflows-yaml.py")
+    lecteur = os.path.join(racine or depot, "enforcement", "workflows-yaml.py")
     if not os.path.isfile(lecteur):
         raise Erreur("enforcement/workflows-yaml.py absent : lecture YAML impossible")
     with tempfile.TemporaryDirectory() as d:
@@ -477,7 +496,7 @@ def diff(a, fautes):
         noms = chemins_du_patch(a.depot, lire(a.fichier).decode("utf-8"), a.fichier)
     except Erreur:
         noms = None
-    if noms and any(GC.chemin_interdit(os.path.join(a.depot, c)) for c in noms):
+    if noms and any(GC.chemin_interdit(os.path.join(a.racine, c)) for c in noms):
         fautes.append(interdit)
         return
     with tempfile.TemporaryDirectory() as d:
@@ -491,7 +510,7 @@ def diff(a, fautes):
             fautes.append(("refus", "D2", "le diff ne s'applique pas sur la tête du dépôt (base ancienne ?)",
                            "refaire le diff sur la tête du moment", "-"))
             return
-        fichiers, ecartes = GC.lignes_ajoutees(a.depot, env)
+        fichiers, ecartes = GC.lignes_ajoutees(a.depot, env, a.racine)
         if ecartes:
             fautes.append(interdit)
             return
@@ -501,11 +520,11 @@ def diff(a, fautes):
         if touches:
             git(a.depot, "checkout-index", "--prefix=" + apres + os.sep, "--", *touches, env=env)
         textes = [(f["apres"], place(f["ajouts"])) for f in fichiers if (f["apres"] or "").endswith(".md")]
-        heures_et_citations(a.depot, textes, fautes, apres)
+        heures_et_citations(a.racine, textes, fautes, apres)
         passees(a.depot, fichiers, fautes)
         presg5(apres, textes, fautes)
         cites(a.depot, "", fichiers, fautes, env)
-        workflows(a.depot, fichiers, fautes, env)
+        workflows(a.depot, fichiers, fautes, env, a.racine)
 
 
 
@@ -735,6 +754,7 @@ def parseur():
     """Lignes de commande des sous-commandes (lues aussi par tests/test_skills.py : options exigées)."""
     p = argparse.ArgumentParser(prog="avant_acte.py", description=__doc__.split(chr(10))[0])
     p.add_argument("--depot", default=".")
+    p.add_argument("--lecture-seule", action="store_true")
     sp = p.add_subparsers(dest="cmd", required=True)
     s = sp.add_parser("sceller")
     s.add_argument("--tete", action="store_true")
@@ -767,19 +787,24 @@ def main(argv=None):
         a = parseur().parse_args(argv)
     except SystemExit as e:
         return 0 if e.code == 0 else 3
-    fautes = []
-    try:
-        COMMANDES[a.cmd](a, fautes)
-    except Exception as e:      # erreur de l'outil, jamais un refus (contrat 0, 1, 3)
-        print(f"ERREUR {a.cmd} : {type(e).__name__} : {e}", file=sys.stderr)
-        return 3
-    for niveau, code, raison, geste, _c in fautes:
-        print(f"{niveau.upper()} {code} : {raison}" + (f" ; à faire : {geste}" if geste else ""))
-    try:
-        journal(a, fautes)
-    except Exception as e:      # journal non écrit : erreur de l'outil, jamais un refus (C-9)
-        print(f"ERREUR journal : {type(e).__name__} : {e}", file=sys.stderr)
-        return 3
+    fautes, a.racine = [], a.depot
+    with contextlib.ExitStack() as pile:
+        try:
+            if a.lecture_seule:
+                if a.cmd not in ("diff", "commit"):
+                    raise Erreur("--lecture-seule : diff et commit seulement")
+                a.depot = jetable(a.racine, pile.enter_context(tempfile.TemporaryDirectory()), a.cmd == "commit")
+            COMMANDES[a.cmd](a, fautes)
+        except Exception as e:      # erreur de l'outil, jamais un refus (contrat 0, 1, 3)
+            print(f"ERREUR {a.cmd} : {type(e).__name__} : {e}", file=sys.stderr)
+            return 3
+        for niveau, code, raison, geste, _c in fautes:
+            print(f"{niveau.upper()} {code} : {raison}" + (f" ; à faire : {geste}" if geste else ""))
+        try:
+            journal(a, fautes)
+        except Exception as e:      # journal non écrit : erreur de l'outil, jamais un refus (C-9)
+            print(f"ERREUR journal : {type(e).__name__} : {e}", file=sys.stderr)
+            return 3
     return 1 if any(f[0] == "refus" for f in fautes) else 0
 
 
