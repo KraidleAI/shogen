@@ -99,7 +99,10 @@ chaque chemin:N se lit (fichier présent, ligne dans le fichier) ; chaque chemin
 (hors sha256) est un commit ; chaque sous-commande avant_acte.py nommée existe ; les interdits ne sont jamais lus.
 RX (E12), à commit (index), diff (HEAD plus le diff) et pousser (plage poussée) : chaque motif ajouté
 (garde_commun.motifs_ajoutes) passe garde_commun.motifs_suspects ; forme exponentielle : refus, sauf ligne qui porte
-redos-admis (journalisée en contournement) ; motif illisible : avertissement."""
+redos-admis (journalisée en contournement) ; motif illisible : avertissement.
+diff --rapport R (E13) : D3, toute fonction publique (def de premier niveau, sans _) ajoutée à scripts/controle/*.py
+est nommée dans scripts/controle/README.md d'après le diff ; D4, tout test ajouté (def test_… d'un .py sous tests/) est
+nommé dans le rapport R sur une ligne qui dit un mutant tué ; tests ajoutés sans --rapport : refus."""
 import argparse
 import contextlib
 import fnmatch
@@ -559,7 +562,37 @@ def diff(a, fautes):
         cites(a.depot, "", fichiers, fautes, env)
         workflows(a.depot, fichiers, fautes, env, a.racine)
         motifs(fichiers, fautes)
+        suivi(a, fichiers, env, fautes)
 
+
+DEF_PUBLIQUE = re.compile("def ([a-z][A-Za-z0-9_]*)[(]")
+DEF_TEST = re.compile(" *def (test_[A-Za-z0-9_]*)[(]")
+TUE = re.compile("(?i)(?<![a-zà-ÿ])(?:tués?|tuées?|killed)(?![a-zà-ÿ])")
+
+
+def suivi(a, fichiers, env, fautes):
+    """D3 et D4 (E13) : README des contrôles d'après le diff (index temporaire env), rapport du générateur."""
+    ajouts = [(f["apres"], n, x) for f in fichiers if (f["apres"] or "").endswith(".py") for n, x in f["ajouts"]]
+    publiques = [(c, n, m[1]) for c, n, x in ajouts if re.fullmatch("scripts/controle/[^/]+", c)
+                 for m in [DEF_PUBLIQUE.match(x)] if m]
+    try:
+        readme = git(a.depot, "cat-file", "-p", ":scripts/controle/README.md", env=env) if publiques else ""
+    except Erreur:
+        readme = ""
+    for c, n, nom in publiques:
+        if not re.search("(?<![A-Za-z0-9_])" + re.escape(nom) + "(?![A-Za-z0-9_])", readme):
+            fautes.append(("refus", "D3", f"{c}:{n} : fonction publique {nom} absente de scripts/controle/README.md "
+                           "(E13)", "la nommer dans l'ajout daté du README (rôle, usage)", "-"))
+    tests = [(c, n, m[1]) for c, n, x in ajouts if "/tests/" in "/" + c for m in [DEF_TEST.match(x)] if m]
+    if tests and not a.rapport:
+        fautes.append(("refus", "D4", f"{len(tests)} test(s) ajouté(s), aucun rapport de mutants (--rapport) (E13)",
+                       "relancer avec --rapport <rapport du générateur>", "-"))
+        return
+    lignes = lire(a.rapport).decode("utf-8").split(chr(10)) if tests else []
+    for c, n, nom in tests:
+        if not any(nom in x and TUE.search(x) for x in lignes):
+            fautes.append(("refus", "D4", f"{c}:{n} : {nom} sans mutant tué au rapport (E13)",
+                           "muter le code que le test garde, le voir rouge, consigner le mutant tué", "-"))
 
 
 def verser(a, fautes):
@@ -923,7 +956,9 @@ def parseur():
     c.add_argument("--source", action="append", required=True)
     c.add_argument("--diff", action="append", default=[])
     c.add_argument("--id")
-    sp.add_parser("diff").add_argument("--fichier", required=True)
+    s = sp.add_parser("diff")
+    s.add_argument("--fichier", required=True)
+    s.add_argument("--rapport")
     sp.add_parser("verser").add_argument("--pieces", required=True)
     s = sp.add_parser("pousser")
     for option in ("--distant", "--branche", "--acte"):

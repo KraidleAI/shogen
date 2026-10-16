@@ -8,10 +8,11 @@ description: >-
 
 # Avant de committer ou de verser
 
-Erreurs visées : E1, E8, E9, E10, E13, E14, E16, E21, E28, LA-N04, LA-N05 (liste de l'orchestrateur, lot GARDE-FOUS-ORCH).
+Erreurs visées : E1, E8, E9, E10, E12, E13, E14, E16, E21, E28, LA-N04, LA-N05 (liste de l'orchestrateur, lot GARDE-FOUS-ORCH).
 
 1. Diff reçu d'un worker, avant de lancer la G2 :
-   `python3 -I -B scripts/controle/avant_acte.py diff --fichier <x.diff>` ; sortie 1 : le diff retourne au worker.
+   `python3 -I -B scripts/controle/avant_acte.py diff --fichier <x.diff> --rapport <rapport du worker>` ; sortie 1 :
+   le diff retourne au worker (motifs, README des contrôles, mutants des tests ajoutés compris).
 2. Message de commit : un fichier écrit après la dernière retouche de l'adjudication relue, avec une ligne
    `Source-Sha: <sha256>` par source (`sha256sum <source>`) et la ligne `Diff-Id: <id>`.
 3. Vérification complète puis sceau, d'une seule commande :
