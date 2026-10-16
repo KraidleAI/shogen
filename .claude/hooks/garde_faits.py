@@ -74,6 +74,7 @@ import os
 import re
 import subprocess
 import sys
+from urllib.parse import urlsplit
 
 QUEUE = 6_000_000          # octets lus en fin de journal (faits affichés)
 FENETRE_APPELS = 60        # derniers appels d'outil de l'agent pour les lectures préalables (R1 à R4)
@@ -127,9 +128,10 @@ NEGATION = re.compile(r"\b(pas|ne|non|sans|jamais|aucune?|interdite?s?|no|not|ne
 COMMUNS = {"le", "la", "les", "un", "une", "je", "tu", "il", "elle", "nous", "vous", "bonjour", "merci", "salut", "oui",
            "non", "cordialement", "hello", "hi", "dear", "thanks", "thank", "best", "regards", "the", "this", "we",
            "our", "utc", "api", "url", "pr", "ok", "json", "ci", "pdf", "http", "https", "readme"}
-NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
+NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
                         r"(?![\w-])")
 RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+FORGE_HOTE = re.compile(r"(?i)(?<![\w-])api\.github\.com(?![\w-])")     # hôte de la forge dans le texte (sens sûr)
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
@@ -371,6 +373,24 @@ def motif_non_ancre(mots):
     return False
 
 
+def hote_forge(mots):
+    """Vrai si un mot de la commande vise l'API de la forge : URL dont l'hôte, lu par urlsplit (jamais par sous-chaîne),
+    est api.github.com (schéma en toute casse, point final admis) ; mot sans schéma dont l'hôte est api.github.com (curl
+    le lit en http) ; URL que urlsplit refuse (ValueError : sens sûr, jamais une erreur interne). Une URL d'un autre hôte
+    dont le chemin, la requête ou un sous-domaine porte « api.github.com » ne compte pas."""
+    for x in mots:
+        if re.match(r"(?i)https?://", x):
+            try:
+                h = urlsplit(x).hostname or ""
+            except ValueError:
+                return True
+        else:
+            h = re.sub(r":[0-9]*$", "", re.split(r"[/?#]", x, maxsplit=1)[0].rsplit("@", 1)[-1]).lower()
+        if h.rstrip(".") == "api.github.com":
+            return True
+    return False
+
+
 def faits_de_la_commande(c, cwd, fond=False):
     """Ce que fait la commande : rm (cibles d'un rm récursif), worktree (git worktree remove), ecrit (fichiers écrits),
     git (sous-commandes), messages (textes que R5 juge pour un commit), forge (gh, curl vers l'API). Lu sur les actes
@@ -406,7 +426,8 @@ def faits_de_la_commande(c, cwd, fond=False):
             f["git"].add(sous)
             f["worktree"] |= sous == "worktree" and reste[:1] == ["remove"]
             f["messages"] += messages_commit(reste, a["corps"], cwd) if sous == "commit" else []
-        elif p == "gh" and m[1:2] in (["pr"], ["issue"], ["api"], ["release"]) or p == "curl" and "api.github.com" in c:
+        elif p == "gh" and m[1:2] in (["pr"], ["issue"], ["api"], ["release"]) or p == "curl" and (
+                hote_forge(m) or any(re.search("[$`]", x) for x in m[1:]) and FORGE_HOTE.search(c)):
             f["forge"] = True
     return f
 

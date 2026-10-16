@@ -688,3 +688,7 @@ dépendent des tests du harnais qu'ils importent.
 > 3 tests, `tests/test_garde_suivi.py` 2 tests,
 > `tests/test_garde_acte.py` 22 tests ; le groupe ajoute 13 tests (dont un de l'intégration) ;
 > plancher du job `controle-unittest` 174.
+
+> Ajout daté du 2026-10-16 12:17:57 UTC (`date -u`), correctif CQ-1 (alertes CodeQL de la PR n° 12 sur le crochet GARDE-FAITS) :
+> `tests/test_garde_codeql.py` 3 tests (temps borné de `NOM_PROPRE`, mêmes mots reconnus, hôte de la forge lu par
+> `urlsplit`, sens sûr : schéma en toute casse, mot sans schéma, URL que `urlsplit` refuse, URL dans une variable du shell) ; plancher du job `controle-unittest` 177.
