@@ -26,7 +26,8 @@
 //! renvoi par numéro de ligne (ligne citante, jeton, cible, lignes écrites, lignes actuelles du texte cité ou `-`,
 //! empreinte SHA-256 de 16 chiffres, commit de lecture). Chaque référence (a) de docs/17 y a son entrée, hors bornes
 //! listées ; chaque entrée est contrôlée (jeton, empreinte aux lignes actuelles, document scellé lu à son sceau) : une
-//! insertion au milieu d'un fichier cité rougit la gate ; le registre se met à jour par un lot revu.
+//! insertion au milieu d'un fichier cité rougit la gate ; le registre se met à jour par un lot revu. Une entrée qui
+//! nomme un emplacement interdit, en document citant ou en cible, est refusée avant toute lecture (relecture G2, C-3).
 //! Coquille hors rôle S-G3 : tranches et indices bornés par construction (positions de motifs).
 
 use crate::documents::{fichiers_markdown, normaliser_pour_recherche, prose_sans_code};
@@ -236,6 +237,7 @@ const R_TEXTE: &str = "(a) registre : texte cité changé ou déplacé (empreint
 const R_SCELLE: &str = "(a) registre : document scellé lu hors de son commit de scellement";
 const R_DOUBLE: &str = "(a) registre : entrée en double";
 const R_ORPHELINE: &str = "(a) registre : entrée de docs/17 sans référence (a) à sa ligne";
+const R_INTERDIT: &str = "(a) registre : emplacement interdit, ni lu ni haché";
 const A_SANS_ENTREE: &str = "(a) référence sans entrée au registre des renvois";
 
 /// Une entrée du registre des renvois, sa forme contrôlée.
@@ -325,6 +327,12 @@ fn controle_renvois(r: &mut Rapport, racine: &Path, registre: &str, a_couvrir: &
             viol_r(r, i + 1, R_FORME);
             continue;
         };
+        // Sûreté (relecture G2 de DETTES-T15, C-3) : refus avant toute lecture ; la gate ne lit, ne cite ni ne hache
+        // aucun octet d'un emplacement interdit.
+        if crate::sg5::emplacement_interdit(e.citant) || crate::sg5::emplacement_interdit(e.cible) {
+            viol_r(r, i + 1, R_INTERDIT);
+            continue;
+        }
         if vues.contains(&(e.citant, e.ligne, e.jeton, e.ecrit)) {
             viol_r(r, i + 1, R_DOUBLE);
             continue;

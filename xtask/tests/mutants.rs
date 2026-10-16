@@ -1483,6 +1483,34 @@ fn mutant_couverture_sg9_registre_des_renvois_absent() {
     );
 }
 
+/// Sûreté (relecture G2 de DETTES-T15, C-3) : une entrée qui nomme un emplacement interdit, en cible ou en document
+/// citant, est refusée sans lecture. Sans ce refus, la gate lisait la ligne citante et hachait les lignes citées : ces
+/// deux entrées, justes, passaient (empreinte de « ligne » : fe9d9907da5ee9a7, `sha256sum` hors du code).
+#[test]
+fn mutant_sg9_registre_emplacement_interdit_jamais_lu() {
+    let cas = [
+        (
+            "Lu : factice.md l.1.\n",
+            "ligne\n",
+            "docs/journal.md:3\tfactice.md l.1\tdocs/rapports/factice.md\t1\t1\tfe9d9907da5ee9a7\t0000000\n",
+        ),
+        (
+            "",
+            "Lu : exemple.rs l.2.\n",
+            "docs/rapports/factice.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t0000000\n",
+        ),
+    ];
+    for (rang, (journal, interdit, entree)) in cas.into_iter().enumerate() {
+        let racine = arbre_menace(&format!("registre-interdit-{rang}"));
+        ajouter(&racine, "docs/journal.md", journal);
+        ecrire(&racine, "docs/rapports/factice.md", interdit);
+        ajouter(&racine, R, entree);
+        let rapport = xtask::sg9::executer(&racine);
+        exiger_rouge(&rapport, "emplacement interdit, ni lu ni haché");
+        assert_eq!(rapport.violations.len(), 1, "{}", motifs(&rapport));
+    }
+}
+
 /// Témoin : sans octets versés ni emplacement interdit, l'entrée épinglée est listée ; `biblio/` peuplée, la référence
 /// à un sidecar (octets non versionnés) et celle d'un emplacement interdit n'ont pas d'entrée et sont listées.
 #[test]
