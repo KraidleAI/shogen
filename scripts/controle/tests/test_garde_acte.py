@@ -51,6 +51,9 @@ class Crochet(unittest.TestCase):
         os.makedirs(os.path.join(a, ".claude", "hooks"), exist_ok=True)
         for x in ("garde_faits.py", "acte_shell.py"):
             shutil.copy(os.path.join(os.path.dirname(GARDE), x), os.path.join(a, ".claude", "hooks"))
+        os.makedirs(os.path.join(a, "scripts", "controle", "garde"), exist_ok=True)
+        shutil.copy(os.path.join(RACINE, "scripts", "controle", "garde", "dossiers.txt"),
+                    os.path.join(a, "scripts", "controle", "garde"))
         for chemin, texte in fichiers.items():
             os.makedirs(os.path.dirname(os.path.join(a, chemin)), exist_ok=True)
             with open(os.path.join(a, chemin), "w", encoding="utf-8") as f:
@@ -100,6 +103,19 @@ class ActeLu(Crochet):
                     "timeout 60 env A=1 git push", "bash <<'FIN'" + NL + "git push" + NL + "FIN", "eval 'git push'"):
             self.refus(appel("ls"), cmd, "R3")
 
+    def test_ln6_actes_non_litteraux(self):
+        """G2, C-2 : commande portée par une variable (programme, eval) ou lancée par un code python (os.system,
+        subprocess) : les motifs d'avant jugent aussi, refus R3 ou R1 ; la sonde et un code python qui ne lance rien
+        passent toujours, une variable hors du programme ne change rien."""
+        os.makedirs(os.path.join(self.t, "clone", ".git"))
+        for cmd, regle in (("C='git commit -m x'; $C", "R3"), ("C='git commit -m x'; eval \"$C\"", "R3"),
+                           ("python3 -c \"import os; os.system('git commit -m x')\"", "R3"),
+                           (NL.join(["python3 - <<'EOF'", "import subprocess", "subprocess.run('git push', shell=1)",
+                                     "EOF"]), "R3"), ("R='rm -rf clone'; $R", "R1")):
+            self.refus(appel("ls"), cmd, regle)
+        for cmd in ("F=neuf.txt; echo x > $F", "python3 -c \"print('git commit -m x')\"", SONDE):
+            self.permis(appel("ls"), cmd)
+
     def test_r5_lit_le_message_et_le_fichier_de_f(self):
         """R5 sur le message d'un commit : -m et le fichier de -F (que le texte de la commande ne montre pas) ;
         identifiant affiché avant : permis."""
@@ -109,6 +125,9 @@ class ActeLu(Crochet):
         self.refus(lu, "git commit -q -F msg.txt", "R5")
         self.refus(lu, "git commit -am 'reprend " + FICTIF + "'", "R5")
         self.permis(lu + appel("git log -1", resultat=FICTIF + "a1 sujet"), "git commit -q -F msg.txt")
+        # G2, C-8 (mutants G11, G12 vivants) : forme --message=, et texte d'une PR créée par gh
+        self.refus(lu, "git commit --message='reprend " + FICTIF + "'", "R5")
+        self.refus(appel("ls"), "gh pr create --title t --body 'reprend " + FICTIF + "'", "R5")
 
     def test_r2_ecriture_lue_sur_l_acte(self):
         """R2 : redirection, tee, sed -i, open en écriture d'un code python sur un fichier non lu : refus ; le même
@@ -157,6 +176,20 @@ class AttenteEtMotif(Crochet):
         self.permis(appel("ls"), "sleep 60", entree={"tool_input": {"command": "sleep 60", "run_in_background": True}})
         self.refus(appel("ls"), 'echo "x ; sleep 60', "R7 (E18)")          # illisible par shlex : motifs
 
+    def test_e18_boucle_a_condition_de_sortie(self):
+        """G2, C-3 (L-3 adjugée par l'orchestrateur) : while ou until à condition de sortie, ou boucle à condition
+        constante qui porte break (moniteur de l'orchestrateur) : permis ; condition constante sans sortie (while :,
+        until false, leurs négations) ou boucle for : refus R7."""
+        for cmd in ("while ! test -f fin; do sleep 5; done", "while kill -0 1 2>/dev/null; do sleep 10; done; echo f",
+                    "while true; do test -f fin && break; sleep 5; done",
+                    "while pgrep -f '^bash c.sh'; do sleep 9; done",
+                    "until ! pgrep -f '^bash c.sh'; do sleep 9; done",
+                    "until test -f f; do for i in 1 2; do sleep 1; done; done"):        # C-8 : boucle englobante
+            self.permis(appel("ls"), cmd)
+        for cmd in ("while :; do sleep 1; done", "until false; do sleep 5; done", "while ! false; do sleep 5; done",
+                    "until ! true; do sleep 5; done", "for i in 1 2; do sleep 5; done"):
+            self.refus(appel("ls"), cmd, "R7 (E18)")
+
     def test_e28_motif_non_ancre_se_reconnait(self):
         """Cas réel E28 : le moniteur pgrep -f chaine_gf.sh se reconnaissait (le shell qui le lance porte le motif ;
         preuve sur l'hôte : trouvé sans aucune chaîne, rien trouvé une fois ancré) ; refus R7 de pkill -f et pgrep -f
@@ -193,10 +226,17 @@ class Forge(Crochet):
         self.permis(gh, "", entree=self.PR)
         autre = dict(self.LISTE, repo="autre")
         self.refus(outil("mcp__github__actions_list", autre, '"conclusion": "success"', 1), "", "R8", entree=self.PR)
+        # G2, C-8 (mutants G04, G05 vivants) : refus du crochet cité dans un résultat, gh run d'un autre dépôt
+        refus = 'GARDE-FAITS : REFUS. "conclusion": "success"'
+        self.refus(outil("mcp__github__actions_list", self.LISTE, refus, 1), "", "R8", entree=self.PR)
+        self.refus(outil("Bash", {"command": "gh run list -R x/r"}, "completed\tsuccess\tgates", 2), "", "R8",
+                   entree=self.PR)
 
     def test_e20_marqueur_du_jour(self):
-        """Marqueur scripts/controle/garde/forge-actions.txt : ligne o/r du jour (date -u, fixée par un faux date) :
-        permis ; ligne d'un autre jour, ou d'un autre dépôt : refus."""
+        """Marqueur scripts/controle/garde/forge-actions.txt (G2, C-4) : ligne o/r du jour (date -u, fixée par un faux
+        date) qui porte l'identifiant d'un run lu dans une preuve du même dépôt, au journal principal (PR créée par un
+        sous-agent) ou d'un sous-agent de la session : permis ; ligne sans identifiant, d'un autre jour, d'un autre
+        dépôt, identifiant absent des preuves ou lu dans un échec : refus."""
         faux = os.path.join(self.t, "faux")
         os.makedirs(faux)
         with open(os.path.join(faux, "date"), "w", encoding="utf-8") as f:
@@ -206,10 +246,24 @@ class Forge(Crochet):
         ancien = os.environ["PATH"]
         os.environ["PATH"] = faux + os.pathsep + ancien
         self.addCleanup(os.environ.__setitem__, "PATH", ancien)
-        for texte, code in (("# entête" + NL + "o/r 2026-10-15" + NL, 0), ("o/r 2026-10-14" + NL, 2),
-                            ("x/r 2026-10-15" + NL, 2)):
-            self.assertEqual(self.lancer(appel("ls"), "", garde=self.arbre({chemin: texte}), entree=self.PR)[0], code,
-                             texte)
+        sous = os.path.join(self.t, "agent-a1.txt")
+        with open(sous, "w", encoding="utf-8") as f:
+            f.write(json.dumps(appel("ls")[0]) + NL)
+        pr = dict(self.PR, agent_id="a1", agent_transcript_path=sous)
+        vu = outil("mcp__github__actions_list", self.LISTE,
+                   '{"workflow_runs": [{"id": 4242, "conclusion": "success"}]}', 1)
+        echec = outil("mcp__github__actions_list", self.LISTE, '{"workflow_runs": [{"id": 4343, "runner_id": 0}]}', 1)
+        for avant, texte, code in ((vu, "# entête" + NL + "o/r 2026-10-15 4242" + NL, 0),
+                                   (vu, "o/r 2026-10-15" + NL, 2),
+                                   (vu, "o/r 2026-10-14 4242" + NL, 2), (vu, "x/r 2026-10-15 4242" + NL, 2),
+                                   (vu, "o/r 2026-10-15 4243" + NL, 2), (echec, "o/r 2026-10-15 4343" + NL, 2),
+                                   (appel("ls"), "o/r 2026-10-15 4242" + NL, 2)):
+            self.assertEqual(self.lancer(avant, "", garde=self.arbre({chemin: texte}), entree=pr)[0], code, texte)
+        os.makedirs(os.path.join(self.t, "subagents"))
+        with open(os.path.join(self.t, "subagents", "agent-b.txt"), "w", encoding="utf-8") as f:
+            f.writelines(json.dumps(e) + NL for e in vu)
+        garde = self.arbre({chemin: "o/r 2026-10-15 4242" + NL})
+        self.assertEqual(self.lancer(appel("ls"), "", garde=garde, entree=self.PR)[0], 0)
 
 
 class Cout(Crochet):
@@ -244,6 +298,17 @@ class Cout(Crochet):
             self.permis([self.humain(texte)], "", entree=wf(self.DIX))
         ancien = [self.humain("FANOUT-AUTORISE"), self.humain("autre chose")]
         self.refus(ancien + appel("ls", resultat="FANOUT-AUTORISE"), "", "R9", entree=wf(self.DIX))
+        meta = {"type": "user", "isMeta": True, "message": {"role": "user", "content": "FANOUT-AUTORISE"}}
+        self.refus([self.humain("vérifie"), meta], "", "R9", entree=wf(self.DIX))     # G2, C-8 (G06 vivant)
+
+    def test_e27_fan_out_dans_une_phrase_niee(self):
+        """G2, C-7 : les mots fan out dans une phrase niée ne valent pas jeton (refus R9) ; FANOUT-AUTORISE vaut
+        toujours, et une négation d'une autre phrase ne retire pas le jeton."""
+        wf = {"tool_name": "Workflow", "tool_input": self.DIX}
+        for texte in ("non, pas de fan out, fais en direct", "fan-out interdit ici", "no fan out please"):
+            self.refus([self.humain(texte)], "", "R9 (E27)", entree=wf)
+        for texte in ("pas de souci, FANOUT-AUTORISE", "Pas de souci. Fan out sur les dix."):
+            self.permis([self.humain(texte)], "", entree=wf)
 
     def test_e27_jeton_lu_au_journal_de_la_session(self):
         """Pour un sous-agent, le jeton se lit au dernier message de l'humain du journal de la session, jamais au
@@ -268,6 +333,10 @@ class Cout(Crochet):
         self.vivants(3)
         self.permis([self.humain("relis")], "", entree=agent)
         self.vivants(4, age=1000)
+        self.permis([self.humain("relis")], "", entree=agent)
+        for k in range(4):                  # G2, C-8 (G07 vivant) : un fichier qui n'est pas agent-* ne compte pas
+            with open(os.path.join(self.t, "subagents", f"autre-{k}.txt"), "w", encoding="utf-8") as f:
+                f.write("x")
         self.permis([self.humain("relis")], "", entree=agent)
 
 
@@ -302,6 +371,8 @@ class Releve(Crochet):
         ancien = outil("Bash", {"command": "grep -n Pocket JOURNAL.md"}, "55:## Session POKT (Pocket)", 1)
         self.assertEqual(self.evenement(garde, "Stop", ancien + self.tour("Rattaché à Pocket."))[0], 2)  # tour d'avant
         self.assertEqual(self.evenement(garde, "SubagentStop", self.tour("Rattaché à Pocket."), agent_id="a")[0], 0)
+        codes = [self.evenement(garde, "Stop", self.tour(x))[0] for x in ("Rattaché à pocket.", "Un Pocketbook.")]
+        self.assertEqual(codes, [2, 0])     # G2, C-8 (G10 vivant) : casse ignorée, mot entier
         nomme = [{"type": "user", "message": {"content": "Jane de CoinGecko demande où en est Pocket."}},
                  {"type": "assistant", "message": {"content": [{"type": "text", "text": "Pocket attend."}]}}]
         self.assertEqual(self.evenement(garde, "Stop", nomme)[0], 0)          # le message nomme lui-même le dossier
@@ -325,6 +396,14 @@ class Releve(Crochet):
         autre = [{"type": "user", "message": {"content": "Note de Paul Martin sur la suite."}},
                  {"type": "assistant", "message": {"content": [{"type": "text", "text": "Réponse au préavis."}]}}]
         self.assertEqual(self.evenement(garde, "Stop", autre)[0], 2)          # relevé d'un autre message : sans effet
+
+    def test_e26_dossiers_lus_au_fichier(self):
+        """G2, C-5 : la liste des dossiers se lit dans scripts/controle/garde/dossiers.txt (versé, un nom par ligne) :
+        un dossier ajouté au fichier est refusé sans relevé, un dossier qui n'y est plus ne l'est plus."""
+        chemin = os.path.join("scripts", "controle", "garde", "dossiers.txt")
+        garde = self.arbre(dict(self.JOURNAL, **{chemin: "# liste" + NL + "Zorglub" + NL}))
+        codes = [self.evenement(garde, "Stop", self.tour(f"Rattaché à {d}."))[0] for d in ("Zorglub", "Pocket")]
+        self.assertEqual(codes, [2, 0])
 
     def test_e26_crochet_branche(self):
         """.claude/settings.json branche le crochet du dépôt sur UserPromptSubmit."""

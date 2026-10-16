@@ -33,21 +33,30 @@ Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et 
 de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
 d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
 pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr).
+G2, C-2 : un acte dont le programme (ou l'argument d'eval) porte $ ou `, ou un code python qui lance un processus
+(subprocess, os.system, os.popen, os.exec*, os.spawn*, pty.spawn), est jugé aussi par les motifs d'avant (sens sûr).
 R7 (E18, E28) : refus d'un sleep d'avant-plan (hors boucle until, hors arrière-plan : &, run_in_background) et d'un
 pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance porte le motif : il se reconnaît).
+G2, C-3 (L-3 adjugée) : une boucle while ou until à condition de sortie admet son sleep comme until ; une boucle à
+condition constante (while true, while :, until false) ne l'admet que si la commande porte break, exit ou return.
 R8 (E20) : create_pull_request refusé sans preuve que la forge lance des jobs sur ce dépôt : au journal, un résultat
 de mcp__github__actions_* (ou de gh run, gh api) du même owner/repo qui montre un run conclu success ou un job à
 runner_id non nul ; ou, au marqueur scripts/controle/garde/forge-actions.txt, la ligne owner/repo AAAA-MM-JJ du jour
 (date -u), écrite après constat.
+G2, C-4 : la ligne du marqueur porte l'identifiant du run lu (owner/repo AAAA-MM-JJ <id>) ; elle ne vaut que si cet
+identifiant figure dans une preuve du même dépôt (résultat ci-dessus) d'un journal de la session (journal principal ou
+subagents/agent-*) : un marqueur écrit sans lecture de la forge, ou sans identifiant, ne vaut rien.
 R9 (E27) : seuil de coût avant Agent et Workflow : refus d'un workflow de plus de SEUIL_WORKFLOW agents (appels agent(
 du script ; nombre inconnu, boucle qui les multiplie : refus), ou d'un lancement qui porterait les sous-agents vivants
 (journal touché depuis VIVANT_S s) au-delà de SEUIL_VIVANTS ; sauf jeton FANOUT-AUTORISE (ou les mots fan out) écrit
-par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil).
+par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil). G2, C-7 : les mots fan out
+ne valent jeton que dans une phrase sans négation (pas, ne, non, sans, jamais, aucun, interdit, no, not, never…).
 R10 (E26) : UserPromptSubmit relève les noms propres du message (capitale hors début de phrase et mots courants,
 capitales internes, sigles, domaine d'un courriel) au JOURNAL et dans docs/publication/ (chemin:N: ligne), l'affiche
 en contexte et le garde (garde-faits.releve) ; au Stop, si le dernier message de l'humain porte un nom propre, une
 réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du tour (résultat d'outil, relevé) est
-refusée une fois (stop_hook_active : passage consigné)."""
+refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se lit dans le fichier versé
+scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien."""
 import importlib.util
 import json
 import os
@@ -69,6 +78,7 @@ SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\
 PY_W = re.compile(r"open\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"][wa]")
 RM = re.compile(r"\brm\s+(?:-[a-zA-Z]*\s+)*(['\"]?)([^\s'\"|;&]+)\1")
 GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
+PY_PROCESSUS = re.compile(r"\b(subprocess|os\s*\.\s*(system|popen|exec\w*|spawn\w*|posix_spawn\w*)|pty\s*\.\s*spawn)\b")
 
 
 def _acte_shell():
@@ -89,7 +99,7 @@ AS = _acte_shell()
 RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SEUIL_WORKFLOW, SEUIL_VIVANTS, VIVANT_S = 3, 4, 300
 JETON = re.compile(r"FANOUT-AUTORISE|\bfan[ -]?out\b", re.I)
-DOSSIERS = ("Pocket", "MONARK", "publication", "préavis", "procurement", "S2-bis")
+NEGATION = re.compile(r"\b(pas|ne|non|sans|jamais|aucune?|interdite?s?|no|not|never|without|don't)\b|\bn'", re.I)
 COMMUNS = {"le", "la", "les", "un", "une", "je", "tu", "il", "elle", "nous", "vous", "bonjour", "merci", "salut", "oui",
            "non", "cordialement", "hello", "hi", "dear", "thanks", "thank", "best", "regards", "the", "this", "we",
            "our", "utc", "api", "url", "pr", "ok", "json", "ci", "pdf", "http", "https", "readme"}
@@ -342,14 +352,21 @@ def faits_de_la_commande(c, cwd, fond=False):
     git (sous-commandes), messages (textes que R5 juge pour un commit), forge (gh, curl vers l'API). Lu sur les actes
     (LN-6) ; par les motifs d'avant si shlex ne lit pas la commande (sens sûr)."""
     actes = AS.analyser(c, fond) if AS else None
+    g = GIT_CMD.search(c)
+    motifs = {"rm": [m.group(2) for m in RM.finditer(c)] if re.search(r"\brm\s+-[a-zA-Z]*[rR]", c) else [],
+              "worktree": "git worktree remove" in c, "git": {g.group(1)} if g else set(), "messages": [c],
+              "ecrit": [m.group(3) for m in REDIR.finditer(c)] + [m.group(2) for m in SED_I.finditer(c)]
+              + PY_W.findall(c),
+              "forge": bool(re.search(r"\bgh\s+pr\s+(create|comment|review|merge)|pull_request", c)), "actes": None}
     if actes is None:
-        g = GIT_CMD.search(c)
-        return {"rm": [m.group(2) for m in RM.finditer(c)] if re.search(r"\brm\s+-[a-zA-Z]*[rR]", c) else [],
-                "worktree": "git worktree remove" in c, "git": {g.group(1)} if g else set(), "messages": [c],
-                "ecrit": [m.group(3) for m in REDIR.finditer(c)] + [m.group(2) for m in SED_I.finditer(c)]
-                + PY_W.findall(c),
-                "forge": bool(re.search(r"\bgh\s+pr\s+(create|comment|review|merge)|pull_request", c)), "actes": None}
-    f = {"rm": [], "worktree": False, "git": set(), "messages": [], "ecrit": [], "forge": False, "actes": actes}
+        return motifs
+    # G2, C-2 : acte non lisible sur ses mots (programme ou argument d'eval portant $ ou `, code python qui lance un
+    # processus) : les motifs d'avant jugent aussi la commande, en plus des actes (sens sûr)
+    douteux = any(re.search("[$`]", a["prog"]) or a["prog"] == "eval" and re.search("[$`]", " ".join(a["mots"][1:]))
+                  or any(PY_PROCESSUS.search(code) for code in a["python"]) for a in actes)
+    f = {"rm": [], "worktree": False, "git": set(), "messages": [], "ecrit": [], "forge": False}
+    f = {k: (type(v)(motifs[k]) if douteux else v) for k, v in f.items()}
+    f["actes"] = actes
     for a in actes:
         m, p = a["mots"], a["prog"]
         f["ecrit"] += [x for op, x in a["redirs"] if ">" in op and not op.endswith("&")]
@@ -385,21 +402,38 @@ def jour_utc():
     return subprocess.run(["date", "-u", "+%Y-%m-%d"], capture_output=True, text=True, timeout=10).stdout.strip()
 
 
-def forge_lance(entrees, owner, repo):
-    """Vrai si le journal ou le marqueur du jour montre que la forge lance des jobs sur owner/repo (R8, E20)."""
-    cible = f"{owner}/{repo}".casefold()
+def preuves_forge(entrees, cible):
+    """Résultats d'outil du journal qui montrent, pour cible (owner/repo), un run conclu success ou un job à runner_id
+    non nul (outil mcp__github__actions_* du même dépôt, ou gh run, gh api qui le nomme)."""
+    out = []
     for nom, inp, txt in appels_resultats(entrees):
         if MARQUE in txt or not FORGE_JOB.search(txt):
             continue
         depot = f"{inp.get('owner', '')}/{inp.get('repo', '')}".casefold()
-        if nom.startswith("mcp__github__actions_") and depot == cible:
-            return True
         c = inp.get("command", "") if nom == "Bash" else ""
-        if re.search(r"\bgh\s+(run|api)\b", c) and cible in c.casefold():
-            return True
+        if nom.startswith("mcp__github__actions_") and depot == cible or re.search(r"\bgh\s+(run|api)\b", c) and (
+                cible in c.casefold()):
+            out.append(txt)
+    return out
+
+
+def forge_lance(entrees, owner, repo, entree):
+    """Vrai si le journal de l'agent, ou le marqueur du jour adossé à une preuve d'un journal de la session, montre que
+    la forge lance des jobs sur owner/repo (R8, E20 ; G2, C-4)."""
+    cible = f"{owner}/{repo}".casefold()
+    if preuves_forge(entrees, cible):
+        return True
     marqueur = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "forge-actions.txt"))
-    lignes = {x.strip().casefold() for x in marqueur.split("\n") if x.strip() and not x.startswith("#")}
-    return f"{cible} {jour_utc()}" in lignes
+    lignes = [x.split() for x in marqueur.casefold().split("\n") if x.strip() and not x.startswith("#")]
+    ids = {x[2] for x in lignes if len(x) == 3 and x[2].isdigit() and x[:2] == [cible, jour_utc()]}
+    tp = entree.get("transcript_path") or ""
+    d = os.path.join(tp[:-6] if tp.endswith(".jsonl") else os.path.dirname(tp), "subagents")
+    try:
+        journaux = [tp] + [os.path.join(d, x) for x in sorted(os.listdir(d)) if x.startswith("agent-")] if ids else []
+    except OSError:
+        journaux = [tp]
+    return any(re.search(r"(?<![\w.])" + i + r"(?![\w.])", t) for j in journaux
+               for t in preuves_forge(lire_queue(j) or [], cible) for i in ids)
 
 
 def tour_humain(entrees):
@@ -463,6 +497,12 @@ def soumission(entree):
     return 0
 
 
+def dossiers():
+    """Dossiers du projet (R10, E26 ; G2, C-5), lus dans scripts/controle/garde/dossiers.txt : un nom par ligne."""
+    texte = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "dossiers.txt"))
+    return [x.strip() for x in texte.split("\n") if x.strip() and not x.lstrip().startswith("#")]
+
+
 def dossiers_sans_releve(entree):
     """R10 (E26) : dossiers que le dernier texte du tour nomme sans relevé, si le message de l'humain porte un nom
     propre ; au second arrêt (stop_hook_active), passage consigné, rien rendu."""
@@ -476,13 +516,19 @@ def dossiers_sans_releve(entree):
     if garde.split("\n", 1)[0] == json.dumps(noms_propres(humains[0]), ensure_ascii=False):
         faits.append(garde)
     vus = "\n".join(faits + humains).casefold()
-    manque = [d for d in DOSSIERS if re.search(r"(?<!\w)" + re.escape(d) + r"(?!\w)", agent[-1], re.I)
+    manque = [d for d in dossiers() if re.search(r"(?<!\w)" + re.escape(d) + r"(?!\w)", agent[-1], re.I)
               and d.casefold() not in vus]
     if manque and entree.get("stop_hook_active"):
         journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
                     f"PASSAGE R10 au second arrêt : {manque}")
         return []
     return manque
+
+
+def jeton(texte):
+    """Jeton du fan-out (R9, E27) : FANOUT-AUTORISE, ou les mots fan out dans une phrase sans négation (G2, C-7)."""
+    return bool(re.search("FANOUT-AUTORISE", texte, re.I)) or any(
+        JETON.search(p) and not NEGATION.search(p) for p in re.split(r"[.!?;\n]+", texte))
 
 
 def agents_du_workflow(inp):
@@ -552,17 +598,20 @@ def pre_tool_use(entree):
         if fc["forge"]:
             textes_ecrits.append(c)
         # R7 (E18, E28) : attente d'avant-plan, motif de processus non ancré
-        attente = "R7 (E18) : sleep d'avant-plan ; attendre par une boucle until (until <condition>; do sleep N; done) "
+        attente = "R7 (E18) : sleep d'avant-plan ; attendre par une boucle while ou until à condition de sortie (until "
+        attente += "<condition>; do sleep N; done) "
         attente += "ou lancer en arrière-plan (run_in_background, ou commande suivie de &) et sonder."
         ancre = "R7 (E28) : pkill -f ou pgrep -f à motif non ancré, qui reconnaît le shell qui le lance ; ancrer par ^ "
         ancre += "(pgrep -f '^bash chaine_x.sh')."
+        sortie = any(a["prog"] in ("break", "exit", "return") for a in fc["actes"] or [])
         for a in fc["actes"] or []:
-            if a["prog"] == "sleep" and not a["fond"] and "until" not in a["boucles"]:
+            en_boucle = any(b in ("while", "until") or b.endswith("-sans-fin") and sortie for b in a["boucles"])
+            if a["prog"] == "sleep" and not a["fond"] and not en_boucle:
                 refuser(attente)
             if a["prog"] in ("pkill", "pgrep") and motif_non_ancre(a["mots"]):
                 refuser(ancre)
         motifs = fc["actes"] is None            # commande illisible par shlex : motifs (sens sûr)
-        if motifs and re.search(r"(^|[;&|(\s])sleep\s", c) and not re.search(r"\buntil\b", c) and not inp.get(
+        if motifs and re.search(r"(^|[;&|(\s])sleep\s", c) and not re.search(r"\b(until|while)\b", c) and not inp.get(
                 "run_in_background"):
             refuser(attente)
         if motifs and re.search(r"\bp(kill|grep)\s[^;&|]*-[a-zA-Z]*f", c) and not re.search(r"\s['\"]?\^", c):
@@ -583,7 +632,7 @@ def pre_tool_use(entree):
         if n is None or (nom == "Workflow" and n > SEUIL_WORKFLOW) or vivants + (n or 0) > SEUIL_VIVANTS:
             tp = entree.get("transcript_path") or ""
             session = entrees if chemin == tp else lire_queue(tp)
-            if not any(JETON.search(t) for t in tour_humain(session or [])[1]):
+            if not any(jeton(t) for t in tour_humain(session or [])[1]):
                 lances = "nombre d’agents illisible" if n is None else f"{n} agent(s) lancé(s)"
                 refuser(f"R9 (E27) : seuil de coût : {lances}, {vivants} vivant(s) (seuils : {SEUIL_WORKFLOW} par "
                         f"workflow, {SEUIL_VIVANTS} vivants) ; faire en direct, ou attendre le jeton FANOUT-AUTORISE "
@@ -591,11 +640,11 @@ def pre_tool_use(entree):
         textes_ecrits.append(p)
     elif nom.startswith("mcp__github__") and nom.split("__")[-1] in ("create_pull_request", "add_issue_comment", "update_pull_request", "pull_request_review_write", "add_reply_to_pull_request_comment"):
         o, r = inp.get("owner", ""), inp.get("repo", "")
-        if nom.endswith("__create_pull_request") and not forge_lance(entrees, o, r):
+        if nom.endswith("__create_pull_request") and not forge_lance(entrees, o, r, entree):
             refuser(f"R8 (E20) : aucune preuve que la forge lance des jobs sur {o}/{r} (dépôt privé : runner_id 0, "
                     "échec en 2 s) ; lire mcp__github__actions_list de ce dépôt (un run conclu success, un job à "
-                    "runner_id non nul), ou écrire après constat la ligne owner/repo AAAA-MM-JJ du jour dans "
-                    "scripts/controle/garde/forge-actions.txt.")
+                    "runner_id non nul), ou écrire après ce constat la ligne owner/repo AAAA-MM-JJ <id du run lu> "
+                    "dans scripts/controle/garde/forge-actions.txt.")
         textes_ecrits.append(json.dumps(inp, ensure_ascii=False))
 
     # R5 : identifiants de commit et numéros de PR écrits

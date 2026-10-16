@@ -97,11 +97,12 @@ class R2_EcrireFichierExistant(Base):
 
     def test_permis_apres_read(self):
         self.ecrire_journal([entree_appel("Read", {"file_path": self.fichier}), entree_resultat("note")])
-        self.permet("PreToolUse", "Bash", {"command": f"echo x >> {self.fichier}"})
+        # G2, C-6 (L-7) : nom relatif au cwd du cas ; le chemin du TMPDIR (segment hexadécimal) reste hors du texte
+        self.permet("PreToolUse", "Bash", {"command": "echo x >> NOTES.md"})
 
     def test_permis_apres_tail(self):
         self.ecrire_journal([entree_appel("Bash", {"command": f"tail -3 {self.fichier}"}), entree_resultat("note")])
-        self.permet("PreToolUse", "Bash", {"command": f"printf 'y\\n' >> {self.fichier}"})
+        self.permet("PreToolUse", "Bash", {"command": "printf 'y\\n' >> NOTES.md"})
 
     def test_permis_fichier_neuf(self):
         self.ecrire_journal([entree_appel("Bash", {"command": "ls"})])

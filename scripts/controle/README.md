@@ -556,3 +556,50 @@ dépendent des tests du harnais qu'ils importent.
 > 20 tests, `tests/test_avant_acte.py` 49 tests,
 > `tests/test_gabarit_chaine.py` 10 tests ; le groupe ajoute 12 tests ; plancher du job
 > `controle-unittest` 138.
+
+
+> *Ajout daté du 2026-10-16 10:27:25 UTC (`date -u` ; lot INTEGRATION-P2 : GARDE-FOUS-ORCH, phase 2, groupe B, pas INT-08 à INT-16 ;
+> annexe B, B.102 : SHOGEN-GARDE-CROCHET-ACTE-1, SHOGEN-GARDE-OUTIL-E18-E20-1, SHOGEN-GARDE-OUTIL-E26-E27-E28-1 ;
+> relecture G2 du groupe, C-1 à C-8)* : un ajout pour le groupe ; empreintes au pas INT-16 :
+> `.claude/hooks/acte_shell.py` `a74689b1d67eec7630a7c046e86a940c9697ebbf94645b2b72b25acf062b736d`,
+> `.claude/hooks/garde_faits.py` `bb90a337977e2f6c4833157cb0ffa902d6f3951c072d9fe112f72d440aaaedfc`,
+> `.claude/settings.json` `952f4a781c8837c13de413dc3b1e7a1cedbfd367b263708a0f2db486f8167bcc`,
+> `.claude/skills/shogen-avant-committer/SKILL.md` `600531d3b74737e02783378196428c01d82fd2b49151d725760787ab6668b205`,
+> `avant_acte.py` `23fcaa3460439442a0b68df194315ca9d35c4dd2023bf777c3d010d4bc8f889a`,
+> `garde/forge-actions.txt` `0ce631b4c66783152afff919699f7d6f006aae7536a447fc014a37261a850ff9`,
+> `garde/dossiers.txt` `cd22558b07b70752428801ade3fa5f5f2c4f1f418df6087844008b07bb017fa8`.
+> - Acte lu (LN-6) : `.claude/hooks/acte_shell.py`, voisin du crochet GARDE-FAITS, bibliothèque standard seule, lit
+>   l'acte d'une commande shell par shlex (commandes simples, programme après les enveloppes, redirections, corps de
+>   heredoc, arrière-plan, boucles ; bash -c, eval et substitutions lus récursivement ; None si shlex ne lit pas la
+>   commande). Le crochet juge R1, R2, R3 et le texte de R5 sur ces actes : la sonde du contre-contrôle (journal
+>   synthétique écrit par un heredoc python qui porte un commit) passe ; un commit dans bash -c, une substitution,
+>   derrière une affectation ou des options globales reste refusé ; R5 lit le message de git commit, fichier de -F
+>   compris. Commande illisible, ou module absent : motifs d'avant. Un acte dont le programme ou l'argument d'eval
+>   porte `$` ou un accent grave, ou un code python qui lance un processus, est jugé aussi par les motifs d'avant
+>   (C-2 : régressions de LN-6 refermées).
+> - R7 (E18, E28) : refus d'un sleep d'avant-plan (hors arrière-plan : &, run_in_background) et d'un pkill -f ou
+>   pgrep -f dont le motif ne commence pas par ^. Une boucle while ou until à condition de sortie admet son sleep ;
+>   une boucle à condition constante (while true, until false), seulement si la commande porte break, exit ou return
+>   (C-3) ; for reste refusé.
+> - R8 (E20) : mcp__github__create_pull_request refusé sans preuve que la forge lance des jobs sur ce owner/repo
+>   (résultat de mcp__github__actions_*, gh run ou gh api du même dépôt : run conclu success ou job à runner_id non
+>   nul) ; ou ligne `owner/repo AAAA-MM-JJ <id du run lu>` du jour au marqueur `garde/forge-actions.txt`, qui ne vaut
+>   que si l'identifiant figure dans une telle preuve d'un journal de la session (C-4).
+> - R9 (E27) : seuil de coût avant Agent et Workflow : workflow de plus de 3 agents (nombre illisible ou multiplié par
+>   une boucle : refus), lancement qui porterait au-delà de 4 les sous-agents vivants (journal touché depuis moins de
+>   300 s) ; sauf jeton FANOUT-AUTORISE, ou les mots fan out dans une phrase sans négation (C-7), au dernier message
+>   de l'humain.
+> - R10 (E26) : à la soumission d'un message (UserPromptSubmit, `.claude/settings.json`), ses noms propres sont
+>   relevés au JOURNAL et dans docs/publication/, affichés en contexte et gardés pour le tour ; au Stop, une réponse
+>   qui nomme un dossier de `garde/dossiers.txt` (C-5 : liste versée, un nom par ligne ; absent ou vide : aucun refus)
+>   absent du message et de tout fait du tour est refusée une fois.
+> - E28, `verser` : V6 (`biblio`), chaque fichier de biblio/ (hors INDEX.md et `*.sidecar`, répertoire plat) nommé en
+>   accents graves dans biblio/INDEX.md et compte d'en-tête égal au compte réel, sauf corpus partiel tout nommé
+>   (forme de S-G6) ; V7 (`chaine_active`, `MOTIF_CHAINE`), refus pendant qu'une chaîne de commits tourne (pgrep -f
+>   ancré ; pgrep en erreur : 3). Skill `shogen-avant-committer`, point 5.
+> - Cas hors CI (C-6, L-7) : `.claude/hooks/tests/test_garde_faits.py` écrit `NOTES.md` par son nom relatif ; un
+>   segment hexadécimal du TMPDIR n'y est plus pris pour un identifiant (R5).
+>
+> Tests : `tests/test_garde_acte.py` 21 tests (cas des mutants vivants de la G2 compris,
+> C-8), `tests/test_avant_acte.py` 51 tests ; le groupe ajoute 23 tests ; plancher du job
+> `controle-unittest` 161.

@@ -5,8 +5,10 @@ du shell, saut de ligne séparateur) en commandes simples : programme (après af
 enveloppes timeout, env, nohup, …), mots, redirections, corps de heredoc, arrière-plan (& d'une commande, d'une liste,
 d'un groupe, d'une boucle), boucles englobantes ; bash -c, sh -c, eval, heredoc donné à un shell et substitutions
 $(…) et `…` entre guillemets sont lus récursivement. analyser() rend None si shlex ne lit pas la commande : le crochet
-revient alors à ses motifs (sens sûr). Limites : un opérateur seul entre guillemets est lu comme opérateur ; un
-script lancé par son nom (bash x.sh) n'est pas lu ; case n'est pas analysé. Bibliothèque standard seule (R-8)."""
+revient alors à ses motifs (sens sûr). G2, C-3 : une boucle while ou until à condition constante (while true, while :,
+until false, ou leur négation) est marquée sans fin (while-sans-fin, until-sans-fin) dans boucles.
+Limites : un opérateur seul entre guillemets est lu comme opérateur ; un script lancé par son nom (bash x.sh)
+n'est pas lu ; case n'est pas analysé. Bibliothèque standard seule (R-8)."""
 import os
 import re
 import shlex
@@ -141,18 +143,24 @@ def analyser(texte, fond=False, boucles=(), profondeur=0):
                         pile.pop()
                     debut = pile.pop()[1] if pile else debut
             continue
-        mots = list(x["mots"])
+        mots, boucle = list(x["mots"]), None
         while mots and (mots[0] in DEBUT or mots[0] in FIN or mots[0] == "for" or AFFECT.match(mots[0])):
             m = mots.pop(0)
             if m in ("while", "until", "for", "{"):
                 pile.append((m, debut))
                 debut = len(actes)
+                boucle = [m, False] if m in ("while", "until") else boucle
             elif m in ("done", "}"):
-                while pile and pile[-1][0] not in (("while", "until", "for") if m == "done" else ("{",)):
+                while pile and pile[-1][0].split("-")[0] not in (("while", "until", "for") if m == "done" else ("{",)):
                     pile.pop()
                 debut = pile.pop()[1] if pile else debut
+            elif m == "!" and boucle:
+                boucle[1] = not boucle[1]
             if m == "for":
                 mots = []           # for x in liste : la liste n'est pas une commande
+        if boucle and pile and pile[-1][0] == boucle[0]:    # G2, C-3 : condition constante, boucle sans fin
+            sans_fin = mots[:1] in (["true"], [":"]) if (boucle[0] == "while") != boucle[1] else mots[:1] == ["false"]
+            pile[-1] = (boucle[0] + "-sans-fin", pile[-1][1]) if sans_fin else pile[-1]
         mots = deballer(mots)
         if not mots and not x["redirs"] and not x["corps"]:
             continue
