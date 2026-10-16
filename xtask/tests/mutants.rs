@@ -1511,6 +1511,42 @@ fn mutant_sg9_registre_emplacement_interdit_jamais_lu() {
     }
 }
 
+/// Paquet scellé (relecture G2 de DETTES-T15, C-4) : un renvoi que le paquet recopie d'ADR-0028 (l.56 et l.63) se lit
+/// au commit de lecture d'ADR-0028, `ce63fed` ; tout autre renvoi du paquet, à son sceau `8b14567`.
+#[test]
+fn mutant_sg9_registre_paquet_recopie_lu_au_commit_de_sa_source() {
+    let paquet = "docs/adr-0028/PAQUET-PREREG-S2.md";
+    let texte = format!(
+        "Repère : exemple.rs l.2 (lu au commit de scellement).\n{}Recopié : exemple.rs l.2.\n",
+        "x\n".repeat(54)
+    );
+    let entree = |commit: &str| {
+        format!(
+            "{paquet}:56\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t{commit}\n"
+        )
+    };
+    let cas = [
+        ("recopie", "ce63fed", "8b14567"),
+        ("sceau", "8b14567", "8b14567"),
+        ("ligne-1", "ce63fed", "ce63fed"),
+    ];
+    for (cas, commit, sceau_ligne_1) in cas {
+        let racine = arbre_menace(&format!("paquet-{cas}"));
+        ecrire(&racine, paquet, &texte);
+        remplacer(&racine, R, "\t8b14567\n", &format!("\t{sceau_ligne_1}\n"));
+        ajouter(&racine, R, &entree(commit));
+        let rapport = xtask::sg9::executer(&racine);
+        if cas == "recopie" {
+            assert!(rapport.vert(), "{}", motifs(&rapport));
+        } else {
+            exiger_rouge(
+                &rapport,
+                "document scellé lu hors de son commit de scellement",
+            );
+        }
+    }
+}
+
 /// Témoin : sans octets versés ni emplacement interdit, l'entrée épinglée est listée ; `biblio/` peuplée, la référence
 /// à un sidecar (octets non versionnés) et celle d'un emplacement interdit n'ont pas d'entrée et sont listées.
 #[test]

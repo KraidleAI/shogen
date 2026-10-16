@@ -225,10 +225,18 @@ fn controle_a<'t>(r: &mut Rapport, racine: &Path, t: &'t str) -> Vec<(usize, &'t
 }
 
 const ENTETE_RENVOIS: &str = "renvoi\tjeton\tcible\tecrit\tlignes\tempreinte\tcommit";
-/// Documents scellés : leurs renvois se lisent au commit de scellement qu'ils déclarent (paquet, l.5 et l.8).
-const SCELLES: [(&str, &str); 1] = [(
+/// Un document scellé : chemin, commit de scellement, renvois recopiés (ligne, commit de lecture de leur source).
+type Scelle = (&'static str, &'static str, &'static [(usize, &'static str)]);
+/// Documents scellés : leurs renvois se lisent au commit de scellement qu'ils déclarent (paquet, l.5 et l.8), sauf ceux
+/// qu'ils recopient d'un autre document, lus au commit de lecture de celui-ci : paquet l.56 et l.63, recopiés
+/// d'ADR-0028 l.35 et l.44, inexacts dès le scellement (`4d49757` insère 14 lignes dans doc 10 ; relecture G2, C-4).
+const SCELLES: [Scelle; 1] = [(
     "docs/adr-0028/PAQUET-PREREG-S2.md",
     "8b1456740b0f8012cce886d4720d1ff0c4b68483",
+    &[
+        (56, "ce63fed4f822554087d1f101f06e626c39ff68f3"),
+        (63, "ce63fed4f822554087d1f101f06e626c39ff68f3"),
+    ],
 )];
 const R_FORME: &str = "(a) registre : ligne hors forme";
 const R_JETON: &str = "(a) registre : jeton absent de sa ligne citante, ou numéro écrit absent";
@@ -347,8 +355,16 @@ fn controle_renvois(r: &mut Rapport, racine: &Path, registre: &str, a_couvrir: &
         if !porte || !numero_ecrit(e.jeton, e.ecrit) {
             viol_r(r, i + 1, R_JETON);
         }
-        let sceau = SCELLES.iter().find(|(document, _)| *document == e.citant);
-        if sceau.is_some_and(|(_, commit)| !commit.starts_with(e.commit)) {
+        let sceau = SCELLES
+            .iter()
+            .find(|(document, _, _)| *document == e.citant);
+        let lu = sceau.map(|(_, commit, recopies)| {
+            recopies
+                .iter()
+                .find(|(l, _)| *l == e.ligne)
+                .map_or(*commit, |(_, c)| *c)
+        });
+        if lu.is_some_and(|commit| !commit.starts_with(e.commit)) {
             viol_r(r, i + 1, R_SCELLE);
         }
         if e.citant == PERIMETRE {

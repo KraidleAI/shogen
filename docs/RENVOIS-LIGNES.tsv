@@ -3,7 +3,8 @@
 # jeton (texte du renvoi dans cette ligne), cible, ecrit (ligne ou plage écrite), lignes (où le texte cité se trouve
 # aujourd'hui ; « - » s'il n'est plus dans l'arbre : le renvoi se lit alors à son commit seul), empreinte (16 premiers
 # chiffres hexadécimaux du SHA-256 des lignes citées, jointes par LF, au commit de lecture), commit (de lecture : base
-# que déclare le document citant ; docs/17 : cf696bd, ses ajouts datés : leur commit ; paquet scellé : 8b14567).
+# que déclare le document citant ; docs/17 : cf696bd, ses ajouts datés : leur commit ; paquet scellé : 8b14567 ; renvoi
+# recopié d'un autre document : commit de lecture de celui-ci, paquet l.56 et l.63 et CP1 l.101 : ADR-0028, ce63fed).
 # Rejeu d'une empreinte : git show <commit>:<cible> | sed -n '<a>,<b>p' | head -c -1 | sha256sum (16 chiffres).
 # Mise à jour par un lot revu ; aucune ligne d'un document cité n'est réécrite pour un renvoi.
 renvoi	jeton	cible	ecrit	lignes	empreinte	commit
@@ -124,7 +125,7 @@ docs/adr-0028/AVIS-G4-NOTAIRE.md:5	ADR-0028-decisions-sortie-S2.md` l.222-261	do
 docs/adr-0028/AVIS-G4-NOTAIRE.md:71	ADR-0028-decisions-sortie-S2.md:231	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	231	232	2e0fcec193d6a61a	ab55f81
 docs/adr-0028/AVIS-G4-NOTAIRE.md:72	ADR-0028-decisions-sortie-S2.md:257	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	257	258	17a881dc894ac862	ab55f81
 docs/adr-0028/CP1-PAQUET-2026-10-02.md:36	annexe A l.61-128	docs/adr-0028/ANNEXE-A-lots.md	61-128	-	659be09ab534c027	8b9536b
-docs/adr-0028/CP1-PAQUET-2026-10-02.md:101	doc 10 l.521-522	docs/10-mesures-pilotes-design.md	521-522	523-524	b239ac3baefc1307	8b9536b
+docs/adr-0028/CP1-PAQUET-2026-10-02.md:101	doc 10 l.521-522	docs/10-mesures-pilotes-design.md	521-522	537-538	26d69972d4fff18a	ce63fed
 docs/adr-0028/CP1-PAQUET-2026-10-02.md:136	doc 10 l.392-395	docs/10-mesures-pilotes-design.md	392-395	394-397	5cbd03b872bec94a	8b9536b
 docs/adr-0028/G0-lot-D8a.md:25	ADR-0028-decisions-sortie-S2.md` l.93-101	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	93-101	-	4633b0070af9608d	fb089dc
 docs/adr-0028/G0-lot-D8a.md:35	ADR-0028 l.160	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	160	281	ebfe0ae35ea915b8	fb089dc
@@ -138,5 +139,6 @@ docs/adr-0028/G0-lot-D8a.md:424	ADR-0028 l.85	docs/adr-0028/ADR-0028-decisions-s
 docs/adr-0028/G2-RATTRAPAGE-R-A.md:61	ADR-0028-decisions-sortie-S2.md` l.1-327	docs/adr-0028/ADR-0028-decisions-sortie-S2.md	1-327	-	a42daa2d477f2c17	e586c0b
 docs/adr-0028/INVENTAIRE-G2-RECALCUL.md:55	ANNEXE-A-lots.md` l.1-131	docs/adr-0028/ANNEXE-A-lots.md	1-131	-	70d5daef2fd5774c	35a601e
 docs/adr-0028/PAQUET-PREREG-S2.md:16	doc 10 §6 (l.555-579	docs/10-mesures-pilotes-design.md	555-579	557-581	5248f10c8514473c	8b14567
-docs/adr-0028/PAQUET-PREREG-S2.md:56	doc 10 l.379-380	docs/10-mesures-pilotes-design.md	379-380	381-382	a1d11483100a02a1	8b14567
-docs/adr-0028/PAQUET-PREREG-S2.md:63	doc 10 l.519-522	docs/10-mesures-pilotes-design.md	519-522	521-524	10a4bb8925720a99	8b14567
+docs/adr-0028/PAQUET-PREREG-S2.md:56	doc 10 l.379-380	docs/10-mesures-pilotes-design.md	379-380	395-396	769648f826fa2d96	ce63fed
+docs/adr-0028/PAQUET-PREREG-S2.md:57	l.392-395	docs/10-mesures-pilotes-design.md	392-395	394-397	5cbd03b872bec94a	8b14567
+docs/adr-0028/PAQUET-PREREG-S2.md:63	doc 10 l.519-522	docs/10-mesures-pilotes-design.md	519-522	535-538	7f2c99c9c221191f	ce63fed
