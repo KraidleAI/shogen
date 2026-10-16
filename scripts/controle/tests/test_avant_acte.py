@@ -556,7 +556,13 @@ class DiffDeWorker(Source):
         dépôt jetable (clone --shared) ; rien n'est écrit dans le dépôt lu (objets, journal, sceaux), mêmes verdicts
         qu'en mode courant (refus C7, C5 et C8 du diff : fichiers cités et lecteur YAML du dépôt lu ; sceau du dépôt
         lu exigé et lu par commit ; interdit vu par un lien de l'arbre lu) ; sans l'option, le dépôt lu
-        change ; autre sous-commande avec l'option : erreur 3."""
+        change ; autre sous-commande avec l'option : erreur 3. Contre-contrôle de INTEGRATION-P2 : dépôt jetable sous
+        un TMPDIR qui porte un interdit, interdits jugés dans le dépôt lu (racine), non dans le jetable."""
+        rapports = os.path.join(self.tmp, "docs", "rapports")
+        os.makedirs(rapports)
+        self.assertEqual(self.diff_de({"n.md": "x" + NL}), (0, ""))
+        with mock.patch.object(tempfile, "tempdir", rapports):
+            self.assertEqual(self.lancer("--lecture-seule", "diff", "--fichier", self.w), (0, ""))
         self.diff_de({"JOURNAL.md": NL.join(["l1", "l2", "neuf", "l3", "l4", "l5", ""])})
         avant = self.etat()
         seul = self.lancer("--lecture-seule", "diff", "--fichier", self.w)
