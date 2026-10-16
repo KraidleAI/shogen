@@ -32,7 +32,9 @@ Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisib
 Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et le texte de R5 se lisent sur les actes
 de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
 d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
-pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr)."""
+pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr).
+R7 (E18, E28) : refus d'un sleep d'avant-plan (hors boucle until, hors arrière-plan : &, run_in_background) et d'un
+pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance porte le motif : il se reconnaît)."""
 import importlib.util
 import json
 import os
@@ -291,6 +293,26 @@ def lire_texte(chemin):
         return ""
 
 
+def motif_non_ancre(mots):
+    """Vrai si pkill ou pgrep porte -f (--full, ou groupée : -af) et que son motif ne commence pas par ^."""
+    plein, k = False, 1
+    while k < len(mots):
+        m = mots[k]
+        if m == "--" or not m.startswith("-") or m == "-":
+            motif = mots[k + 1] if m == "--" and k + 1 < len(mots) else (None if m == "--" else m)
+            return plein and motif is not None and not motif.startswith("^")
+        if m.startswith("--"):
+            plein |= m == "--full"
+            k += 2 if m in ("--signal", "--euid", "--uid", "--group", "--pgroup", "--parent", "--session", "--terminal",
+                            "--pidfile", "--ns", "--nslist", "--runstates", "--delimiter", "--cgroup") else 1
+        elif mots[0].endswith("pkill") and re.fullmatch(r"-([0-9]+|[A-Z][A-Z0-9+-]*)", m):
+            k += 1                  # signal : -9, -TERM
+        else:
+            plein |= "f" in m[1:]
+            k += 2 if m[-1] in "dgGPstuUFr" else 1
+    return False
+
+
 def faits_de_la_commande(c, cwd, fond=False):
     """Ce que fait la commande : rm (cibles d'un rm récursif), worktree (git worktree remove), ecrit (fichiers écrits),
     git (sous-commandes), messages (textes que R5 juge pour un commit), forge (gh, curl vers l'API). Lu sur les actes
@@ -366,6 +388,22 @@ def pre_tool_use(entree):
                 refuser("R3 : « git push » exige ce qui part lu avant (git log origin/<branche>..HEAD, git status ou ls-remote).")
         if fc["forge"]:
             textes_ecrits.append(c)
+        # R7 (E18, E28) : attente d'avant-plan, motif de processus non ancré
+        attente = "R7 (E18) : sleep d'avant-plan ; attendre par une boucle until (until <condition>; do sleep N; done) "
+        attente += "ou lancer en arrière-plan (run_in_background, ou commande suivie de &) et sonder."
+        ancre = "R7 (E28) : pkill -f ou pgrep -f à motif non ancré, qui reconnaît le shell qui le lance ; ancrer par ^ "
+        ancre += "(pgrep -f '^bash chaine_x.sh')."
+        for a in fc["actes"] or []:
+            if a["prog"] == "sleep" and not a["fond"] and "until" not in a["boucles"]:
+                refuser(attente)
+            if a["prog"] in ("pkill", "pgrep") and motif_non_ancre(a["mots"]):
+                refuser(ancre)
+        motifs = fc["actes"] is None            # commande illisible par shlex : motifs (sens sûr)
+        if motifs and re.search(r"(^|[;&|(\s])sleep\s", c) and not re.search(r"\buntil\b", c) and not inp.get(
+                "run_in_background"):
+            refuser(attente)
+        if motifs and re.search(r"\bp(kill|grep)\s[^;&|]*-[a-zA-Z]*f", c) and not re.search(r"\s['\"]?\^", c):
+            refuser(ancre)
     elif nom in ("Edit", "MultiEdit", "Write"):
         fp = inp.get("file_path", "")
         if fp.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):

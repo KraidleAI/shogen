@@ -1,7 +1,8 @@
 """Cas du crochet GARDE-FAITS du dépôt (.claude/hooks/garde_faits.py), lancé tel quel sur des journaux synthétiques
 (nom en .txt), lot GARDE-FOUS-ORCH phase 2. LN-6 (SHOGEN-GARDE-CROCHET-ACTE-1) : l'acte est jugé, non le texte ; les
 deux faux refus de la sonde du contre-contrôle (R3 puis R5 sur une commande qui écrit un journal synthétique par un
-heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F."""
+heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F.
+R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré."""
 import json
 import os
 import shutil
@@ -116,6 +117,39 @@ class ActeLu(Crochet):
         shutil.copy(os.path.join(os.path.dirname(GARDE), "acte_shell.py"), seul)
         self.permis(appel("ls"), SONDE, garde=os.path.join(seul, "garde_faits.py"))
         self.assertEqual(sorted(os.listdir(seul)), ["acte_shell.py", "garde_faits.py"])
+
+
+class AttenteEtMotif(Crochet):
+    """R7 (E18, E28 ; SHOGEN-GARDE-OUTIL-E18-E20-1, SHOGEN-GARDE-OUTIL-E26-E27-E28-1)."""
+
+    def test_e18_sleep_d_avant_plan(self):
+        """Cas réel E18 : sleep 60 en commande d'avant-plan, et ses formes (liste, enveloppe, bash -c, boucle while) :
+        refus R7 ; boucle until, arrière-plan (&, groupe, liste, run_in_background), texte cité : permis."""
+        for cmd in ("sleep 60", "ls" + NL + "sleep 60", "sleep 5 && git log -1", "timeout 30 sleep 20",
+                    "bash -c 'sleep 4'", "while true; do sleep 5; done", "cmd & sleep 3"):
+            self.refus(appel("ls"), cmd, "R7 (E18)")
+        for cmd in ("until test -f fin; do sleep 5; done", "sleep 30 &", "(sleep 10; kill 1) &", "sleep 3 && cmd &",
+                    "setsid nohup bash -c 'sleep 4' > log 2>&1 &", 'echo "sleep 60"', "sleep 2 && (kill 1) &",
+                    "until test -f fin; do bash -c 'sleep 5'; done"):
+            self.permis(appel("ls"), cmd)
+        self.permis(appel("ls"), "sleep 60", entree={"tool_input": {"command": "sleep 60", "run_in_background": True}})
+        self.refus(appel("ls"), 'echo "x ; sleep 60', "R7 (E18)")          # illisible par shlex : motifs
+
+    def test_e28_motif_non_ancre_se_reconnait(self):
+        """Cas réel E28 : le moniteur pgrep -f chaine_gf.sh se reconnaissait (le shell qui le lance porte le motif ;
+        preuve sur l'hôte : trouvé sans aucune chaîne, rien trouvé une fois ancré) ; refus R7 de pkill -f et pgrep -f
+        non ancrés, sous leurs formes ; motif ancré, ou sans -f : permis."""
+        essai = "pgrep -f chaine_zz_" + str(os.getpid()) + ".sh"
+        ancre = essai.replace("-f ", "-f '^bash ") + "'"
+        lances = [subprocess.run(["bash", "-c", c + " > /dev/null; echo $?"], capture_output=True, text=True,
+                                 timeout=30).stdout.split()[-1] for c in (essai, ancre)]
+        self.assertEqual(lances, ["0", "1"])         # moniteur à deux commandes : le shell reste, porteur du motif
+        for cmd in ("pgrep -f chaine_gf.sh", "pkill -9 -f chaine_gf.sh", "pgrep -af chaine", "x=$(pgrep -f chaine_gf)",
+                    "pkill --signal TERM --full chaine", "pgrep -u 0 -f chaine", "pkill -HUP -f chaine"):
+            self.refus(appel("ls"), cmd, "R7 (E28)")
+        for cmd in ("pgrep -f '^bash chaine_gf.sh'", "pgrep chaine_gf", "pkill -f -- '^bash x'", "pgrep -fu0 '^x'",
+                    "pgrep -f 2>/dev/null '^bash x'"):
+            self.permis(appel("ls"), cmd)
 
 
 if __name__ == "__main__":
