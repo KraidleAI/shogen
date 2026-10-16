@@ -29,12 +29,17 @@ dernière écrite restent refusées (C-1) ; le marqueur qui suit des fenêtres s
 ses octets avant tout décodeur, par la copie du compte du lecteur du recalcul (RB-1j, RB-1l ; texte égal, contrôlé par
 `test_fitness`) : une RecursionError n'est jamais un verdict (SHOGEN-S2BIS-ECRIVAIN-IMBRICATION-OCTETS-1) ;
 `canonique` compte les valeurs une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur plus
-de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1)."""
+de LIMITE valeurs (`JOURNAL/taille`, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1). DT6-a : la borne porte sur les
+octets (SHOGEN-S2BIS-CANONIQUE-OCTETS-1 : une longue chaîne partagée comptait pour une valeur), et un cycle est refusé
+avant le sérialiseur, qui développait le graphe partagé placé devant lui (résiduel de CORPS-BORNE-1). DT6-c
+(SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1) : un fichier du journal ou des sommes qui n'est pas un fichier ordinaire est
+refusé à l'ouverture (JOURNAL/fichier), et toute lecture s'ouvre sans attente (`ordinaire`)."""
 import fcntl
 import hashlib
 import json
 import os
 import re
+import stat
 import threading
 import time
 
@@ -64,11 +69,25 @@ class JournalOccupe(ErreurJournal):
     pass
 
 
+def _octets(v):
+    """Borne basse des octets que le sérialiseur écrit pour la valeur simple `v` (DT6-a,
+    SHOGEN-S2BIS-CANONIQUE-OCTETS-1) : chaîne, sa longueur et deux guillemets ; entier, son signe et ses chiffres,
+    bornés par sa taille en bits (3/10 < log10 2) ; null, true, false, 4 ; nombre à virgule, 3 ; autre valeur, 1."""
+    if isinstance(v, str):
+        return len(v) + 2
+    if v is None or isinstance(v, bool):
+        return 4
+    if isinstance(v, int):
+        return (v < 0) + 1 + (max(v.bit_length(), 1) - 1) * 3 // 10
+    return 3 if isinstance(v, float) else 1
+
+
 def _parcours(enr):
-    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr` et nombre de ses valeurs, une
-    fois par occurrence, None sur un cycle), sans récursion. Chaque conteneur n'est développé qu'une fois, sa hauteur
-    et son nombre de valeurs retenus : un conteneur partagé compte à sa plus grande profondeur et autant de fois qu'il
-    figure, sans parcours exponentiel (CB-6d) ; un cycle n'arrête pas la recherche des entiers."""
+    """(entier de plus de CHIFFRES chiffres ?, niveau du plus profond conteneur de `enr` et borne basse de ses octets,
+    une fois par occurrence, None sur un cycle), sans récursion. Chaque conteneur n'est développé qu'une fois, sa
+    hauteur et sa borne retenues : un conteneur partagé compte à sa plus grande profondeur et autant de fois qu'il
+    figure, sans parcours exponentiel (CB-6d) ; sa borne compte crochets, séparateurs, clés (`_octets`, deux-points) et
+    valeurs (DT6-a) ; un cycle n'arrête pas la recherche des entiers."""
     long_, cycle, haut, chemin, pile, n = False, False, {}, set(), [(enr, False)], {}
     while pile:
         v, fin = pile.pop()
@@ -80,7 +99,9 @@ def _parcours(enr):
             chemin.discard(id(v))
             haut[id(v)] = 1 + max([haut.get(id(x), 0) for x in enfants if isinstance(x, (dict, list, tuple))],
                                   default=0)
-            n[id(v)] = 1 + sum(n.get(id(x), 1) if isinstance(x, (dict, list, tuple)) else 1 for x in enfants)
+            cles = sum(_octets(k) + 1 for k in v) if isinstance(v, dict) else 0     # clé entre guillemets, deux-points
+            n[id(v)] = 1 + len(enfants) + cles + sum(n.get(id(x), 1) if isinstance(x, (dict, list, tuple)) else
+                                                     _octets(x) for x in enfants)
         elif id(v) in chemin:
             cycle = True                                            # le sérialiseur le refusera (JOURNAL/type)
         else:
@@ -114,17 +135,21 @@ def _types(e):
 
 
 def canonique(enr):
-    """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Le
-    contrôle de cycle de `json` précède le parcours, qui se termine donc (C-3). Un entier de plus de CHIFFRES chiffres
-    (JOURNAL/entier, I-1) et un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication, C-4) sont refusés avant le
-    sérialiseur, quel que soit le réglage de l'interpréteur."""
-    long_, niveaux, valeurs = _parcours(enr)
+    """Octets canoniques de `enr` ; flottant, clé non textuelle, valeur hors JSON ou cycle : refus JOURNAL/type. Un
+    entier de plus de CHIFFRES chiffres (JOURNAL/entier, I-1), un cycle (JOURNAL/type, DT6-a : le sérialiseur
+    développait d'abord le graphe partagé qui le précède), un conteneur au-delà du niveau NIVEAUX (JOURNAL/imbrication,
+    C-4) et une ligne de plus de LIMITE octets selon la borne basse de `_parcours` (JOURNAL/taille, DT6-a) sont refusés
+    avant le sérialiseur, quel que soit le réglage de l'interpréteur : celui-ci écrit au plus 8 × LIMITE octets (8 :
+    nombre à virgule de 24 caractères compté 3), et le parcours des valeurs qui le suit se termine (C-3)."""
+    long_, niveaux, octets = _parcours(enr)
     if long_:
         raise ErreurJournal("JOURNAL/entier", f"entier de plus de {CHIFFRES} chiffres")
-    if niveaux is not None and niveaux > NIVEAUX:
+    if niveaux is None:
+        raise ErreurJournal("JOURNAL/type", "structure cyclique")
+    if niveaux > NIVEAUX:
         raise ErreurJournal("JOURNAL/imbrication", f"{niveaux} niveaux, {NIVEAUX} au plus")
-    if valeurs is not None and valeurs > LIMITE:                 # chaque valeur écrit un octet au moins (CB-6d)
-        raise ErreurJournal("JOURNAL/taille", f"{valeurs} valeurs, plus que {LIMITE} octets")
+    if octets + 1 > LIMITE:                                     # saut de ligne compris (CB-6d ; DT6-a)
+        raise ErreurJournal("JOURNAL/taille", f"au moins {octets + 1} octets, plus que {LIMITE}")
     try:
         octets = json.dumps(enr, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     except (TypeError, ValueError, RecursionError) as e:          # ValueError : cycle ; RecursionError : imbrication
@@ -136,6 +161,17 @@ def canonique(enr):
             raise ErreurJournal("JOURNAL/type", repr(v)[:80])
         pile += v.values() if isinstance(v, dict) else v if isinstance(v, (list, tuple)) else []
     return octets
+
+
+def ordinaire(chemin):
+    """Descripteur en lecture du fichier ordinaire `chemin`, ouvert sans attente (O_NONBLOCK) : un tube nommé, un
+    dossier ou un périphérique à ce nom lève JOURNAL/fichier sans bloquer (DT6-c,
+    SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 ; comme au dépôt, FORMAT §16.9)."""
+    fd = os.open(chemin, os.O_RDONLY | os.O_NONBLOCK)
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ErreurJournal("JOURNAL/fichier", f"pas un fichier ordinaire : {os.path.basename(chemin)}")
+    return fd
 
 
 def jour(ws):
@@ -150,7 +186,7 @@ def _tout(fd, octets):
 def _empreinte(chemin, debut=0):
     """(sha256, octets) du fichier `chemin` à partir de `debut`, lu par blocs."""
     h, n = hashlib.sha256(), 0
-    with open(chemin, "rb") as f:
+    with open(ordinaire(chemin), "rb") as f:
         f.seek(debut)
         for bloc in iter(lambda: f.read(1 << 20), b""):
             h.update(bloc)
@@ -204,7 +240,8 @@ class Journal:
 
     @_terminal
     def ouvrir(self, ws):
-        """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal."""
+        """Verrou exclusif, puis journal ouvert à la fenêtre courante `ws` (horloge de l'appelant) ; rend le journal. Un
+        nom du journal ou des sommes qui n'est pas un fichier ordinaire : JOURNAL/fichier (DT6-c)."""
         self.verrou = os.open(os.path.join(self.dossier, self.prefixe + ".verrou"), os.O_RDWR | os.O_CREAT, 0o644)
         try:
             fcntl.flock(self.verrou, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -214,6 +251,10 @@ class Journal:
         if type(ws) is not int or ws % self.w:
             raise ErreurJournal("JOURNAL/fenetre", ws)
         fichiers = self._fichiers(refus=True)
+        sommes = [self.prefixe + ".sha256"] * os.path.exists(os.path.join(self.dossier, self.prefixe + ".sha256"))
+        for n in [x for _j, _k, x in fichiers] + sommes:              # DT6-c : avant toute lecture et toute écriture
+            if not stat.S_ISREG(os.stat(os.path.join(self.dossier, n)).st_mode):
+                raise ErreurJournal("JOURNAL/fichier", f"pas un fichier ordinaire : {n}")
         if fichiers:
             self._reprendre(ws, fichiers)
         else:
@@ -317,7 +358,7 @@ class Journal:
     def _synchro(self, n=None):
         """fsync (injecté) du fichier `n` du dossier, ou du dossier lui-même, par un descripteur en lecture seule
         (C-2 de la relecture d'intégration de P1)."""
-        fd = os.open(os.path.join(self.dossier, n) if n else self.dossier, os.O_RDONLY)
+        fd = os.open(os.path.join(self.dossier, n) if n else self.dossier, os.O_RDONLY | os.O_NONBLOCK)
         try:
             self.fsync(fd)
         finally:
@@ -329,7 +370,7 @@ class Journal:
         État : celui du dernier intègre, ou None ; `derniere` : ws du dernier enregistrement écrit par `ecrire` ou
         `marqueur`, None si le fichier n'en a pas."""
         etat, pos, h = None, 0, hashlib.sha256()
-        with open(os.path.join(self.dossier, n), "rb") as f:
+        with open(ordinaire(os.path.join(self.dossier, n)), "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 try:                                                # UTF-8 strict, niveaux avant le décodeur
                     texte = ligne.decode("utf-8")                   # (CB-6d) ; puis (c), (d) et (b)
@@ -401,7 +442,7 @@ class Journal:
         y est close par un saut de ligne, jamais réécrite."""
         chemin, texte = os.path.join(self.dossier, self.prefixe + ".sha256"), ""
         if os.path.exists(chemin):
-            with open(chemin, encoding="utf-8", errors="replace") as f:
+            with open(ordinaire(chemin), encoding="utf-8", errors="replace") as f:
                 texte = f.read()
         if texte and not texte.endswith("\n"):
             fd = os.open(chemin, os.O_WRONLY | os.O_APPEND)

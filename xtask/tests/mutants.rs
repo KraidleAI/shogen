@@ -919,6 +919,425 @@ fn mutant_sg5_interdits_casse_et_jsonl() {
 }
 
 // ---------------------------------------------------------------------------
+// S-G5 et commentaires HTML (lot DETTES-T15 ; SHOGEN-SG5-COMMENTAIRE-HTML-1, adjudication de DETTES-T14, Q-6 (i)) : un
+// commentaire `<!-- … -->` d'une page détenue n'est pas du texte affiché. Fixture minimale, de la forme de la page NIST
+// §1.3.5.15 du 2026-10-09 (règle retirée de la section affichée, restée en commentaire, balises comprises), non copiée.
+// ---------------------------------------------------------------------------
+
+/// La phrase témoin de l'arbre documentaire, suivie de `suite` : une page détenue `biblio/artefact-a.html`.
+fn page_detenue(suite: &str) -> String {
+    format!("<p>this quotation is present in the corpus and it is checked by the gate</p>\n{suite}")
+}
+
+/// S-G5 sur l'arbre documentaire, `biblio/<artefact>` réécrit, docs/note.md augmenté de la citation « `citation` ».
+fn sg5_page(cas: &str, artefact: &str, contenu: &str, citation: &str) -> Rapport {
+    let racine = arbre_documentaire(cas);
+    ecrire(&racine, &format!("biblio/{artefact}"), contenu);
+    ajouter(
+        &racine,
+        "docs/note.md",
+        &format!("\nUne citation : « {citation} ».\n"),
+    );
+    let rapport = xtask::sg5::executer(&racine);
+    rapport.imprimer();
+    rapport
+}
+
+const REGLE_RETIREE: &str = "the rule that is kept only in this comment is not shown to the reader";
+const AFFICHEE: &str = "the sentence after the comment is shown to the reader and it is found";
+
+/// La forme NIST : en-tête et paragraphe balisés dans le commentaire, premier `>` à moins de 300 octets de `<!--`.
+fn commentaire_nist() -> String {
+    let remplissage = "the padding of this section is long and it has no tag in it. ".repeat(6);
+    format!(
+        "<!-- <h3>Definition</h3>\n<p>{REGLE_RETIREE}.</p>\n<p>{remplissage}</p> -->\n<p>{AFFICHEE}.</p>\n"
+    )
+}
+
+#[test]
+fn mutant_sg5_commentaire_html_regle_retiree_de_la_page() {
+    let page = page_detenue(&commentaire_nist());
+    let rapport = sg5_page(
+        "sg5-commentaire-nist",
+        "artefact-a.html",
+        &page,
+        REGLE_RETIREE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Commentaire de plus de 300 octets sans balise (le débalisage le gardait entier), en `.html`, `.htm` et `.md`.
+#[test]
+fn mutant_sg5_commentaire_html_long_sans_balise() {
+    let long = format!(
+        "<!-- {REGLE_RETIREE} ; {} -->\n",
+        "and it has no tag. ".repeat(20)
+    );
+    let cas = [
+        ("artefact-a.html", page_detenue(&long)),
+        ("artefact-d.htm", long.clone()),
+        ("artefact-c.md", long.clone()),
+    ];
+    for (artefact, contenu) in cas {
+        let rapport = sg5_page(
+            &format!("sg5-long-{artefact}"),
+            artefact,
+            &contenu,
+            REGLE_RETIREE,
+        );
+        exiger_rouge(&rapport, "citation introuvable");
+    }
+}
+
+/// Commentaire jamais fermé : le reste du fichier n'est pas affiché (tokenisation HTML, fin de fichier en commentaire).
+#[test]
+fn mutant_sg5_commentaire_html_jamais_ferme() {
+    let ouvert = format!("<p>debut</p><!-- jamais ferme\n<p>{AFFICHEE}.</p>\n");
+    let rapport = sg5_page(
+        "sg5-commentaire-ouvert",
+        "artefact-a.html",
+        &page_detenue(&ouvert),
+        AFFICHEE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// `<!---!>` ne ferme pas le commentaire (en HTML, `-!>` au début n'est pas une fin) : il court jusqu'à `-->`.
+#[test]
+fn mutant_sg5_commentaire_html_fausse_fermeture() {
+    let page = format!("<!---!><p>{REGLE_RETIREE}.</p> -->\n<p>suite</p>\n");
+    let rapport = sg5_page(
+        "sg5-fausse-fermeture",
+        "artefact-a.html",
+        &page_detenue(&page),
+        REGLE_RETIREE,
+    );
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Le texte affiché reste au corpus : après un commentaire NIST, après `<!-->` et `<!--->` (commentaires vides, fermés
+/// tout de suite), après `--!>` (fermeture admise par la tokenisation HTML) et après `<!-xy>`, qui n'est pas `<!--`.
+#[test]
+fn temoin_sg5_commentaire_html_texte_affiche_garde() {
+    let pages = [
+        commentaire_nist(),
+        format!("<!--><p>{AFFICHEE}.</p>\n"),
+        format!("<!---><p>{AFFICHEE}.</p>\n"),
+        format!("<!-- x --!><p>{AFFICHEE}.</p>\n<!-- y -->\n"),
+        format!("<!-xy><p>{AFFICHEE}.</p>\n<!-- z -->\n"),
+    ];
+    for (rang, page) in pages.iter().enumerate() {
+        let rapport = sg5_page(
+            &format!("sg5-affiche-{rang}"),
+            "artefact-a.html",
+            &page_detenue(page),
+            AFFICHEE,
+        );
+        assert!(
+            rapport.vert(),
+            "page {rang} : texte affiché perdu :\n{}",
+            motifs(&rapport)
+        );
+    }
+}
+
+/// Hors HTML (texte brut), `<!--` n'ouvre rien : la phrase d'un long « commentaire » de `.txt` reste au corpus.
+#[test]
+fn temoin_sg5_commentaire_hors_html_reste_au_corpus() {
+    let texte = format!(
+        "<!-- {REGLE_RETIREE} ; {} -->\n",
+        "and it has no tag. ".repeat(20)
+    );
+    let rapport = sg5_page(
+        "sg5-commentaire-txt",
+        "artefact-b.txt",
+        &texte,
+        REGLE_RETIREE,
+    );
+    assert!(
+        rapport.vert(),
+        "texte brut retiré à tort :\n{}",
+        motifs(&rapport)
+    );
+}
+
+// S-G5, éléments script et style (lot DETTES-T15, DT15-g ; adjudication Q-5) : leur contenu n'est jamais affiché.
+// Fermante selon la tokenisation HTML : casse ignorée, nom suivi d'un blanc, de `/` ou de `>` ; dans un script,
+// `<!--` puis `<script` font ignorer la fermante suivante jusqu'à `-->`. Fixtures minimales, aucune page copiée.
+
+/// S-G5 sur la page détenue `page_detenue(page)` qui cite « `citation` » : ROUGE exigé si `rouge`, VERT sinon.
+fn sg5_page_rouge(cas: &str, page: &str, citation: &str, rouge: bool) {
+    let rapport = sg5_page(cas, "artefact-a.html", &page_detenue(page), citation);
+    if rouge {
+        exiger_rouge(&rapport, "citation introuvable");
+    } else {
+        assert!(
+            rapport.vert(),
+            "{cas} : texte affiché perdu :\n{}",
+            motifs(&rapport)
+        );
+    }
+}
+
+/// Un test par page : la page, la citation, ROUGE exigé ou non.
+macro_rules! pages_sg5 {
+    ($($nom:ident : $page:expr, $citation:expr => $rouge:expr),* $(,)?) => {
+        $(#[test] fn $nom() { sg5_page_rouge(stringify!($nom), &$page, $citation, $rouge); })*
+    };
+}
+
+pages_sg5! {
+    mutant_sg5_script_contenu_ote:
+        format!("<script>var r = \"{REGLE_RETIREE}\";</script><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_style_contenu_ote:
+        format!("<style>/* {REGLE_RETIREE} */ p {{ color: red }}</style>"), REGLE_RETIREE => true,
+    mutant_sg5_script_casse_et_fermante_espacee:
+        format!("<SCRIPT type=\"text/javascript\">\"{REGLE_RETIREE}\"</Script >"), REGLE_RETIREE => true,
+    mutant_sg5_script_fermante_d_un_autre_nom:
+        format!("<script>x</scripts>\"{REGLE_RETIREE}\"</script>"), REGLE_RETIREE => true,
+    mutant_sg5_script_jamais_ferme: format!("<p>debut</p><script>{REGLE_RETIREE}\n<p>suite</p>"), REGLE_RETIREE => true,
+    mutant_sg5_script_doublement_echappe:
+        format!("<script><!-- w(\"<script>a</script>\"); {REGLE_RETIREE} --></script>"), REGLE_RETIREE => true,
+    mutant_sg5_script_doublement_echappe_deux_fois: format!(
+        "<script><!-- <script></script><script></script> {REGLE_RETIREE} --></script>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_script_ferme_texte_suivant_affiche: format!("<script>x</script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_element_scripts_n_est_pas_un_script: format!("<scripts>{AFFICHEE}.</scripts>"), AFFICHEE => false,
+    temoin_sg5_style_ferme_texte_suivant_affiche: format!("<style>p {{}}</style><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_double_echappe_rendu_aux_donnees:
+        format!("<script><!-- <script> --></script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_commentaire_vide: format!("<script><!--><script></script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_dans_un_commentaire: format!("<!-- <script> --><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_commentaire_texte_colle_garde: format!("<!-- x -->{AFFICHEE}."), AFFICHEE => false,
+    temoin_sg5_commentaire_trois_tirets: format!("<!-- a ---><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    // Relecture G2 de DT15-g à k, C-5 : dans l'état échappé (après `<!--`), la fermante appropriée clôt le script
+    // (WHATWG 13.2.5.23 à 13.2.5.25) ; RAWTEXT (`style`) n'a pas d'état échappé (13.2.5.3, 13.2.5.12 à 13.2.5.14).
+    temoin_sg5_script_echappe_clos_par_sa_fermante:
+        format!("<script><!-- x</script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_style_sans_etat_echappe:
+        format!("<style><!-- <script></style><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+}
+
+// S-G5, commentaires factices (lot DETTES-T15, DT15-h ; limite L-6 fermée) : `<!` sans `--` et `</` suivi d'un
+// caractère qui n'est ni une lettre ni `>` ouvrent un commentaire factice, `<?` une instruction de traitement
+// (tokenisation WHATWG, 13.2.5.72 à 13.2.5.76), tous clos au premier `>`, sans borne de longueur.
+
+pages_sg5! {
+    mutant_sg5_commentaire_factice_long:
+        format!("<!x {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_instruction_factice_longue:
+        format!("<?x {REGLE_RETIREE} ; {} ?><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_fermante_factice_longue:
+        format!("</ {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_commentaire_factice_jamais_ferme: format!("<p>x</p><!x {REGLE_RETIREE}"), REGLE_RETIREE => true,
+    mutant_sg5_fermante_factice_lettre_non_ascii:
+        format!("</é {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    temoin_sg5_factices_clos_au_premier_chevron:
+        format!("<!DOCTYPE html><?xml version=\"1\"?></ x><!x><p>{AFFICHEE}.</p><p>y</p>"), AFFICHEE => false,
+}
+
+// S-G5, balises de script et de style (lot DETTES-T15, DT15-j) : la balise ouvrante ou fermante d'un script ou d'un
+// style se clôt à son `>` hors des valeurs d'attribut entre guillemets (tokenisation HTML) ; une fermante écrite dans
+// une valeur d'attribut ne clôt rien, une valeur jamais refermée court jusqu'au bout du texte.
+
+pages_sg5! {
+    mutant_sg5_script_ouvrante_guillemets:
+        format!(r#"<script data-x="a></script>">{REGLE_RETIREE}</script><p>x</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_style_ouvrante_apostrophes:
+        format!(r#"<style title='a></style>'>{REGLE_RETIREE}</style><p>x</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_fermante_guillemets:
+        format!(r#"<script>x</script data-x=">{REGLE_RETIREE}"><p>y</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_guillemets_apres_blancs:
+        format!(r#"<script a = "b></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_guillemet_jamais_ferme:
+        format!(r#"<script a="b></script><p>{REGLE_RETIREE}</p>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_valeur_nue_puis_guillemets:
+        format!(r#"<script a=b c="d></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    mutant_sg5_script_barre_puis_guillemets:
+        format!(r#"<script/a="b></script>">{REGLE_RETIREE}</script>"#), REGLE_RETIREE => true,
+    temoin_sg5_script_guillemet_dans_un_nom: format!(r#"<script a"b>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_egal_avant_le_nom: format!(r#"<script ="b>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_guillemet_dans_une_valeur_nue:
+        format!(r#"<script a=b"c>x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_valeur_entre_guillemets_close:
+        format!(r#"<script a="b>c">x</script><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_script_fermante_guillemets_texte_suivant:
+        format!(r#"<script>x</script a=">"><p>{AFFICHEE}.</p>"#), AFFICHEE => false,
+}
+
+// S-G5, débalisage (lot DETTES-T15, DT15-k ; Q-8 et Q-9) : une balise est ce que la tokenisation HTML lit comme telle
+// (`<` ou `</` suivi d'une lettre ASCII), lue jusqu'à son vrai `>`, guillemets compris, sans borne de longueur ; tout
+// autre `<` est du texte. Le texte des attributs ne reste jamais au corpus, et la recherche du `>` est linéaire. Dans
+// une page rendue, une balise se lit aussi entière avant tout le reste : un `<!--` ou un `<script` écrit dans une
+// valeur d'attribut n'ouvre rien.
+
+pages_sg5! {
+    mutant_sg5_attribut_long_ote:
+        format!(r#"<p title="{REGLE_RETIREE} ; {}">x</p>"#, "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_attribut_chevron_entre_guillemets:
+        format!(r#"<a title="a > {REGLE_RETIREE}">x</a>"#), REGLE_RETIREE => true,
+    mutant_sg5_attribut_chevron_entre_apostrophes:
+        format!(r#"<a title='a > {REGLE_RETIREE}'>x</a>"#), REGLE_RETIREE => true,
+    mutant_sg5_balise_jamais_close: format!(r#"<p>x</p><img alt="{REGLE_RETIREE}"#), REGLE_RETIREE => true,
+    mutant_sg5_fermante_attribut_long:
+        format!(r#"<p>x</p data-x="{REGLE_RETIREE} ; {}">"#, "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    temoin_sg5_chevron_de_texte_garde:
+        String::from("<p>the gate keeps the sign in a < b and it is found</p>"),
+        "the gate keeps the sign in a < b and it is found" => false,
+    temoin_sg5_chevron_lettre_non_ascii_garde: format!("<p>x <é {AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_texte_entre_balises_garde: format!(r#"<p class="a">{AFFICHEE}.</p>"#), AFFICHEE => false,
+    temoin_sg5_texte_apres_la_derniere_balise_garde: format!(r#"<p class="a">x</p>{AFFICHEE}."#), AFFICHEE => false,
+    temoin_sg5_fermante_vide_otee:
+        String::from("<p>the gate keeps this sentence whole when an empty end tag</> sits inside it</p>"),
+        "the gate keeps this sentence whole when an empty end tag sits inside it" => false,
+    temoin_sg5_commentaire_dans_un_attribut_n_ouvre_rien:
+        format!(r#"<a title="<!--">{AFFICHEE}.</a><p>x</p><!-- y -->"#), AFFICHEE => false,
+    temoin_sg5_script_dans_un_attribut_n_ouvre_rien:
+        format!(r#"<a title="<script>">{AFFICHEE}.</a>"#), AFFICHEE => false,
+}
+
+// S-G5, éléments de texte brut (relecture G2 de DETTES-T15, C-6) : la construction de l'arbre bascule la tokenisation
+// en RCDATA (`title`, `textarea`), RAWTEXT (`xmp`, `iframe`, `noembed`, `noframes`) ou PLAINTEXT (`plaintext`) ; un
+// `<!--` ou un `<script` y est du texte. Lu comme un ouvreur, il pouvait se clore dans une construction vraie et en
+// laisser la fin au corpus (faux vert). Dans `svg` ou `math`, `title` reste du balisage.
+
+pages_sg5! {
+    mutant_sg5_titre_ouvreur_clos_dans_un_script: format!(
+        "<title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_textarea_script_clos_dans_un_commentaire:
+        format!("<textarea><script></textarea><!-- </script> {REGLE_RETIREE} --><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_iframe_ouvreur_clos_dans_un_style: format!(
+        "<iframe><!--</iframe><style>p {{ content: \"-->{REGLE_RETIREE}\" }}</style><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_titre_svg_commentaire_ote:
+        format!("<svg><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_titre_apres_svg_auto_ferme: format!(
+        "<svg/><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_titre_apres_svg_referme: format!(
+        "<svg></svg><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_textarea_texte_affiche: format!("<textarea>{AFFICHEE}.</textarea><p>x</p>"), AFFICHEE => false,
+    temoin_sg5_plaintext_affiche_jusqu_au_bout: format!("<plaintext>a</plaintext> {AFFICHEE}."), AFFICHEE => false,
+    temoin_sg5_titre_texte_affiche: format!("<title>{AFFICHEE}.</title><p>x</p>"), AFFICHEE => false,
+}
+
+// S-G5, page à cadres (contre-contrôle de DETTES-T15, R-4) : la construction de l'arbre ignore le texte qui suit
+// `<frameset>` (page WHATWG du 2026-10-14, modes « in frameset » et « after frameset ») ; ce qui le précède reste.
+
+pages_sg5! {
+    mutant_sg5_page_a_cadres_texte_ote: format!("<frameset>{REGLE_RETIREE}</frameset>"), REGLE_RETIREE => true,
+    mutant_sg5_page_a_cadres_noframes_ote: format!(
+        "<FRAMESET cols=\"50%\"><noframes>{REGLE_RETIREE}</noframes></FRAMESET>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_page_a_cadres_titre_garde:
+        format!("<title>{AFFICHEE}.</title><frameset><frame src=a></frameset>"), AFFICHEE => false,
+    temoin_sg5_page_a_cadres_nom_voisin: format!("<framesets>{AFFICHEE}.</framesets>"), AFFICHEE => false,
+}
+
+// S-G5, trois lectures du texte brut (contre-contrôle de DETTES-T15, R-3) : la construction de l'arbre décide si un
+// `title`, un `textarea`, un `iframe`… bascule la tokenisation (élément HTML) ou non (contenu SVG ou MathML, balise
+// ignorée) ; le corpus perd ce qu'une des trois lectures ôte. Pages lues d'après la page WHATWG du 2026-10-14 : les
+// formes 1 à 6 étaient ôtées par la série et gardées par C-6 seul ; 7 à 9, gardées par les deux ; 10, par la série
+// et par la lecture brute partout, ôtée par C-6.
+
+pages_sg5! {
+    mutant_sg5_textarea_commentaire_ote_en_trop:
+        format!("<textarea><!-- {REGLE_RETIREE} --></textarea><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_1_svg_valeur_nue_barre:
+        format!("<svg width=10/><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_2_fermante_math_dans_svg:
+        format!("<svg></math><title><!-- {REGLE_RETIREE} --></title></svg><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_3_iframe_commentaire:
+        format!("<iframe><!-- {REGLE_RETIREE} --></iframe><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_4_noframes_commentaire:
+        format!("<noframes><!-- {REGLE_RETIREE} --></noframes><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_5_iframe_jamais_ferme:
+        format!("<iframe src=x><p>a</p><script>var s = 1; {REGLE_RETIREE}</script>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_6_titre_ignore_en_colonnes:
+        format!("<template><col><title><!-- {REGLE_RETIREE} --></title></template><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_lectures_7_sortie_de_svg_par_p: format!(
+        "<svg><p><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_8_point_d_integration: format!(
+        "<svg><foreignObject><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_9_fermante_div_hors_svg: format!(
+        "<div><svg></div><title><!--</title><script>var s = \"-->{REGLE_RETIREE}\";</script>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_lectures_10_titre_svg_puis_titre_html: format!(
+        "<svg><title><!-- </title><script> --></title></svg><title></script><!--</title>\
+         <script>var s = 1; /*-->{REGLE_RETIREE}*/</script>"
+    ), REGLE_RETIREE => true,
+}
+
+/// Markdown (R-3) : un `<title>` ou un `<iframe>` écrit dans un extrait de code n'ouvre aucun texte brut au
+/// rendu ; lu comme un vrai, il gardait jusqu'au bout du fichier les commentaires et les scripts qui suivent.
+#[test]
+fn mutant_sg5_lectures_markdown_extrait_de_code() {
+    let cas = [
+        format!("Set the `<title>` of the page.\n\n<!-- {REGLE_RETIREE} -->\n\nEnd.\n"),
+        format!("Use an `<iframe>` here.\n\n<script>var s = 1; {REGLE_RETIREE}</script>\n\nEnd.\n"),
+    ];
+    for (rang, page) in cas.iter().enumerate() {
+        let rapport = sg5_page(
+            &format!("sg5-md-extrait-{rang}"),
+            "artefact-c.md",
+            page,
+            REGLE_RETIREE,
+        );
+        exiger_rouge(&rapport, "citation introuvable");
+    }
+}
+
+// S-G5, éléments de texte brut que C-6 ne testait pas (contre-contrôle de DETTES-T15, R-2 ; mutants M08 à M10) : un
+// `<!--` écrit dans un `xmp`, un `noembed` ou un `noframes` est du texte (RAWTEXT) et ne se clôt pas dans un script.
+
+pages_sg5! {
+    mutant_sg5_xmp_ouvreur_clos_dans_un_script: format!(
+        "<xmp><!--</xmp><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_noembed_ouvreur_clos_dans_un_script: format!(
+        "<noembed><!--</noembed><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_noframes_ouvreur_clos_dans_un_script: format!(
+        "<noframes><!--</noframes><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+}
+
+/// Hors HTML aussi (texte brut), une balise se lit jusqu'à son vrai `>`, sans borne : son attribut sort du corpus.
+#[test]
+fn mutant_sg5_attribut_long_ote_hors_html() {
+    let texte = format!(
+        r#"<p title="{REGLE_RETIREE} ; {}">x</p>"#,
+        "and it has no tag. ".repeat(20)
+    );
+    let rapport = sg5_page("sg5-attribut-txt", "artefact-b.txt", &texte, REGLE_RETIREE);
+    exiger_rouge(&rapport, "citation introuvable");
+}
+
+/// Recherche du `>` linéaire (Q-9) : une page de 4 000 002 octets de `x < y `, sans `>`, se juge en moins de 10 s.
+/// L'état j relisait la fin du texte à chaque `<`.
+#[test]
+fn mutant_sg5_debalisage_en_temps_lineaire() {
+    let racine = arbre_documentaire("sg5-debalisage-lineaire");
+    ecrire(
+        &racine,
+        "biblio/artefact-a.html",
+        &page_detenue(&"x < y ".repeat(666_667)),
+    );
+    let (envoi, reception) = std::sync::mpsc::channel();
+    std::thread::spawn(move || envoi.send(xtask::sg5::executer(&racine).vert()));
+    assert!(
+        reception
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .is_ok(),
+        "S-G5 : plus de 10 s pour une page de 4 000 002 octets"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
 // ajoute UNE forme fautive et exige le ROUGE pour son motif ; les survivants de la revue G2 d'E1 (résidu en
@@ -949,6 +1368,20 @@ L'acte d'E1 et l'avis des pairs' sont lus ; « this quotation is English and is 
 @@@ docs/adr-0028/ANNEXE-B-items.md
 | SHOGEN-EXEMPLE-1 | objet | SHOGEN-MENTION-1 |
 | 9 | ligne sans identifiant en tête | SHOGEN-MENTION-2 |
+@@@ docs/RENVOIS-LIGNES.tsv
+# registre synthétique des renvois (une ligne de commentaire)
+renvoi\tjeton\tcible\tecrit\tlignes\tempreinte\tcommit
+docs/17-modele-de-menace.md:4\tcrates/exemple.rs:2-3\tcrates/exemple.rs\t2-3\t2-3\t849ab6324f790f2f\t0000000
+docs/17-modele-de-menace.md:4\tcrates/LISEZMOI:1\tcrates/LISEZMOI\t1\t1\t38e9b1de50176b4a\t0000000
+docs/17-modele-de-menace.md:12\tcrates/exemple.rs:1\tcrates/exemple.rs\t1\t1\t4bb546d3a6668da1\t0000000
+docs/adr-0028/PAQUET-PREREG-S2.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t8b14567
+docs/journal.md:1\texemple.rs l.3\tcrates/exemple.rs\t3\t3\tbe9b4817a9d4792f\t0000000
+docs/journal.md:2\tancien.rs l.7\tcrates/ancien.rs\t7\t-\t03744d41bdab3b8d\tabcdef0
+@@@ docs/journal.md
+Lu : exemple.rs l.3 (dernière ligne).
+Lu aussi : ancien.rs l.7 (fichier retiré depuis).
+@@@ docs/adr-0028/PAQUET-PREREG-S2.md
+Repère : exemple.rs l.2 (lu au commit de scellement).
 @@@ docs/source.md
 Selon lui, une phrase française de la source, citée telle quelle, fait foi.
 @@@ crates/exemple.rs
@@ -975,7 +1408,7 @@ fn notes_sg9_vert(cas: &str, ajout: &str) -> String {
     let rapport = xtask::sg9::executer(&racine);
     rapport.imprimer();
     assert!(rapport.vert(), "VERT attendu :\n{}", motifs(&rapport));
-    assert_eq!((rapport.examines, rapport.presents), (4, 4), "couverture");
+    assert_eq!((rapport.examines, rapport.presents), (5, 5), "couverture");
     rapport.notes.join("\n")
 }
 
@@ -1101,4 +1534,200 @@ mutants_sg9! {
     mutant_sg9_f_ipv4: "\nHôte 192.0.2.1 contacté.\n" => "adresse IP",
     mutant_sg9_f_ipv6: "\nHôte 2001:db8::1 contacté.\n" => "adresse IP",
     mutant_sg9_f_adresse_electronique: "\nÉcrire à quelqu.un@example.org.\n" => "adresse électronique",
+}
+
+// S-G9 (a), registre des renvois (lot DETTES-T15 ; SHOGEN-REFS-LIGNE-CONTENU-1, adjudication de DETTES-T14, Q-6 (ii)) :
+// une référence désigne encore le texte qu'elle citait. Empreintes de l'arbre synthétique calculées hors du code
+// (`sha256sum`, 16 premiers chiffres) : « ligne 2⏎ligne 3 » 849ab632…, « fichier sans extension » 38e9b1de…,
+// « ligne 1 » 4bb546d3…, « ligne 2 » 27fbd56e…, « ligne 3 » be9b4817….
+
+/// S-G9 sur l'arbre synthétique où `fichier` a vu `avant` remplacé par `apres` : ROUGE exigé, pour `attendu`.
+fn exiger_rouge_sg9_remplace(cas: &str, fichier: &str, avant: &str, apres: &str, attendu: &str) {
+    let racine = arbre_menace(cas);
+    remplacer(&racine, fichier, avant, apres);
+    exiger_rouge(&xtask::sg9::executer(&racine), attendu);
+}
+
+/// Un test par mutant : un seul remplacement dans un fichier de l'arbre, un seul motif exigé.
+macro_rules! mutants_registre {
+    ($($nom:ident : $fichier:expr, $avant:expr, $apres:expr => $attendu:expr),* $(,)?) => {
+        $(#[test] fn $nom() { exiger_rouge_sg9_remplace(stringify!($nom), $fichier, $avant, $apres, $attendu); })*
+    };
+}
+
+const R: &str = "docs/RENVOIS-LIGNES.tsv";
+const EXEMPLE: &str = "crates/exemple.rs";
+
+mutants_registre! {
+    mutant_sg9_a_insertion_au_milieu_du_fichier_cite:
+        EXEMPLE, "ligne 1\n", "ligne 1\nligne 1 bis\n" => "texte cité changé ou déplacé",
+    mutant_sg9_a_ligne_citee_reecrite_sur_place: EXEMPLE, "ligne 2", "ligne deux" => "texte cité changé ou déplacé",
+    mutant_sg9_registre_jeton_hors_de_sa_ligne: R, "docs/journal.md:1\t", "docs/journal.md:2\t" => "jeton absent",
+    mutant_sg9_registre_numero_absent_du_jeton: R, "\t3\t3\tbe9b", "\t13\t3\tbe9b" => "jeton absent",
+    mutant_sg9_registre_empreinte_hors_forme: R, "be9b4817a9d4792f", "be9b4817a9d4792" => "hors forme",
+    mutant_sg9_registre_colonne_manquante: R, "\t-\t03744d41bdab3b8d", "\t03744d41bdab3b8d" => "hors forme",
+    mutant_sg9_registre_entete: R, "renvoi\tjeton", "renvois\tjeton" => "hors forme",
+    mutant_sg9_registre_lignes_hors_du_fichier:
+        R, "\t3\t3\tbe9b", "\t3\t4\tbe9b" => "lignes actuelles hors du fichier",
+    mutant_sg9_registre_ligne_zero: R, "\t3\t3\tbe9b", "\t3\t0\tbe9b" => "hors forme",
+    mutant_sg9_registre_fin_de_plage_seule: R, "\t2-3\t2-3\t", "\t3\t2-3\t" => "jeton absent",
+    mutant_sg9_registre_debut_de_plage_seul: R, "\t2-3\t2-3\t", "\t2\t2-3\t" => "jeton absent",
+    mutant_sg9_registre_commit_court: R, "\tabcdef0\n", "\tabc\n" => "hors forme",
+    mutant_sg9_registre_scelle_hors_de_son_commit: R, "\t8b14567\n", "\t0000000\n" => "document scellé",
+    mutant_sg9_registre_entree_orpheline: R, ":12\tcrates/exemple.rs:1", ":12\texemple.rs:1" => "sans référence (a)",
+    mutant_sg9_registre_en_double: R, "\tabcdef0\n",
+        "\tabcdef0\ndocs/journal.md:2\tancien.rs l.7\tcrates/ancien.rs\t7\t-\t03744d41bdab3b8d\tabcdef0\n"
+        => "en double",
+}
+
+/// L'empreinte se compare sur ses 16 chiffres (relecture G2 de DETTES-T15, C-5) : « ligne 1012 » et « ligne 16091 »
+/// ont les mêmes 8 premiers chiffres, 834d10b8, non les 16 (`sha256sum` hors du code : 834d10b8940e1b2b et
+/// 834d10b8c7149b9b).
+#[test]
+fn mutant_sg9_registre_empreinte_comparee_sur_seize_chiffres() {
+    let racine = arbre_menace("registre-seize-chiffres");
+    remplacer(&racine, EXEMPLE, "ligne 1\n", "ligne 16091\n");
+    remplacer(&racine, R, "\t4bb546d3a6668da1\t", "\t834d10b8940e1b2b\t");
+    exiger_rouge(
+        &xtask::sg9::executer(&racine),
+        "texte cité changé ou déplacé",
+    );
+}
+
+#[test]
+fn mutant_sg9_a_reference_sans_entree_au_registre() {
+    exiger_rouge_sg9(
+        "sans-entree",
+        "\nVoir `crates/exemple.rs:3`.\n",
+        "sans entrée au registre des renvois",
+    );
+}
+
+#[test]
+fn mutant_couverture_sg9_registre_des_renvois_absent() {
+    let racine = arbre_menace("registre-absent");
+    std::fs::remove_file(racine.join(R)).expect("suppression du registre");
+    exiger_rouge(
+        &xtask::sg9::executer(&racine),
+        "fichier absent : docs/RENVOIS-LIGNES.tsv",
+    );
+}
+
+/// Sûreté (relecture G2 de DETTES-T15, C-3) : une entrée qui nomme un emplacement interdit, en cible ou en document
+/// citant, est refusée sans lecture. Sans ce refus, la gate lisait la ligne citante et hachait les lignes citées : les
+/// deux premières entrées, justes, passaient (empreinte de « ligne » : fe9d9907da5ee9a7, `sha256sum` hors du code).
+/// Dans les deux dernières, le fichier interdit rougirait l'entrée s'il était lu (empreinte, jeton) : une lecture
+/// faite avant le refus ajoute une violation (contre-contrôle de DETTES-T15, R-1, mutant M01).
+#[test]
+fn mutant_sg9_registre_emplacement_interdit_jamais_lu() {
+    let cas = [
+        (
+            "Lu : factice.md l.1.\n",
+            "ligne\n",
+            "docs/journal.md:3\tfactice.md l.1\tdocs/rapports/factice.md\t1\t1\tfe9d9907da5ee9a7\t0000000\n",
+        ),
+        (
+            "",
+            "Lu : exemple.rs l.2.\n",
+            "docs/rapports/factice.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t0000000\n",
+        ),
+        (
+            "Lu : factice.md l.1.\n",
+            "autre\n",
+            "docs/journal.md:3\tfactice.md l.1\tdocs/rapports/factice.md\t1\t1\tfe9d9907da5ee9a7\t0000000\n",
+        ),
+        (
+            "",
+            "sans le jeton\n",
+            "docs/rapports/factice.md:1\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t0000000\n",
+        ),
+    ];
+    for (rang, (journal, interdit, entree)) in cas.into_iter().enumerate() {
+        let racine = arbre_menace(&format!("registre-interdit-{rang}"));
+        ajouter(&racine, "docs/journal.md", journal);
+        ecrire(&racine, "docs/rapports/factice.md", interdit);
+        ajouter(&racine, R, entree);
+        let rapport = xtask::sg9::executer(&racine);
+        exiger_rouge(&rapport, "emplacement interdit, ni lu ni haché");
+        assert_eq!(rapport.violations.len(), 1, "{}", motifs(&rapport));
+    }
+}
+
+/// Paquet scellé (relecture G2 de DETTES-T15, C-4) : un renvoi que le paquet recopie d'ADR-0028 (l.56 et l.63) se lit
+/// au commit de lecture d'ADR-0028, `ce63fed` ; tout autre renvoi du paquet, à son sceau `8b14567`.
+#[test]
+fn mutant_sg9_registre_paquet_recopie_lu_au_commit_de_sa_source() {
+    let paquet = "docs/adr-0028/PAQUET-PREREG-S2.md";
+    let texte = format!(
+        "Repère : exemple.rs l.2 (lu au commit de scellement).\n{}Recopié : exemple.rs l.2.\n",
+        "x\n".repeat(54)
+    );
+    let entree = |commit: &str| {
+        format!(
+            "{paquet}:56\texemple.rs l.2\tcrates/exemple.rs\t2\t2\t27fbd56e8c6236bc\t{commit}\n"
+        )
+    };
+    let cas = [
+        ("recopie", "ce63fed", "8b14567"),
+        ("sceau", "8b14567", "8b14567"),
+        ("ligne-1", "ce63fed", "ce63fed"),
+    ];
+    for (cas, commit, sceau_ligne_1) in cas {
+        let racine = arbre_menace(&format!("paquet-{cas}"));
+        ecrire(&racine, paquet, &texte);
+        remplacer(&racine, R, "\t8b14567\n", &format!("\t{sceau_ligne_1}\n"));
+        ajouter(&racine, R, &entree(commit));
+        let rapport = xtask::sg9::executer(&racine);
+        if cas == "recopie" {
+            assert!(rapport.vert(), "{}", motifs(&rapport));
+        } else {
+            exiger_rouge(
+                &rapport,
+                "document scellé lu hors de son commit de scellement",
+            );
+        }
+    }
+}
+
+/// Témoin : sans octets versés ni emplacement interdit, l'entrée épinglée est listée ; `biblio/` peuplée, la référence
+/// à un sidecar (octets non versionnés) et celle d'un emplacement interdit n'ont pas d'entrée et sont listées.
+#[test]
+fn temoin_sg9_registre_epinglees_et_bornes_listees() {
+    let notes = notes_sg9_vert("registre-temoin", "");
+    assert!(
+        notes.contains("6 entrée(s), 5 texte(s) cité(s) retrouvé(s)"),
+        "{notes}"
+    );
+    assert!(
+        notes.contains("1 épinglée(s) à leur commit") && notes.contains("[docs/journal.md:2]"),
+        "{notes}"
+    );
+    let racine = arbre_menace("registre-bornes");
+    ecrire(&racine, "biblio/source.pdf.sidecar", &"x\n".repeat(9));
+    ecrire(&racine, "docs/rapports/factice.md", "ligne\n");
+    ajouter(
+        &racine,
+        xtask::sg9::PERIMETRE,
+        "\nVoir `docs/rapports/factice.md:1`.\n",
+    );
+    let rapport = xtask::sg9::executer(&racine);
+    let notes = rapport.notes.join("\n");
+    assert!(rapport.vert(), "{}", motifs(&rapport));
+    let bornes = "plage seule) : [biblio/source.pdf.sidecar:9, docs/rapports/factice.md:1]";
+    assert!(notes.contains(bornes), "{notes}");
+}
+
+/// Une même référence deux fois sur une ligne de docs/17 : une seule entrée la couvre.
+#[test]
+fn temoin_sg9_registre_reference_double_sur_une_ligne() {
+    let racine = arbre_menace("registre-double");
+    ajouter(
+        &racine,
+        xtask::sg9::PERIMETRE,
+        "\nVoir `crates/exemple.rs:1` et `crates/exemple.rs:1`.\n",
+    );
+    let entree = "docs/17-modele-de-menace.md:15\tcrates/exemple.rs:1\tcrates/exemple.rs\t1\t1\t4bb546d3a6668da1";
+    ajouter(&racine, R, &format!("{entree}\t0000000\n"));
+    let rapport = xtask::sg9::executer(&racine);
+    assert!(rapport.vert(), "{}", motifs(&rapport));
 }

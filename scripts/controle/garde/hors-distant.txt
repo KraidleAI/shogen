@@ -1,0 +1,37 @@
+# Ce qui ne va jamais au dépôt distant (lot GARDE-FOUS-ORCH, GF-8), lu par avant_acte.py pousser.
+# Source des chemins : docs/adr-0028/ADR-0028-decisions-sortie-S2.md l.293 à dda4bbc ; sha256 de la ligne entière,
+# saut de ligne compris : 16e208a95e493ff438ea902a66a764700781ede77fd7b33989220692364e9cd1 ; extraits mot pour mot :
+# les docs 15/16 ne vont pas sur le remote GitHub, même privé, tant que l'accord avec la Pocket Foundation ne
+# l'autorise pas ; [...] le push éventuel se limite aux préfixes sans ces fichiers.
+chemin docs/15-*
+chemin docs/16-*
+# Écritures sur la forge refusées par le mandataire réseau (HTTP 403 ; la lecture est admise) : protection de branche
+# et réglages du dépôt, le 2026-10-10 (annexe B, B.95 ; docs/adr-0028/forge-pr11/refus-mandataire.txt) ; suppression
+# de branche par l'API, le 2026-10-10 (annexe B, B.92 : source exacte en fin de fichier). Motifs fnmatch de l'acte.
+acte *-X PUT *protection*
+acte *--method PUT *protection*
+acte *-X PATCH *repos/*
+acte *--method PATCH *repos/*
+acte git push*--delete*
+# Relecture G2 du lot (C-4, Q-4) : la suppression refusée est celle de la branche jetable essai/analyseur-residus, par
+# une écriture de l'API (réponse 403 du mandataire), docs/adr-0028/ANNEXE-B-items.md l.1568 (B.92) ; sha256 de la
+# ligne entière, saut de ligne compris : 0c3a9bfc1a2dc935fb255d980882722799bbdd1ab59a51963558366cc4282196 ; et non E17
+# [2nd]. Même requête écrite autrement : méthode après le chemin, -XPUT, --method=PUT (ramenés à -X PUT par l'outil),
+# gh repo edit (réglages) ; suppression d'une branche par le protocole git (-d, :branche) : refus conservateur, non
+# constaté.
+acte *-X DELETE *git/refs/*
+acte *git/refs/*-X DELETE*
+acte *protection*-X PUT*
+acte *repos/*-X PATCH*
+acte gh repo edit*
+acte git push* -d *
+acte git push* :*
+# Contre-contrôle du lot (R-3) : formes voisines des actes constatés (B.92, B.95), ramenées par l'outil avant les
+# motifs (guillemets du shell, blancs répétés, options de git avant la sous-commande : -C, -c, --git-dir,
+# --work-tree, --no-optional-locks) ; refspec de suppression forcée (+:branche) ; autres écritures de la protection
+# de branche (DELETE, POST) : refus conservateur, non constaté.
+acte git push* +:*
+acte *-X DELETE *protection*
+acte *protection*-X DELETE*
+acte *-X POST *protection*
+acte *protection*-X POST*

@@ -1,0 +1,4 @@
+Écritures de réglages refusées par le mandataire réseau de la session cloud, 2026-10-10 entre 04:11:39 et 04:13:17 UTC, bornes lues : fusion de la PR n° 11 (merged_at de l'API) et heure d'écriture de ce fichier (jeton : droits admin, lus par GET /repos/KraidleAI/shogen → permissions.admin = true).
+PUT /repos/KraidleAI/shogen/branches/main/protection (corps : protection-proposee.json) → HTTP 403 : `Write access to this GitHub API path is not permitted through this proxy.`
+PATCH /repos/KraidleAI/shogen (security_and_analysis : secret_scanning et secret_scanning_push_protection « enabled ») → HTTP 403 : `Repository settings writes are not permitted through this proxy.`
+État lu avant : GET /repos/KraidleAI/shogen/branches/main/protection → 404 (aucune protection) ; security_and_analysis.secret_scanning.status = disabled ; visibilité : public.

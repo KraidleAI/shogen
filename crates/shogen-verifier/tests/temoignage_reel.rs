@@ -31,6 +31,9 @@
 //! parfaitement canonique et fait tomber exactement le contrôle visé. Le cas
 //! doit mordre là où il dit mordre.
 
+mod commun;
+
+use commun::Arbre;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -57,12 +60,12 @@ fn lot_reel() -> Vec<u8> {
 }
 
 /// Un répertoire de travail **propre à ce processus** (même motif que les
-/// autres suites : la gate de mutation lance quatre suites de front).
-fn repertoire(nom: &str) -> PathBuf {
-    let chemin = std::env::temp_dir().join(format!("shogen-reel-{nom}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&chemin);
-    std::fs::create_dir_all(&chemin).expect("création du répertoire de test");
-    chemin
+/// autres suites : la gate de mutation lance quatre suites de front). Lot DETTES-T7
+/// (SHOGEN-VERIFIER-TESTS-TMP-RESTES-1) : `commun::Arbre`, effacé à la fin du test.
+fn repertoire(nom: &str) -> Arbre {
+    let arbre = Arbre::nouveau("shogen-reel", nom);
+    std::fs::create_dir_all(&*arbre).expect("création du répertoire de test");
+    arbre
 }
 
 /// Exécute le vrai binaire sur un lot donné, avec le constat et le registre

@@ -1,0 +1,881 @@
+#!/usr/bin/env python3
+"""Shōgen, garde des faits (crochets Claude Code). Règle du fondateur (2026-10-15) : « aucun acte n'est
+possible sans vérification, rien de mémoire ». Le journal de la session (transcript) est le registre des
+faits : chaque commande lancée et chaque résultat affiché. Un acte dont la vérification manque dans les
+derniers appels de l'agent qui agit est REFUSÉ (sortie 2, motif sur stderr) ; les motifs commencent par
+GARDE-FAITS et ne comptent jamais comme des faits affichés.
+
+Crochets : PreToolUse (Bash, Edit, Write, MultiEdit, Agent, Workflow) ; Stop et SubagentStop.
+Entrée : JSON sur stdin (session_id, transcript_path, cwd, tool_name, tool_input, agent_id éventuel).
+Journal lu : celui de l'agent qui agit ; pour un sous-agent, <dossier de session>/subagents/agent-<agent_id>.jsonl.
+Seule la fin du journal est lue (QUEUE octets), il devient très gros.
+
+Règles PreToolUse (R1 à R5, R11) :
+  R1 effacer un worktree ou un clone (rm -rf, git worktree remove) : « git status » et « git log origin/… ..HEAD »
+     (ou @{u}..HEAD, --not --remotes) lus avant ;
+  R2 écrire dans un fichier existant par le shell (>, >>, tee, sed -i, python open 'w'/'a', Add-Content) :
+     le fichier lu avant (Read, cat, tail, head, sed -n, grep, less, diff, git show, python open 'r') ;
+  R3 git commit : diff ou status lu avant ; git push : ce qui part lu avant (git log …origin…, status, ls-remote,
+     rev-list …origin…) ;
+  R4 lancer un sous-agent ou un workflow dont la consigne nomme un arbre git : l'état de cet arbre lu avant
+     (git status ou git log dans la fenêtre) ;
+  R5 écrire un identifiant de commit (7 à 40 hexadécimaux, lettres et chiffres mêlés) ou un numéro de PR
+     (#123, PR n° 123, pull/123) dans un .md, un message de commit, une PR, un texte écrit par le shell :
+     il doit avoir été affiché par un outil (tool_result, attachment, queue-operation) ; le texte tapé par
+     l'agent et les refus de ce crochet ne comptent pas. Dans un brief (fichier BRIEF*.md écrit par Write, Edit,
+     MultiEdit ou une redirection du shell), chaque compte à unité (N tests, N fichiers, N lignes, N mutants, N cas,
+     N commits, N diffs, N gardes, N items, en chiffres ou de deux à douze en lettres ; Ran N) doit avoir été affiché
+     avec la même unité (E7) ; un compte précédé d'une borne (≤, au plus, moins de, chacun…) n'est pas jugé ; un
+     nombre affiché seul (ou suivi d'un nom) par une commande de comptage (wc, grep -c) vaut pour toute unité
+     (relecture G2 du groupe A, C-6 : un compte lu par grep -c ou wc -l est un compte lu).
+  R11 lancer un sous-agent ou un workflow dont la consigne nomme un fichier BRIEF*.md : le brief passe
+     scripts/controle/avant_acte.py brief (items de l'annexe B, E6 ; constats relayés, E22 ; faisabilité, E23 ;
+     règle git, E24), avec --fiche <subagent_type> si la fiche existe ; brief absolu absent : refus ; erreur de
+     l'outil (sortie 3, délai) : acte permis, note sur stderr (lot GARDE-FOUS-ORCH, phase 2, groupe A) ; une consigne
+     (prompt) de plus de CONSIGNE_MAX caractères qui ne nomme aucun BRIEF*.md : refus, le brief s'écrit dans un
+     fichier (relecture G2 du groupe A, C-5 : une consigne en ligne échappait à B1-B4).
+Crochets Stop et SubagentStop (R6) : le dernier texte de l'agent ne porte aucun nombre de trois chiffres ou plus (ni, E29, aucun
+nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille de route : jours, semaines, %, observateurs, …),
+ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
+du même tour, laisser passer et le consigner (fichier d'état sous le dossier de la session).
+Journal des décisions : <dossier de session>/garde-faits.log (une ligne par refus et par passage consigné).
+Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisible (jamais un refus aveugle).
+Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et le texte de R5 se lisent sur les actes
+de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
+d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
+pas un ; R5 lit le message de git commit (-m, et le fichier de -F). Commande illisible par shlex : motifs (sens sûr).
+G2, C-2 : un acte dont le programme (ou l'argument d'eval) porte $ ou `, ou un code python qui lance un processus
+(subprocess, os.system, os.popen, os.exec*, os.spawn*, pty.spawn), est jugé aussi par les motifs d'avant (sens sûr).
+R7 (E18, E28) : refus d'un sleep d'avant-plan (hors boucle until, hors arrière-plan : &, run_in_background) et d'un
+pkill -f ou pgrep -f dont le motif ne commence pas par ^ (le shell qui le lance porte le motif : il se reconnaît).
+G2, C-3 (L-3 adjugée) : une boucle while ou until à condition de sortie admet son sleep comme until ; une boucle à
+condition constante (while true, while :, until false) ne l'admet que si la commande porte break, exit ou return.
+R8 (E20) : create_pull_request refusé sans preuve que la forge lance des jobs sur ce dépôt : au journal, un résultat
+de mcp__github__actions_* (ou de gh run, gh api) du même owner/repo qui montre un run conclu success ou un job à
+runner_id non nul ; ou, au marqueur scripts/controle/garde/forge-actions.txt, la ligne owner/repo AAAA-MM-JJ du jour
+(date -u), écrite après constat.
+G2, C-4 : la ligne du marqueur porte l'identifiant du run lu (owner/repo AAAA-MM-JJ <id>) ; elle ne vaut que si cet
+identifiant figure dans une preuve du même dépôt (résultat ci-dessus) d'un journal de la session (journal principal ou
+subagents/agent-*) : un marqueur écrit sans lecture de la forge, ou sans identifiant, ne vaut rien.
+R9 (E27) : seuil de coût avant Agent et Workflow : refus d'un workflow de plus de SEUIL_WORKFLOW agents (appels agent(
+du script ; nombre inconnu, boucle qui les multiplie : refus), ou d'un lancement qui porterait les sous-agents vivants
+(journal touché depuis VIVANT_S s) au-delà de SEUIL_VIVANTS ; sauf jeton FANOUT-AUTORISE (ou les mots fan out) écrit
+par l'humain dans son dernier message (journal de la session, jamais un résultat d'outil). G2, C-7 : les mots fan out
+ne valent jeton que dans une phrase sans négation (pas, ne, non, sans, jamais, aucun, interdit, no, not, never…).
+R10 (E26) : UserPromptSubmit relève les noms propres du message (capitale hors début de phrase et mots courants,
+capitales internes, sigles, domaine d'un courriel) au JOURNAL et dans docs/publication/ (chemin:N: ligne), l'affiche
+en contexte et le garde (garde-faits.releve) ; au Stop, si le dernier message de l'humain porte un nom propre, une
+réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du tour (résultat d'outil, relevé) est
+refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se lit dans le fichier versé
+scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien."""
+import importlib.util
+import json
+import os
+import re
+import subprocess
+import sys
+from urllib.parse import urlsplit
+
+QUEUE = 6_000_000          # octets lus en fin de journal (faits affichés)
+FENETRE_APPELS = 60        # derniers appels d'outil de l'agent pour les lectures préalables (R1 à R4)
+MARQUE = "GARDE-FAITS"
+
+HEX_ID = re.compile(r"(?<![0-9a-fA-F])([0-9a-f]{7,40})(?![0-9a-fA-F])")
+PR_NUM = re.compile(r"(?:(?<![\w/])#|\bPR\s*(?:n°|no\.?|#)?\s*|pull/|pulls/)(\d{1,6})\b", re.I)
+NOMBRE = re.compile(r"(?<![\w.,])(\d{1,3}(?:[   ,]\d{3})+(?:[.,]\d+)?|\d+[.,]\d+|\d{3,})(?![\w])")
+# E29 (2026-10-15) : un nombre d un ou deux chiffres suivi d une unite ou d une grandeur de la feuille de route est un fait
+NOMBRE_UNITE = re.compile(r"(?<![\w.,])(\d{1,2})(?=\s*(?:%|jours?|semaines?|mois|heures?|minutes?|ans?|années?|observateurs?|actifs?|commits?|fenêtres?|pas|tests?|hôtes?|unités?|sources?|pages?|citations?|lignes?|items?|lots?|diffs?|machines?|places?|classes?|strates?|étapes?)\b)", re.I)
+LECTURE_SHELL = re.compile(r"\b(cat|tail|head|less|more|diff|grep|awk|sed\s+-n|git\s+show|sha256sum\s+-c|wc)\b")
+REDIR = re.compile(r"(?<![<>])(>>?|\btee(?:\s+-a)?)\s+(?!&)(['\"]?)([^\s'\"|;&]+)\2")
+SED_I = re.compile(r"\bsed\s+(?:-[a-zA-Z]*i[a-zA-Z]*\b[^|;]*?)\s+(['\"]?)([^\s'\"|;&]+)\1\s*(?:[;&|]|$)")
+PY_W = re.compile(r"open\(\s*['\"]([^'\"]+)['\"]\s*,\s*['\"][wa]")
+RM = re.compile(r"\brm\s+(?:-[a-zA-Z]*\s+)*(['\"]?)([^\s'\"|;&]+)\1")
+NOMBRES = {"deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6, "sept": 7, "huit": 8, "neuf": 9, "dix": 10,
+           "onze": 11, "douze": 12}
+UNITES = {"file": "fichier", "line": "ligne", "case": "cas", "cas": "cas"}
+COMPTE = re.compile("(?i)(?<![0-9A-Za-zà-ÿ.,/-])([0-9]+|" + "|".join(NOMBRES) + ") (tests?|fichiers?|files?|lignes?"
+                    "|lines?|mutants?|cas|cases?|commits?|diffs?|gardes?|items?)(?![A-Za-zà-ÿ])"
+                    "|(?<![A-Za-z])Ran ([0-9]+)(?![0-9])")
+COMPTEUR = re.compile(r"\bwc\b|\bgrep\b[^|;&]*\s-[A-Za-z]*c")      # commandes de comptage (C-6)
+NU = re.compile(r"^ *(?:[^ :]+:)?([0-9]+)(?: +[^ ]+)? *$", re.M)      # ligne de wc ou de grep -c : N, N nom, nom:N
+BORNE = re.compile("(?i)(?:≤|≥|<|>|au plus|au moins|moins de|plus de|jusqu'à|jusqu’à|maximum|minimum|chacun) ?$")
+BRIEF_NOMME = re.compile("(?:[^ " + chr(9) + chr(10) + "\"'`<>|;,()]*/)?BRIEF[^ " + chr(9) + chr(10) + "\"'`<>|;,()/]*[.]md")
+CONSIGNE_MAX = 1500       # caractères d'une consigne sans fichier BRIEF*.md au-delà desquels R11 refuse (C-5)
+OUTILS = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))      # racine du dépôt du crochet
+GIT_CMD = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|--no-optional-locks|--git-dir=\S+|--work-tree=\S+))*\s+(\w[\w-]*)")
+PY_PROCESSUS = re.compile(r"\b(subprocess|os\s*\.\s*(system|popen|exec\w*|spawn\w*|posix_spawn\w*)|pty\s*\.\s*spawn)\b")
+
+
+def _acte_shell():
+    """acte_shell.py, voisin, chargé par son chemin (sous -I), sans bytecode écrit dans l'arbre ; None s'il manque ou
+    ne se charge pas (motifs)."""
+    sys.dont_write_bytecode = True
+    try:
+        chemin = os.path.join(os.path.dirname(os.path.abspath(__file__)), "acte_shell.py")
+        spec = importlib.util.spec_from_file_location("acte_shell", chemin)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+    except Exception:
+        return None
+
+
+AS = _acte_shell()
+RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SEUIL_WORKFLOW, SEUIL_VIVANTS, VIVANT_S = 3, 4, 300
+JETON = re.compile(r"FANOUT-AUTORISE|\bfan[ -]?out\b", re.I)
+NEGATION = re.compile(r"\b(pas|ne|non|sans|jamais|aucune?|interdite?s?|no|not|never|without|don't)\b|\bn'", re.I)
+COMMUNS = {"le", "la", "les", "un", "une", "je", "tu", "il", "elle", "nous", "vous", "bonjour", "merci", "salut", "oui",
+           "non", "cordialement", "hello", "hi", "dear", "thanks", "thank", "best", "regards", "the", "this", "we",
+           "our", "utc", "api", "url", "pr", "ok", "json", "ci", "pdf", "http", "https", "readme"}
+NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
+                        r"(?![\w-])")
+RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
+FORGE_HOTE = re.compile(r"(?i)(?<![\w-])api\.github\.com(?![\w-])")     # hôte de la forge dans le texte (sens sûr)
+FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
+
+
+def lire_queue(chemin):
+    """Lit la fin du journal (QUEUE octets), rend la liste des entrées JSON décodées."""
+    out = []
+    try:
+        with open(chemin, "rb") as f:
+            f.seek(0, 2)
+            n = f.tell()
+            f.seek(max(0, n - QUEUE))
+            if n > QUEUE:
+                f.readline()
+            for ligne in f:
+                try:
+                    out.append(json.loads(ligne))
+                except Exception:
+                    continue
+    except OSError:
+        return None
+    return out
+
+
+def contenus(bloc):
+    """Texte d'un bloc de contenu (str, dict content, liste)."""
+    if bloc is None:
+        return ""
+    if isinstance(bloc, str):
+        return bloc
+    if isinstance(bloc, list):
+        return "\n".join(contenus(b) for b in bloc)
+    if isinstance(bloc, dict):
+        if bloc.get("type") == "tool_result":
+            return contenus(bloc.get("content"))
+        if bloc.get("type") == "text":
+            return bloc.get("text", "")
+        if "content" in bloc and bloc.get("type") in (None, "queued_command"):
+            return contenus(bloc.get("content"))
+        return bloc.get("prompt", "") or bloc.get("text", "") or ""
+    return str(bloc)
+
+
+def faits_et_appels(entrees):
+    """Sépare : textes affichés par des outils ou la veille (faits) ; appels d'outil (dans l'ordre) ;
+    textes tapés par l'agent ; textes de l'humain. Les résultats qui portent la marque du crochet sont écartés
+    des faits (ils citent l'identifiant refusé)."""
+    faits, appels, agent, humain = [], [], [], []
+    for e in entrees:
+        t = e.get("type")
+        if t == "user":
+            for b in (e.get("message") or {}).get("content") or []:
+                if isinstance(b, dict) and b.get("type") == "tool_result":
+                    txt = contenus(b)
+                    if MARQUE not in txt:
+                        faits.append(txt)
+                else:
+                    humain.append(contenus(b))
+            tur = e.get("toolUseResult")
+            if tur is not None:
+                txt = json.dumps(tur, ensure_ascii=False) if not isinstance(tur, str) else tur
+                if MARQUE not in txt:
+                    faits.append(txt)
+        elif t == "assistant":
+            for b in (e.get("message") or {}).get("content") or []:
+                if isinstance(b, dict) and b.get("type") == "tool_use":
+                    appels.append((b.get("name", ""), b.get("input") or {}))
+                elif isinstance(b, dict) and b.get("type") == "text":
+                    agent.append(b.get("text", ""))
+        elif t == "attachment":
+            faits.append(contenus(e.get("attachment")))
+        elif t == "queue-operation":
+            faits.append(e.get("content", "") or "")
+    return faits, appels, agent, humain
+
+
+def texte_appel(nom, inp):
+    if nom == "Bash":
+        return inp.get("command", "")
+    if nom in ("Read", "Edit", "Write", "MultiEdit", "NotebookEdit"):
+        return inp.get("file_path", "") or inp.get("notebook_path", "")
+    if nom in ("Grep",):
+        return inp.get("path", "") or ""
+    return json.dumps(inp, ensure_ascii=False)
+
+
+def resoudre(chemin, cwd):
+    if not chemin:
+        return chemin
+    chemin = os.path.expanduser(chemin)
+    if not os.path.isabs(chemin):
+        chemin = os.path.join(cwd or "", chemin)
+    return os.path.normpath(chemin)
+
+
+def fichier_lu_avant(cible, appels, cwd):
+    """Vrai si un appel récent a lu la cible : Read/Edit/Write sur ce chemin, ou commande shell de lecture
+    qui nomme ce chemin (absolu, relatif, ou son nom de base précédé d'un séparateur)."""
+    base = os.path.basename(cible)
+    for nom, inp in appels[-FENETRE_APPELS:]:
+        if nom in ("Read", "Edit", "Write", "MultiEdit") and resoudre(inp.get("file_path", ""), cwd) == cible:
+            return True
+        if nom == "Bash":
+            c = inp.get("command", "")
+            if (cible in c or re.search(r"(^|[\s/'\"=])" + re.escape(base) + r"(?=$|[\s'\";|&)])", c)) and (
+                LECTURE_SHELL.search(c) or PY_W.sub("", c) != c and "'r'" in c
+            ):
+                return True
+    return False
+
+
+def commandes_git_recentes(appels):
+    out = []
+    for nom, inp in appels[-FENETRE_APPELS:]:
+        if nom == "Bash":
+            out.append(inp.get("command", ""))
+    return out
+
+
+def a_lu(cmds, motif):
+    r = re.compile(motif)
+    return any(r.search(c) for c in cmds)
+
+
+def identifiants_affiches(faits, humain):
+    """Ensemble des identifiants hexadécimaux et numéros de PR affichés par des outils (ou tapés par l'humain)."""
+    hexs, prs = set(), set()
+    for txt in faits + humain:
+        for h in HEX_ID.findall(txt):
+            hexs.add(h.lower())
+        for p in PR_NUM.findall(txt):
+            prs.add(p)
+    return hexs, prs
+
+
+def est_identifiant_commit(h):
+    """Un sha court ou long : lettres et chiffres mêlés (écarte les nombres purs et les mots comme 'deadbeef' ? non :
+    'deadbeef' est admis comme identifiant possible ; seuls les suites purement numériques sont écartées)."""
+    return any(c.isdigit() for c in h) and any(c.isalpha() for c in h)
+
+
+def hex_affiche(h, hexs):
+    """h est couvert si lui-même, un préfixe affiché de 7+ caractères, ou un affiché dont il est préfixe, existe."""
+    h = h.lower()
+    if h in hexs:
+        return True
+    for x in hexs:
+        if len(x) >= 7 and (h.startswith(x) or x.startswith(h)):
+            return True
+    return False
+
+
+def refuser(motif):
+    sys.stderr.write(f"{MARQUE} : REFUS. {motif}\n")
+    sys.exit(2)
+
+
+def journaliser(dossier, ligne):
+    try:
+        with open(os.path.join(dossier, "garde-faits.log"), "a", encoding="utf-8") as f:
+            f.write(ligne.rstrip("\n") + "\n")
+    except OSError:
+        pass
+
+
+def journal_de_l_agent(entree):
+    tp = entree.get("transcript_path") or ""
+    agent = entree.get("agent_id") or entree.get("agentId") or ""
+    if entree.get("agent_transcript_path"):
+        return entree["agent_transcript_path"], os.path.dirname(tp)
+    if agent:
+        dossier = tp[:-6] if tp.endswith(".jsonl") else os.path.dirname(tp)
+        return os.path.join(dossier, "subagents", f"agent-{agent}.jsonl"), os.path.dirname(tp)
+    return tp, os.path.dirname(tp)
+
+
+def fichiers_sed(mots):
+    """Fichiers qu'un sed -i (ou --in-place) récrit, sinon [] : le script (premier mot, sauf -e ou -f) n'en est pas."""
+    if not any(m.startswith("--in-place") or m[:1] == "-" and m[1:2] != "-" and "i" in m for m in mots[1:]):
+        return []
+    out, script, k = [], False, 1
+    while k < len(mots):
+        m = mots[k]
+        script |= m in ("-e", "-f", "--expression", "--file") or m.startswith(("--expression=", "--file="))
+        if m in ("-e", "-f", "--expression", "--file"):
+            k += 1
+        elif not m.startswith("-") or m == "-":
+            out.append(m)
+        k += 1
+    return out if script else out[1:]
+
+
+def messages_commit(args, corps, cwd):
+    """Textes des messages d'un git commit : -m, --message, groupées (-am) ou collées ; fichier de -F et --file lu
+    (-F - : corps du heredoc)."""
+    out, k = [], 0
+    while k < len(args):
+        m, opt, v = args[k], None, None
+        if m.startswith(("--message=", "--file=")):
+            opt, v = m[2], m.split("=", 1)[1]
+        elif m in ("--message", "--file"):
+            opt, v, k = m[2], args[k + 1] if k + 1 < len(args) else "", k + 1
+        elif m[:1] == "-" and m[1:2] != "-" and re.search("[mF]", m[1:]):
+            p = re.search("[mF]", m[1:]).start() + 1
+            opt, v = m[p].lower(), m[p + 1:] or (args[k + 1] if k + 1 < len(args) else "")
+            k += 0 if m[p + 1:] else 1
+        if opt == "m":
+            out.append(v)
+        elif opt == "f":
+            out.append("\n".join(corps) if v == "-" else lire_texte(resoudre(v, cwd)))
+        k += 1
+    return out
+
+
+def lire_texte(chemin):
+    try:
+        with open(chemin, encoding="utf-8", errors="replace") as f:
+            return f.read(1_000_000)
+    except OSError:
+        return ""
+
+
+def motif_non_ancre(mots):
+    """Vrai si pkill ou pgrep porte -f (--full, ou groupée : -af) et que son motif ne commence pas par ^."""
+    plein, k = False, 1
+    while k < len(mots):
+        m = mots[k]
+        if m == "--" or not m.startswith("-") or m == "-":
+            motif = mots[k + 1] if m == "--" and k + 1 < len(mots) else (None if m == "--" else m)
+            return plein and motif is not None and not motif.startswith("^")
+        if m.startswith("--"):
+            plein |= m == "--full"
+            k += 2 if m in ("--signal", "--euid", "--uid", "--group", "--pgroup", "--parent", "--session", "--terminal",
+                            "--pidfile", "--ns", "--nslist", "--runstates", "--delimiter", "--cgroup") else 1
+        elif mots[0].endswith("pkill") and re.fullmatch(r"-([0-9]+|[A-Z][A-Z0-9+-]*)", m):
+            k += 1                  # signal : -9, -TERM
+        else:
+            plein |= "f" in m[1:]
+            k += 2 if m[-1] in "dgGPstuUFr" else 1
+    return False
+
+
+def hote_forge(mots):
+    """Vrai si un mot de la commande vise l'API de la forge : URL dont l'hôte, lu par urlsplit (jamais par sous-chaîne),
+    est api.github.com (schéma en toute casse, point final admis) ; mot sans schéma dont l'hôte est api.github.com (curl
+    le lit en http) ; URL que urlsplit refuse (ValueError : sens sûr, jamais une erreur interne). Une URL d'un autre hôte
+    dont le chemin, la requête ou un sous-domaine porte « api.github.com » ne compte pas."""
+    for x in mots:
+        if re.match(r"(?i)https?://", x):
+            try:
+                h = urlsplit(x).hostname or ""
+            except ValueError:
+                return True
+        else:
+            h = re.sub(r":[0-9]*$", "", re.split(r"[/?#]", x, maxsplit=1)[0].rsplit("@", 1)[-1]).lower()
+        if h.rstrip(".") == "api.github.com":
+            return True
+    return False
+
+
+def faits_de_la_commande(c, cwd, fond=False):
+    """Ce que fait la commande : rm (cibles d'un rm récursif), worktree (git worktree remove), ecrit (fichiers écrits),
+    git (sous-commandes), messages (textes que R5 juge pour un commit), forge (gh, curl vers l'API). Lu sur les actes
+    (LN-6) ; par les motifs d'avant si shlex ne lit pas la commande (sens sûr)."""
+    actes = AS.analyser(c, fond) if AS else None
+    g = GIT_CMD.search(c)
+    motifs = {"rm": [m.group(2) for m in RM.finditer(c)] if re.search(r"\brm\s+-[a-zA-Z]*[rR]", c) else [],
+              "worktree": "git worktree remove" in c, "git": {g.group(1)} if g else set(), "messages": [c],
+              "ecrit": [m.group(3) for m in REDIR.finditer(c)] + [m.group(2) for m in SED_I.finditer(c)]
+              + PY_W.findall(c),
+              "forge": bool(re.search(r"\bgh\s+pr\s+(create|comment|review|merge)|pull_request", c)), "actes": None}
+    if actes is None:
+        return motifs
+    # G2, C-2 : acte non lisible sur ses mots (programme ou argument d'eval portant $ ou `, code python qui lance un
+    # processus) : les motifs d'avant jugent aussi la commande, en plus des actes (sens sûr)
+    douteux = any(re.search("[$`]", a["prog"]) or a["prog"] == "eval" and re.search("[$`]", " ".join(a["mots"][1:]))
+                  or any(PY_PROCESSUS.search(code) for code in a["python"]) for a in actes)
+    f = {"rm": [], "worktree": False, "git": set(), "messages": [], "ecrit": [], "forge": False}
+    f = {k: (type(v)(motifs[k]) if douteux else v) for k, v in f.items()}
+    f["actes"] = actes
+    for a in actes:
+        m, p = a["mots"], a["prog"]
+        f["ecrit"] += [x for op, x in a["redirs"] if ">" in op and not op.endswith("&")]
+        f["ecrit"] += [x for code in a["python"] for x in PY_W.findall(code)]
+        if p == "rm" and {"r", "R", "--recursive"} & AS.options_courtes(m):
+            f["rm"] += [x for x in m[1:] if not x.startswith("-")]
+        elif p == "tee":
+            f["ecrit"] += [x for x in m[1:] if not x.startswith("-")]
+        elif p == "sed":
+            f["ecrit"] += fichiers_sed(m)
+        elif p == "git":
+            sous, reste = AS.git_sous_commande(m)
+            f["git"].add(sous)
+            f["worktree"] |= sous == "worktree" and reste[:1] == ["remove"]
+            f["messages"] += messages_commit(reste, a["corps"], cwd) if sous == "commit" else []
+        elif p == "gh" and m[1:2] in (["pr"], ["issue"], ["api"], ["release"]) or p == "curl" and (
+                hote_forge(m) or any(re.search("[$`]", x) for x in m[1:]) and FORGE_HOTE.search(c)):
+            f["forge"] = True
+    return f
+
+
+def appels_resultats(entrees):
+    """[(nom, entrée, texte du résultat)] : appels d'outil appariés à leur résultat par l'identifiant d'appel."""
+    blocs = lambda genre: [b for e in entrees if e.get("type") == genre for b in (e.get("message") or {}).get(
+        "content") or [] if isinstance(b, dict)]      # noqa: E731
+    res = {b.get("tool_use_id"): contenus(b) for b in blocs("user") if b.get("type") == "tool_result"}
+    return [(b.get("name", ""), b.get("input") or {}, res.get(b.get("id"), "")) for b in blocs("assistant")
+            if b.get("type") == "tool_use"]
+
+
+def jour_utc():
+    """Date du jour lue par date -u (les cas la fixent par un faux date en tête du PATH)."""
+    import subprocess
+    return subprocess.run(["date", "-u", "+%Y-%m-%d"], capture_output=True, text=True, timeout=10).stdout.strip()
+
+
+def preuves_forge(entrees, cible):
+    """Résultats d'outil du journal qui montrent, pour cible (owner/repo), un run conclu success ou un job à runner_id
+    non nul (outil mcp__github__actions_* du même dépôt, ou gh run, gh api qui le nomme)."""
+    out = []
+    for nom, inp, txt in appels_resultats(entrees):
+        if MARQUE in txt or not FORGE_JOB.search(txt):
+            continue
+        depot = f"{inp.get('owner', '')}/{inp.get('repo', '')}".casefold()
+        c = inp.get("command", "") if nom == "Bash" else ""
+        if nom.startswith("mcp__github__actions_") and depot == cible or re.search(r"\bgh\s+(run|api)\b", c) and (
+                cible in c.casefold()):
+            out.append(txt)
+    return out
+
+
+def forge_lance(entrees, owner, repo, entree):
+    """Vrai si le journal de l'agent, ou le marqueur du jour adossé à une preuve d'un journal de la session, montre que
+    la forge lance des jobs sur owner/repo (R8, E20 ; G2, C-4)."""
+    cible = f"{owner}/{repo}".casefold()
+    if preuves_forge(entrees, cible):
+        return True
+    marqueur = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "forge-actions.txt"))
+    lignes = [x.split() for x in marqueur.casefold().split("\n") if x.strip() and not x.startswith("#")]
+    ids = {x[2] for x in lignes if len(x) == 3 and x[2].isdigit() and x[:2] == [cible, jour_utc()]}
+    tp = entree.get("transcript_path") or ""
+    d = os.path.join(tp[:-6] if tp.endswith(".jsonl") else os.path.dirname(tp), "subagents")
+    try:
+        journaux = [tp] + [os.path.join(d, x) for x in sorted(os.listdir(d)) if x.startswith("agent-")] if ids else []
+    except OSError:
+        journaux = [tp]
+    return any(re.search(r"(?<![\w.])" + i + r"(?![\w.])", t) for j in journaux
+               for t in preuves_forge(lire_queue(j) or [], cible) for i in ids)
+
+
+def tour_humain(entrees):
+    """(indice, textes) du dernier message de l'humain (hors résultats d'outil, rappels du système et refus de ce
+    crochet), suivi des messages qu'il a mis en file après lui."""
+    idx, textes = None, []
+    for i, e in enumerate(entrees):
+        c = (e.get("message") or {}).get("content") if e.get("type") == "user" and not e.get("isMeta") else None
+        blocs = [c] if isinstance(c, str) else [b for b in c or [] if isinstance(b, dict) and b.get("type") == "text"]
+        txt = RAPPEL.sub("", "\n".join(contenus(b) for b in blocs))
+        outils = isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c)
+        if txt.strip() and MARQUE not in txt and not outils:
+            idx, textes = i, [txt]
+        elif idx is not None and e.get("type") == "attachment" and (e.get("attachment") or {}).get(
+                "type") == "queued_command":
+            textes.append(contenus(e.get("attachment")))
+    return idx, textes
+
+
+def noms_propres(texte):
+    """Noms propres d'un message, douze au plus : capitale hors début de phrase et hors COMMUNS, capitales internes
+    (CoinGecko), sigles (MONARK), domaine d'une adresse (coingecko.com)."""
+    t, out = RAPPEL.sub("", texte), []
+    for m in NOM_PROPRE.finditer(t):
+        avant, mot = t[:m.start()].rstrip(" \t\"'«(*"), m.group(1)
+        simple = re.fullmatch(r"[A-ZÀ-Ý][a-zà-ÿ]+", mot)
+        if not (simple and (not avant or avant[-1] in ".!?:\n")) and mot.casefold() not in COMMUNS and mot not in out:
+            out.append(mot)
+    return (out + [d for d in dict.fromkeys(re.findall(r"@([A-Za-z0-9-]+)[.]", t)) if d not in out])[:12]
+
+
+def releve(noms):
+    """Lignes du JOURNAL et des .md et .txt de docs/publication/ qui portent chaque nom (casse ignorée), cinq par
+    nom."""
+    sources = [os.path.join(RACINE, "JOURNAL.md")]
+    for base, ds, fs in os.walk(os.path.join(RACINE, "docs", "publication")):
+        ds[:] = sorted(ds)
+        sources += [os.path.join(base, x) for x in sorted(fs) if x.endswith((".md", ".txt"))]
+    out = []
+    for nom in noms:
+        vus = [f"{os.path.relpath(x, RACINE)}:{n}: {ligne.strip()[:200]}" for x in sources
+               for n, ligne in enumerate(lire_texte(x).split("\n"), 1) if nom.casefold() in ligne.casefold()][:5]
+        out += vus or [f"{nom} : aucune ligne au JOURNAL ni sous docs/publication/"]
+    return out
+
+
+def soumission(entree):
+    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0."""
+    noms = noms_propres(entree.get("prompt") or "")
+    if not noms:
+        return 0
+    texte = (f"RELEVÉ (crochet du dépôt, E26) : noms propres du message : {', '.join(noms)}. Avant de rattacher ce "
+             "message à un dossier, lire ces lignes (grep -n) :\n" + "\n".join(releve(noms)))
+    try:
+        with open(os.path.join(os.path.dirname(entree.get("transcript_path") or "") or ".", "garde-faits.releve"), "w",
+                  encoding="utf-8") as f:
+            f.write(json.dumps(noms, ensure_ascii=False) + "\n" + texte)
+    except OSError:
+        pass
+    print(texte)
+    return 0
+
+
+def dossiers():
+    """Dossiers du projet (R10, E26 ; G2, C-5), lus dans scripts/controle/garde/dossiers.txt : un nom par ligne."""
+    texte = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "dossiers.txt"))
+    return [x.strip() for x in texte.split("\n") if x.strip() and not x.lstrip().startswith("#")]
+
+
+def dossiers_sans_releve(entree):
+    """R10 (E26) : dossiers que le dernier texte du tour nomme sans relevé, si le message de l'humain porte un nom
+    propre ; au second arrêt (stop_hook_active), passage consigné, rien rendu."""
+    entrees = lire_queue(entree.get("transcript_path") or "") or []
+    i, humains = tour_humain(entrees)
+    noms = noms_propres("\n".join(humains)) if i is not None else []
+    faits, _appels, agent, _humain = faits_et_appels(entrees[i + 1:] if noms else [])
+    if not agent:
+        return []
+    garde = lire_texte(os.path.join(os.path.dirname(entree.get("transcript_path") or ""), "garde-faits.releve"))
+    if garde.split("\n", 1)[0] == json.dumps(noms_propres(humains[0]), ensure_ascii=False):
+        faits.append(garde)
+    vus = "\n".join(faits + humains).casefold()
+    manque = [d for d in dossiers() if re.search(r"(?<!\w)" + re.escape(d) + r"(?!\w)", agent[-1], re.I)
+              and d.casefold() not in vus]
+    if manque and entree.get("stop_hook_active"):
+        journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
+                    f"PASSAGE R10 au second arrêt : {manque}")
+        return []
+    return manque
+
+
+def jeton(texte):
+    """Jeton du fan-out (R9, E27) : FANOUT-AUTORISE, ou les mots fan out dans une phrase sans négation (G2, C-7)."""
+    return bool(re.search("FANOUT-AUTORISE", texte, re.I)) or any(
+        JETON.search(p) and not NEGATION.search(p) for p in re.split(r"[.!?;\n]+", texte))
+
+
+def agents_du_workflow(inp):
+    """Agents qu'un Workflow lance : appels agent( de son texte, ou liste agents ; None si inconnu (aucun compte, ou
+    boucle qui les multiplie)."""
+    t = json.dumps(inp, ensure_ascii=False)
+    n = len(re.findall(r"\bagent\s*\(", t))
+    if n and re.search(r"\b(for|while)\s*\(|\.(map|forEach|flatMap)\s*\(|Array\.from|\bfor\s+\w+\s+(of|in)\b", t):
+        return None
+    liste = inp.get("agents") if isinstance(inp, dict) else None
+    return n or (len(liste) if isinstance(liste, list) and liste else None)
+
+
+def agents_vivants(entree):
+    """Sous-agents de la session dont le journal a bougé depuis VIVANT_S secondes (identifiants distincts)."""
+    import time
+    tp = entree.get("transcript_path") or ""
+    d = os.path.join(tp[:-6] if tp.endswith(".jsonl") else os.path.dirname(tp), "subagents")
+    try:
+        noms = os.listdir(d)
+    except OSError:
+        return 0
+    return len({x.split(".")[0] for x in noms if x.startswith("agent-")
+                and time.time() - os.path.getmtime(os.path.join(d, x)) < VIVANT_S})
+
+
+def pre_tool_use(entree):
+    nom = entree.get("tool_name", "")
+    inp = entree.get("tool_input") or {}
+    cwd = entree.get("cwd") or os.getcwd()
+    chemin, dossier = journal_de_l_agent(entree)
+    entrees = lire_queue(chemin)
+    if entrees is None:
+        sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; acte permis sans contrôle.\n")
+        return 0
+    faits, appels, agent, humain = faits_et_appels(entrees)
+    cmds = commandes_git_recentes(appels)
+    textes_ecrits = []     # textes où un identifiant écrit doit avoir été affiché (R5)
+    briefs_ecrits = []     # textes de BRIEF*.md où un compte écrit doit avoir été affiché (R5, E7)
+
+    if nom == "Bash":
+        c = inp.get("command", "")
+        fc = faits_de_la_commande(c, cwd, bool(inp.get("run_in_background")))
+        # R1 : effacer un worktree ou un clone
+        cibles_rm = [resoudre(x, cwd) for x in fc["rm"]]
+        if fc["worktree"] or any(os.path.exists(os.path.join(p, ".git")) for p in cibles_rm):
+            if not a_lu(cmds, r"\bgit(\s+-C\s+\S+)?\s+status\b"):
+                refuser("R1 : effacer un arbre git exige « git status » lu avant, dans les derniers appels de cet agent.")
+            if not a_lu(cmds, r"\bgit(\s+-C\s+\S+)?\s+(log|rev-list)\b.*(origin/\S+\.\.|@\{u\}\.\.|--not\s+--remotes|\.\.HEAD)"):
+                refuser("R1 : effacer un arbre git exige ses commits non poussés lus avant (git log origin/<branche>..HEAD).")
+        # R2 : écrire dans un fichier existant par le shell
+        for cib in fc["ecrit"]:
+            if not cib or cib in ("/dev/null", "/dev/stderr", "/dev/stdout") or cib.startswith("&"):
+                continue
+            abs_c = resoudre(cib, cwd)
+            if os.path.isfile(abs_c) and not fichier_lu_avant(abs_c, appels, cwd):
+                refuser(f"R2 : écrire dans un fichier existant exige sa lecture avant (Read, cat, tail…) : {abs_c}")
+            if os.path.isfile(abs_c) and abs_c.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
+                textes_ecrits.append(c)
+        if any(re.fullmatch("BRIEF.*[.]md", os.path.basename(x)) for x in fc["ecrit"]):
+            briefs_ecrits.append(c)
+        # R3 : commit et push (sous-commandes de git lues sur les actes)
+        if "commit" in fc["git"]:
+            if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|diff)\b"):
+                refuser("R3 : « git commit » exige le diff ou le status de l'arbre lu avant, dans les derniers appels de cet agent.")
+            textes_ecrits += fc["messages"]
+        if "push" in fc["git"]:
+            if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+((log|rev-list)\b.*origin|status\b|ls-remote\b)"):
+                refuser("R3 : « git push » exige ce qui part lu avant (git log origin/<branche>..HEAD, git status ou ls-remote).")
+        if fc["forge"]:
+            textes_ecrits.append(c)
+        # R7 (E18, E28) : attente d'avant-plan, motif de processus non ancré
+        attente = "R7 (E18) : sleep d'avant-plan ; attendre par une boucle while ou until à condition de sortie (until "
+        attente += "<condition>; do sleep N; done) "
+        attente += "ou lancer en arrière-plan (run_in_background, ou commande suivie de &) et sonder."
+        ancre = "R7 (E28) : pkill -f ou pgrep -f à motif non ancré, qui reconnaît le shell qui le lance ; ancrer par ^ "
+        ancre += "(pgrep -f '^bash chaine_x.sh')."
+        sortie = any(a["prog"] in ("break", "exit", "return") for a in fc["actes"] or [])
+        for a in fc["actes"] or []:
+            en_boucle = any(b in ("while", "until") or b.endswith("-sans-fin") and sortie for b in a["boucles"])
+            if a["prog"] == "sleep" and not a["fond"] and not en_boucle:
+                refuser(attente)
+            if a["prog"] in ("pkill", "pgrep") and motif_non_ancre(a["mots"]):
+                refuser(ancre)
+        motifs = fc["actes"] is None            # commande illisible par shlex : motifs (sens sûr)
+        if motifs and re.search(r"(^|[;&|(\s])sleep\s", c) and not re.search(r"\b(until|while)\b", c) and not inp.get(
+                "run_in_background"):
+            refuser(attente)
+        if motifs and re.search(r"\bp(kill|grep)\s[^;&|]*-[a-zA-Z]*f", c) and not re.search(r"\s['\"]?\^", c):
+            refuser(ancre)
+    elif nom in ("Edit", "MultiEdit", "Write"):
+        fp = inp.get("file_path", "")
+        if fp.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
+            textes_ecrits.append(inp.get("new_string", "") or inp.get("content", "") or json.dumps(inp.get("edits", []), ensure_ascii=False))
+            if re.fullmatch("BRIEF.*[.]md", os.path.basename(fp)):
+                briefs_ecrits.append(textes_ecrits[-1])
+    elif nom in ("Agent", "Workflow", "SendMessage"):
+        p = json.dumps(inp, ensure_ascii=False)
+        # R4 : lancer un sous-agent sur un arbre
+        if nom in ("Agent", "Workflow") and re.search(r"/home/user/shogen|dépôt|depot|worktree|git archive|\.git\b", p):
+            if not a_lu(cmds, r"\bgit(\s+(-C\s+\S+|--no-optional-locks))*\s+(status|log)\b"):
+                refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
+        if nom in ("Agent", "Workflow"):
+            controler_briefs(inp, cwd)      # R11
+        # R9 (E27) : seuil de coût
+        n = 1 if nom == "Agent" else agents_du_workflow(inp) if nom == "Workflow" else 0
+        vivants = agents_vivants(entree) if n else 0
+        if n is None or (nom == "Workflow" and n > SEUIL_WORKFLOW) or vivants + (n or 0) > SEUIL_VIVANTS:
+            tp = entree.get("transcript_path") or ""
+            session = entrees if chemin == tp else lire_queue(tp)
+            if not any(jeton(t) for t in tour_humain(session or [])[1]):
+                lances = "nombre d’agents illisible" if n is None else f"{n} agent(s) lancé(s)"
+                refuser(f"R9 (E27) : seuil de coût : {lances}, {vivants} vivant(s) (seuils : {SEUIL_WORKFLOW} par "
+                        f"workflow, {SEUIL_VIVANTS} vivants) ; faire en direct, ou attendre le jeton FANOUT-AUTORISE "
+                        "écrit par l'investisseur dans son message.")
+        textes_ecrits.append(p)
+    elif nom.startswith("mcp__github__") and nom.split("__")[-1] in ("create_pull_request", "add_issue_comment", "update_pull_request", "pull_request_review_write", "add_reply_to_pull_request_comment"):
+        o, r = inp.get("owner", ""), inp.get("repo", "")
+        if nom.endswith("__create_pull_request") and not forge_lance(entrees, o, r, entree):
+            refuser(f"R8 (E20) : aucune preuve que la forge lance des jobs sur {o}/{r} (dépôt privé : runner_id 0, "
+                    "échec en 2 s) ; lire mcp__github__actions_list de ce dépôt (un run conclu success, un job à "
+                    "runner_id non nul), ou écrire après ce constat la ligne owner/repo AAAA-MM-JJ <id du run lu> "
+                    "dans scripts/controle/garde/forge-actions.txt.")
+        textes_ecrits.append(json.dumps(inp, ensure_ascii=False))
+
+    # R5 : identifiants de commit et numéros de PR écrits
+    if textes_ecrits:
+        hexs, prs = identifiants_affiches(faits, humain)
+        for txt in textes_ecrits:
+            for h in HEX_ID.findall(txt):
+                if est_identifiant_commit(h) and not hex_affiche(h, hexs):
+                    refuser(f"R5 : l'identifiant « {h} » n'a été affiché par aucun outil dans le journal de cet agent ; lis-le (git log) avant de l'écrire.")
+            for p in PR_NUM.findall(txt):
+                if p not in prs:
+                    refuser(f"R5 : le numéro de PR « {p} » n'a été affiché par aucun outil dans le journal de cet agent ; lis-le avant de l'écrire.")
+    if briefs_ecrits:      # R5, comptes d'un brief (E7)
+        vus = {(n, u) for txt in faits + humain for n, u, _x in comptes(txt, bornes=False)}
+        nus = comptes_nus(entrees)
+        for n, u, brut in [x for txt in briefs_ecrits for x in comptes(txt)]:
+            if (n, u) not in vus and n not in nus:
+                refuser(f"R5 : le compte « {brut} » du brief n'a été affiché par aucun outil, avec son unité, dans le journal de cet agent (E7) ; affiche-le (printf '%s {u}s' $(…), wc ou grep -c) avant de l'écrire.")
+    return 0
+
+
+def comptes(texte, bornes=True):
+    """[(nombre, unité, texte écrit)] des comptes à unité (E7) ; bornes : les comptes précédés d'une borne écartés."""
+    out = []
+    for m in COMPTE.finditer(texte):
+        if m[3] or not (bornes and BORNE.search(texte[max(0, m.start() - 12):m.start()])):
+            unite = "test" if m[3] else m[2].lower()
+            unite = UNITES.get(unite, UNITES.get(unite.rstrip("s"), unite.rstrip("s")))
+            out.append((int(m[3] or NOMBRES.get(m[1].lower(), m[1])), unite, m[0]))
+    return out
+
+
+def comptes_nus(entrees):
+    """Nombres affichés seuls sur leur ligne (ou suivis d'un nom, ou après nom:) par une commande de comptage (wc,
+    grep -c) : comptes lus sans unité, admis pour toute unité (C-6, E7). Résultat apparié à sa commande par l'id."""
+    ids, out = set(), set()
+    for e in entrees:
+        m = e.get("message")
+        if e.get("type") not in ("assistant", "user") or not isinstance(m, dict) or not isinstance(m.get("content"), list):
+            continue
+        for b in m["content"]:
+            if not isinstance(b, dict):
+                continue
+            entree = b.get("input") if isinstance(b.get("input"), dict) else {}
+            if b.get("type") == "tool_use" and b.get("id") and COMPTEUR.search(str(entree.get("command", ""))):
+                ids.add(b["id"])
+            elif b.get("type") == "tool_result" and b.get("tool_use_id") in ids and MARQUE not in contenus(b):
+                out |= {int(x) for x in NU.findall(contenus(b))}
+    return out
+
+
+def controler_briefs(inp, cwd):
+    """R11 : chaque fichier BRIEF*.md nommé par la consigne passe avant_acte.py brief (dépôt : CLAUDE_PROJECT_DIR)."""
+    depot = os.environ.get("CLAUDE_PROJECT_DIR") or OUTILS
+    acte = os.path.join(OUTILS, "scripts", "controle", "avant_acte.py")
+    textes = "\n".join(v for v in inp.values() if isinstance(v, str))
+    noms = sorted(set(BRIEF_NOMME.findall(textes)))
+    consigne = inp.get("prompt") if isinstance(inp.get("prompt"), str) else ""
+    if not noms and len(consigne) > CONSIGNE_MAX:
+        refuser(f"R11 : consigne de {len(consigne)} caractères sans fichier BRIEF*.md (plus de {CONSIGNE_MAX}) : écris le "
+                "brief dans un fichier BRIEF*.md, contrôlé par avant_acte.py brief (E6, E22, E23, E24), et nomme-le.")
+    for nom_brief in noms:
+        chemin = resoudre(nom_brief, cwd)
+        if not os.path.isfile(chemin):
+            if os.path.isabs(nom_brief):
+                refuser(f"R11 : la consigne nomme un brief absent : {chemin} ; écris-le, ou corrige le chemin.")
+            continue
+        cmd = [sys.executable, "-I", "-B", acte, "--depot", depot, "brief", "--texte", chemin]
+        fiche = inp.get("subagent_type") or ""
+        if re.fullmatch("[a-z0-9-]+", fiche) and os.path.isfile(os.path.join(depot, ".claude", "agents", fiche + ".md")):
+            cmd += ["--fiche", fiche]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        except (OSError, subprocess.TimeoutExpired) as e:
+            sys.stderr.write(f"{MARQUE} : R11 non contrôlé ({e!r}) ; acte permis.\n")
+            continue
+        if p.returncode == 1:
+            refus = [x for x in p.stdout.splitlines() if x.startswith("REFUS")]
+            refuser(f"R11 : le brief {chemin} échoue à avant_acte.py brief : " + " | ".join(refus[:6]))
+        elif p.returncode:
+            sys.stderr.write(f"{MARQUE} : R11 : avant_acte.py brief, sortie {p.returncode} ; acte permis.\n")
+
+
+def formes_nombre(s):
+    """Lectures possibles d'un nombre écrit : la virgule est un séparateur de milliers (1,715 → 1715) ou une
+    décimale (0,901 → 0.901) ; les deux formes sont rendues, il suffit qu'une soit affichée."""
+    s = re.sub(r"[   ]", "", s)
+    formes = {s.replace(",", ".")}
+    if re.fullmatch(r"\d{1,3}(,\d{3})+(\.\d+)?", s):
+        formes.add(s.replace(",", ""))
+    return formes
+
+
+def normaliser_nombre(s):
+    return min(formes_nombre(s))
+
+
+def stop(entree, sous_agent):
+    if entree.get("stop_hook_active"):
+        return 0
+    chemin, dossier = journal_de_l_agent(entree)
+    entrees = lire_queue(chemin)
+    if not entrees:
+        return 0
+    faits, appels, agent, humain = faits_et_appels(entrees)
+    if not agent:
+        return 0
+    dernier = agent[-1]
+    # identifiant du tour : uuid de la dernière entrée assistant
+    uuid = next((e.get("uuid") for e in reversed(entrees) if e.get("type") == "assistant"), "sans-uuid")
+    corpus = "\n".join(faits + humain)
+    corpus_norm = set()
+    for m in NOMBRE.findall(corpus):
+        corpus_norm |= formes_nombre(m)
+    corpus_plat = re.sub(r"[   ,]", "", corpus)
+    manquants = []
+    for m in NOMBRE.findall(dernier):
+        fs = formes_nombre(m)
+        if fs & corpus_norm or any(f.replace(".", "") in corpus_plat for f in fs) or m in corpus:
+            continue
+        manquants.append(m)
+    for m in NOMBRE_UNITE.findall(dernier):
+        if re.search(r"(?<![\d.,])" + m + r"(?![\d])", corpus) or m in manquants:
+            continue
+        manquants.append(m)
+    if not manquants:
+        return 0
+    etat = os.path.join(dossier, "garde-faits.etat")
+    deja = ""
+    try:
+        with open(etat, encoding="utf-8") as f:
+            deja = f.read().strip()
+    except OSError:
+        pass
+    if deja == uuid:
+        journaliser(dossier, f"PASSAGE consigné au second arrêt ({'sous-agent' if sous_agent else 'agent'} {entree.get('agent_id', '')}) : nombres non affichés {manquants[:8]}")
+        return 0
+    try:
+        with open(etat, "w", encoding="utf-8") as f:
+            f.write(uuid)
+    except OSError:
+        pass
+    journaliser(dossier, f"REFUS Stop ({'sous-agent' if sous_agent else 'agent'} {entree.get('agent_id', '')}) : {manquants[:8]}")
+    sys.stderr.write(f"{MARQUE} : REFUS. R6 : le dernier texte porte des nombres qu'aucun outil n'a affichés : {', '.join(manquants[:8])}. Lis-les par un outil, ou retire-les.\n")
+    return 2
+
+
+def main():
+    try:
+        entree = json.load(sys.stdin)
+    except Exception:
+        return 0
+    ev = entree.get("hook_event_name", "")
+    dossier = os.path.dirname(entree.get("transcript_path") or "") or "."
+    try:
+        if ev == "PreToolUse":
+            return pre_tool_use(entree)
+        if ev == "UserPromptSubmit":
+            return soumission(entree)
+        if ev in ("Stop", "SubagentStop"):
+            manque = dossiers_sans_releve(entree) if ev == "Stop" else []
+            code = stop(entree, ev == "SubagentStop")
+            if manque:
+                sys.stderr.write(f"{MARQUE} : REFUS. R10 (E26) : la réponse nomme {', '.join(manque)} sans relevé du "
+                                 "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
+                                 "docs/publication/), puis rattacher.\n")
+                journaliser(dossier, f"REFUS Stop R10 : {manque}")
+                return 2
+            return code
+    except SystemExit as e:
+        if e.code == 2:
+            journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} agent={entree.get('agent_id', '')}")
+        raise
+    except Exception as exc:  # jamais un refus aveugle
+        sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; acte permis sans contrôle.\n")
+        journaliser(dossier, f"ERREUR {ev} {exc!r}")
+        return 0
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -269,6 +269,10 @@ jobs:
     # exigé, aucun saut admis, Ran ≥ plancher committé ci-dessous (SHOGEN-CI-S2-SAUT-1), relevé au compte mesuré à
     # chaque sous-lot (SHOGEN-CI-PLANCHER-SUIVI-1). Étapes lues par le cas K-02 du runner (SHOGEN-CI-S2-CABLAGE-1).
     # Diff CB-2e (Q-2 de la G2 de P1) : --egal exige Ran = plancher ; un plancher oublié ou abaissé fait échouer le job.
+    # Forme fermée des jobs unittest (lot DETTES-T6, DT6-j ; SHOGEN-S2BIS-ENV-ETAPE-1) : aucune clé `env`, ni au
+    # workflow, ni au job, ni à l'étape (leurres L-10, L-12, L-19 et L-33 du runner, refusés) ; une variable dont une
+    # suite a besoin se pose dans la suite (son tests/__init__.py, comme la purge des mandataires) ; tout autre besoin
+    # amende le gabarit K du runner et l'analyseur de enforcement/verdict-suite-s2.py, avec leurs cas.
     name: s2bis-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -284,7 +288,7 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 342
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 374
 
   sim-bis-unittest:
     # Lot SIM-BIS, sous-lot SB-0 (2026-10-05 ; ADR-0029 §6 lot 4 ; G0 docs/adr-0029/g0-sim/G0-SIM-BIS.md, PROPOSITION
@@ -334,7 +338,7 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 65
+          python3 -B enforcement/verdict-suite-s2.py scripts/calib-actifs --aucun-saut --egal --plancher 78
 
   controle-unittest:
     # Lot DETTES-T3, DT3-A (2026-10-09 ; ADR-0028 annexe B, B.35, B.87 ; SHOGEN-FM11-VERIFIABLE-1) : témoin de fm11.py et
@@ -342,6 +346,11 @@ jobs:
     # Lot DETTES-T5 (2026-10-09) : cas du contrôle des images de runner (10 tests, dont 2 de la relecture G2 et 1 de
     # l'adjudication C-10), plancher 26 → 36.
     # Correctif DT5-24 (2026-10-10, alerte CodeQL de la PR n° 11 : retour arrière exponentiel) : un test, plancher 37.
+    # Lot DETTES-T7, DT7-f (2026-10-10, recalé 2026-10-15) : cas de l'outil commun des mutants (scripts/controle/mutants.py), plancher 117.
+    # Lot DETTES-T15 (2026-10-10, SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1 : FLOTTANT quadratique) : un test de temps
+    # borné, plancher 118 (117 à la tête `413321b`, plus un ; recalé par la relecture G2 du 2026-10-15).
+    # Lot DETTES-T15, DT15-m (2026-10-16, SHOGEN-PRESG5-QUADRATIQUE-1 : presg5.py en temps linéaire) : trois tests,
+    # plancher 121.
     name: controle-unittest
     # Image épinglée (SHOGEN-CI-RUNNERS-1) ; interpréteur de l'image, sans setup-python (R-8).
     runs-on: ubuntu-24.04
@@ -357,4 +366,4 @@ jobs:
         shell: bash
         run: |
           python3 --version
-          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 37
+          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 177

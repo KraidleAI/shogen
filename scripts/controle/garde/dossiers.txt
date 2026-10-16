@@ -1,0 +1,9 @@
+# Dossiers du projet que le crochet GARDE-FAITS du dépôt (R10, erreur E26 ; lot GARDE-FOUS-ORCH, phase 2, correction
+# C-5 de la G2) refuse de voir nommés au Stop sans relevé du tour, quand le message de l'humain porte un nom propre.
+# Un nom par ligne ; casse ignorée ; un dossier neuf s'ajoute ici, par un diff relu.
+Pocket
+MONARK
+publication
+préavis
+procurement
+S2-bis

@@ -49,6 +49,15 @@
   diff CB-12a ferme SHOGEN-S2BIS-DNS-TC-1 et SHOGEN-S2BIS-DNS-ID-16BITS-1 (§12) ; le diff CB-13b écrit le §15
   (processus secondaire : journal, `carte.json` et ses règles croisées, boucle de la carte, relevé ASN de CB-12b et
   CB-13a, commande `secondaire`) et retouche les §12, §13.1 et §14.2.
+- **Lot de dettes DETTES-T6** (ajout daté du 2026-10-10 01:18:37 UTC, heure lue par `date -u` à la dernière écriture
+  du texte ; règle « aucune dette ») : le diff DT6-a ferme SHOGEN-S2BIS-CANONIQUE-OCTETS-1 et le résiduel du volet
+  graphe de SHOGEN-S2BIS-CORPS-BORNE-1 (cycle placé derrière un graphe partagé) (§8.4) ; le diff DT6-c,
+  SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (§5, §7.7, §17.1) ; le diff DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 (§17.1,
+  §17.3, §17.4) ; le diff DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 (§13.3, §17.2, §17.4, §17.6) ; le diff DT6-f,
+  SHOGEN-S2BIS-ASN-LECTURE-1 et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (§15.4) ; le diff DT6-g, par un test seul,
+  SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15) ; le diff DT6-h achève SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§14.4) ; le
+  diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17) ; le diff DT6-k porte
+  les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -151,8 +160,8 @@ mécanique :
 - un écrivain s'ouvre une seule fois : un second `ouvrir` est refusé (`JOURNAL/ouvert`), sans toucher au verrou ni au
   fichier ouvert ;
 - une écriture avant `ouvrir` ou après `fermer`, et l'ouverture d'un écrivain fermé, sont refusées (`JOURNAL/ferme`) ;
-- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/nom`, `JOURNAL/illisible`) ferme l'écrivain et
-  rend le verrou ;
+- une ouverture refusée (`JOURNAL/occupe`, `JOURNAL/fenetre`, `JOURNAL/nom`, `JOURNAL/fichier`, `JOURNAL/illisible`)
+  ferme l'écrivain et rend le verrou ;
 - `fermer` est le seul appel admis de tout fil (nettoyage) ; il reste admis après une casse (§4).
 
 Aucun de ces refus n'écrit. Les trois méthodes publiques d'écriture portent la même garde que la casse de C-2 (§4) ; un
@@ -267,7 +276,12 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    `jour` d'une `ouverture` ou d'une `cloture` au nom de son fichier restent de la validité (RB-3). La reprise de
    l'écrivain ne juge pas le lien entre la première ligne d'un fichier et la dernière ligne intègre qui la précède
    dans la chaîne (§7.1) : ce lien se juge ici, par le lecteur du recalcul (RB-1) et le lecteur indépendant (RB-18)
-   seuls.
+   seuls. **Fichiers ordinaires** (DT6-c, SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 ; O-4 de la G2 de P2B) : un fichier
+   du journal, et le fichier de sommes, sont des fichiers ordinaires. Devant un tube nommé, un dossier ou un
+   périphérique à l'un de ces noms, l'écrivain refuse de démarrer (`JOURNAL/fichier`, contrôle par `stat`, sans
+   ouverture, avant toute lecture et toute écriture) ; il ouvre toute lecture sans attente (`O_NONBLOCK`) et n'y lit
+   qu'un fichier ordinaire, comme au dépôt (§16.9) : un tube nommé bloquait sa reprise sans fin. `status` ne lit pas
+   un tel fichier (§17.1).
 
 ## 8. Trous et sommes rattrapées (CB-2c, E-C-22, E-C-20)
 
@@ -299,12 +313,20 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    lecture mesuré sur les décodeurs Python du projet est 988 niveaux (Python 3.10, limite de récursion par défaut ;
    seuils mesurés sous 3.10 et 3.12 seulement, banc de la G2 de RB-18) ; N est très au-dessus du premier et très
    au-dessous du second.
-4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`) :
-   le contrôle de cycle du sérialiseur `json` précède le parcours des valeurs (CB-2e, C-3). Une sous-structure
-   partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure. L'écrivain en compte les valeurs
-   une fois par occurrence, sans développer le graphe, et refuse avant le sérialiseur un enregistrement de plus de
-   LIMITE valeurs, qui ferait plus de LIMITE octets (`JOURNAL/taille` ; CB-6d, volet graphe de
-   SHOGEN-S2BIS-CORPS-BORNE-1 : `canonique` développait le graphe, en temps exponentiel).
+4. L'écrivain refuse de même, en temps borné, un enregistrement qui contient une structure cyclique (`JOURNAL/type`),
+   avant le sérialiseur (CB-2e, C-3 ; DT6-a : le contrôle de cycle du sérialiseur `json` ne voyait le cycle qu'après
+   avoir développé le graphe partagé placé devant lui, en temps exponentiel, 3,8 s pour 2^20 feuilles, mesuré). Une
+   sous-structure partagée sans cycle reste admise ; elle est écrite autant de fois qu'elle figure. L'écrivain en
+   compte, une fois par occurrence et sans développer le graphe, une borne basse des octets de la ligne (DT6-a) :
+   crochets, accolades, virgules et deux-points ; chaque chaîne, clés comprises, sa longueur et ses deux guillemets ;
+   chaque entier, son signe et ses chiffres, bornés par sa taille en bits ; `null`, `true` et `false`, 4 octets ; un
+   nombre à virgule, 3 ; toute autre valeur, 1. Il refuse avant le sérialiseur un enregistrement dont la borne, saut
+   de ligne compris, passe LIMITE (`JOURNAL/taille` ; CB-6d, volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1 : `canonique`
+   développait le graphe, en temps exponentiel ; DT6-a, SHOGEN-S2BIS-CANONIQUE-OCTETS-1 : la borne comptait les
+   valeurs, et une chaîne de 1 Mio partagée 1 000 fois faisait écrire 1 Gio, en 10 s, mesuré). Le contrôle prend un
+   temps linéaire dans le nombre de liens des conteneurs distincts ; le sérialiseur, qui ne part que sous cette borne,
+   écrit au plus 8 × LIMITE octets (un caractère de contrôle s'écrit en 6 octets pour 1 compté, un nombre à virgule,
+   refusé après lui, en 24 au plus pour 3).
 
 ## 9. Enregistrement `lecture` (CB-3a ; E-C-03, E-C-04, E-C-17)
 
@@ -517,10 +539,20 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    précédente a rendu ; une sonde qui lève vaut null et repart de même. Le nombre d'instances encore en cours est
    journalisé (`fils.sondes`, §11.6) : les fils de sonde restent bornés, au plus un par sonde.
 3. `d3` : sortie brute de la commande d'horloge scellée (configuration de l'observateur ; relevé chrony, ADR-0029
-   l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard lue en UTF-8 (octet invalide
-   remplacé par U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur`
-   valant `absente` (commande introuvable), `delai` (plus de 2 s) ou `autre`. Le collecteur n'analyse pas cette
-   sortie : la borne d'erreur, le statut et l'âge du relevé se lisent au recalcul.
+   l.83 et l.108) : `{sortie, code, debut, fin}`, où `sortie` est la sortie standard et la sortie d'erreur, mêlées
+   dans un même tube dans l'ordre où la commande les écrit (DT6-e : la sortie d'erreur était jetée, O-3 de la G2
+   de P1-B ; C-3 de la G2 de DETTES-T6), lue en UTF-8 (octet invalide remplacé par
+   U+FFFD), 4 096 caractères au plus, et `code` le code de sortie ; ou `{erreur, debut, fin}`, `erreur` valant
+   `absente` (commande introuvable), `delai` (plus de 2 s) ou `autre`. Le collecteur n'analyse pas cette sortie : la
+   borne d'erreur, le statut et l'âge du relevé se jugent au recalcul et dans `status` (§17.2). **Forme lue sur pièce**
+   (DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1) : la commande scellée est `chronyc -n tracking` (`-n` : aucune résolution
+   inverse des adresses) ; sa sortie, lue dans la source de chrony 4.6.1 (`client.c`, `process_cmd_tracking` et
+   `print_report`, sha256 `7e515f33…2d6d` ; `doc/chronyc.adoc`, exemple et formule de la borne, `dc955e0f…c5a7` ;
+   archive `chrony-4.6.1.tar.gz`, `571ff73f…9c5c`) et inchangée en 4.9, compte treize lignes `<libellé> : <valeur>`,
+   dont « System time » (`<s> seconds slow` ou `fast of NTP time`, valeur absolue), « Root delay » et « Root
+   dispersion » (`<s> seconds`), en secondes à neuf décimales (`%.9f`), et « Leap status » (`Normal`, `Insert second`,
+   `Delete second`, `Not synchronised` ou `Invalid`) ; `client.c` ne fixe aucune locale : point décimal et libellés
+   anglais. La mémoire de la capture n'est bornée que par le délai de 2 s (sortie de `tracking` : treize lignes).
 4. `d4` : liste, dans l'ordre des témoins scellés, de `{adresse, …}` : adresse IPv4 littérale du témoin, puis le
    résultat de la requête SOA de « . » sans récursion, délai de 2 s (§12). `d5` : liste, dans l'ordre des noms
    scellés, de `{nom, …}` : le nom témoin, puis le résultat de sa requête A, avec récursion, au résolveur de
@@ -592,7 +624,11 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
    `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
    `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
-   `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8).
+   `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8). Une configuration dont `run_params`,
+   `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE est un refus de configuration (`CONFIG/taille`,
+   sortie 2), levé avant l'ouverture du journal (DT6-h, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : l'écrivain refuserait la
+   ligne à un démarrage, quand `seq` aurait grandi, et chaque relance écrirait une `reprise` ; aucun enregistrement
+   que la boucle écrit n'atteint ainsi un refus de l'écrivain (§9.1, §13.6, §15.5, §16.5).
 5. **Fermeture** (CB-18d, SHOGEN-S2BIS-ECRIVAIN-USAGE-1) : le journal est fermé à la sortie du point d'entrée, quelle
    qu'elle soit. Une OSError ou un refus de l'écrivain (`JOURNAL/casse` compris, et toute ouverture refusée) arrête la
    boucle : sortie 1, refus nommé (`collecte : arrêt : <code> : …`) ; systemd relance le service, et l'instance
@@ -641,17 +677,24 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    suit son rendu (avant le `releve_asn` de cette fenêtre, s'il y en a un), dans l'ordre des hôtes. Champs de `asn` :
    - `hote` ;
    - `a` : résultat DNS (§12) de la requête A de l'hôte au résolveur du descripteur, récursion demandée (jamais
-     1.1.1.1, ADR-0029 l.82) ;
-   - `ip` : première adresse de type A de la section réponse ; null sans réponse retenue, sans A, ou sous le drapeau TC
-     (`reponses` null, §12) ;
+     1.1.1.1, ADR-0029 l.82) ; null pour un hôte écrit en IPv4 littérale canonique (forme du §12), relevé directement
+     (DT6-f, SHOGEN-S2BIS-ASN-HOTE-IPV4-1, Q-2 du lot DETTES-T6 : sa requête A ne rendait rien, et il n'était jamais
+     relevé) ;
+   - `ip` : première adresse de type A de la section réponse, ou l'hôte écrit en IPv4 littérale canonique, que la
+     lecture contacte sans résolution ; null sans réponse retenue, sans A, ou sous le drapeau TC (`reponses` null,
+     §12). Une IPv4 écrite autrement (« 127.1 », zéros de tête) est un nom, que le résolveur ne résout pas ; son
+     écriture canonique relève de SHOGEN-S2BIS-NOMS-HOTE-RFC1123-1 ;
    - `ripestat` : null sans `ip` ; sinon les champs d'une `lecture` (§9.1) de
      `https://stat.ripe.net/data/prefix-overview/data.json?resource=<ip>`, dont `valeurs`, au statut `ok`, est
      `{asn, detenteur, prefixe}` : `data.asns[0].asn` et `.holder`, `data.resource` (forme de S2, r2.py l.275-289) ;
-     `asn` et `detenteur` null si `asns` est vide ; `asn`, entier ou texte décimal lu comme `int()` de S2, de 0 à 2³²
-     exclu ; 4 096 octets canoniques au plus ; tout autre corps : `panne_decode` ;
+     `asn` et `detenteur` null si `asns` est vide ; `asn`, entier ou texte de 1 à 10 chiffres ASCII, de 0 à 2³² exclu
+     (DT6-f, SHOGEN-S2BIS-ASN-LECTURE-1, Q-3 du lot DETTES-T6 : écart à S2, dont `int()` admettait le souligné, le
+     signe, les blancs et les chiffres d'autres écritures) ; 4 096 octets canoniques au plus ; tout autre corps :
+     `panne_decode` ;
    - `cymru` : null sans `ip` ; sinon le résultat DNS (§12) de la requête TXT de `<d>.<c>.<b>.<a>.origin.asn.cymru.com.`
-     au même résolveur, plus `asn` : premier nombre du premier champ (avant « | ») de la première chaîne de la première
-     réponse TXT qui en a un, de 0 à 2³² exclu (forme de S2, `_cymru_asn` l.292-312) ; null sinon.
+     au même résolveur, plus `asn` : premier mot du premier champ (avant « | ») de la première chaîne de la première
+     réponse TXT dont ce mot est un numéro lu comme celui de RIPEstat (chiffres ASCII, de 0 à 2³² exclu ; DT6-f), dans
+     la forme de S2 (`_cymru_asn` l.292-312) ; null sinon.
 
    Un défaut imprévu du relevé d'un hôte donne un `asn` à `a`, `ip`, `ripestat` et `cymru` nuls, et le relevé
    continue. Aucun jugement : la concordance des deux bases se juge au recalcul (E-R-29).
@@ -760,35 +803,54 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
 
 1. **Lecture** (CB-17a) : le journal du pool est lu sans rien écrire ni prendre le verrou de l'écrivain (§5) : la
    lecture peut se faire pendant la collecte. Fichiers dans l'ordre (jour, k entier) de la grammaire du §6.1 ; aucun :
-   refus `STATUS/journal`. Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme canonique
+   refus `STATUS/journal`. Un fichier qui n'est pas un fichier ordinaire n'est pas lu : il est ouvert sans attente
+   (DT6-c, §7.7). Une ligne qui commence par `{"adresse":`, première clé de toute `lecture` en forme canonique
    (§1.2, §9.1, §11.2) et d'aucun autre type, est une `lecture` : elle n'est jamais décodée, et rien d'une lecture
    n'entre au jugement. Les autres lignes sont décodées ; un fichier s'arrête à sa première ligne coupée, illisible,
    sans `type` chaîne ni `seq` entier, ou d'un jour postérieur à celui de son fichier : `ws` à la fin du jour du nom du
    fichier ou au-delà, `suivante` au-delà (§6.1 : aucune fenêtre n'est d'un jour postérieur à celui de son fichier ;
-   CB-17c, C-3 de la G2 de P2B). Un fichier dont le jour n'est pas au calendrier n'est pas lu. La chaîne n'est pas
-   contrôlée : l'intégrité se juge au recalcul (RB-1, RB-18).
+   CB-17c, C-3 de la G2 de P2B). Un fichier arrêté avant sa fin est nommé au rapport, avec son motif (point 4 ; DT6-d,
+   SHOGEN-S2BIS-STATUS-QUEUES-1 : ses fenêtres disparaissaient sans le dire, O-3 de la G2 de P2B). Un fichier dont le
+   jour n'est pas au calendrier n'est pas lu. La chaîne n'est pas contrôlée : l'intégrité se juge au recalcul (RB-1,
+   RB-18).
 2. **Jugement d'une santé** (CB-17a ; ADR-0029 §2.3 ; seuils égaux au bloc `degradation` de
    `s2bis/config/analyse.json`, contrôlé par un test) : D-1, aucune `sante` lisible ; D-2, `d2.non_parties` non nul ou
    `d2.retard_max` au-delà de 5 s (règle Q-C-02 de l'AVIS, §11.6) ; D-4, au moins 2 témoins dont le résultat n'est pas
    une réponse retenue (`statut` autre que `reponse`, ou null) ; D-5, au moins 2 noms témoins non résolus (pas de
-   réponse retenue, `rcode` non nul, ou aucune réponse de type 1, A). **D-3 n'est pas jugé** : le format de la sortie
-   de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1, ouvert) ; est relevé, à part, un relevé D-3
-   absent, en erreur ou de code non nul.
+   réponse retenue, `rcode` non nul, ou aucune réponse de type 1, A). **D-3** (DT6-e, SHOGEN-S2BIS-CHRONYC-FORMAT-1 ;
+   ADR-0029 §2.1 l.83, §2.3 l.108) : un relevé est lisible si `d3` porte `code` 0 (entier) et une `sortie` où les
+   lignes « System time », « Root delay », « Root dispersion » et « Leap status » figurent une fois chacune, dans la
+   forme du §13.3 ; une fenêtre est D-3 si aucune `sante` d'une fenêtre commencée moins de 120 s avant elle, elle
+   comprise (avec w = 60 s : elle et la précédente), ne porte un relevé lisible, ou si le dernier de ces relevés dit une
+   borne d'erreur |System time| + Root dispersion + Root delay / 2 de plus de 1 s, ou un statut autre que `Normal`,
+   `Insert second` ou `Delete second` (« Not synchronised », ADR-0029 §2.3 ; « Invalid »). L'âge se compte en fenêtres
+   du journal (Q-1 du lot DETTES-T6, adoptée : « relevé chrony » est le relevé D-3 de la fenêtre, ADR-0029 l.239) ;
+   une fenêtre sans `sante` reste D-1 seul.
 3. **État par fenêtre** (CB-17b) : sont jugées les fenêtres de w = 60 s (§3.1) de la première que le journal admet
    (`suivante` de son premier enregistrement), jamais avant le jour du premier fichier présent moins un jour (segment de
    reprise, §6.1 ; CB-17c, C-3 : un chiffre corrompu ne gonfle pas la grille), au dernier marqueur ; une fenêtre sans
    marqueur vaut D-1 ; une fenêtre close prend les codes de sa `sante` (point 2). Une fenêtre est **valide** si elle n'a
    aucun code. La tête est celle du dernier enregistrement lu hors `lecture`. Limites : seuls les fichiers présents sont
    lus (la rétention locale de 7 jours en retire, ajout daté du 2026-10-04 17:03:38 UTC à l'ADR-0029, point 2) ; la
-   grille est celle de w = 60 s.
+   grille est celle de w = 60 s. **Étendue** (DT6-d, SHOGEN-S2BIS-STATUS-QUEUES-1 ; R-B1 du contre-contrôle de P2B) :
+   la grille compte au plus 46 080 fenêtres (32 jours, plus de trois fois la rétention locale) ; au-delà, refus
+   `STATUS/grille`, qui nomme l'étendue, sans rien allouer. Un saut d'horloge en avant y mène sans aucun fichier forgé :
+   la boucle prend `ws` sur l'horloge murale et l'écrivain nomme le fichier par son jour (§6.1) ; `status`, qui tourne
+   sous la même horloge, ne peut pas écarter les noms postérieurs à elle. Avant DT6-d : MemoryError, trace Python
+   (3,6 s sous 512 Mio d'espace d'adressage, mesuré).
 4. **Commande et rapport** (CB-17b) : `python3 -m shogen_s2bis.collecte status --journal DOSSIER` : sortie 0 et le
-   rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal`, ou dossier illisible). Rapport, une ligne par
-   rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC, <n> ; dernier marqueur :
-   <fin> UTC` ; `tête : seq <s>, sha256 <h>` ; `disque : <libre> octets libres sur <total>` (dernière `sante`) ;
-   `dégradations : D-1 <n> ; D-2 <n> ; D-3 non jugé (… ; relevé absent ou en erreur : <n>) ; D-4 <n> ; D-5 <n>` ;
-   `dernière fenêtre : valide` ou `dégradée (<codes>)` ; `fenêtres valides hors D-3 (compte local) : calme <n> ; stress
-   <n>` (strates : stress le samedi et le dimanche UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » : D-3 n'est pas jugé,
-   point 2, tant que SHOGEN-S2BIS-CHRONYC-FORMAT-1 est ouvert ; C-7 de la G2 de P2B, Q-9). Aucun nombre à virgule, aucun
+   rapport ; sortie 1 et `status : refus : …` (refus `STATUS/journal` ou `STATUS/grille`, ou dossier illisible).
+   Rapport, une ligne par rubrique : `status : journal « pool », lecture seule` ; `fenêtres : de <début> à <fin> UTC,
+   <n> ; dernier marqueur : <fin> UTC` ; `tête : seq <s>, sha256 <h>` ; `disque : <libre> octets libres sur <total>`
+   (dernière `sante` ; `disque : non relevé (<valeur>)` si elle n'a pas ces deux champs : DT6-d, I-3 du générateur de
+   P2B) ; `dégradations : D-1 <n> ; D-2 <n> ; D-3 <n> ; D-4 <n> ; D-5 <n>` ; `dernière fenêtre : valide` ou `dégradée
+   (<codes>)` ; `fenêtres valides (compte local) : calme <n> ; stress <n>` (strates : stress le samedi et le dimanche
+   UTC, calme sinon, ADR-0029 l.196 ; « hors D-3 » jusqu'à DT6-e, qui juge D-3, point 2 ; C-7 de la G2 de P2B, Q-9) ;
+   s'il y en a, `fichiers arrêtés avant leur fin : <nom> (<motif>) ; …`, motifs `ligne illisible`, `hors FORMAT`,
+   `jour postérieur au sien`, `ligne coupée`, `pas un fichier ordinaire` ou `illisible (<exception>)` (DT6-d). Lu
+   pendant la collecte, le dernier fichier peut porter `ligne coupée` pour la ligne que l'écrivain est en train
+   d'écrire (une écriture de plusieurs pages se lit en cours : C-10 de la G2 de DETTES-T6, mesuré) : ce motif
+   passager disparaît à la lecture suivante ; persistant, il dit une queue (§7). Aucun nombre à virgule, aucun
    statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
 5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
    DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
@@ -798,7 +860,7 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    aucun statut de source. Le résumé est une projection des enregistrements du journal : il se recalcule sur le
    journal. Sortie 0 et `resume : <fichiers>` ; 1 refus du journal ou du dépôt ; 2 refus du descripteur.
 6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F` ajoute au
-   rapport, après le compte local : `quorum hors D-3 (au moins 2 observateurs valides) : calme <n> ; stress <n>` et
+   rapport, après le compte local : `quorum (au moins 2 observateurs valides) : calme <n> ; stress <n>` et
    `résumés lus : <o> jusqu'à <heure> UTC (âge <n> s) ; …`, ou `quorum : aucun résumé d'un autre observateur lisible` ;
    puis, s'il y en a, `résumés refusés : <fichier> (<code>) ; …`. Sont lus les résumés des autres observateurs pour les
    jours des fenêtres locales ; un résumé est refusé, un seul code par fichier : `RESUME/taille` (plus de 131 072

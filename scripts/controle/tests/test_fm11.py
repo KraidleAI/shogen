@@ -14,7 +14,7 @@ import unittest
 
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # scripts/controle
 FM11 = os.path.join(ICI, "fm11.py")
-SHA_FM11 = "4a0b8abcc0b249034eb2e73397334e85f35d19a957ac4f8a9ddcf3efdda958b5"   # DT3-E ; avant : 886cc676… (B.35)
+SHA_FM11 = "17caaa358ce471c8a9b734873f874794f8c97e66f0125fa05a9dc0cff04452b7"   # Q-3 ; avant : 4a0b8abc… (DT3-E), 886cc676… (B.35)
 SHA51 = "5cc89b563f73d213e38021165a360c3bf2e297e36be467786a007021c71db358"      # fm11.py l.12 (cartographie l.51)
 SHA14 = "0fe88f1a3810244ecce91b31c1f4e2117f397a7c65d381a75afdbf0b9954b71f"      # fm11.py l.13 (ADR-0025 l.14)
 CARTO = "".join(f"c{i:02d}|" for i in range(25))           # 100 caractères ; fragments aux rangs 0, 20 et 40
@@ -143,6 +143,19 @@ class Temoin(unittest.TestCase):
         code, _sortie, err = lancer([], chemin="/home/user/shogen/docs/transcription.txt")
         self.assertNotEqual(code, 0)
         self.assertIn("lecture refusée par la doublure", err)
+
+    def test_q3_session_du_scratchpad(self):
+        """Q-3 (SHOGEN-FM11-MOTIF-SESSION-1) : la session nommée comme composant du chemin du scratchpad, que toute
+        transcription de la session porte, n'est pas comptée ; nommée ailleurs (transcription, dossier de la
+        session, dossier voisin du scratchpad), elle l'est, une fois par bloc. Identifiant formé en deux morceaux."""
+        s = "7ba84933" + "-ba6d-5813-9ef4-ca3ac4febd16"
+        racine = "/tmp/claude" + "-0/-home-user-shogen/" + s
+        res = self.compter([texte("cat " + racine + "/scratchpad/lot/NOTES.md"), resultat(racine + "/scratchpad")])
+        self.assertEqual((res["entrees"], res["resultats"]), ({}, {}))
+        res = self.compter([texte("/root/.claude/projects/-home-user-shogen/" + s + ".txt"),
+                            resultat(racine + "/tasks/a.output et " + racine + "/scratchpad-copie/a")])
+        vus = [(role, v) for role in ("entrees", "resultats") for v in res[role].values()]
+        self.assertEqual(vus, [("entrees", [[0, 1]]), ("resultats", [[1, 2]])])
 
 
 class Empreintes(unittest.TestCase):

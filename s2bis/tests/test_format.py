@@ -8,7 +8,9 @@ placé dans l'ordre de la première fenêtre d'une exécution (§11.5, observati
 FORMAT, avis sur le banc de concordance) : une seule définition d'« intègre » au §7.1, points (a) à (e), sans limite
 déclarée, et `_lire` la fait. CB-19a (C-1 (a) de la relecture d'intégration de P1) : §12, réponse appariée de plus
 de 512 octets en `forme`, deux citations de la RFC 1035 mot pour mot (texte lu au fichier du registre, sha256
-d14ae809…)."""
+d14ae809…). DT6-i (SHOGEN-S2BIS-FORMAT-P2B-TESTS-1, O-B1 du contre-contrôle de P2B) : phrases normatives des §16
+et §17 (têtes, jetons, `status`, résumés), dont celle du dépôt local de C-7, et bornes du texte égales à celles du
+code ; valeurs prises au texte et au code, écrites à la main."""
 import hashlib
 import json
 import os
@@ -16,7 +18,7 @@ import pathlib
 import tempfile
 import unittest
 
-from shogen_s2bis.collecte import entree, journal
+from shogen_s2bis.collecte import entree, journal, status, tetes
 
 NL = chr(10)
 FORMAT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs",
@@ -231,6 +233,47 @@ class Format(unittest.TestCase):
         cinq = sections["11"].split(" 5. ", 1)[1].split(" 6. ", 1)[0]
         self.assertEqual([("première fenêtre" in p, "précède toute `lecture`" in p) for p in cinq.split(". ") if
                           "`run_params`" in p], [(True, True)])
+
+    def test_paragraphe_16_tetes_depot_et_jeton(self):          # DT6-i, SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1)
+        """§16 : dépôt local (C-7 de la G2 de P2B ; mutant K-C7-2 du contre-contrôle, vivant), requête et statut
+        RFC 3161, liaison du jeton, manifeste, fichier de tête, lecture du dépôt, `tetes`, jeton du jour, commande
+        `jeton`, fichiers du dépôt ; bornes du texte égales à celles de `tetes` (1 024 octets, 16 têtes, 65 536
+        octets)."""
+        seize = decoupe(FORMAT.read_text(encoding="utf-8"))[1]["16"]
+        attendus = ("Le dépôt est un dossier **local** de l'observateur",
+                    "une unité séparée qui synchronise ce dossier (DB-4), hors du collecteur",
+                    "`certReq` vrai ; ni `reqPolicy` ni `extensions`", "refus nommés `JETON/empreinte`, `JETON/nonce`",
+                    "est présent si et seulement si le statut vaut 0 ou 1", "(1.2.840.113549.1.7.2)",
+                    "(1.2.840.113549.1.9.16.1.4)", "un écart le refus `JETON/liaison`", "`{jour, observateur, tetes}`",
+                    "`<observateur>-<journal>.tete`", "`{journal, observateur, seq, sha256, ws}`",
+                    "fichier temporaire `.<nom>.tmp` écrit et synchronisé, renommé, dossier synchronisé",
+                    "16 au plus, puis ceux des autres, 16 au plus", "`TETES/taille` (plus de 1 024 octets)",
+                    "après ses `lecture` et avant sa `sante`", "« déjà émis »", "« non armé »", "`JETON/tete`",
+                    "`Content-Type: application/timestamp-query`", "`secrets.randbits(64)`",
+                    "une réponse 200 d'au plus 65 536 octets",
+                    "sans attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire", "en exclusif (`O_EXCL`)")
+        self.assertEqual([x for x in attendus if x not in seize], [])
+        self.assertEqual((tetes.TAILLE, tetes.NOMBRE, tetes.PLAFOND), (1024, 16, 65536))
+
+    def test_paragraphe_17_status_et_resumes(self):             # DT6-i, SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1)
+        """§17 : lecture sans verrou, `lecture` reconnue à sa première clé, fichiers ordinaires, arrêts nommés,
+        jugement D-1 à D-5 (D-3 depuis DT6-e), étendue de la grille, rapport, résumés, quorum ; bornes du texte égales
+        à celles de `status` (46 080 fenêtres, 131 072 octets)."""
+        dix_sept = decoupe(FORMAT.read_text(encoding="utf-8"))[1]["17"]
+        attendus = ("sans rien écrire ni prendre le verrou de l'écrivain", 'commence par `{"adresse":`',
+                    "refus `STATUS/journal`", "Un fichier qui n'est pas un fichier ordinaire n'est pas lu",
+                    "Un fichier arrêté avant sa fin est nommé au rapport", "`d2.retard_max` au-delà de 5 s",
+                    "D-4, au moins 2 témoins", "D-5, au moins 2 noms témoins non résolus", "de plus de 1 s",
+                    "moins de 120 s avant elle", "jamais avant le jour du premier fichier présent moins un jour",
+                    "au plus 46 080 fenêtres", "refus `STATUS/grille`",
+                    "`dégradations : D-1 <n> ; D-2 <n> ; D-3 <n> ; D-4 <n> ; D-5 <n>`",
+                    "`fenêtres valides (compte local) : calme <n> ; stress <n>`",
+                    "`fichiers arrêtés avant leur fin : <nom> (<motif>) ; …`", "`<observateur>-<jour>.resume`",
+                    "`{jour, observateur, fenetres}`", "`RESUME/taille` (plus de 131 072 octets)", "`RESUME/lecture`",
+                    "M_j ≥ 2", "`quorum (au moins 2 observateurs valides) : calme <n> ; stress <n>`",
+                    "refus `CONFIG/options`, sortie 2")
+        self.assertEqual([x for x in attendus if x not in dix_sept], [])
+        self.assertEqual((status.GRILLE, status.TAILLE), (46080, 131072))
 
 
 if __name__ == "__main__":

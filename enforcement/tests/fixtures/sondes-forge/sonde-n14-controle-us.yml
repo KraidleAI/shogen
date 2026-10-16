@@ -1,0 +1,40 @@
+name: sonde SONDE-N14 N-14 caractere de controle U+001F
+on:
+  push:
+    branches: [essai/analyseur-residus]
+permissions: {}
+jobs:
+  s2bis-unittest:
+    name: s2bis-unittest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: SONDE-N14 pose du leurre python3 (aucun python ne tourne)
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/leurre"
+          echo '#!/bin/bash' > "$RUNNER_TEMP/leurre/python3"
+          echo 'echo "SONDE-N14 python3 recu :" "${@@Q}"' >> "$RUNNER_TEMP/leurre/python3"
+          echo 'printf "%s|" "$@" | od -An -c | sed "s/^/SONDE-N14 argv octets :/"' >> "$RUNNER_TEMP/leurre/python3"
+          echo 's=$(xargs -0 -n1 < /proc/$PPID/cmdline | tail -n1)' >> "$RUNNER_TEMP/leurre/python3"
+          echo 'echo "SONDE-N14 script execute : $s"' >> "$RUNNER_TEMP/leurre/python3"
+          echo 'sha256sum "$s" | sed "s/^/SONDE-N14 script sha256 :/"' >> "$RUNNER_TEMP/leurre/python3"
+          echo 'od -An -c "$s" | sed "s/^/SONDE-N14 script octets :/"' >> "$RUNNER_TEMP/leurre/python3"
+          echo 'exit 0' >> "$RUNNER_TEMP/leurre/python3"
+          chmod +x "$RUNNER_TEMP/leurre/python3"
+          echo "$RUNNER_TEMP/leurre" >> "$GITHUB_PATH"
+          echo "SONDE-N14 leurre pose"
+      - name: SONDE-N14 controle du leurre
+        shell: bash
+        run: |
+          p=$(command -v python3)
+          echo "SONDE-N14 python3 resolu en $p"
+          case "$p" in "$RUNNER_TEMP"/leurre/python3) ;; *) echo "SONDE-N14 ARRET leurre absent"; exit 1 ;; esac
+      - name: suite unittest de s2bis (fixtures, garde réseau), jugée par le vérificateur, aucun saut admis
+        shell: bash
+        run: |
+          python3 --version
+          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 341
+      - name: SONDE-N14 fin du job
+        shell: bash
+        run: echo "SONDE-N14 fin du job"

@@ -21,6 +21,13 @@
 //! résidu vide, jeton de chemin servi absent, marqueur entre guillemets au lieu du jeton) de
 //! `verif_refs.py` (`docs/G1-lot-E1-modele-de-menace.md` §5) ; (i) et (j), propres au lot E1, sans
 //! objet. Résidu : la fidélité des lignes citées reste au G2.
+//!
+//! Registre des renvois (lot DETTES-T15, SHOGEN-REFS-LIGNE-CONTENU-1) : `docs/RENVOIS-LIGNES.tsv`, une entrée par
+//! renvoi par numéro de ligne (ligne citante, jeton, cible, lignes écrites, lignes actuelles du texte cité ou `-`,
+//! empreinte SHA-256 de 16 chiffres, commit de lecture). Chaque référence (a) de docs/17 y a son entrée, hors bornes
+//! listées ; chaque entrée est contrôlée (jeton, empreinte aux lignes actuelles, document scellé lu à son sceau) : une
+//! insertion au milieu d'un fichier cité rougit la gate ; le registre se met à jour par un lot revu. Une entrée qui
+//! nomme un emplacement interdit, en document citant ou en cible, est refusée avant toute lecture (relecture G2, C-3).
 //! Coquille hors rôle S-G3 : tranches et indices bornés par construction (positions de motifs).
 
 use crate::documents::{fichiers_markdown, normaliser_pour_recherche, prose_sans_code};
@@ -32,10 +39,13 @@ use std::path::Path;
 
 /// Le document sous gate, en chemin exact ; puis ses trois registres.
 pub const PERIMETRE: &str = "docs/17-modele-de-menace.md";
-const REGISTRES: [&str; 3] = [
+/// Le registre des renvois par numéro de ligne (SHOGEN-REFS-LIGNE-CONTENU-1).
+pub const RENVOIS: &str = "docs/RENVOIS-LIGNES.tsv";
+const REGISTRES: [&str; 4] = [
     "docs/08-assumptions.md",
     "docs/adr-0028/ANNEXE-A-lots.md",
     "docs/adr-0028/ANNEXE-B-items.md",
+    RENVOIS,
 ];
 const TITRE: &str = "références du modèle de menace (verif_refs.py mécanisé)";
 
@@ -43,11 +53,13 @@ pub fn executer(racine: &Path) -> Rapport {
     let mut r = Rapport::nouveau("S-G9", TITRE);
     let chemins = std::iter::once(PERIMETRE).chain(REGISTRES);
     let lus: Vec<_> = chemins.map(|c| lire_exact(&mut r, racine, c)).collect();
-    let Ok([Some(t), Some(registre), Some(a), Some(b)]) = <[_; 4]>::try_from(lus) else {
+    let Ok([Some(t), Some(registre), Some(a), Some(b), Some(renvois)]) = <[_; 5]>::try_from(lus)
+    else {
         return r;
     };
     let prose = prose_sans_code(&t);
-    controle_a(&mut r, racine, &t);
+    let a_couvrir = controle_a(&mut r, racine, &t);
+    controle_renvois(&mut r, racine, &renvois, &a_couvrir);
     controle_b(&mut r, &t, &registre);
     controle_c(&mut r, &t, &prose, &a, &b);
     controle_nombres(&mut r, &t, &prose);
@@ -136,8 +148,16 @@ fn nombre_de_lignes(fichier: &Path) -> Option<usize> {
     Some(o.iter().filter(|x| **x == b'\n').count() + usize::from(ouverte))
 }
 
-fn controle_a(r: &mut Rapport, racine: &Path, t: &str) {
+/// Sans empreinte au registre : octets de `biblio/` hors `INDEX.md` (non versionnés), emplacements interdits.
+fn sans_empreinte(chemin: &str) -> bool {
+    let biblio = chemin.starts_with("biblio/") && chemin != "biblio/INDEX.md";
+    biblio || crate::sg5::emplacement_interdit(chemin)
+}
+
+/// Rend les références résolues que le registre des renvois doit couvrir : (ligne de docs/17, span), sans doublon.
+fn controle_a<'t>(r: &mut Rapport, racine: &Path, t: &'t str) -> Vec<(usize, &'t str)> {
     let (mut resolues, mut monark, mut absentes) = (0, 0, Vec::new());
+    let (mut a_couvrir, mut bornes) = (Vec::new(), Vec::new());
     let sans_octets = biblio_sans_octets(racine);
     for (p, span) in spans(t) {
         let Some((chemin, lignes)) = span.rsplit_once(':') else {
@@ -168,6 +188,12 @@ fn controle_a(r: &mut Rapport, racine: &Path, t: &str) {
                 Some(n) if debut == 0 || debut > fin || fin > n => A_PLAGE,
                 Some(_) => {
                     resolues += 1;
+                    let cle = (ligne_de(t, p).0, span);
+                    if sans_empreinte(chemin) {
+                        bornes.push(span);
+                    } else if !a_couvrir.contains(&cle) {
+                        a_couvrir.push(cle);
+                    }
                     continue;
                 }
             }
@@ -190,8 +216,192 @@ fn controle_a(r: &mut Rapport, racine: &Path, t: &str) {
     };
     r.notes.push(format!(
         "(a) {resolues} référence(s) résolue(s) ; {monark} MONARK (forme du sha seule, dépôt hors \
-         arbre) ; biblio/ {borne} : [{}]",
-        absentes.join(", ")
+         arbre) ; biblio/ {borne} : [{}] ; sans empreinte au registre des renvois (octets de biblio/ non \
+         versionnés, emplacements interdits ; plage seule) : [{}]",
+        absentes.join(", "),
+        bornes.join(", ")
+    ));
+    a_couvrir
+}
+
+const ENTETE_RENVOIS: &str = "renvoi\tjeton\tcible\tecrit\tlignes\tempreinte\tcommit";
+/// Un document scellé : chemin, commit de scellement, renvois recopiés (ligne, commit de lecture de leur source).
+type Scelle = (&'static str, &'static str, &'static [(usize, &'static str)]);
+/// Documents scellés : leurs renvois se lisent au commit de scellement qu'ils déclarent (paquet, l.5 et l.8), sauf ceux
+/// qu'ils recopient d'un autre document, lus au commit de lecture de celui-ci : paquet l.56 et l.63, recopiés
+/// d'ADR-0028 l.35 et l.44, inexacts dès le scellement (`4d49757` insère 14 lignes dans doc 10 ; relecture G2, C-4).
+const SCELLES: [Scelle; 1] = [(
+    "docs/adr-0028/PAQUET-PREREG-S2.md",
+    "8b1456740b0f8012cce886d4720d1ff0c4b68483",
+    &[
+        (56, "ce63fed4f822554087d1f101f06e626c39ff68f3"),
+        (63, "ce63fed4f822554087d1f101f06e626c39ff68f3"),
+    ],
+)];
+const R_FORME: &str = "(a) registre : ligne hors forme";
+const R_JETON: &str = "(a) registre : jeton absent de sa ligne citante, ou numéro écrit absent";
+const R_CIBLE: &str = "(a) registre : cible illisible ou lignes actuelles hors du fichier";
+const R_TEXTE: &str = "(a) registre : texte cité changé ou déplacé (empreinte, lignes actuelles)";
+const R_SCELLE: &str = "(a) registre : document scellé lu hors de son commit de scellement";
+const R_DOUBLE: &str = "(a) registre : entrée en double";
+const R_ORPHELINE: &str = "(a) registre : entrée de docs/17 sans référence (a) à sa ligne";
+const R_INTERDIT: &str = "(a) registre : emplacement interdit, ni lu ni haché";
+const A_SANS_ENTREE: &str = "(a) référence sans entrée au registre des renvois";
+
+/// Une entrée du registre des renvois, sa forme contrôlée.
+struct Entree<'a> {
+    citant: &'a str,
+    ligne: usize,
+    jeton: &'a str,
+    cible: &'a str,
+    ecrit: &'a str,
+    actuelles: Option<(usize, usize)>,
+    empreinte: &'a str,
+    commit: &'a str,
+}
+
+fn entree(ligne: &str) -> Option<Entree<'_>> {
+    let champs: Vec<&str> = ligne.split('\t').collect();
+    let [renvoi, jeton, cible, ecrit, lignes, empreinte, commit] =
+        <[&str; 7]>::try_from(champs).ok()?;
+    let (citant, k) = renvoi.rsplit_once(':')?;
+    let valide = |p: Option<(usize, usize)>| p.filter(|(a, b)| *a >= 1 && a <= b);
+    let actuelles = if lignes == "-" {
+        None
+    } else {
+        Some(valide(plage(lignes))?)
+    };
+    let hexa = |s: &str, n: std::ops::RangeInclusive<usize>| {
+        n.contains(&s.len()) && s.bytes().all(|o| matches!(o, b'0'..=b'9' | b'a'..=b'f'))
+    };
+    let forme = valide(plage(ecrit)).is_some() && hexa(empreinte, 16..=16) && hexa(commit, 7..=40);
+    let chemins = canonique(citant) && canonique(cible) && !jeton.is_empty();
+    let ligne = valide(plage(k)).filter(|(a, b)| a == b)?.0;
+    (forme && chemins).then_some(Entree {
+        citant,
+        ligne,
+        jeton,
+        cible,
+        ecrit,
+        actuelles,
+        empreinte,
+        commit,
+    })
+}
+
+/// Empreinte d'un texte cité : les 16 premiers chiffres hexadécimaux du SHA-256 (shogen-core, ADR-0018) des lignes
+/// `a` à `b` jointes par LF, sans la fin de la dernière ; `None` hors du fichier.
+fn empreinte_lignes(octets: &[u8], a: usize, b: usize) -> Option<String> {
+    let lignes: Vec<&[u8]> = octets.split(|o| *o == b'\n').collect();
+    let n = lignes.len() - usize::from(octets.last().is_none_or(|o| *o == b'\n'));
+    let texte = lignes
+        .get(a.checked_sub(1)?..b)
+        .filter(|_| b <= n)?
+        .join(&b'\n');
+    let hexa = shogen_core::empreinte_en_hexadecimal(&shogen_core::empreinte_sha256(&texte));
+    hexa.get(..16).map(str::to_string)
+}
+
+/// Vrai si `ecrit` figure dans le jeton comme numéro entier : ni chiffre ni trait d'union devant, ni chiffre ni suite
+/// de plage derrière.
+fn numero_ecrit(jeton: &str, ecrit: &str) -> bool {
+    jeton.match_indices(ecrit).any(|(p, _)| {
+        let devant = jeton[..p].chars().next_back();
+        let derriere = &jeton.as_bytes()[p + ecrit.len()..];
+        let plage_suit =
+            derriere.first() == Some(&b'-') && derriere.get(1).is_some_and(u8::is_ascii_digit);
+        !devant.is_some_and(|c| c.is_ascii_digit() || c == '-')
+            && !derriere.first().is_some_and(u8::is_ascii_digit)
+            && !plage_suit
+    })
+}
+
+fn controle_renvois(r: &mut Rapport, racine: &Path, registre: &str, a_couvrir: &[(usize, &str)]) {
+    let viol_r = |r: &mut Rapport, n: usize, motif: &str| {
+        r.violation(RENVOIS.into(), n, motif.into(), String::new())
+    };
+    let mut lignes = registre
+        .split('\n')
+        .enumerate()
+        .filter(|(_, l)| !l.starts_with('#') && !l.is_empty());
+    match lignes.next() {
+        Some((_, entete)) if entete == ENTETE_RENVOIS => {}
+        autre => return viol_r(r, autre.map_or(1, |(i, _)| i + 1), R_FORME),
+    }
+    let (mut controlees, mut epinglees, mut vues) = (0, Vec::new(), Vec::new());
+    let mut couvertes = vec![false; a_couvrir.len()];
+    for (i, ligne) in lignes {
+        let Some(e) = entree(ligne) else {
+            viol_r(r, i + 1, R_FORME);
+            continue;
+        };
+        // Sûreté (relecture G2 de DETTES-T15, C-3) : refus avant toute lecture ; aucune entrée du registre ne fait
+        // lire, citer ni hacher un octet d'un emplacement interdit (la référence (a) de docs/17:70 n'en fait que
+        // compter les lignes, `controle_a`, adjudication Q-6 ; contre-contrôle, R-6).
+        if crate::sg5::emplacement_interdit(e.citant) || crate::sg5::emplacement_interdit(e.cible) {
+            viol_r(r, i + 1, R_INTERDIT);
+            continue;
+        }
+        if vues.contains(&(e.citant, e.ligne, e.jeton, e.ecrit)) {
+            viol_r(r, i + 1, R_DOUBLE);
+            continue;
+        }
+        vues.push((e.citant, e.ligne, e.jeton, e.ecrit));
+        let citante = std::fs::read_to_string(racine.join(e.citant)).ok();
+        let porte = citante.is_some_and(|t| {
+            t.split('\n')
+                .nth(e.ligne - 1)
+                .is_some_and(|l| l.contains(e.jeton))
+        });
+        if !porte || !numero_ecrit(e.jeton, e.ecrit) {
+            viol_r(r, i + 1, R_JETON);
+        }
+        let sceau = SCELLES
+            .iter()
+            .find(|(document, _, _)| *document == e.citant);
+        let lu = sceau.map(|(_, commit, recopies)| {
+            recopies
+                .iter()
+                .find(|(l, _)| *l == e.ligne)
+                .map_or(*commit, |(_, c)| *c)
+        });
+        if lu.is_some_and(|commit| !commit.starts_with(e.commit)) {
+            viol_r(r, i + 1, R_SCELLE);
+        }
+        if e.citant == PERIMETRE {
+            let rang = a_couvrir
+                .iter()
+                .position(|(k, span)| *k == e.ligne && *span == e.jeton);
+            match rang.filter(|_| e.jeton.rsplit_once(':') == Some((e.cible, e.ecrit))) {
+                Some(rang) => couvertes[rang] = true,
+                None => viol_r(r, i + 1, R_ORPHELINE),
+            }
+        }
+        let Some((a, b)) = e.actuelles else {
+            epinglees.push(format!("{}:{}", e.citant, e.ligne));
+            continue;
+        };
+        match std::fs::read(racine.join(e.cible))
+            .ok()
+            .and_then(|o| empreinte_lignes(&o, a, b))
+        {
+            None => viol_r(r, i + 1, R_CIBLE),
+            Some(lue) if lue == e.empreinte => controlees += 1,
+            Some(_) => viol_r(r, i + 1, R_TEXTE),
+        }
+    }
+    for ((k, span), couverte) in a_couvrir.iter().zip(couvertes) {
+        if !couverte {
+            r.violation(PERIMETRE.into(), *k, A_SANS_ENTREE.into(), (*span).into());
+        }
+    }
+    r.notes.push(format!(
+        "(a) registre des renvois ({RENVOIS}) : {} entrée(s), {controlees} texte(s) cité(s) retrouvé(s) à leurs \
+         lignes actuelles ; {} épinglée(s) à leur commit (texte cité absent de l'arbre, lu au commit seul, non \
+         contrôlé ici) : [{}]",
+        vues.len(),
+        epinglees.len(),
+        epinglees.join(", ")
     ));
 }
 

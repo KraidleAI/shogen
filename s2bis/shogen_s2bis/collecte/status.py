@@ -5,16 +5,22 @@ forme canonique (FORMAT §1.2, §9.1), et n'est jamais décodée : aucun statut 
 n'entre au jugement. Jugement par fenêtre aux seuils scellés (ADR-0029 §2.3 ; égaux au bloc `degradation` de
 `config/analyse.json`, test croisé) : D-1 aucun marqueur, ou aucune `sante` ; D-2 lecture partie plus de 5 s après
 son instant planifié, ou non partie (règle Q-C-02 de l'AVIS, FORMAT §11.6) ; D-4 au moins 2 témoins sans réponse
-retenue ; D-5 au moins 2 noms témoins non résolus (sans réponse retenue, rcode non nul, ou sans réponse A). D-3 n'est
-pas jugé : le format de la sortie de `chronyc` n'est pas lu sur pièce (SHOGEN-S2BIS-CHRONYC-FORMAT-1) ; seuls les
-relevés absents ou en erreur sont comptés.
+retenue ; D-5 au moins 2 noms témoins non résolus (sans réponse retenue, rcode non nul, ou sans réponse A). DT6-e
+(SHOGEN-S2BIS-CHRONYC-FORMAT-1) : D-3 jugé sur la sortie de `chronyc -n tracking`, forme lue sur pièce (FORMAT §13.3) :
+aucun relevé lisible d'une fenêtre commencée moins de 120 s avant, borne d'erreur de plus de 1 s, ou statut de
+synchronisation autre que Normal, Insert second, Delete second (FORMAT §17.2).
 CB-17b : état par fenêtre (w = 60 s, FORMAT §3.1), de la première que le journal admet au dernier marqueur, sur les
 fichiers présents (la rétention locale peut en avoir retiré) ; rapport (santé seule, aucun nombre à virgule) ;
 strates : stress le samedi et le dimanche UTC, calme sinon (ADR-0029 l.196).
 CB-17c (AVIS Q-D-03, point 2) : résumé par jour, `[ws, codes]` de chaque fenêtre, publié au dépôt par la commande
 `resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3).
 CB-17d (AVIS Q-D-03, point 3) : avec un dépôt, `status` ajoute le compte à quorum (au moins deux observateurs
-valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge."""
+valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge.
+DT6-c (SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1) : un fichier du journal est ouvert sans attente et lu s'il est un fichier
+ordinaire (`journal.ordinaire`) ; un tube nommé à son nom bloquait `status`. DT6-d (SHOGEN-S2BIS-STATUS-QUEUES-1) : un
+fichier arrêté avant sa fin est nommé au rapport, avec son motif ; la grille compte GRILLE fenêtres au plus, au-delà le
+refus STATUS/grille (un saut d'horloge en avant, que l'écrivain suit en nommant ses fichiers, faisait lever
+MemoryError) ; un `disque` partiel est « non relevé »."""
 import calendar
 import hashlib
 import json
@@ -29,11 +35,15 @@ from shogen_s2bis.collecte.lecture import S
 LECTURE, W = b'{"adresse":', 60                      # première clé d'une `lecture` canonique ; largeur des fenêtres
 D2, D4, D5 = 5 * S, 2, 2                             # retard (µs), témoins sans réponse, noms non résolus
 CODES, TAILLE = ("D-1", "D-2", "D-3", "D-4", "D-5"), 1 << 17                 # codes d'un résumé ; octets au plus
+GRILLE = 32 * 1440          # fenêtres jugées au plus (DT6-d) : 32 jours ; rétention locale de 7 jours (ADR-0029 §6)
+D3_BORNE, D3_AGE = 10 ** 9, 120            # D-3 (DT6-e) : borne d'erreur, ns ; âge du dernier relevé lisible, s
+CHRONY = re.compile("^(System time|Root delay|Root dispersion|Leap status) *: (.*)$", re.M)   # chronyc tracking
+SYNCHRO, NS = ("Normal", "Insert second", "Delete second"), "([0-9]+)[.]([0-9]{9}) seconds"     # client.c, %L et %.9f
 RESUME = re.compile("([a-z0-9]{1,16})-([0-9]{4}-[0-9]{2}-[0-9]{2})[.]resume")    # <observateur>-<jour>.resume
 
 
 class RefusStatus(ValueError):
-    """Refus nommé (`code`) : STATUS/journal."""
+    """Refus nommé (`code`) : STATUS/journal, STATUS/grille."""
     def __init__(self, code, detail):
         super().__init__(f"{code} : {detail}")
         self.code = code
@@ -60,22 +70,38 @@ def _au_dela(e, fin):
     return type(e.get("ws")) is int and e["ws"] >= fin or type(e.get("suivante")) is int and e["suivante"] > fin
 
 
-def enregistrements(dossier, prefixe="pool"):
+def enregistrements(dossier, prefixe="pool", arrets=None):
     """(enregistrement, ligne) hors `lecture`, dans l'ordre de `fichiers` ; un fichier s'arrête à sa première ligne
-    coupée, illisible, sans `type` ni `seq`, ou d'un jour postérieur au sien (`_au_dela`)."""
+    coupée, illisible, sans `type` ni `seq`, ou d'un jour postérieur au sien (`_au_dela`) ; un fichier qui n'est pas un
+    fichier ordinaire n'est pas lu (DT6-c). Chaque fichier arrêté avant sa fin est noté dans `arrets`, (nom, motif)
+    (DT6-d)."""
+    arrets = [] if arrets is None else arrets
     for debut, _k, n in fichiers(dossier, prefixe):
-        with open(os.path.join(dossier, n), "rb") as f:
+        try:                                                    # DT6-c : fichier ordinaire, ouvert sans attente
+            fd = journal.ordinaire(os.path.join(dossier, n))
+        except (journal.ErreurJournal, OSError) as x:
+            arrets.append((n, "pas un fichier ordinaire" if type(x) is journal.ErreurJournal else
+                           f"illisible ({type(x).__name__})"))
+            continue
+        with open(fd, "rb") as f:
             while (ligne := f.readline(LIMITE)).endswith(b"\n"):
                 if ligne.startswith(LECTURE):
                     continue
                 try:
                     e = json.loads(ligne)
                 except (ValueError, RecursionError):
+                    arrets.append((n, "ligne illisible"))
                     break
-                if type(e) is not dict or type(e.get("type")) is not str or type(e.get("seq")) is not int or _au_dela(
-                        e, debut + 86400):
+                if type(e) is not dict or type(e.get("type")) is not str or type(e.get("seq")) is not int:
+                    arrets.append((n, "hors FORMAT"))
+                    break
+                if _au_dela(e, debut + 86400):
+                    arrets.append((n, "jour postérieur au sien"))
                     break
                 yield e, ligne
+            else:
+                if ligne:
+                    arrets.append((n, "ligne coupée"))
 
 
 def _repond(v):
@@ -87,36 +113,74 @@ def _resolu(v):
 
 
 def juger(sante):
-    """(codes, relevé D-3 absent ou en erreur) d'une fenêtre close dont `sante` est la santé (None : aucune) ; sans
-    santé lisible : D-1."""
+    """Codes D-2, D-4, D-5 d'une fenêtre close dont `sante` est la santé (None : aucune) ; sans santé lisible : D-1.
+    D-3 se juge sur les relevés de plusieurs fenêtres (`etat`, `trois`)."""
     try:
-        d2, d3, codes = sante["d2"], sante["d3"], []
+        d2, codes = sante["d2"], []
         if d2["non_parties"] or d2["retard_max"] is not None and d2["retard_max"] > D2:
             codes.append("D-2")
         codes += ["D-4"] * (sum(not _repond(v) for v in sante["d4"]) >= D4)
         codes += ["D-5"] * (sum(not _resolu(v) for v in sante["d5"]) >= D5)
-        return codes, type(d3) is not dict or "erreur" in d3 or d3.get("code") != 0
+        return codes
     except (KeyError, TypeError, AttributeError):
-        return ["D-1"], False
+        return ["D-1"]
 
 
-def etat(dossier, prefixe="pool"):
-    """{ws : codes} des fenêtres de la première admise au dernier marqueur, dernière `sante`, tête (seq, sha256) du
-    dernier enregistrement lu, nombre de relevés D-3 absents ou en erreur."""
+def chrony(d3):
+    """(deux fois la borne d'erreur en ns, statut) d'un relevé D-3 lisible : `code` 0 (entier, booléen exclu), sortie
+    de `chronyc -n tracking` où les lignes System time, Root delay, Root dispersion et Leap status figurent une fois
+    chacune, valeurs en secondes à neuf décimales, partie entière de journal.CHIFFRES chiffres au plus (`%.9f` d'un
+    double en écrit 309 au plus ; int() ne lève alors sous aucun réglage de l'interpréteur : R-1 du contre-contrôle de
+    DETTES-T6) ; borne de la documentation de chrony, |System time| + Root dispersion + Root delay / 2 (FORMAT §13.3,
+    §17.2 ; DT6-e) ; None sinon."""
+    if type(d3) is not dict or type(d3.get("code")) is not int or d3["code"] != 0 or type(d3.get("sortie")) is not str:
+        return None
+    lus = CHRONY.findall(d3["sortie"])
+    c = dict(lus)
+    if len(lus) != 4 or len(c) != 4:
+        return None
+    formes = (("System time", " (slow|fast) of NTP time"), ("Root delay", ""), ("Root dispersion", ""))
+    o, r, d = (re.fullmatch(NS + x, c[cle]) for cle, x in formes)
+    if not (o and r and d) or max(len(x[1]) for x in (o, r, d)) > journal.CHIFFRES:         # R-1 du contre-contrôle
+        return None
+    ns = [int(x[1]) * 10 ** 9 + int(x[2]) for x in (o, r, d)]
+    return 2 * ns[0] + ns[1] + 2 * ns[2], c["Leap status"]
+
+
+def trois(releve, ws):
+    """D-3 de la fenêtre `ws` (ADR-0029 §2.3 ; DT6-e) : `releve` (ws de sa santé, deux fois la borne, statut), le
+    dernier relevé lisible à elle, manque ou vient d'une fenêtre commencée D3_AGE s ou plus avant elle, ou dit une borne
+    de plus de D3_BORNE, ou un statut hors SYNCHRO."""
+    return releve is None or ws - releve[0] >= D3_AGE or releve[1] > 2 * D3_BORNE or releve[2] not in SYNCHRO
+
+
+def etat(dossier, prefixe="pool", arrets=None):
+    """{ws : codes} des fenêtres de la première admise au dernier marqueur, GRILLE au plus (sinon STATUS/grille, DT6-d),
+    dernière `sante`, tête (seq, sha256) du dernier enregistrement lu ; fichiers arrêtés avant leur fin notés dans
+    `arrets`. D-3 (DT6-e) : sur le dernier relevé lisible (`chrony`, `trois`)."""
     plancher = fichiers(dossier, prefixe)[0][0] - 86400       # C-3 : jour du premier fichier, moins un jour (§6.1)
-    premiere, en_cours, juges, derniere, tete, absents = None, {}, {}, None, None, 0
-    for e, ligne in enregistrements(dossier, prefixe):
+    premiere, en_cours, juges, derniere, tete, releve = None, {}, {}, None, None, None
+    for e, ligne in enregistrements(dossier, prefixe, arrets):
         tete = e["seq"], hashlib.sha256(ligne).hexdigest()
         if premiere is None and e["type"] in ("ouverture", "reprise") and type(e.get("suivante")) is int:
             premiere = e["suivante"]
         if e["type"] == "sante":
-            en_cours[e.get("ws")] = derniere = e
+            derniere = e
+            if type(e.get("ws")) is int:                    # C-1 de la G2 : `ws` liste ou objet, jamais une clé
+                en_cours[e["ws"]] = e
+                if lu := chrony(e.get("d3")):
+                    releve = e["ws"], *lu
         elif e["type"] == "marqueur" and type(e.get("ws")) is int:
-            juges[e["ws"]], absent = juger(en_cours.pop(e["ws"], None))
-            absents += absent
+            codes = juger(en_cours.pop(e["ws"], None))
+            juges[e["ws"]] = codes if codes == ["D-1"] or not trois(releve, e["ws"]) else sorted(codes + ["D-3"])
     debut = max(min([x for x in (premiere,) if x is not None] + list(juges), default=0), plancher)
+    n = len(range(debut, max(juges) + W, W)) if juges else 0      # DT6-d : avant d'allouer la grille ; compte
+    if n > GRILLE:                                                  # exact, `ws` hors grille compris (C-2 de la G2)
+        raise RefusStatus("STATUS/grille", f"{n} fenêtres de {heure(debut)} à "
+                          f"{heure(max(juges))} UTC, plus que {GRILLE} (32 jours) : saut d'horloge, ou journal "
+                          "non purgé")
     grille = {ws: juges.get(ws, ["D-1"]) for ws in range(debut, max(juges) + W, W)} if juges else {}
-    return grille, derniere, tete, absents
+    return grille, derniere, tete
 
 
 def heure(ws):
@@ -182,8 +246,7 @@ def quorum(grille, depot, observateur, maintenant):
         compte = {"calme": 0, "stress": 0}
         for ws, codes in grille.items():
             compte[strate(ws)] += (not codes) + sum(v.get(ws, False) for v in autres.values()) >= 2
-        lignes = [f"quorum hors D-3 (au moins 2 observateurs valides) : calme {compte['calme']} ; stress "
-                  f"{compte['stress']}",
+        lignes = [f"quorum (au moins 2 observateurs valides) : calme {compte['calme']} ; stress {compte['stress']}",
                   "résumés lus : " + " ; ".join(f"{o} jusqu'à {heure(max(v))} UTC (âge {maintenant // S - max(v) - W}"
                                                 f" s)" for o, v in sorted(autres.items()))]
     return lignes + (["résumés refusés : " + " ; ".join(refus)] if refus else [])
@@ -192,21 +255,23 @@ def quorum(grille, depot, observateur, maintenant):
 def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=None):
     """Lignes du rapport : fenêtres, tête, disque, dégradations par code, dernière fenêtre, valides par strate ; avec
     un dépôt, le compte à quorum (`quorum`)."""
-    grille, sante, tete, absents = etat(dossier, prefixe)
+    arrets = []
+    grille, sante, tete = etat(dossier, prefixe, arrets)
     lignes = [f"status : journal « {prefixe} », lecture seule"]
+    arretes = ["fichiers arrêtés avant leur fin : " + " ; ".join(f"{n} ({m})" for n, m in arrets)] if arrets else []
     if not grille:
-        return lignes + ["fenêtres : aucune fenêtre close", f"tête : {tete and f'seq {tete[0]}, sha256 {tete[1]}'}"]
+        return lignes + ["fenêtres : aucune fenêtre close", f"tête : {tete and f'seq {tete[0]}, sha256 {tete[1]}'}",
+                         *arretes]
     debut, fin = min(grille), max(grille)
     disque = (sante or {}).get("disque")
-    compte = {c: sum(c in x for x in grille.values()) for c in ("D-1", "D-2", "D-4", "D-5")}
+    compte = {c: sum(c in x for x in grille.values()) for c in CODES}
     strates = {s: sum(not x and strate(ws) == s for ws, x in grille.items()) for s in ("calme", "stress")}
     return lignes + [
         f"fenêtres : de {heure(debut)} à {heure(fin)} UTC, {len(grille)} ; dernier marqueur : {heure(fin)} UTC",
         f"tête : seq {tete[0]}, sha256 {tete[1]}",
-        f"disque : {disque['libre']} octets libres sur {disque['total']}" if type(disque) is dict and "libre" in disque
-        else f"disque : non relevé ({disque})",
-        f"dégradations : D-1 {compte['D-1']} ; D-2 {compte['D-2']} ; D-3 non jugé (SHOGEN-S2BIS-CHRONYC-FORMAT-1 ; "
-        f"relevé absent ou en erreur : {absents}) ; D-4 {compte['D-4']} ; D-5 {compte['D-5']}",
+        f"disque : {disque['libre']} octets libres sur {disque['total']}" if type(disque) is dict and {
+            "libre", "total"} <= disque.keys() else f"disque : non relevé ({disque})",
+        "dégradations : " + " ; ".join(f"{c} {compte[c]}" for c in CODES),
         "dernière fenêtre : " + (f"dégradée ({', '.join(grille[fin])})" if grille[fin] else "valide"),
-        f"fenêtres valides hors D-3 (compte local) : calme {strates['calme']} ; stress {strates['stress']}"] + (
-        quorum(grille, depot, observateur, maintenant) if depot else [])
+        f"fenêtres valides (compte local) : calme {strates['calme']} ; stress {strates['stress']}",
+        *arretes] + (quorum(grille, depot, observateur, maintenant) if depot else [])

@@ -22,7 +22,8 @@ l'investisseur. Sortie : 0 émis, déjà émis ou non armé ; 1 refus ou échec 
 CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans rien écrire (status.py) : 0 et le rapport
 sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
 journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
-quorum ; `--depot` sans `--descripteur` : sortie 2."""
+quorum ; `--depot` sans `--descripteur` : sortie 2. DT6-h (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : une configuration
+dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal."""
 import argparse
 import collections
 import ipaddress
@@ -31,7 +32,7 @@ import re
 import secrets
 import sys
 
-from shogen_s2bis.collecte import boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
+from shogen_s2bis.collecte import asn, boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
@@ -140,6 +141,22 @@ def configurer_secondaire(chemins, commit):
     return lus
 
 
+def _run_params(lus, commit):
+    """Champs de `run_params` (FORMAT §14.4). Une ligne qui passerait LIMITE, `seq` et `ws` écrits sur 19 chiffres
+    (10^18), est un refus de configuration (CONFIG/taille, ou le code de l'écrivain), levé avant l'ouverture du
+    journal : l'écrivain la refuserait à un démarrage, et chaque relance écrirait une `reprise` (DT6-h)."""
+    champs = {"commit": commit, "sha256": {n: lus[n][1] for n in lus}, "python": sys.version,
+              **{n: lus[n][0] for n in lus}}
+    try:
+        n = len(journal.canonique({**champs, "type": "run_params", "ws": 10 ** 18, "seq": 10 ** 18,
+                                   "prec": journal.GENESE}))
+    except journal.ErreurJournal as e:
+        raise config.RefusConfig("CONFIG/" + e.code.split("/")[1], e) from None
+    if n > journal.LIMITE:
+        raise config.RefusConfig("CONFIG/taille", f"run_params de {n} octets, {journal.LIMITE} au plus")
+    return champs
+
+
 def _lecteur(x, delai, tls):
     req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
     return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
@@ -206,22 +223,22 @@ def _status(a, fsync):
     return 0
 
 
-def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync):
+def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
     du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
     échéance ws + w − `marge`, places de la carte, sans sondes ; relevé ASN des hôtes du pool et de la carte au
-    résolveur du descripteur, à la cadence de `asn`."""
+    résolveur du descripteur, à la cadence de `asn` ; `releve` injectable (tests sans réseau, DT6-f)."""
     jl = journal.Journal(dossier, "secondaire", w=f["w"], fsync=fsync)
     return jl, secondaire.Secondaire(
         jl, {x["nom"]: _lecteur(x, c["delai"], tls) for x in c["formes"]}, _plan(c), c["places"], _par_hote(f, c),
         d["resolveur"], c["asn"]["periode"], c["asn"]["decalage"], w=f["w"], delta=f["w"] * S - c["depart"],
-        marge=c["marge"])
+        marge=c["marge"], releve=releve)
 
 
 FICHIERS = {"pool": ("formes", "sante", "descripteur"), "secondaire": ("formes", "carte", "descripteur")}
 
 
-def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
+def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     p = argparse.ArgumentParser(prog="python3 -m shogen_s2bis.collecte", description="collecteur de S2-bis")
     commandes = p.add_subparsers(dest="commande", required=True)
     for nom, aide in (("pool", "processus du pool"), ("secondaire", "processus secondaire : carte et relevé ASN")):
@@ -250,16 +267,15 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync):
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
-        f = lus["formes"][0]
+        f, champs = lus["formes"][0], _run_params(lus, a.commit)
         args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
-        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args)
+        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args, releve)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2
     try:
         jl.ouvrir(horloge() // (S * f["w"]) * f["w"])
-        jl.ecrire("run_params", jl.suivante, commit=a.commit, sha256={n: lus[n][1] for n in lus}, python=sys.version,
-                  **{n: lus[n][0] for n in lus})
+        jl.ecrire("run_params", jl.suivante, **champs)
         b.tourner(a.fenetres)
     except (OSError, journal.ErreurJournal) as e:
         print(f"collecte : arrêt : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)

@@ -6,6 +6,10 @@
 - **Mesures** : lignes physiques par `wc -l` ; tests par `unittest` (compte de la découverte, sans sous-tests) ;
   campagnes de mutants classées par la sortie du lanceur (SHOGEN-MUT-FATAL-1 : 1 tué par le test nommé, 0 vivant, toute
   autre sortie FATAL), témoin vert avant chaque campagne. Chaque sous-lot ajoute sa section à la fin de ce fichier.
+- **Compte de R-25** (SHOGEN-S2BIS-R25-COMPTE-1, O-7 de la G2 de P2A ; lot DETTES-T6, diff DT6-a) : la borne de
+  200 lignes par sous-lot porte sur les lignes ajoutées des fichiers de code, `.py` et `.yml` (colonne des ajouts de
+  `git diff --numstat`) ; données (`.json`, `.bin`), fixtures et documents (`.md`) sont hors compte et déclarés dans
+  la section du sous-lot.
 
 ## Fonctions de fitness
 
@@ -2364,3 +2368,365 @@ de la série sur c58b997 (mêmes fichiers mutés, code de P2B inchangé hors des
 rejoués sur la variante ; suite et plancher mesurés sur l'état de la variante.
 
 Suite : 340 tests ; plancher du job : 340, égalité exigée (`--egal`).
+
+## DT6-a (2026-10-09) : borne basse des octets par occurrence, cycle refusé avant le sérialiseur (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-CANONIQUE-OCTETS-1 (O-4 de la G2 de P2A) et résiduel du volet graphe de SHOGEN-S2BIS-CORPS-BORNE-1.
+`canonique` comptait une valeur par occurrence : une chaîne de 1 Mio partagée 1 000 fois passait la borne, puis le
+sérialiseur écrivait 1 Gio (10 s, pic de 2 Gio, mesuré) ; un cycle placé derrière un graphe partagé n'était vu par le
+sérialiseur qu'après le développement du graphe (2^20 feuilles : 3,8 s, mesuré). La borne porte sur une borne basse des
+octets, comptée une fois par occurrence, et un cycle est refusé avant le sérialiseur (FORMAT §8.4). En-tête : convention
+du compte de R-25.
+
+Rouge : sur la base, 2 tests en échec d'assertion (FAIL 2, ERROR 0) : sérialiseur appelé (espion qui lève).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 452 | — |
+| `tests/test_journal.py` | 356 | 17 (2 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : cycle laissé au
+sérialiseur, chaîne comptée 1, entier compté 1, chiffres surestimés (4/10), clés non comptées, virgules non comptées,
+saut de ligne non compté, signe non compté, null et booléens comptés 5, nombre à virgule compté 24, borne retirée,
+conteneur partagé compté une fois.
+
+Suite : 344 tests ; plancher du job : 344, égalité exigée (`--egal`).
+
+## DT6-b (2026-10-09) : borne d'exposant de `decodeurs._entier` figée, docstring exacte (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-DECODEURS-BORNE-TEST-1 (O-A1 et O-A2 du contre-contrôle de P2A). La borne d'exposant de `_entier`
+(16) n'était figée par aucun test au-dessous de 10^6 : le mutant K1-03 (borne à 200 000) vivait, alors que
+`int(Decimal("1E+199999"))` coûte 0,51 s. Test de la borne exacte (9E+15 et 9,999999999999999E+15 convertis ;
+1E+16, 1E+17, 10000000000000000 et 0E+16 refusés avant int(), espion qui lève) et des nombres JSON 1E+199999 et
+1E+200000 à chaque champ d'instant (`panne_decode` en moins de 0,1 s) ; docstring rendue exacte (0E+16, l'instant 0,
+est refusé). Code inchangé.
+
+Rouge : sur la base, le test passe (code juste) ; sur le mutant K1-03, 5 échecs d'assertion (FAIL 5, ERROR 0 : quatre
+refus attendus avant int(), puis 1E+199999 décodé en 0,48 s).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 147 | — |
+| `tests/test_decodeurs.py` | 260 | 20 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 9 tués par le test visé, 0 vivant, 0 FATAL : K1-03 (200 000), borne à
+200 001, à 100 000, à 17 et à 15, comparaison stricte, branche Decimal retirée, zéro admis à tout exposant, exposant
+brut au lieu de l'exposant ajusté.
+
+Suite : 345 tests ; plancher du job : 345, égalité exigée (`--egal`).
+
+## DT6-c (2026-10-09) : fichiers du journal ordinaires, lus sans attente (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1 (O-4 de la G2 de P2B). Un tube nommé au nom d'un fichier du journal
+bloquait `status` (ouverture sans `O_NONBLOCK`) et la reprise de l'écrivain ; un dossier à ce nom faisait lever
+`IsADirectoryError` à `status`. L'écrivain refuse de démarrer devant un nom du journal ou des sommes qui n'est pas un
+fichier ordinaire (`JOURNAL/fichier`, contrôle par `stat`, avant toute lecture et toute écriture) et ouvre toute lecture
+sans attente (`journal.ordinaire`, comme au dépôt) ; `status` ne lit pas un tel fichier (FORMAT §5, §7.7, §17.1).
+
+Rouge : sur l'état DT6-b, 2 tests en échec d'assertion (FAIL 2, ERROR 0) : appels bloqués, interrompus par l'alarme de
+2 s (`bloqué`), puis `JOURNAL/occupe` (verrou tenu par l'instance bloquée).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/journal.py` | 471 | — |
+| `shogen_s2bis/collecte/status.py` | 219 | — |
+| `tests/test_reprise.py` | 376 | 28 (1 de plus) |
+| `tests/test_status.py` | 407 | 19 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : lecture ouverte en attente,
+type du fichier lu non contrôlé, contrôle d'ouverture retiré, sommes hors du contrôle, tube seul refusé (contrôle
+d'ouverture ; lecture), refus de l'écrivain non rattrapé par `status`, ouverture de `status` d'avant DT6-c, relecture
+de la reprise et sommes relues par `open` (tués par le cas du tube posé après le contrôle).
+
+Suite : 347 tests ; plancher du job : 347, égalité exigée (`--egal`).
+
+## DT6-d (2026-10-09) : `status`, fichiers arrêtés nommés, étendue de la grille bornée (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-STATUS-QUEUES-1 (O-3 de la G2 de P2B ; résiduel de C-3 ; R-B1 du contre-contrôle ; I-3 du
+générateur). Un fichier arrêté avant sa fin l'était sans le dire : il est nommé en dernière ligne du rapport local, avec
+son motif. Un saut d'horloge en avant, sans fichier forgé (l'écrivain nomme le fichier par le jour de `ws`), étendait la
+grille jusqu'à MemoryError (trace Python, 3,6 s sous 512 Mio, mesuré) : la grille compte au plus 46 080 fenêtres
+(32 jours), au-delà le refus nommé `STATUS/grille` (0,15 s). Un `disque` partiel faisait lever KeyError (FORMAT §17.1,
+§17.3, §17.4).
+
+Rouge : sur l'état DT6-c, 4 tests en échec d'assertion (FAIL 4, ERROR 0) : ligne des arrêts absente, grille de 46 081
+fenêtres admise, `KeyError` rendu par le rapport, trace Python au lieu du refus nommé.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 242 | — |
+| `tests/test_status.py` | 473 | 23 (4 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 11 mutants, 11 tués par leur test visé, 0 vivant, 0 FATAL : borne relâchée et serrée
+d'une fenêtre, comparaison large, borne retirée, ligne illisible non notée, motifs confondus, ligne coupée non notée,
+fichier spécial noté illisible, ligne des arrêts omise, disque partiel lu, arrêts non transmis.
+
+Suite : 351 tests ; plancher du job : 351, égalité exigée (`--egal`).
+
+## DT6-e (2026-10-09) : D-3 jugé sur la sortie de `chronyc -n tracking`, forme lue sur pièce (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-CHRONYC-FORMAT-1 (I-B1 et O-3 de la G2 de P1-B ; Q-9 de la G2 de P2B). La forme de la sortie de
+`chronyc tracking` est lue dans la source de chrony 4.6.1 (`client.c`, `doc/chronyc.adoc` ; inchangée en 4.9) et écrite
+au FORMAT §13.3 ; `status` juge D-3 (§17.2) : relevé lisible (code 0 ; System time, Root delay, Root dispersion et Leap
+status une fois chacune ; neuf décimales), borne |System time| + Root dispersion + Root delay / 2 de plus de 1 s,
+statut autre que Normal, Insert second ou Delete second, ou aucun relevé lisible d'une fenêtre commencée moins de 120 s
+avant (âge compté en fenêtres du journal, Q-1 du lot). La sonde garde la sortie d'erreur, mêlée à la sortie
+standard dans l'ordre des écritures de la commande, dans la borne de 4 096 caractères (O-3 ; C-3 de la G2).
+Une `sante` sans `ws` et un `code` non entier (booléen compris),
+hors FORMAT, ne font jamais lever ni lire un relevé (I-3 ; défaut de la première écriture, vu en relecture du
+générateur). Fixture `tests/fixtures/chrony/tracking.txt` : l'exemple de la documentation (l.147-159), copié octet pour
+octet ; 13 lignes, hors compte de R-25.
+
+Rouge : sur les tests de DT6-e et le code de l'état DT6-d (`status.py`, `sante.py`), 10 tests en échec d'assertion
+(FAIL 10, ERROR 0) : D-3 non jugé (grille, rapport, résumés, quorum, arrêts), `juger` rendant un couple, seuils D-3
+absents, sortie d'erreur jetée. Correctif de relecture : sur le code d'avant lui, 2 tests en échec d'assertion
+(FAIL 2, ERROR 0 : `code` faux lu comme 0, `KeyError` sur une `sante` sans `ws`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/sante.py` | 111 | — |
+| `shogen_s2bis/collecte/status.py` | 272 | — |
+| `tests/fixtures/chrony/tracking.txt` | 13 | — |
+| `tests/test_sante.py` | 285 | 14 (1 de plus) |
+| `tests/test_status.py` | 517 | 24 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 17 mutants, 17 tués par leur test visé, 0 vivant, 0 FATAL : âge en comparaison
+stricte, âge porté à 180 s, borne en comparaison large, borne sans le facteur 2, « Not synchronised » admis,
+« Invalid » admis, « Insert second » refusé, ligne en double admise, code de sortie ignoré, « fast » illisible, délai
+racine compté entier, décimales libres, D-3 ajouté à une fenêtre D-1, première fenêtre sans relevé lisible jugée sans
+D-3 (vivant au premier passage : cas ajouté), sortie d'erreur jetée, `code` booléen admis, `ws` lu par indexation.
+
+Suite : 353 tests ; plancher du job : 353, égalité exigée (`--egal`).
+
+## DT6-f (2026-10-09) : numéro d'AS en chiffres ASCII, IPv4 littérale relevée directement (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-ASN-LECTURE-1 (O-2 de la G2 de P2A ; Q-3 du lot) et SHOGEN-S2BIS-ASN-HOTE-IPV4-1 (O-6 ; Q-2).
+`asn` de RIPEstat et premier mot du TXT de Cymru : entier, ou texte de 1 à 10 chiffres ASCII, de 0 à 2³² exclu
+(souligné, signe, blancs et chiffres d'autres écritures refusés : écart à `int()` de S2, écrit au §15.4). Un hôte écrit
+en IPv4 littérale canonique est relevé directement : `a` null, `ip` l'hôte, aucune requête A ; écrit autrement, c'est
+un nom (§15.4). Le relevé du secondaire devient injectable (`entree.main`, `construire_secondaire`) : le test
+d'isolement des deux processus le dirige vers des ports fermés de boucle locale (sans lui, les hôtes 127.0.0.1 partaient
+vers RIPEstat, arrêtés par la garde réseau des tests, mesuré).
+
+Rouge : sur les tests de DT6-f et le code de l'état DT6-e (`asn.py`, `entree.py`), 4 tests en échec d'assertion
+(FAIL 4, ERROR 0) : textes signés, soulignés et non ASCII admis (RIPEstat, Cymru), IPv4 littérale jamais relevée,
+relevé du secondaire non injectable (sous-processus en échec).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/asn.py` | 85 | — |
+| `shogen_s2bis/collecte/entree.py` | 269 | — |
+| `tests/test_asn.py` | 150 | 6 (1 de plus) |
+| `tests/test_secondaire.py` | 207 | 7 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 11 mutants, 11 tués par leur test visé, 0 vivant, 0 FATAL : lecture d'avant DT6-f
+(`int()` de S2), chiffres de toute écriture (`isdigit`), signe admis, blancs admis, souligné admis, texte vide lu 0,
+littérale toujours fausse (forme d'avant DT6-f), littérale reconnue à un motif (zéros de tête admis), requête A gardée
+pour une littérale, relevé injecté ignoré par `construire_secondaire`, puis par `main`.
+
+Suite : 354 tests ; plancher du job : 354, égalité exigée (`--egal`).
+
+## DT6-g (2026-10-09) : journal du secondaire contrôlé de bout en bout contre le FORMAT (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (O-5 de la G2 de P2A ; E-C-24). Test seul : le processus secondaire entier
+en sous-processus (w = 1 s, cinq fenêtres), son relevé ASN dirigé vers des serveurs factices de boucle locale
+(résolveur, RIPEstat en clair) ; chaque enregistrement est contrôlé contre le FORMAT par `anomalies` de
+`test_bout_en_bout` (§1 à §14 ; `sante` sans sondes, §13.1 ; lectures de la carte aux instants du §15.3), puis contre le
+§15 par des règles écrites dans le test (préfixe et fichiers, `run_params` à `{formes, carte, descripteur}`,
+`releve_asn` des hôtes du pool et de la carte dans l'ordre, un `asn` par hôte en tête de fenêtre, champs d'un hôte
+nommé et d'une IPv4 littérale). `anomalies` reçoit les champs par type, `servir` ses routes. Code inchangé.
+
+Rouge : sur l'état DT6-f, le mutant G05 (`run_params` du secondaire sans le sha256 de la carte) vit (aucun test ne le
+voit) ; sur les tests de DT6-g, `Conformite` échoue (FAIL 1, ERROR 0 : `seq 1 run_params : run_params`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_bout_en_bout.py` | 226 | 1 |
+| `tests/test_secondaire.py` | 253 | 8 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 10 mutants, 10 tués, 0 vivant, 0 FATAL, dont 9 par `Conformite` (G05 par elle seule) :
+`a` gardé null pour un hôte nommé, `ip` à la deuxième adresse A, `asn` écrits après la fenêtre (tué par un test du
+relevé seul), hôtes du pool non relevés, `run_params` sans le sha256 de la carte, santé sans sondes à `disque` {},
+`asn` de Cymru non relevé, journal au préfixe `carte`, `releve_asn` sans `lance`, hôtes non triés.
+
+Suite : 355 tests ; plancher du job : 355, égalité exigée (`--egal`).
+
+## DT6-h (2026-10-09) : `run_params` trop grand, refus de configuration avant l'ouverture du journal (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1, volet restant (sondes DNS de P1 : C-1 ; décodeurs : CB-6c). `run_params`,
+seul enregistrement écrit d'une configuration, pouvait atteindre un refus de l'écrivain : admis au premier démarrage
+(`seq` et `ws` courts), refusé plus tard, chaque relance écrivant une `reprise`. Sa taille est contrôlée avant
+l'ouverture du journal, `seq` et `ws` écrits sur 19 chiffres : au-delà de LIMITE, refus `CONFIG/taille` (sortie 2,
+rien d'écrit) ; un refus de l'écrivain sur ses valeurs devient un refus de configuration (FORMAT §14.4).
+
+Rouge : sur les tests de DT6-h et le code de l'état DT6-g (`entree.py`), 1 test en échec d'assertion (FAIL 1, ERROR 0) :
+ligne de LIMITE + 1 octets admise au premier démarrage (sortie 0, journal écrit).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 285 | — |
+| `tests/test_entree.py` | 300 | 11 (1 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 9 tués par leur test visé, 0 vivant, 0 FATAL : contrôle retiré, borne
+doublée, comparaison large, `seq` et `ws` courts (0), `ws` court seul, refus de l'écrivain propagé sans conversion,
+contrôle après l'ouverture du journal (forme d'avant DT6-h), version de Python omise du calcul, contenus omis du
+calcul.
+
+Suite : 356 tests ; plancher du job : 356, égalité exigée (`--egal`).
+
+## DT6-i (2026-10-09) : phrases normatives des §16 et §17 figées par `test_format` (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1 du contre-contrôle de P2B). Tests seuls : 23 phrases normatives du §16
+(dont celle du dépôt local de C-7) et 23 du §17, prises au texte, et les bornes du texte égales à celles du code
+(`tetes` : 1 024 octets, 16 têtes, 65 536 octets ; `status` : 46 080 fenêtres, 131 072 octets).
+
+Rouge : le mutant K-C7-2 du contre-contrôle de P2B (« local » retiré de la phrase du dépôt, vivant à ce contre-contrôle)
+fait échouer `test_paragraphe_16_tetes_depot_et_jeton` (FAIL 1, ERROR 0) ; la grille écrite 46 081 fenêtres,
+`test_paragraphe_17_status_et_resumes` (FAIL 1, ERROR 0).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_format.py` | 280 | 16 (2 de plus) |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : K-C7-2 (« local » retiré
+du §16), taille d'une tête écrite 2 048, `TAILLE` de `tetes` à 2 048, refus de liaison renommé, `NOMBRE` de têtes à 32,
+grille écrite 46 081 fenêtres, `GRILLE` de 64 jours, taille d'un résumé écrite 65 536, arrêts nommés retirés du §17,
+quorum écrit à 3, `PLAFOND` de réponse à 2^17, nonce écrit sur 32 bits.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-k (2026-10-10) : corrections C-1 à C-10 de la G2 du lot (lot DETTES-T6)
+
+Objet : liste fermée de la G2 (ACCEPTE-AVEC-CORRECTIONS), adoptée par l'orchestrateur, dans la forme du diff du
+réviseur. Code : C-1, une `sante` dont `ws` n'est pas un entier (liste, objet) n'entre plus en clé de l'état de
+`status` (elle levait TypeError dans `status` et `resume`, I-3 de STATUS-QUEUES-1) ; C-2, l'étendue de la grille se
+compte exactement (`len(range(...))`, `ws` hors grille compris : 46 081 fenêtres passaient). Tests : C-5 et C-6 (motifs
+`illisible (FileNotFoundError)` et `ligne coupée` d'une ligne de plus de LIMITE octets), C-7 (Root delay, Root
+dispersion et `sortie` mal formés : D-3, jamais une trace), C-8 (`_synchro` ouvert sans attente), C-9 (texte d'AS de 10
+chiffres admis, de 11 refusé). Textes : C-3 (sorties standard et d'erreur mêlées dans l'ordre des écritures, FORMAT
+§13.3, docstring, section DT6-e), C-4 (Q-1 adoptée, §17.2), C-10 (motif `ligne coupée` passager pendant la collecte,
+§17.4). Ajout daté DETTES-T6 du FORMAT complété et redaté. Aucun test ajouté (cas dans des tests existants).
+
+Rouge : C-1 et C-2, tests de DT6-k sur le `status.py` de DT6-j : 2 tests en échec d'assertion (FAIL 2, ERROR 0 :
+`TypeError` rendu par `sans_attente`, `RefusStatus` non levé) ; tests seuls, chacun sur le mutant qu'il vise (K06 à
+K13) : FAIL 1, ERROR 0. Sur l'état DT6-j, ces huit mutants vivaient (commande du job).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 275 | — |
+| `shogen_s2bis/collecte/sante.py` | 111 | — |
+| `tests/test_status.py` | 535 | 24 |
+| `tests/test_reprise.py` | 383 | 28 |
+| `tests/test_asn.py` | 151 | 6 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 13 mutants, 13 tués par leur test visé, 0 vivant, 0 FATAL : C-1 défait (`ws`
+quelconque en clé), dernière santé retenue pour un `ws` entier seulement, C-2 défait (`(max(juges) - debut) // W +
+1`), borne en comparaison large, compte d'une fenêtre de moins, OSError à l'ouverture non rattrapée, ligne lue sans
+borne, Root delay et Root dispersion non contrôlés, type de `sortie` non contrôlé, `_synchro` ouvert en attente,
+texte d'AS sans borne de longueur, de 1 à 9 chiffres. Les huit derniers, sur l'état DT6-j : 8 vivants (tests
+manquants que C-5 à C-9 ajoutent).
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-l à DT6-q (2026-10-10) : réserves R-1 à R-6 du contre-contrôle du lot (lot DETTES-T6)
+
+Objet : réserves du contre-contrôle neuf (CONFORME-AVEC-RÉSERVES). Code : R-1, `status.chrony` ne convertit plus une
+partie entière de plus de `journal.CHIFFRES` chiffres (relevé illisible) : une `sante` hors FORMAT dont System time a
+4 301 chiffres faisait lever `ValueError` à `status` et `resume` (limite de `int()` ; 641 chiffres sous la plus petite
+limite), contre I-3 de STATUS-QUEUES-1. Tests : R-2 (ligne de LIMITE + 1 octets coupée, de LIMITE octets lue), R-3
+(fenêtre D-4 sans relevé récent : D-3 et D-4, triés), R-4 (l'entier 0 dans la borne « au plus 8 fois »), R-5 (Cymru :
+premier champ vide, réponse suivante lue), R-6 (code de sortie négatif : relevé illisible). Aucun test ajouté (cas dans
+des tests existants) ; FORMAT inchangé (le §17.2 exige déjà la forme `%.9f` du §13.3).
+
+Rouge : R-1, test sur le `status.py` d'avant : FAIL 1, ERROR 0 (`ValueError` rendu par `sans_attente`) ; R-2 à R-6,
+chacun sur le mutant du contre-contrôle qu'il vise (M01, M03, M07, M10, M12, vivants sur l'état DT6-k) : FAIL 1 (R-5 :
+ERROR 1, `IndexError`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/status.py` | 277 | — |
+| `tests/test_status.py` | 556 | 24 |
+| `tests/test_journal.py` | 357 | 17 |
+| `tests/test_asn.py` | 152 | 6 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : 9 mutants, 8 tués par leur test visé, 1 vivant équivalent, 0 FATAL : M01, M03, M07, M10,
+M12 ; R-1 défait, borne à 4 300 chiffres, à 641 ; borne à 639 vivante, équivalente (une sortie de chrony a 19 chiffres
+entiers au plus : `UTI_FloatNetworkToHost`).
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-t (2026-10-10) : borne exacte de R-1 figée (lot DETTES-T6)
+
+Objet : O-6 de la phase 3, adopté : R1-M4 (borne à 639 chiffres) vivait, la borne de R-1 n'étant figée qu'au-delà (641
+chiffres illisibles). Deux lignes de plus dans `test_ligne_hors_format_jamais_une_trace` (celles de l'essai de la phase
+3) : une partie entière d'exactement `journal.CHIFFRES` chiffres reste lisible sous la plus petite limite de `int()`
+(`status.chrony` ne rend pas None) ; docstring. Aucun test ajouté ; FORMAT inchangé.
+
+Rouge : sur R1-M4, vivant à l'état DT6-s : FAIL 1 (`AssertionError: unexpectedly None`) ; sur R1-M3 : FAIL 1 (cas de 641
+chiffres du même test, `ValueError`) ; vert sur le code.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_status.py` | 559 | 24 |
+
+Mutants (commande exacte du job s2bis-unittest : runner, puis ligne de `gates.yml` ; borne de 300 s ; python3.12 ;
+réseau isolé ; témoin VIVANT) : R1-M1 à R1-M4 (forme du contre-contrôleur), 4 tués par
+`test_ligne_hors_format_jamais_une_trace`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-u (2026-10-10) : `test_sante`, lecture et d3 attendues avant E (lot DETTES-T6)
+
+Objet : SHOGEN-S2BIS-TEST-SANTE-CHARGE-1 (constat E-6 du générateur de DB-1 :
+`test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null` en ERROR, `enr["d3"]` nul, une fois en 81 suites
+complètes sous charge). Mesures sur l'état DT6-r, sous 3 processus de charge (boucle Python vide ; charge moyenne sur
+1 min de 4,0 à 4,5) : 200 passages du module `test_sante`, 0 échec ; 10 000 passages du test dans un interpréteur, 2
+ERROR (`TypeError: 'NoneType' object is not subscriptable`, à `enr["d3"]["code"]`). Cause, lue au test : son `attendre`
+injecté n'attend que les deux témoins, puis avance l'horloge à E et à E + 1 ms ; un fil de d3 que la charge retarde rend
+après (non rendu au relevé, ou `fin` > E) et d3 vaut null, comme la règle `fin` > E le veut : le code est juste, le test
+ne l'était pas. Correction du test : `attendre` attend d'abord la lecture et d3 (`futurs[:2]`, borne de 5 s, celle de
+ses autres attentes) ; d3 rend 20 ms réelles après son départ (`Faux(pause=0.02)`), ce qui fige l'ordre que la charge
+défaisait. Aucun saut ; aucune borne d'attente changée.
+
+Rouge (test d'abord) : d3 lente, sans l'attente : 200 passages, 200 ERROR (`TypeError`, le symptôme du constat) ; avec
+l'attente : 200 passages, 0 échec. Sous charge, après la correction (charge moyenne de 4,5 à 4,9) : 10 000 passages du
+test, 0 échec ; 200 passages du module, 0 échec.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_sante.py` | 288 | 14 |
+
+Mutants (même commande ; témoin VIVANT) : U01 (`fin >= limite` : un témoin rendu à E vaut null), U02 (`fin > limite +
+1000`), U03 (limite des sondes prise au relevé, non à E) : 3 tués par
+`test_sonde_rendue_apres_l_echeance_avant_le_releve_vaut_null`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## DT6-v (2026-10-10) : règle `fin` > E appliquée à chaque sonde, d3 comprise (lot DETTES-T6)
+
+Objet : R-8 de la passe 2 du contre-contrôle. Le mutant V4 (d3 exemptée de la règle `fin` > E de `Sondes.joindre`)
+vivait avant comme après DT6-u : aucun test n'appliquait la règle à d3. Deux lignes de plus dans
+`test_sondes_en_parallele_arguments_et_ordre` : `joindre` avec une limite antérieure à toutes les fins nulle chaque
+sonde (d3, témoins, noms). Aucun test ajouté ; FORMAT inchangé.
+
+Rouge : sur V4, FAIL 1 ; vert sur le code ; module `test_sante` vert sous 3.10 à 3.13 en `-X dev -W error`.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_sante.py` | 290 | 14 |
+
+Mutants (commande exacte du job s2bis-unittest ; borne de 300 s ; python3.12 ; réseau isolé ; témoin VIVANT) : V4 tué
+par `test_sondes_en_parallele_arguments_et_ordre`, 0 vivant, 0 FATAL.
+
+Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).

@@ -65,6 +65,15 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Cas du lint d'épinglage sous Git Bash (Windows seul, SHOGEN-LINT-ENVIRONNEMENTS-1)
+        # Lot DETTES-T7, DT7-g (2026-10-10) : le runner du lint R-1 n'était mesuré sous Git Bash que sur le poste
+        # local ; ici, bash est celui de Git (defaults.run.shell). Plancher : 227 cas passés et aucun en échec (compte
+        # du runner au lot DETTES-T7, mesuré sous Linux) ; lecture du premier run par l'orchestrateur.
+        if: runner.os == 'Windows'
+        run: |
+          bash enforcement/tests/run-fixtures-model-pinning.sh | tee "$RUNNER_TEMP/lint-cas.txt"
+          awk '$1 == "model-pinning" && $3 >= 227 && $5 == 0 { t = 1 } END { exit !t }' "$RUNNER_TEMP/lint-cas.txt"
+
       - name: Toolchain épinglée (rust-toolchain.toml fait foi)
         run: |
           set -euo pipefail

@@ -32,7 +32,15 @@ SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i) : `suite` passe par AMORCE de VERIF, 
 (environnement inchangé : la variable scellée y reste si elle est posée) ; un run sorti en 0 est jugé sur le compte
 réel (`compte_reel`) : refus, exit 1 consigné et motif nommé en fin de sortie, que la lecture cite (refus (exit)).
 Limites : celle d'AMORCE (un test qui altère unittest dans son processus forge encore le compte) ; un enregistrement
-écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture."""
+écrit par un outil d'avant OUT-2i (`suite` par -m unittest, sans compte réel) n'est pas rejugé à la lecture.
+SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : l'extraction n'écrit ni ne hache aucun fichier d'un emplacement
+interdit des briefs (prédicat `interdit` de INTERDITS, liste unique, jamais recopiée) ; tree.exclus consigne leur
+nombre et le sha256 de leur liste triée, jamais leurs noms ; la lecture en tient compte. SHOGEN-S2BIS-ANALYSEUR-
+RESIDUS-1 (lot DETTES-T7, faille LC-03 du run 38015225784) : la ligne d'un job n'est lue que si le gates.yml n'a aucun
+résidu (`residus` de VERIF) et que le job suit la forme K (`gabarit` de VERIF, celui du cas K-02 du runner).
+SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : au dépassement, l'arbre entier de la commande est arrêté (`lancer`).
+SHOGEN-S2BIS-ENREG-ANCIEN-OUTIL-1 (lot DETTES-T7, Q-3 du générateur) : la lecture refuse (ancien outil) un run lancé
+autrement que par l'outil courant : `suite` sans amorçage (avant OUT-2i), autre commande sans -I (avant OUT-2d)."""
 from __future__ import annotations
 
 import argparse
@@ -43,9 +51,12 @@ import io
 import json
 import math
 import os
+import posixpath
 import re
+import runpy
 import secrets
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -73,8 +84,11 @@ LINT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.absp
                     "lint-model-pinning.sh")      # liste blanche des modèles : seule source de vérité, jamais recopiée
 VERIF = os.path.join(os.path.dirname(LINT), "verdict-suite-s2.py")    # analyseur unique des lignes de job, non recopié
 VERIF_COMMIT = "enforcement/verdict-suite-s2.py"     # vérificateur que lance la ligne d'un job, dans l'extraction
+INTERDITS = os.path.join(os.path.dirname(LINT), "docs-sha256sums.py")   # emplacements interdits : liste unique (DT4-a)
 DELAI_DEFAUT = 3600     # s par commande ; suite mesurée ≈ 30 s (docs/G1-partie-2-etape-B-3.md) : garde de blocage
 EXIT_DELAI = 124        # exit consigné au dépassement du délai (convention de timeout(1), GNU coreutils)
+RELIQUAT = 5            # s de lecture après l'arrêt de l'arbre au délai ; au-delà, un descendant détaché qui garde le
+                        # tuyau n'est plus attendu (DELAI-ARBRE-1, relecture G2 du lot DETTES-T7, C-2)
 COMPILES = (".pyc", ".pyo", ".so", ".pyd", *importlib.machinery.EXTENSION_SUFFIXES)     # règle de `compiles` de VERIF
 
 
@@ -193,13 +207,20 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     N », une seule fois dans les blocs `run:` des étapes admises du job, lue par `lignes_du_job` de VERIF (étapes
     `if:` et `continue-on-error` exclues, `name: >` jamais lu). Job absent, ligne absente ou répétée, analyseur
     illisible, plancher 0 ou à zéro de tête (N suit `[1-9][0-9]*`, comme K-02 du runner : C-5 (a) de la relecture
-    d'intégration de P1) : ValueError (refus). Toute exception au chargement est rattrapée et nommée (OUT-1b)."""
+    d'intégration de P1) : ValueError (refus). Toute exception au chargement est rattrapée et nommée (OUT-1b).
+    ANALYSEUR-RESIDUS-1 : avant toute lecture, `residus` de VERIF vide (N-12, N-14, LC-02, LC-13) et job à la forme K
+    (`gabarit` de VERIF) ; sinon refus qui nomme chaque écart."""
     try:
         with open(os.path.join(arbre, GATES), encoding="utf-8") as f:
             texte = f.read()
     except BaseException as e:
         raise ValueError(f"{GATES} de l'extraction illisible ({e!r}) — refus") from e
     analyseur = charger_verif()
+    ecarts = analyseur.residus(texte) + ([] if analyseur.gabarit(texte, job) else [
+        "forme K : lignes du job hors du gabarit de VERIF (cas K-02 du runner : name, runs-on, timeout-minutes, steps, "
+        "checkout épinglé, runner, étape du vérificateur puis son seul bloc)"])
+    if ecarts:
+        raise ValueError(f"job {job} de {GATES} : {' ; '.join(ecarts)} — refus")
     motif = ("python3 -B enforcement/verdict-suite-s2[.]py " + re.escape(suite)
              + " --aucun-saut --egal --plancher [1-9][0-9]*")      # C-5 (a) : plancher 0 refusé, comme K-02
     trouves = analyseur.lignes_du_job(texte, job, motif)
@@ -210,30 +231,108 @@ def ligne_du_job(arbre: str, job: str, suite: str) -> list:
     return trouves[0].split()[1:]
 
 
-def extraire(depot: str, sha: str, arbre: str) -> dict:
-    """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend {chemin : sha256} par
-    fichier."""
-    with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
+def arreter(groupes):
+    """Groupes de processus `groupes` arrêtés (SIGKILL), jamais celui de l'outil ni 0 ou 1 ; déjà vides : rien
+    (POSIX)."""
+    for g in {x for x in groupes if x > 1} - {os.getpgrp()}:
         try:
-            t.extractall(arbre, filter="data")
+            os.killpg(g, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+
+
+def groupes(racine: int) -> set:
+    """Groupe de `racine` et groupes de tous ses descendants vivants, lus par `ps -A -o pid=,ppid=,pgid=` (champs
+    POSIX) : un descendant parti dans sa propre session (la suite du vérificateur) est suivi par son parent ; ps
+    illisible : le seul groupe de `racine`."""
+    try:
+        t = [tuple(map(int, x.split())) for x in subprocess.run(["ps", "-A", "-o", "pid=,ppid=,pgid="],
+                                                                capture_output=True, text=True).stdout.splitlines()]
+    except (OSError, ValueError):
+        return {racine}
+    arbre, plus = {racine}, None
+    while plus != set():
+        plus = {x[0] for x in t if len(x) == 3 and x[1] in arbre} - arbre
+        arbre |= plus
+    return {racine} | {x[2] for x in t if len(x) == 3 and x[0] in arbre}
+
+
+def lancer(cmd: list, cwd: str, delai: float, entree) -> tuple:
+    """SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : (octets, code ; None au dépassement) de `cmd`, lancée dans un
+    groupe de processus neuf (POSIX : start_new_session ; Windows : CREATE_NEW_PROCESS_GROUP), `entree` sur stdin
+    (None : vide). Au dépassement, l'arbre entier est arrêté (POSIX : `groupes` ; Windows : taskkill /T /F), aucun
+    descendant ne garde le tuyau ; à la sortie, son groupe l'est aussi (descendant resté : fork), avant tout nettoyage
+    (POSIX ; sous Windows, rien après la sortie : PID réemployés). C-2 (G2) : après l'arrêt au délai, la sortie n'est
+    plus lue que RELIQUAT s ; un descendant détaché de l'arbre (double fork, setsid) qui garde le tuyau n'est pas
+    attendu au-delà. Réserve R-3 du contre-contrôle : l'enfant direct est alors tué avant d'être attendu, même si
+    l'arrêt de l'arbre a échoué (taskkill refusé) : aucune attente sans borne."""
+    p = subprocess.Popen(cmd, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         start_new_session=True, creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0))
+    try:
+        return p.communicate(entree, timeout=delai)[0], p.returncode
+    except subprocess.TimeoutExpired:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True)
+        else:
+            arreter(groupes(p.pid))
+        try:
+            return p.communicate(timeout=RELIQUAT)[0], None
+        except subprocess.TimeoutExpired as e:      # C-2 : descendant détaché, hors de l'arbre, qui garde le tuyau
+            p.stdin.close()
+            p.stdout.close()
+            p.kill()                                # R-3 : l'enfant direct, même si l'arrêt de l'arbre a échoué
+            p.wait()
+            return e.output or b"", None
+    finally:
+        if os.name != "nt":
+            arreter({p.pid})
+
+
+def interdit():
+    """SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : prédicat `interdit` de INTERDITS (préfixes des
+    emplacements interdits des briefs, tout composant en .jsonl, casse pliée), exécuté depuis sa source, jamais
+    recopié ; toute exception au chargement : ValueError (refus)."""
+    try:
+        return runpy.run_path(INTERDITS, run_name="docs_sha256sums")["interdit"]
+    except BaseException as e:                     # comme charger_verif : SystemExit comprise
+        raise ValueError(f"emplacements interdits {INTERDITS} illisibles ({e!r}) — refus") from e
+
+
+def resume(exclus: list) -> dict:
+    """tree.exclus : nombre de chemins exclus et sha256 de leur liste triée (un par ligne), jamais leurs noms."""
+    return {"nombre": len(exclus), "sha256": hashlib.sha256(chr(10).join(exclus).encode()).hexdigest()}
+
+
+def extraire(depot: str, sha: str, arbre: str) -> tuple:
+    """`git archive` de `sha` extrait dans `arbre` sous le filtre data de tarfile ; rend ({chemin : sha256} par
+    fichier extrait, chemins exclus triés). EXTRACTION-INTERDITS-1 : un membre d'un emplacement interdit, ou un lien
+    qui y mène (vers un fichier, ou vers le dossier lui-même : C-3 de la G2), n'est ni écrit ni haché."""
+    exclu, garde, hors = interdit(), [], []
+    with tarfile.open(fileobj=io.BytesIO(git(depot, "archive", "--format=tar", sha))) as t:
+        for m in t.getmembers():
+            cible = posixpath.normpath(posixpath.join(posixpath.dirname(m.name), m.linkname)) if m.issym() else ""
+            (hors if exclu(m.name + "/" * m.isdir()) or cible and (exclu(cible) or exclu(cible + "/")) else garde
+             ).append(m)
+        try:
+            t.extractall(arbre, members=garde, filter="data")
         except tarfile.FilterError as e:
             raise ValueError(f"extraction de {sha} rejetée par le filtre data de tarfile ({e}) — refus") from e
     return {os.path.relpath(os.path.join(d, f), arbre).replace(os.sep, "/"): sha256_fichier(os.path.join(d, f))
-            for d, _sous, fs in os.walk(arbre) for f in fs}
+            for d, _sous, fs in os.walk(arbre) for f in fs}, sorted(m.name for m in hors if not m.isdir())
 
 
-def ecarts_arbre(depot: str, commit: str, consignes) -> list:
-    """Chemins dont le sha256 de la ré-extraction de `commit` diffère de `consignes` (fichiers en trop ou en moins
-    compris) ; ré-extraction impossible : un écart unique qui la nomme."""
+def ecarts_arbre(depot: str, commit: str, consignes) -> tuple:
+    """(chemins dont le sha256 de la ré-extraction de `commit` diffère de `consignes`, fichiers en trop ou en moins
+    compris ; `resume` de ses exclus) ; ré-extraction impossible : un écart unique qui la nomme, et None."""
     arbre = tempfile.mkdtemp(prefix="oracle_")
     try:
-        h = extraire(depot, commit, arbre)
+        h, x = extraire(depot, commit, arbre)
     except (ValueError, OSError, subprocess.CalledProcessError) as e:
-        return [f"ré-extraction impossible ({e})"]
+        return [f"ré-extraction impossible ({e})"], None
     finally:
         shutil.rmtree(arbre)
     t = consignes if isinstance(consignes, dict) else {}
-    return sorted(k for k in set(h) | set(t) if h.get(k) != t.get(k))
+    return sorted(k for k in set(h) | set(t) if h.get(k) != t.get(k)), resume(x)
 
 
 def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, commandes=("suite",), base=None,
@@ -267,7 +366,7 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     nom = f"shogen-{sha[:7]}-{role}-{maintenant:%Y%m%dT%H%M%SZ}-{os.getpid()}"
     arbre, runs = tempfile.mkdtemp(prefix="oracle_"), []
     try:
-        hashes = extraire(depot, sha, arbre)
+        hashes, exclus = extraire(depot, sha, arbre)
         lignes = {c: ligne_du_job(arbre, *JOBS[c]) for c in commandes if c in JOBS}     # refus avant tout run
         if lignes and hashes.get(VERIF_COMMIT) != sha256_fichier(VERIF):              # OUT-1b : leurre L2
             raise ValueError(f"vérificateur du commit {VERIF_COMMIT} (sha256 {hashes.get(VERIF_COMMIT)}) autre que "
@@ -289,13 +388,12 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
             sortie = f"{nom}.{i}-{c}.out"
             n, t = (secrets.token_hex(16), tempfile.mkdtemp(prefix="oracle_compte_")) if c == "suite" else (None, None)
             try:                                     # OUT-2i : nonce et dossier du compte sur stdin, comme le job
-                p = subprocess.run(cmd, cwd=os.path.join(arbre, sous), stdout=subprocess.PIPE,
-                                   stderr=subprocess.STDOUT, timeout=delai, input=n and f"{n} {t}{chr(10)}".encode())
-                octets, code = compte_reel(verif, p.stdout, t, n) if n and p.returncode == 0 else (p.stdout,
-                                                                                                    p.returncode)
-            except subprocess.TimeoutExpired as e:
-                octets, code = (e.stdout or b"") + (f"\n[oracle_record] délai maximal de {delai:g} s dépassé : "
-                                                    f"commande arrêtée, exit {EXIT_DELAI}\n").encode(), EXIT_DELAI
+                octets, code = lancer(cmd, os.path.join(arbre, sous), delai, n and f"{n} {t}{chr(10)}".encode())
+                if code is None:                     # DELAI-ARBRE-1 : l'arbre entier est arrêté
+                    octets, code = octets + (f"{chr(10)}[oracle_record] délai maximal de {delai:g} s dépassé : "
+                                             f"commande arrêtée, exit {EXIT_DELAI}{chr(10)}").encode(), EXIT_DELAI
+                elif n and code == 0:
+                    octets, code = compte_reel(verif, octets, t, n)
             finally:
                 if t:
                     shutil.rmtree(t, ignore_errors=True)
@@ -310,7 +408,8 @@ def enregistrer(dossier: str, role: str, auteur: str, depot: str, commit: str, c
     finally:
         shutil.rmtree(arbre)
     rec = {"schema": SCHEMA, "role": role, "auteur": auteur, "base": base, "static_only": False, "served_from": None,
-           "tree": {"commit": sha, "extraction": f"git archive {sha}", "sha256": dict(sorted(hashes.items()))},
+           "tree": {"commit": sha, "extraction": f"git archive {sha}", "sha256": dict(sorted(hashes.items())),
+                    "exclus": resume(exclus)},
            "python": sys.version, "env": consigne(os.environ), "runs": runs,
            "exit": 0 if all(r["exit"] == 0 for r in runs) else 1, "ecrit": f"{maintenant:%Y-%m-%dT%H:%M:%SZ}",
            "paquet": {"sha256": paquet_sha256}, "sceau": {"genTime": sceau_gentime}}
@@ -347,7 +446,8 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     sha256 de chaque sortie recalculé,
     masque (OUT-2f : tree.sha256 sans entrée au nom d'un module standard à la racine de la suite d'un run, s2-harness
     pour `suite` et la production, dossier de la suite pour JOBS, ni fichier compilé), paquet.sha256 et runs (suite,
-    puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, served_from nul, ou
+    puis PRODUCTION, dans l'ordre ; G2, C-6) au rôle « rendu » ou champs nuls hors de ce rôle, ancien outil
+    (ANCIEN-OUTIL-1 : `suite` lancée par -c, l'amorçage ; toute autre commande de COMMANDES par -I), served_from nul, ou
     chemin et sha256 d'un enregistrement conforme aux mêmes contrôles (même dépôt). Rend l'enregistrement."""
     def exige(ok, controle, detail=""):
         if not ok:
@@ -357,8 +457,9 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
             rec = json.load(f)
     except (OSError, ValueError):
         rec = None
-    exige(cles(rec, CHAMPS) and cles(rec["tree"], ("commit", "extraction", "sha256")) and cles(rec["paquet"], [
-        "sha256"]) and cles(rec["sceau"], ["genTime"]) and isinstance(rec["runs"], list) and all(
+    exige(cles(rec, CHAMPS) and cles(rec["tree"], ("commit", "extraction", "sha256", "exclus")) and cles(
+        rec["tree"]["exclus"], ("nombre", "sha256")) and cles(rec["paquet"], ["sha256"]) and cles(rec["sceau"], [
+            "genTime"]) and isinstance(rec["runs"], list) and all(
         cles(r, RUN) and cles(r["sortie"], ("chemin", "sha256")) for r in rec["runs"]), "champs")
     exige(rec["schema"] == SCHEMA, "schema")
     exige(rec["role"] == role, "rôle", f" : {rec['role']!r}, attendu {role!r}")
@@ -372,9 +473,15 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
     if any(r["nom"] in tuple(JOBS) for r in rec["runs"]):     # OUT-1b : vérificateur lancé par la ligne du job
         v = rec["tree"]["sha256"].get(VERIF_COMMIT) if isinstance(rec["tree"]["sha256"], dict) else None
         exige(v == sha256_fichier(VERIF), "vérificateur", f" : {VERIF_COMMIT} {v!r}, attendu le sha256 de {VERIF}")
+    try:                                             # EXTRACTION-INTERDITS-1 : aucun chemin interdit haché
+        n = sum(map(interdit(), rec["tree"]["sha256"])) if isinstance(rec["tree"]["sha256"], dict) else 0
+    except ValueError as e:
+        exige(False, "exclus", f" : {e}")
+    exige(not n, "exclus", f" : {n} chemin(s) d'un emplacement interdit dans tree.sha256 (noms non imprimés)")
     if depot is not None:
-        e = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
+        e, x = ecarts_arbre(depot, commit, rec["tree"]["sha256"])
         exige(not e, "tree.sha256", f" : {e[:3]}{' …' if len(e) > 3 else ''} (ré-extraction depuis {depot})")
+        exige(x == rec["tree"]["exclus"], "exclus", f" : {rec['tree']['exclus']!r}, ré-extraction {x}")
     exige(rec["static_only"] is False, "static_only")
     racine = os.path.dirname(os.path.abspath(chemin))
     ko = [f"{r['nom']} exit {r['exit']!r}{fin_nommee(os.path.join(racine, str(r['sortie']['chemin'])))}"
@@ -395,6 +502,11 @@ def verifier(chemin: str, role: str, commit: str, depot=None) -> dict:
         exige(noms == ["suite", *PRODUCTION], "runs", f" : {noms}, attendu {['suite', *PRODUCTION]}")
     else:
         exige((rec["paquet"]["sha256"], rec["sceau"]["genTime"]) == (None, None), "nuls hors rendu")
+    vieux = [r["nom"] for r in rec["runs"] if not isinstance(r["commande"], list) or (
+        r["commande"][1:3] != ["-B", "-c"] if r["nom"] == "suite" else r["nom"] in COMMANDES and r["commande"][1:2] != [
+            "-I"])]                                  # ANCIEN-OUTIL-1 : forme des commandes depuis OUT-2d et OUT-2i
+    exige(not vieux, "ancien outil", f" : {vieux[:3]} lancé(s) sans l'amorçage (suite, OUT-2i) ou sans -I (OUT-2d) : "
+          "enregistrement d'un outil antérieur, à refaire avec l'outil courant")
     sf = rec["served_from"]
     if sf is not None:
         p = os.path.join(racine, str(sf.get("chemin"))) if isinstance(sf, dict) else ""

@@ -128,6 +128,20 @@ class RunnersEpingles(unittest.TestCase):
                                capture_output=True, text=True, timeout=20)
             self.assertEqual(p.returncode, 0, p.stderr)
 
+    def test_libelle_long_en_temps_lineaire(self):
+        """SHOGEN-RUNNERS-FLOTTANT-QUADRATIQUE-1 (lot DETTES-T15) : une longue suite de caractères de libellé sans
+        `-latest` refusable se juge en temps borné (l'ancienne forme de FLOTTANT y était quadratique : relecture G2 du
+        correctif DT5-24, O-5) ; une suite qui finit par `-latest` reste refusée, d'un seul jeton."""
+        n = 200000
+        for valeur, code in (("a" * n, 0), ("-" * n, 0), ("a1_.-" * (n // 5), 0), ("-latestx" * (n // 8), 0),
+                             ("x" * n + "-latest", 1)):
+            try:
+                p = subprocess.run([sys.executable, "-B", SCRIPT, self.arbre({"w.yml": "    runs-on: " + valeur + NL})],
+                                   capture_output=True, text=True, timeout=20)
+            except subprocess.TimeoutExpired:
+                self.fail(f"plus de 20 s pour {valeur[:16]!r}… ({len(valeur)} caractères)")
+            self.assertEqual((p.returncode, p.stderr.count("image flottante")), (code, code), valeur[:16])
+
     def test_erreurs_sortie_3(self):
         """Racine sans .github/workflows, arguments en trop ou absents, workflow illisible (UTF-8 invalide) : 3."""
         vide = tempfile.mkdtemp()

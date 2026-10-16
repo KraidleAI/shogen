@@ -14,6 +14,7 @@ import time
 import urllib.request
 import zipfile
 
+import bougies
 import socle
 
 NL, TAB = chr(10), chr(9)
@@ -76,26 +77,30 @@ def lire_url(prm: dict, url: str, plage=None, total=False):
     raise socle.Refus("CA/acquisition", f"téléchargement impossible ({erreur})")
 
 
-def mois(fen: dict) -> list:
-    """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre ; rang du mois borné (la boucle finit)."""
-    a, b = (datetime.datetime.fromtimestamp(x, datetime.timezone.utc) for x in (fen["debut"], fen["fin"] - 60))
-    return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in range(12 * a.year + a.month - 1, 12 * b.year + b.month)]
+def mois(fen: dict, voisins: int = 0) -> list:
+    """Mois (AAAA-MM) couverts par la fenêtre [debut ; fin), dans l'ordre, et `voisins` mois de chaque côté (OKX :
+    mensuels découpés en UTC+8, établi sur pièce, fuseau des dates écrit par la documentation détenue ; voisins
+    gardés, DECISION de FORMES-API-1 pt 4) ; rang du mois borné."""
+    return [f"{k // 12:04d}-{k % 12 + 1:02d}" for k in socle.rangs_mois(fen, voisins)]
 
 
 def mensuels(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str) -> None:
     """Fichiers mensuels d'une (place, actif) : Binance avec son .CHECKSUM (sha256 différent : CA/acquisition, E-CA-13),
-    OKX sans somme publiée."""
+    OKX sans somme publiée ; mois voisins de parametres.json (minutes hors fenêtre écartées au chargement)."""
     s = prm["series"][place]
-    for m in mois(fen):
+    for m in mois(fen, s["voisins"]):
         url = s["url"].format(s=s["paires"][actif], m=m, mm=m.replace("-", ""))
         rel = os.path.join(nom, place, actif, url.rsplit("/", 1)[1])
         if man.present(rel):
             continue
-        octets = lire_url(prm, url)
-        if s["acces"] == "mensuel_checksum":
-            somme = lire_url(prm, url + ".CHECKSUM").decode("ascii", "replace").split(" ")[0]
-            if somme != hashlib.sha256(octets).hexdigest():
-                raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
+        try:                                                        # C-2 de la G2 : refus nommé par le mois
+            octets = lire_url(prm, url)
+            somme = lire_url(prm, url + ".CHECKSUM") if s["acces"] == "mensuel_checksum" else None
+        except socle.Refus as r:
+            raise socle.Refus("CA/acquisition", f"mensuel {m} non obtenu ({str(r).split(' : ', 1)[1]}) ; un mensuel "
+                              "n'est publié qu'après la fin de son mois", actif, place=place) from None
+        if somme is not None and somme.decode("ascii", "replace").split(" ")[0] != hashlib.sha256(octets).hexdigest():
+            raise socle.Refus("CA/acquisition", "sha256 différent du .CHECKSUM publié", actif, place=place)
         man.ajouter(url, rel, octets)
 
 
@@ -163,19 +168,40 @@ def iso(t: int) -> str:
     return datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str, debit: Debit) -> None:
-    """API paginée d'une (place, actif) : pages de `pas` minutes, dernière minute incluse et bornée à la fenêtre
-    (aucune bougie demandée hors fenêtre) ; une page par fichier page-<début>.json ; reprise sur le manifeste."""
-    s, pas = prm["series"][place], prm["series"][place]["pas"]
-    for debut in range(fen["debut"], fen["fin"], 60 * pas):
-        fin = min(debut + 60 * (pas - 1), fen["fin"] - 60)
-        rel = os.path.join(nom, place, actif, f"page-{debut}.json")
-        if man.present(rel):
-            continue
-        url = s["url"].format(s=s["paires"][actif], debut=debut, fin=fin, n=(fin - debut) // 60 + 1,
-                              debut_ms=debut * 1000, fin_ms=fin * 1000, debut_iso=iso(debut), fin_iso=iso(fin))
+def requete(prm: dict, man: Manifeste, rel: str, place: str, actif: str, a: int, b: int, debit: Debit) -> None:
+    """Requête [a ; b] d'une place paginée vers rel, au débit de la place ; reprise sur le manifeste."""
+    s = prm["series"][place]
+    if not man.present(rel):
+        url = s["url"].format(s=s["paires"][actif], debut=a, fin=b, n=(b - a) // 60 + 1, debut_ms=a * 1000,
+                              fin_ms=b * 1000, debut_iso=iso(a), fin_iso=iso(b))
         debit.attendre(place, s["intervalle_ms"])
         man.ajouter(url, rel, lire_url(prm, url))
+
+
+def pages(prm: dict, man: Manifeste, nom: str, fen: dict, place: str, actif: str, debit: Debit) -> None:
+    """API paginée d'une (place, actif) : découpage de socle.pages (requête de départ à borne, `pas` bougies au plus,
+    chevauchement de chaque côté ; la première et la dernière peuvent demander une minute hors fenêtre, écartée au
+    chargement) ; une page par fichier page-<début>.json ; reprise sur le manifeste. C-8 : page suspecte de
+    troncature (bougies.suspecte) redemandée en deux demi-pages (socle.demis), page-<début>.1.json et .2.json. C-13 :
+    puis le second découpage (socle.doubles), double-<début>.json, de même. C-15 : puis les sondes de première bougie
+    (socle.sonde), sonde-<x>.json, en couverture double."""
+    s = prm["series"][place]
+    for prefixe, debut, fin, depart, borne in ([("page", *x) for x in socle.pages(prm, place, fen)]
+                                               + [("double", *x) for x in socle.doubles(prm, place, fen)]):
+        rel = os.path.join(nom, place, actif, f"{prefixe}-{debut}.json")
+        requete(prm, man, rel, place, actif, depart, borne, debit)
+        with open(os.path.join(man.bruts, rel), "rb") as f:
+            suspecte = bougies.suspecte(s["format"], f.read(), s["pas"], depart, fin - 60)
+        for k, (a, b, _d) in enumerate(socle.demis(prm, place, depart, borne, fin) if suspecte else (), 1):
+            requete(prm, man, f"{rel[:-5]}.{k}.json", place, actif, a, b, debit)
+
+    def vide(x):                                                    # C-15 : sonde de première bougie
+        rel = os.path.join(nom, place, actif, f"sonde-{x}.json")
+        requete(prm, man, rel, place, actif, x, x + 60 * (s["pas"] // 2 - 1), debit)
+        with open(os.path.join(man.bruts, rel), "rb") as f:
+            return not bougies.instants(s["format"], f.read(), [])          # illisible : arrêt (refus au chargement)
+    if s["couverture"] == 2:
+        socle.sonde(prm, place, fen, vide)
 
 
 def main(argv=None, env=None) -> int:

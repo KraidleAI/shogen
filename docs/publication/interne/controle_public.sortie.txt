@@ -1,12 +1,13 @@
 === Contrôle du brouillon public (lot DOCS11-PUBLIC) ===
-source    : /home/user/shogen/docs/11-mesures-pilotes.md
+source    : ../../11-mesures-pilotes.2db4f40.md
             sha256 fcf93b87f95eb793d565232cb488ccffc504ae7cb9fe045cee737c6e876353b7
-brouillon : 11-mesures-pilotes-public.md
-            sha256 c101998bb0bb9ea7107475f8c42b0f450f835ec6dfadfae8246ff86f15d16561
+brouillon : ../11-mesures-pilotes-public.md
+            sha256 5de6e716ca38b20a6a976252f0cf5fd034c550e8d04afc053e1817ea081908b6
 table     : TABLE-CORRESPONDANCE.md
-            sha256 d78b65fdb19e17774cbcd0466311065a47a4aa8490c60be758a591b1c76040ec
+            sha256 ee8f87a40c12aab334c84fc8b6de77c413d92e48e4b2973674e4c3e83c17b5e2
 
 --- 1. Nombres (aucun inventé, aucun ajouté) ---
+  contrat amendé le 2026-10-15 (adjudication, décision 2) : ajouts datés exclus du compte : E-24 (2026-10-15), E-25 (2026-10-15), E-26 (2026-10-15) ; mentions de date exclues : E-28
   composite : source 1051 distincts / 2564 occurrences ; brouillon 1047 distincts / 2557 occurrences
   groupe : source 44 distincts / 66 occurrences ; brouillon 44 distincts / 66 occurrences
   chiffres : source 814 distincts / 3859 occurrences ; brouillon 811 distincts / 3851 occurrences
@@ -126,10 +127,10 @@ table     : TABLE-CORRESPONDANCE.md
 
 --- 5. Sections modifiées contre sections déclarées par la table ---
   sections de la source : 58 ; du brouillon : 58
-  modifiées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
-  déclarées : 1, 10.1, 10.2, 12, 2.4, 2.7, 6, 7.4, 8.3, 8.9, 9.3, titre
-  sections identiques à l'octet : 46 sur 58
-  rejeu de la table sur la source (20 retouches, chacune exactement une fois) : brouillon identique à l'octet
+  modifiées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Conventions de lecture et lexique, titre
+  déclarées : 1, 10.1, 10.2, 12, 2.1, 2.4, 2.7, 4.1, 4.2, 6, 7.4, 7.5, 8.3, 8.9, 9.3, Conventions de lecture et lexique, titre
+  sections identiques à l'octet : 41 sur 58
+  rejeu de la table sur la source (28 retouches, chacune exactement une fois) : brouillon identique à l'octet
   => OK
 
 --- 6. Structure ---

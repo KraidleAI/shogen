@@ -1,0 +1,13 @@
+2026-10-10T03:52:09.4679414Z ##[group]Runner Image
+2026-10-10T03:52:09.4680022Z Image: ubuntu-24.04
+2026-10-10T03:52:09.4680647Z Version: 20261004.327.1
+2026-10-10T03:52:09.4681887Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-10T03:52:09.4683534Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261004.327
+2026-10-10T03:55:24.7735041Z --- distillation du corpus de fuzz (13 §7 dette 3) ---
+2026-10-10T03:55:24.7735797Z   arêtes, corpus sans graines distillées : 1346
+2026-10-10T03:55:24.7736208Z   arêtes, corpus entier                  : 2090
+2026-10-10T03:55:24.7736568Z   E, apport du corpus dérivé             : 1073
+2026-10-10T03:55:24.7738997Z   arêtes de la base perdues (attendu 0)  : 0
+2026-10-10T03:55:24.7739854Z   arêtes gagnées : 744, dont dans E : 718 ; seuil 641 = ⌈1073 × 471/789⌉
+2026-10-10T03:55:24.7740460Z   VERDICT : VERT
+job 114124946416, run 38022048234, tête 0e03a9f, fusion de test 405b708 ; journal complet sha256 7f57a52e8122702c50fcc24bd09458ba5fde790b631d612a66cc8968bdeab360

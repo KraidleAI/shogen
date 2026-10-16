@@ -1,0 +1,8 @@
+job 114124946382 (g1-model-pinning), run 38022048420, tête 0e03a9f, fusion de test 405b708, 2026-10-10 03:51:57 UTC
+Runner Image : ubuntu-24.04, Version 20261004.327.1 ; ImageOS=ubuntu24 ImageVersion=20261004.327.1 ; Ubuntu 24.04.5 LTS
+locale : LANG=C.UTF-8, LC_*="C.UTF-8", LC_ALL vide
+python3 : Python 3.12.3
+awk : /usr/bin/gawk ; GNU Awk 5.2.1, API 3.2, PMA Avon 8-g1, (GNU MPFR 4.2.1, GNU MP 6.3.0)
+python3-yaml : 6.0.1-2build2 déjà installé (branche « dpkg-query égal », aucune installation) ; PyYAML lu : /usr/lib/python3/dist-packages/yaml/__init__.py
+runners-epingles : conforme (7 workflow(s), 22 clé(s) runs-on/os lues) ; workflows-yaml : 16 ok, conforme (7 workflows, PyYAML 6.0.1)
+model-pinning : 227 ok ; lint R-1 OK ; journaux-modele conforme ; docs-sha256sums conforme (38 SHA256SUMS, 310 lignes)

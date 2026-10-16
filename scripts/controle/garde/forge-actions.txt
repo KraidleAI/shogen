@@ -1,0 +1,6 @@
+# Marqueur de la forge (crochet GARDE-FAITS du dépôt, R8 ; erreur E20 ; lot GARDE-FOUS-ORCH, phase 2) : une ligne
+# owner/repo AAAA-MM-JJ <id> par constat que la forge lance des jobs sur ce dépôt (run conclu success, job à runner_id
+# non nul), datée du jour du constat (date -u) ; <id> est l'identifiant du run lu dans le résultat de
+# mcp__github__actions_list (ou gh run, gh api) du même dépôt, au journal de la session (G2, C-4) : une ligne d'un
+# autre jour, sans identifiant, ou dont l'identifiant ne figure dans aucune preuve d'un journal de la session, ne vaut
+# rien. Sans ligne valide, la preuve se lit au journal de l'agent qui crée la PR.

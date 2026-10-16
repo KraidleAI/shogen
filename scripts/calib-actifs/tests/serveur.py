@@ -1,8 +1,9 @@
 """Serveur local de fichiers synthétiques des tests d'acquisition (127.0.0.1, port libre) : GET d'un chemin
 (requête comprise) servi depuis le dict `fichiers` ; en-tête Range « bytes=a-b » servi en 206 ; `pannes[chemin]`
 réponses 500 avant de servir ; `sans_plage` : 200 et tout le corps ; `longs[chemin]` : un octet de trop sous ce
-rang ; `defaut` : corps de tout chemin absent (sinon 404) ; requêtes notées dans `vus`. Aucun accès hors de la
-boucle locale."""
+rang ; `defaut` : corps de tout chemin absent (sinon 404) ; `fonction` : corps calculé depuis le chemin (None : 404),
+à la place de `fichiers` (pages simulées, DETTES-T2) ; requêtes notées dans `vus`. Aucun accès hors de la boucle
+locale."""
 import http.server
 import threading
 
@@ -10,13 +11,14 @@ import threading
 class Serveur:
     def __init__(self, fichiers: dict, pannes=None, sans_plage=(), longs=None):
         self.fichiers, self.pannes, self.vus, self.sans_plage = fichiers, dict(pannes or {}), [], sans_plage
-        self.octets, self.longs, self.defaut = 0, longs or {}, None
+        self.octets, self.longs, self.defaut, self.fonction = 0, longs or {}, None, None
         serveur = self
 
         class Gestion(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
                 serveur.vus.append(self.path)
-                corps = serveur.fichiers.get(self.path, serveur.defaut)
+                corps = (serveur.fonction(self.path) if serveur.fonction else
+                         serveur.fichiers.get(self.path, serveur.defaut))
                 if corps is None or serveur.pannes.get(self.path, 0) > 0:
                     if corps is not None:
                         serveur.pannes[self.path] -= 1

@@ -19,6 +19,14 @@
 //! local plus large que le corpus CI, et les rares citations que
 //! l'extraction perd (ligature sans mapping) vivent à l'INDEX.
 //!
+//! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1 ; DT15-g) :
+//! une page HTML ou Markdown entre au corpus sans ce qu'elle ne donne jamais à
+//! lire — commentaires `<!-- … -->` et factices (`<!…>`, `</…>`, DT15-h),
+//! instructions de traitement (`<?…>`, DT15-h), contenu des éléments `script`
+//! et `style` —, ôté avant le débalisage : une
+//! citation d'un texte retiré d'une page, resté en commentaire ou dans un
+//! script, est introuvable.
+//!
 //! **La leçon de couverture, assumée en deux régimes** : le régime est
 //! détecté en comparant les octets présents au **compte déclaré à
 //! l'en-tête d'INDEX** (revue G2 du 2026-08-13, bloquante 1b — l'ancienne
@@ -77,6 +85,12 @@ const OCCURRENCES_MINIMALES: usize = 2;
 const EXTENSIONS_TEXTE: &[&str] = &[
     "html", "htm", "txt", "md", "sidecar", "json", "xml", "rs", "toml", "yml", "yaml", "lock",
 ];
+
+/// Extensions des pages rendues (HTML, et Markdown, dont le rendu cache aussi
+/// ces constructions) : ce qu'elles ne donnent jamais à lire sort du corpus
+/// (`retirer_non_affiche`). Ailleurs (texte brut, code, données), `<` n'ouvre
+/// rien.
+const EXTENSIONS_RENDUES: &[&str] = &["html", "htm", "md"];
 
 /// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
 /// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
@@ -176,7 +190,12 @@ pub fn executer(racine: &Path) -> Rapport {
                 }
                 match std::fs::read(&chemin) {
                     Ok(brut) => {
-                        let texte = String::from_utf8_lossy(&brut);
+                        let brut = String::from_utf8_lossy(&brut);
+                        let texte = if EXTENSIONS_RENDUES.contains(&extension.as_str()) {
+                            retirer_non_affiche(&brut)
+                        } else {
+                            brut.into_owned()
+                        };
                         let depagine = retirer_pagination_rfc(&texte);
                         corpus.push(normaliser_pour_recherche(&retirer_balises(&depagine)));
                         octets_presents = octets_presents.saturating_add(1);
@@ -400,27 +419,321 @@ fn retirer_pagination_rfc(texte: &str) -> String {
         .join("\n")
 }
 
-/// Retire les balises `<…>` d'un texte de corpus HTML : une citation d'une
-/// page détenue traverse souvent une balise d'emphase en plein milieu de
-/// phrase. Appliqué au corpus seulement — jamais aux aiguilles.
+/// Ôte d'une page ce qu'elle ne donne jamais à lire, en un balayage de gauche
+/// à droite comme la tokenisation HTML (WHATWG) : commentaires
+/// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices et instructions de
+/// traitement (DT15-h), éléments `script` et `style` jusqu'à la fermante qui
+/// les clôt (DT15-g), et tout ce qui suit `<frameset>` (contre-contrôle de
+/// DETTES-T15, R-4). Une balise
+/// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
+/// d'attribut n'ouvre rien (DT15-k). Un élément de texte brut (`TEXTE_BRUT`)
+/// bascule la tokenisation selon la construction de l'arbre, que cette lecture
+/// ne suit pas : élément HTML, son contenu est du texte, où un `<!--` ou un
+/// `<script` n'ouvre rien (relecture G2, C-6) ; même nom dans un contenu SVG ou
+/// MathML, ou balise que la construction ignore, il reste au balisage. La page
+/// est lue trois fois (`Lecture`) et garde ce que les trois lectures gardent
+/// (contre-contrôle de DETTES-T15, R-3) : jamais plus que la série sans C-6, ni
+/// que C-6. Ce qu'un script ou une interaction peut montrer (`template`,
+/// `noscript`, attribut `hidden`, CSS) reste. Lecture sans analyseur : texte
+/// ôté en trop (bloc de code Markdown, balise ou ouvreur écrits dans un
+/// `textarea` ou un `title`), jamais gardé en trop, hors de trois cas. Un
+/// contenu SVG ou MathML, lu ici comme du HTML (un `</script` ou un `</style`
+/// écrit dans un commentaire, une section CDATA ou une valeur d'attribut à
+/// l'intérieur d'un tel script ou style l'y clôt trop tôt) ; un élément de texte
+/// brut HTML écrit dans le `title` d'un SVG, point d'intégration, y est lu comme
+/// du balisage. Un
+/// ouvreur écrit dans un extrait ou un bloc de code Markdown, que le rendu
+/// affiche, et dont la fin tomberait dans une construction vraie. Le texte d'un
+/// `iframe`, d'un `noembed` ou d'un `noframes` hors d'une page à cadres, que la
+/// page n'affiche pas. Temps linéaire (trois balayages).
+/// Appliqué au corpus seulement, avant le débalisage.
+fn retirer_non_affiche(texte: &str) -> String {
+    let lectures = [Lecture::Balisage, Lecture::Brut, Lecture::BrutHorsEtranger]
+        .map(|lecture| gardes_d_une_lecture(texte, lecture));
+    let mut sortie = String::with_capacity(texte.len());
+    let mut debut = None;
+    for i in 0..=texte.len() {
+        let garde = lectures
+            .iter()
+            .all(|gardes| gardes.get(i).copied().unwrap_or(false));
+        match (garde, debut) {
+            (true, None) => debut = Some(i),
+            (false, Some(d)) => {
+                sortie.push_str(texte.get(d..i).unwrap_or(""));
+                debut = None;
+            }
+            _ => {}
+        }
+    }
+    sortie
+}
+
+/// Les trois lectures du contenu d'un élément `TEXTE_BRUT` (contre-contrôle de
+/// DETTES-T15, R-3) : comme du balisage (la série sans C-6), comme du texte
+/// partout, comme du texte hors d'un contenu `svg` ou `math` (C-6).
+#[derive(Clone, Copy)]
+enum Lecture {
+    Balisage,
+    Brut,
+    BrutHorsEtranger,
+}
+
+/// Octets qu'une lecture garde, balises comprises (pour le débalisage).
+fn gardes_d_une_lecture(texte: &str, lecture: Lecture) -> Vec<bool> {
+    let mut gardes = vec![true; texte.len()];
+    let mut etranger = 0usize;
+    let mut i = 0usize;
+    while let Some(o) = texte.get(i..).and_then(|reste| reste.find('<')) {
+        let ouverture = i.saturating_add(o);
+        let suite = texte.get(ouverture..).unwrap_or("");
+        let longueur = match longueur_non_affichee(suite) {
+            Some(longueur) => {
+                let fin = ouverture.saturating_add(longueur).min(texte.len());
+                if let Some(ote) = gardes.get_mut(ouverture..fin) {
+                    ote.fill(false);
+                }
+                longueur
+            }
+            None => {
+                let t = suite.as_bytes();
+                let lue = longueur_de_balise(t).unwrap_or(1);
+                let contenu = match lecture {
+                    Lecture::Balisage => 0,
+                    Lecture::Brut => texte_brut(t, lue, None),
+                    Lecture::BrutHorsEtranger => texte_brut(t, lue, Some(&mut etranger)),
+                };
+                lue.saturating_add(contenu)
+            }
+        };
+        i = ouverture.saturating_add(longueur.max(1));
+    }
+    gardes
+}
+
+/// Éléments dont la construction de l'arbre bascule la tokenisation (WHATWG,
+/// algorithmes « generic RCDATA » et « generic raw text ») : RCDATA (`title`,
+/// `textarea`) et RAWTEXT (`xmp`, `iframe`, `noembed`, `noframes`) jusqu'à leur
+/// fermante, PLAINTEXT (`plaintext`) jusqu'au bout du texte. Leur contenu est du
+/// texte : ni commentaire ni script n'y commence. `noscript` reste lu comme du
+/// balisage (lecture sans script, celle qui l'affiche).
+const TEXTE_BRUT: [&str; 7] = [
+    "<title",
+    "<textarea",
+    "<xmp",
+    "<iframe",
+    "<noembed",
+    "<noframes",
+    "<plaintext",
+];
+
+/// Longueur du contenu de texte brut qui suit une balise `TEXTE_BRUT` longue de
+/// `lue` octets (relecture G2 de DETTES-T15, C-6) ; 0 après toute autre balise,
+/// et, si la profondeur `etranger` est tenue (lecture C-6), dans un contenu
+/// `svg` ou `math`, où ces éléments ne basculent pas la tokenisation.
+fn texte_brut(t: &[u8], lue: usize, etranger: Option<&mut usize>) -> usize {
+    if let Some(etranger) = etranger {
+        let auto_fermee = t.get(..lue).is_some_and(|b| b.ends_with(b"/>"));
+        if balise(t, 0, "<svg") || balise(t, 0, "<math") {
+            *etranger = etranger.saturating_add(usize::from(!auto_fermee));
+            return 0;
+        }
+        if balise(t, 0, "</svg") || balise(t, 0, "</math") {
+            *etranger = etranger.saturating_sub(1);
+            return 0;
+        }
+        if *etranger > 0 {
+            return 0;
+        }
+    }
+    let Some(nom) = TEXTE_BRUT.iter().find(|nom| balise(t, 0, nom)) else {
+        return 0;
+    };
+    let fermante = format!("</{}", nom.get(1..).unwrap_or(""));
+    let fin = if *nom == "<plaintext" {
+        t.len()
+    } else {
+        (lue..t.len())
+            .find(|i| balise(t, *i, &fermante))
+            .unwrap_or(t.len())
+    };
+    fin.saturating_sub(lue)
+}
+
+/// Longueur, depuis son `<`, d'une construction jamais affichée (jusqu'au bout
+/// du texte si elle ne se ferme pas) ; `None` pour une balise ou un `<` de texte.
+fn longueur_non_affichee(suite: &str) -> Option<usize> {
+    if let Some(corps) = suite.strip_prefix("<!--") {
+        return Some(fin_de_commentaire(corps).saturating_add(4));
+    }
+    // Page à cadres (contre-contrôle de DETTES-T15, R-4) : après `<frameset>`, la construction de l'arbre ignore tout
+    // caractère autre qu'un blanc et toute balise hors `html`, `frameset`, `frame` et `noframes` (modes « in
+    // frameset », « after frameset » et « after after frameset ») ; `noframes` est du texte brut. Ôté jusqu'au bout
+    // du texte : sens sûr si la balise est ignorée (corps déjà commencé, extrait de code Markdown).
+    if balise(suite.as_bytes(), 0, "<frameset") {
+        return Some(suite.len());
+    }
+    // Commentaire factice (DT15-h) : `<!` sans `--`, ou `</` suivi d'un
+    // caractère qui n'est ni une lettre ASCII ni `>` ; instruction de traitement :
+    // `<?` (tokenisation WHATWG du 2026-10-14, 13.2.5.72 à 13.2.5.76 ; commentaire
+    // factice si sa cible est invalide, `xml` ou `xml-stylesheet`). Tous clos au
+    // premier `>`, jusqu'au bout du texte sans lui.
+    let fermante_factice = suite.strip_prefix("</").and_then(|r| r.chars().next());
+    let factice = suite.starts_with("<!")
+        || suite.starts_with("<?")
+        || fermante_factice.is_some_and(|c| !c.is_ascii_alphabetic() && c != '>');
+    if factice {
+        return Some(suite.find('>').map_or(suite.len(), |q| q.saturating_add(1)));
+    }
+    [("<script", "</script"), ("<style", "</style")]
+        .into_iter()
+        .find(|(ouvrante, _)| balise(suite.as_bytes(), 0, ouvrante))
+        .map(|(ouvrante, fermante)| fin_d_element(suite, ouvrante, fermante))
+}
+
+/// Fin d'un commentaire, dans son corps : `>` ou `->` tout de suite
+/// (commentaire vide), sinon le premier `--` suivi de `>` ou de `!>` ; sans
+/// fin, le bout du texte. Un seul passage sur le corps.
+fn fin_de_commentaire(corps: &str) -> usize {
+    if corps.starts_with('>') {
+        return 1;
+    }
+    if corps.starts_with("->") {
+        return 2;
+    }
+    let mut depuis = 0usize;
+    while let Some(p) = corps.get(depuis..).and_then(|r| r.find("--")) {
+        let tirets = depuis.saturating_add(p);
+        let apres = corps.get(tirets.saturating_add(2)..).unwrap_or("");
+        if apres.starts_with('>') {
+            return tirets.saturating_add(3);
+        }
+        if apres.starts_with("!>") {
+            return tirets.saturating_add(4);
+        }
+        depuis = tirets.saturating_add(1);
+    }
+    corps.len()
+}
+
+/// Vrai si `t` porte en `i` le `motif` (`<script`, `</style`…, casse ASCII
+/// ignorée) suivi d'un blanc, de `/`, de `>` ou de la fin du texte.
+fn balise(t: &[u8], i: usize, motif: &str) -> bool {
+    let fin = i.saturating_add(motif.len());
+    t.get(i..fin)
+        .is_some_and(|lu| lu.eq_ignore_ascii_case(motif.as_bytes()))
+        && t.get(fin).is_none_or(|o| b"\t\n\x0c\r />".contains(o))
+}
+
+/// Fin d'un élément `script` ou `style`, depuis son `<` : après la fermante
+/// qui le clôt, sinon le bout du texte. `style` se clôt à sa première
+/// fermante ; `script` suit les états de la tokenisation : après `<!--`, un
+/// `<script` fait ignorer les fermantes jusqu'à `-->`. Ouvrante et fermante
+/// se lisent jusqu'à leur vrai `>` (`fin_de_balise`, DT15-j).
+fn fin_d_element(suite: &str, ouvrante: &str, fermante: &str) -> usize {
+    let t = suite.as_bytes();
+    let script = ouvrante == "<script";
+    let mut i = fin_de_balise(t, ouvrante.len());
+    let mut etat = 0u8; // 0 : données ; 1 : échappé, après `<!--` ; 2 : doublement échappé
+    while i < t.len() {
+        if script && etat > 0 && t.get(i..i.saturating_add(3)) == Some(b"-->".as_slice()) {
+            etat = 0;
+        } else if balise(t, i, fermante) {
+            if etat < 2 {
+                return fin_de_balise(t, i.saturating_add(fermante.len()));
+            }
+            etat = 1;
+        } else if script && etat == 0 && t.get(i..i.saturating_add(4)) == Some(b"<!--".as_slice()) {
+            etat = 1;
+            i = i.saturating_add(2);
+            continue;
+        } else if script && etat == 1 && balise(t, i, "<script") {
+            etat = 2;
+        }
+        i = i.saturating_add(1);
+    }
+    t.len()
+}
+
+/// Fin d'une balise ouvrante ou fermante, depuis son nom ou l'octet qui le
+/// suit : après le `>` qui la clôt hors des valeurs d'attribut entre
+/// guillemets, selon les états de la balise dans la tokenisation (nom,
+/// attribut, valeur) ; sans ce `>`, le bout du texte, qu'une balise inachevée
+/// n'affiche pas (DT15-j ; toute balise depuis DT15-k).
+fn fin_de_balise(t: &[u8], depuis: usize) -> usize {
+    #[derive(Clone, Copy)]
+    enum Etat {
+        Nom,
+        AvantAttribut,
+        Attribut,
+        ApresAttribut,
+        AvantValeur,
+        Valeur,
+    }
+    let mut etat = Etat::Nom;
+    let mut i = depuis;
+    while let Some(&o) = t.get(i) {
+        let blanc = o.is_ascii_whitespace();
+        etat = match (etat, o) {
+            (_, b'>') => return i.saturating_add(1),
+            (Etat::AvantValeur, b'"' | b'\'') => {
+                let valeur = t.get(i.saturating_add(1)..).unwrap_or_default();
+                let Some(q) = valeur.iter().position(|&x| x == o) else {
+                    return t.len();
+                };
+                i = i.saturating_add(q).saturating_add(1);
+                Etat::AvantAttribut
+            }
+            (Etat::AvantValeur, _) if blanc => Etat::AvantValeur,
+            (Etat::AvantValeur | Etat::Valeur, _) if !blanc => Etat::Valeur,
+            (Etat::Valeur, _) => Etat::AvantAttribut,
+            (_, b'/') => Etat::AvantAttribut,
+            (Etat::Attribut | Etat::ApresAttribut, b'=') => Etat::AvantValeur,
+            (Etat::Attribut | Etat::ApresAttribut, _) if blanc => Etat::ApresAttribut,
+            (Etat::Nom, _) if !blanc => Etat::Nom,
+            (_, _) if blanc => Etat::AvantAttribut,
+            (_, _) => Etat::Attribut,
+        };
+        i = i.saturating_add(1);
+    }
+    t.len()
+}
+
+/// Retire les balises d'un texte de corpus : une citation d'une page détenue
+/// traverse souvent une balise d'emphase en plein milieu de phrase. Une balise
+/// est lue entière (`longueur_de_balise`), sans borne de longueur : le texte
+/// de ses attributs ne reste jamais au corpus (DT15-k, Q-8) ; tout autre `<`
+/// est du texte. Chaque octet est lu une fois : temps linéaire (Q-9). Appliqué
+/// au corpus seulement — jamais aux aiguilles.
 fn retirer_balises(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
     while let Some(ouverture) = reste.find('<') {
-        let (avant, apres) = reste.split_at(ouverture);
-        sortie.push_str(avant);
-        match apres.get(1..).and_then(|suite| suite.find('>')) {
-            Some(fermeture) if fermeture <= 300 => {
-                reste = apres.get(fermeture.saturating_add(2)..).unwrap_or("");
-            }
-            _ => {
-                sortie.push('<');
-                reste = apres.get(1..).unwrap_or("");
-            }
+        sortie.push_str(reste.get(..ouverture).unwrap_or(""));
+        let suite = reste.get(ouverture..).unwrap_or("");
+        let longueur = longueur_de_balise(suite.as_bytes());
+        if longueur.is_none() {
+            sortie.push('<');
         }
+        reste = suite.get(longueur.unwrap_or(1)..).unwrap_or("");
     }
     sortie.push_str(reste);
     sortie
+}
+
+/// Longueur, depuis son `<`, d'une balise que la tokenisation HTML lit comme
+/// telle : `<` ou `</` suivi d'une lettre ASCII, jusqu'à son vrai `>`
+/// (`fin_de_balise`), ou `</>`, qu'elle ignore ; `None` pour un `<` de texte.
+fn longueur_de_balise(suite: &[u8]) -> Option<usize> {
+    let lettre = |o: Option<&u8>| o.is_some_and(u8::is_ascii_alphabetic);
+    if lettre(suite.get(1)) {
+        Some(fin_de_balise(suite, 1))
+    } else if suite.get(1) == Some(&b'/') && lettre(suite.get(2)) {
+        Some(fin_de_balise(suite, 2))
+    } else if suite.get(1..3) == Some(b"/>".as_slice()) {
+        Some(3)
+    } else {
+        None
+    }
 }
 
 /// Heuristique de langue : le corpus détenu est anglophone ; un fragment

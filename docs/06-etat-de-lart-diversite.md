@@ -129,3 +129,37 @@ dans le répertoire de session (`tasks/wm1ju9h7w.output`) — à copier dans le
 dépôt si ce document est cité au-delà du dépôt. Artefacts détenus : voir
 `biblio/INDEX.md` (les 6 fetchés de cette passe y portent leurs pages de
 titre vérifiées).
+
+## Ajouts datés en fin de document
+
+*Ajout daté du 2026-10-10 04:55:38 UTC (`date -u`) ; lot DETTES-T14* : les
+ajouts datés du lot DETTES-T14 sont placés ici, en fin de document, pour n'en
+décaler aucune ligne, ce document étant cité ailleurs par numéro de ligne ;
+chacun nomme la section qu'il vise, dont le texte est inchangé.
+
+**Vise §5, point 5.** *Ajout daté du 2026-10-10 04:55:38 UTC (`date -u`) ;
+lot DETTES-T14 ; SHOGEN-FETCH-AVANT-PUB-1 et décision Q-D de l'adjudication
+du procurement du 2026-10-09 ; le point 5 de §5 est inchangé* : les onze
+dettes de fetch du point 5 (ses quinze noms, moins Dong 2010, détenu, et
+Sevim-Torres, SQA et Kohli, détenus, dont reste la lecture du texte complet)
+sont formées et traitées le 2026-10-09 : identité, DOI, pages et tentatives
+datées sont à `biblio/INDEX.md` (section du lot DETTES-T14). Détenues
+(huit) : LPS 2001 (version de City Research Online) ; RepAudit (Zhai et al.,
+PACMPL 1(OOPSLA), art. 97, 2017) ; Junqueira et Marzullo (ICDCS 2003) ; Vendi
+(arXiv 2210.02410v2, publié à TMLR en 07/2023) ; la lignée Gashi (SQL 2007,
+AV 2011, OS/DSN 2011 ; l'identité d'« AV 2011 » reste proposée, City Research
+Online listant d'autres papiers antivirus de Gashi) ; Ron et al. 2026 (arXiv
+2606.20158v1) ; Nogueira et al. 2026 (arXiv 2607.02808v1, quatre auteurs) ;
+Eskandari et al. 2021 (arXiv 2106.00667v2). À l'achat (une) : Malkhi et
+Reiter 1998 (DOI 10.1007/s004460050050 ; prix non lu, page de l'éditeur
+derrière un contrôle anti-robot). Introuvables (deux) : NUREG/CR-5485 et
+« Finkbeiner 2025 ». NUREG/CR-5485 est gardé là où il est cité (§1, §2, §5),
+avec ce statut : copie non détenue ; page NRC (404) et document ADAMS (403)
+inaccessibles au 2026-10-09 ; toute affirmation sur son contenu reste [2nd].
+« Finkbeiner 2025 » : attribution non établie au 2026-10-09 (le seul SoK de
+Finkbeiner relevé, ICBC 2025, traite du *selfish mining*, non des oracles) :
+la référence est retirée. Eskandari 2021 répond à la question du point 5 :
+aucun passage n'y pose la dépendance d'amont commun comme problème ouvert
+[abs : recherche par mots-clés sur les quinze pages] ; un texte qui l'affirme
+le fait en propre, et le dit. Au §2, le « 429 co-déf. vs 115 prédites » est
+de Ron et al. (p. 1) ; le texte de Nogueira et al. ne porte ni 429 ni 115.

@@ -27,26 +27,39 @@ def series(prm, base):
 
 class TestPages(unittest.TestCase):
     def test_pages_bornees(self):
-        """700 minutes, pages de 300 (Coinbase) : 00:00-04:59, 05:00-09:59, 10:00-11:39 UTC ; pages de 1 000
-        (Bitstamp) : une page de 700 minutes, fin 1775043540 ; Bitfinex en ms ; Coinbase repris : aucune requête.
-        Horloge figée : deux attentes de 0,34 s entre les pages de Coinbase. Mutations : fin de page au-delà de la
-        fenêtre ; pas de page faux ; n faux ; reprise ignorée ; débit non appliqué aux pages."""
+        """700 minutes, DETTES-T2 et C-9 (créneaux ≤ pas / 2) : Coinbase, 148 minutes utiles + 1 de chaque côté :
+        23:59-02:28, 02:27-04:56, 04:55-07:24, 07:23-09:52, 09:51-11:40 UTC ; Bitstamp, 498 minutes utiles : n = 500 de
+        1775001540 à 1775031480, puis n = 204 de 1775031420 à 1775043600 ; Bitfinex en ms, une page, fin 1775043540 ;
+        C-13, second découpage décalé d'une demi-page jusqu'à fin + demi-page : Coinbase (74 minutes) 22:45-01:14 (le
+        31), 01:13-03:42, 03:41-06:10, 06:09-08:38, 08:37-11:06, 11:05-13:34 ; Bitstamp (249 minutes) n = 500 depuis
+        1774986600, 1775016480 et 1775046360 ; C-15, sondes vides en recul depuis fin − ⌊pas/2⌋ jusqu'au début de
+        l'historique fixé à −300 minutes (Coinbase : 550, 400, 100, −300 ; Bitstamp n = 500 : 200, −300) ; Coinbase
+        repris : aucune requête ; attentes : 14 de 0,34 s, 6 de 0,2 s.
+        Mutations : borne de page fausse ; pas faux ; n faux ; reprise ; débit ; second découpage omis ou mal décalé."""
         fen = {"debut": T0, "fin": T0 + 700 * 60}
-        attendus = ["/c/ETH-USD?start=2026-04-01T00:00:00Z&end=2026-04-01T04:59:00Z",
-                    "/c/ETH-USD?start=2026-04-01T05:00:00Z&end=2026-04-01T09:59:00Z",
-                    "/c/ETH-USD?start=2026-04-01T10:00:00Z&end=2026-04-01T11:39:00Z",
-                    "/s/ethusd?n=700&start=1775001600&end=1775043540",
-                    "/f/tETHUSD?start=1775001600000&end=1775043540000"]
+        attendus = [f"/c/ETH-USD?start=2026-0{a}:00Z&end=2026-0{b}:00Z" for a, b in (
+            ("3-31T23:59", "4-01T02:28"), ("4-01T02:27", "4-01T04:56"), ("4-01T04:55", "4-01T07:24"),
+            ("4-01T07:23", "4-01T09:52"), ("4-01T09:51", "4-01T11:40"), ("3-31T22:45", "4-01T01:14"),
+            ("4-01T01:13", "4-01T03:42"), ("4-01T03:41", "4-01T06:10"), ("4-01T06:09", "4-01T08:38"),
+            ("4-01T08:37", "4-01T11:06"), ("4-01T11:05", "4-01T13:34"), ("4-01T09:10", "4-01T11:39"),
+            ("4-01T06:40", "4-01T09:09"), ("4-01T01:40", "4-01T04:09"), ("3-31T19:00", "3-31T21:29"))] + [
+            "/s/ethusd?n=500&start=1775001540&end=1775031480", "/s/ethusd?n=204&start=1775031420&end=1775043600"] + [
+            f"/s/ethusd?n=500&start={a}&end={a + 29940}" for a in (1774986600, 1775016480, 1775046360, 1775013600,
+                                                                    1774983600)] + [
+            "/f/tETHUSD?start=1775001600000&end=1775043540000"]
         horloge, acquerir.HORLOGE = acquerir.HORLOGE, lambda: 100.0
         self.addCleanup(setattr, acquerir, "HORLOGE", horloge)
         with Serveur(dict.fromkeys(attendus, b"[]")) as s:
             prm, d, pauses = local(self, s.base)
             series(prm, s.base)
+            prm["historique"]["debut"] = T0 - 18000
             for place in ("coinbase", "bitstamp", "bitfinex", "coinbase"):
                 acquerir.pages(prm, acquerir.Manifeste(d), "principale", fen, place, "ETH", acquerir.Debit())
-        self.assertEqual((s.vus, pauses), (attendus, [0.34, 0.34]))
-        self.assertEqual(sorted(os.listdir(os.path.join(d, "principale", "coinbase", "ETH"))),
-                         ["page-1775001600.json", "page-1775019600.json", "page-1775037600.json"])
+        self.assertEqual((s.vus, pauses), (attendus, [0.34] * 14 + [0.2] * 6))
+        self.assertEqual(sorted(os.listdir(os.path.join(d, "principale", "coinbase", "ETH"))), sorted(
+            [f"page-{x}.json" for x in (1775001600, 1775010480, 1775019360, 1775028240, 1775037120)]
+            + [f"double-{1775001600 + 60 * x}.json" for x in (-74, 74, 222, 370, 518, 666)]
+            + [f"sonde-{1775001600 + 60 * x}.json" for x in (550, 400, 100, -300)]))
 
     def test_debit(self):
         """Horloge factice : coinbase à 100 s, 100,1 s, puis bitfinex et coinbase à 100,3 s, intervalle 340 ms :
@@ -64,7 +77,10 @@ class TestPages(unittest.TestCase):
 
     def test_main(self):
         """Lecture réduite aux places paginées (deux par actif), fenêtres d'une heure et d'une demi-heure : serveur
-        muet : code 4, CA/acquisition sur stderr ; puis code 0 et 12 pages au manifeste (reprise) ; variable posée :
+        muet : code 4, CA/acquisition sur stderr ; puis code 0 et 98 fichiers au manifeste (reprise ; 12 du premier
+        découpage, 2 du second par fenêtre et par paire de Coinbase et de Bitstamp, C-13 ; sondes vides en recul jusqu'à
+        l'historique fixé à −300 minutes, C-15 : principale 3 par paire de Coinbase, 1 de Bitstamp ; descriptive 12 et
+        11, en haut − k (2^j − 1), calculées ici) ; variable posée :
         code 3 ; arguments faux : code 2 ; dossier des bruts qui est un fichier : code 4, nommé par le type.
         Mutations : fenêtre descriptive omise ; code de refus faux ; garde non appelée ; exception non nommée."""
         with Serveur({}) as s:
@@ -72,6 +88,7 @@ class TestPages(unittest.TestCase):
             series(prm, s.base)
             prm["fenetre"].update(fin=T0 + 3600)
             prm["fenetre_descriptive"]["debut"] = 1790811000
+            prm["historique"]["debut"] = T0 - 18000
             prm["lectures"]["A"].update(places={"ETH": ["bitstamp", "coinbase"], "USDC": ["bitfinex", "bitstamp"],
                                                 "USDT": ["bitstamp", "coinbase"]}, n_min=dict.fromkeys(socle.ACTIFS, 2),
                                         derniere_transaction={"ETH": [], "USDC": [], "USDT": []})
@@ -89,10 +106,13 @@ class TestPages(unittest.TestCase):
             [4, 0, 3, 2, 4], ["REFUS CA/acquisition", "REFUS CA/variable", "REFUS CA/usage", "REFUS CA/acquisition",
                               ""]))
         with open(os.path.join(d, "b", "manifeste.tsv"), encoding="utf-8") as f:
-            self.assertEqual(len(f.read().split(socle.NL)), 1 + 12 + 1)
+            self.assertEqual(len(f.read().split(socle.NL)), 1 + 98 + 1)
         desc = os.path.join(d, "b", "descriptive")                  # C-7 : bornes de la fenêtre descriptive (G08)
-        self.assertEqual({x for _r, _s, fs in os.walk(desc) for x in fs}, {"page-1790811000.json"})
-        self.assertIn("/s/ethusd?n=30&start=1790811000&end=1790812740", s.vus)    # fin de septembre : 1790812800 - 60
+        self.assertEqual({x for _r, _s, fs in os.walk(desc) for x in fs}, {"page-1790811000.json"} | {
+            f"double-{1790811000 + h}.json" for h in (-4440, 4440, -14940, 14940)} | {
+            f"sonde-{max(T0 - 18000, haut - k * (2 ** j - 1))}.json" for haut, k, n in (
+                (1790803800, 9000, 12), (1790782800, 30000, 11)) for j in range(n)})
+        self.assertIn("/s/ethusd?n=32&start=1790810940&end=1790812800", s.vus)    # chevauchement des deux côtés
 
 
     def test_garde_reseau(self):

@@ -73,6 +73,7 @@ import secrets
 import shutil
 import subprocess
 import tempfile
+import time
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 GY = os.path.join(ICI, "..", "..", ".github", "workflows", "gates.yml")
@@ -197,7 +198,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 137                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 153                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -368,6 +369,20 @@ try:
     cas("F-15 .pyc vert et marqué écrit pendant le run dans tests/__pycache__, source rouge : jamais lu, sortie 1",
         [] if (r, os.path.exists(MARQUE_C)) == (1, False) else [f"code {r}, .pyc lu : {os.path.exists(MARQUE_C)}"],
         None)
+    MARQUE_F, CHEMIN_T = os.path.join(W, "F-16-marque"), os.path.join(W, "F-16-t")   # LEURRE-FORK-TMP-1 (DETTES-T7)
+    r = v.main([forgee("F-16", *ROUGE, "    def test_z(self):", "        t = __import__('__main__').t",
+                       f"        open({CHEMIN_T!r}, 'w').write(t)", "        " + FORGE, "        sys.stderr.flush()",
+                       "        if os.fork():", "            os._exit(0)",
+                       "        n = os.open(os.devnull, os.O_WRONLY)",
+                       "        os.dup2(n, 1)", "        os.dup2(n, 2)", "        __import__('time').sleep(1.5)",
+                       "        os.makedirs(os.path.join(t, 'reste'))", f"        open({MARQUE_F!r}, 'w').close()",
+                       "        os._exit(0)"), *DEUX])
+    time.sleep(3)                                       # le descendant aurait recréé le dossier du compte à 1,5 s
+    with open(CHEMIN_T, encoding="utf-8") as f:
+        t = f.read()
+    cas("F-16 leurre de fork LE-05 : descendant arrêté avec le groupe de la suite, dossier du compte effacé, sortie 1",
+        [] if (r, os.path.exists(MARQUE_F), os.path.exists(t)) == (1, False, False) else [
+            f"code {r}, marque {os.path.exists(MARQUE_F)}, dossier {os.path.exists(t)}"], None)
     MARQUE_P, AILLEURS = os.path.join(W, "P-marque"), os.path.join(W, "P-ailleurs")     # SUITE-CODE-COMPILE-1 (OUT-2h)
     os.makedirs(AILLEURS)                                     # dossier hors de toute racine, qui porte une extension
     open(os.path.join(AILLEURS, "aide.so"), "w").close()
@@ -430,13 +445,15 @@ try:
                                                                                     "os._exit(0)"]
 
     def copie(rep, corps, plus=0, avant=None):
-        """Copie du runner (CAS + plus) et de gates.yml réel sous W/rep, vérificateur `corps` (lignes ; None : le réel),
+        """Copie du runner (CAS + plus), de ses sondes de forge (S-01 à S-08) et de gates.yml réel sous W/rep,
+        vérificateur `corps` (lignes ; None : le réel),
         lancée en --copie (C-5 (b)) après avant(d), d le dossier du runner copié (SCRIPT-MASQUE-1) ; rend le processus
         fini."""
         d = os.path.join(W, rep, "enforcement", "tests")
         os.makedirs(d)
         os.makedirs(os.path.join(W, rep, ".github", "workflows"))
         shutil.copy(GY, os.path.join(W, rep, ".github", "workflows"))
+        shutil.copytree(os.path.join(ICI, "fixtures", "sondes-forge"), os.path.join(d, "fixtures", "sondes-forge"))
         with open(os.path.abspath(__file__), encoding="utf-8") as f:
             src = f.read()
         with open(os.path.join(d, os.path.basename(__file__)), "w", encoding="utf-8") as f:
@@ -507,9 +524,10 @@ try:
             d, "..", "verdict-suite-s2.py")), doraise=True,
                            invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
     APRES = ("atexit.py", "contextlib.py", "importlib/__init__.py", "io.py", "json.py", "py_compile.py", "re.py",
-             "secrets.py", "shutil.py", "subprocess.py", "tempfile.py")      # I-01 : chaque import qui suit la garde,
-    # dans l'ordre du fichier (C-1 de la revue de la vague 2) ; atexit (intégré) et io (préchargé) ne sont jamais
-    # cherchés dans sys.path (mesuré sous 3.10 à 3.13), posés pour que la liste suive les imports
+             "secrets.py", "shutil.py", "subprocess.py", "tempfile.py", "time.py")   # I-01 : chaque import qui suit
+    # la garde, dans l'ordre du fichier (C-1 de la revue de la vague 2 ; time : DETTES-T7) ; atexit et time (intégrés)
+    # et io (préchargé) ne sont jamais cherchés dans sys.path (mesuré sous 3.10 à 3.13), posés pour que la liste suive
+    # les imports
     for nom, rc, motif, corps, avant in (     # SCRIPT-MASQUE-1 (OUT-2d) : rien de posé à côté n'est exécuté
             ("I-01 json.py, et chaque module importé après la garde, posés à côté du runner (« 999 ok », os._exit(0))"
              " : jamais importés, runner en sortie 3", 3, "vérificateur illisible", ILLISIBLE,
@@ -529,7 +547,7 @@ try:
     MARQUE4, D4 = os.path.join(W, "I-04", "marque"), os.path.join(W, "I-04")
     d = factice(os.path.join(W, "I-04", "s"), "    def test_x(self):" + chr(10) + "        self.fail()", n=1)
     shutil.copy(os.path.join(ICI, "..", "verdict-suite-s2.py"), D4)
-    for x in ("importlib/__init__", "re", "secrets", "shutil", "subprocess", "tempfile"):     # importlib : OUT-2h
+    for x in ("importlib/__init__", "re", "secrets", "shutil", "signal", "subprocess", "tempfile"):   # signal : DT7
         m = x.split("/")[0]
         voisin(x + ".py", "import os, sys", f"open({MARQUE4!r}, 'a').close()", "sys.path[:] = [p for p in sys.path if "
                f"os.path.realpath(p) != os.path.realpath({D4!r})]", f"del sys.modules[{m!r}]", f"import {m}")(D4)
@@ -538,55 +556,15 @@ try:
     # Python, importe re depuis le dossier du script ; 3.10 à 3.12 non : mesuré)
     p = None if sys.argv[1:] == ["--copie"] else subprocess.run([sys.executable, "-B", os.path.join(
         D4, "verdict-suite-s2.py"), d, *s2bis], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
-    cas("I-04 importlib/, re.py, secrets.py, shutil.py, subprocess.py, tempfile.py posés à côté du vérificateur lancé "
-        "en script (suite rouge) : jamais importés", [] if p is None or not os.path.exists(MARQUE4) else [
-            f"importé, sortie {p.returncode}"], None)                               # la sortie n'est pas jugée (E-4)
+    cas("I-04 importlib/, re.py, secrets.py, shutil.py, signal.py, subprocess.py, tempfile.py posés à côté du "
+        "vérificateur lancé en script (suite rouge) : jamais importés", [] if p is None or not os.path.exists(
+            MARQUE4) else [f"importé, sortie {p.returncode}"], None)         # la sortie n'est pas jugée (E-4)
 finally:
     shutil.rmtree(W)
 
 
-def job(texte, nom):
-    """Lignes brutes du job `nom` du texte de gates.yml, indentation comprise : de sa clé (exclue) à la première ligne
-    d'indentation inférieure à 4 qui n'est ni vide ni un commentaire ; lignes vides et commentaires d'indentation 8 au
-    plus omis (aucun n'est une ligne d'un bloc `run:`, à l'indentation 10) ; [] s'il manque."""
-    lignes, sortie = texte.split(chr(10)), []
-    for x in lignes[lignes.index(f"  {nom}:") + 1:] if f"  {nom}:" in lignes else []:
-        n, t = len(x) - len(x.lstrip(" ")), x.strip()
-        if t and n < 4 and t[0] != "#":
-            break
-        sortie += [x] if t and (n > 8 or t[0] != "#") else []
-    return sortie
-
-
-RUNNER = "python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"
-ETAPES = ("runs-on: ubuntu-24.04", "- uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1",
-          "run: " + RUNNER)
-LIBRE = "[0-9A-Za-z].*"      # CC2-1 : valeur libre en scalaire simple, jamais un guillemet qui avalerait des lignes
-GABARIT = ("    name: " + LIBRE, "    " + re.escape(ETAPES[0]), "    timeout-minutes: [1-9][0-9]*", "    steps:",
-           "      " + re.escape(ETAPES[1]), "        with:", "          persist-credentials: false",
-           "      - name: " + LIBRE, "        shell: bash", "        " + re.escape(ETAPES[2]), "      - name: " + LIBRE,
-           "        shell: bash", "        run: [|]")
-FETCH = "          fetch-depth: 0"   # CB-18v (Q-T4-11) : historique complet du job sim-bis, git archive de f35a70c
-
-
-def gabarit(texte, nom):
-    """CC-1 du contre-contrôle de CB-18, remède (a) : les lignes brutes du job (`job`), à indentation exacte, suivent
-    GABARIT ligne à ligne, puis ne sont plus que des lignes d'indentation 10 exactement, celles du bloc de la troisième
-    étape. Soit, sur ces lignes et dans cet ordre : `name`, `runs-on: ubuntu-24.04`, `timeout-minutes`, `steps`, puis
-    trois étapes et rien d'autre : le checkout épinglé, son `with:` réduit à `persist-credentials: false` ; le runner
-    (`name`, `shell: bash`, `run:` du runner) ; une étape `name`, `shell: bash`, `run: |`. Une ligne cachée dans un nom
-    plié ou dans un `with:` n'a pas l'indentation de la ligne qu'elle imite. CC2-1 : les trois `name` sont des scalaires
-    simples (premier caractère alphanumérique : ni guillemet, ni bloc, ni ancre, ni flux), `timeout-minutes` un entier ;
-    une chaîne entre guillemets écrite sur plusieurs lignes avalerait sinon des lignes du gabarit. CB-18v (Q-T4-11) et
-    CB-18w (O-2) : dans le seul job sim-bis-unittest, la ligne FETCH (`fetch-depth: 0`, valeur exacte) suit
-    `persist-credentials: false`, exigée ; l'adaptateur oracle_r1 y extrait f35a70c par git archive."""
-    b = job(texte, nom)
-    if nom == "sim-bis-unittest":
-        if b[7:8] != [FETCH]:
-            return False
-        del b[7]
-    return len(b) > len(GABARIT) and all(re.fullmatch(g, x) for g, x in zip(GABARIT, b)) and all(
-        re.fullmatch(" {10}[^ ].*", x) for x in b[len(GABARIT):])
+RUNNER, ETAPES, job, gabarit = v.RUNNER, v.ETAPES, v.job, v.gabarit    # forme K : du vérificateur depuis le lot
+# DETTES-T7 (ANALYSEUR-RESIDUS-1), partagée avec l'enregistreur de rôle ; jugée ici par L-23 à L-44 et G-01 à G-04
 
 
 def analyseur(texte, nom, appel):
@@ -695,6 +673,39 @@ for nom, lignes in (                                    # CC2-1 : guillemet ferm
         ("G-04 nom de l'étape 3", DEBUT + ['      - name: "suite'] + SUITE[1:4] + [L + LIGNE + '"'])):
     cas(nom + " entre guillemets, fermé à la dernière ligne du bloc : refusé par le gabarit (scalaire simple, CC2-1)",
         ["admis"] if gabarit(chr(10).join(lignes), "s2bis-unittest") else [], None)
+SONDES = os.path.join(ICI, "fixtures", "sondes-forge")      # ANALYSEUR-RESIDUS-1 : épreuve de forge du 2026-10-10
+for nom, sonde, attendu in (            # run de la forge ; attendu : débuts des refus nommés de `residus`, dans l'ordre
+        ("S-01 témoin (run 38015225743, vert)", "t00-temoin", []),
+        ("S-02 N-12 (run 38015223763, refusé, l.42)", "n12-cle-guillemets", ["N-12 : l.42 "]),
+        ("S-03 N-14 (run 38015224164, refusé)", "n14-controle-us", ["N-14 : "]),
+        ("S-04 LC-02 (run 38015224723, refusé)", "l02-commentaire-set-e", ["LC-02 : l.39 "]),
+        ("S-05 LC-03 (run 38015225784, vert à 3 étapes, vérificateur avalé)", "l03-etape-avalee", []),
+        ("S-06 LC-08 (run 38015225738, vert)", "l08-timeout-600", []),
+        ("S-07 LC-13 (run 38015225196, refusé, l.8)", "l13-ancre-alias", ["LC-13 : l.8 ", "LC-13 : l.10 "]),
+        ("S-08 AN1 (run 38015225753, vert ; ancre refusée : serrage)", "an1-ancre-valide", ["LC-13 : l.8 ",
+                                                                                            "LC-13 : l.38 "])):
+    with open(os.path.join(SONDES, f"sonde-{sonde}.yml"), encoding="utf-8") as f:
+        t = f.read()
+    r, lues = v.residus(t), v.lignes_du_job(t, "s2bis-unittest", APPEL)
+    bon = len(r) == len(attendu) and all(x.startswith(a) for x, a in zip(r, attendu)) and lues == (
+        None if attendu else [LIGNE.replace(" 7", " 341")]) and not gabarit(t, "s2bis-unittest")
+    cas(nom + " : refus nommés, ligne lue si aucun, jamais la forme K", [] if bon else [f"{r} {lues}"], None)
+K = DEBUT + SUITE                                       # forme K témoin (L-00), puis une forme résiduelle chacun
+for nom, lignes, admis in (
+        ("S-09 N-12 : seconde définition du job entre guillemets, ligne affaiblie", K + [
+         '  "s2bis-unittest":', "    steps:"] + SUITE[:3] + [L + FAIBLE], False),
+        ("S-10 N-14 : U+001F dans le nom du job", K[:2] + [K[2] + chr(31)] + K[3:], False),
+        ("S-11 LC-02 : commentaire puis set +e après le bloc", K + ["        # c", L + "set +e"], False),
+        ("S-12 LC-08 : timeout-minutes 600 (run 38015225738)", K[:4] + ["    timeout-minutes: 600"] + K[5:], True)):
+    ok = cable(chr(10).join(lignes), "s2bis-unittest", APPEL)
+    cas(nom + (" : admis" if admis else " : refusé"), [] if ok == admis else [f"admis : {ok}"], None)
+cas("S-13 LC-13 : ancre au nom du job, alias au nom de l'étape 3 : refusé par l'analyseur seul", ["admis"] if analyseur(
+    chr(10).join(K[:2] + ["    name: &n s2bis-unittest"] + K[3:12] + ["      - name: *n"] + K[13:]), "s2bis-unittest",
+    APPEL) else [], None)
+FINS = (11, 12, 13, 28, 29, 30, 133, 8232, 8233)       # réserve R-7 du contre-contrôle : écrites à la main, une à une
+cas("S-14 N-14 : chaque fin de ligne autre que LF, seule dans le nom du job (U+0085 compris) : refusée", [
+    f"U+{c:04X} admis" for c in FINS if cable(chr(10).join(K[:2] + [K[2] + chr(c)] + K[3:]), "s2bis-unittest", APPEL)],
+    None)
 SIM = [x.replace("s2bis-unittest", "sim-bis-unittest") for x in DEBUT]        # CB-18v : job sim-bis (Q-T4-11)
 SIM_SUITE, FD = SUITE[:4] + [L + LIGNE.replace(" s2bis ", " scripts/sim-bis ")], "          fetch-depth: "
 APPEL_SIM = APPEL.replace(" s2bis ", " scripts/sim-bis ")
@@ -724,7 +735,10 @@ for nom, texte, attendu in (                            # analyseur seul : ce qu
         ("A-02 séparateur U+2028 : job illisible", DEBUT + SUITE[:1] + [L + chr(8232)] + SUITE[1:], None),
         ("A-03 étapes imitées dans le nom plié du job, hors de steps (CC-2, CA-12)", DEBUT[:2] + ["    name: >",
          "      - name: x", "        shell: bash", "        run: |", L + LIGNE] + DEBUT[3:] + SUITE[:3] + [L + FAIBLE],
-         [])):
+         []),
+        ("A-04 bloc ouvert par - run: | puis shell: bash au même niveau (colonne de la clé, LC-02 ; DETTES-T7)",
+         DEBUT + ["      - run: |", L + "python3 --version", L + LIGNE, "        shell: bash"],
+         [None, [RUNNER], ["python3 --version", LIGNE]])):
     cas(f"{nom} (analyseur unique)", [] if v.etapes(chr(10).join(texte), "s2bis-unittest") == attendu else ["écart"],
         None)
 for nom, ok, ko, rc in (("B-01 CAS cas joués, tous passés : sortie 0", CAS, 0, 0),      # RUNNER-SORTIE-1 (Q-2)

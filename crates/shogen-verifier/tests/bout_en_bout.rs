@@ -10,6 +10,9 @@
 //! développement (S-G2), et un test qui produirait son entrée avec l'encodeur
 //! qu'il vérifie ne testerait que la cohérence de l'encodeur avec lui-même.
 
+mod commun;
+
+use commun::Arbre;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -50,11 +53,12 @@ fn lot_de_reference() -> Vec<u8> {
 /// le mutant `subject.rs:522:17` était compté survivant au premier run et tué
 /// aux suivants, sur un code de `subject.rs` que le lot trivial n'atteint même
 /// pas. Un score non rejouable n'est pas un fait (ADR-0011 point 2).
-fn repertoire(nom: &str) -> PathBuf {
-    let chemin = std::env::temp_dir().join(format!("shogen-e2e-{nom}-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&chemin);
-    std::fs::create_dir_all(&chemin).expect("création du répertoire de test");
-    chemin
+/// Lot DETTES-T7 (SHOGEN-VERIFIER-TESTS-TMP-RESTES-1) : `commun::Arbre`, sous la
+/// cible cargo, nom unique (processus et rang), effacé à la fin du test.
+fn repertoire(nom: &str) -> Arbre {
+    let arbre = Arbre::nouveau("shogen-e2e", nom);
+    std::fs::create_dir_all(&*arbre).expect("création du répertoire de test");
+    arbre
 }
 
 fn executer(chemin: &PathBuf) -> (i32, String, String) {
@@ -203,7 +207,8 @@ fn lot_rallonge_refuse() {
 
 #[test]
 fn fichier_absent_refuse_sans_panique() {
-    let chemin = repertoire("absent").join("inexistant.cbor");
+    let repertoire = repertoire("absent");
+    let chemin = repertoire.join("inexistant.cbor");
     let (code, _, erreur) = executer(&chemin);
     assert_ne!(code, 0);
     assert!(erreur.contains("lot illisible"), "stderr : {erreur}");

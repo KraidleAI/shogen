@@ -1069,3 +1069,52 @@ une tolérance et une loi nulle de la statistique par événements (c) ; le test
 > *Ajout daté du 2026-10-04 06:52:35 UTC (relecture G2 du lot DETTES-B1, C-3 ; points « Code » et « Rejeu » ci-dessus)* : à partir du commit `0221a74` (lot DETTES-B1, B1-1 ; `rendu_unique.py` à partir de `0789d96`, B1-4), `s2-harness/shogen_s2` et `s2-harness/tools` diffèrent du commit d'analyse `f35a70c` (sha256 de `rendu_unique.py` à la tête `5ee95dbf…` ≠ `sha256_script` `06d189cf…`) : les gardes (2) et (4) refusent à la tête ; tout rejeu (`recompute_*`) ou ré-exécution du rendu de S2 se fait sur une extraction de `f35a70c` ; à la tête, les sorties diffèrent par construction (bloc 5 (d), note k_eff, clé `etiquette` du drapeau 2 de `j28-incluse`, divergences ASN de relevés partiels).
 
 > *Ajout daté du 2026-10-04 09:36:41 UTC (cp-2 de clôture, C-7 ; limite à lire avec le §9.3)* : un changement d'ASN visible sur une seule base d'un relevé partiel n'est pas cherché par les rendus de S2 (sémantique du lot CORR : relevés complets seuls) ; l'effet du correctif postérieur SHOGEN-ASN-DIVERGENCE-PARTIELLE-1 sur les journaux scellés n'est pas mesuré (SHOGEN-ASN-PARTIELLE-S2-1, annexe B.49).
+
+## Ajouts datés en fin de document
+
+*Ajout daté du 2026-10-10 04:56:09 UTC (`date -u`) ; lot DETTES-T14* : les ajouts datés du lot DETTES-T14 sont placés
+ici, en fin de document, pour n'en décaler aucune ligne, ce document étant cité ailleurs par numéro de ligne ; chacun
+nomme la section qu'il vise, dont le texte est inchangé.
+
+**Vise §11.1, paragraphe Restes.** *Ajout daté du 2026-10-10 04:56:09 UTC (`date -u`) ; lot DETTES-T14 (BIBLIO) ;
+décisions Q-B et Q-C de l'adjudication du procurement du 2026-10-09 ; le texte de §11.1 est inchangé* : sources des
+restes de §11.1, détenues depuis ce lot (`biblio/INDEX.md`, section du lot DETTES-T14) ; aucun calcul nouveau.
+
+- **SHOGEN-PEARSON-IF-SOURCE-1** : la fonction d'influence de la corrélation de Pearson employée pour N_eff
+  (`scripts/post-s2/contenu.py`, l.5 et l.31) est celle de Croux et Dehon 2010, éq. (4), qui l'attribuent à Devlin,
+  Gnanadesikan et Kettenring 1975 (CentER DP 2010-40, PDF p. 6) : même forme, prise en coordonnées centrées et
+  réduites par les moments empiriques. Limite : la pièce l'énonce au modèle normal bivarié Φρ, moyennes nulles et
+  variances unitaires « without loss of generality » par invariance linéaire (§3) ; elle ne l'énonce pas hors de ce
+  modèle. Les séries de contenu ne sont pas supposées gaussiennes : l'emploi de cette forme sur elles repose sur la
+  dérivation par fonction lisse de moments (Künsch 1989, Ex. 2.2) [inféré], non sur la pièce.
+- **SHOGEN-R1-PLUGIN-1 (b)** : statistique et niveau d'un test de la loi complète de m_t, sourcés : la loi de
+  Poisson-binomiale (somme de Bernoulli indépendantes de probabilités inégales) et son calcul exact (Chen et Liu 1997,
+  *Statistica Sinica* 7, p. 875) ; le test χ² d'ajustement (NIST/SEMATECH e-Handbook §1.3.5.15, copie du 2026-10-09) :
+  statistique du χ² sur les classes (écarts des comptes observés aux comptes attendus), k − c degrés de liberté, c
+  étant le nombre de paramètres estimés plus un. Limite en trois membres : (1) le test traite les fenêtres comme des
+  tirages indépendants [inféré] ; les m_t successifs sont dépendants (SHOGEN-DEP-FENETRES-2) : le niveau nominal n'est
+  pas garanti, et la correction sous dépendance reste ouverte (candidats : fixed-b, Künsch 1989) ; (2) la page fonde
+  les k − c degrés de liberté sur un paramètre estimé par maximum de vraisemblance sur les comptes des classes, « not
+  from the individual observations » : les p̂_i de Shōgen sont estimés sur les fenêtres individuelles, et la loi nulle
+  du test avec ces p̂_i n'est pas donnée par la source ; (3) le regroupement des classes de queue jusqu'à un effectif
+  attendu d'au moins 5 n'est pas sourcé par le texte affiché de la page (la règle n'y survit que dans un commentaire
+  HTML, version retirée le 2024-04-01) : c'est un choix de conception. La statistique et sa forme sont sourcées ; sa
+  validité sous dépendance ne l'est pas. Le test n'est pas calculé ici : son niveau ne serait pas tenu ; la loi de m_t
+  reste décrite (table de §11.1, ligne SHOGEN-R1-PLUGIN-1 (b)).
+- **SHOGEN-DEP-FENETRES-2 (a)** : la source de l'asymptotique fixed-b est détenue (Kiefer et Vogelsang, préimpression
+  CAE WP 05-08 de *Econometric Theory* 21(6) : 1130-1164, DOI 10.1017/S0266466605050565) : la valeur critique se lit
+  au rapport b de la largeur de bande M à la taille d'échantillon T, Tables I à V, avec interpolation entre les points
+  de la grille (PDF p. 13) ; noyau de Bartlett, Table I, seuil unilatéral de 99 % : 2,377 à b = 0,02 et 2,459 à b =
+  0,04 (PDF p. 26) ; à b petit, les valeurs critiques sont proches de celles de la normale (p. 13). Correspondance
+  avec z_bloc,s [inféré] : même noyau, M = ℓ = 240 et T = n_s, donc b = 240/n_s ; la grille commence à b = 0,02. Le
+  calcul de (a) reste dans l'item, sous son déclencheur (run maximal ≥ ℓ, non atteint au J28 : 6 et 2, §5.4) ; l'item
+  reste ouvert pour ce calcul et pour (c). Manquent : les valeurs critiques de F_b, annoncées pour un article
+  ultérieur, et le texte final de l'éditeur.
+- **SHOGEN-CENSURE-INFO-2** : l'attribution « de type Manski » est sourcée : les bornes extérieures de z_s sous
+  imputation arbitraire des fenêtres sautées suivent l'approche « worst-case » de Horowitz et Manski, qui bornent un
+  paramètre sans hypothèse invérifiable sur les données manquantes et dont les bornes sont « sharp » (version d'auteur
+  « Revised: June 1999 » de *JASA* 95(449) : 77-84, PDF pp. 1 et 3). Limite : Horowitz et Manski bornent un paramètre
+  de population ; ici, une statistique de test est bornée sur les imputations, dans le même esprit [inféré] ; la
+  pagination *JASA* n'est pas citable depuis cette version. Vocabulaire des données manquantes (MCAR, MAR, MNAR) :
+  Little et Rubin 2019, extrait officiel du chapitre 1 (PDF p. 14). Aucun achat (décision Q-B). La borne de z_bloc
+  reste à SHOGEN-CENSURE-ZBLOC-1.

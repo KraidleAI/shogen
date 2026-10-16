@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -41,6 +42,17 @@ GIT_ENV = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 LINT = os.path.join(os.path.dirname(HARNESS), "enforcement", "lint-model-pinning.sh")
 BANNI = "claude-opus-" + "5"                    # construit à l'exécution, comme dans le lint (aucun littéral)
 STUB = b"import sys\nprint('argv', sys.argv[1:])\n"    # tools/rendu_unique.py de fixture : imprime ses arguments
+SONDES = os.path.join(os.path.dirname(HARNESS), "enforcement", "tests", "fixtures", "sondes-forge")   # DETTES-T7
+
+
+def forme_k(nom: str) -> list:
+    """Job `nom` à la forme K (gabarit du cas K-02 du runner, écrit ici à la main ; SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1),
+    jusqu'à l'étape du runner comprise ; fetch-depth: 0 dans le seul job sim-bis-unittest."""
+    return [f"  {nom}:", f"    name: {nom}", "    runs-on: ubuntu-24.04", "    timeout-minutes: 10", "    steps:",
+            "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag v7.0.1", "        with:",
+            "          persist-credentials: false", *["          fetch-depth: 0"][:nom == "sim-bis-unittest"],
+            "      - name: cas", "        shell: bash",
+            "        run: python3 -B enforcement/tests/run-fixtures-verdict-suite-s2.py"]
 
 
 def g(d: str, *args: str, entree: bytes = None) -> str:
@@ -90,7 +102,8 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual((code, rec), (0, {
             "schema": "shogen.oracle-record.v1", "role": "G2", "auteur": "claude-opus-5-5", "base": None,
             "tree": {"commit": self.c1, "extraction": f"git archive {self.c1}",
-                     "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())}},
+                     "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(OK.items())},
+                     "exclus": {"nombre": 0, "sha256": hashlib.sha256(b"").hexdigest()}},     # DETTES-T7 : aucun
             "static_only": False, "served_from": None, "python": sys.version, "exit": 0,
             "env": {"SHOGEN_S2_CAMPAGNE_CONTROL": None, "PYTHONHASHSEED": "17", "PYTHONPATH": os.environ.get(
                 "PYTHONPATH")},
@@ -145,8 +158,9 @@ class TestOracleRecord(unittest.TestCase):
         six = ["suite", "j14-principal", "j14-second", "j28", "recalcul-tiers", "raw"]    # C-6 : suite, puis D.4 b
         for n in six:
             Path(d, f"{n}.out").write_bytes(n.encode())
-        runs = [{"nom": n, "arbre": "s2-harness", "commande": [n], "exit": 0, "tests_avec_variable": [],
-                 "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(n.encode()).hexdigest()}} for n in six]
+        runs = [{"nom": n, "arbre": "s2-harness", "commande": [sys.executable, *(["-B", "-c"] if n == "suite" else [
+            "-I"]), n], "exit": 0, "tests_avec_variable": [], "sortie": {"chemin": f"{n}.out", "sha256": hashlib.sha256(
+                n.encode()).hexdigest()}} for n in six]               # formes de l'outil courant (ANCIEN-OUTIL-1)
         rendu = copie(rendu1, "rendu.json", runs=runs)
         sert = {"chemin": os.path.basename(g2), "sha256": sha[g2]}
         for chemin, role in ((g2, "G2"), (rendu, "rendu"), (copie(g2, "sert.json", served_from=sert), "G2")):
@@ -301,6 +315,63 @@ class TestOracleRecord(unittest.TestCase):
                                 "--depot", self.depot], capture_output=True, text=True)
             self.assertEqual((v.returncode, v.stdout, "refus (tree.sha256)" in v.stderr), (code, sortie, code == 2))
 
+    def test_extraction_sans_emplacement_interdit(self):
+        """SHOGEN-ENREG-EXTRACTION-INTERDITS-1 (lot DETTES-T7) : aucun fichier d'un emplacement interdit des briefs
+        (préfixes d'INTERDITS de enforcement/docs-sha256sums.py, liste unique ; composant en .jsonl ; casse pliée)
+        n'est écrit ni haché ; tree.exclus consigne leur nombre et le sha256 de leur liste triée, jamais leurs noms ;
+        --verifier refuse un tree.sha256 qui porte un chemin interdit, et, avec le dépôt, un tree.exclus autre que
+        celui de la ré-extraction. Rougit si : liste recopiée ou incomplète, .jsonl ou casse oubliés, fichier interdit
+        écrit ou haché, lien vers un interdit gardé, tree.exclus absent ou non vérifié, liste illisible admise. G2 du
+        lot DETTES-T7 (C-3) : un lien vers le dossier interdit lui-même (cible sans barre finale) est exclu aussi.
+        Réserve R-6 du contre-contrôle : un lien dont la cible passe par `..` est jugé sur sa cible normalisée."""
+        d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-interdits"), "claude-opus-5-5"
+        interdits = ["Docs/Rapports/i.md", "docs/15-a.md", "docs/16-b.md", "docs/adr-0025/e.md",
+                     "docs/adr-0028/execution/g/h.md", "docs/adr-0028/monark-m009a/f.txt", "docs/pocket-report/c.md",
+                     "docs/rapports/d.md", "docs/sous/vers-haut", "docs/vers-dossier", "docs/vers-interdit",
+                     "x/journal.jsonl", "y.JSONL/z.txt"]   # triés
+        permis = {**OK, **{k: b"permis" for k in ("docs/150.md", "docs/adr-0028/autre.md", "docs/rapports.md",
+                                                     "z.jsonl.txt", "docs/vers-permis")}}
+        list(depot(dep, [{k: v for k, v in permis.items() if k != "docs/vers-permis"}, {
+            k: b"interdit" for k in interdits if k not in ("docs/vers-interdit", "docs/vers-dossier",
+                                                          "docs/sous/vers-haut")}]))
+        for lien, cible in (("docs/vers-interdit", b"rapports/d.md"), ("docs/vers-permis", b"150.md"),
+                            ("docs/vers-dossier", b"rapports"), ("docs/sous/vers-haut", b"../rapports/d.md")):
+            blob = g(dep, "hash-object", "-w", "--stdin", entree=cible)     # liens relatifs posés par la plomberie git
+            g(dep, "update-index", "--add", "--cacheinfo", f"120000,{blob},{lien}")
+        g(dep, "commit", "-q", "-m", "liens")
+        c = g(dep, "rev-parse", "HEAD")
+        arbre = os.path.join(d, "arbre")
+        h, x = orc.extraire(dep, c, arbre)
+        ecrits = {os.path.relpath(os.path.join(r, f), arbre).replace(os.sep, "/") for r, _s, fs in os.walk(arbre)
+                  for f in fs}
+        self.assertEqual((ecrits, h, x), (set(permis), {k: hashlib.sha256(v).hexdigest() for k, v in permis.items()},
+                                          interdits))
+        for r in ("docs/rapports", "docs/adr-0025", "docs/adr-0028/execution", "docs/pocket-report", "y.JSONL"):
+            self.assertFalse(os.path.exists(os.path.join(arbre, r)), r)
+        self.assertFalse(os.path.lexists(os.path.join(arbre, "docs", "vers-dossier")), "lien vers le dossier écrit")
+        attendu = {"nombre": 13, "sha256": hashlib.sha256(chr(10).join(interdits).encode()).hexdigest()}
+        chemin = orc.enregistrer(d, "G2", a, dep, c)[0]
+        rec = orc.verifier(chemin, "G2", c, dep)
+        self.assertEqual((rec["exit"], rec["tree"]["exclus"], set(rec["tree"]["sha256"])), (0, attendu, set(permis)))
+        for nom, f, depot_, controle in (
+                ("haché", lambda r: r["tree"]["sha256"].update({"x/journal.jsonl": "0" * 64}), None, "exclus"),
+                ("nombre", lambda r: r["tree"]["exclus"].update(nombre=9), dep, "exclus"),
+                ("liste", lambda r: r["tree"]["exclus"].update(sha256="0" * 64), dep, "exclus"),
+                ("absent", lambda r: r["tree"].pop("exclus"), None, "champs"),
+                ("forme", lambda r: r["tree"]["exclus"].pop("sha256"), None, "champs")):
+            with self.subTest(copie=nom), self.assertRaisesRegex(ValueError, rf"^refus [(]{controle}[)] : "):
+                orc.verifier(self.copie(d, chemin, f"exclus-{nom}.json", f), "G2", c, depot_)
+        source = Path(orc.INTERDITS).read_text(encoding="utf-8")
+        autre = os.path.join(d, "interdits.py")
+        Path(autre).write_text(source.replace('"docs/rapports/", ', ""), encoding="utf-8")
+        with mock.patch.object(orc, "INTERDITS", autre):
+            self.assertEqual(orc.extraire(dep, c, os.path.join(d, "arbre-2"))[1], [y for y in interdits if y not in (
+                "Docs/Rapports/i.md", "docs/rapports/d.md", "docs/sous/vers-haut", "docs/vers-dossier",
+                "docs/vers-interdit")])   # partagée
+        with mock.patch.object(orc, "INTERDITS", os.path.join(d, "absent.py")), self.assertRaisesRegex(
+                ValueError, r"— refus$"):
+            orc.extraire(dep, c, os.path.join(d, "arbre-3"))
+
     def test_delai_depasse_exit_non_nul_enregistrement_ecrit(self):
         """SHOGEN-ENREG-VERIF-1 (iii) : test qui dort 20 s sous un délai de 1 s : commande arrêtée, exit 124 consigné
         dans le run, ligne de dépassement en fin de sortie hachée, enregistrement écrit (exit 1), refus (exit) à la
@@ -333,6 +404,56 @@ class TestOracleRecord(unittest.TestCase):
         self.assertEqual((p.returncode, m.returncode, "--verifier" in m.stderr), (1, 2, True))
         self.assertEqual(json.loads(Path(p.stdout.strip()).read_text(encoding="utf-8"))["runs"][0]["exit"], 124)
 
+
+    def test_delai_arrete_l_arbre_entier(self):
+        """SHOGEN-ENREG-DELAI-ARBRE-1 (lot DETTES-T7) : test qui lance deux petits-enfants, l'un dans son groupe,
+        l'autre parti dans sa propre session (comme la suite lancée par le vérificateur), qui dorment 3 s puis posent
+        une marque, et dort 20 s, sous un délai de 1 s : l'enregistreur rend la main au délai, aucune marque posée ;
+        descendant resté après la sortie normale de la suite (stdio coupés, comme un fork) : arrêté avec le groupe,
+        sauf sous Windows (aucun arrêt après la sortie : PID réemployés). Rougit si : enfant direct seul arrêté,
+        descendant d'une autre session non suivi, aucun arrêt après la sortie. G2 du lot DETTES-T7 (C-2) : petit-enfant
+        détaché (double fork, setsid) qui garde le tuyau et dort 90 s, suite sortie en 0, délai de 1 s : l'enregistreur
+        rend la main RELIQUAT s après l'arrêt de l'arbre, sans l'attendre. Rougit si : sortie attendue sans borne.
+        Réserve R-3 du contre-contrôle : arrêt de l'arbre échoué (simulé : `groupes` vide), suite qui dort 20 s sous un
+        délai de 1 s : l'enregistreur rend la main RELIQUAT s après le délai. Rougit si : enfant direct attendu."""
+        d, m, dep = tempfile.mkdtemp(dir=self.d), tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-arbre")
+        p = os.path.join(tempfile.mkdtemp(dir=self.d), "pid")
+        marquer = "import os, sys, time; time.sleep(3); open(os.path.join(*sys.argv[1:]), 'w').close()"
+        lancer = "subprocess.Popen([sys.executable, '-c', " + repr(marquer) + ", os.environ['ORACLE_ESSAI_MARQUES'], "
+
+        def suite(*corps):
+            return {**OK, "s2-harness/tests/test_t.py": chr(10).join([
+                "import os, subprocess, sys, time, unittest", "", "", "class T(unittest.TestCase):",
+                "    def test_a(self):", *corps, ""]).encode()}
+        long_, reste, detache = depot(dep, [suite("        for i, s in enumerate((False, True)):",
+                                         "            " + lancer + "str(i)], start_new_session=s)",
+                                         "        time.sleep(20)"),
+                                   suite("        " + lancer + "'reste'], stdin=subprocess.DEVNULL, "
+                                         "stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)"),
+                                   suite("        if os.fork() == 0:", "            os.setsid()",
+                                         "            if os.fork() == 0:", "                e = os.environ",
+                                         "                open(e['ORACLE_ESSAI_PID'], 'w').write(str(os.getpid()))",
+                                         "                time.sleep(90)", "            os._exit(0)")])
+        with mock.patch.dict(os.environ, {"ORACLE_ESSAI_MARQUES": m, "ORACLE_ESSAI_PID": p}):
+            debut = time.monotonic()
+            code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, long_, delai=1)[1]
+            duree = time.monotonic() - debut
+            code2 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, reste)[1]
+            debut = time.monotonic()
+            code3 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, detache, delai=1)[1]
+            duree3 = time.monotonic() - debut
+        with mock.patch.object(orc, "groupes", lambda racine: set()), mock.patch.dict(os.environ, {
+                "ORACLE_ESSAI_MARQUES": tempfile.mkdtemp(dir=self.d)}):       # R-3 : arrêt de l'arbre échoué
+            debut = time.monotonic()
+            code4 = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, long_, delai=1)[1]
+            duree4 = time.monotonic() - debut
+        try:                                            # descendant détaché, que l'outil ne suit pas : arrêté ici
+            os.kill(int(Path(p).read_text(encoding="utf-8")), 9)
+        except (OSError, ValueError):
+            pass
+        time.sleep(4)                                   # chaque marque serait posée 3 s après son lancement
+        self.assertEqual((code, duree < 10, code2, sorted(os.listdir(m)), code3, duree3 < 30, code4, duree4 < 15),
+                         (1, True, 0, ["reste"] if os.name == "nt" else [], 1, True, 1, True))
 
     def test_auteur_refuse_a_l_ecriture(self):
         """SHOGEN-ENREG-AUTEUR-ECRITURE-1 : à l'écriture, auteur hors de la liste blanche du lint (identifiant banni, nu
@@ -387,7 +508,8 @@ class TestOracleRecord(unittest.TestCase):
         vérificateur de s2bis présente dans le seul job suivant (C-2 de la G2 de la tranche C), leurres C1 (ligne dans
         un bloc `name: >`) et C4 (ligne dans une étape `if: false`), la vraie ligne étant affaiblie
         (SHOGEN-S2BIS-LIGNE-JOB-LEURRE-1), plancher 0 ou à zéro de tête (C-5 (a) de la relecture d'intégration de P1,
-        comme K-02 du runner) : refus avant toute écriture ; la CLI admet les deux noms. Rougit si : noms
+        comme K-02 du runner), job sim-bis sans fetch-depth: 0 (forme K, DETTES-T7) : refus avant toute écriture ; la
+        CLI admet les deux noms. Rougit si : noms
         hors liste fermée, ligne recopiée dans l'outil, autre job (MR-24 : lecture au-delà du job) ou autre suite lus,
         ligne lue hors d'un bloc `run:` ou dans une étape `if:`, ligne répétée admise, refus après écriture."""
         self.assertLessEqual({"suite-s2bis", "suite-sim-bis"}, set(orc.COMMANDES))      # liste fermée, étendue
@@ -398,8 +520,8 @@ class TestOracleRecord(unittest.TestCase):
         etape, faible = ["        shell: bash", "        run: |"], v.format("s2bis", 0).replace(" --egal", "")
 
         def gates(p1, p2, n1=1, apres=(), bis=None):               # lignes du vérificateur des deux jobs
-            return chr(10).join(["jobs:", "  s2bis-unittest:", "    steps:", *(bis or ["      - name: suite", *etape, *[
-                v.format("s2bis", p1)] * n1]), "  sim-bis-unittest:", "    steps:", "      - name: suite", *etape,
+            return chr(10).join(["jobs:", *forme_k("s2bis-unittest"), *(bis or ["      - name: suite", *etape, *[
+                v.format("s2bis", p1)] * n1]), *forme_k("sim-bis-unittest"), "      - name: suite", *etape,
                                  v.format("scripts/sim-bis", p2), *apres, ""]).encode()
         base = {"enforcement/verdict-suite-s2.py": verif, **{f"{x}/tests/{n}": c for x in (
             "s2bis", "scripts/sim-bis", "s2-harness") for n, c in (("__init__.py", b""), ("test_t.py", T))}}
@@ -410,9 +532,10 @@ class TestOracleRecord(unittest.TestCase):
                               "      - name: suite", *etape, faible])
         complaisant = chr(10).join(["import re", "lignes_du_job = lambda t, j, m: [x.strip() for x in t.split(chr(10))"
                                     " if re.fullmatch(m, x.strip())]", ""]).encode()   # analyseur complaisant du commit
-        ok, ko, double, sans, mauvaise, suivant, zero, zero7, leurre1, leurre4 = depot(dep, [
+        sans_fetch = gates(1, 1).replace(b"          fetch-depth: 0" + bytes([10]), b"")   # forme K de s2bis (DT7)
+        ok, ko, double, sans, mauvaise, suivant, zero, zero7, fetch, leurre1, leurre4 = depot(dep, [
             {**base, ".github/workflows/gates.yml": g} for g in (gates(1, 1), gates(2, 1), gates(1, 1, 2), gates(
-                1, 1).split(b"  sim-bis")[0], autre, loin, gates(0, 1), gates(1, "07"))] + [
+                1, 1).split(b"  sim-bis")[0], autre, loin, gates(0, 1), gates(1, "07"), sans_fetch)] + [
                 {**base, ".github/workflows/gates.yml": c1, "enforcement/verdict-suite-s2.py": complaisant},
                 {**base, ".github/workflows/gates.yml": c4}])
         chemin, code = orc.enregistrer(d, "G2", "claude-opus-5-5", dep, ok, ("suite-s2bis", "suite-sim-bis"))
@@ -431,7 +554,7 @@ class TestOracleRecord(unittest.TestCase):
         avant = sorted(os.listdir(d))
         for commit, c in ((double, "suite-s2bis"), (sans, "suite-sim-bis"), (mauvaise, "suite-s2bis"),
                           (suivant, "suite-s2bis"), (leurre1, "suite-s2bis"), (leurre4, "suite-s2bis"),
-                          (zero, "suite-s2bis"), (zero7, "suite-sim-bis")):
+                          (zero, "suite-s2bis"), (zero7, "suite-sim-bis"), (fetch, "suite-sim-bis")):
             with self.subTest(commande=c), self.assertRaisesRegex(ValueError, "— refus$"):
                 orc.enregistrer(d, "cp-2", "claude-opus-5-5", dep, commit, ("suite", c))
         self.assertEqual(sorted(os.listdir(d)), avant)
@@ -452,7 +575,7 @@ class TestOracleRecord(unittest.TestCase):
         exception au chargement non rattrapée ou non nommée."""
         d, dep, a = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-verif"), "claude-opus-5-5"
         cle, verif, nl = "enforcement/verdict-suite-s2.py", Path(orc.VERIF).read_bytes(), chr(10)
-        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+        gates = nl.join(["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash",
                          "        run: |", "          python3 -B " + cle + " s2bis --aucun-saut --egal --plancher 1",
                          ""]).encode()
         faux = nl.join(["import sys", "print('verdict-suite-s2 : conforme')", "sys.exit(0)", ""]).encode()   # L2
@@ -492,6 +615,50 @@ class TestOracleRecord(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"UnicodeDecodeError.* — refus$"):
             orc.ligne_du_job(arbre, "s2bis-unittest", "s2bis")
 
+    def test_ligne_du_job_forme_k_et_residus_nommes(self):
+        """SHOGEN-S2BIS-ANALYSEUR-RESIDUS-1 (lot DETTES-T7 ; épreuve de forge du 2026-10-10) : ligne_du_job exige la
+        forme K (gabarit de VERIF, cas K-02 du runner) et nomme chaque résidu ; les huit sondes (octets épinglés par le
+        sha256 de leur SHA256SUMS) ne sont pas à la forme K : refus `forme K` pour chacune, dont LC-03, faille du run
+        38015225784 (vert à 3 étapes, vérificateur avalé), plus N-12, N-14, LC-02 et LC-13 nommés ; à la forme K, LC-08
+        admis (run 38015225738), N-12, N-14, LC-02, LC-13 et LC-03 refusés. Rougit si : forme K non exigée, résidu non
+        nommé, sonde changée."""
+        d, nl = tempfile.mkdtemp(dir=self.d), chr(10)
+        gy = Path(d, ".github", "workflows", "gates.yml")
+        gy.parent.mkdir(parents=True)
+        sommes = Path(SONDES, "SHA256SUMS").read_bytes()
+        self.assertEqual(hashlib.sha256(sommes).hexdigest(),
+                         "675057da601f26d08680c8e4c378414bd1073aa29723c50da0e5d5ac78077846")
+        for ligne in sommes.decode().splitlines():                              # sommes du plan des sondes
+            self.assertEqual(hashlib.sha256(Path(SONDES, ligne[66:]).read_bytes()).hexdigest(), ligne[:64])
+        for sonde, motifs in (("t00-temoin", []), ("n12-cle-guillemets", ["N-12 : l.42 "]),    # runs : README
+                              ("n14-controle-us", ["N-14 : "]), ("l02-commentaire-set-e", ["LC-02 : l.39 "]),
+                              ("l03-etape-avalee", []), ("l08-timeout-600", []),
+                              ("l13-ancre-alias", ["LC-13 : l.8 ", "LC-13 : l.10 "]),
+                              ("an1-ancre-valide", ["LC-13 : l.8 ", "LC-13 : l.38 "])):
+            gy.write_bytes(Path(SONDES, f"sonde-{sonde}.yml").read_bytes())
+            with self.subTest(sonde=sonde):
+                with self.assertRaises(ValueError) as e:
+                    orc.ligne_du_job(d, "s2bis-unittest", "s2bis")
+                self.assertEqual([m in str(e.exception) for m in motifs + ["forme K :"]], [True] * (len(motifs) + 1))
+        ligne = "          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut --egal --plancher 7"
+        k = ["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash", "        run: |", ligne]
+        for nom, lignes, motif in (("témoin", k, None), ("LC-08", k[:4] + ["    timeout-minutes: 600"] + k[5:], None),
+                                   ("N-12", k + ['  "s2bis-unittest":', "    steps:"], "N-12 : "),
+                                   ("N-12 répété", k + ["  s2bis-unittest:", "    steps:"], "N-12 : "),
+                                   ("N-14", k[:2] + [k[2] + chr(31)] + k[3:], "N-14 : "),
+                                   ("U+2028", k[:2] + [k[2] + chr(8232)] + k[3:], "N-14 : "),
+                                   ("LC-02", k + ["        # c", "          set +e"], "LC-02 : "),
+                                   ("LC-13", k[:2] + ["    name: &n s2bis-unittest"] + k[3:], "LC-13 : "),
+                                   ("LC-03", k[:12] + ['      - name: "suite'] + k[13:] + ['      - name: fin"'],
+                                    "forme K :")):
+            gy.write_text(nl.join(lignes) + nl, encoding="utf-8")
+            with self.subTest(forme=nom):
+                if motif is None:
+                    self.assertEqual(orc.ligne_du_job(d, "s2bis-unittest", "s2bis"), ligne.split()[1:])
+                    continue
+                with self.assertRaisesRegex(ValueError, f"^job s2bis-unittest de .*{motif}.* — refus$"):
+                    orc.ligne_du_job(d, "s2bis-unittest", "s2bis")
+
     def test_racine_de_suite_qui_masque_la_bibliotheque_standard(self):
         """SHOGEN-S2BIS-SUITE-MASQUE-UNITTEST-1 (lot OUT-2, OUT-2b) : un unittest.py à la racine d'une suite, qui
         imprime un résumé conforme et sort en 0, masquerait le module standard pour -m unittest. Commande `suite`
@@ -504,7 +671,7 @@ class TestOracleRecord(unittest.TestCase):
         d, dep, a, nl = tempfile.mkdtemp(dir=self.d), os.path.join(self.d, "depot-masque"), "claude-opus-5-5", chr(10)
         leurre = nl.join(["import sys", "sys.stderr.write(chr(10) + '-' * 70 + chr(10) + 'Ran 1 test in 0.001s' + "
                           "chr(10) * 2 + 'OK' + chr(10))", "sys.exit(0)", ""]).encode()      # résumé conforme forgé
-        gates = nl.join(["jobs:", "  s2bis-unittest:", "    steps:", "      - name: suite", "        shell: bash",
+        gates = nl.join(["jobs:", *forme_k("s2bis-unittest"), "      - name: suite", "        shell: bash",
                          "        run: |", "          python3 -B enforcement/verdict-suite-s2.py s2bis --aucun-saut "
                          "--egal --plancher 1", ""]).encode()
         s2, s2bis = depot(dep, [{**KO, "s2-harness/unittest.py": leurre}, {
@@ -588,7 +755,8 @@ class TestOracleRecord(unittest.TestCase):
     def test_verificateur_de_l_outil_lu_dans_sa_source(self):
         """SHOGEN-S2BIS-SCRIPT-MASQUE-1 (OUT-2d) : ligne_du_job exécute VERIF depuis sa source ; un .pyc à
         invalidation non vérifiée posé dans son __pycache__ (analyseur complaisant) est ignoré : job absent du
-        gates.yml, refus. Rougit si : VERIF chargé par le chargeur d'import (exec_module), qui lit ce .pyc."""
+        gates.yml, refus (forme K, DETTES-T7). Rougit si : VERIF chargé par le chargeur d'import (exec_module), qui lit
+        ce .pyc."""
         d, nl = tempfile.mkdtemp(dir=self.d), chr(10)
         v, src = os.path.join(d, "enforcement", "verdict-suite-s2.py"), os.path.join(d, "complaisant.py")
         os.makedirs(os.path.join(d, "arbre", ".github", "workflows"))
@@ -599,7 +767,7 @@ class TestOracleRecord(unittest.TestCase):
                              encoding="utf-8")
         py_compile.compile(src, importlib.util.cache_from_source(v), doraise=True,
                            invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
-        with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest absent"):
+        with mock.patch.object(orc, "VERIF", v), self.assertRaisesRegex(ValueError, "^job s2bis-unittest de .*forme K"):
             orc.ligne_du_job(os.path.join(d, "arbre"), "s2bis-unittest", "s2bis")
 
     def test_verifier_refuse_un_arbre_qui_porte_un_masque(self):
@@ -635,6 +803,25 @@ class TestOracleRecord(unittest.TestCase):
                                                                                           "^refus [(]masque[)] : "):
                 orc.verifier(p, "G2", commit, depot_)
         self.assertEqual(orc.verifier(temoin, "G2", self.c1)["tree"]["commit"], self.c1)
+
+    def test_verifier_refuse_l_enregistrement_d_un_outil_anterieur(self):
+        """SHOGEN-S2BIS-ENREG-ANCIEN-OUTIL-1 (lot DETTES-T7, Q-3 du générateur) : la lecture refuse (ancien outil) un
+        run `suite` lancé sans l'amorçage (-m unittest, outil d'avant OUT-2i), une commande de production ou de JOBS
+        lancée sans -I (outil d'avant OUT-2d), une commande qui n'est pas une liste (chaîne, entier) ; l'enregistrement
+        de l'outil courant reste conforme. Rougit si : contrôle absent, forme de `suite` ou de -I non lue, nom hors de
+        COMMANDES jugé."""
+        d = tempfile.mkdtemp(dir=self.d)
+        g2 = orc.enregistrer(d, "G2", "claude-opus-5-5", self.depot, self.c1)[0]
+        self.assertEqual(orc.verifier(g2, "G2", self.c1)["runs"][0]["commande"][1:3], ["-B", "-c"])
+        moins_m = [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-t", ".", "-v"]   # avant OUT-2i
+        for nom, f in (("moins-m", lambda r: r["runs"][0].update(commande=moins_m)),
+                       ("sans-I", lambda r: r["runs"][0].update(nom="j28", commande=[sys.executable, "-B", "x"])),
+                       ("chaine", lambda r: r["runs"][0].update(commande=" ".join(moins_m))),
+                       ("entier", lambda r: r["runs"][0].update(commande=5))):
+            with self.subTest(copie=nom), self.assertRaisesRegex(ValueError, "^refus [(]ancien outil[)] : "):
+                orc.verifier(self.copie(d, g2, f"{nom}.json", f), "G2", self.c1)
+        hors = self.copie(d, g2, "hors.json", lambda r: r["runs"][0].update(nom="essai", commande=[sys.executable]))
+        self.assertEqual(orc.verifier(hors, "G2", self.c1)["runs"][0]["nom"], "essai")      # nom hors de COMMANDES
 
     def test_suite_par_amorce_jugee_sur_le_compte_reel(self):
         """SHOGEN-S2BIS-ENREG-SUITE-COMPTE-1 (OUT-2i ; LF-06 de la revue de la vague 2) : la commande `suite` passe par

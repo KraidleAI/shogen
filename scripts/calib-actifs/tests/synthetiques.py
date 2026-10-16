@@ -52,12 +52,38 @@ def octets(format_: str, s: dict) -> bytes:
     return lignes[format_]()
 
 
+def fichiers(prm: dict, place: str, s: dict, fen=FEN) -> dict:
+    """{nom : octets} : f.dat, ou une page-<début>.json par page de ⌊`pas`/2⌋ − 2·`chevauchement` minutes (découpage
+    calculé ici ; clé absente : découpage d'avant DETTES-T2, sans chevauchement, pour le rouge sur le code d'avant) ;
+    couverture 2 (C-13) : et une double-<début>.json par page décalée d'une demi-page h, de début − h à fin + h ; et
+    (C-15) les sondes de socle.sonde, lecture exacte d'un historique fictif actif dès début − 7 jours."""
+    x = prm["series"][place]
+    if x["acces"] != "pages":
+        return {"f.dat": octets(x["format"], s)}
+    u = 60 * (x["pas"] // 2 - 2 * x.get("chevauchement", 0))
+    h = 60 * (u // 120)
+    plans = [("page", range(fen["debut"], fen["fin"], u))] + [("double", range(fen["debut"] - h, fen["fin"] + h, u))
+                                                               ] * (x.get("couverture", 1) == 2)
+    f = {f"{n}-{d}.json": octets(x["format"], {t: v for t, v in s.items() if d <= t < d + u})
+         for n, r in plans for d in r}
+    if x.get("couverture", 1) == 2 and "historique" in prm:
+        k, h0 = 60 * (x["pas"] // 2), fen["debut"] - 7 * 86400
+
+        def vide(y):
+            b = {max(y, h0): (Decimal(100), True)} if y < fen["debut"] and y + k > h0 else {}
+            f[f"sonde-{y}.json"] = octets(x["format"], b | {t: v for t, v in s.items() if y <= t < y + k})
+            return f[f"sonde-{y}.json"] == octets(x["format"], {})
+        socle.sonde(prm, place, fen, vide)
+    return f
+
+
 def ecrire_bruts(prm: dict, bruts: str, nom: str, fen=FEN) -> None:
-    """<bruts>/<nom>/<place>/<actif>/f.dat de chaque (actif, place) de la lecture retenue (fenêtre descriptive : sans
-    ses places exclues)."""
+    """<bruts>/<nom>/<place>/<actif>/ (fichiers()) de chaque (actif, place) de la lecture retenue (fenêtre
+    descriptive : sans ses places exclues)."""
     for actif in socle.ACTIFS:
         for p, s in series(prm, actif, fen).items():
             if nom == "principale" or p not in prm["fenetre_descriptive"]["sans"]:
                 os.makedirs(os.path.join(bruts, nom, p, actif), exist_ok=True)
-                with open(os.path.join(bruts, nom, p, actif, "f.dat"), "wb") as f:
-                    f.write(octets(prm["series"][p]["format"], s))
+                for n, o in fichiers(prm, p, s, fen).items():
+                    with open(os.path.join(bruts, nom, p, actif, n), "wb") as f:
+                        f.write(o)

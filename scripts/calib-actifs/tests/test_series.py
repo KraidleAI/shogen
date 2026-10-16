@@ -28,15 +28,28 @@ class TestSeries(unittest.TestCase):
         self.assertEqual((c, a), ([None, 10, 11, 11, 11, 14], [None, 0, 0, 1, 2, 0]))
 
     def test_charger(self):
-        """Fichiers d'une (place, actif) lus dans l'ordre des noms, .partiel ignoré ; dossier vide : CA/format.
-        Mutations : .partiel lu ; format de la place ignoré."""
+        """Fichiers d'une (place, actif) lus, .partiel ignoré ; dossier vide : CA/format. Fenêtre de 300 minutes,
+        pages de Coinbase du découpage (DETTES-T2, C-9 : 148 minutes utiles, en T0, T0 + 8880, T0 + 17760) et du second
+        (C-13 : décalé de 74 minutes, en T0 − 4440, T0 + 4440, T0 + 13320, T0 + 22200, la dernière vide), sondes vides
+        en recul depuis fin − 150 minutes, T0 + 9000 et T0, jusqu'à l'historique fixé à T0 − 18000, sonde non vide
+        (C-15 ; R-1 du contre-contrôle cc2 : sans sonde non vide, la fenêtre servie est refusée).
+        Mutations :
+        .partiel lu ; format de la place ignoré."""
         d = tempfile.mkdtemp(prefix="ca_ch_")
         self.addCleanup(shutil.rmtree, d, True)
         os.makedirs(os.path.join(d, "principale", "coinbase", "ETH"))
-        for nom, t in (("page-a.json", T0), ("page-b.json", T0 + 60), ("page-c.json.partiel", T0 + 120)):
+        fen = {"debut": T0, "fin": T0 + 18000}
+        for nom, t in ((f"page-{T0}.json", T0), (f"page-{T0 + 8880}.json", T0 + 8880),
+                       (f"page-{T0 + 17760}.json", T0 + 17760), (f"page-{T0 + 17760}.json.partiel", T0 + 60),
+                       (f"double-{T0 - 4440}.json", T0), (f"double-{T0 + 4440}.json", T0 + 8880),
+                       (f"double-{T0 + 13320}.json", T0 + 17760), (f"double-{T0 + 22200}.json", None),
+                       (f"sonde-{T0 + 9000}.json", None), (f"sonde-{T0}.json", None),
+                       (f"sonde-{T0 - 18000}.json", T0 - 18000)):
             with open(os.path.join(d, "principale", "coinbase", "ETH", nom), "w", encoding="ascii") as f:
-                f.write(f"[[{t}, 1, 2, 1, 1.5, 3]]")
-        self.assertEqual(sorted(bougies.charger(P, d, "principale", "coinbase", "ETH", P["fenetre"])), [T0, T0 + 60])
+                f.write("[]" if t is None else f"[[{t}, 1, 2, 1, 1.5, 3]]")
+        q = socle.json.loads(socle.json.dumps(P)) | {"historique": {"debut": T0 - 18000, "source": "tests"}}
+        self.assertEqual(sorted(bougies.charger(q, d, "principale", "coinbase", "ETH", fen)),
+                         [T0, T0 + 8880, T0 + 17760])
         with self.assertRaises(socle.Refus) as r:
             bougies.charger(P, d, "principale", "coinbase", "USDT", P["fenetre"])
         self.assertEqual(r.exception.code, "CA/format")
