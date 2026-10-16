@@ -21,3 +21,9 @@ docs/09-vocabulaire.md
 docs/13-temoignage-e2e-design.md
 docs/G1-lot-B0-pool-analyse.md
 CLAUDE.md
+# Phase 2, L-13 (SHOGEN-GARDE-LIGNE-REMPLACEE-1) : une ligne <chemin>:<a>[-<b>] <empreinte> est l'empreinte d'un
+# renvoi par numéro, non un motif, à la convention du registre de DETTES-T15 (docs/RENVOIS-LIGNES.tsv) : sha256 des
+# lignes a à b jointes par LF, sans LF final (sed -n 'a,bp' <chemin> | head -c -1 | sha256sum), 16 à 64 chiffres ;
+# avant_acte.py refuse (C7) un diff qui change ces lignes, même à nombre de lignes égal, sans changer l'empreinte.
+docs/adr-0028/ADR-0028-decisions-sortie-S2.md:293 d4d626281fcd97a6
+scripts/controle/fm11.py:4 3501489f246ba05c

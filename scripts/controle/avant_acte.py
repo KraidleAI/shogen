@@ -74,7 +74,11 @@ ou --id) : refus si les sources ne l'écrivent que dans des passages (paragraphe
 nomment d'autres diffs du même préfixe (plages N à M lues) et si les lignes ajoutées du diff ne le portent pas.
 Phase 2, L-4 : sceller --verif F (texte de declare -f verif, - : entrée standard) écrit au sceau la ligne verif
 <sha256> ; commit C1 refuse un sceau dont la ligne verif n'est pas l'empreinte de la fonction verif de
-gabarits/chaine.sh des outils (fonction versionnée, declare -f par bash) ; un sceau sans ligne verif n'est pas jugé."""
+gabarits/chaine.sh des outils (fonction versionnée, declare -f par bash) ; un sceau sans ligne verif n'est pas jugé.
+Phase 2, L-13 : C7 lit aussi les empreintes des lignes citées (lignes <chemin>:<a>[-<b>] <empreinte> de
+garde/lignes-citees.txt ; rangées du registre docs/RENVOIS-LIGNES.tsv de DETTES-T15, de l'état d'après, colonnes
+cible, lignes, empreinte) : un renvoi qui répondait à son empreinte à HEAD et n'y répond plus après le diff est refusé
+(à nombre de lignes égal compris), sauf empreinte mise à jour dans le même diff ; empreinte du registre."""
 import argparse
 import contextlib
 import fnmatch
@@ -114,6 +118,8 @@ PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Déca
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
 MODELE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gabarits", "chaine.sh")
+REGISTRE = "docs/RENVOIS-LIGNES.tsv"
+EMPREINTE = re.compile("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})")
 BORNE_LIEE = 100
 PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
 
@@ -348,11 +354,12 @@ def decalage(blocs, longueur):
     return pos + 1 if pos < longueur and ecart else None
 
 
-def cites(depot, texte, fichiers, fautes):
+def cites(depot, texte, fichiers, fautes, env=None):
     """C7 (E21) sur les fichiers de garde/lignes-citees.txt ; ligne Décalage admis : <chemin> du message : admis,
     journalisé en contournement."""
     with open(CITES, encoding="utf-8") as f:
-        motifs = [x.strip() for x in f if x.strip() and not x.startswith("#")]
+        motifs = [x.strip() for x in f if x.strip() and not x.startswith("#") and not EMPREINTE.fullmatch(x.strip())]
+    decales = set()
     for f in fichiers:
         chemin = f["avant"]
         if not chemin or not any(fnmatch.fnmatchcase(chemin, m) for m in motifs):
@@ -365,12 +372,60 @@ def cites(depot, texte, fichiers, fautes):
             quoi = f"un bloc décale la ligne {ligne} et les suivantes"
         if ligne is None:
             continue
+        decales.add(chemin)
         if "Décalage admis : " + chemin in texte.split(chr(10)):
             fautes.append(("admis", "C7", f"{chemin} : ligne {ligne} décalée, admis par le message", "",
                            "decalage-admis"))
         else:
             fautes.append(("refus", "C7", f"{chemin} : {quoi} (E21)",
                            "ajouter en fin ; décalage voulu : ligne Décalage admis : " + chemin + " au message", "-"))
+    remplacees(depot, fichiers, decales, fautes, env)
+
+
+def empreintes(depot, env=None):
+    """[(chemin, a, b, empreinte, source)] : lignes d'empreinte de garde/lignes-citees.txt, puis rangées du registre de
+    l'état d'après (index, ou index temporaire d'env) aux colonnes cible, lignes (a ou a-b ; - : hors de l'arbre,
+    sautée), empreinte ; lignes # sautées."""
+    with open(CITES, encoding="utf-8") as f:
+        vus = [(m[1], int(m[2]), int(m[3] or m[2]), m[4], "garde/lignes-citees.txt")
+               for m in map(EMPREINTE.fullmatch, map(str.strip, f)) if m]
+    if not git(depot, "ls-files", "-z", "--", REGISTRE, env=env):
+        return vus
+    rangees = [x.split(chr(9)) for x in git(depot, "show", ":" + REGISTRE, env=env).split(chr(10))
+               if x.strip() and not x.startswith("#")]
+    tete = rangees[0] if rangees else []
+    if not {"cible", "lignes", "empreinte"} <= set(tete):
+        raise Erreur(f"{REGISTRE} : colonnes cible, lignes, empreinte attendues en tête")
+    k = [tete.index(c) for c in ("cible", "lignes", "empreinte")]
+    for r in rangees[1:]:
+        m = re.fullmatch("([0-9]+)(?:-([0-9]+))?|-", r[k[1]] if len(r) == len(tete) else "?")
+        if not m or not re.fullmatch("[0-9a-f]{16,64}", r[k[2]]):
+            raise Erreur(f"{REGISTRE} : rangée illisible")
+        vus += [(r[k[0]], int(m[1]), int(m[2] or m[1]), r[k[2]], REGISTRE)] if m[1] else []
+    return vus
+
+
+def remplacees(depot, fichiers, decales, fautes, env=None):
+    """C7 (L-13) : renvoi (lignes a à b) qui répondait à son empreinte à HEAD et n'y répond plus après le diff : refus ;
+    empreinte qui ne répond ni à HEAD ni à l'état d'après : avertissement ; fichier déjà décalé (refusé ou admis) : non
+    jugé. Empreinte : sha256 des lignes jointes par LF, sans LF final, comparé sur sa longueur (16 au registre)."""
+    touches = {f["avant"]: f for f in fichiers if f["avant"] and f["avant"] not in decales}
+    for chemin, a, b, e, source in empreintes(depot, env):
+        if chemin not in touches:
+            continue
+        avant = git(depot, "cat-file", "-p", "HEAD:" + chemin).split(chr(10))
+        apres = git(depot, "show", ":" + chemin, env=env).split(chr(10)) if touches[chemin]["apres"] else []
+        h = lambda t: hashlib.sha256(chr(10).join(t[a - 1:b]).encode()).hexdigest()[:len(e)] if b < len(t) else None
+        renvoi = str(a) + ("-" + str(b) if b != a else "")
+        if h(apres) == e:
+            continue
+        if h(avant) == e:
+            fautes.append(("refus", "C7", f"{chemin} : renvoi {renvoi} changé ou retiré (empreinte de {source}, "
+                           "L-13)", "écrire l'erratum en fin ; changement voulu : mettre l'empreinte à jour au "
+                           "registre dans le même diff", "-"))
+        else:
+            fautes.append(("avertissement", "C7", f"{chemin} : empreinte du renvoi {renvoi} ({source}) sans "
+                           "réponse à HEAD ni après le diff", "", "-"))
 
 
 def workflows(depot, fichiers, fautes, env=None):
@@ -449,7 +504,7 @@ def diff(a, fautes):
         heures_et_citations(a.depot, textes, fautes, apres)
         passees(a.depot, fichiers, fautes)
         presg5(apres, textes, fautes)
-        cites(a.depot, "", fichiers, fautes)
+        cites(a.depot, "", fichiers, fautes, env)
         workflows(a.depot, fichiers, fautes, env)
 
 

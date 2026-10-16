@@ -134,6 +134,20 @@ class ListeDesCites(unittest.TestCase):
         self.assertEqual(hors, [])
 
 
+    def test_l13_empreintes_de_la_garde_a_jour(self):
+        """L-13 : chaque empreinte <chemin>:<a>[-<b>] <empreinte> de garde/lignes-citees.txt répond à ses lignes dans
+        l'arbre des outils (hors interdits, jamais ouverts) ; au moins celle d'ADR-0028 l.293 (garde/hors-distant.txt)."""
+        racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+        with open(avant_acte.CITES, encoding="utf-8") as f:
+            vus = [m for m in (re.fullmatch("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})", x.strip()) for x in f)
+                   if m]
+        self.assertIn("docs/adr-0028/ADR-0028-decisions-sortie-S2.md", [m[1] for m in vus])
+        for m in [m for m in vus if not avant_acte.GC.chemin_interdit(os.path.join(racine, m[1]))]:
+            with open(os.path.join(racine, m[1]), "rb") as f:
+                lignes = f.read().split(NL.encode())[int(m[2]) - 1:int(m[3] or m[2])]
+            self.assertEqual(hashlib.sha256(NL.encode().join(lignes)).hexdigest()[:len(m[4])], m[4], m[1])
+
+
 class Journal(Depot):
     def test_c9_journal_en_erreur(self):
         """C-9 : journal impossible à écrire (shogen-garde n'est pas un dossier) ou horloge en échec, après une
@@ -376,6 +390,57 @@ class CommitSuite(Source):
                                      self.CORPS + NL + NL + "Décalage admis : JOURNAL.md")
         self.assertEqual((code, sortie[:9]), (0, "ADMIS C7 "))
         self.assertEqual(self.journal()[-1][1:], ["commit", "C7", "admis", "decalage-admis"])
+
+    def test_l13_ligne_citee_remplacee(self):
+        """L-13 (SHOGEN-GARDE-LIGNE-REMPLACEE-1) : renvoi du registre docs/RENVOIS-LIGNES.tsv (format de DETTES-T15 :
+        colonnes renvoi, jeton, cible, ecrit, lignes, empreinte, commit ; empreinte, 16 premiers chiffres du sha256 des
+        lignes jointes par LF) dont les lignes changent à nombre de lignes égal : refus C7, au commit et au diff d'un
+        worker ; plage a-b ; autre ligne remplacée, renvoi hors de l'arbre (lignes -) ou empreinte mise à jour au
+        registre dans le même diff : admis ; empreinte qui ne répond ni à HEAD ni à l'état d'après : avertissement ;
+        décalage admis au message : non jugé une seconde fois ; registre sans colonnes cible, lignes, empreinte :
+        erreur 3."""
+        h = lambda x: hashlib.sha256(x.encode()).hexdigest()[:16]
+        tete = "renvoi jeton cible ecrit lignes empreinte commit".replace(" ", chr(9))
+        registre = lambda lg, x: NL.join(["# registre", tete, chr(9).join(["x.md:1", "JOURNAL.md:2", "JOURNAL.md", "2",
+                                                                            lg, h(x), "abc1234"]), ""])
+        self.indexer({"JOURNAL.md": NL.join(["l1", "l2", "l3", ""]), "docs/RENVOIS-LIGNES.tsv": registre("2", "l2"),
+                      "biblio/INDEX.md": "# index" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "journal")
+        refus = "REFUS C7 : JOURNAL.md : renvoi 2 changé ou retiré"
+        code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "L2", "l3", ""])})
+        self.assertEqual((code, sortie[:len(refus)]), (1, refus))
+        ag.ecrire(self.tmp, {"w.diff": ag.git(self.d, self.env, "diff", "--cached", "HEAD")})
+        ag.git(self.d, self.env, "reset", "-q", "--hard", "HEAD")
+        code, sortie = self.lancer("diff", "--fichier", os.path.join(self.tmp, "w.diff"))
+        self.assertEqual((code, sortie[:len(refus)]), (1, refus))
+        self.assertEqual(self.verifier({"JOURNAL.md": NL.join(["l1", "l2", "L3", ""])}), (0, ""))
+        for lg, x, attendu in (("2-3", "l2" + NL + "l3", (1, "REFUS C7 : JOURNAL.md : renvoi 2-3 changé")),
+                               ("-", "l2", (0, "")), ("2", "L3", (0, "AVERTISSEMENT C7 "))):
+            ag.git(self.d, self.env, "reset", "-q", "--hard", "HEAD")
+            self.indexer({"docs/RENVOIS-LIGNES.tsv": registre(lg, x)})
+            ag.git(self.d, self.env, "commit", "-q", "-m", "registre " + lg)
+            code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "l2", "L3", ""])})
+            self.assertEqual((code, sortie[:len(attendu[1])]), attendu, lg)
+        self.assertEqual(self.verifier({"JOURNAL.md": NL.join(["l1", "L2", "l3", ""]),
+                                        "docs/RENVOIS-LIGNES.tsv": registre("2", "L2")}), (0, ""))
+        code, sortie = self.verifier({"JOURNAL.md": NL.join(["l1", "neuf", "L2", "l3", ""])},
+                                     self.CORPS + NL + NL + "Décalage admis : JOURNAL.md")
+        self.assertEqual((code, sortie), (0, "ADMIS C7 : JOURNAL.md : ligne 3 décalée, admis par le message" + NL))
+        self.assertEqual(self.verifier({"docs/RENVOIS-LIGNES.tsv": "cible" + chr(9) + "n" + NL})[0], 3)
+
+    def test_l13_empreinte_de_la_garde(self):
+        """L-13 : ligne <chemin>:<a>[-<b>] <empreinte> de garde/lignes-citees.txt (lue par l'outil, convention du
+        registre, 16 à 64 chiffres) : même refus C7 pour un fichier hors des motifs ; la ligne d'empreinte n'est pas
+        un motif (insertion au milieu admise)."""
+        garde = os.path.join(self.tmp, "cites.txt")
+        h = hashlib.sha256(("un" + NL + "deux").encode()).hexdigest()
+        ag.ecrire(self.tmp, {"cites.txt": "# motifs" + NL + "a.md:1-2 " + h[:20] + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "a.md à deux lignes")
+        with mock.patch.object(avant_acte, "CITES", garde):
+            code, sortie = self.verifier({"a.md": "UN" + NL + "deux" + NL})
+            refus = "REFUS C7 : a.md : renvoi 1-2 changé ou retiré"
+            self.assertEqual((code, sortie[:len(refus)]), (1, refus))
+            self.assertEqual(self.verifier({"a.md": "un" + NL + "deux" + NL + "trois" + NL}), (0, ""))
 
     def test_c3_prefixes_de_la_configuration(self):
         """C-3 : dépôt réglé en diff.mnemonicPrefix (préfixes c/ et i/) : commit lit toujours a/ et b/ ; une insertion
