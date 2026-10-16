@@ -1061,6 +1061,57 @@ fn temoin_sg5_commentaire_hors_html_reste_au_corpus() {
     );
 }
 
+// S-G5, éléments script et style (lot DETTES-T15, DT15-g ; adjudication Q-5) : leur contenu n'est jamais affiché.
+// Fermante selon la tokenisation HTML : casse ignorée, nom suivi d'un blanc, de `/` ou de `>` ; dans un script,
+// `<!--` puis `<script` font ignorer la fermante suivante jusqu'à `-->`. Fixtures minimales, aucune page copiée.
+
+/// S-G5 sur la page détenue `page_detenue(page)` qui cite « `citation` » : ROUGE exigé si `rouge`, VERT sinon.
+fn sg5_page_rouge(cas: &str, page: &str, citation: &str, rouge: bool) {
+    let rapport = sg5_page(cas, "artefact-a.html", &page_detenue(page), citation);
+    if rouge {
+        exiger_rouge(&rapport, "citation introuvable");
+    } else {
+        assert!(
+            rapport.vert(),
+            "{cas} : texte affiché perdu :\n{}",
+            motifs(&rapport)
+        );
+    }
+}
+
+/// Un test par page : la page, la citation, ROUGE exigé ou non.
+macro_rules! pages_sg5 {
+    ($($nom:ident : $page:expr, $citation:expr => $rouge:expr),* $(,)?) => {
+        $(#[test] fn $nom() { sg5_page_rouge(stringify!($nom), &$page, $citation, $rouge); })*
+    };
+}
+
+pages_sg5! {
+    mutant_sg5_script_contenu_ote:
+        format!("<script>var r = \"{REGLE_RETIREE}\";</script><p>x</p>"), REGLE_RETIREE => true,
+    mutant_sg5_style_contenu_ote:
+        format!("<style>/* {REGLE_RETIREE} */ p {{ color: red }}</style>"), REGLE_RETIREE => true,
+    mutant_sg5_script_casse_et_fermante_espacee:
+        format!("<SCRIPT type=\"text/javascript\">\"{REGLE_RETIREE}\"</Script >"), REGLE_RETIREE => true,
+    mutant_sg5_script_fermante_d_un_autre_nom:
+        format!("<script>x</scripts>\"{REGLE_RETIREE}\"</script>"), REGLE_RETIREE => true,
+    mutant_sg5_script_jamais_ferme: format!("<p>debut</p><script>{REGLE_RETIREE}\n<p>suite</p>"), REGLE_RETIREE => true,
+    mutant_sg5_script_doublement_echappe:
+        format!("<script><!-- w(\"<script>a</script>\"); {REGLE_RETIREE} --></script>"), REGLE_RETIREE => true,
+    mutant_sg5_script_doublement_echappe_deux_fois: format!(
+        "<script><!-- <script></script><script></script> {REGLE_RETIREE} --></script>"
+    ), REGLE_RETIREE => true,
+    temoin_sg5_script_ferme_texte_suivant_affiche: format!("<script>x</script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_element_scripts_n_est_pas_un_script: format!("<scripts>{AFFICHEE}.</scripts>"), AFFICHEE => false,
+    temoin_sg5_style_ferme_texte_suivant_affiche: format!("<style>p {{}}</style><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_double_echappe_rendu_aux_donnees:
+        format!("<script><!-- <script> --></script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_commentaire_vide: format!("<script><!--><script></script><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_script_dans_un_commentaire: format!("<!-- <script> --><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+    temoin_sg5_commentaire_texte_colle_garde: format!("<!-- x -->{AFFICHEE}."), AFFICHEE => false,
+    temoin_sg5_commentaire_trois_tirets: format!("<!-- a ---><p>{AFFICHEE}.</p>"), AFFICHEE => false,
+}
+
 // ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant

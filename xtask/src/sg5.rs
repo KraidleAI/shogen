@@ -19,10 +19,11 @@
 //! local plus large que le corpus CI, et les rares citations que
 //! l'extraction perd (ligature sans mapping) vivent à l'INDEX.
 //!
-//! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1) : une
-//! page HTML ou Markdown entre au corpus sans ses commentaires `<!-- … -->`,
-//! ôtés avant le débalisage — une citation d'un texte retiré d'une page,
-//! resté en commentaire, est introuvable.
+//! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1 ; DT15-g) :
+//! une page HTML ou Markdown entre au corpus sans ce qu'elle ne donne jamais à
+//! lire — commentaires `<!-- … -->`, contenu des éléments `script` et `style` —,
+//! ôté avant le débalisage : une citation d'un texte retiré d'une page, resté
+//! en commentaire ou dans un script, est introuvable.
 //!
 //! **La leçon de couverture, assumée en deux régimes** : le régime est
 //! détecté en comparant les octets présents au **compte déclaré à
@@ -84,10 +85,10 @@ const EXTENSIONS_TEXTE: &[&str] = &[
 ];
 
 /// Extensions des pages rendues (HTML, et Markdown, dont le rendu cache aussi
-/// ces commentaires) : leurs commentaires `<!-- … -->` ne sont pas du texte
-/// affiché et sortent du corpus (`retirer_commentaires`). Ailleurs (texte
-/// brut, code, données), `<!--` n'ouvre rien.
-const EXTENSIONS_A_COMMENTAIRES: &[&str] = &["html", "htm", "md"];
+/// ces constructions) : ce qu'elles ne donnent jamais à lire sort du corpus
+/// (`retirer_non_affiche`). Ailleurs (texte brut, code, données), `<` n'ouvre
+/// rien.
+const EXTENSIONS_RENDUES: &[&str] = &["html", "htm", "md"];
 
 /// Les emplacements interdits de lecture, liste du brief du lot SG5-INTERDITS
 /// (G0 `docs/adr-0029/G0-lots-S2BIS.md`) : préfixes exacts de chemin relatif,
@@ -188,8 +189,8 @@ pub fn executer(racine: &Path) -> Rapport {
                 match std::fs::read(&chemin) {
                     Ok(brut) => {
                         let brut = String::from_utf8_lossy(&brut);
-                        let texte = if EXTENSIONS_A_COMMENTAIRES.contains(&extension.as_str()) {
-                            retirer_commentaires(&brut)
+                        let texte = if EXTENSIONS_RENDUES.contains(&extension.as_str()) {
+                            retirer_non_affiche(&brut)
                         } else {
                             brut.into_owned()
                         };
@@ -416,33 +417,103 @@ fn retirer_pagination_rfc(texte: &str) -> String {
         .join("\n")
 }
 
-/// Retire les commentaires d'une page (SHOGEN-SG5-COMMENTAIRE-HTML-1) : de
-/// `<!--` à sa fin selon la tokenisation HTML (WHATWG, états du commentaire),
-/// `>` ou `->` tout de suite (commentaire vide), sinon le premier `-->` ou
-/// `--!>` ; sans fin, jusqu'au bout du texte, que le navigateur n'affiche
-/// plus. Lecture sans analyseur : un `<!--` dans une valeur d'attribut, un
-/// script ou un bloc de code ouvre aussi un commentaire (texte ôté en trop,
-/// jamais gardé en trop). Appliqué au corpus seulement, avant le débalisage.
-fn retirer_commentaires(texte: &str) -> String {
+/// Ôte d'une page ce qu'elle ne donne jamais à lire, en un balayage de gauche
+/// à droite comme la tokenisation HTML (WHATWG) : commentaires
+/// (SHOGEN-SG5-COMMENTAIRE-HTML-1) et éléments `script` et `style` jusqu'à la
+/// fermante qui les clôt (DT15-g). Ce qu'un script ou une interaction peut
+/// montrer (`template`, attribut `hidden`, CSS) reste. Lecture sans analyseur :
+/// texte ôté en trop (valeur d'attribut, bloc de code Markdown), jamais gardé
+/// en trop ; temps linéaire. Appliqué au corpus seulement, avant le débalisage.
+fn retirer_non_affiche(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
-    while let Some(ouverture) = reste.find("<!--") {
+    while let Some(ouverture) = reste.find('<') {
         sortie.push_str(reste.get(..ouverture).unwrap_or(""));
-        let corps = reste.get(ouverture.saturating_add(4)..).unwrap_or("");
-        let fin = if corps.starts_with('>') {
-            Some(1)
-        } else if corps.starts_with("->") {
-            Some(2)
-        } else {
-            ["-->", "--!>"]
-                .iter()
-                .filter_map(|marque| corps.find(marque).map(|p| p.saturating_add(marque.len())))
-                .min()
-        };
-        reste = fin.and_then(|n| corps.get(n..)).unwrap_or("");
+        let suite = reste.get(ouverture..).unwrap_or("");
+        let longueur = longueur_non_affichee(suite);
+        if longueur.is_none() {
+            sortie.push('<');
+        }
+        reste = suite.get(longueur.unwrap_or(1)..).unwrap_or("");
     }
     sortie.push_str(reste);
     sortie
+}
+
+/// Longueur, depuis son `<`, d'une construction jamais affichée (jusqu'au bout
+/// du texte si elle ne se ferme pas) ; `None` pour une balise ou un `<` de texte.
+fn longueur_non_affichee(suite: &str) -> Option<usize> {
+    if let Some(corps) = suite.strip_prefix("<!--") {
+        return Some(fin_de_commentaire(corps).saturating_add(4));
+    }
+    [("<script", "</script"), ("<style", "</style")]
+        .into_iter()
+        .find(|(ouvrante, _)| balise(suite.as_bytes(), 0, ouvrante))
+        .map(|(_, fermante)| fin_d_element(suite, fermante))
+}
+
+/// Fin d'un commentaire, dans son corps : `>` ou `->` tout de suite
+/// (commentaire vide), sinon le premier `--` suivi de `>` ou de `!>` ; sans
+/// fin, le bout du texte. Un seul passage sur le corps.
+fn fin_de_commentaire(corps: &str) -> usize {
+    if corps.starts_with('>') {
+        return 1;
+    }
+    if corps.starts_with("->") {
+        return 2;
+    }
+    let mut depuis = 0usize;
+    while let Some(p) = corps.get(depuis..).and_then(|r| r.find("--")) {
+        let tirets = depuis.saturating_add(p);
+        let apres = corps.get(tirets.saturating_add(2)..).unwrap_or("");
+        if apres.starts_with('>') {
+            return tirets.saturating_add(3);
+        }
+        if apres.starts_with("!>") {
+            return tirets.saturating_add(4);
+        }
+        depuis = tirets.saturating_add(1);
+    }
+    corps.len()
+}
+
+/// Vrai si `t` porte en `i` le `motif` (`<script`, `</style`…, casse ASCII
+/// ignorée) suivi d'un blanc, de `/`, de `>` ou de la fin du texte.
+fn balise(t: &[u8], i: usize, motif: &str) -> bool {
+    let fin = i.saturating_add(motif.len());
+    t.get(i..fin)
+        .is_some_and(|lu| lu.eq_ignore_ascii_case(motif.as_bytes()))
+        && t.get(fin).is_none_or(|o| b"\t\n\x0c\r />".contains(o))
+}
+
+/// Fin d'un élément `script` ou `style`, depuis son `<` : après le `>` de la
+/// fermante qui le clôt, sinon le bout du texte. `style` se clôt à sa première
+/// fermante ; `script` suit les états de la tokenisation : après `<!--`, un
+/// `<script` fait ignorer les fermantes jusqu'à `-->`.
+fn fin_d_element(suite: &str, fermante: &str) -> usize {
+    let t = suite.as_bytes();
+    let script = fermante == "</script";
+    let mut i = suite.find('>').unwrap_or(t.len());
+    let mut etat = 0u8; // 0 : données ; 1 : échappé, après `<!--` ; 2 : doublement échappé
+    while i < t.len() {
+        if script && etat > 0 && t.get(i..i.saturating_add(3)) == Some(b"-->".as_slice()) {
+            etat = 0;
+        } else if balise(t, i, fermante) {
+            if etat < 2 {
+                let fin = suite.get(i..).and_then(|r| r.find('>'));
+                return fin.map_or(t.len(), |q| i.saturating_add(q).saturating_add(1));
+            }
+            etat = 1;
+        } else if script && etat == 0 && t.get(i..i.saturating_add(4)) == Some(b"<!--".as_slice()) {
+            etat = 1;
+            i = i.saturating_add(2);
+            continue;
+        } else if script && etat == 1 && balise(t, i, "<script") {
+            etat = 2;
+        }
+        i = i.saturating_add(1);
+    }
+    t.len()
 }
 
 /// Retire les balises `<…>` d'un texte de corpus HTML : une citation d'une
