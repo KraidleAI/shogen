@@ -42,8 +42,9 @@ python3 -B scripts/publication/gabarit_controle.py docs/publication/gabarits/RAP
 
 Sortie 0 : conforme ; 1 : refus, motifs sur la sortie d'erreur ; 3 : erreur (gabarit malformé, doc 09 dont une ligne
 ancrée a changé). Le contrôle mécanise les règles 1, 2 (sous-ensemble ancré de doc 09), 3 et 4 (champs `libre`) ; il ne
-juge ni le contexte d'une phrase, ni l'égalité d'une valeur à sa pièce. La relecture humaine du rapport reste due
-(doc 09, règle d'application), par un réviseur qui n'a pas rempli le rapport.
+juge ni le contexte d'une phrase, ni l'égalité d'une valeur à sa pièce, ni un nombre écrit en lettres (il ne lit que
+les chiffres). La relecture humaine du rapport reste due (doc 09, règle d'application), par un réviseur qui n'a pas
+rempli le rapport.
 
 ## Limites
 
