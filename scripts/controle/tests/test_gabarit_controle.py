@@ -74,6 +74,7 @@ class GabaritControle(unittest.TestCase):
                                (remplir().replace("# R", "# X"), "changé avant le premier champ"),
                                (remplir().replace("fin `Acme`", "fin `Beta`"), "<libre.client> : deux valeurs"),
                                (remplir() + "ajout", "texte en trop"), (remplir(rendu_k=""), "valeur vide"),
+                               (remplir(rendu_k=" \n "), "valeur vide"),
                                (remplir(libre_client="Acme`\n- k : `x"), "texte en trop"),
                                (remplir(libre_client="des sources indépendantes"), "l.7 : locution (doc 09 l.21)"),
                                (remplir(libre_client="sources indépendantes").replace("# R", "# X"), "(doc 09 l.21)")):
@@ -82,11 +83,15 @@ class GabaritControle(unittest.TestCase):
 
     def test_nombres_empreintes_et_r1(self):
         self.assertEqual(lancer(G, remplir(libre_client="Acme 3 [sha256.rendu l.12]")), (0, ""))
+        self.assertEqual(lancer(G, remplir(libre_client="Acme 3 [sha256.rendu l.12-14]")), (0, ""))
         for valeurs, motif in (({"sha256_rendu": "A" * 64}, "forme sha256"), ({"date_r": "2026-10-15"}, "forme date"),
                                ({"commit_h": "b" * 39}, "forme commit"), ({"version_p": "3.11.15+"}, "forme version"),
+                               ({"version_p": "3.11"}, "forme version"),
+                               ({"date_r": "2026-10-15T23:00:00"}, "forme date"),
                                ({"libre_client": "Acme 3"}, "nombre sans empreinte"),
                                ({"libre_client": "Acme 3 [sha256.autre]"}, "nombre sans empreinte"),
                                ({"libre_client": "Acme [sha256.autre]"}, "empreinte inconnue"),
+                               ({"libre_client": "Acme\n[sha256.autre] [sha256.rendu]"}, "empreinte inconnue"),
                                ({"libre_client": "Acme 3\n[sha256.rendu]"}, "nombre sans empreinte"),
                                ({"libre_client": "Acme\nR1"}, "prétention R1"),
                                ({"libre_client": "Acme, R1 mesuré"}, "prétention R1")):
