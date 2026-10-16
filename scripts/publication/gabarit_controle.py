@@ -83,7 +83,7 @@ def controler(gabarit: str, rapport: str, doc09: str = DOC09) -> list:
             motifs.append(f"<{n}> : valeur vide")
         if genre == "libre" and re.search(r"(?<!\w)R1(?!\w)", v):
             motifs.append(f"<{n}> : prétention R1 (aucune avant le rendu de S2-bis)")
-        if genre in FORMES and not re.fullmatch(FORMES[genre], v):
+        if genre in FORMES and not re.fullmatch(FORMES[genre], v, re.ASCII):     # chiffres ASCII seuls (CC)
             motifs.append(f"<{n}> : forme {genre} attendue")
         elif genre not in FORMES and genre not in empreintes:
             motifs += [f"<{n}> : nombre sans empreinte : {x.strip()[:80]!r}" for x in v.split("\n")

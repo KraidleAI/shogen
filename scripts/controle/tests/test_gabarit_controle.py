@@ -87,6 +87,7 @@ class GabaritControle(unittest.TestCase):
         self.assertEqual(lancer(G, remplir(libre_client="Acme 3 [sha256.rendu l.12]")), (0, ""))
         self.assertEqual(lancer(G, remplir(libre_client="Acme 3 [sha256.rendu l.12-14]")), (0, ""))
         for valeurs, motif in (({"sha256_rendu": "A" * 64}, "forme sha256"), ({"date_r": "2026-10-15"}, "forme date"),
+                               ({"date_r": "２０２６-10-15T23:00:00Z"}, "forme date"),
                                ({"commit_h": "b" * 39}, "forme commit"), ({"version_p": "3.11.15+"}, "forme version"),
                                ({"version_p": "3.11"}, "forme version"),
                                ({"date_r": "2026-10-15T23:00:00"}, "forme date"),
