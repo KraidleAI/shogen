@@ -1223,6 +1223,21 @@ pages_sg5! {
     temoin_sg5_titre_texte_affiche: format!("<title>{AFFICHEE}.</title><p>x</p>"), AFFICHEE => false,
 }
 
+// S-G5, éléments de texte brut que C-6 ne testait pas (contre-contrôle de DETTES-T15, R-2 ; mutants M08 à M10) : un
+// `<!--` écrit dans un `xmp`, un `noembed` ou un `noframes` est du texte (RAWTEXT) et ne se clôt pas dans un script.
+
+pages_sg5! {
+    mutant_sg5_xmp_ouvreur_clos_dans_un_script: format!(
+        "<xmp><!--</xmp><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_noembed_ouvreur_clos_dans_un_script: format!(
+        "<noembed><!--</noembed><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+    mutant_sg5_noframes_ouvreur_clos_dans_un_script: format!(
+        "<noframes><!--</noframes><script>var s = \"-->{REGLE_RETIREE}\";</script><p>x</p>"
+    ), REGLE_RETIREE => true,
+}
+
 /// Hors HTML aussi (texte brut), une balise se lit jusqu'à son vrai `>`, sans borne : son attribut sort du corpus.
 #[test]
 fn mutant_sg5_attribut_long_ote_hors_html() {
