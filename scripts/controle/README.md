@@ -485,3 +485,12 @@ dépendent des tests du harnais qu'ils importent.
 > du dépôt, mêmes textes et mêmes lignes avant et après, le corpus lu en 5 s au lieu de 991 s).
 > `tests/test_presg5_lineaire.py` compte 3 tests (deux tests de temps bornés à 20 s sur 8 000 000 de caractères,
 > rouges sur l'ancienne lecture ; des valeurs de référence) ; plancher du job `controle-unittest` 121.
+
+> *Ajout daté du 2026-10-16 06:58:15 UTC (`date -u` ; lot PRODUIT-R2, R2-c ; ADR-0028 §4 pt 7 et D9, AVIS-PRODUIT-APRES-S2 §3)* :
+> `../publication/gabarit_controle.py` (sha256 `81512aeaac3f72131fe4ae57a47f05885deb5115da1f0f16c180eefbd1688abd`) contrôle un rapport écrit depuis un
+> gabarit de `docs/publication/gabarits/` : locutions de doc 09 (25 entrées, chacune ancrée à sa ligne de doc 09 ;
+> ancre absente : erreur 3), texte fixe à l'octet, champs tous remplis ou tous vides, nombre sans empreinte, R1 dans un
+> champ libre. `tests/test_gabarit_controle.py` compte 5 tests (une phrase par entrée de doc 09 ; les 26 renvois
+> chemin:ligne des deux gabarits relus contre le harnais ; doc 04 l.129-139 recopiées) ; plancher du job
+> `controle-unittest` 126. Un lot qui décale une ligne citée de `s2-harness/shogen_s2/report.py`, `r2.py` ou
+> `sources.py` fait échouer ce test : il met à jour les renvois des deux gabarits. Limites : docstring de l'outil.
