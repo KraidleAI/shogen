@@ -27,7 +27,7 @@ Un champ s'écrit entre chevrons, sous la forme type point nom. Le type dit d'o�
    correcte est celle de la troisième colonne de doc 09.
 3. Aucun nombre sans sa source. Un champ de pièce recopie la pièce sans arrondi ni reformulation ; un champ `libre` qui
    porte un chiffre cite, sur la même ligne, l'empreinte d'une pièce du gabarit, avec la ligne si elle est connue
-   (forme `[sha256.rendu l.12]`).
+   (forme `[sha256.rendu l.12]`, ou `[sha256.rendu l.12-14]` pour une plage).
 4. Aucune prétention R1 tant que S2-bis n'a pas rendu : ni les blocs 3 et 4 du rendu, ni les drapeaux du bloc 6, ni
    aucune phrase sur la co-défaillance des flux ; k_eff n'est jamais lu comme un compte d'indépendance.
 5. La liste des axes non mesurés (§5 du gabarit) est un champ non optionnel (doc 04 l.129-139) : le champ propre au pool
@@ -41,7 +41,8 @@ python3 -B scripts/publication/gabarit_controle.py docs/publication/gabarits/RAP
 ```
 
 Sortie 0 : conforme ; 1 : refus, motifs sur la sortie d'erreur ; 3 : erreur (gabarit malformé, doc 09 dont une ligne
-ancrée a changé). Le contrôle mécanise les règles 1, 2 (sous-ensemble ancré de doc 09), 3 et 4 (champs `libre`) ; il ne
+ancrée a changé). Le contrôle mécanise les règles 1, 2 (sous-ensemble ancré de doc 09), 3 et 4 (champs `libre`, jeton
+`R1` en capitales seul : une phrase sur la co-défaillance qui ne l'écrit pas passe) ; il ne
 juge ni le contexte d'une phrase, ni l'égalité d'une valeur à sa pièce, ni un nombre écrit en lettres (il ne lit que
 les chiffres). La relecture humaine du rapport reste due (doc 09, règle d'application), par un réviseur qui n'a pas
 rempli le rapport.
