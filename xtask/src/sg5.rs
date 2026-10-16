@@ -21,9 +21,10 @@
 //!
 //! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1 ; DT15-g) :
 //! une page HTML ou Markdown entre au corpus sans ce qu'elle ne donne jamais à
-//! lire — commentaires `<!-- … -->`, contenu des éléments `script` et `style` —,
-//! ôté avant le débalisage : une citation d'un texte retiré d'une page, resté
-//! en commentaire ou dans un script, est introuvable.
+//! lire — commentaires `<!-- … -->` et factices (`<!…>`, `<?…>`, DT15-h),
+//! contenu des éléments `script` et `style` —, ôté avant le débalisage : une
+//! citation d'un texte retiré d'une page, resté en commentaire ou dans un
+//! script, est introuvable.
 //!
 //! **La leçon de couverture, assumée en deux régimes** : le régime est
 //! détecté en comparant les octets présents au **compte déclaré à
@@ -419,11 +420,12 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 
 /// Ôte d'une page ce qu'elle ne donne jamais à lire, en un balayage de gauche
 /// à droite comme la tokenisation HTML (WHATWG) : commentaires
-/// (SHOGEN-SG5-COMMENTAIRE-HTML-1) et éléments `script` et `style` jusqu'à la
-/// fermante qui les clôt (DT15-g). Ce qu'un script ou une interaction peut
-/// montrer (`template`, attribut `hidden`, CSS) reste. Lecture sans analyseur :
-/// texte ôté en trop (valeur d'attribut, bloc de code Markdown), jamais gardé
-/// en trop ; temps linéaire. Appliqué au corpus seulement, avant le débalisage.
+/// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices (DT15-h) et éléments
+/// `script` et `style` jusqu'à la fermante qui les clôt (DT15-g). Ce qu'un
+/// script ou une interaction peut montrer (`template`, attribut `hidden`, CSS)
+/// reste. Lecture sans analyseur : texte ôté en trop (valeur d'attribut, bloc
+/// de code Markdown), jamais gardé en trop ; temps linéaire. Appliqué au corpus
+/// seulement, avant le débalisage.
 fn retirer_non_affiche(texte: &str) -> String {
     let mut sortie = String::with_capacity(texte.len());
     let mut reste = texte;
@@ -445,6 +447,15 @@ fn retirer_non_affiche(texte: &str) -> String {
 fn longueur_non_affichee(suite: &str) -> Option<usize> {
     if let Some(corps) = suite.strip_prefix("<!--") {
         return Some(fin_de_commentaire(corps).saturating_add(4));
+    }
+    // Commentaire factice (DT15-h) : `<!` sans `--`, `<?`, ou `</` suivi d'un
+    // caractère qui n'est ni une lettre ASCII ni `>` ; clos au premier `>`.
+    let fermante_factice = suite.strip_prefix("</").and_then(|r| r.chars().next());
+    let factice = suite.starts_with("<!")
+        || suite.starts_with("<?")
+        || fermante_factice.is_some_and(|c| !c.is_ascii_alphabetic() && c != '>');
+    if factice {
+        return Some(suite.find('>').map_or(suite.len(), |q| q.saturating_add(1)));
     }
     [("<script", "</script"), ("<style", "</style")]
         .into_iter()

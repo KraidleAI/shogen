@@ -1112,6 +1112,23 @@ pages_sg5! {
     temoin_sg5_commentaire_trois_tirets: format!("<!-- a ---><p>{AFFICHEE}.</p>"), AFFICHEE => false,
 }
 
+// S-G5, commentaires factices (lot DETTES-T15, DT15-h ; limite L-6 fermée) : `<!` sans `--`, `<?`, et `</` suivi d'un
+// caractère qui n'est ni une lettre ni `>` ouvrent un commentaire factice, clos au premier `>`, sans borne de longueur.
+
+pages_sg5! {
+    mutant_sg5_commentaire_factice_long:
+        format!("<!x {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_instruction_factice_longue:
+        format!("<?x {REGLE_RETIREE} ; {} ?><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_fermante_factice_longue:
+        format!("</ {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    mutant_sg5_commentaire_factice_jamais_ferme: format!("<p>x</p><!x {REGLE_RETIREE}"), REGLE_RETIREE => true,
+    mutant_sg5_fermante_factice_lettre_non_ascii:
+        format!("</é {REGLE_RETIREE} ; {} ><p>x</p>", "and it has no tag. ".repeat(20)), REGLE_RETIREE => true,
+    temoin_sg5_factices_clos_au_premier_chevron:
+        format!("<!DOCTYPE html><?xml version=\"1\"?></ x><!x><p>{AFFICHEE}.</p><p>y</p>"), AFFICHEE => false,
+}
+
 // ---------------------------------------------------------------------------
 // S-G9 (lot DETTES-B2, 2026-10-04 ; SHOGEN-E1-XTASK-REFS-1, ADR-0028 annexe B.7) : contrôles (a) à (f) de
 // l'oracle hors dépôt `verif_refs.py` du lot E1, sur un docs/17 synthétique et ses registres. Chaque mutant
