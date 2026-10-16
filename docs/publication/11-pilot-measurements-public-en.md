@@ -669,7 +669,7 @@ Each output carries on its first line: « ajoutée après le pré-enregistrement
 | « n'est pas rejeté » | is not rejected |
 | « aucune strate ne rejette ; strate(s) testée(s) : calme, stress » | no stratum rejects; stratum(s) tested: calm, stress |
 | « nonÉv » | not evaluable |
-| (panne / stale / horsE / nonÉv) | outage / stale / out-of-envelope / not evaluable |
+| (panne / stale / horsE / nonÉv) | failed reading / stale / out-of-envelope / not evaluable |
 | « côté livraison » | delivery side |
 | « comparaison hétérogène déclarée » | heterogeneous comparison declared |
 | « historique insuffisant » | insufficient history |
@@ -711,8 +711,8 @@ Each output carries on its first line: « ajoutée après le pré-enregistrement
 | flux | feed | a reading of the BTC/USD (or BTC/USDT) price served by a source |
 | source ; place (d'échange) ; agrégateur ; oracle | source ; exchange ; aggregator ; oracle |  |
 | hôte ; hôte de collecte | host ; collection host |  |
-| panne | outage | status panne_transport kept as printed |
-| écart (doc 10 §5.2) ; en écart ; co-écart ; taux d'écart | anomaly ; anomalous ; co-anomaly ; anomaly rate | a feed is anomalous in a window if in outage, stale or out of envelope |
+| panne | failed reading | status panne_transport kept as printed; ordinary sense (outage of a provider, §9.3 pt 8): outage |
+| écart (doc 10 §5.2) ; en écart ; co-écart ; taux d'écart | anomaly ; anomalous ; co-anomaly ; anomaly rate | a feed is anomalous in a window if it has a failed reading, is stale or out of envelope |
 | écart (sens courant) ; écart déclaré (à un texte) ; écart (contrôle d'horloge) | difference, gap ; declared departure ; offset | offset: clock-check sense (§9.2 pt 17), as in the median offset of §11.1 |
 | déviation (déclarée) | (declared) deviation | departure from the pre-registered plan |
 | co-défaillance | co-failure |  |
