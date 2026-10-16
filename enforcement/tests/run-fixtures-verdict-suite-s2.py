@@ -198,7 +198,7 @@ def sortie(n=v.PLANCHER, sauts=(NOMME, NOMME), statut=None, apres=""):
 
 
 OK_ = KO = 0
-CAS = 152                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
+CAS = 153                   # cas joués exigés, ni plus ni moins (Q-2) : un cas ajouté ou retiré la change (PLANCHER)
 
 
 def cas(nom, refus, attendu):
@@ -702,6 +702,10 @@ for nom, lignes, admis in (
 cas("S-13 LC-13 : ancre au nom du job, alias au nom de l'étape 3 : refusé par l'analyseur seul", ["admis"] if analyseur(
     chr(10).join(K[:2] + ["    name: &n s2bis-unittest"] + K[3:12] + ["      - name: *n"] + K[13:]), "s2bis-unittest",
     APPEL) else [], None)
+FINS = (11, 12, 13, 28, 29, 30, 133, 8232, 8233)       # réserve R-7 du contre-contrôle : écrites à la main, une à une
+cas("S-14 N-14 : chaque fin de ligne autre que LF, seule dans le nom du job (U+0085 compris) : refusée", [
+    f"U+{c:04X} admis" for c in FINS if cable(chr(10).join(K[:2] + [K[2] + chr(c)] + K[3:]), "s2bis-unittest", APPEL)],
+    None)
 SIM = [x.replace("s2bis-unittest", "sim-bis-unittest") for x in DEBUT]        # CB-18v : job sim-bis (Q-T4-11)
 SIM_SUITE, FD = SUITE[:4] + [L + LIGNE.replace(" s2bis ", " scripts/sim-bis ")], "          fetch-depth: "
 APPEL_SIM = APPEL.replace(" s2bis ", " scripts/sim-bis ")
