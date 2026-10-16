@@ -21,8 +21,9 @@
 //!
 //! **Texte affiché** (lot DETTES-T15, SHOGEN-SG5-COMMENTAIRE-HTML-1 ; DT15-g) :
 //! une page HTML ou Markdown entre au corpus sans ce qu'elle ne donne jamais à
-//! lire — commentaires `<!-- … -->` et factices (`<!…>`, `<?…>`, DT15-h),
-//! contenu des éléments `script` et `style` —, ôté avant le débalisage : une
+//! lire — commentaires `<!-- … -->` et factices (`<!…>`, `</…>`, DT15-h),
+//! instructions de traitement (`<?…>`, DT15-h), contenu des éléments `script`
+//! et `style` —, ôté avant le débalisage : une
 //! citation d'un texte retiré d'une page, resté en commentaire ou dans un
 //! script, est introuvable.
 //!
@@ -420,8 +421,9 @@ fn retirer_pagination_rfc(texte: &str) -> String {
 
 /// Ôte d'une page ce qu'elle ne donne jamais à lire, en un balayage de gauche
 /// à droite comme la tokenisation HTML (WHATWG) : commentaires
-/// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices (DT15-h) et éléments
-/// `script` et `style` jusqu'à la fermante qui les clôt (DT15-g). Une balise
+/// (SHOGEN-SG5-COMMENTAIRE-HTML-1), commentaires factices et instructions de
+/// traitement (DT15-h), éléments `script` et `style` jusqu'à la fermante qui
+/// les clôt (DT15-g). Une balise
 /// ordinaire est recopiée entière pour le débalisage : ce qu'écrit une valeur
 /// d'attribut n'ouvre rien (DT15-k). Ce qu'un script ou une interaction peut
 /// montrer (`template`, attribut `hidden`, CSS) reste. Lecture sans analyseur :
@@ -456,8 +458,11 @@ fn longueur_non_affichee(suite: &str) -> Option<usize> {
     if let Some(corps) = suite.strip_prefix("<!--") {
         return Some(fin_de_commentaire(corps).saturating_add(4));
     }
-    // Commentaire factice (DT15-h) : `<!` sans `--`, `<?`, ou `</` suivi d'un
-    // caractère qui n'est ni une lettre ASCII ni `>` ; clos au premier `>`.
+    // Commentaire factice (DT15-h) : `<!` sans `--`, ou `</` suivi d'un
+    // caractère qui n'est ni une lettre ASCII ni `>` ; instruction de traitement :
+    // `<?` (tokenisation WHATWG du 2026-10-14, 13.2.5.72 à 13.2.5.76 ; commentaire
+    // factice si sa cible est invalide, `xml` ou `xml-stylesheet`). Tous clos au
+    // premier `>`, jusqu'au bout du texte sans lui.
     let fermante_factice = suite.strip_prefix("</").and_then(|r| r.chars().next());
     let factice = suite.starts_with("<!")
         || suite.starts_with("<?")

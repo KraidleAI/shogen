@@ -1112,8 +1112,9 @@ pages_sg5! {
     temoin_sg5_commentaire_trois_tirets: format!("<!-- a ---><p>{AFFICHEE}.</p>"), AFFICHEE => false,
 }
 
-// S-G5, commentaires factices (lot DETTES-T15, DT15-h ; limite L-6 fermée) : `<!` sans `--`, `<?`, et `</` suivi d'un
-// caractère qui n'est ni une lettre ni `>` ouvrent un commentaire factice, clos au premier `>`, sans borne de longueur.
+// S-G5, commentaires factices (lot DETTES-T15, DT15-h ; limite L-6 fermée) : `<!` sans `--` et `</` suivi d'un
+// caractère qui n'est ni une lettre ni `>` ouvrent un commentaire factice, `<?` une instruction de traitement
+// (tokenisation WHATWG, 13.2.5.72 à 13.2.5.76), tous clos au premier `>`, sans borne de longueur.
 
 pages_sg5! {
     mutant_sg5_commentaire_factice_long:
