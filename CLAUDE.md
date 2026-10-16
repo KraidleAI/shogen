@@ -53,5 +53,8 @@ Conséquences opérationnelles :
    [lu]/[abs]/[2nd] ; adopté en signal le 2026-10-10, SHOGEN-HAIKU-ROLE-SOURCES-1) ; aiguiller seul, constituer la
    liste des sources et juger une source admissible ou détenue restent refusés (décisions). Règle 7 de la fiche
    `shogen-extracteur`.
+   Ajout daté du 2026-10-16 00:26:20 UTC (décision de l'investisseur du 2026-10-15, session cloud : « mets les workers en HIGH ») : les workers
+   (`shogen-worker`, `shogen-devops`) tournent sous `claude-opus-5-5` à l'effort `high` (et non plus `max`, décision 133) ; effort toujours
+   écrit explicitement au lancement ; lecteurs, extracteur, advisors et validateur inchangés ; frontmatters alignés au même commit.
 8. Audit d'entrée : fait le 2026-08-12 (docs/AUDIT-ENTREE.md, commit 10e5557) ; son rafraîchissement
    (état S2/S3 réel) est porté par la cartographie du 2026-09-29 (docs/rapports/cartographie-2026-09-29.md).
