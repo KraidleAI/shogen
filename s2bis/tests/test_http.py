@@ -1,5 +1,6 @@
 """CB-3, E-C-03, E-C-17 : lecture typée, requête, analyse de la réponse sur flux injecté. Requêtes recopiées des octets
 d'urllib (forme de S2, serveur de boucle locale) ; base64 et sha256 du corps par printf, base64 et sha256sum."""
+import ssl
 import time
 import unittest
 
@@ -31,6 +32,15 @@ def flux(*morceaux):
         reste[:0] = [m[n:]] if n < len(m) else []
         return n
     return recevoir
+
+
+class ContexteTls(unittest.TestCase):
+    def test_version_minimale_tls_1_2_ecrite(self):
+        """Alerte CodeQL n° 1 (py/insecure-protocol) : la version minimale du contexte est écrite, TLS 1.2 (ADR-0015
+        pt 5), jamais laissée au défaut de la bibliothèque ; TLS 1.0 et 1.1 refusées par construction."""
+        self.assertEqual(http.CONTEXTE.minimum_version, ssl.TLSVersion.TLSv1_2)
+        self.assertGreaterEqual(http.CONTEXTE.minimum_version, ssl.TLSVersion.TLSv1_2)
+        self.assertEqual(http.CONTEXTE.maximum_version, ssl.TLSVersion.MAXIMUM_SUPPORTED)
 
 
 class Requete(unittest.TestCase):

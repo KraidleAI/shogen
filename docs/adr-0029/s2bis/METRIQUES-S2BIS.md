@@ -3191,3 +3191,15 @@ Rouge : sous chacun des cinq mutants, un test échoue par assertion (FAIL, 0 ERR
 Suite : 431 tests ; plancher du job : 431, égalité exigée (`--egal`). Compte de R-25 : 33 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Pas neuf après INT-P2-16 : y replier C-1 porterait INT-P2-16 à
 214 lignes de code, au-delà de R-25.
+
+## INT-P2-18 (2026-10-17) : version minimale TLS 1.2 écrite dans le contexte (alerte CodeQL n° 1 de la forge, py/insecure-protocol ; ADR-0015 pt 5)
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/http.py` | +2 | — |
+| `tests/test_http.py` | +9 | 1 (neuf : `ContexteTls.test_version_minimale_tls_1_2_ecrite`) |
+
+Le contexte `ssl.create_default_context()` laissait la version minimale au défaut de la bibliothèque ; elle est écrite
+`TLSVersion.TLSv1_2`, ce que l'ADR-0015 pt 5 admet (TLS 1.2 accepté par le pool, mesure du 2026-08-13) ; TLS 1.0 et
+1.1 refusées par construction, la version maximale reste celle de la bibliothèque. Suite : 432 tests ; plancher du job :
+432, égalité exigée (`--egal`). Compte de R-25 : 12 lignes de code ajoutées (`.py`, `.yml`).
