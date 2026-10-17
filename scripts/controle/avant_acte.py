@@ -126,7 +126,10 @@ de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne 
 Phase 3, groupe A, RECALAGE-CHECK : chaine --blanc --script S [--diffs D...] (diffs du plan à défaut), avant le
 lancement (E30, E31, E36) : sur une copie creuse de HEAD (git archive, interdits exclus), chaque diff dans l'ordre : K0
 interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 (lu dans gates.yml) et G5 presg5 sur ses
-seules lignes ajoutées."""
+seules lignes ajoutées.
+Phase 3, groupe A, RECALAGE-CHECK, script (E34, E36, E18) : chaine --blanc juge d'abord le script : K1 bash -n ; K2
+trap ... ERR sous set -E ; K3 sleep d'avant-plan ; K4, sous set -u, $N lu sans protection par une fonction appelée
+avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés)."""
 import argparse
 import ast
 import collections
@@ -136,6 +139,7 @@ import hashlib
 import importlib.util
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -930,11 +934,84 @@ def portes(depot, nom, ajouts, fautes):
     presg5(depot, [(f"{nom} : {c}", place(lignes)) for c, lignes in ajouts if c.endswith(".md")], fautes)
 
 
+SEP = set("();<>|&")
+TETE = {"then", "do", "else", "elif", "if", "while", "until", "!", "{", "time"}
+DEF_SH = re.compile("[ " + chr(9) + "]*(?:function +)?([A-Za-z_][A-Za-z0-9_]*) *[(][)] *[{](.*)$")
+
+
+def mots(ligne):
+    """Mots d'une ligne de shell (shlex, ponctuation à part, commentaires ôtés), le texte de $( ) entre guillemets
+    relu à part ; ligne illisible : []."""
+    s = shlex.shlex(ligne, posix=True, punctuation_chars=True)
+    s.whitespace_split, s.commenters = True, "#"
+    try:
+        vus = list(s)
+    except ValueError:
+        return []
+    return vus + [y for x in vus if "$(" in x and len(x) > 2 for y in [";"] + mots(x.split("$(", 1)[1])]
+
+
+def appels(vus):
+    """(commande, nombre d'arguments avant la première ponctuation, séparateur qui la termine, redirections passées)
+    de chaque commande simple d'une liste de mots."""
+    coupe, out = lambda x: set(x) <= SEP and not re.fullmatch("[<>]+&?", x), []
+    for k, x in enumerate(vus):
+        if (k == 0 or coupe(vus[k - 1]) or vus[k - 1] in TETE) and not set(x) <= SEP and x not in TETE:
+            j = next((i for i in range(k + 1, len(vus)) if set(vus[i]) <= SEP), len(vus))
+            out.append((x, j - k - 1, next((y for y in vus[j:] if coupe(y)), "")))
+    return out
+
+
+def script(chemin, fautes):
+    """K1 à K4 sur le script d'une chaîne (E34, E36, E18), corps des documents en ligne (<<) sautés."""
+    p = subprocess.run(["bash", "-n", chemin], capture_output=True, text=True)
+    if p.returncode:
+        fautes.append(("refus", "K1", "bash -n : " + p.stderr.strip()[:160], "corriger la syntaxe du script", "-"))
+        return
+    lignes, fin = [], None
+    for n, x in enumerate(lire(chemin).decode("utf-8").split(chr(10)), 1):
+        if fin is None:
+            lignes.append((n, x))
+            fin = (re.findall("(?<!<)<<-?[ ]*['" + chr(34) + "]?([A-Za-z_][A-Za-z0-9_]*)", x) or [None])[0]
+        elif x.strip() == fin:
+            fin = None
+    sets = [x.split()[1:] for _n, x in lignes if x.split()[:1] == ["set"]]
+    drapeau = lambda c, nom: any(nom in s or any(o[:1] == "-" and o[1:2] != "-" and c in o[1:] for o in s)
+                                 for s in sets)
+    if not (drapeau("E", "errtrace") and any(re.match("[ " + chr(9) + "]*trap .*[ ]ERR(?:[ ;]|$)", x) for _n, x in lignes)):
+        fautes.append(("refus", "K2", "aucun trap ... ERR sous set -E (errtrace) : la chaîne peut sortir sans un mot, "
+                       "d'une substitution sous set -e comme d'une fonction (E36)", "ajouter après set : set -E et "
+                       "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND, code $? >&2' ERR", "-"))
+    corps, fonctions, k = set(), {}, 0
+    while k < len(lignes):
+        m = DEF_SH.match(lignes[k][1])
+        if m:
+            j = k if m[2].rstrip().endswith("}") else next((i for i in range(k + 1, len(lignes))
+                                                            if lignes[i][1].strip() == "}"), len(lignes))
+            texte = chr(10).join([m[2]] + [x for _n, x in lignes[k + 1:j]])
+            fonctions[m[1]] = max([0] + [int(a or b) for a, b in re.findall("[$]([1-9])|[$][{]([1-9])[}]",
+                                                                             re.sub("'[^']*'", "", texte))])
+            corps |= set(range(k, j + 1))
+        k += 1
+    for i, (n, x) in enumerate(lignes):
+        if drapeau("u", "nounset") and i not in corps and re.search("[$][1-9]|[$][{][1-9][}]", re.sub("'[^']*'", "", x)):
+            fautes.append(("refus", "K4", f"l.{n} : $N lu hors de toute fonction sous set -u : la chaîne se lance sans "
+                           "argument (E34)", "écrire ${N:?raison} ou ${N:-défaut}", "-"))
+        for cmd, nb, fin in appels(mots(DEF_SH.match(x)[2] if DEF_SH.match(x) else x)):
+            if cmd == "sleep" and fin != "&":
+                fautes.append(("refus", "K3", f"l.{n} : sleep d'avant-plan (E18)",
+                               "attendre une condition (boucle bornée sur un fichier ou un PID), jamais une durée", "-"))
+            if drapeau("u", "nounset") and nb < fonctions.get(cmd, 0):
+                fautes.append(("refus", "K4", f"l.{n} : {cmd} appelée avec {nb} argument(s), lit ${fonctions[cmd]} "
+                               "sans protection sous set -u (E34)", "protéger l'argument optionnel : ${N:-}", "-"))
+
+
 def blanc(a, fautes):
-    """RECALAGE-CHECK (E30, E31, E36) : chaque diff, dans l'ordre, sur une copie creuse de HEAD qui porte déjà les
-    précédents (K0, K5, K6, G5)."""
+    """RECALAGE-CHECK (E30, E31, E34, E36) : script de la chaîne (K1 à K4), puis chaque diff, dans l'ordre, sur une
+    copie creuse de HEAD qui porte déjà les précédents (K0, K5, K6, G5)."""
     if not a.script:
         raise Erreur("chaine --blanc : --script exigé")
+    script(a.script, fautes)
     plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()] if a.plan else []
     diffs = a.diffs or [d for x in plan for d in x.split("|")[1].split(",")]
     if not diffs:

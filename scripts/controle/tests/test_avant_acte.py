@@ -1101,3 +1101,18 @@ class ChaineABlanc(Depot):
         self.assertEqual(self.blanc(self.faire("g.diff", {"g.md": "Refus : " + e9 + NL}))[1][:9], "REFUS G5 ")
         self.assertEqual(self.blanc(self.faire("x.diff", {".claude/n.md": "Comptes ; " + "TO" + "DO : 0" + NL})), (0, ""))
         self.assertEqual(self.blanc(self.faire("i.diff", {"docs/rapports/n.md": "n" + NL}))[1][:9], "REFUS K0 ")
+
+    def test_e34_e36_script(self):
+        """Script de la chaîne : K1 bash -n ; K2 trap ERR absent, ou sans set -E (E36) ; K3 sleep d'avant-plan ;
+        K4 sous set -u, fonction appelée avec moins d'arguments qu'elle n'en lit sans protection (E34), aussi dans
+        un $( ) entre guillemets, ou $1 lu hors de toute fonction ; sleep en arrière-plan, $1 protégé, corps d'un document en ligne : admis."""
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        self.assertEqual(self.blanc(d1), (0, ""))
+        cas = [("K1", self.SCRIPT + "if true; then" + NL), ("K2", self.SCRIPT.replace("set -Eeuo", "set -euo")),
+               ("K2", self.SCRIPT.replace("trap", "# trap")), ("K3", self.SCRIPT + "sle" + "ep 60" + NL),
+               ("K4", self.SCRIPT.replace('r="${3:-}"', 'r="$3"')), ("K4", self.SCRIPT + 'echo "$1"' + NL),
+               ("K4", self.SCRIPT.replace('r="${3:-}"', 'r="$3"').replace('"message"', "m r") + 'y="$(un X-3 m)"' + NL)]
+        for code, texte in cas:
+            self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS " + code + " ", texte)
+        admis = self.SCRIPT + "sle" + "ep 1 > /dev/null &" + NL + 'echo "${1:-}"' + NL + "cat <<'F'" + NL + "$1" + NL
+        self.assertEqual(self.blanc(d1, script=admis + "F" + NL + "wait" + NL), (0, ""))
