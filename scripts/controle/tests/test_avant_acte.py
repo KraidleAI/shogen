@@ -60,6 +60,9 @@ class Depot(unittest.TestCase):
         env = mock.patch.dict(os.environ, self.env, clear=True)
         env.start()
         self.addCleanup(env.stop)
+        ls = mock.patch.object(avant_acte, "JOURNAL_LS", os.path.join(self.tmp, "lecture-seule.tsv"), create=True)
+        ls.start()          # journal de --lecture-seule détourné, jamais celui de l'arbre (JOURNAL-LECTURE-SEULE-1)
+        self.addCleanup(ls.stop)
 
     def lancer(self, *argv, depot=None):
         sortie = io.StringIO()

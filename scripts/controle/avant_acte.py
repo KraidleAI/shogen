@@ -115,7 +115,10 @@ Phase 3, groupe C (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 cherche le nom de la fonct
 Phase 3, groupe C (SHOGEN-MOTIFS-ARBRE-REDOS-1) : motifs --arbre, RX sur tous les motifs de l'arbre (appels de re des
 .py lus par l'arbre d'ast, motifs YAML) de scripts/controle/, .claude/hooks/ et enforcement/ (motifs_arbre).
 Phase 3, groupe C (SHOGEN-GARDE-FOUS-ORCH-1, phase 3) : refus [--depuis J] [--journal F], relevé du journal des refus
-du crochet GARDE-FAITS (refus, regles_du_crochet)."""
+du crochet GARDE-FAITS (refus, regles_du_crochet).
+Phase 3, groupe B (SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : chaque passage en --lecture-seule ajoute une ligne au
+journal garde/lecture-seule.tsv des outils (JOURNAL_LS, ignoré par git) : heure lue par date -u, sous-commande, tête du
+dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3."""
 import argparse
 import ast
 import collections
@@ -158,6 +161,7 @@ SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
+JOURNAL_LS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lecture-seule.tsv")    # ignoré par git
 MODELE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gabarits", "chaine.sh")
 REGISTRE = "docs/RENVOIS-LIGNES.tsv"
 EMPREINTE = re.compile("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})")
@@ -1088,12 +1092,38 @@ def parseur():
     return p
 
 
+def journal_lecture_seule(a, verdict):
+    """SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1 : une ligne par passage en --lecture-seule au journal JOURNAL_LS des outils
+    (heure lue par date -u, sous-commande, tête du dépôt lu ou -, verdict : conforme, refus, erreur) ; le dépôt lu
+    n'est pas écrit."""
+    try:
+        tete = git(a.racine, "rev-parse", "--verify", "HEAD").strip()
+    except Erreur:
+        tete = "-"
+    ligne = [GC.maintenant().strftime("%Y-%m-%dT%H:%M:%SZ"), a.cmd, tete, verdict]
+    with open(JOURNAL_LS, "a", encoding="utf-8") as f:
+        f.write(chr(9).join(ligne) + chr(10))
+
+
 def main(argv=None):
     try:
         a = parseur().parse_args(argv)
     except SystemExit as e:
         return 0 if e.code == 0 else 3
-    fautes, a.racine = [], a.depot
+    a.racine = a.depot
+    code = _jouer(a)
+    if a.lecture_seule:
+        try:
+            journal_lecture_seule(a, {0: "conforme", 1: "refus"}.get(code, "erreur"))
+        except Exception as e:      # journal de lecture seule non écrit : erreur de l'outil, jamais 0 ni 1
+            print(f"ERREUR journal de lecture seule : {type(e).__name__} : {e}", file=sys.stderr)
+            return 3
+    return code
+
+
+def _jouer(a):
+    """Sous-commande jouée (dépôt jetable sous --lecture-seule), fautes imprimées, journal du dépôt : 0, 1 ou 3."""
+    fautes = []
     with contextlib.ExitStack() as pile:
         try:
             if a.lecture_seule:
