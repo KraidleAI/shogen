@@ -129,7 +129,8 @@ interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 
 seules lignes ajoutées.
 Phase 3, groupe A, RECALAGE-CHECK, script (E34, E36, E18) : chaine --blanc juge d'abord le script : K1 bash -n ; K2
 trap ... ERR sous set -E ; K3 sleep d'avant-plan ; K4, sous set -u, $N lu sans protection par une fonction appelée
-avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés).
+avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés) ; K7 (CHAINE-ORCH-MODELE),
+verif écrite dans la chaîne ou non tirée par source de $OUTILS/gabarits/chaine.sh, git commit sans acte commit.
 Phase 3, groupe A, RECALAGE-CHECK, versement : verser --blanc --script S (E32, E33, E35) : V8, script qui ne lit pas
 SHOGEN_DEPOT (jamais lancé), qui sort hors de 0 (écriture avant contrôle nommée) ou qui écrit dans le dépôt ; sur ce
 qu'il écrit dans la copie creuse : K6 et G5 (lignes ajoutées), V9 rangée de tableau dont le compte de cellules diffère
@@ -1059,15 +1060,34 @@ def script(chemin, fautes):
                                "sans protection sous set -u (E34)", "protéger l'argument optionnel : ${N:-}", "-"))
 
 
+def sceau_de_chaine(chemin, fautes):
+    """K7 (CHAINE-ORCH-MODELE) : une chaîne tire sa verif par source de $OUTILS/gabarits/chaine.sh, celle que le sceau
+    et C1 jugent ; une verif écrite ou recopiée, ou absente, et un git commit sans acte commit sont refusés."""
+    lignes = [x for x in lire(chemin).decode("utf-8").split(chr(10)) if not x.lstrip().startswith("#")]
+    ecrite = any(DEF_SH.match(x) and DEF_SH.match(x)[1] == "verif" for x in lignes)
+    tiree = any(re.search("(?:^|[ ;&|(])(?:source|[.]) ", x) and "verif" in x and
+                re.search("[$][{]?OUTILS[}]?/gabarits/chaine[.]sh", x) for x in lignes)
+    if ecrite or not tiree:
+        fautes.append(("refus", "K7", f"verif {'écrite dans la chaîne' if ecrite else 'non tirée du modèle'} : seule "
+                       "celle de $OUTILS/gabarits/chaine.sh, tirée par source, est celle du sceau (C1)",
+                       "copier gabarits/chaine-modele.sh, qui la tire par source", "-"))
+    texte = chr(10).join(lignes)
+    if re.search("git(?: -[Cc] [^ ]+)* commit", texte) and not re.search("(?:acte|avant_acte[.]py)[^;&|]* commit", texte):
+        fautes.append(("refus", "K7", "git commit sans acte commit : commit hors de la garde du sceau (C1)",
+                       "commettre par acte commit ... && git commit, comme gabarits/chaine-modele.sh", "-"))
+
+
 def blanc(a, fautes):
     """RECALAGE-CHECK (E30, E31, E34, E36) : script de la chaîne (K1 à K4), puis chaque diff, dans l'ordre, sur une
     copie creuse de HEAD qui porte déjà les précédents (K0, K5, K6, G5)."""
     if not a.script:
         raise Erreur("chaine --blanc : --script exigé")
     script(a.script, fautes)
+    sceau_de_chaine(a.script, fautes)
     plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()] if a.plan else []
-    diffs = a.diffs or [d for x in plan for d in x.split("|")[1].split(",")]
-    if not diffs:
+    faits = set(re.findall("(?m)^Diff-Id: (.+)$", git(a.depot, "log", "--format=%B", "HEAD"))) if plan else set()
+    diffs = a.diffs or [d for x in plan if x.split("|")[0] not in faits for d in x.split("|")[1].split(",")]
+    if not (diffs or plan):
         raise Erreur("chaine --blanc : aucun diff (--diffs, ou --plan)")
     with tempfile.TemporaryDirectory() as d:
         copie, env = copie_creuse(a.depot, d)

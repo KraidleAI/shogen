@@ -9,13 +9,13 @@ description: >-
 
 # Avant de lancer
 
-Erreurs visées : E3, E4, E6, E11, E18, E22, E23, E24, E25, E30, E31, E36 (liste de l'orchestrateur, lot GARDE-FOUS-ORCH).
+Erreurs visées : E3, E4, E6, E11, E18, E22, E23, E24, E25, E30, E31, E34, E36 (liste de l'orchestrateur, lot GARDE-FOUS-ORCH).
 
 1. Avant tout lancement : `python3 -I -B scripts/controle/avant_acte.py --depot <dépôt> disque` (système de
    fichiers du dépôt, et de TMPDIR s'il diffère ; jamais `/`, E4). Sortie 1 :
    `python3 -I -B scripts/controle/avant_acte.py disque --lister <dossier du scratchpad>`, supprimer les cibles
    cargo des lots clos, relancer le contrôle.
-2. Chaîne de commits : copier `scripts/controle/gabarits/chaine.sh` ; une ligne de plan par commit ; rapport du
+2. Chaîne de commits : copier `scripts/controle/gabarits/chaine-modele.sh` (verif tirée du modèle, K7) ; une ligne de plan par commit ; rapport du
    contre-contrôle écrit sur `scripts/controle/gabarits/rapport-cc.md` (ligne `GROUPES :`). Puis
    `python3 -I -B scripts/controle/avant_acte.py chaine --plan <plan> --cc <rapport> --duree-pas <minutes>`, avec la
    durée mesurée d'un pas ; sortie 1 : regrouper les pas, ou lancer détaché comme le refus l'écrit. À blanc, avant

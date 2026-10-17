@@ -22,8 +22,11 @@ acte() { "$PYTHON" -I -B "$OUTILS/avant_acte.py" --depot "$DEPOT" "$@"; }
 # par verif && sceller, la fonction tourne hors de set -e : chaque pas sort en 1 à son échec (relecture G2, C-1) ;
 # cargo tourne sans CARGO_TARGET_DIR ni CARGO_BUILD_TARGET_DIR, à la cible par défaut (E5, règle I-1 ; C-15).
 # Étape « - run: python3 -B enforcement/… » lancée aussi (R-6) ; sceau au sha256 de declare -f verif, égal au modèle (L-4).
+# CHAINE-ORCH-MODELE : portes Python sous unshare -n (lo allumée par lo, ioctl), variables de mandataire retirées ($mand,
+# hors cargo) ; à copier : gabarits/chaine-modele.sh, qui tire cette fonction par source.
 verif() {
-  local j sans="-u CARGO_TARGET_DIR -u CARGO_BUILD_TARGET_DIR"
+  local j sans="-u CARGO_TARGET_DIR -u CARGO_BUILD_TARGET_DIR" mand="-u HTTPS_PROXY -u HTTP_PROXY -u https_proxy -u http_proxy -u ALL_PROXY -u all_proxy -u NO_PROXY -u no_proxy"
+  local lo='import fcntl,socket,struct;p=struct.pack;s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);f=struct.unpack("16sh22x",fcntl.ioctl(s.fileno(),0x8913,p("16sh22x",b"lo",0)))[1];f&1 or fcntl.ioctl(s.fileno(),0x8914,p("16sh22x",b"lo",f|1))'
   j="$(dirname "$PLAN")/verif-$1"
   ( cd "$DEPOT" || exit 1
     timeout "$DELAI" env $sans cargo --locked xtask verify > "$j-xtask.log" 2>&1 || true
@@ -31,10 +34,10 @@ verif() {
     timeout "$DELAI" env $sans cargo --locked test -p xtask > "$j-cargo.log" 2>&1 || exit 1
     grep -E '^ *(- )?(run: )?(/usr/bin/)?python3 -B enforcement/' .github/workflows/gates.yml |
       sed -E 's/^ *(- )?(run: )?//' | while read -r ligne; do
-        env -u SHOGEN_S2_CAMPAGNE_CONTROL timeout "$DELAI" bash -c "$ligne" < /dev/null > /dev/null 2>&1 || exit 1
+        env -u SHOGEN_S2_CAMPAGNE_CONTROL $mand timeout "$DELAI" unshare -n bash -c 'python3 -I -c "$1" && exec bash -c "$2"' _ "$lo" "$ligne" < /dev/null > /dev/null 2>&1 || exit 1
       done || exit 1
-    timeout "$DELAI" bash enforcement/tests/run-fixtures-model-pinning.sh < /dev/null > /dev/null 2>&1 || exit 1
-    timeout "$DELAI" bash enforcement/lint-model-pinning.sh . < /dev/null > /dev/null 2>&1 )
+    timeout "$DELAI" env $mand bash enforcement/tests/run-fixtures-model-pinning.sh < /dev/null > /dev/null 2>&1 || exit 1
+    timeout "$DELAI" env $mand bash enforcement/lint-model-pinning.sh . < /dev/null > /dev/null 2>&1 )
 }
 # --- fin de verif
 

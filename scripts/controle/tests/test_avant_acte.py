@@ -1051,7 +1051,8 @@ class PlanDeChaine(Depot):
 class ChaineABlanc(Depot):
     """SHOGEN-GARDE-RECALAGE-CHECK-1 : chaine --blanc, la chaîne jouée à blanc avant son lancement (E30, E31, E34,
     E35, E36) ; diffs faits dans une copie de travail, l'un après l'autre (le suivant suppose le précédent)."""
-    SCRIPT = NL.join(["#!/usr/bin/env bash", "set -Eeuo pipefail", "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND >&2' ERR",
+    SOURCE = "source <(sed -n '/^verif() {/,/^# --- fin de verif/p' " + chr(34) + "$OUTILS/gabarits/chaine.sh" + chr(34) + ")"
+    SCRIPT = NL.join(["#!/usr/bin/env bash", "set -Eeuo pipefail", "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND >&2' ERR", SOURCE,
                       'un() { local d="$1" m="$2" r="${3:-}"; echo "$d $m $r"; }', 'un X-1 "message"',
                       "x=$(un X-2 m r)", ""])
     VIEUX = "# Journal" + NL + chr(171) + " the old message is not here " + chr(187) + " ; " + "TO" + "DO: vieux" + NL
@@ -1117,6 +1118,21 @@ class ChaineABlanc(Depot):
         admis = self.SCRIPT + "sle" + "ep 1 > /dev/null &" + NL + 'echo "${1:-}"' + NL + "cat <<'F'" + NL + "$1" + NL
         self.assertEqual(self.blanc(d1, script=admis + "F" + NL + "wait" + NL), (0, ""))
 
+
+    def test_k7_verif_du_sceau(self):
+        """SHOGEN-GARDE-CHAINE-ORCH-MODELE-1 : une chaîne tire sa verif du modèle par source ($OUTILS/gabarits/
+        chaine.sh, celle que C1 juge) : sans elle, ou avec une verif écrite ou recopiée (forme de chaine_int.sh), ou
+        source d'un autre fichier, ou git commit sans acte commit (hors de la garde du sceau) : refus K7 ; le modèle
+        gabarits/chaine-modele.sh lui-même : admis."""
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        commit = 'acte commit --message m --source s && git -C "$DEPOT" commit -q -F m' + NL
+        self.assertEqual(self.blanc(d1, script=self.SCRIPT + commit), (0, ""))
+        cas = [self.SCRIPT.replace(self.SOURCE, "true"), self.SCRIPT + "verif() {" + NL + "  true" + NL + "}" + NL,
+               self.SCRIPT.replace("$OUTILS/gabarits", "$SP/gabarits"), self.SCRIPT + 'git -C "$DEPOT" -c a=b commit -q -F m' + NL]
+        for texte in cas:
+            self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS K7 ", texte)
+        modele = os.path.join(os.path.dirname(os.path.abspath(avant_acte.__file__)), "gabarits", "chaine-modele.sh")
+        self.assertEqual(self.lancer("chaine", "--blanc", "--script", modele, "--diffs", d1), (0, ""))
 
 class VersementABlanc(Depot):
     """SHOGEN-GARDE-RECALAGE-CHECK-1 : verser --blanc --script S, le script de versement joué sur une copie creuse

@@ -23,6 +23,7 @@ from tests import aide_garde as ag
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 NL = chr(10)
 FAUX = 'verif() { [ "$1" != "${ROUGE:-}" ]; }' + NL
+UNSHARE = NL.join(["#!/bin/sh", '[ "$1" = -n ] || exit 9', "shift", "export ISOLE=1", 'exec "$@"', ""])  # forge sans droits
 
 
 class Chaine(unittest.TestCase):
@@ -67,7 +68,7 @@ class Chaine(unittest.TestCase):
                    PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"))
         env.update(variables)
         p = subprocess.run(["bash", self.chaine], env=env, capture_output=True, text=True, timeout=300)
-        self.erreur = p.stderr
+        self.erreur, self.sortie = p.stderr, p.stdout
         return p.returncode, re.findall("(?m)^Diff-Id: (.+)$", ag.git(self.d, self.env, "log", "--format=%B"))
 
     def test_verte_puis_reprise(self):
@@ -157,13 +158,16 @@ class Chaine(unittest.TestCase):
         self.assertEqual(subprocess.run(["bash", "-n", chemin], capture_output=True, timeout=60).returncode, 0)
         with open(chemin, encoding="utf-8") as f:
             modele = f.read()
-        for x in ("cargo --locked xtask verify", "cargo --locked test -p xtask", "lint-model-pinning.sh", "timeout"):
+        for x in ("cargo --locked xtask verify", "cargo --locked test -p xtask", "lint-model-pinning.sh", "timeout",
+                  "unshare -n bash", "-u HTTPS_PROXY", "-u all_proxy", "0x8914"):      # CHAINE-ORCH-MODELE
             self.assertIn(x, modele[modele.index("verif() {"):modele.index("# --- fin")])
 
 
 class VerifDuModele(unittest.TestCase):
     PORTE = NL.join(["import os, sys", "if sys.argv[1] == 'mange':", "    sys.stdin.read()",
-                     "sys.exit(1 if os.environ.get('ROUGE_A') == sys.argv[1] else 0)", ""])
+                     "isole = os.environ.get('ISOLE') == '1' or sys.argv[1] in ('cas', 'lint')",      # CHAINE-ORCH-MODELE
+                     "sys.exit(1 if os.environ.get('ROUGE_A') == sys.argv[1] or 'HTTPS_PROXY' in os.environ or not isole "
+                     "else 0)", ""])
     CARGO = NL.join(["#!/bin/sh", '[ -z "${CARGO_TARGET_DIR}${CARGO_BUILD_TARGET_DIR}" ] || exit 1', 'case "$*" in',
                      '  *"xtask verify"*) [ "$ROUGE_A" = xtask ] ||',
                      '    echo "=== VERDICT GLOBAL : VERT ===" ;;', '  *) [ "$ROUGE_A" != cargo ] ;;', "esac", ""])
@@ -181,12 +185,14 @@ class VerifDuModele(unittest.TestCase):
         (verdict de xtask, cargo test, ligne de gates.yml, même après une ligne qui lit l'entrée standard, cas du lint,
         lint), arrête la chaîne avant le sceau et le commit (le pas arrêté est retiré de l'index avant la relance) ;
         tout vert : un commit. C-15 (E5, règle I-1) : CARGO_TARGET_DIR posé dans l'environnement ne déplace pas la
-        cible de cargo (le cargo factice échoue s'il la voit). R-6 : étape de gates.yml écrite « - run: »."""
+        cible de cargo (le cargo factice échoue s'il la voit). R-6 : étape de gates.yml écrite « - run: ».
+        CHAINE-ORCH-MODELE : une porte Python lancée hors de unshare -n, ou qui voit HTTPS_PROXY, échoue."""
         with tempfile.TemporaryDirectory() as t:
             d, env = ag.depot(t, self.fichiers())
             ag.ecrire(t, {"bin/cargo": self.CARGO, "ADJ.md": "CONFORME en deux passes." + NL,
-                          "cc.md": "GROUPES : aucun" + NL})
-            os.chmod(os.path.join(t, "bin", "cargo"), 0o755)
+                          "cc.md": "GROUPES : aucun" + NL, "bin/unshare": UNSHARE})
+            for x in ("cargo", "unshare"):
+                os.chmod(os.path.join(t, "bin", x), 0o755)
             copie = os.path.join(t, "copie")
             shutil.copytree(d, copie)
             ag.ecrire(copie, {"b.md": "b" + NL})
@@ -200,7 +206,7 @@ class VerifDuModele(unittest.TestCase):
             for rouge in ("xtask", "cargo", "porte", "tiret", "cas", "lint", ""):
                 variables = dict(env, DEPOT=d, PLAN=os.path.join(t, "plan"), CC=os.path.join(t, "cc.md"), OUTILS=ICI,
                                  PYTHON=sys.executable, ROUGE_A=rouge, PATH=chemin,
-                                 CARGO_TARGET_DIR=os.path.join(t, "ailleurs"))
+                                 CARGO_TARGET_DIR=os.path.join(t, "ailleurs"), HTTPS_PROXY="http://127.0.0.1:9")
                 p = subprocess.run(["bash", os.path.join(ICI, "gabarits", "chaine.sh")], env=variables,
                                    capture_output=True, text=True, timeout=300)
                 ids = re.findall("(?m)^Diff-Id: (.+)$", ag.git(d, env, "log", "--format=%B"))
@@ -208,3 +214,49 @@ class VerifDuModele(unittest.TestCase):
                 self.assertEqual((p.returncode != 0, ids, "vérification rouge avant X-1" in p.stderr), attendu, rouge)
                 if rouge:
                     ag.git(d, env, "rm", "-q", "-f", "b.md")
+
+
+class ChaineModele(Chaine):
+    """SHOGEN-GARDE-CHAINE-ORCH-MODELE-1 : gabarits/chaine-modele.sh copié tel quel ; sa verif est tirée par source
+    du modèle des outils (le faux de Chaine) ; chaine --blanc avant tout pas ; trap ERR (E36)."""
+    def setUp(self):
+        super().setUp()
+        with open(os.path.join(ICI, "gabarits", "chaine-modele.sh"), encoding="utf-8") as f:
+            ag.ecrire(self.tmp, {"chaine.sh": f.read()})
+        os.makedirs(os.path.join(self.tmp, "outils", ".github", "workflows"))
+        shutil.copy(os.path.join(os.path.dirname(os.path.dirname(ICI)), ".github", "workflows", "gates.yml"),
+                    os.path.join(self.tmp, "outils", ".github", "workflows"))
+        ag.ecrire(self.d, {"biblio/INDEX.md": "# index" + NL})
+        ag.git(self.d, self.env, "add", "-A")
+        ag.git(self.d, self.env, "commit", "-q", "-m", "biblio")
+
+    def test_modele_a_blanc_avant_tout_pas(self):
+        """E30 : second diff sans saut de ligne final : refus K5 avant le premier pas, rien de commis (le modèle
+        d'avant commettait X-1 puis s'arrêtait) ; E36 : l'arrêt écrit sa ligne ROUGE ; diffs sains : deux commits."""
+        with open(os.path.join(self.tmp, "d2.diff"), encoding="utf-8") as f:
+            sain = f.read()
+        ag.ecrire(self.tmp, {"d2.diff": sain[:-1]})
+        code, ids = self.lancer()
+        self.assertEqual((code != 0, ids, "REFUS K5 " in self.erreur + self.sortie, "ROUGE l." in self.erreur),
+                         (True, [], True, True))
+        ag.ecrire(self.tmp, {"d2.diff": sain})
+        self.assertEqual(self.lancer(), (0, ["X-2", "X-1"]))
+
+    def test_l4_verif_versionnee(self):
+        """K7 : copie du modèle qui écrit sa propre verif (toujours verte) : refus avant tout pas, rien de commis."""
+        with open(self.chaine, encoding="utf-8") as f:
+            texte = f.read().replace("acte() {", "verif() {" + NL + "  true" + NL + "}" + NL + "acte() {")
+        ag.ecrire(self.tmp, {"chaine.sh": texte})
+        code, ids = self.lancer()
+        self.assertEqual((code != 0, ids, "REFUS K7 " in self.sortie), (True, [], True))
+
+    def test_modele(self):
+        """Le modèle se lit en bash, n'écrit aucune verif, la tire par source du modèle des outils et porte set -E,
+        trap ERR et chaine --blanc avant la boucle."""
+        chemin = os.path.join(ICI, "gabarits", "chaine-modele.sh")
+        self.assertEqual(subprocess.run(["bash", "-n", chemin], capture_output=True, timeout=60).returncode, 0)
+        with open(chemin, encoding="utf-8") as f:
+            modele = f.read()
+        self.assertNotRegex(modele, "(?m)^ *(function +)?verif *[(][)]")
+        for x in ("set -Eeuo pipefail", "' ERR", "fin de verif/p' " + chr(34) + "$OUTILS/gabarits/chaine.sh", "--blanc"):
+            self.assertIn(x, modele[:modele.index("while IFS")])
