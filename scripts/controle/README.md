@@ -692,3 +692,8 @@ dépendent des tests du harnais qu'ils importent.
 > Ajout daté du 2026-10-16 12:17:57 UTC (`date -u`), correctif CQ-1 (alertes CodeQL de la PR n° 12 sur le crochet GARDE-FAITS) :
 > `tests/test_garde_codeql.py` 3 tests (temps borné de `NOM_PROPRE`, mêmes mots reconnus, hôte de la forge lu par
 > `urlsplit`, sens sûr : schéma en toute casse, mot sans schéma, URL que `urlsplit` refuse, URL dans une variable du shell) ; plancher du job `controle-unittest` 177.
+
+> Ajout daté du 2026-10-16 23:37:58 UTC (`date -u`), lot ISOLE-ENV (erreur E39 du registre de l'orchestrateur) : `tests/aide_garde.py`,
+> `variables_de_chaine()` lit les variables `${NOM:` des modèles `gabarits/*.sh` ; `env_git` ne les hérite plus de
+> l'environnement ambiant (une chaîne lancée avec `DETACHE=1` faisait rougir `test_e25_lancement_lie`) ;
+> `tests/test_aide_garde.py` 2 tests ; plancher du job `controle-unittest` 179.
