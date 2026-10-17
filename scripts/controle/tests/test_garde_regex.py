@@ -111,7 +111,8 @@ class Arbre(unittest.TestCase):
         """Plantés sous scripts/controle/, .claude/hooks/ et enforcement/ : concaténation de noms et de chr(92), drapeaux
         re.I et re.X, sep.join, appel sur deux lignes, clé YAML : refus RX à leur ligne ; redos-admis (sur la dernière ligne d'un
         appel sur deux lignes compris) : admis ; motif fait d'une variable : NON-LU ; code illisible : avertissement ;
-        hors des trois dossiers ou sous __pycache__ : non jugé."""
+        hors des trois dossiers ou sous __pycache__ : non jugé. G2, C-5 : méthode d'un motif compilé (SAIN.search) dont
+        l'argument est un sujet, non un motif : non jugée."""
         t = tempfile.TemporaryDirectory()
         self.addCleanup(t.cleanup)
         q = chr(34)
@@ -121,7 +122,8 @@ class Arbre(unittest.TestCase):
                                               + q + "s*)*$" + q + ")", "VAR = re.compile(motif)",
                                               "CASSE = re.compile(" + q + "(?:A+a+)+$" + q + ", re.I)",
                                               "JOINT = re.search(" + q + q + ".join([" + q + "(a+)" + q + ", " + q + "+" + q
-                                              + "]), x)", "VERB = re.compile(" + q + "(a +)+" + q + ", re.X)", ""]),
+                                              + "]), x)", "VERB = re.compile(" + q + "(a +)+" + q + ", re.X)",
+                                              "SUJET = SAIN.search(" + q + "(a+)+" + q + ")", ""]),
             ".claude/hooks/h.py": NL.join(["import re", "NOM = re.compile(r" + q + "(a+)" + q, "                 r" + q
                                            + "+$" + q + ")", "ADMIS = re.compile(" + q + "(b+)+" + q + ")  # redos-admis",
                                            "DEUX = re.compile(" + q + "(c+)" + q, "                  " + q + "+$" + q

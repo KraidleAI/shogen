@@ -143,6 +143,8 @@ CLE_SECRETE = re.compile("(?i)((?:api[_-]?key|secret|token|passw(?:or)?d|authori
 JETON_SECRET = re.compile("(?<![A-Za-z0-9_+/=-])(?:(?=[A-Za-z0-9_+/=-]*[0-9])(?=[A-Za-z0-9_+/=-]*[a-z])"
                           "(?=[A-Za-z0-9_+/=-]*[A-Z])[A-Za-z0-9_+/=-]{24,}|(?:sk-|ghp_|gho_|github_pat_|xox[baprs]-|AIza"
                           "|AKIA)[A-Za-z0-9_-]{8,})")
+MOT_DE_PASSE = re.compile("(?i)(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*://[^/ :@]*:)[^/ @]+(?=@)"      # URL user:mot@hôte
+                          "|(?<![^ ])((?:-u|--user)[ =]?[^ :]*:)[^ ]+")      # curl -u user:mot (G2 du groupe C, C-2)
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
@@ -310,8 +312,9 @@ def journaliser(dossier, ligne):
 
 def abreger(texte):
     """Acte abrégé du journal des refus : blancs réduits (ni tabulation ni saut de ligne), secrets masqués (***),
-    80 caractères au plus (le masque passe avant la coupe)."""
+    80 caractères au plus (le masque passe avant la coupe) ; mot de passe d'une URL et de curl -u masqué (G2, C-2)."""
     t = CLE_SECRETE.sub(lambda m: m[1] + "***", " ".join(str(texte).split()))
+    t = MOT_DE_PASSE.sub(lambda m: (m[1] or m[2]) + "***", t)
     return JETON_SECRET.sub("***", t)[:80]
 
 
@@ -353,14 +356,29 @@ def consigner(entree, regle, acte="-"):
         pass
 
 
+def lire_tete(chemin):
+    """Entrées JSON du journal de session, lues une à une depuis son début (releve_refus, G2 du groupe C, C-3 : le
+    premier message de l'humain est en tête ; la queue d'un journal de plus de QUEUE octets ne le porte plus)."""
+    try:
+        with open(chemin, "rb") as f:
+            for ligne in f:
+                try:
+                    yield json.loads(ligne)
+                except ValueError:
+                    continue
+    except OSError:
+        return
+
+
 def releve_refus(entree):
     """Phase 3 : au premier message d'une session (aucun autre message de l'humain à son journal), ligne du relevé :
     refus du journal depuis la dernière ligne releve, par règle ; une ligne releve est écrite ; sinon None (journal
-    éteint, /dev/null, compris)."""
+    éteint, /dev/null, compris). G2, C-3 : journal de session lu depuis sa tête (lire_tete) ; journal des refus absent
+    ou non écrit après la ligne releve : le relevé le dit, jamais « 0 refus »."""
     prompt = (entree.get("prompt") or "").strip()
     if chemin_refus() == os.devnull:
         return None
-    for e in lire_queue(entree.get("transcript_path") or "") or []:
+    for e in lire_tete(entree.get("transcript_path") or ""):
         c = (e.get("message") or {}).get("content") if e.get("type") == "user" and not e.get("isMeta") else None
         blocs = [c] if isinstance(c, str) else [b for b in c or [] if isinstance(b, dict) and b.get("type") == "text"]
         txt = RAPPEL.sub("", chr(10).join(contenus(b) for b in blocs)).strip()
@@ -380,6 +398,9 @@ def releve_refus(entree):
     refus = [x[2] for x in lignes[k + 1:] if re.fullmatch("R[0-9]+", x[2])]
     regles = sorted(set(refus), key=lambda r: (-refus.count(r), int(r[1:])))
     consigner(entree, "releve", f"{len(refus)} refus")
+    if not os.path.isfile(chemin_refus()):
+        return (f"RELEVÉ DES REFUS (crochet du dépôt, phase 3) : journal {chemin_refus()} absent ou non écrit : aucun "
+                "refus relevé")
     return (f"RELEVÉ DES REFUS (crochet du dépôt, phase 3) : {len(refus)} refus depuis "
             + (f"le dernier relevé ({lignes[k][0]})" if k >= 0 else "le début du journal")
             + (" : " + ", ".join(f"{r} ×{refus.count(r)}" for r in regles) if regles else "")
@@ -619,7 +640,10 @@ def releve(noms):
 def soumission(entree):
     """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0. Phase
     3 : au premier message d'une session, la ligne du relevé des refus (releve_refus) en dernier."""
-    ligne = releve_refus(entree)
+    try:
+        ligne = releve_refus(entree)
+    except Exception:      # G2 du groupe C, C-3 : le relevé des refus ne fait jamais tomber le relevé E26
+        ligne = None
     noms = noms_propres(entree.get("prompt") or "")
     if not noms:
         print(ligne or "", end=chr(10) if ligne else "")

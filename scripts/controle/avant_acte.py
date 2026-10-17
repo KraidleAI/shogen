@@ -623,11 +623,12 @@ TUE = re.compile("(?i)(?<![a-zà-ÿ])(?:tués?|tuées?|killed)(?![a-zà-ÿ])")
 
 def nomme_en_code(nom, texte):
     """D3 (SHOGEN-GARDE-D3-MOT-COMMUN-1) : vrai si texte nomme la fonction nom en code (passage entre accents graves
-    qui est le nom seul ou qualifié : `nom`, `module.nom`) ou en signature (nom( , en code ou non : `nom(a, b)`) ; un mot
-    courant (non suivi) ou un passage de code qui ne fait que porter le mot (`le suivi des diffs`) ne compte pas."""
+    qui est le nom seul ou qualifié : `nom`, `module.nom`) ou en signature (nom( , en code ou non, qualifiée ou non :
+    `nom(a, b)`, `module.nom(a)`) ; un mot courant (non suivi), un passage de code qui ne fait que porter le mot (`le
+    suivi des diffs`) ou nom( après / - ou $ (URL, chemin, identifiant composé) ne compte pas (G2 du groupe C, C-1)."""
     code = "(?:[A-Za-z0-9_]+[.])*" + re.escape(nom)
     return any(re.fullmatch(code, x.strip()) for x in re.findall("`([^`" + chr(10) + "]*)`", texte)) or bool(
-        re.search("(?<![A-Za-z0-9_.])" + re.escape(nom) + "[(]", texte))
+        re.search("(?<![A-Za-z0-9_./$-])" + code + "[(]", texte))
 
 
 def suivi(a, fichiers, env, fautes):

@@ -56,7 +56,8 @@ class Journal(Base):
     """Le crochet : lignes du journal, en-tête, relevé au premier message."""
     def test_refus_journal_des_passages(self):
         """Passage (permis), refus R7 et R6 (règle), sous-agent (agent), erreur interne (erreur), acte d'un secret et
-        d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien."""
+        d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien.
+        G2, C-4 : refus R11 (consigne longue sans brief) et R10 (dossier nommé sans relevé) consignés sous leur règle."""
         secret = ("echo " + chr(34) + "token=s3cr3tValeur" + chr(34) + " sk-ant-" + "api03-AbCdEf0123456789xyzXYZ0" + TAB
                   + "password:" + TAB + "motdepasse" + TAB)
         texte = {"type": "assistant", "uuid": "u1", "message": {"content": [{"type": "text", "text": "Il y a 4321 cas."}]}}
@@ -64,13 +65,17 @@ class Journal(Base):
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "sleep 5"})[0],
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": secret + "x" * 99})[0],
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "ls"}, agent_id="a1")[0],
-                 self.lancer("Stop", [texte])[0], self.lancer("PreToolUse", tool_name="Bash", tool_input=["x"])[0]]
+                 self.lancer("Stop", [texte])[0], self.lancer("PreToolUse", tool_name="Bash", tool_input=["x"])[0],
+                 self.lancer("PreToolUse", tool_name="Agent", tool_input={"prompt": "x" * 1600})[0],
+                 self.lancer("Stop", [{"type": "user", "message": {"content": "Note de Zorglubien."}}, {
+                     "type": "assistant", "uuid": "u2", "message": {"content": [{"type": "text", "text": "Voir MONARK."}]}}])[0]]
         abrege = "echo " + chr(34) + "token=***" + chr(34) + " *** password: *** "
         lignes = [["PreToolUse:Bash", "permis", "ls", "principal"], ["PreToolUse:Bash", "R7", "sleep 5", "principal"],
                   ["PreToolUse:Bash", "permis", abrege + "x" * (80 - len(abrege)), "principal"],
                   ["PreToolUse:Bash", "permis", "ls", "a1"], ["Stop", "R6", "-", "principal"],
-                  ["PreToolUse:Bash", "erreur", "-", "principal"]]
-        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 0], ENTETE + "".join(TAB.join([H, *x]) + NL
+                  ["PreToolUse:Bash", "erreur", "-", "principal"],
+                  ["PreToolUse:Agent", "R11", '{"prompt": "' + "x" * 68, "principal"], ["Stop", "R10", "-", "principal"]]
+        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 0, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
                                                                                     for x in lignes)))
         self.assertNotIn("motdepasse", self.lire())
         self.env["SHOGEN_GARDE_REFUS"] = os.path.join(self.t, "absent", "refus.tsv")
@@ -80,7 +85,8 @@ class Journal(Base):
 
     def test_refus_entete_unique(self):
         """Journal créé entre le test d'existence et la pose de l'en-tête (crochets concurrents) : ni second en-tête, ni
-        ligne perdue, ni fichier temporaire laissé ; journal absent : en-tête puis ligne."""
+        ligne perdue, ni fichier temporaire laissé ; journal absent : en-tête puis ligne. G2, C-2 : abreger masque le mot
+        de passe d'une URL et de curl -u, garde le port d'une URL."""
         spec = importlib.util.spec_from_file_location("garde_faits_refus", GARDE)
         g = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(g)
@@ -94,11 +100,17 @@ class Journal(Base):
         with mock.patch.dict(os.environ, self.env):
             g.consigner({"hook_event_name": "Stop"}, "permis")
         self.assertEqual(self.lire(), ENTETE + TAB.join([H, "Stop", "permis", "-", "principal"]) + NL)
+        self.assertEqual([g.abreger(x) for x in ("git clone https://alice:Motdepasse2026@forge.example.org/r.git",
+                                                 "curl -u alice:hunter2hunter2 https://h", "curl https://h:8080/x")],
+                         ["git clone https://alice:***@forge.example.org/r.git", "curl -u alice:*** https://h",
+                          "curl https://h:8080/x"])
 
     def test_refus_releve_premier_message(self):
         """Premier message d'une session (journal de session vide, ou ne portant que ce message) : refus depuis la
         dernière ligne releve, par règle (plus fréquente d'abord), ligne releve écrite ; message suivant : rien ; aucun
-        relevé d'avant : depuis le début ; noms propres : relevé E26 d'abord, refus en dernier."""
+        relevé d'avant : depuis le début ; noms propres : relevé E26 d'abord, refus en dernier. G2, C-3 : autre message
+        en tête d'un journal de session de plus de QUEUE octets : rien ; entrée illisible : relevé E26 gardé ; journal
+        des refus non écrit : dit, non « 0 refus »."""
         avant = [["2026-10-14T08:00:00Z", "PreToolUse:Bash", "R5", "git commit", "principal"],
                  ["2026-10-15T09:00:00Z", "UserPromptSubmit", "releve", "1 refus", "principal"],
                  ["2026-10-15T10:00:00Z", "PreToolUse:Bash", "R7", "sleep 5", "principal"],
@@ -124,6 +136,14 @@ class Journal(Base):
         self.assertEqual((code, sortie.split(NL)[0][:31], sortie.split(NL)[-2]),
                          (0, "RELEVÉ (crochet du dépôt, E26) ", RELEVE + "1 refus depuis le début du journal : R5 ×1"
                           + DETAIL))
+        long = {"type": "assistant", "message": {"content": [{"type": "text", "text": "x" * 6_000_001}]}}
+        self.assertEqual(self.lancer("UserPromptSubmit", [humain, long], prompt=q), (0, ""))
+        chaine = {"type": "user", "message": "texte en chaîne"}
+        code, sortie = self.lancer("UserPromptSubmit", [chaine], prompt="Note de Zorglubien sur la suite.")
+        self.assertEqual((code, sortie.split(NL)[0][:31], RELEVE in sortie), (0, "RELEVÉ (crochet du dépôt, E26) ", False))
+        self.env["SHOGEN_GARDE_REFUS"] = absent = os.path.join(self.t, "absent", "refus.tsv")
+        self.assertEqual(self.lancer("UserPromptSubmit", prompt=q), (0, RELEVE + "journal " + absent
+                                                                     + " absent ou non écrit : aucun refus relevé" + NL))
 
 
 class Lecteur(Base):

@@ -697,3 +697,54 @@ dépendent des tests du harnais qu'ils importent.
 > `variables_de_chaine()` lit les variables `${NOM:` des modèles `gabarits/*.sh` ; `env_git` ne les hérite plus de
 > l'environnement ambiant (une chaîne lancée avec `DETACHE=1` faisait rougir `test_e25_lancement_lie`) ;
 > `tests/test_aide_garde.py` 2 tests ; plancher du job `controle-unittest` 179.
+
+> *Ajout daté du 2026-10-17 01:50:28 UTC (`date -u` ; lot INTEGRATION-P3 : GARDE-FOUS phase 3, groupe C, pas INT-01 à INT-06 ;
+> annexe B, B.108 et B.109 : SHOGEN-GARDE-D3-MOT-COMMUN-1, SHOGEN-MOTIFS-ARBRE-REDOS-1, phase 3 de
+> SHOGEN-GARDE-FOUS-ORCH-1 ; relecture G2 du groupe, C-1 à C-5)* : un ajout pour le groupe.
+> - D3 (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 de `avant_acte.py diff` cherche le nom d'une fonction publique ajoutée au
+>   README en code (`nomme_en_code(nom, texte)` : passage entre accents graves qui est le nom seul ou qualifié) ou en
+>   signature (`nom(`, en code ou non, qualifiée ou non : `module.nom(a)`), non plus comme mot courant : une fonction
+>   `suivi` n'est plus nommée par « non suivi » ; `nom(` après `/`, `-` ou `$` (URL, chemin, identifiant composé :
+>   `non-suivi(x)`) ne compte pas (G2, C-1). Cas : `tests/test_garde_suivi.py`, `test_d3_mot_commun`.
+> - Motifs de l'arbre (SHOGEN-MOTIFS-ARBRE-REDOS-1) : `avant_acte.py motifs --arbre` (`motifs_arbre(a, fautes)` ;
+>   `motifs(fichiers, fautes, liste=None)` reçoit la liste lue) passe le détecteur `motifs_suspects` sur tous les
+>   motifs déjà dans l'arbre, non plus sur les seuls diffs reçus : appels de `re` des `.py` de `scripts/controle/`,
+>   `.claude/hooks/` et `enforcement/` (`DOSSIERS_MOTIFS`), lus sur l'arbre d'ast par `motifs_du_code(texte)` de
+>   `garde_commun.py` (appel sur plusieurs lignes, concaténation, `chr(N)`, `sep.join`, noms de premier niveau,
+>   drapeaux `re.I` et `re.X` ; la méthode d'un motif compilé, `SAIN.search(…)`, porte un sujet et n'est pas lue, G2,
+>   C-5), et motifs YAML des `.yml` (`motifs_ajoutes`). Sortie : une ligne `REFUS RX` par motif suspect avec
+>   `chemin:ligne` (sortie 1), `ADMIS RX` sous `redos-admis`, `NON-LU chemin:ligne` par motif construit autrement
+>   (variable, `re.escape`), jamais jugé, puis un bilan. Limites : les motifs des scripts shell et des workflows de
+>   `.github/` ne sont pas lus ; un motif non lu n'est pas jugé. Cas : `tests/test_garde_regex.py`, `test_motifs_arbre`.
+> - Journal des refus (phase 3 de SHOGEN-GARDE-FOUS-ORCH-1, écriture) : chaque refus et chaque passage du crochet
+>   `.claude/hooks/garde_faits.py` écrit une ligne au journal `scripts/controle/garde/refus.tsv` (`consigner(entree,
+>   regle, acte)`) : heure lue par `date -u`, événement (`PreToolUse:Bash`, `Stop`…), règle du refus (`R1` à `R11`)
+>   ou `permis`, `erreur` (erreur interne, acte permis sans contrôle), acte abrégé à 80 caractères (`abreger(texte)` :
+>   blancs réduits, valeur d'une clé `token`, `secret`, `password`, `api_key`, `authorization`…, mot de passe d'une
+>   URL (`https://alice:***@hôte`) et de `curl -u alice:***` (`MOT_DE_PASSE`, G2, C-2 ; port gardé) et jeton mêlant
+>   chiffres, minuscules et majuscules masqués par `***` avant la coupe), agent (`principal` ou identifiant du
+>   sous-agent). Écriture atomique : en-tête posé par lien d'un fichier complet, ligne ajoutée d'un seul `write` en
+>   `O_APPEND` ; dossier absent ou erreur : rien, jamais un refus. Le journal n'est pas versionné : choix du
+>   `.gitignore` de son contenu (`scripts/controle/garde/.gitignore`), non de l'en-tête seul, qui rendrait l'arbre
+>   sale à chaque passage (refus S1 de `sceller`) ; le journal du dépôt reste donc vide au commit. `SHOGEN_GARDE_REFUS`
+>   (`chemin_refus()`) le déplace : les cas le posent (`tests/__init__.py` : `/dev/null`, journal éteint). Cas :
+>   `tests/test_garde_refus.py`, `test_refus_journal_des_passages` (refus R11 et R10 consignés sous leur règle, G2,
+>   C-4), `test_refus_entete_unique`.
+> - Relevé des refus au premier message (même item) : au premier message d'une session (aucun autre message de
+>   l'humain au journal de la session, lu depuis sa tête par `lire_tete`, G2, C-3), le crochet UserPromptSubmit
+>   affiche, après le relevé E26 des noms propres, une ligne `RELEVÉ DES REFUS` : refus du journal depuis la dernière
+>   ligne `releve`, par règle (la plus fréquente d'abord), et la commande du détail (`avant_acte.py refus --depuis` le
+>   jour du dernier relevé), puis écrit une ligne `releve` (`releve_refus(entree)`) ; journal éteint (`/dev/null`) :
+>   rien ; journal des refus absent ou non écrit : le relevé le dit (jamais 0 refus) ; une erreur du relevé des refus
+>   ne fait plus tomber le relevé E26 (G2, C-3). Cas : `tests/test_garde_refus.py`, `test_refus_releve_premier_message`.
+> - Lecture du journal (même item) : `avant_acte.py refus [--depuis AAAA-MM-JJ] [--journal F]` (`refus(a, fautes)`)
+>   lit `scripts/controle/garde/refus.tsv` du dépôt et rend : refus par règle et par jour, les dix actes refusés les
+>   plus fréquents (avec leurs règles), les règles du crochet sans refus depuis trente jours, borne lue par `date -u`
+>   et comprise, sur tout le journal (candidates à relire ; règles lues dans la docstring du crochet par
+>   `regles_du_crochet(chemin)`), le nombre de passages (`permis`, `erreur` ; lignes `releve` exclues) et les lignes
+>   illisibles ; `--depuis` filtre tout sauf les règles sans refus ; date mal formée ou journal absent : 3. Cas :
+>   `tests/test_garde_refus.py`, `test_refus_lecteur`.
+>
+> Le groupe ajoute 6 tests (`test_d3_mot_commun`, `test_motifs_arbre`, `test_refus_journal_des_passages`,
+> `test_refus_entete_unique`, `test_refus_releve_premier_message`, `test_refus_lecteur`) ; plancher du job
+> `controle-unittest` 185.
