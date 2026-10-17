@@ -77,7 +77,7 @@
   porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
   par des tests seuls (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
   le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
-  les formes du témoin dans `formes-pool.json` (§14.1).
+  les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -970,3 +970,20 @@ l.224, l.278 ; AVIS du G0, Q-C-05. Code de référence : `s2bis/shogen_s2bis/col
 4. **Code de sortie** : 0 si et seulement si toutes les formes du pool et du témoin décodent ; 1 sinon. Une forme de
    la carte qui ne décode pas, ou un code de CryptoCompare autre que 401, est déclaré sans changer le code
    (ADR-0029 l.81 : la source reste hors de la carte que lit l'observateur).
+
+## 19. Commande `capture` (INT-P2-16 ; AVIS Q-C-05 ; E-C-37, E-C-40)
+
+Rattachement : AVIS du G0, Q-C-05 (« la recapture par le smoke du premier observateur avant le gel doit être une
+commande séparée, qui écrit les octets dans un fichier sans rien imprimer ») ; question Q-5 du lot INT-P2, adjugée le
+2026-10-17. Code de référence : `s2bis/shogen_s2bis/collecte/capture.py`.
+
+1. **Commande** : `python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` ; configurations
+   contrôlées comme pour `smoke` (§18, point 1). Refus avant toute lecture : dossier absent (`dossier`), nom de forme
+   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom`), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
+   `capture : refus : …` sur l'erreur standard, sortie 2.
+2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
+3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
+   `carte`), puis `captures.txt`, une ligne par lecture : `<fichier> <sha256> <statut> <code ou -> <départ>` (départ
+   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40).
+4. **Rien n'est imprimé** sur la sortie standard : ni octet, ni prix, ni valeur décodée (ADR-0029 l.222). Code de
+   sortie : 0 si toutes les lectures du pool et du témoin sont `ok` ; 1 sinon ; 2 refus.

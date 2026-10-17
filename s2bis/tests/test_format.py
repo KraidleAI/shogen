@@ -290,6 +290,15 @@ class Format(unittest.TestCase):
                                                         "`rpc.mevblocker.io`")], [True] * 3)
         self.assertEqual([("INT-P2-15" in p) for p in puces if p.startswith("**Partie P2, intégration**")], [True])
 
+    def test_paragraphe_19_capture(self):                           # INT-P2-16 (Q-5 adjugée)
+        """§19 : commande, refus, fichiers et manifeste, rien d'imprimé ; puce de l'intégration."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("`python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D`", "jamais écrasé",
+                    "`<fichier> <sha256> <statut> <code ou -> <départ>`", "**Rien n'est imprimé**")
+        self.assertEqual([x in sections.get("19", "") for x in attendus], [True] * 4)
+        self.assertEqual([("INT-P2-16" in p and "§19" in p) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

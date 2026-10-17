@@ -3138,3 +3138,31 @@ Uniswap espacé ; FORMAT ; puce ; plancher.
 
 Suite : 425 tests ; plancher du job : 425, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `formes-pool.json` (4 lignes de données), FORMAT, METRIQUES.
+
+## INT-P2-16 (2026-10-17) : commande `capture` des octets (Q-5 adjugée ; AVIS Q-C-05 ; E-C-40 ; FORMAT §19)
+
+Objet : `collecte/capture.py`, `capturer` : une lecture de chaque forme du pool, du témoin et de la carte, en série,
+comme le smoke ; les octets bruts du corps de chacune dans `<dossier>/<rôle>-<forme>.bin`, puis `captures.txt` (fichier,
+sha256, statut, code, départ). Aucun décodage ; rien d'imprimé, ni octet ni prix. Refus avant toute lecture (dossier
+absent, nom de forme hors de NOM, fichier déjà présent : jamais écrasé). Commande
+`python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` (`entree._smoke`, partagé avec `smoke`) :
+sortie 0, 1, ou 2 et `capture : refus : …` sur l'erreur standard seule. FORMAT §19, puce de l'intégration.
+
+Rouge : sur un squelette d'interface (noms présents, aucun comportement ; commande muette), les tests neufs échouent par
+assertion (11 FAIL, sous-cas compris, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/capture.py` | 51 | — |
+| `shogen_s2bis/collecte/entree.py` | 329 | — |
+| `tests/test_capture.py` | 120 | 4 (neuf : octets et manifeste, rien sur la sortie ; codes ; refus ; commande) |
+| `tests/test_format.py` | 357 | 23 (1 de plus : §19) |
+
+Mutants (même commande, même outil) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL : trois mutants «
+imprime » (octets lus, manifeste, commande) ; fichier présent, nom de forme, dossier absent non refusés ; la carte
+change le code ; le témoin ne compte pas ; aucun espacement ; délai du pool pour la carte ; empreinte d'autre chose
+que des octets ; rôle du témoin perdu (site d'appel de smoke.role) ; code du refus ; refus de capture non attrapé ;
+FORMAT §19 ; plancher.
+
+Suite : 430 tests ; plancher du job : 430, égalité exigée (`--egal`). Compte de R-25 : 197 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Lignes de plus de 120 caractères recoupées avant la campagne.
