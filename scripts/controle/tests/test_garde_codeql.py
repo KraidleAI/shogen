@@ -20,7 +20,11 @@ def charger():
 
 
 class CasCodeql(unittest.TestCase):
-    ANCIEN = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
+    # Référence : le langage de l'ancien motif, écrit sans ambiguïté (alerte CodeQL n° 5, py/redos, sur l'ancienne forme
+    # « (?:[A-Z][A-Za-z0-9]*)+ », dont la répétition se découpait de plusieurs façons) : une majuscule suivie de
+    # minuscules ou chiffres, puis une majuscule et toute suite alphanumérique, reconnaît exactement les mêmes mots, car
+    # le premier groupe répété absorbe tous les suivants ; les deux autres branches sont inchangées.
+    ANCIEN = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*|[A-Z]{3,}[0-9]*|[A-ZÀ-Ý][a-zà-ÿ]{2,})"
                         r"(?![\w-])")
 
     def test_nom_propre_temps_borne(self):

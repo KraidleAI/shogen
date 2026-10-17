@@ -2730,3 +2730,476 @@ Mutants (commande exacte du job s2bis-unittest ; borne de 300 s ; python3.12 ; r
 par `test_sondes_en_parallele_arguments_et_ordre`, 0 vivant, 0 FATAL.
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## CB-7a (2026-10-17) : sorte des conteneurs lus par les décodeurs (SHOGEN-S2BIS-DECODEURS-TYPES-1)
+
+Objet (partie P2, tranche C ; sous-lot CB-7 de la PROPOSITION ; item de l'annexe B au déclencheur « G0 de CB-7 ») :
+`decodeurs._champ` lit chaque conteneur à sa sorte (une clé de texte lit un objet, un indice entier une liste ; sinon
+TypeError, donc `panne_decode`) ; les décodeurs BTC repris de S2 lisent par elle (Binance, Coinbase, Kraken, OKX,
+Bitstamp, Gemini, CoinGecko, DefiLlama, Chainlink ; Bitfinex : `type(j) is list`). Écart à S2, nommé au FORMAT §9.1 :
+Kraken `c` écrit en chaîne y rendait son premier caractère comme prix (« 6 », O-1 de la G2 de P2A). Test neuf : chaque
+conteneur de chaque fixture BTC, racine comprise, remplacé par son texte JSON, par l'autre sorte de conteneur ou par
+l'un de ses enfants scalaires : `panne_decode` ou la même valeur, jamais une autre.
+
+Rouge : sur le code d'avant (t0), le test neuf échoue par assertion (2 FAIL, 0 ERROR) ; une sonde des onze décodeurs BTC
+sur ce code montre que seul `kraken_btc` rend une autre valeur (« 6 »).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 173 | — |
+| `tests/test_decodeurs_actifs.py` | 65 | 1 (neuf : sorte des conteneurs) |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 5 mutants, 5 tués par leur test visé, 0 vivant, 0 FATAL : contrôle de sorte retiré ;
+indice entier admis sur une chaîne ; Kraken `c` lu sans `_champ` (S2) ; sortes échangées ; plancher non relevé. Suite :
+375 tests ; plancher du job : 375, égalité exigée (`--egal`). Compte de R-25 : 117 lignes de code ajoutées (`.py`,
+`.yml`) ; hors compte : FORMAT (puce « Sorte des conteneurs » du §9.1, puce « Partie P2, tranche C »).
+
+## CB-7b (2026-10-17) : décodeurs ETH, USDC et USDT des places (E-C-06, E-C-08)
+
+Objet : un décodeur par (hôte, actif) sur les paires servies lues sur pièce
+(`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1 ; formes de la PROPOSITION du G0 de CALIB-ACTIFS §2.2,
+adoptée par l'avis) : Binance USDC, USDT ; Coinbase ETH, USDT ; Kraken ETH, USDC, USDT ; OKX USDT ; Bitstamp et Gemini
+ETH, USDC, USDT ; classe de source de S2 pour l'hôte, devise de la paire (USD). L'instrument que la réponse nomme
+(Binance `symbol`, Kraken clé de `result`, OKX `instId`) est exigé ; aucun décodeur pour une paire non servie (Coinbase
+USDC/USD, OKX ETH/USD et USDC/USD ; test qui le fige). Fixtures écrites octet pour octet depuis les formes de réponse de
+la pièce (tableau 1.2), valeurs mesurées du tableau 1.1, champs élidés construits (rapport du lot) ; finitude contrôlée
+à chaque place ; corps OKX où chaque champ de prix diffère (dans la fixture, `bidPx` égale `last`, pièce l.47).
+
+Rouge : sur le code de CB-7a, les tests neufs et le test de sorte (fixtures neuves) échouent par assertion (16 FAIL, 0
+ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 205 | — |
+| `tests/test_decodeurs_actifs.py` | 126 | 5 (4 de plus : paires servies ; finitude à chaque place ; instrument exigé ; paires absentes) |
+| `tests/test_decodeurs.py` | 260 | 20 (un compte filtré sur les décodeurs BTC) |
+| `tests/fixtures/actifs/` | — | 14 fichiers `.bin`, construits |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 15 mutants, 15 tués par leur test visé, 0 vivant, 0 FATAL : instrument non exigé
+(OKX, Kraken, Binance) ; clé demandée de Kraken au lieu de la clé rendue ; devise, classe ou actif changés ; champ
+`bidPx` d'OKX ; site d'appel d'OKX et de Binance (instrument d'une autre paire) ; Bitstamp et Gemini sans USDT ou
+échangés ; décodeurs de substitution Coinbase USDC/USD et OKX ETH/USD ; plancher non relevé. Suite : 379 tests ;
+plancher du job : 379, égalité exigée (`--egal`). Compte de R-25 : 108 lignes de code ajoutées (`.py`, `.yml`) ; hors
+compte : 14 fixtures (une ligne chacune), FORMAT (puce « Places » du §9.1), G6 (fixtures construites).
+
+## CB-7c (2026-10-17) : ETH coté en USDT chez binance et okx (Q-CA-01 (a) du G0 de CALIB-ACTIFS)
+
+Objet : binance `ETHUSDT` et okx `ETH-USDT`, cotés en USDT comme BTC (avis de CALIB-ACTIFS l.41, adopté ; ADR-0029
+l.98) ; aucun ETH de ces deux hôtes coté en USD. Diff séparé pour rester retirable : le brief demandait de rendre la
+question d'OKX ETH/USD sans décodeur de substitution, la décision (a) est lue au G0 adjugé (rapport du lot).
+
+Rouge : sur le code de CB-7b, les tests de `Places` échouent par assertion (3 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 209 | — |
+| `tests/test_decodeurs_actifs.py` | 137 | 6 (1 de plus : ETH en USDT chez binance et okx) |
+| `tests/fixtures/actifs/` | — | 2 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 7 mutants, 7 tués par leur test visé, 0 vivant, 0 FATAL : devise USD (binance,
+okx) ; symbole ou instrument ETH/USD ; champ `askPx` ; classe changée ; plancher non relevé. Suite : 380 tests ;
+plancher du job : 380, égalité exigée (`--egal`). Compte de R-25 : 17 lignes de code ajoutées (`.py`, `.yml`) ; hors
+compte : 2 fixtures, FORMAT (§9.1).
+
+## CB-8a (2026-10-17) : lectures regroupées, plafond d'un relevé par actif (E-C-09 ; ADR-0029 l.236)
+
+Objet : CoinGecko (`simple/price`), DefiLlama (`prices/current`) et Bitfinex (`v2/tickers`) en une lecture par hôte pour
+les quatre actifs (E-C-09 ; PROPOSITION du G0 de collecte l.263-264 ; PROPOSITION de CALIB-ACTIFS §2.2) : un relevé par
+actif, dans l'ordre BTC, ETH, USDC, USDT ; identifiants rendus exactement ceux de la requête, sinon la lecture entière
+est `panne_decode` (pannes identiques entre actifs, déclarées par l'ADR) ; Bitfinex : symbole à l'indice 0, dernier prix
+à l'indice 7, onze éléments au moins, symbole unique. `decoder` : un relevé par actif au plus (plafond de quatre), aucun
+relevé ou un actif répété : panne ; actif, devise et classe des listes fermées du §9.1.
+
+Rouge : sur le code de CB-7c, les six tests de `Groupes` échouent par assertion (7 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 248 | — |
+| `tests/test_decodeurs_actifs.py` | 211 | 12 (6 de plus : CoinGecko et DefiLlama à quatre relevés ; positions de Bitfinex ; identifiants exacts ; un relevé par actif ; listes fermées) |
+| `tests/fixtures/actifs/` | — | 3 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL : actif répété ou aucun
+relevé admis ; actif, devise ou classe hors des listes ; identifiant en trop ; Bitfinex à l'indice 6 ou 8, ligne de 8
+éléments, symbole répété, code UDC changé ; USDC et USDT échangés ; objet `coins` non lu ; classe de CoinGecko ; site
+d'appel de CoinGecko ; plancher non relevé. Suite : 386 tests ; plancher du job : 386, égalité exigée (`--egal`). Compte
+de R-25 : 120 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puces « Lectures regroupées »
+et « Plafond du nombre de relevés »).
+
+## CB-8b (2026-10-17) : Chainlink ETH, USDC et USDT, plafond des stables en extra (E-C-10)
+
+Objet : `latestRoundData` du proxy principal de chaque flux (pièce §2 ; Q-CA-08 du G0 de CALIB-ACTIFS), 8 décimales, lu
+comme BTC ; USDC et USDT : `extra.plafond` = `1.05000000` (`maxSubmissionValue` 105000000, pièce l.72), jamais appliqué
+(classe « borné » au recalcul, E-C-26) ; BTC et ETH sans plafond. Fixtures : réponse, `updatedAt`, phase et tour mesurés
+(pièce l.63-65 ; PROPOSITION de CALIB-ACTIFS l.218) ; `startedAt` construit 12 s avant `updatedAt`. Test du plafond sur
+cinq mots distincts : il fige aussi le `roundId` au mot 1, `chainlink_btc` compris (un mutant « mot 5 » survivrait sur
+toutes les fixtures, où `answeredInRound` égale `roundId`).
+
+Rouge : sur le code de CB-8a, les deux tests de `Chainlink` échouent par assertion (4 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 260 | — |
+| `tests/test_decodeurs_actifs.py` | 248 | 14 (2 de plus : trois flux ; plafond porté, jamais appliqué) |
+| `tests/fixtures/actifs/` | — | 3 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 8 mutants, 8 tués par leur test visé, 0 vivant, 0 FATAL : plafond écrit autrement ;
+USDC sans plafond ; ETH plafonné ; plafond appliqué au prix ; actif changé ; instant au mot 3 ; `roundId` au mot 5 ;
+plancher non relevé. Suite : 388 tests ; plancher du job : 388, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de
+code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puce « Chainlink ETH, USDC et USDT »).
+
+## CB-8c (2026-10-17) : formes du pool, requêtes BTC de S2 gardées (SHOGEN-S2BIS-FORMES-BTC-1)
+
+Objet : `s2bis/config/formes-pool.json`, 30 formes (une par lecture du pool), contrôlées par le schéma `FORME` et les
+règles de forme de `formes.json` (noms uniques, méthode et corps, hôte, chemin, espace par hôte, décodeur connu) : huit
+flux BTC gardés, URL et corps de S2 octet pour octet (`sources.py` l.221-281) ; CoinGecko, DefiLlama et Bitfinex
+regroupés (aucune forme BTC seule pour eux) ; chemins des paires et des regroupements de la PROPOSITION de CALIB-ACTIFS
+§2.2 ; Chainlink : proxy principal par actif (pièce §2) ; lectures par hôte (binance 4, coinbase 3, kraken 4, okx 4,
+bitstamp 4, gemini 4, bitfinex 1, coingecko 1, defillama 1, chainlink 4) ; OKX à cinq avec le témoin de CB-9 : plan de 0
+à 4 s, budget 5 + 4 + 10 + 1 = 20 s ; une sixième forme d'OKX est refusée par la boucle (`BOUCLE/hote`, Q-C-10). Les
+autres champs de `formes.json` restent au gel (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
+
+Rouge : une seule forme (`binance_btc`, chemin « / ») et FORMAT de CB-8b : les tests neufs échouent par assertion (6
+FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_formes_pool.py` | 100 | 5 (neuf : formes contrôlées ; requêtes BTC de S2 ; chemins ; proxys ; lectures par hôte et budget) |
+| `tests/test_format.py` | 294 | 17 (1 de plus : phrases du §9.1, du §14.1 et puce de la tranche C) |
+| `config/formes-pool.json` | 32 | données, 30 formes |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : symbole BTC de Binance ;
+corps de Chainlink compacté ; proxy d'un autre actif ; bitcoin retiré de CoinGecko ; décodeur d'une autre forme ;
+sixième lecture d'OKX ; `espace` faux pour une forme d'OKX ; phrase du FORMAT changée ; chemin de Gemini USDT ; plancher
+non relevé. Suite : 394 tests ; plancher du job : 394, égalité exigée (`--egal`). Compte de R-25 : 115 lignes de code
+ajoutées (`.py`, `.yml`) ; hors compte : `formes-pool.json` (32 lignes de données), FORMAT (§14.1, puce de la tranche
+C).
+
+## CB-9a (2026-10-17) : témoin, OKX `USDC-USDT` et Uniswap v3 `slot0`, requête `eth_call` construite (E-C-06 à E-C-08)
+
+Objet : deux décodeurs du témoin USDC/USDT (ADR-0029 l.174 ; PROPOSITION l.217 ; adresses, sélecteurs et décimales lus
+sur `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §3.1) : `okx_usdc_usdt` (`last`, `ts` en ms, `askPx` et `bidPx` en
+extra, instrument contrôlé) ; `uniswap_usdc_usdt` (`slot0` du pool 0,01 %, prix sqrtPriceX96² / 2^192 en une division
+sous une copie du contexte nommé, jamais celui du fil, E-C-07 ; `tick` en extra). Corps `eth_call` construit
+(`decodeurs.eth_call`, `CORPS`), forme du corps de Chainlink en S2, jamais envoyé. Fixtures construites hors du code
+(bc, printf) depuis les valeurs de la pièce (l.87, l.90) ; trois fichiers `.bin` hors du compte de R-25 (733 octets).
+
+Rouge : sur le code de la tête, avec un squelette d'interface (`CORPS` vide, `eth_call` et `_uniswap` muets), les 6
+tests neufs échouent par assertion (0 erreur).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 324 | — |
+| `tests/test_temoin.py` | 120 | 6 (neuf : OKX, Uniswap, requête, contexte nommé) |
+| `tests/test_decodeurs.py` | 260 | 20 (relevés de S2 filtrés sur les décodeurs `_btc`) |
+| `tests/test_decodeurs_actifs.py` | 248 | inchangé (paire OKX absente lue en USD) |
+| `tests/test_formes_pool.py` | 101 | inchangé (décodeurs du témoin sans forme du pool) |
+
+Rebasage (lot INT-P2, 2026-10-17 ; adjudication Q-3 de la tranche D) : diff écrit d'abord sur 2a07ae6, rebasé sur la
+tranche C (CB-7a à CB-8c) par fusion à trois. Conflits de texte : docstring de `decodeurs.py` (phrase de CB-9a mise
+après celle de CB-8b), table `DECODEURS` (bloc du témoin avant la table de la tranche C, ses deux entrées en fin de
+table), plancher de `gates.yml` (394 + 6), fin de ce fichier ; la ligne 52 de `test_decodeurs.py`, identique dans les
+deux séries, n'est plus dans ce diff. Conflits de sens, deux tests de la tranche C à listes fermées : OKX `USDC-USDT`
+n'est pas la paire non servie USDC/USD (`test_paires_absentes_sans_decodeur`) ; les décodeurs du témoin n'ont pas de
+forme dans `formes-pool.json` (`test_requete_btc_de_s2_gardee`). Rouge (ci-dessus) et mutants (ci-dessous) : ceux du
+générateur, sur 2a07ae6, non rejoués.
+
+Mutants (commande du job s2bis-unittest par `scripts/controle/mutants.py`, borne 300 s, réseau isolé, témoin
+VIVANT) : 20 mutants, 20 tués (19 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL.
+
+Suite : 400 tests ; plancher du job : 400, égalité exigée (`--egal`).
+
+## CB-9b (2026-10-17) : témoin, Curve 3pool `get_dy` (E-C-06, E-C-07 ; Q-CA-09 du G0 de CALIB-ACTIFS)
+
+Objet : décodeur `curve_usdc_usdt` : `get_dy(1, 2, 10^6)` du 3pool (PAIRES-ET-TEMOIN l.94), prix dy · 10^6 / (10^6 ·
+10^6), une division sous le contexte nommé ; corps `eth_call` construit (i = 1, USDC ; j = 2, USDT ; dx = 10^6) ;
+`get_dy` retenu, non `price_oracle`, dont le sens n'est pas lu (PAIRES-ET-TEMOIN §4 point 8 ; limite
+SHOGEN-S2BIS-CURVE-DOC-1, ouverte). Un test des décimales distinctes (USDT à 18, valeur de test) sépare D_USDC de
+D_USDT pour les deux pièces sur chaîne.
+
+Rouge : sur le code de CB-9a, avec un squelette d'interface (`_curve` muet), les 4 tests neufs échouent par
+assertion (0 erreur).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 338 | — |
+| `tests/test_temoin.py` | 161 | 10 (4 de plus : requête, fixture, mot maximal, décimales distinctes) |
+| `tests/test_formes_pool.py` | 101 | inchangé (décodeur Curve du témoin sans forme du pool) |
+
+Rebasage (lot INT-P2, 2026-10-17) : conflits de texte (docstring de `decodeurs.py`, `_curve` et CORPS avant les lignes
+`H, P` et `CG` de la tranche C, plancher 400 + 4, fin de ce fichier) ; conflit de sens : `curve_usdc_usdt` ajouté à la
+liste fermée des décodeurs sans forme du pool (`test_requete_btc_de_s2_gardee`). Rouge et mutants : ceux du générateur,
+sur 2a07ae6, non rejoués.
+
+Mutants (même commande) : 13 mutants, 13 tués (12 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL ;
+décimales permutées dans chaque pièce, tuées par le test des décimales distinctes (à 6 et 6, ces mutants sont
+équivalents sur la fixture de la pièce).
+
+Suite : 404 tests ; plancher du job : 404, égalité exigée (`--egal`).
+
+## CB-9c (2026-10-17) : témoin, une unité sur chaîne = un hôte RPC, corps lié au décodeur (FORMAT §9.1, §14.1)
+
+Objet : règles `corps-du-decodeur` (une forme dont le décodeur lit un `eth_call` construit porte ce corps exact) et
+`rpc-par-unite` (ADR-0029 l.174 : parmi les formes lues sur chaîne, unités et hôtes en bijection ; « chainlink » pour
+toute forme de la classe `oracle_chainlink`) dans `formes.json` et `carte.json`, non entre les deux ; hôtes RPC du
+témoin (`eth.drpc.org`, `rpc.mevblocker.io`, Q-CA-10) en configuration seule, aucun dans le code (test). FORMAT :
+puce « Partie P2, tranche D », §9.1 (relevés du témoin, classe en question), §14.1 (les deux règles).
+
+Rouge : sur le code de CB-9b, avec un squelette d'interface (`unite_sur_chaine` muette), 3 tests neufs échouent par
+assertion (9 sous-cas, 0 erreur) ; sur le FORMAT d'avant, le test du FORMAT échoue par assertion. Deux tests neufs
+sont verts dès avant le code (caractérisation du câblage : requêtes construites et hôte de la configuration ; aucun
+hôte dans le code des décodeurs).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 349 | — |
+| `shogen_s2bis/collecte/entree.py` | 298 | — |
+| `tests/test_temoin.py` | 281 | 15 (5 de plus : corps lié, un hôte par unité, carte, câblage, aucun hôte en dur) |
+| `tests/test_format.py` | 308 | 18 (1 de plus : §9.1, §14.1 et puce « Partie P2, tranche D ») |
+
+Rebasage (lot INT-P2, 2026-10-17) : conflits de texte (docstring de `decodeurs.py` ; puce « Partie P2, tranche D »
+après celle de la tranche C ; §14.1, règles de CB-9c avant la phrase des formes du pool de CB-8c ; plancher 404 + 6 ;
+fin de ce fichier) ; aucun conflit de sens. Rouge et mutants : ceux du générateur, sur 2a07ae6, non rejoués.
+
+Mutants (même commande) : 14 mutants, 14 tués (13 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL ;
+dont trois sites d'appel ou sources sous étiquette (corps d'une autre pièce, nom de la forme au lieu de son
+décodeur, Chainlink reconnu par son seul nom) ; le mutant « méthode non contrôlée » est équivalent (`methode-corps`
+fait d'un corps non vide un POST) : la règle ne contrôle que le corps.
+
+Suite : 410 tests ; plancher du job : 410, égalité exigée (`--egal`).
+
+## INT-P2-10 (2026-10-17) : C-P2D-1, classe `temoin` des lectures du témoin (adjudication Q-1 de la tranche D)
+
+Objet (lot INT-P2, correction C-P2D-1) : les trois décodeurs du témoin (`okx_usdc_usdt`, `uniswap_usdc_usdt`,
+`curve_usdc_usdt`) rendent la classe `temoin`, ajoutée à la liste fermée `CLASSES` de `decodeurs.py` ; le recalcul la
+tient hors du vote : `config_analyse.TEMOIN`, refus nommé `ANALYSE/temoin` d'une classe `temoin` dans `tau_sigma`,
+avant le refus générique `ANALYSE/classe` ; `temoin` n'entre ni dans `PLANCHERS` ni dans `SIGMA_BTC` (ADR-0029 l.174 :
+« hors des classes USD et hors du vote »). FORMAT §9.1 (liste des classes, puce du témoin) et puce « Partie P2,
+intégration » ; `test_bout_en_bout` lit la liste des classes du FORMAT.
+
+Rouge : sur le code et le FORMAT de INT-P2-09, les tests neufs et modifiés échouent par assertion (9 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 351 | — |
+| `shogen_s2bis/recalc/config_analyse.py` | 171 | — |
+| `tests/test_temoin.py` | 291 | 16 (1 de plus : classe des trois lectures ; trois relevés attendus en `temoin`) |
+| `tests/test_config_analyse.py` | 219 | 14 (1 de plus : refus nommé `ANALYSE/temoin`) |
+| `tests/test_format.py` | 318 | 19 (1 de plus : §9.1 et puce de l'intégration) |
+| `tests/test_bout_en_bout.py` | 227 | inchangé (liste des classes du FORMAT) |
+
+Mutants (commande du job s2bis-unittest par `scripts/controle/mutants.py` d'une extraction de 2a07ae6, à part de la
+copie mutée ; borne 300 s ; python3 3.11.15 ; réseau isolé ; témoin vivant ; relevé `ps` de fin vide) : 14 mutants,
+14 tués par leur test visé, 0 vivant, 0 FATAL : `temoin` retiré de CLASSES ; chacune des trois lectures rendue à sa
+classe d'avant ; un flux du vote rangé au témoin ; refus nommé retiré, code confondu, nom altéré, refus du témoin
+seul ; `temoin` ajouté à PLANCHERS, à SIGMA_BTC ; site d'appel de CLASSES dans `_releve` ; FORMAT ; plancher.
+
+Suite : 413 tests ; plancher du job : 413, égalité exigée (`--egal`). Compte de R-25 : 54 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, trois lignes de plus de 120 caractères
+(FORMAT, `test_format`, `test_bout_en_bout`) sont recoupées : forme seule, texte égal aux blancs près (contrôle du
+lot), d'où deux lignes de plus.
+
+## INT-P2-11 (2026-10-17) : C-P2D-2, limites de la lecture Curve déclarées (SHOGEN-S2BIS-CURVE-DOC-1)
+
+Objet (lot INT-P2, correction C-P2D-2 ; adjudication de la tranche D, ajout daté du 2026-10-17 10:19:21 UTC, sur la
+lecture `s2bis/curve-doc/RAPPORT-LECTEUR.md`) : la docstring de `_curve` dit le sens lu de `get_dy` (unités natives,
+frais plats déduits ; source `StableSwap3Pool.vy`, branche `master`) et les trois limites : identité de la source
+`master` avec le bytecode déployé non vérifiée ; rattachement direct du pool NG à sa fabrique non lu ; absence du
+bogue d'oracle du pool NG non vérifiée sur chaîne. Même texte au FORMAT §9.1 (puce du témoin) ; puce « Partie P2,
+intégration ». Aucun changement de code exécuté.
+
+Rouge : sur la docstring et le FORMAT de INT-P2-10, les deux tests neufs échouent par assertion (2 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 356 | — |
+| `tests/test_temoin.py` | 301 | 17 (1 de plus : limites dans la docstring) |
+| `tests/test_format.py` | 329 | 20 (1 de plus : limites au §9.1, puce) |
+
+Mutants (même commande, même outil) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : chaque limite dite
+levée dans la docstring puis au FORMAT, source lue confondue, unités fausses, correction et item mal nommés, plancher.
+
+Suite : 415 tests ; plancher du job : 415, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
+(`.py`, `.yml`, docstring comprise) ; hors compte : FORMAT, METRIQUES. Après la campagne, une ligne de la docstring de
+`_curve` de plus de 120 caractères est recoupée (forme seule).
+
+## INT-P2-12 (2026-10-17) : C-P2C-1, test `Bornes` indépendant de la charge (I-1 du générateur de P2C)
+
+Objet (lot INT-P2, correction C-P2C-1 de l'adjudication de la tranche C) : `test_decodeurs.Bornes` ne mesure plus
+aucun temps réel. Chaque champ d'instant converti par int() (OKX `ts`, Bitstamp `timestamp`, Gemini
+`volume.timestamp`, CoinGecko `last_updated_at`, DefiLlama `timestamp`) est servi par des valeurs hors bornes
+(1E+1000000, entiers et texte de 10^6 chiffres, 1E+199999, 1E+200000) ; `_entier` est enveloppé, et le test exige
+pour chacune la panne et une seule note, le refus de borne (« instant : hors bornes avant int() », texte écrit à la
+main) ; le témoin dans les bornes est converti. Un décodeur qui convertirait sans `_entier` ne laisse aucune note :
+tué sans mesure de temps. Test neuf : le code de la classe (AST) ne nomme aucune horloge. Puce « Partie P2,
+intégration » du FORMAT.
+
+Rouge : l'ancien test, sous une horloge monotone truquée (+0,2 s à chaque lecture), échoue : 6 FAIL sur 6 ; le
+nouveau y passe (6 OK). Rejoué dix fois pendant la campagne m12 (mutant M12-01 en cours) : dix verts. Le test
+neuf échoue sur l'ancien test (1 FAIL : `monotonic` et `time` nommés).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_decodeurs.py` | 298 | 21 (1 de plus : aucune horloge nommée dans `Bornes` ; six tests réécrits) |
+
+Mutants (même commande, même outil) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : borne d'exposant
+relâchée, retirée, décalée d'un chiffre ; borne de texte relâchée, multipliée ; chacun des cinq décodeurs convertit
+sans la borne (sites d'appel de `_entier`).
+
+Suite : 416 tests ; plancher du job : 416, égalité exigée (`--egal`). Compte de R-25 : 50 lignes de code ajoutées
+(tests, plancher) ; hors compte : FORMAT, METRIQUES.
+
+## INT-P2-13 (2026-10-17) : CB-16a, smoke sans prix (E-C-37 ; PROPOSITION l.224, l.278)
+
+Objet (lot INT-P2, sous-lot CB-16) : `collecte/smoke.py`, `jouer` : une lecture de chaque forme du pool et du témoin
+(au délai de `formes.json`), puis de chaque forme de la carte (au délai de `carte.json`), en série, décodée par le
+décodeur de sa forme, une seconde au moins avant une nouvelle lecture d'un hôte à `espace` vrai ; puis CryptoCompare
+(URL de S2), dont le 401 sans clé est re-confirmé. Une ligne par lecture : rôle (`pool`, `temoin` par la classe du
+décodeur, `carte`, `exclue`), forme, hôte, statut, code HTTP, sous-type, latence en ms, décodable ; jamais un prix, une
+valeur décodée, une fourchette ni un octet du corps (ADR-0029 l.222). Code 0 si et seulement si toutes les formes du
+pool et du témoin décodent. Lecture HTTP (`lire`), pause et sortie injectables : tests sur fixtures, sans réseau.
+
+Rouge : sur un squelette d'interface (noms présents, aucun comportement), les 4 tests neufs échouent par assertion
+(9 FAIL, sous-cas compris, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/smoke.py` | 48 | — |
+| `tests/test_smoke.py` | 129 | 4 (neuf : sortie sans prix, codes, requêtes et espacement, rôle) |
+
+Mutants (même commande, même outil) : 17 mutants, 17 tués par leur test visé, 0 vivant, 0 FATAL : prix imprimé ;
+octets du corps imprimés ; la carte change le code ; le témoin ne compte pas ; décodable lu sur le code HTTP ; rôle du
+témoin perdu ; espacement retiré, ou posé sans `espace` (hôte de Chainlink lu deux fois) ; délai du pool pour la
+carte ; 401 jamais contrôlé ; URL de CryptoCompare ; latence en secondes ; compte des formes décodées ; lecture non
+décodée ; nom de la forme au lieu de son décodeur (site d'appel) ; contexte TLS non transmis ; plancher.
+
+Suite : 420 tests ; plancher du job : 420, égalité exigée (`--egal`). Compte de R-25 : 178 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, la docstring de `smoke.py` est recoupée à 117
+colonnes (forme seule, mêmes mots : contrôle du lot).
+
+## INT-P2-14 (2026-10-17) : CB-16b, commande `smoke` du collecteur (E-C-37 ; FORMAT §18)
+
+Objet : `python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]` (`entree._smoke`) : `formes.json` et
+`carte.json` contrôlés par leurs schémas, leurs règles et les règles croisées, comme au démarrage (sans `sante` ni
+descripteur) ; refus `smoke : refus : …`, sortie 2 ; sinon `smoke.jouer` aux délais de chaque fichier, sortie 0 ou 1.
+FORMAT : §18 (commande, lectures, forme de la ligne, aucun prix, code de sortie) et puce « Partie P2, intégration ».
+
+Rouge : sur un squelette d'interface (sous-commande et options présentes, `_smoke` rend 0 sans rien lire) et le FORMAT
+de INT-P2-13, les deux tests neufs échouent par assertion (2 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 321 | — |
+| `tests/test_smoke.py` | 183 | 5 (1 de plus : commande par le point d'entrée) |
+| `tests/test_format.py` | 341 | 21 (1 de plus : §18 et puce) |
+
+Mutants (même commande, même outil) : 13 mutants, 13 tués par leur test visé, 0 vivant, 0 FATAL : règles croisées,
+règles de `formes.json` ou de `carte.json` omises ; délai du pool pour la carte ; fichier illisible non attrapé ; code
+d'un refus confondu avec un échec ; préfixe du refus ; carte non lue ; carte exigée ; FORMAT : prix admis, code sans le
+témoin ; puce sans §18 ; plancher.
+
+Suite : 422 tests ; plancher du job : 422, égalité exigée (`--egal`). Compte de R-25 : 93 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## INT-P2-15 (2026-10-17) : formes du témoin dans `formes-pool.json` (Q-1 adjugée ; E-C-37)
+
+Objet (lot INT-P2, adjudication de l'orchestrateur sur Q-1) : les trois formes du témoin entrent dans
+`s2bis/config/formes-pool.json` (33 formes) : OKX `USDC-USDT` (GET, `espace` vrai comme les autres lectures d'OKX :
+cinq par fenêtre, plan de 0 à 4 s, budget de 20 s tenu) ; Uniswap sur `eth.drpc.org` et Curve sur
+`rpc.mevblocker.io` (Q-CA-10), `POST` du corps de leur décodeur. Les règles `corps-du-decodeur` et `rpc-par-unite`
+entrent au contrôle de `test_formes_pool` ; la liste des décodeurs sans forme revient aux trois BTC regroupés. Le
+smoke lit les 33 formes, chacune servie par la fixture de son décodeur : toutes décodées, rôle `temoin` pour les trois
+formes du témoin. FORMAT §14.1 et puce « Partie P2, intégration ».
+
+Rouge : sur `formes-pool.json` de INT-P2-14, 7 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes-pool.json` | 35 | données, 33 formes |
+| `tests/test_formes_pool.py` | 112 | 6 (1 de plus : formes du témoin) |
+| `tests/test_smoke.py` | 211 | 6 (1 de plus : les 33 formes lues et décodées par le smoke) |
+| `tests/test_format.py` | 348 | 22 (1 de plus : §14.1) |
+
+Mutants (même commande, même outil) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : Uniswap sur l'hôte
+de Chainlink ; Curve sur l'hôte d'Uniswap ; paire non servie demandée ; OKX du témoin non espacé, ou sur un autre hôte
+; corps d'Uniswap autre que celui du décodeur ; Curve lu par le décodeur d'Uniswap ; OKX du témoin lu comme USDT/USD ;
+Uniswap espacé ; FORMAT ; puce ; plancher.
+
+Suite : 425 tests ; plancher du job : 425, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `formes-pool.json` (4 lignes de données), FORMAT, METRIQUES.
+
+## INT-P2-16 (2026-10-17) : commande `capture` des octets (Q-5 adjugée ; AVIS Q-C-05 ; E-C-40 ; FORMAT §19)
+
+Objet : `collecte/capture.py`, `capturer` : une lecture de chaque forme du pool, du témoin et de la carte, en série,
+comme le smoke ; les octets bruts du corps de chacune dans `<dossier>/<rôle>-<forme>.bin`, puis `captures.txt` (fichier,
+sha256, statut, code, départ). Aucun décodage ; rien d'imprimé, ni octet ni prix. Refus avant toute lecture (dossier
+absent, nom de forme hors de NOM, fichier déjà présent : jamais écrasé). Commande
+`python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` (`entree._smoke`, partagé avec `smoke`) :
+sortie 0, 1, ou 2 et `capture : refus : …` sur l'erreur standard seule. FORMAT §19, puce de l'intégration.
+
+Rouge : sur un squelette d'interface (noms présents, aucun comportement ; commande muette), les tests neufs échouent par
+assertion (11 FAIL, sous-cas compris, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/capture.py` | 51 | — |
+| `shogen_s2bis/collecte/entree.py` | 329 | — |
+| `tests/test_capture.py` | 120 | 4 (neuf : octets et manifeste, rien sur la sortie ; codes ; refus ; commande) |
+| `tests/test_format.py` | 357 | 23 (1 de plus : §19) |
+
+Mutants (même commande, même outil) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL : trois mutants «
+imprime » (octets lus, manifeste, commande) ; fichier présent, nom de forme, dossier absent non refusés ; la carte
+change le code ; le témoin ne compte pas ; aucun espacement ; délai du pool pour la carte ; empreinte d'autre chose
+que des octets ; rôle du témoin perdu (site d'appel de smoke.role) ; code du refus ; refus de capture non attrapé ;
+FORMAT §19 ; plancher.
+
+Suite : 430 tests ; plancher du job : 430, égalité exigée (`--egal`). Compte de R-25 : 197 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Lignes de plus de 120 caractères recoupées avant la campagne.
+
+## INT-P2-17 (2026-10-17) : C-1 et C-2 de la G2 de la série, `capture` jamais écrasante, port et TLS figés
+
+Objet (relecture G2 neuve de la série INT-P2, corrections C-1 et C-2 ; code inchangé) :
+- C-1 : le contrôle des noms de `capturer` précède toute lecture ; entre lui et l'écriture, un fichier peut apparaître
+  (autre capture dans le même dossier, fichier posé pendant une lecture). L'ouverture exclusive (`xb` pour les octets,
+  `x` pour le manifeste) refuse alors d'écraser ; aucun test ne la fixait : les mutants `wb` et `w` restaient
+  vivants (G2-23, G2-24 de la G2). Test neuf : un fichier d'octets, puis le manifeste, posés pendant la lecture qui les
+  précède : FileExistsError, octets gardés. FORMAT §19 (point 3) et puce de l'intégration.
+- C-2 : `smoke.jouer` et `capture.capturer` construisent chaque requête avec le port de sa forme et lisent sous le
+  contexte TLS reçu ; les tests ne regardaient ni l'un ni l'autre (toutes les formes de test sur 443 ; contexte de
+  `capture` jamais relevé) : les mutants port 443 en dur (smoke, capture) et `tls=None` (capture) restaient
+  vivants (G2-27, G2-28, G2-29 de la G2). Tests renforcés : la forme de la carte sur le port 8443, port et contexte
+  relevés à chaque lecture.
+
+Rouge : sous chacun des cinq mutants, un test échoue par assertion (FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_capture.py` | 140 | 5 (1 de plus : ouverture exclusive après le contrôle ; port et contexte relevés) |
+| `tests/test_smoke.py` | 214 | 6 (inchangé : port relevé) |
+
+Suite : 431 tests ; plancher du job : 431, égalité exigée (`--egal`). Compte de R-25 : 33 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Pas neuf après INT-P2-16 : y replier C-1 porterait INT-P2-16 à
+214 lignes de code, au-delà de R-25.
+
+## INT-P2-18 (2026-10-17) : version minimale TLS 1.2 écrite dans le contexte (alerte CodeQL n° 1 de la forge, py/insecure-protocol ; ADR-0015 pt 5)
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/http.py` | +2 | — |
+| `tests/test_http.py` | +9 | 1 (neuf : `ContexteTls.test_version_minimale_tls_1_2_ecrite`) |
+
+Le contexte `ssl.create_default_context()` laissait la version minimale au défaut de la bibliothèque ; elle est écrite
+`TLSVersion.TLSv1_2`, ce que l'ADR-0015 pt 5 admet (TLS 1.2 accepté par le pool, mesure du 2026-08-13) ; TLS 1.0 et
+1.1 refusées par construction, la version maximale reste celle de la bibliothèque. Suite : 432 tests ; plancher du job :
+432, égalité exigée (`--egal`). Compte de R-25 : 12 lignes de code ajoutées (`.py`, `.yml`).

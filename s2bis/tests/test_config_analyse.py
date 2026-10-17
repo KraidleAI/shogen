@@ -106,6 +106,21 @@ class TauSigma(Base):                                        # bornes écrites d
                                                       b'"ETH": {}'), "$.tau_sigma.ETH : []")))
 
 
+class Temoin(Base):                                              # C-P2D-1 ; ADR-0029 l.174
+    def test_classe_temoin_refusee_hors_du_vote(self):
+        """Une classe `temoin` dans `tau_sigma` d'un actif, seule ou à côté d'une classe du vote, est refusée par son
+        refus nommé, `ANALYSE/temoin` (l'ensemble témoin est hors du vote) ; garde : une autre classe inconnue reste
+        `ANALYSE/classe` ; `temoin` n'est ni dans PLANCHERS ni dans SIGMA_BTC."""
+        t, r = b'"temoin": {"sigma": null, "tau": "0.005"}', VALIDE.replace
+        self.refus([("ANALYSE/temoin", r(b'"USDC": {"oracle_chainlink"', b'"USDC": {' + t + b', "oracle_chainlink"'),
+                     "$.tau_sigma.USDC : classe du témoin, hors du vote"),
+                    ("ANALYSE/temoin", r(b'"ETH": {"place_horodatee": {"sigma": 30, "tau": "0.0075"}}',
+                                         b'"ETH": {' + t + b'}'), "$.tau_sigma.ETH : classe du témoin, hors du vote"),
+                    ("ANALYSE/classe", r(b'"ETH": {"place_horodatee"', b'"ETH": {"temoins"'), "['temoins']")])
+        self.assertEqual(("temoin" in ca.PLANCHERS, "temoin" in ca.SIGMA_BTC, getattr(ca, "TEMOIN", None)),
+                         (False, False, "temoin"))
+
+
 class Oracles(Base):                       # C-1 et Q-RB-4 de la G2 de RB-T1 ; ADR-0029 l.181, l.188 et l.189
     def ajout(self, entree):                                     # une classe de plus à ETH
         return VALIDE.replace(b'"ETH": {', b'"ETH": {' + entree + b", ")

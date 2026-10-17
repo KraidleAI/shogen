@@ -17,6 +17,8 @@ from shogen_s2bis.collecte.lecture import S, Lecture, horloge, monotone
 
 DELAI = 10 * S                                                      # délai global d'une lecture (ADR-0029 l.233)
 CONTEXTE = ssl.create_default_context()                             # certificats vérifiés, nom d'hôte contrôlé
+CONTEXTE.minimum_version = ssl.TLSVersion.TLSv1_2                  # ADR-0015 pt 5 : TLS 1.2 au moins, écrit (CodeQL
+                                                                    # py/insecure-protocol, alerte n° 1 de la forge)
 CONTEXTE.set_alpn_protocols(["http/1.1"])                           # comme urllib en S2 (C-3) : ALPN http/1.1 et
 CONTEXTE.post_handshake_auth = True                                 # authentification après poignée (TLS 1.3)
 PLAFOND = 1 << 20                    # octets reçus au plus, en-têtes compris (l'enregistrement tient sous la borne)

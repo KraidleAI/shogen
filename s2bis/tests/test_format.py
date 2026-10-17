@@ -191,6 +191,20 @@ class Format(unittest.TestCase):
         self.assertEqual([("CB-6c" in p, "ECRIVAIN-REFUS-ARRET-1" in p) for p in puces if p.startswith(
             "**Partie P2, tranche A**")], [(True, True)])
 
+    def test_paragraphes_9_et_14_decodeurs_de_cb_7_et_cb_8(self):    # CB-8c : phrases de la tranche C de P2
+        """§9.1 : paires non servies, sorte des conteneurs, ETH en USDT, regroupés et identifiants exacts, plafond d'un
+        relevé par actif, plafond des stables jamais appliqué ; §14.1 : formes du pool ; puce « Partie P2, tranche C » :
+        six diffs et deux items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ["n'a de décodeur", "SHOGEN-S2BIS-DECODEURS-TYPES-1", "binance (`ETHUSDT`) et okx (`ETH-USDT`)",
+                    "rend la lecture entière `panne_decode`", "au plus un relevé par actif, donc quatre",
+                    "le collecteur ne l'applique jamais"]
+        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes-pool.json`" in sections[
+            "14"]], [True] * 7)
+        self.assertEqual([(all(f"CB-{d}" in p for d in ("7a", "7b", "7c", "8a", "8b", "8c")), "DECODEURS-TYPES-1" in p,
+                           "FORMES-BTC-1" in p) for p in puces if p.startswith("**Partie P2, tranche C**")],
+                         [(True, True, True)])
+
     def test_paragraphes_8_et_13_items_de_cb_6d(self):                # CB-6d : trois items de l'annexe B
         """§8.3 : niveaux comptés sur les octets avant le décodeur ; §8.4 : valeurs comptées par occurrence ; §13.6 :
         résultat rendu avant la place ; la puce « Partie P2 » nomme CB-6d et les trois items."""
@@ -221,6 +235,69 @@ class Format(unittest.TestCase):
         self.assertEqual([x in quinze for x in attendus + [f"`{n}`" for n, _r in entree.CROISEES]], [True] * 13)
         self.assertEqual(("relevé ASN (§15.4)" in sections["12"], [("CB-13b" in p) for p in puces if p.startswith(
             "**Partie P2, tranche A**")]), (True, [True]))
+
+    def test_paragraphes_9_et_14_temoin(self):                     # CB-9c (ADR-0029 l.174 ; SHOGEN-S2BIS-TEMOIN-RPC-1)
+        """§9.1 : les trois décodeurs du témoin, sa devise et la question de sa classe ; §14.1 : les deux règles de
+        CB-9c, nommées comme dans le code, et la règle de l'ADR ; la puce « Partie P2, tranche D » nomme CB-9 et
+        l'item."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        regles = [n for n, _r in entree.COHERENCE["formes"]][-2:]
+        attendus = [(sections["9"], f"`{n}`") for n in ("okx_usdc_usdt", "uniswap_usdc_usdt", "curve_usdc_usdt")]
+        attendus += [(sections["9"], "`devise` `USDT` (prix en USDT par USDC)"),
+                     (sections["9"], "de classe `temoin`, hors des classes USD et hors du vote"),
+                     (sections["14"], "« une unité on-chain = un hôte RPC »"), (sections["14"],
+                     f"Règle `{regles[0]}`"), (sections["14"], f"règle `{regles[1]}`")]
+        self.assertEqual((regles, [x in s for s, x in attendus]), (["corps-du-decodeur", "rpc-par-unite"], [True] * 8))
+        self.assertEqual([all(x in p for x in ("CB-9a", "CB-9c", "TEMOIN-RPC-1")) for p in puces if p.startswith(
+            "**Partie P2, tranche D**")], [True])
+
+    def test_paragraphe_9_classe_temoin(self):                      # C-P2D-1 (adjudication Q-1 de la tranche D)
+        """§9.1 : `temoin` dans la liste fermée des classes, avec le refus du recalcul qui la tient hors du vote ;
+        puce « Partie P2, intégration » : C-P2D-1 et la classe."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual(["`oracle_chainlink` (noms d'`analyse.json`) ou `temoin`" in sections["9"],
+                          "`ANALYSE/temoin`" in sections["9"]], [True, True])
+        self.assertEqual([all(x in p for x in ("C-P2D-1", "`temoin`")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
+    def test_paragraphe_9_limites_de_la_lecture_curve(self):        # C-P2D-2 ; SHOGEN-S2BIS-CURVE-DOC-1
+        """§9.1 : les trois limites de la lecture Curve, mot pour mot (texte de l'adjudication de la tranche D, ajout
+        daté du 2026-10-17 10:19:21 UTC) ; puce « Partie P2, intégration » : C-P2D-2 et l'item."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("identité de la source `master` avec le bytecode déployé non vérifiée",
+                    "rattachement direct du pool NG à sa fabrique non lu",
+                    "absence du bogue d'oracle du pool NG non vérifiée sur chaîne")
+        self.assertEqual([x in sections["9"] for x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("C-P2D-2", "CURVE-DOC-1")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
+    def test_paragraphe_18_smoke_sans_prix(self):                   # CB-16 ; E-C-37
+        """§18 : commande, lectures, forme de la ligne, aucun prix, code de sortie ; puce « Partie P2, intégration » :
+        CB-16a et CB-16b."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("`python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]`", "sortie 2",
+                    "`<rôle> <forme> <hôte> <statut> <code ou -> <sous-type ou -> <latence> ms décodable oui|non`",
+                    "**Aucun prix**", "0 si et seulement si toutes les formes du pool et du témoin décodent",
+                    "`GET https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD`")
+        self.assertEqual([x in sections.get("18", "") for x in attendus], [True] * 6)
+        self.assertEqual([all(x in p for x in ("CB-16a", "CB-16b", "§18")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
+    def test_paragraphe_14_formes_du_temoin(self):                  # INT-P2-15 (Q-1 adjugée)
+        """§14.1 : les trois formes du témoin dans `formes-pool.json`, avec leurs hôtes RPC ; puce de l'intégration."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual([x in sections["14"] for x in ("les trois formes du témoin", "`eth.drpc.org`",
+                                                        "`rpc.mevblocker.io`")], [True] * 3)
+        self.assertEqual([("INT-P2-15" in p) for p in puces if p.startswith("**Partie P2, intégration**")], [True])
+
+    def test_paragraphe_19_capture(self):                           # INT-P2-16 (Q-5 adjugée)
+        """§19 : commande, refus, fichiers et manifeste, rien d'imprimé ; puce de l'intégration."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("`python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D`", "jamais écrasé",
+                    "`<fichier> <sha256> <statut> <code ou -> <départ>`", "**Rien n'est imprimé**")
+        self.assertEqual([x in sections.get("19", "") for x in attendus], [True] * 4)
+        self.assertEqual([("INT-P2-16" in p and "§19" in p) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et

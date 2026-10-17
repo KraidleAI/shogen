@@ -76,7 +76,8 @@ def releves(e):
     v, cles = e["valeurs"], {"actif", "classe", "devise", "prix", "ts_source", "extra"}
     return v is None if e["statut"] != "ok" else type(v) is list and v != [] and all(
         type(r) is dict and set(r) == cles and r["actif"] in ("BTC", "ETH", "USDC", "USDT") and r["classe"] in (
-            "place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink") and type(r["devise"]) is str and
+            "place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink", "temoin") and
+        type(r["devise"]) is str and
         type(r["prix"]) is str and (r["ts_source"] is None or entiers(r["ts_source"]) and 0 <= r["ts_source"] < 1 << 53)
         and type(r["extra"]) is dict and all(type(k) is str is type(x) for k, x in r["extra"].items()) for r in v)
 

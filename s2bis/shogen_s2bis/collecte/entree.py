@@ -23,7 +23,14 @@ CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans r
 sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
 journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
 quorum ; `--depot` sans `--descripteur` : sortie 2. DT6-h (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : une configuration
-dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal."""
+dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal.
+CB-9c (témoin, ADR-0029 l.174) : règles `corps-du-decodeur` (une forme dont le décodeur lit un `eth_call` construit
+porte ce corps exact ; `methode-corps` en fait un POST) et `rpc-par-unite` (une unité sur chaîne = un hôte RPC, hôtes
+pris en configuration) ; elles valent aussi pour `carte.json` (COHERENCE_CARTE), non entre le pool et la carte.
+CB-16 (E-C-37 ; FORMAT §18) : commande `smoke` (smoke.py), `formes.json` et `carte.json` (facultative) contrôlés comme
+au démarrage, une lecture de chaque forme, sans prix : 0 pool et témoin décodés ; 1 sinon ; 2 refus de configuration.
+INT-P2-16 (Q-5 adjugée ; FORMAT §19) : commande `capture` (capture.py), mêmes configurations, octets bruts de chaque
+forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus."""
 import argparse
 import collections
 import ipaddress
@@ -32,7 +39,8 @@ import re
 import secrets
 import sys
 
-from shogen_s2bis.collecte import asn, boucle, config, decodeurs, dns, http, journal, sante, secondaire, status, tetes
+from shogen_s2bis.collecte import (asn, boucle, capture, config, decodeurs, dns, http, journal, sante, secondaire,
+                                   smoke, status, tetes)
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
@@ -72,6 +80,13 @@ def _plan(f):
                             {x["hote"] for x in f["formes"] if x["espace"]})
 
 
+def _rpc(f):
+    """Une unité sur chaîne = un hôte RPC (ADR-0029 l.174 ; SHOGEN-S2BIS-TEMOIN-RPC-1) : parmi les formes dont le
+    décodeur lit une chaîne (`decodeurs.unite_sur_chaine`), unités et hôtes en bijection."""
+    paires = {(x["hote"], u) for x in f["formes"] for u in [decodeurs.unite_sur_chaine(x["decodeur"])] if u}
+    return len(paires) == len({h for h, _u in paires}) == len({u for _h, u in paires})
+
+
 COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("marge-delta-fenetre", lambda f: f["marge"] < f["delta"] <= f["w"] * S),
                         ("noms-uniques", lambda f: len({x["nom"] for x in f["formes"]}) == len(f["formes"])),
@@ -83,7 +98,10 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                             {x["hote"] for x in f["formes"]})),
                         ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"]),
                         ("places-formes", lambda f: f["places"] >= len(f["formes"])),
-                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"]))),
+                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"])),
+                        ("corps-du-decodeur", lambda f: all(x["corps"] == decodeurs.CORPS[x["decodeur"]] for x in
+                                                            f["formes"] if x["decodeur"] in decodeurs.CORPS)),
+                        ("rpc-par-unite", _rpc)),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
              "descripteur": (("observateur-nom", lambda d: re.fullmatch("[a-z0-9]{1,16}", d["observateur"])),
@@ -235,6 +253,23 @@ def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, r
         marge=c["marge"], releve=releve)
 
 
+def _smoke(a, tls):
+    """Commandes `smoke` (CB-16) et `capture` (INT-P2-16) : `formes.json` et `carte.json` contrôlés par leurs schémas,
+    leurs règles et les règles croisées, comme au démarrage (sans `sante` ni descripteur) ; refus : sortie 2."""
+    try:
+        f = config.charger(a.formes, SCHEMAS["formes"], COHERENCE["formes"])[0]
+        c = config.charger(a.carte, CARTE, COHERENCE_CARTE)[0] if a.carte else {"formes": [], "delai": f["delai"]}
+        for nom, regle in CROISEES if a.carte else ():
+            if not regle(f, c):
+                raise config.RefusConfig("CONFIG/incoherent", nom)
+        if a.commande == "capture":
+            return capture.capturer(f["formes"], c["formes"], (f["delai"], c["delai"]), a.dossier, tls=tls)
+    except (config.RefusConfig, boucle.RefusBoucle, capture.CaptureRefusee, OSError) as e:
+        print(f"{a.commande} : refus : {e}", file=sys.stderr)
+        return 2
+    return smoke.jouer(f["formes"], c["formes"], (f["delai"], c["delai"]), tls=tls)
+
+
 FICHIERS = {"pool": ("formes", "sante", "descripteur"), "secondaire": ("formes", "carte", "descripteur")}
 
 
@@ -259,7 +294,16 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         commande.add_argument("--journal", required=True)
         for option in ("--depot", "--descripteur"):
             commande.add_argument(option, required=requis)
+    sm = commandes.add_parser("smoke", help="une lecture de chaque forme du pool, du témoin et de la carte, sans prix")
+    sm.add_argument("--formes", required=True)
+    sm.add_argument("--carte", help="carte.json ; sans elle, pool, témoin et CryptoCompare seuls")
+    ca = commandes.add_parser("capture", help="octets bruts de chaque forme écrits dans un dossier ; rien d'imprimé")
+    ca.add_argument("--formes", required=True)
+    ca.add_argument("--carte", help="carte.json ; sans elle, pool et témoin seuls")
+    ca.add_argument("--dossier", required=True)
     a = p.parse_args(argv)
+    if a.commande in ("smoke", "capture"):
+        return _smoke(a, tls)
     if a.commande == "jeton":
         return _jeton(a, tls, fsync)
     if a.commande in ("status", "resume"):

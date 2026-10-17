@@ -58,6 +58,27 @@
   SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15) ; le diff DT6-h achève SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§14.4) ; le
   diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17) ; le diff DT6-k porte
   les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
+- **Partie P2, tranche C** (2026-10-17 ; sous-lots CB-7, CB-8) : le diff CB-7a écrit au §9.1 la sorte des conteneurs et
+  ferme SHOGEN-S2BIS-DECODEURS-TYPES-1 ;
+  le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1) ;
+  le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1) ;
+  le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1) ;
+  le diff CB-8b, Chainlink ETH, USDC et USDT et le plafond des stables (§9.1) ;
+  le diff CB-8c, les formes du pool (§14.1), et ferme SHOGEN-S2BIS-FORMES-BTC-1.
+- **Partie P2, tranche D** (2026-10-17 ; sous-lot CB-9, témoin USDC/USDT de l'ADR-0029 l.174) : les diffs CB-9a et
+  CB-9b versent les décodeurs du témoin (OKX `USDC-USDT`, Uniswap v3 `slot0`, Curve 3pool `get_dy`) et les corps
+  `eth_call` construits ; le diff CB-9c écrit leurs relevés (§9.1) et les règles `corps-du-decodeur` et
+  `rpc-par-unite` de `formes.json` (§14.1), qui tiennent la règle « une unité on-chain = un hôte RPC » de
+  SHOGEN-S2BIS-TEMOIN-RPC-1 (hôtes en configuration, aucun dans le code ; l'item reste ouvert, déclencheur « avant le
+  sceau »).
+- **Partie P2, intégration** (2026-10-17 ; lot INT-P2 : tranches C et D en une série) : le diff C-P2D-1 donne aux
+  trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
+  `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
+  porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
+  par des tests seuls (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
+  le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
+  les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19) ;
+  le diff INT-P2-17 (C-1 de la G2 de la série) fige son ouverture exclusive (§19).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -347,11 +368,26 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      (`decodeur` de `formes.json`, §14.1), un par actif que la réponse porte ; chaque relevé est un objet aux clés
      exactes `actif`, `classe`, `devise`, `prix`, `ts_source` et `extra` : `actif`, l'un de `BTC`, `ETH`, `USDC`,
      `USDT` ; `classe`, la classe de source, l'un de `place_horodatee`, `sans_horodatage`, `agregateur`,
-     `oracle_chainlink` (noms d'`analyse.json`) ; `devise`, la devise de cotation (`USD`, `USDT`) ; `prix`, décimal en
-     chaîne, texte d'un Decimal fini et strictement positif ; `ts_source`, l'instant que porte la source, en
+     `oracle_chainlink` (noms d'`analyse.json`) ou `temoin` (lectures du témoin seules, C-P2D-1 : classe absente
+     d'`analyse.json`, que le recalcul refuse dans `tau_sigma` par `ANALYSE/temoin`) ; `devise`, la devise de
+     cotation (`USD`, `USDT`) ; `prix`, décimal en chaîne, texte d'un Decimal fini et strictement positif ;
+     `ts_source`, l'instant que porte la source, en
      microsecondes entières de 0 à 2^53 exclu, null pour une source sans horodatage ; `extra`, objet de chaînes propre
      à la source. Un corps que le décodeur ne lit pas, ou dont le prix n'est pas fini, est nul ou négatif, donne
      `panne_decode`, `code` et `brut` gardés, `valeurs` null.
+   - **Témoin USDC/USDT** (CB-9 ; ADR-0029 l.174) : `actif` `USDC`, `devise` `USDT` (prix en USDT par USDC), trois
+     décodeurs : `okx_usdc_usdt` (instrument `USDC-USDT` contrôlé ; `ts_source` lu de
+     `ts`, en millisecondes ; `extra` : `askPx` et `bidPx`, finis et > 0, sans ordre exigé) ; `uniswap_usdc_usdt`
+     (`slot0` du pool 0,01 % : prix sqrtPriceX96² / 2^192, décimales 6 et 6, une division en 50 chiffres sous le
+     contexte nommé, jamais celui du fil ; `extra` : `sqrt_price_x96` et `tick`) ; `curve_usdc_usdt` (`get_dy(1, 2,
+     10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers n'ont pas d'instant de source
+     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. Les trois sont de classe `temoin`, hors
+     des classes USD et hors du vote (ADR-0029 l.174 ; C-P2D-1, adjudication Q-1 de la tranche D, 2026-10-17).
+     Lecture Curve (SHOGEN-S2BIS-CURVE-DOC-1, lecture du 2026-10-17) : `get_dy` rend la quantité de USDT en unités
+     natives, nette de frais (source `StableSwap3Pool.vy` du dépôt officiel, branche `master`) ; `price_oracle` du
+     pool Stableswap-NG n'est pas retenu. Limites déclarées (C-P2D-2) : identité de la source `master` avec le bytecode
+     déployé non vérifiée ; rattachement direct du pool NG à sa fabrique non lu ; absence du bogue d'oracle du pool NG
+     non vérifiée sur chaîne (pool créé après la correction d'après l'API, inféré).
    - **Instant ISO-8601** (C-5 de la G2 de P2A) : un instant de source écrit en ISO-8601 (Coinbase, champ `time`) est
      lu par un motif fixe : date `AAAA-MM-JJ`, « T » majuscule, heure `hh:mm:ss`, fraction de chiffres facultative
      (tronquée à la microseconde, comme en S2), puis « Z » majuscule, `±hh:mm` ou rien (instant lu en UTC). « t »,
@@ -367,6 +403,31 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      l'atteint : son refus (`JOURNAL/…`) arrêterait le processus, que systemd relancerait avec un trou à chaque
      fenêtre. Avec un corps de 1 048 576 octets (point 4) et des valeurs à leur borne, une `lecture` fait moins de
      3 500 000 octets, sous LIMITE (§7.1).
+   - **Places ETH, USDC et USDT** (CB-7b ; G0 de CALIB-ACTIFS, PROPOSITION §2.2, adoptée par l'avis) : un décodeur par
+     (hôte, actif) sur les seules paires servies (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1), avec la
+     classe de source de S2 pour l'hôte et la devise de la paire ; aucune paire non servie (Coinbase USDC/USD, OKX
+     ETH/USD et USDC/USD) n'a de décodeur. L'instrument que la réponse nomme (Binance `symbol`, Kraken clé de `result`,
+     OKX `instId`) est celui du décodeur, sinon `panne_decode` : une forme qui demanderait une autre paire ne range
+     jamais son prix sous un autre actif ou une autre devise. Les décodeurs BTC ne le lisent pas (S2 non plus).
+     ETH est coté en USDT chez binance (`ETHUSDT`) et okx (`ETH-USDT`), comme BTC (CB-7c ; Q-CA-01 (a) du G0 de
+     CALIB-ACTIFS ; ADR-0029 l.98).
+   - **Sorte des conteneurs** (CB-7a, SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque objet ou liste qu'un décodeur lit est de
+     la sorte attendue, sinon `panne_decode`. Écart à S2, qui indexait une chaîne comme une liste : Kraken `c` écrit en
+     chaîne y rendait son premier caractère comme prix (« 6 »).
+   - **Lectures regroupées** (CB-8a ; E-C-09 ; ADR-0029 l.236) : CoinGecko (`simple/price`), DefiLlama
+     (`prices/current`) et Bitfinex (`v2/tickers`) sont lus en une lecture par hôte pour les quatre actifs ; le
+     décodeur rend un relevé par actif, dans l'ordre BTC, ETH, USDC, USDT. Les identifiants rendus sont exactement
+     ceux de la requête (CoinGecko `bitcoin`, `ethereum`, `usd-coin`, `tether` ; DefiLlama les mêmes, préfixés de
+     `coingecko:` ; Bitfinex `tBTCUSD`, `tETHUSD`, `tUDCUSD`, `tUSTUSD`, symbole à l'indice 0 et dernier prix à
+     l'indice 7) ; un identifiant manquant, en trop ou répété, ou un prix refusé pour un seul actif, rend la lecture
+     entière `panne_decode` : les pannes d'un regroupement sont identiques entre actifs, comme l'ADR le déclare.
+   - **Plafond du nombre de relevés** (CB-8a) : une lecture rend au plus un relevé par actif, donc quatre ; aucun
+     relevé, un actif répété, ou un actif, une devise ou une classe hors des listes ci-dessus : `panne_decode`.
+   - **Chainlink ETH, USDC et USDT** (CB-8b ; Q-CA-08 du G0 de CALIB-ACTIFS) : `latestRoundData` du proxy
+     principal de chaque flux (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §2), à 8 décimales, lu comme celui de
+     BTC. Pour USDC/USD et USDT/USD, flux plafonnés (E-C-10), `extra` porte aussi `plafond`, la valeur maximale
+     publiée du flux (`maxSubmissionValue` 105000000 à 8 décimales : `1.05000000`) ; le collecteur ne l'applique
+     jamais, la classe « borné » se juge au recalcul (E-C-26). BTC et ETH n'ont pas de plafond.
 2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
    restent sous 2^53 : tout lecteur JSON les lit exactement.
 3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un
@@ -589,7 +650,20 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      chemin, methode, corps, espace, decodeur}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
      la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
-     chaque lecture `ok` de la forme, §9.1).
+     chaque lecture `ok` de la forme, §9.1). Règle `corps-du-decodeur` (CB-9c) : une forme dont le décodeur lit la
+     réponse d'un `eth_call` construit par le code (Uniswap, Curve) est un `POST` de ce corps exact, octet pour
+     octet ; règle `rpc-par-unite` (CB-9c ; ADR-0029 l.174, « une unité on-chain = un hôte RPC ») : parmi les formes
+     lues sur chaîne (Chainlink, toute forme de la classe `oracle_chainlink` comprise, Uniswap, Curve), chaque unité a
+     un seul hôte et chaque hôte une seule unité. L'hôte RPC n'est écrit que dans `formes.json`, jamais dans le code
+     des décodeurs.
+     Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
+     `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
+     reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
+     les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
+     autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
+     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent ;
+     les autres champs de `formes.json` (`w`, `delta`, `tolerance`, `delai`, `marge`, `places`) restent à sceller
+     au gel du collecteur (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +
@@ -871,3 +945,48 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    à quorum si M_j ≥ 2 (ADR-0029 §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur
    dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans
    `--descripteur` : refus `CONFIG/options`, sortie 2.
+
+## 18. Commande `smoke` (CB-16 ; E-C-37)
+
+Rattachement : ADR-0029 l.81 (chaque observateur lit avec succès, avant le sceau, chaque forme de requête des quatre
+classes, de l'ensemble témoin et de chaque source de la carte), l.222 (aucun prix lu au rodage) ; PROPOSITION E-C-37,
+l.224, l.278 ; AVIS du G0, Q-C-05. Code de référence : `s2bis/shogen_s2bis/collecte/smoke.py`.
+
+1. **Commande** (CB-16b) : `python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]` ; `formes.json` (pool et
+   témoin) et `carte.json` contrôlés par leurs schémas, leurs règles (§14.1) et les règles croisées (§15.2), comme au
+   démarrage ; un refus imprime `smoke : refus : …` sur l'erreur standard, sortie 2. Rien n'est écrit : ni journal,
+   ni octets.
+2. **Lectures** (CB-16a) : une lecture par forme du pool et du témoin, au délai de `formes.json`, puis par forme de la
+   carte, au délai de `carte.json`, en série, chacune décodée par le décodeur de sa forme (§9.1) ; une seconde au
+   moins avant une nouvelle lecture d'un hôte à `espace` vrai ; puis CryptoCompare,
+   `GET https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD` (URL de S2), écartée du pool, dont le 401
+   sans clé est re-confirmé.
+3. **Sortie** : une ligne par lecture,
+   `<rôle> <forme> <hôte> <statut> <code ou -> <sous-type ou -> <latence> ms décodable oui|non` ; rôle `pool`,
+   `temoin` (décodeur de la classe `temoin`, §9.1) ou `carte` ; latence `fin` − `depart` en millisecondes entières ;
+   pour CryptoCompare, rôle `exclue` et `attendu 401 : OK` ou `ÉCART` au lieu de `décodable` ; puis
+   `smoke : OK|ÉCHEC (<n>/<N> formes du pool et du témoin décodées)`. **Aucun prix**, aucune valeur décodée, aucune
+   fourchette ni aucun octet du corps (ADR-0029 l.222) ; la capture des octets d'une fixture est une autre commande,
+   qui n'imprime rien (AVIS Q-C-05).
+4. **Code de sortie** : 0 si et seulement si toutes les formes du pool et du témoin décodent ; 1 sinon. Une forme de
+   la carte qui ne décode pas, ou un code de CryptoCompare autre que 401, est déclaré sans changer le code
+   (ADR-0029 l.81 : la source reste hors de la carte que lit l'observateur).
+
+## 19. Commande `capture` (INT-P2-16 ; AVIS Q-C-05 ; E-C-37, E-C-40)
+
+Rattachement : AVIS du G0, Q-C-05 (« la recapture par le smoke du premier observateur avant le gel doit être une
+commande séparée, qui écrit les octets dans un fichier sans rien imprimer ») ; question Q-5 du lot INT-P2, adjugée le
+2026-10-17. Code de référence : `s2bis/shogen_s2bis/collecte/capture.py`.
+
+1. **Commande** : `python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` ; configurations
+   contrôlées comme pour `smoke` (§18, point 1). Refus avant toute lecture : dossier absent (`dossier`), nom de forme
+   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom`), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
+   `capture : refus : …` sur l'erreur standard, sortie 2.
+2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
+3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
+   `carte`), puis `captures.txt`, une ligne par lecture : `<fichier> <sha256> <statut> <code ou -> <départ>` (départ
+   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Chaque fichier, manifeste compris, est
+   ouvert en création exclusive : un fichier apparu après le contrôle des noms n'est pas écrasé non plus ; la
+   capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
+4. **Rien n'est imprimé** sur la sortie standard : ni octet, ni prix, ni valeur décodée (ADR-0029 l.222). Code de
+   sortie : 0 si toutes les lectures du pool et du témoin sont `ok` ; 1 sinon ; 2 refus.
