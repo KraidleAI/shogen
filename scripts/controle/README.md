@@ -748,3 +748,97 @@ dépendent des tests du harnais qu'ils importent.
 > Le groupe ajoute 6 tests (`test_d3_mot_commun`, `test_motifs_arbre`, `test_refus_journal_des_passages`,
 > `test_refus_entete_unique`, `test_refus_releve_premier_message`, `test_refus_lecteur`) ; plancher du job
 > `controle-unittest` 185.
+
+> *Ajout daté du 2026-10-17 01:50:29 UTC (`date -u` ; lot INTEGRATION-P3 : GARDE-FOUS phase 3, groupe B, pas INT-07 à INT-12 ;
+> annexe B, B.108 et B.109 : SHOGEN-GARDE-ERREUR-INTERNE-1, SHOGEN-GARDE-CROCHET-MESSAGE-CHAINE-1,
+> SHOGEN-GARDE-REPONSE-INVESTISSEUR-1, SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1, SHOGEN-GARDE-DISQUE-DU-DEPOT-1 ;
+> relecture G2 du groupe, C-1 à C-5)* : un ajout pour le groupe.
+> - Erreur interne (SHOGEN-GARDE-ERREUR-INTERNE-1 ; G2 du correctif CQ-1, C-1), sens sûr par règle :
+>   `.claude/hooks/garde_faits.py`, une exception levée pendant le jugement d'un PreToolUse dont l'acte écrit, commet,
+>   pousse, supprime ou crée une PR (R1 à R3, R5, R8) sort 2 (`REFUS. erreur interne (<exception>)`, ligne `REFUS …
+>   erreur interne` au journal des décisions) ; `pre_tool_use`, journal illisible : même règle. Une lecture pure
+>   (`lecture_pure`, `acte_qui_ecrit`) reste permise, l'erreur écrite sur stderr et au journal. Table des cas :
+>
+> | événement, outil | acte | erreur interne ou journal illisible |
+> |---|---|---|
+> | PreToolUse Bash | `lecture_pure` : chaque commande simple, nommée sans chemin, est `cat`, `head`, `tail`, `grep`, `ls`, `wc`, `sha256sum`, `cmp`, `diff`, `od`, `stat`, `pwd`, `echo`, `df`, `du`, `cut`, `tr`, `nl`, `basename`, `dirname`, `realpath`, `readlink`, `true`, `cd`, ou git (`-C`, `--no-pager`, `--no-optional-locks`) `status`, `log`, `diff`, `show`, `rev-parse`, `ls-files`, `ls-tree`, `blame`, `cat-file` sans `--output` ni `$` ; aucune redirection d'écriture (hors `>&N` vers un descripteur, vers `/dev/null`), ni substitution, ni affectation en tête | permis, erreur écrite |
+> | PreToolUse Bash | toute autre commande (commit, push, `rm`, redirection, `tee`, `sed`, `curl`, `gh`, `make`, `git -c`, `printf`, programme nommé par un chemin, commande illisible par `shlex`, séparateur entre guillemets…) | refus |
+> | PreToolUse `mcp__github__` | `get_…`, `list_…`, `search_…` | permis, erreur écrite |
+> | PreToolUse `mcp__github__` | tout autre (création de PR, commentaire, fusion…) | refus |
+> | PreToolUse Edit, MultiEdit, Write, Agent, Workflow, SendMessage, autre | écriture ou lancement | refus |
+> | Stop, SubagentStop, UserPromptSubmit | aucun acte | permis, erreur écrite |
+>
+>   G2, C-1 : `echo x >&1b` (`>&` suivi d'un mot : bash écrit le fichier `1b`), un programme nommé par un chemin
+>   (`./cat`, `/x/git status`) et `printf -v PATH …` ne sont plus des lectures. Cas réel de la G2 du correctif CQ-1
+>   (`curl 'http://[' ; git commit -m essai`, erreur provoquée par un double de `hote_forge`) : refus. Limites : une
+>   entrée illisible en JSON sort toujours 0 ; une entrée JSON qui n'est pas un objet lève hors du `try` (sortie 1 de
+>   Python) ; la liste des lectures est étroite (une lecture hors liste est refusée en cas d'erreur, sens sûr). Cas :
+>   `tests/test_garde_erreur_interne.py` (`test_cas_reel_de_la_g2_refuse`, `test_table_des_cas`, Stop compris,
+>   `test_journal_illisible`).
+> - Message humain à contenu chaîne (SHOGEN-GARDE-CROCHET-MESSAGE-CHAINE-1) : `faits_et_appels` lit un message
+>   humain sous ses deux formes, `content` chaîne (un texte entier) et liste de blocs ; un message qui porte la marque
+>   du crochet (refus relayé) n'est jamais un texte humain (G2, C-2). R5 voit l'identifiant et le compte qu'un message
+>   humain à contenu chaîne porte. Effets sur R6 (code inchangé), mesurés : un chiffre pris dans un nombre plus long
+>   tapé par l'humain ne couvre plus un nombre d'un chiffre (serrage) ; un nombre tapé par l'humain couvre le même
+>   nombre de la réponse (desserrage, celui de la forme liste) : `J28` tapé couvre `28 jours` pour R6, et R12 refuse
+>   ce cas. Cas : `tests/test_garde_message_chaine.py` (`test_r5_voit_le_message_a_contenu_chaine`,
+>   `test_faits_et_appels_deux_formes`).
+> - Règle R12 (SHOGEN-GARDE-REPONSE-INVESTISSEUR-1 ; E29), à la suite de R11 ; R6 n'est pas modifiée. Au Stop (jamais
+>   au SubagentStop), chaque nombre à unité de la réponse (texte de l'agent après son dernier appel d'outil ; jours,
+>   semaines, mois, heures, minutes, ans, %, commits, tests, fichiers : `R12_NOMBRE`) doit être porté, avec une forme
+>   de son unité (`R12_FORMES`, française ou anglaise) sur la même ligne, par un résultat d'outil ou une pièce jointe
+>   du tour, ou par le message de l'humain qui ouvre le tour (`nombres_sans_piece`, `piece_porte`) ; un compte de
+>   commits, tests ou fichiers affiché seul par une commande de comptage du tour (`comptes_nus` : `wc`, `grep -c`)
+>   le porte aussi (G2, C-4), jamais une durée ni un pourcentage ; `280 jours` ou `28,5 jours` ne portent pas `28
+>   jours` (G2, C-5). Fenêtre : le tour, depuis le dernier message de l'humain (`tour_humain`). Sinon refus `R12 (E29)`
+>   qui nomme les nombres et demande la lecture de la pièce, jugé même quand R6 ou R10 refusent (G2, C-3 : les refus
+>   s'ajoutent) ; au second arrêt du tour, passage consigné (`PASSAGE R12`). Cas réel : `Pendant les 28 jours de
+>   collecte` sans pièce lue : refus ; `16 semaines` après lecture de l'ADR-0029 §2.4 (e) (l.158) : permis. Limites :
+>   nombres en lettres non lus ; unités hors liste jugées par R6 seule ; une pièce qui porte le nombre et son unité pour
+>   un autre objet suffit ; les milliers (`1 715 tests`) sont refusés à tort (sens sûr). Cas :
+>   `tests/test_garde_reponse.py` (`test_e29_vingt_huit_jours_sans_piece`, `test_e29_seize_semaines_apres_lecture`,
+>   `test_unite_et_fenetre`). Règles du crochet GARDE-FAITS après la phase 3 :
+>
+> | règle | crochet | acte jugé | origine |
+> |---|---|---|---|
+> | R1 | PreToolUse Bash | effacer un worktree ou un clone : status et commits non poussés lus | phase 1 ; LN-6 |
+> | R2 | PreToolUse Bash | écrire dans un fichier existant par le shell : fichier lu avant | phase 1 ; acte lu (LN-6) |
+> | R3 | PreToolUse Bash | `git commit` : diff ou status lu ; `git push` : ce qui part lu | phase 1 ; acte lu (LN-6) |
+> | R4 | PreToolUse Agent, Workflow | consigne qui nomme un arbre git : état de l'arbre lu avant | phase 1 |
+> | R5 | PreToolUse | commit ou PR écrit : affiché avant ; comptes d'un brief | phase 1 ; E7 (A) |
+> | R6 | Stop, SubagentStop | nombres du dernier texte affichés par un outil | phase 1 ; E29 |
+> | R7 | PreToolUse Bash | sleep d'avant-plan ; pkill -f ou pgrep -f à motif non ancré | E18, E28 (B) |
+> | R8 | PreToolUse create_pull_request | preuve que la forge lance des jobs sur le dépôt | E20 (B) |
+> | R9 | PreToolUse Agent, Workflow | seuil de coût ; jeton FANOUT-AUTORISE | E27 (B) |
+> | R10 | UserPromptSubmit, Stop | relevé des noms propres ; dossier nommé sans relevé | E26 (B) |
+> | R11 | PreToolUse Agent, Workflow | brief : `avant_acte.py brief` ; consigne longue sans brief | E6, E22-E24 (A) |
+> | R12 | Stop | nombres à unité de la réponse portés par une pièce du tour, avec leur unité | E29 (phase 3, B) |
+>
+> - Journal des refus (intégration P3, point 3 du brief de l'intégrateur) : un refus R12 est consigné `R12` (le
+>   crochet ne posait aucune règle et le refus était consigné `R6`) ; un refus sur erreur interne ou sur journal
+>   illisible est consigné `R0`, marque du journal (non une règle du crochet : absente de sa docstring, donc des
+>   règles sans refus de `avant_acte.py refus`), compté parmi les refus par le relevé et la lecture ; une erreur
+>   interne ou un journal illisible sur une lecture pure est consigné `erreur` (acte permis sans contrôle ;
+>   contre-contrôle de l'intégration, R-1). Une ligne par passage du crochet : quand R6, R10 et R12
+>   refusent au même arrêt, la dernière qui refuse (dans cet ordre) est consignée. Cas : `test_refus_journal_des_passages`
+>   et `test_refus_lecteur` (R12 parmi les règles sans refus) recalés ; une marque `R0` comptée par le relevé
+>   (`test_refus_releve_premier_message`) et par la lecture (`test_refus_lecteur`) (contre-contrôle, R-3).
+> - Journal des passages en lecture seule (SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : `avant_acte.py --lecture-seule`
+>   journalise chaque passage : `journal_lecture_seule` ajoute une ligne à `garde/lecture-seule.tsv` des outils
+>   (`JOURNAL_LS`) : heure lue par `date -u`, sous-commande, tête du dépôt lu (`-` si illisible), verdict
+>   (`conforme`, `refus`, `erreur`) ; `main` joue la sous-commande (`_jouer`), puis écrit la ligne ; journal non écrit
+>   : sortie 3. Le fichier est ignoré par git (`.gitignore` de la racine) ; les cas détournent `JOURNAL_LS`
+>   (`Depot.setUp` de `tests/test_avant_acte.py`). Limites : une ligne de commande illisible (sortie 3 d'argparse)
+>   n'est pas journalisée ; le journal reste local. Cas : `tests/test_lecture_seule_journal.py`
+>   (`test_passages_journalises`, `test_journal_non_ecrit`, `test_journal_ignore_par_git`).
+> - Disque du dépôt (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : `avant_acte.py disque` mesure le système de fichiers du dépôt
+>   (`--depot`), et celui de TMPDIR s'il en diffère (`st_dev`), non `/` : `lieux_disque(depot)` rend les chemins,
+>   `GC.etat_disque` les mesure ; chaque DQ nomme son chemin. Le contrôle de disque du modèle de chaîne (`acte
+>   disque`) passe `--depot "$DEPOT"` : la limite écrite à DISQUE-CHAINE (disque mesuré `/`) est levée. Le point 1 de
+>   la skill `shogen-avant-lancer` appelle `avant_acte.py --depot <dépôt> disque` au lieu de `df -h /` (décision de
+>   l'orchestrateur, adjudication du groupe B, I-5 de la G2 ; garde ajoutée à `test_modele_de_chaine_passe_le_depot`).
+>   Limite : la cible cargo d'une copie hors du dépôt et hors de TMPDIR n'est pas mesurée. Cas :
+>   `tests/test_disque_depot.py` (`test_disque_du_depot`, `test_tmpdir_sur_un_autre_systeme`,
+>   `test_modele_de_chaine_passe_le_depot`).
+>
+> Le groupe ajoute 14 tests ; plancher du job `controle-unittest` 199.

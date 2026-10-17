@@ -70,6 +70,14 @@ class ReponseInvestisseur(unittest.TestCase):
         self.assertEqual(self.arreter(tour, actif=True), (0, ""))
         with open(os.path.join(self.t, "garde-faits.log"), encoding="utf-8") as f:
             self.assertIn("PASSAGE R12", f.read())
+        double = [humain("Bilan ?"), *outil(1, "grep -n collecte notes.txt", "28:collecte"),
+                  reponse("Il reste 28 jours ; 123 cas.")]        # G2, C-3 : R6 refuse 123, R12 juge aussi 28 jours
+        code, err = self.arreter(double)
+        self.assertEqual((code, "R6" in err, "R12" in err, "28 jours" in err), (2, True, True, True), err)
+        r10 = [humain("Réponds à CoinGecko."), *outil(1, "grep -n collecte notes.txt", "28:collecte"),
+               reponse("Pour Pocket, il reste 28 jours.")]        # G2, C-3 : R10 refuse Pocket, R12 juge aussi 28 jours
+        code, err = self.arreter(r10)
+        self.assertEqual((code, "R10" in err, "R12" in err), (2, True, True), err)
 
     def test_e29_seize_semaines_apres_lecture(self):
         """16 semaines après lecture de la pièce ADR-0029 §2.4 (e) dans le tour : permis ; forme anglaise de l'unité
@@ -78,6 +86,8 @@ class ReponseInvestisseur(unittest.TestCase):
         self.assertEqual(self.arreter([humain("Durée ?"), *lu, reponse("La campagne dure 16 semaines.")]), (0, ""))
         avant = reponse("Je vérifie les 28 jours.")        # texte d'avant le dernier appel d'outil : hors réponse
         self.assertEqual(self.arreter([humain("Durée ?"), avant, *lu, reponse("16 semaines.")]), (0, ""))
+        compte = [humain("Série ?"), *outil(1, "git log --oneline a..b | wc -l", "5"), reponse("Elle compte 5 commits.")]
+        self.assertEqual(self.arreter(compte), (0, ""))        # G2, C-4 : compte lu par wc -l (R5, C-6 ; E7)
         for piece, texte in (("16 weeks of data", "Elle dure 16 semaines."), ("| durée | 16 | semaines |",
                              "Elle dure 16 semaines."), ("évaluables : 95%", "Seuil : 95 % des fenêtres.")):
             self.assertEqual(self.arreter([humain("Durée ?"), *outil(1, "cat p", piece), reponse(texte)]), (0, ""),
@@ -96,8 +106,18 @@ class ReponseInvestisseur(unittest.TestCase):
         code, err = self.arreter([*avant, reponse("Toujours 16 semaines.")])
         self.assertEqual((code, "16 semaines" in err), (2, True), err)
         self.assertEqual(self.arreter([humain("Tu dis 16 semaines ?"), reponse("Oui, 16 semaines.")]), (0, ""))
+        code, err = self.arreter([humain("Où en est J28 ?"), reponse("Pendant les 28 jours de collecte.")])
+        self.assertEqual((code, "R12" in err), (2, True), err)      # G2, C-2 : R6 couvre 28 par J28 (B-2), R12 refuse
         tour = [humain("x ?"), *outil(1, "cat p", "28:collecte"), reponse("Pendant les 28 jours.")]
         self.assertEqual(self.arreter(tour, ev="SubagentStop"), (0, ""))
+        code, err = self.arreter([humain("x ?"), *outil(1, "grep -c x f", "28"), reponse("Il reste 28 jours.")])
+        self.assertEqual((code, "28 jours" in err), (2, True), err)        # G2, C-4 : un compte n'est pas une durée
+        ancien = [humain("Série ?"), *outil(1, "git log --oneline | wc -l", "5"), reponse("Vu."), humain("Et donc ?")]
+        code, err = self.arreter([*ancien, reponse("Elle compte 5 commits.")])
+        self.assertEqual((code, "5 commits" in err), (2, True), err)        # G2, C-4 : compte d'un tour antérieur
+        voisins = outil(1, "cat p", "280 jours ; 28,5 jours")
+        code, err = self.arreter([humain("x ?"), *voisins, reponse("Il reste 28 jours.")])
+        self.assertEqual((code, "28 jours" in err), (2, True), err)        # G2, C-5 : 280 et 28,5 ne portent pas 28
 
 
 if __name__ == "__main__":

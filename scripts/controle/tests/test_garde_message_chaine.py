@@ -57,6 +57,9 @@ class MessageChaine(unittest.TestCase):
         self.assertEqual((code, "R5" in err, "4f3e2d1" in err), (2, True, True), err)
         code, err = self.jouer("Reprends le lot.", "Attendu : 7 tests.")
         self.assertEqual((code, "R5" in err, "7 tests" in err), (2, True, True), err)
+        refus = "Stop hook feedback:" + NL + "GARDE-FAITS : REFUS. R5 : 4f3e2d1 jamais affiché."     # G2, C-2
+        for contenu in (refus, [{"type": "text", "text": refus}]):      # un refus du crochet n'est pas un texte humain
+            self.assertEqual(self.jouer(contenu, "Base 4f3e2d1.")[0], 2, contenu)
 
     def test_faits_et_appels_deux_formes(self):
         """Les deux formes donnent le même texte humain, entier (jamais un caractère par entrée)."""

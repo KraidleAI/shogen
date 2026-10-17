@@ -213,7 +213,7 @@ def faits_et_appels(entrees):
                     txt = contenus(b)
                     if MARQUE not in txt:
                         faits.append(txt)
-                else:
+                elif MARQUE not in contenus(b):      # refus du crochet : jamais un texte humain (R5 ; G2 B, C-2)
                     humain.append(contenus(b))
             tur = e.get("toolUseResult")
             if tur is not None:
@@ -742,6 +742,7 @@ def pre_tool_use(entree):
             refuser(f"R0 (erreur interne) : journal illisible ({chemin}) : un acte qui écrit, commet, pousse, supprime "
                     "ou crée une PR ne se juge pas sans lui (R1 à R3, R5, R8) ; relire le chemin du journal, ou agir "
                     "par une lecture.")
+        REGLE[0] = "erreur"          # journal des refus : lecture permise sans contrôle (CC de l'intégration P3, R-1)
         sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; lecture pure permise sans contrôle.\n")
         return 0
     faits, appels, agent, humain = faits_et_appels(entrees)
@@ -1014,8 +1015,11 @@ def nombres_sans_piece(entree):
                 reponse.append(b.get("text", ""))
     lignes = "\n".join(pieces).split("\n")
     unite = lambda u: "an" if u in ("an", "ans") or u.startswith("ann") else u if u in ("%", "mois") else u.rstrip("s")  # noqa: E731
+    nus = comptes_nus(entrees[i + 1:] if i is not None else entrees)      # comptes lus par wc, grep -c (G2, C-4)
     manque = list(dict.fromkeys(m[0] for m in R12_NOMBRE.finditer(RAPPEL.sub("", "\n".join(reponse)))
-                                if not piece_porte(m[1], unite(m[2].lower()), lignes)))
+                                if not piece_porte(m[1], unite(m[2].lower()), lignes) and not (
+                                    unite(m[2].lower()) in ("commit", "test", "fichier") and m[1].isdigit()
+                                    and int(m[1]) in nus)))
     if manque and entree.get("stop_hook_active"):
         journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
                     f"PASSAGE R12 au second arrêt : {manque[:8]}")
@@ -1023,7 +1027,7 @@ def nombres_sans_piece(entree):
     return manque
 
 
-LECTURE = {"cat", "head", "tail", "grep", "ls", "wc", "sha256sum", "cmp", "diff", "od", "stat", "pwd", "echo", "printf",
+LECTURE = {"cat", "head", "tail", "grep", "ls", "wc", "sha256sum", "cmp", "diff", "od", "stat", "pwd", "echo",
            "df", "du", "cut", "tr", "nl", "basename", "dirname", "realpath", "readlink", "true", "cd"}
 GIT_LECTURE = {"status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "blame", "cat-file"}
 
@@ -1032,22 +1036,24 @@ def lecture_pure(c):
     """Vrai seulement si chaque commande simple de c est une lecture connue (SHOGEN-GARDE-ERREUR-INTERNE-1) : programme
     de LECTURE, ou git (options -C, --no-pager, --no-optional-locks) en GIT_LECTURE sans --output ni $ ; aucune
     redirection d'écriture (hors 2>&1 et vers /dev/null), substitution, affectation en tête. Découpe aux séparateurs
-    avant shlex : un séparateur entre guillemets fait une commande illisible, donc pas une lecture (sens sûr)."""
-    reste = re.sub(r"[0-9]?>&[0-9]|[0-9]?>[ ]*/dev/null(?![^\s;&|])", "", c)
+    avant shlex : un séparateur entre guillemets fait une commande illisible, donc pas une lecture (sens sûr). G2 du
+    groupe B, C-1 : programme nommé sans chemin (./cat, /x/git : refus) ; >&N suivi d'un mot n'est pas un descripteur
+    (>&1b écrit le fichier 1b) ; printf hors de LECTURE (printf -v affecte une variable, PATH compris)."""
+    reste = re.sub(r"[0-9]?>&[0-9]+(?![^\s;&|])|[0-9]?>[ ]*/dev/null(?![^\s;&|])", "", c)
     if re.search(r"[>`]|\$\(|<\(", reste):
         return False
     for seg in re.split(r"&&|\|\||[;&|\n]", reste):
         mots = shlex.split(seg)
         if mots and "=" in mots[0]:
             return False
-        if mots and os.path.basename(mots[0]) == "git":
+        if mots and mots[0] == "git":
             k = 1
             while mots[k:k + 1] and mots[k] in ("-C", "--no-pager", "--no-optional-locks"):
                 k += 2 if mots[k] == "-C" else 1
             if not (mots[k:k + 1] and mots[k] in GIT_LECTURE) or "$" in seg or any(
                     m.startswith("--output") for m in mots):
                 return False
-        elif mots and os.path.basename(mots[0]) not in LECTURE:
+        elif mots and mots[0] not in LECTURE:
             return False
     return True
 
@@ -1099,8 +1105,8 @@ def juger(entree):
                                  "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
                                  "docs/publication/), puis rattacher.\n")
                 journaliser(dossier, f"REFUS Stop R10 : {manque}")
-                return 2
-            sans = nombres_sans_piece(entree) if ev == "Stop" and not code else []      # R12 (E29)
+                code = 2
+            sans = nombres_sans_piece(entree) if ev == "Stop" else []      # R12 (E29), jugée aussi après R6 ou R10 (G2, C-3)
             if sans:
                 REGLE[0] = "R12"
                 sys.stderr.write(f"{MARQUE} : REFUS. R12 (E29) : la réponse porte {', '.join(sans[:8])}, qu'aucun "

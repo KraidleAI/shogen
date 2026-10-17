@@ -59,7 +59,8 @@ class Journal(Base):
         d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien.
         G2, C-4 : refus R11 (consigne longue sans brief) et R10 (dossier nommé sans relevé) consignés sous leur règle.
         Intégration P3 (SHOGEN-GARDE-ERREUR-INTERNE-1) : erreur interne ou journal illisible sur un acte qui écrit :
-        refus consigné R0 ; erreur interne sur une lecture pure : permis, consigné erreur. Refus R12 (nombre à unité
+        refus consigné R0 ; erreur interne ou journal illisible sur une lecture pure : permis, consigné erreur (CC
+        de l'intégration P3, R-1 ; le sous-agent a1 n'a pas de journal ici). Refus R12 (nombre à unité
         sans pièce, R6 couverte par un 28 affiché sans unité) : consigné R12."""
         secret = ("echo " + chr(34) + "token=s3cr3tValeur" + chr(34) + " sk-ant-" + "api03-AbCdEf0123456789xyzXYZ0" + TAB
                   + "password:" + TAB + "motdepasse" + TAB)
@@ -73,6 +74,8 @@ class Journal(Base):
                              tool_input={"command": "ls"})[0],
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "git commit -m x"},
                              transcript_path=os.path.join(self.t, "absent.txt"))[0],
+                 self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "ls"},
+                             transcript_path=os.path.join(self.t, "absent.txt"))[0],
                  self.lancer("PreToolUse", tool_name="Agent", tool_input={"prompt": "x" * 1600})[0],
                  self.lancer("Stop", [{"type": "user", "message": {"content": "Note de Zorglubien."}}, {
                      "type": "assistant", "uuid": "u2", "message": {"content": [{"type": "text", "text": "Voir MONARK."}]}}])[0],
@@ -85,12 +88,12 @@ class Journal(Base):
         abrege = "echo " + chr(34) + "token=***" + chr(34) + " *** password: *** "
         lignes = [["PreToolUse:Bash", "permis", "ls", "principal"], ["PreToolUse:Bash", "R7", "sleep 5", "principal"],
                   ["PreToolUse:Bash", "permis", abrege + "x" * (80 - len(abrege)), "principal"],
-                  ["PreToolUse:Bash", "permis", "ls", "a1"], ["Stop", "R6", "-", "principal"],
+                  ["PreToolUse:Bash", "erreur", "ls", "a1"], ["Stop", "R6", "-", "principal"],
                   ["PreToolUse:Bash", "R0", "-", "principal"], ["PreToolUse:Bash", "erreur", "ls", "principal"],
-                  ["PreToolUse:Bash", "R0", "git commit -m x", "principal"],
+                  ["PreToolUse:Bash", "R0", "git commit -m x", "principal"], ["PreToolUse:Bash", "erreur", "ls", "principal"],
                   ["PreToolUse:Agent", "R11", '{"prompt": "' + "x" * 68, "principal"], ["Stop", "R10", "-", "principal"],
                   ["Stop", "R12", "-", "principal"]]
-        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 2, 0, 2, 2, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
+        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 2, 0, 2, 0, 2, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
                                                                                     for x in lignes)))
         self.assertNotIn("motdepasse", self.lire())
         self.env["SHOGEN_GARDE_REFUS"] = os.path.join(self.t, "absent", "refus.tsv")
@@ -131,13 +134,14 @@ class Journal(Base):
                  ["2026-10-15T10:00:00Z", "PreToolUse:Bash", "R7", "sleep 5", "principal"],
                  ["2026-10-15T11:00:00Z", "PreToolUse:Bash", "R2", "sed -i x f", "a1"],
                  ["2026-10-15T12:00:00Z", "PreToolUse:Bash", "R7", "sleep 9", "principal"],
+                 ["2026-10-15T12:30:00Z", "PreToolUse:Bash", "R0", "git commit", "principal"],
                  ["2026-10-15T13:00:00Z", "PreToolUse:Bash", "permis", "ls", "principal"]]
         with open(self.j, "w", encoding="utf-8") as f:
             f.write(ENTETE + "".join(TAB.join(x) + NL for x in avant) + "ligne illisible" + NL)
         q = "où en est la suite ?"
-        self.assertEqual(self.lancer("UserPromptSubmit", prompt=q), (0, RELEVE + "3 refus depuis le dernier relevé "
-                         "(2026-10-15T09:00:00Z) : R7 ×2, R2 ×1" + DETAIL + " --depuis 2026-10-15" + NL))
-        fin = [TAB.join([H, "UserPromptSubmit", "releve", "3 refus", "principal"]) + NL,
+        self.assertEqual(self.lancer("UserPromptSubmit", prompt=q), (0, RELEVE + "4 refus depuis le dernier relevé "
+                         "(2026-10-15T09:00:00Z) : R7 ×2, R0 ×1, R2 ×1" + DETAIL + " --depuis 2026-10-15" + NL))
+        fin = [TAB.join([H, "UserPromptSubmit", "releve", "4 refus", "principal"]) + NL,
                TAB.join([H, "UserPromptSubmit", "permis", "-", "principal"]) + NL]
         self.assertEqual(self.lire().split(NL)[-3:], [x[:-1] for x in fin] + [""])
         humain = {"type": "user", "message": {"role": "user", "content": "Bonjour."}}
@@ -178,6 +182,7 @@ class Lecteur(Base):
         lignes = [["2026-09-15T08:00:00Z", b, "R1", "rm -rf w"], ["2026-09-16T08:00:00Z", "Stop", "R6", "-"],
                   ["2026-09-30T08:00:00Z", b, "permis", "ls"]]
         lignes += [[f"2026-10-15T0{k}:00:00Z", b, "R5", "git commit -m x"] for k in (1, 2, 3)]
+        lignes += [["2026-10-16T02:30:00Z", b, "R0", "git commit -m x"]]      # marque R0 (CC de l'intégration P3, R-3)
         lignes += [["2026-10-16T03:00:00Z", b, "R7", "sleep 5"], ["2026-10-16T04:00:00Z", "PreToolUse:Agent", "R11",
                                                                   "sleep 5"]]
         lignes += [[f"2026-10-16T0{k}:00:00Z", b, "R2", "sed -i s f"] for k in (1, 2)]
@@ -189,14 +194,15 @@ class Lecteur(Base):
             f.write(ENTETE + "".join(TAB.join([*x, "principal"]) + NL for x in lignes) + "x" + NL
                     + TAB.join(["2026-10-16T08:00:00Z", "Stop", "R6", "-"]) + NL)
         self.assertEqual(self.releve("--depuis", "2026-10-01"), (0, [
-            "journal des refus : 23 ligne(s) lue(s), 2 illisible(s) ; depuis 2026-10-01 : 16 refus",
-            "refus par règle et par jour :", "  2026-10-15" + TAB + "R5" + TAB + "3", "  2026-10-16" + TAB + "R2" + TAB
+            "journal des refus : 24 ligne(s) lue(s), 2 illisible(s) ; depuis 2026-10-01 : 17 refus",
+            "refus par règle et par jour :", "  2026-10-15" + TAB + "R5" + TAB + "3", "  2026-10-16" + TAB + "R0" + TAB + "1",
+            "  2026-10-16" + TAB + "R2" + TAB
             + "2", "  2026-10-16" + TAB + "R7" + TAB + "1", "  2026-10-16" + TAB + "R11" + TAB + "10",
             "actes refusés les plus fréquents (dix au plus) :",
-            "  3" + TAB + "R5" + TAB + "git commit -m x", "  2" + TAB + "R2" + TAB + "sed -i s f",
+            "  4" + TAB + "R0,R5" + TAB + "git commit -m x", "  2" + TAB + "R2" + TAB + "sed -i s f",
             "  2" + TAB + "R7,R11" + TAB + "sleep 5"] + ["  1" + TAB + "R11" + TAB + f"acte-0{k}" for k in range(1, 8)] + [
             "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10, R12",
             "passages : 3 (dont 1 erreur(s) interne(s), acte permis sans contrôle)"]))
-        self.assertEqual(self.releve()[1][0], "journal des refus : 23 ligne(s) lue(s), 2 illisible(s) ; depuis le "
-                         "début : 18 refus")
+        self.assertEqual(self.releve()[1][0], "journal des refus : 24 ligne(s) lue(s), 2 illisible(s) ; depuis le "
+                         "début : 19 refus")
         self.assertEqual((self.releve("--depuis", "2026-10-1")[0], self.releve("--journal", self.j)[0]), (3, 3))

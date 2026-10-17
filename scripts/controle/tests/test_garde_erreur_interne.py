@@ -67,7 +67,8 @@ class ErreurInterne(unittest.TestCase):
         refus = [("Bash", {"command": c}) for c in (
             "git commit -m essai", "git push origin main", "rm -rf clone", "cat a > b", "echo x | tee b",
             "sed -n 1p a", "git log --output=f", "GIT_PAGER=rm git log", "cat $(ls)", "echo x | sh", "git -c a=b log",
-            "git status $X", "grep 'a|b' f", "ls ; curl https://api.github.com/x", "cat a >> b", "cd x && make", "F=/bin/cat rm -rf y")] + [
+            "git status $X", "grep 'a|b' f", "ls ; curl https://api.github.com/x", "cat a >> b", "cd x && make", "F=/bin/cat rm -rf y",
+            "echo x >&1b", "cat a >&2copie", "./cat a", "/tmp/x/git status", "printf -v PATH /tmp/x ; cat a")] + [
             ("Write", {"file_path": "/x/a.md", "content": "x"}), ("Edit", {"file_path": "/x/a.md"}),
             ("Agent", {"prompt": "x"}), ("mcp__github__create_pull_request", {"owner": "o", "repo": "r"}),
             ("mcp__github__merge_pull_request", {}), ("Inconnu", {})]
@@ -83,6 +84,12 @@ class ErreurInterne(unittest.TestCase):
         for n, i in permis:
             code, err = vus[(n, json.dumps(i))]
             self.assertEqual((code, "erreur interne" in err, "REFUS" in err), (0, True, False), (n, i, err))
+        arret = {"hook_event_name": "Stop", "transcript_path": self.journal, "cwd": self.t}      # G2, C-1 : table, Stop
+        err = io.StringIO()
+        with (mock.patch.object(self.g, "faits_et_appels", side_effect=RuntimeError("double")),
+              mock.patch.object(sys, "stdin", io.StringIO(json.dumps(arret))), contextlib.redirect_stderr(err)):
+            code = self.g.main()
+        self.assertEqual((code, "erreur interne" in err.getvalue()), (0, True), err.getvalue())
 
     def test_journal_illisible(self):
         """L.610 : journal illisible (absent) ; acte qui commet : refus ; lecture pure : permise, note écrite."""
