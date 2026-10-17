@@ -568,3 +568,18 @@ def motifs_du_code(texte):
         motif = _plier_motif(n.args[0], noms)
         out.append((n.lineno, n.end_lineno, None if motif is None else tete + motif))
     return sorted(out, key=lambda x: x[:2])
+
+
+def rangees_fautives(lignes, numeros):
+    """[(n, cellules, cellules de l'en-tête)] des rangées de tableau aux numéros donnés (1 à N) dont le compte de
+    cellules diffère de celui de l'en-tête de leur tableau, première ligne du bloc de lignes qui commencent par une
+    barre (marques de citation > ôtées) ; barres de bord ôtées, barre échappée non comptée (E32 : compte lu)."""
+    rangee = lambda x: re.sub("^[ >]*", "", x).rstrip()
+    compte = lambda x: len(re.split("(?<!" + chr(92) * 2 + ")[|]", rangee(x)[1:].removesuffix("|")))
+    out = []
+    for n in [n for n in numeros if 0 < n <= len(lignes) and rangee(lignes[n - 1]).startswith("|")]:
+        k = n - 1
+        while k > 0 and rangee(lignes[k - 1]).startswith("|"):
+            k -= 1
+        out += [(n, compte(lignes[n - 1]), compte(lignes[k]))] if compte(lignes[n - 1]) != compte(lignes[k]) else []
+    return out

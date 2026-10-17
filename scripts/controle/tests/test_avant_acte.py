@@ -1116,3 +1116,61 @@ class ChaineABlanc(Depot):
             self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS " + code + " ", texte)
         admis = self.SCRIPT + "sle" + "ep 1 > /dev/null &" + NL + 'echo "${1:-}"' + NL + "cat <<'F'" + NL + "$1" + NL
         self.assertEqual(self.blanc(d1, script=admis + "F" + NL + "wait" + NL), (0, ""))
+
+
+class VersementABlanc(Depot):
+    """SHOGEN-GARDE-RECALAGE-CHECK-1 : verser --blanc --script S, le script de versement joué sur une copie creuse
+    (contrat SHOGEN_DEPOT), puis jugé sur ce qu'il y a écrit (E32, E33, E35, E36) ; gabarits/versement.py."""
+    INDEX = NL.join(["# index", "| nom | a | b | c | d | e | f |", "|---|---|---|---|---|---|---|",
+                     "| `x.pdf` | 1 | 2 | 3 | 4 | 5 | 6 |", ""])
+    HUIT, SEPT = "| `y.pdf` | 1 | 2 | 3 | 4 | 5 | 6 | 7 |" + NL, "| `y.pdf` | 1 | 2 | 3 | 4 | 5 | 6 |" + NL
+
+    def setUp(self):
+        super().setUp()
+        ici = os.path.dirname(os.path.abspath(avant_acte.__file__))
+        with open(os.path.join(ici, "gabarits", "versement.py"), encoding="utf-8") as f:
+            self.gabarit = f.read()
+        with open(os.path.join(ici, "garde_commun.py"), encoding="utf-8") as f:      # lu par le gabarit dans le dépôt
+            commun = f.read()
+        self.indexer({"biblio/INDEX.md": self.INDEX, "JOURNAL.md": ChaineABlanc.VIEUX, ".gitignore": "*.log" + NL,
+                      "scripts/controle/garde_commun.py": commun, "suivi.log": "x ; " + "TO" + "DO : 0" + NL})
+        ag.git(self.d, self.env, "add", "-f", "suivi.log")      # suivi mais ignoré : dans la copie, jamais compté écrit
+        ag.git(self.d, self.env, "commit", "-q", "-m", "base")
+
+    def verser(self, corps=None, actes=None):
+        """Script écrit (corps, ou le gabarit aux ACTES donnés), joué à blanc ; rend (code, sortie, état du dépôt)."""
+        texte = corps if actes is None else self.gabarit.replace("ACTES = []", "ACTES = " + repr(actes))
+        ag.ecrire(self.tmp, {"verser.py": texte})
+        code, sortie = self.lancer("verser", "--blanc", "--script", os.path.join(self.tmp, "verser.py"))
+        return code, sortie, ag.git(self.d, self.env, "status", "--porcelain")
+
+    def test_e32_rangee_lue_et_ordre(self):
+        """E32 : gabarit, rangée de huit cellules sous un en-tête de sept : refus du gabarit avant toute écriture,
+        V8 ; rangée de sept : admis ; script qui écrit la rangée de huit lui-même : V9 (compte lu) ; script qui écrit
+        puis échoue sur son contrôle : V8, écriture avant contrôle nommée ; le dépôt n'est jamais écrit."""
+        code, sortie, etat = self.verser(actes=[("biblio/INDEX.md", self.HUIT)])
+        self.assertEqual((code, sortie[:22], "écrit" in sortie, etat), (1, "REFUS V8 : le versemen", False, ""))
+        self.assertEqual(self.verser(actes=[("biblio/INDEX.md", self.SEPT)]), (0, "", ""))
+        self.assertEqual(self.verser(actes=[]), (0, "", ""))
+        lien = "import os" + NL + "D = os.environ['SHOGEN_DEPOT']" + NL
+        ecrire = "open(os.path.join(D, 'biblio', 'INDEX.md'), 'a').write(" + repr(self.HUIT) + ")" + NL
+        code, sortie, etat = self.verser(lien + ecrire)
+        v9 = sortie.startswith("REFUS V9 : biblio/INDEX.md:5 : 8 cellules, en-tête de 7 (E32)")
+        self.assertEqual((code, v9, etat), (1, True, ""))
+        code, sortie, etat = self.verser(lien + "open(os.path.join(D, 'd17.md'), 'a').write('x')" + NL + "assert 0" + NL)
+        self.assertEqual((code, sortie[:9], "après avoir écrit 1 fichier" in sortie, etat), (1, "REFUS V8 ", True, ""))
+
+    def test_e33_e35_portes_et_contrat(self):
+        """E33, E35, E36 : pièce neuve à fragment anglais entre guillemets : G5 ; marqueur de dette nu ajouté : K6 ;
+        ajout propre à un journal qui porte de vieux fragments : admis ; script sans SHOGEN_DEPOT : V8, jamais lancé ;
+        script qui écrit dans le dépôt lui-même : V8."""
+        e9 = chr(171) + " fatal: not a git repository (or any of the parent directories) " + chr(187)
+        self.assertEqual(self.verser(actes=[("docs/piece.md", "Refus : " + e9 + NL)])[1][:9], "REFUS G5 ")
+        self.assertEqual(self.verser(actes=[("JOURNAL.md", "Comptes ; " + "TO" + "DO : 0" + NL)])[1][:9], "REFUS K6 ")
+        self.assertEqual(self.verser(actes=[("JOURNAL.md", "Ajout du jour." + NL)]), (0, "", ""))
+        temoin = os.path.join(self.tmp, "lance")
+        code, sortie, _e = self.verser("open(" + repr(temoin) + ", 'w')" + NL)
+        self.assertEqual((code, sortie[:9], os.path.exists(temoin)), (1, "REFUS V8 ", False))
+        code, sortie, etat = self.verser("# SHOGEN_DEPOT ignoré" + NL + "open(" + repr(os.path.join(self.d, "z.md"))
+                                         + ", 'w').write('z')" + NL)
+        self.assertEqual((code, sortie[:9], etat), (1, "REFUS V8 ", "?? z.md" + NL))

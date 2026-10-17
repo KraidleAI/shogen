@@ -129,7 +129,11 @@ interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 
 seules lignes ajoutées.
 Phase 3, groupe A, RECALAGE-CHECK, script (E34, E36, E18) : chaine --blanc juge d'abord le script : K1 bash -n ; K2
 trap ... ERR sous set -E ; K3 sleep d'avant-plan ; K4, sous set -u, $N lu sans protection par une fonction appelée
-avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés)."""
+avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés).
+Phase 3, groupe A, RECALAGE-CHECK, versement : verser --blanc --script S (E32, E33, E35) : V8, script qui ne lit pas
+SHOGEN_DEPOT (jamais lancé), qui sort hors de 0 (écriture avant contrôle nommée) ou qui écrit dans le dépôt ; sur ce
+qu'il écrit dans la copie creuse : K6 et G5 (lignes ajoutées), V9 rangée de tableau dont le compte de cellules diffère
+de l'en-tête (garde_commun.rangees_fautives)."""
 import argparse
 import ast
 import collections
@@ -141,6 +145,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -679,7 +684,55 @@ def suivi(a, fichiers, env, fautes):
                            "muter le code que le test garde, le voir rouge, consigner le mutant tué", "-"))
 
 
+BORNE_VERSER = 300      # s, borne du script de versement joué à blanc
+
+
+def verser_blanc(a, fautes):
+    """RECALAGE-CHECK, versement (E32, E33, E35, E36) : le script tourne sur une copie creuse (SHOGEN_DEPOT), dans
+    un groupe de processus neuf, sous BORNE_VERSER ; puis ce qu'il a écrit (fichiers neufs compris) est jugé."""
+    if b"SHOGEN_DEPOT" not in lire(a.script):
+        fautes.append(("refus", "V8", "le script ne lit pas SHOGEN_DEPOT : il écrirait dans le dépôt (non lancé)",
+                       "lire la racine dans SHOGEN_DEPOT (gabarits/versement.py)", "-"))
+        return
+    etat = lambda: git(a.depot, "status", "--porcelain", "--untracked-files=all")
+    with tempfile.TemporaryDirectory() as d:
+        copie, env = copie_creuse(a.depot, d)
+        avant, env_script = etat(), {k: v for k, v in env.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}
+        p = subprocess.Popen([sys.executable, "-B", os.path.abspath(a.script)], cwd=copie, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, env=dict(env_script, SHOGEN_DEPOT=copie), start_new_session=True)
+        try:
+            sortie = p.communicate(timeout=BORNE_VERSER)[0].decode("utf-8", "replace").strip()
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)
+            p.communicate()
+            raise Erreur(f"verser --blanc : script au-delà de {BORNE_VERSER} s, arrêté (groupe entier)")
+        git(copie, "add", "-N", "-f", "--", ".", env=env)
+        fichiers = GC.analyser_diff(git(copie, "diff", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
+                                        "--src-prefix=a/", "--dst-prefix=b/", "-U0", env=env))
+        if etat() != avant:
+            fautes.append(("refus", "V8", "le script a écrit dans le dépôt, hors de la copie (contrat SHOGEN_DEPOT)",
+                           "remettre le dépôt propre, n'écrire que sous SHOGEN_DEPOT", "-"))
+        if p.returncode:
+            ecrit = f", après avoir écrit {len(fichiers)} fichier(s) : écrire après tous les contrôles (E32)"
+            fautes.append(("refus", "V8", f"le versement sort en {p.returncode}{ecrit if fichiers else ''} : "
+                           + (sortie.split(chr(10)) or [""])[-1][:160], "corriger le script ou ses cibles", "-"))
+            return
+        portes(a.depot, "versement", [(f["apres"], f["ajouts"]) for f in fichiers if f["apres"]], fautes)
+        for f in [f for f in fichiers if (f["apres"] or "").endswith(".md")]:
+            with open(os.path.join(copie, f["apres"]), encoding="utf-8") as x:
+                lignes = x.read().split(chr(10))
+            for n, nb, tete in GC.rangees_fautives(lignes, [n for n, _x in f["ajouts"]]):
+                fautes.append(("refus", "V9", f"{f['apres']}:{n} : {nb} cellules, en-tête de {tete} (E32)",
+                               "lire l'en-tête du tableau, écrire la rangée à son compte", "-"))
+
+
 def verser(a, fautes):
+    if not a.pieces and not (a.blanc and a.script) or bool(a.blanc) != bool(a.script):
+        raise Erreur("verser : --pieces D, ou --blanc --script S (ou les deux)")
+    if a.blanc:
+        verser_blanc(a, fautes)
+    if not a.pieces:
+        return
     racine = os.path.abspath(a.pieces)
     if not os.path.isdir(racine) or GC.chemin_interdit(racine):
         raise Erreur("dossier de pièces absent ou interdit (non lu)")
@@ -903,7 +956,7 @@ def copie_creuse(depot, dossier):
     if tar.returncode or subprocess.run(["tar", "-x", "-C", copie], input=tar.stdout, capture_output=True).returncode:
         raise Erreur("git archive ou tar : copie creuse non faite")
     git(copie, "init", "-q", env=env)
-    git(copie, "add", "-A", env=env)
+    git(copie, "add", "-A", "-f", env=env)
     return copie, env
 
 
@@ -1255,7 +1308,10 @@ def parseur():
     s = sp.add_parser("diff")
     s.add_argument("--fichier", required=True)
     s.add_argument("--rapport")
-    sp.add_parser("verser").add_argument("--pieces", required=True)
+    s = sp.add_parser("verser")
+    s.add_argument("--pieces")
+    s.add_argument("--blanc", action="store_true")
+    s.add_argument("--script")
     s = sp.add_parser("pousser")
     for option in ("--distant", "--branche", "--acte"):
         s.add_argument(option)
