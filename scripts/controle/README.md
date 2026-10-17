@@ -921,3 +921,29 @@ dépendent des tests du harnais qu'ils importent.
 >
 > Le groupe ajoute 26 tests ; la série (groupes C, B, A) en ajoute 46 ; plancher du job `controle-unittest`
 > 225.
+
+
+> *Ajout daté du 2026-10-17 01:50:31 UTC (`date -u` ; lot CAUSES, pas INT-20 à INT-22 : une cause supprimée par outil pour chacune des erreurs E37, E39 et E40 du registre de l orchestrateur ; générateur l orchestrateur, G2 neuve)* :
+> - **K8** (E39, `suite_k8`, `chaine --blanc` avec `--plan`) : la ligne exacte du job `controle-unittest` de `gates.yml` de la copie creuse est jouée dans la copie à l état final du plan, sous l environnement du lancement tel quel (variables de la chaîne comprises) ; rouge : refus K8 (le cas qui hérite d une variable rougit au passage à blanc, plus au premier pas) ; copie sans `gates.yml` : rien à jouer ; borne `BORNE_K8`. Cas : `tests/test_avant_acte.py` (`test_k8_suite_sous_les_variables_du_lancement`).
+> - **Motif de chaîne partagé** (`garde/motif-chaine.txt`, une ligne ancrée par `^` ; `motif_chaine` d `avant_acte.py`, `chaine_en_cours` de `mutants.py`, `motif_chaine` du crochet) : lu, jamais recopié. Cas : `test_motif_de_chaine_lu`.
+> - **R13** (crochet GARDE-FAITS, PreToolUse) : (a) E37, une chaîne tourne (pgrep -f du motif) : tout Bash qui lance `cargo`, `xtask` ou `mutants.py` est refusé, un seul lot lourd à la fois ; (b) E39, un Bash qui lance `chaine.sh` ou `chaine_*.sh` ne lance qu une copie à l octet de `gabarits/chaine-modele.sh` (sha256 ; modèle absent : refus) ; (c) E40, une consigne (Agent, Workflow, SendMessage) qui dit qu une gate ou un contrôle a rougi cite une ligne `VIOLATION …` ou `REFUS …` lue dans un résultat d outil du journal, jamais une cause déduite. Cas : `tests/test_garde_acte.py` (`test_r13_processus_lourd_pendant_une_chaine`, `test_r13_chaine_lancee_hors_du_modele`, `test_r13_cause_de_refus_sans_la_ligne_de_la_gate`) ; `test_refus_lecteur` recalé (R13 parmi les règles).
+> - **`mutants.py`** (E37) : campagne refusée (sortie 3) quand une chaîne tourne, par le même motif. Cas : `tests/test_mutants.py` (`test_e37_campagne_refusee_pendant_une_chaine`).
+>
+> | règle | crochet | acte jugé | origine |
+> |---|---|---|---|
+> | R13 | PreToolUse Bash, Agent, Workflow, SendMessage | processus lourd pendant une chaîne ; chaîne hors du modèle ; cause de refus sans la ligne de la gate | E37, E39, E40 (CAUSES) |
+>
+> Empreintes sha256 à l état final du lot :
+>
+> | fichier | sha256 |
+> |---|---|
+> | `avant_acte.py` | `708a25e6347c9f68c1a50ceffcecf81f74a0418f418b6b021078e9900376a368` |
+> | `mutants.py` | `3e21878363ad7a106357abb666c3d8c5351f8ac94fcf3d95c4e64400abddad64` |
+> | `garde/motif-chaine.txt` | `aa7957630ec6b61f40895f8d7b669e3705a4a6d22e54b4f06a398da1ff65b6d0` |
+> | `.claude/hooks/garde_faits.py` | `be7ef7125dfdfeba805c7f49ed4ea6843885d6b40d74336ef4c7c284c81025e1` |
+> | `tests/test_avant_acte.py` | `1df93dd661dcc2e2eb38bd7807b609ce5330d247aa638bc00a5c467a87088a13` |
+> | `tests/test_garde_acte.py` | `2de7d06c9fa26a249bdcda50e3c7f265e1be8df8fe9703502605037a7475fe6d` |
+> | `tests/test_garde_refus.py` | `26b98f69d8ce6314fe8b1d1aa9ddea169530a4132bafceaf5fedf16b14c29900` |
+> | `tests/test_mutants.py` | `c64b6b35866770c51ce49d21cd9c9b06ae226b2bbeef8c5c16465765d12fe5e1` |
+>
+> Le lot ajoute 6 tests ; plancher du job `controle-unittest` 231.
