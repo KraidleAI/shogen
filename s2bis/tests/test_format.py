@@ -271,6 +271,18 @@ class Format(unittest.TestCase):
         self.assertEqual([all(x in p for x in ("C-P2D-2", "CURVE-DOC-1")) for p in puces if p.startswith(
             "**Partie P2, intégration**")], [True])
 
+    def test_paragraphe_18_smoke_sans_prix(self):                   # CB-16 ; E-C-37
+        """§18 : commande, lectures, forme de la ligne, aucun prix, code de sortie ; puce « Partie P2, intégration » :
+        CB-16a et CB-16b."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("`python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]`", "sortie 2",
+                    "`<rôle> <forme> <hôte> <statut> <code ou -> <sous-type ou -> <latence> ms décodable oui|non`",
+                    "**Aucun prix**", "0 si et seulement si toutes les formes du pool et du témoin décodent",
+                    "`GET https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD`")
+        self.assertEqual([x in sections.get("18", "") for x in attendus], [True] * 6)
+        self.assertEqual([all(x in p for x in ("CB-16a", "CB-16b", "§18")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

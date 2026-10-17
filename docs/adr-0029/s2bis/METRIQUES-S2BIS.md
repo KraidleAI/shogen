@@ -3087,3 +3087,27 @@ décodée ; nom de la forme au lieu de son décodeur (site d'appel) ; contexte T
 Suite : 420 tests ; plancher du job : 420, égalité exigée (`--egal`). Compte de R-25 : 178 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, la docstring de `smoke.py` est recoupée à 117
 colonnes (forme seule, mêmes mots : contrôle du lot).
+
+## INT-P2-14 (2026-10-17) : CB-16b, commande `smoke` du collecteur (E-C-37 ; FORMAT §18)
+
+Objet : `python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]` (`entree._smoke`) : `formes.json` et
+`carte.json` contrôlés par leurs schémas, leurs règles et les règles croisées, comme au démarrage (sans `sante` ni
+descripteur) ; refus `smoke : refus : …`, sortie 2 ; sinon `smoke.jouer` aux délais de chaque fichier, sortie 0 ou 1.
+FORMAT : §18 (commande, lectures, forme de la ligne, aucun prix, code de sortie) et puce « Partie P2, intégration ».
+
+Rouge : sur un squelette d'interface (sous-commande et options présentes, `_smoke` rend 0 sans rien lire) et le FORMAT
+de INT-P2-13, les deux tests neufs échouent par assertion (2 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 321 | — |
+| `tests/test_smoke.py` | 183 | 5 (1 de plus : commande par le point d'entrée) |
+| `tests/test_format.py` | 341 | 21 (1 de plus : §18 et puce) |
+
+Mutants (même commande, même outil) : 13 mutants, 13 tués par leur test visé, 0 vivant, 0 FATAL : règles croisées,
+règles de `formes.json` ou de `carte.json` omises ; délai du pool pour la carte ; fichier illisible non attrapé ; code
+d'un refus confondu avec un échec ; préfixe du refus ; carte non lue ; carte exigée ; FORMAT : prix admis, code sans le
+témoin ; puce sans §18 ; plancher.
+
+Suite : 422 tests ; plancher du job : 422, égalité exigée (`--egal`). Compte de R-25 : 93 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.

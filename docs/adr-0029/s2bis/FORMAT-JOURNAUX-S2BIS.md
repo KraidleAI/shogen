@@ -76,7 +76,7 @@
   `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
   porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
   par un test seul (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
-  le diff CB-16a écrit le smoke sans prix (`smoke.py`).
+  le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -940,3 +940,29 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    à quorum si M_j ≥ 2 (ADR-0029 §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur
    dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans
    `--descripteur` : refus `CONFIG/options`, sortie 2.
+
+## 18. Commande `smoke` (CB-16 ; E-C-37)
+
+Rattachement : ADR-0029 l.81 (chaque observateur lit avec succès, avant le sceau, chaque forme de requête des quatre
+classes, de l'ensemble témoin et de chaque source de la carte), l.222 (aucun prix lu au rodage) ; PROPOSITION E-C-37,
+l.224, l.278 ; AVIS du G0, Q-C-05. Code de référence : `s2bis/shogen_s2bis/collecte/smoke.py`.
+
+1. **Commande** (CB-16b) : `python3 -m shogen_s2bis.collecte smoke --formes F [--carte C]` ; `formes.json` (pool et
+   témoin) et `carte.json` contrôlés par leurs schémas, leurs règles (§14.1) et les règles croisées (§15.2), comme au
+   démarrage ; un refus imprime `smoke : refus : …` sur l'erreur standard, sortie 2. Rien n'est écrit : ni journal,
+   ni octets.
+2. **Lectures** (CB-16a) : une lecture par forme du pool et du témoin, au délai de `formes.json`, puis par forme de la
+   carte, au délai de `carte.json`, en série, chacune décodée par le décodeur de sa forme (§9.1) ; une seconde au
+   moins avant une nouvelle lecture d'un hôte à `espace` vrai ; puis CryptoCompare,
+   `GET https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD` (URL de S2), écartée du pool, dont le 401
+   sans clé est re-confirmé.
+3. **Sortie** : une ligne par lecture,
+   `<rôle> <forme> <hôte> <statut> <code ou -> <sous-type ou -> <latence> ms décodable oui|non` ; rôle `pool`,
+   `temoin` (décodeur de la classe `temoin`, §9.1) ou `carte` ; latence `fin` − `depart` en millisecondes entières ;
+   pour CryptoCompare, rôle `exclue` et `attendu 401 : OK` ou `ÉCART` au lieu de `décodable` ; puis
+   `smoke : OK|ÉCHEC (<n>/<N> formes du pool et du témoin décodées)`. **Aucun prix**, aucune valeur décodée, aucune
+   fourchette ni aucun octet du corps (ADR-0029 l.222) ; la capture des octets d'une fixture est une autre commande,
+   qui n'imprime rien (AVIS Q-C-05).
+4. **Code de sortie** : 0 si et seulement si toutes les formes du pool et du témoin décodent ; 1 sinon. Une forme de
+   la carte qui ne décode pas, ou un code de CryptoCompare autre que 401, est déclaré sans changer le code
+   (ADR-0029 l.81 : la source reste hors de la carte que lit l'observateur).
