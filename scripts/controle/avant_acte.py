@@ -122,7 +122,11 @@ dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3.
 Phase 3, groupe B (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : disque (DQ, GF-8b) mesure le système de fichiers du dépôt, et
 celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT".
 Phase 3, groupe A, PLAGE-LETTRES : C3 (L-3) lit aussi une plage à bornes en lettres (DT15-a à DT15-m ; rang : lettres
-de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne forment pas de plage."""
+de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne forment pas de plage.
+Phase 3, groupe A, RECALAGE-CHECK : chaine --blanc --script S [--diffs D...] (diffs du plan à défaut), avant le
+lancement (E30, E31, E36) : sur une copie creuse de HEAD (git archive, interdits exclus), chaque diff dans l'ordre : K0
+interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 (lu dans gates.yml) et G5 presg5 sur ses
+seules lignes ajoutées."""
 import argparse
 import ast
 import collections
@@ -883,7 +887,90 @@ def disque(a, fautes):
 
 
 
+def copie_creuse(depot, dossier):
+    """Copie de HEAD (git archive ; préfixes INTERDITS de la gate et *.jsonl exclus, jamais extraits) dans
+    dossier/copie, dépôt git neuf dont l'index porte la copie ; le dépôt n'est que lu. Rend (copie, env de git)."""
+    pre = GC.constante(os.path.join(GC.RACINE_OUTILS, "enforcement", "docs-sha256sums.py"), "INTERDITS")
+    hors = [":(exclude" + (")" + p.rstrip("/") if p.endswith("/") else ",glob)" + p + "*") for p in pre]
+    tar = subprocess.run(["git", "-C", depot, "archive", "--format=tar", "HEAD", "--", ".", *hors,
+                          ":(exclude,glob)**/*.jsonl"], capture_output=True)
+    copie, env = os.path.join(dossier, "copie"), dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    os.makedirs(copie)
+    if tar.returncode or subprocess.run(["tar", "-x", "-C", copie], input=tar.stdout, capture_output=True).returncode:
+        raise Erreur("git archive ou tar : copie creuse non faite")
+    git(copie, "init", "-q", env=env)
+    git(copie, "add", "-A", env=env)
+    return copie, env
+
+
+def motif_r13():
+    """(motif, exclusions) de l'étape R-13 du job g5 de gates.yml des outils : lus, jamais recopiés (E35)."""
+    with open(os.path.join(GC.RACINE_OUTILS, ".github", "workflows", "gates.yml"), encoding="utf-8") as f:
+        ligne = [x for x in f.read().split(chr(10)) if "git grep -nE '" in x]
+    if len(ligne) != 1:
+        raise Erreur("étape R-13 du job g5 introuvable dans gates.yml")
+    return ligne[0].split("git grep -nE '", 1)[1].split("'", 1)[0], re.findall("':!([^']+)'", ligne[0])
+
+
+def portes(depot, nom, ajouts, fautes):
+    """Portes textuelles sur les seules lignes ajoutées, jamais un fichier entier (E36) : K6, motif R-13 du job g5
+    hors de ses exclusions (E35) ; G5, presg5 sur celles des .md (E33). ajouts : [(chemin, [(n, ligne)])]."""
+    motif, hors = motif_r13()
+    juges = [(c, n, x) for c, lignes in ajouts if not any(c == h.rstrip("/") or c.startswith(h.rstrip("/") + "/")
+                                                          for h in hors) for n, x in lignes]
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "ajouts"), "w", encoding="utf-8") as f:
+            f.writelines(x + chr(10) for _c, _n, x in juges)
+        p = subprocess.run(["grep", "-nE", "--", motif, os.path.join(d, "ajouts")], capture_output=True, text=True)
+    if p.returncode not in (0, 1):
+        raise Erreur(f"grep : sortie {p.returncode}")
+    for c, n, _x in [juges[int(x.split(":", 1)[0]) - 1] for x in p.stdout.split(chr(10)) if x]:
+        fautes.append(("refus", "K6", f"{nom} : {c}:{n} : marqueur de dette nu (motif R-13 du job g5, E35)",
+                       "mettre le mot en code, ou inscrire la dette au registre (R-13)", "-"))
+    presg5(depot, [(f"{nom} : {c}", place(lignes)) for c, lignes in ajouts if c.endswith(".md")], fautes)
+
+
+def blanc(a, fautes):
+    """RECALAGE-CHECK (E30, E31, E36) : chaque diff, dans l'ordre, sur une copie creuse de HEAD qui porte déjà les
+    précédents (K0, K5, K6, G5)."""
+    if not a.script:
+        raise Erreur("chaine --blanc : --script exigé")
+    plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()] if a.plan else []
+    diffs = a.diffs or [d for x in plan for d in x.split("|")[1].split(",")]
+    if not diffs:
+        raise Erreur("chaine --blanc : aucun diff (--diffs, ou --plan)")
+    with tempfile.TemporaryDirectory() as d:
+        copie, env = copie_creuse(a.depot, d)
+        for x in diffs:
+            texte, nom = lire(x).decode("utf-8"), os.path.basename(x)
+            try:
+                noms = chemins_du_patch(copie, texte, x)
+            except Erreur:      # patch illisible : aucun message de git recopié (un chemin interdit n'est pas nommé)
+                noms = None
+            if noms and any(GC.chemin_interdit(os.path.join(os.path.abspath(a.depot), c)) for c in noms):
+                fautes.append(("refus", "K0", f"{nom} : fichier(s) sous un interdit (ni lus ni nommés)",
+                               "retirer ces fichiers du diff", "-"))
+                return
+            p = subprocess.run(["git", "-C", copie, "apply", "--check", os.path.abspath(x)], capture_output=True,
+                               text=True, env=env)
+            if noms is None or p.returncode:
+                raison = (p.stderr.strip() + chr(10)).split(chr(10))[0][:160] if noms is not None else "patch illisible"
+                fautes.append(("refus", "K5", f"{nom} ne s'applique pas sur HEAD plus les diffs qui le précèdent "
+                               f"(E30, E31) : {raison}", "refaire le "
+                               "diff sur l'état d'après les précédents, chemins a/ et b/ relatifs au dépôt, saut de "
+                               "ligne final", "-"))
+                return
+            git(copie, "apply", os.path.abspath(x), env=env)
+            portes(a.depot, nom, [(f["apres"], f["ajouts"]) for f in GC.analyser_diff(texte) if f["apres"]], fautes)
+
+
 def chaine(a, fautes):
+    if (a.plan is None) != (a.cc is None) or not (a.plan or a.blanc):
+        raise Erreur("chaine : --plan et --cc ensemble, ou --blanc --script S --diffs D...")
+    if a.blanc:
+        blanc(a, fautes)
+    if a.plan is None:
+        return
     plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()]
     duree = len(plan) * a.duree_pas
     if duree > BORNE_LIEE and not a.detache:
@@ -1101,10 +1188,13 @@ def parseur():
     s.add_argument("--min-go", type=float)
     s.add_argument("--lister", nargs="+", default=[])
     s = sp.add_parser("chaine")
-    s.add_argument("--plan", required=True)
-    s.add_argument("--cc", required=True)
+    s.add_argument("--plan")
+    s.add_argument("--cc")
     s.add_argument("--duree-pas", type=float, default=6)
     s.add_argument("--detache", action="store_true")
+    s.add_argument("--blanc", action="store_true")
+    s.add_argument("--script")
+    s.add_argument("--diffs", nargs="+", default=[])
     s = sp.add_parser("brief")
     s.add_argument("--texte", required=True)
     s.add_argument("--fiche")

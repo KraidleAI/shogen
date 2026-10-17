@@ -1046,3 +1046,58 @@ class PlanDeChaine(Depot):
                            capture_output=True, text=True, env=self.env, timeout=120)
         self.assertEqual((p.returncode, p.stdout, p.stderr.startswith("ERREUR chaine : ")), (3, "", True))
         self.assertEqual(self.lancer("publier", "--texte", os.path.join(self.tmp, "absent.md")), (3, ""))
+
+
+class ChaineABlanc(Depot):
+    """SHOGEN-GARDE-RECALAGE-CHECK-1 : chaine --blanc, la chaîne jouée à blanc avant son lancement (E30, E31, E34,
+    E35, E36) ; diffs faits dans une copie de travail, l'un après l'autre (le suivant suppose le précédent)."""
+    SCRIPT = NL.join(["#!/usr/bin/env bash", "set -Eeuo pipefail", "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND >&2' ERR",
+                      'un() { local d="$1" m="$2" r="${3:-}"; echo "$d $m $r"; }', 'un X-1 "message"',
+                      "x=$(un X-2 m r)", ""])
+    VIEUX = "# Journal" + NL + chr(171) + " the old message is not here " + chr(187) + " ; " + "TO" + "DO: vieux" + NL
+
+    def setUp(self):
+        super().setUp()
+        self.indexer({"biblio/INDEX.md": "# index" + NL, "JOURNAL.md": self.VIEUX})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "base")
+        self.c = os.path.join(self.tmp, "travail")
+        shutil.copytree(self.d, self.c)
+
+    def faire(self, nom, fichiers):
+        ag.ecrire(self.c, fichiers)
+        ag.git(self.c, self.env, "add", "-A")
+        ag.ecrire(self.tmp, {nom: ag.git(self.c, self.env, "diff", "--cached")})
+        ag.git(self.c, self.env, "commit", "-q", "-m", nom)
+        return os.path.join(self.tmp, nom)
+
+    def blanc(self, *diffs, script=None):
+        ag.ecrire(self.tmp, {"chaine.sh": script or self.SCRIPT})
+        return self.lancer("chaine", "--blanc", "--script", os.path.join(self.tmp, "chaine.sh"), "--diffs", *diffs)
+
+    def test_e30_e31_diffs_a_blanc(self):
+        """E30, E31 : chaque diff passe git apply --check sur HEAD plus les précédents : d1 puis d2 admis ; d2 seul
+        (il suppose d1), dans le désordre, sans saut de ligne final (E30), à chemins absolus (E31) : refus K5 ; sans
+        --script, ou plan sans rapport : erreur 3."""
+        d1, d2 = self.faire("d1.diff", {"b.md": "b" + NL}), self.faire("d2.diff", {"b.md": "b" + NL + "c" + NL})
+        self.assertEqual(self.blanc(d1, d2), (0, ""))
+        with open(d2, encoding="utf-8") as f:
+            texte = f.read()
+        ag.ecrire(self.tmp, {"e30.diff": texte[:-1], "e31.diff": f"--- {self.c}/b.md" + NL + f"+++ {self.c}/b.md" + NL
+                             + texte[texte.index("@@"):]})
+        for cas in ([d2], [d2, d1], [d1, os.path.join(self.tmp, "e30.diff")], [d1, os.path.join(self.tmp, "e31.diff")]):
+            self.assertEqual(self.blanc(*cas)[1][:9], "REFUS K5 ", cas)
+        self.assertEqual(self.lancer("chaine", "--blanc", "--diffs", d1)[0], 3)
+        self.assertEqual(self.lancer("chaine", "--plan", d1)[0], 3)
+
+    def test_e35_e36_portes_sur_lignes_ajoutees(self):
+        """E36 : les portes textuelles jugent les seules lignes ajoutées : un ajout propre à un journal qui porte un
+        vieux fragment anglais et un vieux marqueur de dette : admis ; E35 : marqueur de dette nu ajouté : refus K6 ;
+        E33 : fragment anglais ajouté entre guillemets français : refus G5 ; marqueur sous une exclusion du job g5
+        (.claude/) : admis ; K0 : diff qui touche un interdit (ni lu ni nommé)."""
+        self.assertEqual(self.blanc(self.faire("j.diff", {"JOURNAL.md": self.VIEUX + "Ajout du jour." + NL})), (0, ""))
+        code, sortie = self.blanc(self.faire("k.diff", {"c.md": "Comptes ; " + "TO" + "DO : 0" + NL}))
+        self.assertEqual((code, sortie[:30]), (1, "REFUS K6 : k.diff : c.md:1 : m"))
+        e9 = chr(171) + " fatal: not a git repository (or any of the parent directories) " + chr(187)
+        self.assertEqual(self.blanc(self.faire("g.diff", {"g.md": "Refus : " + e9 + NL}))[1][:9], "REFUS G5 ")
+        self.assertEqual(self.blanc(self.faire("x.diff", {".claude/n.md": "Comptes ; " + "TO" + "DO : 0" + NL})), (0, ""))
+        self.assertEqual(self.blanc(self.faire("i.diff", {"docs/rapports/n.md": "n" + NL}))[1][:9], "REFUS K0 ")

@@ -19,6 +19,7 @@ SKILLS = ("shogen-avant-lancer", "shogen-avant-committer", "shogen-avant-pousser
 DETTE = re.compile("(TO" + "DO|FIX" + "ME)")
 GARDE = os.path.join(RACINE, ".claude", "hooks", "garde_faits.py")      # crochet GARDE-FAITS du dépôt (R-8)
 ACTE = re.compile("(^| )git (commit|push)( |$)")
+EXIGES = {"chaine": ("--plan", "--cc"), "verser": ("--pieces",)}      # exigées par le code hors de --blanc (RECALAGE)
 
 
 def lire(nom):
@@ -67,7 +68,7 @@ class Skills(unittest.TestCase):
             self.assertEqual([c for c in commandes if c not in avant_acte.COMMANDES], [], nom)
             sous = [x for x in avant_acte.parseur()._actions if isinstance(x, argparse._SubParsersAction)][0].choices
             for c in commandes:
-                requis = [o for x in sous[c]._actions if x.required for o in x.option_strings]
+                requis = [o for x in sous[c]._actions if x.required for o in x.option_strings] + list(EXIGES.get(c, ()))
                 self.assertEqual([o for o in requis if o not in texte], [], (nom, c))
             chemins = re.findall("scripts/controle/[A-Za-z0-9_./-]*[A-Za-z0-9_]", texte)
             self.assertEqual([c for c in chemins if not os.path.exists(os.path.join(RACINE, c))], [], nom)
