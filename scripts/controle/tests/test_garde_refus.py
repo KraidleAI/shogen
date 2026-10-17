@@ -1,7 +1,8 @@
 """Cas du journal des refus du crochet GARDE-FAITS (GARDE-FOUS phase 3, annexe B, B.108 : phase 3 de
 SHOGEN-GARDE-FOUS-ORCH-1) : une ligne par refus et par passage, acte abrégé sans secret, en-tête unique. Le crochet du
 dépôt est lancé tel quel sur des journaux synthétiques (nom en .txt), son journal des refus dans un dossier temporaire
-(SHOGEN_GARDE_REFUS), l'heure fixée par un faux date en tête du PATH."""
+(SHOGEN_GARDE_REFUS), l'heure fixée par un faux date en tête du PATH.
+Relevé des refus au premier message d'une session (classe Journal)."""
 import importlib.util
 import json
 import os
@@ -16,6 +17,8 @@ GARDE = os.path.join(RACINE, ".claude", "hooks", "garde_faits.py")
 NL, TAB = chr(10), chr(9)
 H = "2026-10-16T10:00:00Z"
 ENTETE = TAB.join(["heure", "evenement", "regle", "acte", "agent"]) + NL
+RELEVE = "RELEVÉ DES REFUS (crochet du dépôt, phase 3) : "
+DETAIL = " ; détail : python3 -I -B scripts/controle/avant_acte.py refus"
 
 
 class Base(unittest.TestCase):
@@ -45,7 +48,7 @@ class Base(unittest.TestCase):
 
 
 class Journal(Base):
-    """Le crochet : lignes du journal, en-tête."""
+    """Le crochet : lignes du journal, en-tête, relevé au premier message."""
     def test_refus_journal_des_passages(self):
         """Passage (permis), refus R7 et R6 (règle), sous-agent (agent), erreur interne (erreur), acte d'un secret et
         d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien."""
@@ -86,3 +89,33 @@ class Journal(Base):
         with mock.patch.dict(os.environ, self.env):
             g.consigner({"hook_event_name": "Stop"}, "permis")
         self.assertEqual(self.lire(), ENTETE + TAB.join([H, "Stop", "permis", "-", "principal"]) + NL)
+
+    def test_refus_releve_premier_message(self):
+        """Premier message d'une session (journal de session vide, ou ne portant que ce message) : refus depuis la
+        dernière ligne releve, par règle (plus fréquente d'abord), ligne releve écrite ; message suivant : rien ; aucun
+        relevé d'avant : depuis le début ; noms propres : relevé E26 d'abord, refus en dernier."""
+        avant = [["2026-10-14T08:00:00Z", "PreToolUse:Bash", "R5", "git commit", "principal"],
+                 ["2026-10-15T09:00:00Z", "UserPromptSubmit", "releve", "1 refus", "principal"],
+                 ["2026-10-15T10:00:00Z", "PreToolUse:Bash", "R7", "sleep 5", "principal"],
+                 ["2026-10-15T11:00:00Z", "PreToolUse:Bash", "R2", "sed -i x f", "a1"],
+                 ["2026-10-15T12:00:00Z", "PreToolUse:Bash", "R7", "sleep 9", "principal"],
+                 ["2026-10-15T13:00:00Z", "PreToolUse:Bash", "permis", "ls", "principal"]]
+        with open(self.j, "w", encoding="utf-8") as f:
+            f.write(ENTETE + "".join(TAB.join(x) + NL for x in avant) + "ligne illisible" + NL)
+        q = "où en est la suite ?"
+        self.assertEqual(self.lancer("UserPromptSubmit", prompt=q), (0, RELEVE + "3 refus depuis le dernier relevé "
+                         "(2026-10-15T09:00:00Z) : R7 ×2, R2 ×1" + DETAIL + " --depuis 2026-10-15" + NL))
+        fin = [TAB.join([H, "UserPromptSubmit", "releve", "3 refus", "principal"]) + NL,
+               TAB.join([H, "UserPromptSubmit", "permis", "-", "principal"]) + NL]
+        self.assertEqual(self.lire().split(NL)[-3:], [x[:-1] for x in fin] + [""])
+        humain = {"type": "user", "message": {"role": "user", "content": "Bonjour."}}
+        self.assertEqual(self.lancer("UserPromptSubmit", [humain], prompt=q), (0, ""))
+        meme = {"type": "user", "message": {"role": "user", "content": q}}
+        self.assertEqual(self.lancer("UserPromptSubmit", [meme], prompt=q), (0, RELEVE + "0 refus depuis le dernier "
+                         "relevé (" + H + ")" + DETAIL + " --depuis 2026-10-16" + NL))
+        with open(self.j, "w", encoding="utf-8") as f:
+            f.write(ENTETE + TAB.join(avant[0]) + NL)
+        code, sortie = self.lancer("UserPromptSubmit", prompt="Note de Zorglubien sur la suite.")
+        self.assertEqual((code, sortie.split(NL)[0][:31], sortie.split(NL)[-2]),
+                         (0, "RELEVÉ (crochet du dépôt, E26) ", RELEVE + "1 refus depuis le début du journal : R5 ×1"
+                          + DETAIL))

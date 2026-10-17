@@ -69,7 +69,8 @@ réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du t
 refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se lit dans le fichier versé
 scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien.
 Phase 3 (journal des refus, SHOGEN-GARDE-FOUS-ORCH-1) : chaque refus et chaque passage écrit une ligne au journal
-scripts/controle/garde/refus.tsv (consigner : heure, événement, règle ou permis, acte abrégé sans secret, agent)."""
+scripts/controle/garde/refus.tsv (consigner : heure, événement, règle ou permis, acte abrégé sans secret, agent) ; au
+premier message d'une session, UserPromptSubmit affiche les refus depuis le dernier relevé (releve_refus)."""
 import importlib.util
 import json
 import os
@@ -352,6 +353,40 @@ def consigner(entree, regle, acte="-"):
         pass
 
 
+def releve_refus(entree):
+    """Phase 3 : au premier message d'une session (aucun autre message de l'humain à son journal), ligne du relevé :
+    refus du journal depuis la dernière ligne releve, par règle ; une ligne releve est écrite ; sinon None (journal
+    éteint, /dev/null, compris)."""
+    prompt = (entree.get("prompt") or "").strip()
+    if chemin_refus() == os.devnull:
+        return None
+    for e in lire_queue(entree.get("transcript_path") or "") or []:
+        c = (e.get("message") or {}).get("content") if e.get("type") == "user" and not e.get("isMeta") else None
+        blocs = [c] if isinstance(c, str) else [b for b in c or [] if isinstance(b, dict) and b.get("type") == "text"]
+        txt = RAPPEL.sub("", chr(10).join(contenus(b) for b in blocs)).strip()
+        outils = isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c)
+        if txt and txt != prompt and MARQUE not in txt and not outils:
+            return None
+    try:
+        with open(chemin_refus(), "rb") as f:
+            f.seek(0, 2)
+            n = f.tell()
+            f.seek(max(0, n - QUEUE))
+            brut = f.read().decode("utf-8", "replace").split(chr(10))[1 if n > QUEUE else 0:]
+    except OSError:
+        brut = []
+    lignes = [x.split(chr(9)) for x in brut if x.count(chr(9)) == 4]
+    k = max((i for i, x in enumerate(lignes) if x[2] == "releve"), default=-1)
+    refus = [x[2] for x in lignes[k + 1:] if re.fullmatch("R[0-9]+", x[2])]
+    regles = sorted(set(refus), key=lambda r: (-refus.count(r), int(r[1:])))
+    consigner(entree, "releve", f"{len(refus)} refus")
+    return (f"RELEVÉ DES REFUS (crochet du dépôt, phase 3) : {len(refus)} refus depuis "
+            + (f"le dernier relevé ({lignes[k][0]})" if k >= 0 else "le début du journal")
+            + (" : " + ", ".join(f"{r} ×{refus.count(r)}" for r in regles) if regles else "")
+            + " ; détail : python3 -I -B scripts/controle/avant_acte.py refus"
+            + (f" --depuis {lignes[k][0][:10]}" if k >= 0 else ""))
+
+
 def journal_de_l_agent(entree):
     tp = entree.get("transcript_path") or ""
     agent = entree.get("agent_id") or entree.get("agentId") or ""
@@ -582,9 +617,12 @@ def releve(noms):
 
 
 def soumission(entree):
-    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0."""
+    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0. Phase
+    3 : au premier message d'une session, la ligne du relevé des refus (releve_refus) en dernier."""
+    ligne = releve_refus(entree)
     noms = noms_propres(entree.get("prompt") or "")
     if not noms:
+        print(ligne or "", end=chr(10) if ligne else "")
         return 0
     texte = (f"RELEVÉ (crochet du dépôt, E26) : noms propres du message : {', '.join(noms)}. Avant de rattacher ce "
              "message à un dossier, lire ces lignes (grep -n) :\n" + "\n".join(releve(noms)))
@@ -594,7 +632,7 @@ def soumission(entree):
             f.write(json.dumps(noms, ensure_ascii=False) + "\n" + texte)
     except OSError:
         pass
-    print(texte)
+    print(texte + (chr(10) + ligne if ligne else ""))
     return 0
 
 
