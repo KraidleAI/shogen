@@ -57,7 +57,9 @@ class Journal(Base):
     def test_refus_journal_des_passages(self):
         """Passage (permis), refus R7 et R6 (règle), sous-agent (agent), erreur interne (erreur), acte d'un secret et
         d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien.
-        G2, C-4 : refus R11 (consigne longue sans brief) et R10 (dossier nommé sans relevé) consignés sous leur règle."""
+        G2, C-4 : refus R11 (consigne longue sans brief) et R10 (dossier nommé sans relevé) consignés sous leur règle.
+        Intégration P3 (SHOGEN-GARDE-ERREUR-INTERNE-1) : erreur interne ou journal illisible sur un acte qui écrit :
+        refus consigné R0 ; erreur interne sur une lecture pure : permis, consigné erreur."""
         secret = ("echo " + chr(34) + "token=s3cr3tValeur" + chr(34) + " sk-ant-" + "api03-AbCdEf0123456789xyzXYZ0" + TAB
                   + "password:" + TAB + "motdepasse" + TAB)
         texte = {"type": "assistant", "uuid": "u1", "message": {"content": [{"type": "text", "text": "Il y a 4321 cas."}]}}
@@ -66,6 +68,10 @@ class Journal(Base):
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": secret + "x" * 99})[0],
                  self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "ls"}, agent_id="a1")[0],
                  self.lancer("Stop", [texte])[0], self.lancer("PreToolUse", tool_name="Bash", tool_input=["x"])[0],
+                 self.lancer("PreToolUse", [{"type": "assistant", "message": "x"}], tool_name="Bash",
+                             tool_input={"command": "ls"})[0],
+                 self.lancer("PreToolUse", tool_name="Bash", tool_input={"command": "git commit -m x"},
+                             transcript_path=os.path.join(self.t, "absent.txt"))[0],
                  self.lancer("PreToolUse", tool_name="Agent", tool_input={"prompt": "x" * 1600})[0],
                  self.lancer("Stop", [{"type": "user", "message": {"content": "Note de Zorglubien."}}, {
                      "type": "assistant", "uuid": "u2", "message": {"content": [{"type": "text", "text": "Voir MONARK."}]}}])[0]]
@@ -73,9 +79,10 @@ class Journal(Base):
         lignes = [["PreToolUse:Bash", "permis", "ls", "principal"], ["PreToolUse:Bash", "R7", "sleep 5", "principal"],
                   ["PreToolUse:Bash", "permis", abrege + "x" * (80 - len(abrege)), "principal"],
                   ["PreToolUse:Bash", "permis", "ls", "a1"], ["Stop", "R6", "-", "principal"],
-                  ["PreToolUse:Bash", "erreur", "-", "principal"],
+                  ["PreToolUse:Bash", "R0", "-", "principal"], ["PreToolUse:Bash", "erreur", "ls", "principal"],
+                  ["PreToolUse:Bash", "R0", "git commit -m x", "principal"],
                   ["PreToolUse:Agent", "R11", '{"prompt": "' + "x" * 68, "principal"], ["Stop", "R10", "-", "principal"]]
-        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 0, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
+        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 2, 0, 2, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
                                                                                     for x in lignes)))
         self.assertNotIn("motdepasse", self.lire())
         self.env["SHOGEN_GARDE_REFUS"] = os.path.join(self.t, "absent", "refus.tsv")

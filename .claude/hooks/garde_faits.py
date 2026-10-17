@@ -39,7 +39,7 @@ nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille 
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
 du même tour, laisser passer et le consigner (fichier d'état sous le dossier de la session).
 Journal des décisions : <dossier de session>/garde-faits.log (une ligne par refus et par passage consigné).
-Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisible (jamais un refus aveugle).
+Sortie : 0 permis ; 2 refusé ; journal illisible ou erreur interne : voir SHOGEN-GARDE-ERREUR-INTERNE-1 en fin de texte.
 Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et le texte de R5 se lisent sur les actes
 de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
 d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
@@ -70,11 +70,18 @@ refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se 
 scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien.
 Phase 3 (journal des refus, SHOGEN-GARDE-FOUS-ORCH-1) : chaque refus et chaque passage écrit une ligne au journal
 scripts/controle/garde/refus.tsv (consigner : heure, événement, règle ou permis, acte abrégé sans secret, agent) ; au
-premier message d'une session, UserPromptSubmit affiche les refus depuis le dernier relevé (releve_refus)."""
+premier message d'une session, UserPromptSubmit affiche les refus depuis le dernier relevé (releve_refus).
+SHOGEN-GARDE-ERREUR-INTERNE-1 (GARDE-FOUS phase 3, groupe B ; G2 du correctif CQ-1, C-1) : sens sûr par règle. Une
+erreur interne, ou un journal illisible, pendant le jugement d'un acte qui écrit, commet, pousse, supprime ou crée une
+PR (R1 à R3, R5, R8 : tout PreToolUse hors lecture pure) est un refus qui nomme l'erreur ; une lecture pure
+(lecture_pure : commandes simples de LECTURE, git en GIT_LECTURE, sans redirection d'écriture, substitution,
+affectation ni $ sur git ; outils mcp__github__ get_, list_, search_) reste permise, l'erreur écrite sur stderr et au
+journal des décisions ; Stop, SubagentStop et UserPromptSubmit : permis, erreur écrite (ni écriture ni acte)."""
 import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -725,7 +732,11 @@ def pre_tool_use(entree):
     chemin, dossier = journal_de_l_agent(entree)
     entrees = lire_queue(chemin)
     if entrees is None:
-        sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; acte permis sans contrôle.\n")
+        if acte_qui_ecrit(entree):          # SHOGEN-GARDE-ERREUR-INTERNE-1 : sens sûr
+            refuser(f"R0 (erreur interne) : journal illisible ({chemin}) : un acte qui écrit, commet, pousse, supprime "
+                    "ou crée une PR ne se juge pas sans lui (R1 à R3, R5, R8) ; relire le chemin du journal, ou agir "
+                    "par une lecture.")
+        sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; lecture pure permise sans contrôle.\n")
         return 0
     faits, appels, agent, humain = faits_et_appels(entrees)
     cmds = commandes_git_recentes(appels)
@@ -962,6 +973,47 @@ def stop(entree, sous_agent):
     return 2
 
 
+LECTURE = {"cat", "head", "tail", "grep", "ls", "wc", "sha256sum", "cmp", "diff", "od", "stat", "pwd", "echo", "printf",
+           "df", "du", "cut", "tr", "nl", "basename", "dirname", "realpath", "readlink", "true", "cd"}
+GIT_LECTURE = {"status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "blame", "cat-file"}
+
+
+def lecture_pure(c):
+    """Vrai seulement si chaque commande simple de c est une lecture connue (SHOGEN-GARDE-ERREUR-INTERNE-1) : programme
+    de LECTURE, ou git (options -C, --no-pager, --no-optional-locks) en GIT_LECTURE sans --output ni $ ; aucune
+    redirection d'écriture (hors 2>&1 et vers /dev/null), substitution, affectation en tête. Découpe aux séparateurs
+    avant shlex : un séparateur entre guillemets fait une commande illisible, donc pas une lecture (sens sûr)."""
+    reste = re.sub(r"[0-9]?>&[0-9]|[0-9]?>[ ]*/dev/null(?![^\s;&|])", "", c)
+    if re.search(r"[>`]|\$\(|<\(", reste):
+        return False
+    for seg in re.split(r"&&|\|\||[;&|\n]", reste):
+        mots = shlex.split(seg)
+        if mots and "=" in mots[0]:
+            return False
+        if mots and os.path.basename(mots[0]) == "git":
+            k = 1
+            while mots[k:k + 1] and mots[k] in ("-C", "--no-pager", "--no-optional-locks"):
+                k += 2 if mots[k] == "-C" else 1
+            if not (mots[k:k + 1] and mots[k] in GIT_LECTURE) or "$" in seg or any(
+                    m.startswith("--output") for m in mots):
+                return False
+        elif mots and os.path.basename(mots[0]) not in LECTURE:
+            return False
+    return True
+
+
+def acte_qui_ecrit(entree):
+    """Vrai sauf lecture pure (SHOGEN-GARDE-ERREUR-INTERNE-1) : un PreToolUse Bash dont la commande n'est pas une
+    lecture_pure, tout autre outil que mcp__github__ get_, list_ ou search_ ; une erreur ici même : vrai (sens sûr)."""
+    try:
+        nom = entree.get("tool_name", "")
+        if nom.startswith("mcp__github__"):
+            return not nom.split("__")[-1].startswith(("get_", "list_", "search_"))
+        return nom != "Bash" or not lecture_pure((entree.get("tool_input") or {}).get("command", ""))
+    except Exception:
+        return True
+
+
 def main():
     """Phase 3 : chaque passage (permis, erreur) et chaque refus (règle) du crochet consigné au journal des refus."""
     try:
@@ -1003,9 +1055,15 @@ def juger(entree):
         if e.code == 2:
             journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} agent={entree.get('agent_id', '')}")
         raise
-    except Exception as exc:  # jamais un refus aveugle
+    except Exception as exc:  # SHOGEN-GARDE-ERREUR-INTERNE-1 : sens sûr par règle, jamais un refus aveugle
+        if ev == "PreToolUse" and acte_qui_ecrit(entree):
+            REGLE[0] = "R0"           # journal des refus : marque R0 (refus sur erreur interne ; intégration P3)
+            sys.stderr.write(f"{MARQUE} : REFUS. erreur interne ({exc!r}) pendant le jugement d'un acte qui écrit, "
+                             "commet, pousse, supprime ou crée une PR (R1 à R3, R5, R8) : acte refusé (sens sûr).\n")
+            journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} erreur interne {exc!r}")
+            return 2
         REGLE[0] = "erreur"
-        sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; acte permis sans contrôle.\n")
+        sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; lecture pure ou arrêt : permis, erreur écrite.\n")
         journaliser(dossier, f"ERREUR {ev} {exc!r}")
         return 0
     return 0
