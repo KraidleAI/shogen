@@ -62,7 +62,8 @@
   ferme SHOGEN-S2BIS-DECODEURS-TYPES-1 ;
   le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1) ;
   le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1) ;
-  le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1).
+  le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1) ;
+  le diff CB-8b, Chainlink ETH, USDC et USDT et le plafond des stables (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -392,6 +393,11 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      entière `panne_decode` : les pannes d'un regroupement sont identiques entre actifs, comme l'ADR le déclare.
    - **Plafond du nombre de relevés** (CB-8a) : une lecture rend au plus un relevé par actif, donc quatre ; aucun
      relevé, un actif répété, ou un actif, une devise ou une classe hors des listes ci-dessus : `panne_decode`.
+   - **Chainlink ETH, USDC et USDT** (CB-8b ; Q-CA-08 du G0 de CALIB-ACTIFS) : `latestRoundData` du proxy
+     principal de chaque flux (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §2), à 8 décimales, lu comme celui de
+     BTC. Pour USDC/USD et USDT/USD, flux plafonnés (E-C-10), `extra` porte aussi `plafond`, la valeur maximale
+     publiée du flux (`maxSubmissionValue` 105000000 à 8 décimales : `1.05000000`) ; le collecteur ne l'applique
+     jamais, la classe « borné » se juge au recalcul (E-C-26). BTC et ETH n'ont pas de plafond.
 2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
    restent sous 2^53 : tout lecteur JSON les lit exactement.
 3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un

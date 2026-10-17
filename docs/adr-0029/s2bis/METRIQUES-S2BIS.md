@@ -2832,3 +2832,27 @@ relevé admis ; actif, devise ou classe hors des listes ; identifiant en trop ; 
 d'appel de CoinGecko ; plancher non relevé. Suite : 386 tests ; plancher du job : 386, égalité exigée (`--egal`). Compte
 de R-25 : 120 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puces « Lectures regroupées »
 et « Plafond du nombre de relevés »).
+
+## CB-8b (2026-10-17) : Chainlink ETH, USDC et USDT, plafond des stables en extra (E-C-10)
+
+Objet : `latestRoundData` du proxy principal de chaque flux (pièce §2 ; Q-CA-08 du G0 de CALIB-ACTIFS), 8 décimales, lu
+comme BTC ; USDC et USDT : `extra.plafond` = `1.05000000` (`maxSubmissionValue` 105000000, pièce l.72), jamais appliqué
+(classe « borné » au recalcul, E-C-26) ; BTC et ETH sans plafond. Fixtures : réponse, `updatedAt`, phase et tour mesurés
+(pièce l.63-65 ; PROPOSITION de CALIB-ACTIFS l.218) ; `startedAt` construit 12 s avant `updatedAt`. Test du plafond sur
+cinq mots distincts : il fige aussi le `roundId` au mot 1, `chainlink_btc` compris (un mutant « mot 5 » survivrait sur
+toutes les fixtures, où `answeredInRound` égale `roundId`).
+
+Rouge : sur le code de CB-8a, les deux tests de `Chainlink` échouent par assertion (4 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 260 | — |
+| `tests/test_decodeurs_actifs.py` | 248 | 14 (2 de plus : trois flux ; plafond porté, jamais appliqué) |
+| `tests/fixtures/actifs/` | — | 3 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 8 mutants, 8 tués par leur test visé, 0 vivant, 0 FATAL : plafond écrit autrement ;
+USDC sans plafond ; ETH plafonné ; plafond appliqué au prix ; actif changé ; instant au mot 3 ; `roundId` au mot 5 ;
+plancher non relevé. Suite : 388 tests ; plancher du job : 388, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de
+code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puce « Chainlink ETH, USDC et USDT »).

@@ -20,7 +20,8 @@ la paire ; l'instrument que la réponse rend (Binance `symbol`, Kraken clé, OKX
 ne le lisait pas) ; aucun décodeur pour une paire non servie (Coinbase USDC/USD, OKX ETH/USD et USDC/USD).
 CB-7c : ETH coté en USDT chez binance et okx (Q-CA-01 (a) du G0 de CALIB-ACTIFS).
 CB-8a : lectures regroupées (CoinGecko, DefiLlama, Bitfinex : quatre actifs, une lecture par hôte, E-C-09),
-identifiants exacts ; plafond d'un relevé par actif ; actif, devise et classe des listes fermées du FORMAT §9.1."""
+identifiants exacts ; plafond d'un relevé par actif ; actif, devise et classe des listes fermées du FORMAT §9.1.
+CB-8b : Chainlink ETH, USDC et USDT, plafond de 1,05 des stables en extra (E-C-10)."""
 import datetime
 import decimal
 import json
@@ -41,6 +42,7 @@ MOTS = re.compile("0x[0-9a-fA-F]{320}")                             # latestRoun
 CHIFFRES, TEXTE = 16, 4300                      # bornes de `_entier` : instant sous 10^16 ; texte de int()
 ACTIFS, DEVISES = ("BTC", "ETH", "USDC", "USDT"), ("USD", "USDT")           # listes fermées du FORMAT §9.1
 CLASSES = ("place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink")
+PLAFOND = "1.05000000"      # maxSubmissionValue 105000000 à 8 décimales, USDC/USD et USDT/USD (pièce §2 l.72 ; E-C-10)
 
 
 def _iso_us(texte):
@@ -159,13 +161,19 @@ def _lignes(j):
     return {x[0]: x for x in j}
 
 
-def _chainlink(j):
-    h = _champ(j, "result")
-    if type(h) is not str or not MOTS.fullmatch(h):
-        raise ValueError("chainlink : cinq mots attendus")
-    mots = [int(h[2 + 64 * i:66 + 64 * i], 16) for i in range(5)]
-    reponse = mots[1] - (1 << 256 if mots[1] >= 1 << 255 else 0)   # answer : int256, flux BTC/USD à 8 décimales
-    return Decimal(f"{reponse}E-8"), mots[3] * S, {"round_id": str(mots[0])}
+def _chainlink(plafond=None):
+    """`latestRoundData` d'un proxy (flux à 8 décimales : BTC, ETH, USDC, USDT, pièce §2) ; CB-8b (E-C-10) : `plafond`,
+    valeur maximale publiée du flux (USDC et USDT), portée en extra et jamais appliquée : la classe « borné » se juge
+    au recalcul (E-C-26) ; None : flux sans plafond."""
+    def lire(j):
+        h = _champ(j, "result")
+        if type(h) is not str or not MOTS.fullmatch(h):
+            raise ValueError("chainlink : cinq mots attendus")
+        mots = [int(h[2 + 64 * i:66 + 64 * i], 16) for i in range(5)]
+        reponse = mots[1] - (1 << 256 if mots[1] >= 1 << 255 else 0)        # answer : int256, 8 décimales
+        return Decimal(f"{reponse}E-8"), mots[3] * S, {"round_id": str(mots[0]), **({"plafond": plafond} if plafond
+                                                                                    else {})}
+    return lire
 
 
 H, P = "place_horodatee", "sans_horodatage"
@@ -182,7 +190,7 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "bitfinex_btc": ("BTC", "USD", P, _bitfinex),
     "coingecko_btc": ("BTC", "USD", "agregateur", lambda j: _coingecko(_champ(j, "bitcoin"))),
     "defillama_btc": ("BTC", "USD", "agregateur", lambda j: _defillama(_champ(j, "coins", "coingecko:bitcoin"))),
-    "chainlink_btc": ("BTC", "USD", "oracle_chainlink", _chainlink),
+    "chainlink_btc": ("BTC", "USD", "oracle_chainlink", _chainlink()),
     # CB-7b : places, paires de la pièce (tableau 1.1) et formes de la PROPOSITION de CALIB-ACTIFS (§2.2)
     "binance_usdc": ("USDC", "USD", P, _binance("USDCUSD")),
     "binance_usdt": ("USDT", "USD", P, _binance("USDTUSD")),
@@ -203,6 +211,10 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
                                                             lambda j: _champ(j, "coins"), _defillama)),
     "bitfinex_groupe": (None, "USD", P, _groupe({"tBTCUSD": "BTC", "tETHUSD": "ETH", "tUDCUSD": "USDC",
                                                  "tUSTUSD": "USDT"}, _lignes, lambda x: (x[7], None, {}))),
+    # CB-8b : Chainlink, proxy principal de chaque flux (pièce §2 ; Q-CA-08 du G0 de CALIB-ACTIFS)
+    "chainlink_eth": ("ETH", "USD", "oracle_chainlink", _chainlink()),
+    "chainlink_usdc": ("USDC", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
+    "chainlink_usdt": ("USDT", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
 }
 
 

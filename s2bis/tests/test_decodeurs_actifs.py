@@ -192,6 +192,43 @@ class Groupes(unittest.TestCase):             # CB-8a : lectures regroupées (E-
                 self.assertEqual(decodeurs.decoder("h", b"{}")[0], statut)
 
 
+def mots(*m):
+    return json.dumps({"jsonrpc": "2.0", "id": 1, "result": "0x" + "".join(f"{x:064x}" for x in m)}).encode()
+
+
+class Chainlink(unittest.TestCase):             # CB-8b : flux ETH, USDC et USDT (pièce §2 ; Q-CA-08 du G0 de CALIB)
+    def test_trois_flux_valeurs_des_fixtures(self):
+        """`latestRoundData` sur le proxy principal de chaque flux : réponse au mot 2, 8 décimales, `updatedAt` au mot 4
+        (pièce §2 l.63-65 : 2457,46 à 19:26:47Z, 0,99986 à 15:38:23Z, 0,99928672 à 14:38:23Z, date -u -d) ; roundId de
+        la phase et du tour (PROPOSITION de CALIB-ACTIFS l.218 : 7 et 34 445, 4 et 26, 4 et 25 ; 2^64 × phase + tour par
+        bc) ; plafond de 1,05 (`maxSubmissionValue` 105000000, pièce l.72) porté en extra pour USDC et USDT seuls."""
+        plafond = {"plafond": "1.05000000"}
+        for nom, actif, prix, ts, extra in (
+                ("chainlink_eth", "ETH", "2457.46000000", 1791487607000000, {"round_id": "129127208515966895757"}),
+                ("chainlink_usdc", "USDC", "0.99986000", 1791473903000000, {"round_id": "73786976294838206490",
+                                                                            **plafond}),
+                ("chainlink_usdt", "USDT", "0.99928672", 1791470303000000, {"round_id": "73786976294838206489",
+                                                                            **plafond})):
+            with self.subTest(nom=nom):
+                self.assertEqual(decodeurs.decoder(nom, lire(FIX, nom + ".bin")), ("ok", [
+                    {"actif": actif, "classe": "oracle_chainlink", "devise": "USD", "extra": extra, "prix": prix,
+                     "ts_source": ts}]))
+                self.assertEqual(decodeurs.decoder(nom, mots(7, 1, 2, 3, 7, 7)), PANNE)           # six mots
+
+    def test_plafond_porte_jamais_applique(self):                   # E-C-10, E-C-26 : jugé au recalcul (« borné »)
+        """Réponse au-dessus du plafond (2,0) : rendue telle quelle, plafond en extra ; BTC et ETH : aucun plafond. Cinq
+        mots distincts (garde : roundId au mot 1, `updatedAt` au mot 4, ni `startedAt` ni `answeredInRound`)."""
+        m = (9, 200000000, 1, 1791470303, 8)
+        r = {n: decodeurs.decoder(n, mots(*m))[1] or [{}] for n in ("chainlink_btc", "chainlink_eth", "chainlink_usdc",
+                                                                   "chainlink_usdt")}
+        self.assertEqual((len(set(m)), {n: (x[0].get("prix"), x[0].get("ts_source"), x[0].get("extra")) for n, x in
+                                        r.items()}), (5, {
+            "chainlink_btc": ("2.00000000", 1791470303000000, {"round_id": "9"}),
+            "chainlink_eth": ("2.00000000", 1791470303000000, {"round_id": "9"}),
+            "chainlink_usdc": ("2.00000000", 1791470303000000, {"round_id": "9", "plafond": "1.05000000"}),
+            "chainlink_usdt": ("2.00000000", 1791470303000000, {"round_id": "9", "plafond": "1.05000000"})}))
+
+
 class Types(unittest.TestCase):                                   # SHOGEN-S2BIS-DECODEURS-TYPES-1
     def test_conteneur_remplace_jamais_une_autre_valeur(self):
         """Chaque conteneur de chaque fixture remplacé (texte, autre conteneur, enfant scalaire) : `panne_decode` ou la
