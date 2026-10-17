@@ -50,11 +50,15 @@ class JournalLectureSeule(ta.Source):
 
     def test_journal_ignore_par_git(self):
         """Le journal de l'arbre (garde/lecture-seule.tsv des outils) est ignoré par le .gitignore de la racine : il
-        ne salit pas l'arbre d'une chaîne qui tourne (git status --porcelain vide), lu dans un dépôt d'essai."""
+        ne salit pas l'arbre d'une chaîne qui tourne (git status --porcelain vide), lu dans un dépôt d'essai ; de même le
+        journal des refus et son fichier temporaire (garde/.gitignore ; CC de l'intégration P3, R-4)."""
         racine = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
         with open(os.path.join(racine, ".gitignore"), encoding="utf-8") as f:
             ag.ecrire(self.d, {".gitignore": f.read(), "scripts/controle/garde/lecture-seule.tsv": "x" + NL})
-        ag.git(self.d, self.env, "add", ".gitignore")
+        with open(os.path.join(racine, "scripts", "controle", "garde", ".gitignore"), encoding="utf-8") as f:
+            ag.ecrire(self.d, {"scripts/controle/garde/.gitignore": f.read(), "scripts/controle/garde/refus.tsv": "x" + NL,
+                               "scripts/controle/garde/refus.tsv.4242.tmp": "x" + NL})
+        ag.git(self.d, self.env, "add", ".gitignore", "scripts/controle/garde/.gitignore")
         ag.git(self.d, self.env, "commit", "-q", "-m", "gitignore")
         self.assertEqual(ag.git(self.d, self.env, "status", "--porcelain", "--untracked-files=all"), "")
 

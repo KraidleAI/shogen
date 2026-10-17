@@ -95,7 +95,8 @@ class ReponseInvestisseur(unittest.TestCase):
 
     def test_unite_et_fenetre(self):
         """Refus : nombre affiché avec une autre unité sur sa ligne ; pièce lue avant le dernier message de l'humain
-        (hors fenêtre) ; message de l'humain du tour qui porte le nombre : permis ; SubagentStop : R12 ne juge pas."""
+        (hors fenêtre) ; message de l'humain du tour qui porte le nombre : permis ; SubagentStop : R12 ne juge pas.
+        Nombre et unité sur deux lignes d'un même résultat : refus (CC de l'intégration P3, R-4)."""
         code, err = self.arreter([humain("x ?"), *outil(1, "cat p", "28 tests verts"), reponse("Il reste 28 jours.")])
         self.assertEqual((code, "28 jours" in err), (2, True), err)
         refus = "GARDE-FAITS : REFUS. R5 : 28 jours"        # un refus du crochet n'est jamais une pièce
@@ -115,6 +116,9 @@ class ReponseInvestisseur(unittest.TestCase):
         ancien = [humain("Série ?"), *outil(1, "git log --oneline | wc -l", "5"), reponse("Vu."), humain("Et donc ?")]
         code, err = self.arreter([*ancien, reponse("Elle compte 5 commits.")])
         self.assertEqual((code, "5 commits" in err), (2, True), err)        # G2, C-4 : compte d'un tour antérieur
+        lignes = outil(1, "cat p", "28:collecte" + NL + "fenêtre en jours")
+        code, err = self.arreter([humain("x ?"), *lignes, reponse("Il reste 28 jours.")])
+        self.assertEqual((code, "28 jours" in err), (2, True), err)        # CC de l'intégration P3, R-4 : même ligne
         voisins = outil(1, "cat p", "280 jours ; 28,5 jours")
         code, err = self.arreter([humain("x ?"), *voisins, reponse("Il reste 28 jours.")])
         self.assertEqual((code, "28 jours" in err), (2, True), err)        # G2, C-5 : 280 et 28,5 ne portent pas 28

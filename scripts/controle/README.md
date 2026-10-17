@@ -8,7 +8,7 @@ paquet ni ce que lance l'exécution unique.
 
 | fichier | sha256 | rôle | usage |
 |---|---|---|---|
-| `fm11.py` | `b78a19e9303ab4675309cabb3d28f26f4c9b415c093f7be4d93a0bab6e8631b1` (SHOGEN-FM11-MOTIF-ATTRIBUTION-1 ; avant : `17caaa35…`, SHOGEN-FM11-MOTIF-SESSION-1, puis `4a0b8abc…`, DT3-E, puis `886cc676…`) | contrôle FM-1.1 non-LLM d'une transcription de sous-agent (annexe C l.13) : repère par leur sha256 (jamais affichées) la cartographie du 2026-09-29 l.51 et ADR-0025 l.14 (`7f8b5cc`), cherche leurs fragments de 40 caractères et les noms de pièces de D.2 dans les résultats et les entrées d'outils ; n'affiche que des comptes | `python3 fm11.py <transcription.jsonl>` ; chemin du dépôt écrit en dur (`REPO = '/home/user/shogen'`, l.4) |
+| `fm11.py` | `e9c80fa1d98e54c202a82badf445081ce33557a4f6dfd4498bd1c1e8543e7a2d` (relecture G2 du groupe A de la phase 3, C-1 ; avant : `b78a19e9…`, SHOGEN-FM11-MOTIF-ATTRIBUTION-1, puis `17caaa35…`, SHOGEN-FM11-MOTIF-SESSION-1, puis `4a0b8abc…`, DT3-E, puis `886cc676…`) | contrôle FM-1.1 non-LLM d'une transcription de sous-agent (annexe C l.13) : repère par leur sha256 (jamais affichées) la cartographie du 2026-09-29 l.51 et ADR-0025 l.14 (`7f8b5cc`), cherche leurs fragments de 40 caractères et les noms de pièces de D.2 dans les résultats et les entrées d'outils ; n'affiche que des comptes | `python3 fm11.py <transcription.jsonl>` ; chemin du dépôt écrit en dur (`REPO = '/home/user/shogen'`, l.4) |
 | `regle_fixtures.py` | `5557fb56e5edc3b4c0e3a736b65110d466a7b5118aa4e02bb7ea63d75e92f8ab` | valeurs de `r1.regle_critere` sur les 16 fixtures de `tests/test_critere.py` (U1-U8, J1, J1-ℓ1, J2, J3-ℓ1, J5, J4) ; JSON dont le sha256 attendu est `ea3a2d94ef1075603e8f7cfc53c68b26e51729b61714028e3fb03dc32f79cb29` (non-régression de la règle, parties 2 et 3) | `python3 -B regle_fixtures.py <arbre s2-harness> <sortie.json>` |
 | `render_fixture.py` | `4084c42b59ea7d7ce356f04a0ea05bb1ff3646de25b46dc571156dd249d2b395` | rendus de la fixture de `test_exclusion` sans et avec l'option PLAGE ; sha256 attendus = épingles `SHA_BASE_SANS_OPTION` (`4e62fbb8…`) et `SHA_BASE_AVEC_OPTION` (`d079dd9d…`) | `python3 -B render_fixture.py <arbre s2-harness> <dossier>` |
 
@@ -842,3 +842,82 @@ dépendent des tests du harnais qu'ils importent.
 >   `test_modele_de_chaine_passe_le_depot`).
 >
 > Le groupe ajoute 14 tests ; plancher du job `controle-unittest` 199.
+
+> *Ajout daté du 2026-10-17 01:50:30 UTC (`date -u` ; lot INTEGRATION-P3 : GARDE-FOUS phase 3, groupe A, pas INT-13 à INT-19 ;
+> annexe B, B.108 : SHOGEN-FM11-MOTIF-ATTRIBUTION-1, SHOGEN-GARDE-ATTRIBUTION-PLAGE-LETTRES-1,
+> SHOGEN-GARDE-RECALAGE-CHECK-1, SHOGEN-GARDE-CHAINE-ORCH-MODELE-1 ; relecture G2 du groupe, C-1 à C-6)* : un ajout
+> pour le groupe.
+> - FM-1.1 (SHOGEN-FM11-MOTIF-ATTRIBUTION-1) : `fm11.py` ne compte plus le pied `Claude-Session:` d'un message de
+>   commit (motif de session précédé de la clé et de l'URL de la forge) ; il compte un chemin qui ressort du
+>   scratchpad par un composant `..` (juste après `scratchpad` ou plus loin dans le même chemin, jusqu'au premier
+>   blanc ; `..x` et `a..b` ne sont pas des composants `..`), regard avant borné à 4096 caractères (PATH_MAX ; G2,
+>   C-1 : sans borne, temps quadratique sur une ligne sans blanc). Sens sûr : un `..` qui revient dans le scratchpad
+>   est compté aussi. Limites : un chemin écrit par une variable du shell (`$S/../x`), un `..` relatif après un `cd`
+>   dans le scratchpad et un `..` encodé dans une URL (`%2e%2e`) ne sont pas vus. sha256 `e9c80fa1d98e54c202a82badf445081ce33557a4f6dfd4498bd1c1e8543e7a2d`
+>   (`SHA256SUMS`, README l.11 et `tests/test_fm11.py` à jour) ; cas : `tests/test_fm11.py`
+>   (`test_attribution_claude_session`, `test_sortie_du_scratchpad_comptee`, `test_sortie_du_scratchpad_temps_borne`).
+> - Plage à bornes en lettres (SHOGEN-GARDE-ATTRIBUTION-PLAGE-LETTRES-1) : l'attribution d'un mot du message à son
+>   diff (C3, L-3) lit une plage à bornes en lettres (`DT15-a à DT15-m`) comme une plage à bornes en nombres
+>   (`INT-01 à INT-25`). Fonction `rang` de `avant_acte.py` : rang d'un suffixe, nombre de tête ou lettres de tête
+>   (`z` avant `aa`) ; deux bornes de sortes différentes ne forment pas de plage ; le séparateur en mot (`à`, `a`,
+>   `au`) est entre deux blancs (G2, C-3 : `DT15-ba DT15-m` n'est pas une plage). Cas : `tests/test_avant_acte.py`
+>   (`test_plage_a_bornes_en_lettres`, `test_plage_liste_et_bornes_melees`).
+> - Chaîne à blanc (SHOGEN-GARDE-RECALAGE-CHECK-1 ; E30, E31, E33 à E36, E18) : `avant_acte.py chaine --blanc
+>   --script <chaîne.sh> [--diffs <d1> <d2>…]` (diffs du plan à défaut ; `--plan` et `--cc` gardent G1 à G4) joue la
+>   chaîne à blanc avant son lancement (fonction `blanc`). `copie_creuse` : copie de HEAD par `git archive`
+>   (préfixes `INTERDITS` de la gate et `*.jsonl` exclus à toute profondeur, G2, C-6), dépôt git neuf dans TMPDIR.
+>   Chaque diff, dans l'ordre, sur la copie qui porte les précédents : K0 (interdit), K5 (`git apply --check`) ; puis
+>   `portes` sur ses seules lignes ajoutées : K6, motif R-13 du job g5 lu par `motif_r13` dans `gates.yml` des outils,
+>   et G5, presg5 sur les `.md`. Le script de la chaîne (fonction `script`, lecture par `mots` et `appels`) : K1
+>   (`bash -n`), K2 (aucun `trap … ERR` ou pas de `set -E`), K3 (`sleep` d'avant-plan), K4 (sous `set -u`, `$N` lu
+>   sans protection par une fonction appelée avec moins de N arguments, ou hors de toute fonction ; chaînes et
+>   commentaires lus comme bash par `litteraux_otes`, formes `${N:0:1}`, `${#N}`, `${10}` comptées, G2, C-2).
+>   `tests/test_skills.py` garde les options que le code exige hors de `--blanc` (`EXIGES`). Skill
+>   `shogen-avant-lancer`, point 2. Limites : K4 est une lecture statique, non un pas à vide (`shift`, `eval`, appels
+>   par variable non vus). Cas : `tests/test_avant_acte.py` (`test_e30_e31_diffs_a_blanc`,
+>   `test_e35_e36_portes_sur_lignes_ajoutees`, `test_e34_e36_script`, `test_k4_apostrophes_et_formes`,
+>   `test_copie_creuse_exclut_les_interdits`).
+> - Versement à blanc (même item ; E32, E33, E35) : `avant_acte.py verser --blanc --script <versement.py>` (fonction
+>   `verser_blanc`) joue le script de versement sur une copie creuse, racine dans `SHOGEN_DEPOT`, groupe de processus
+>   neuf, borne `BORNE_VERSER` (300 s) ; sortie du script dans un fichier du dossier temporaire, seul le script attendu
+>   (G2, C-5 : un descendant détaché ne retient plus l'outil ; il n'est pas arrêté). V8 : script qui ne lit pas
+>   `SHOGEN_DEPOT` (jamais lancé), qui sort hors de 0, ou qui écrit dans le dépôt ; K6, G5 et V9 (rangée de tableau au
+>   compte de cellules autre que l'en-tête : `rangees_fautives` de `garde_commun.py`, barre échappée non comptée) sur
+>   ce qu'il écrit. Gabarit `gabarits/versement.py` : `ACTES`, cibles vérifiées avant la première écriture (cible
+>   hors du dépôt, cible sans saut de ligne final : refus). Skill `shogen-avant-committer`, point 5. Cas :
+>   `tests/test_avant_acte.py` (`test_e32_rangee_lue_et_ordre`, `test_e33_e35_portes_et_contrat`,
+>   `test_borne_et_descendant_detache`, `test_gabarit_refus_et_barre_echappee`).
+> - Modèle de chaîne (SHOGEN-GARDE-CHAINE-ORCH-MODELE-1) : `gabarits/chaine-modele.sh`, modèle à copier pour toute
+>   chaîne (skill `shogen-avant-lancer`, point 2), fichier neuf parce que `chaine.sh` porte la `verif` scellée
+>   (`MODELE`, référence de C1) et que ses copies déjà faites tournent encore. Le modèle tire `verif` par `source` de
+>   `$OUTILS/gabarits/chaine.sh`, porte `set -Eeuo pipefail` et `trap … ERR`, joue `acte chaine --plan --cc --blanc
+>   --script` avant tout pas. `verif` : portes Python sous `unshare -n`, `lo` allumée, variables de mandataire
+>   retirées. K7 (`sceau_de_chaine`) : `verif` écrite ou recopiée, non tirée par `source`, ou chaque `git commit` sans
+>   son `acte commit … &&` sur la même ligne (`commits_nus`, options globales de git sautées ; G2, C-4) : refus.
+>   Empreinte de `verif` (`empreinte_verif`) : `e0254878d0c18fadd8ac53269891ede6a982e67fd9fb85ad9989d90f3068e976`. Resceau : la chaîne qui
+>   commet cette série est `chaine-modele.sh` de l'arbre d'après la série, `OUTILS` sur cet arbre entier (procédure de
+>   la G2 du groupe A, O-4). Limites : un `source` d'un autre `$OUTILS` que celui d'`acte`, et `function verif {`, ne
+>   sont pas vus (C1 reste la garde au sceau) ; `unshare -n` exige les droits de l'hôte. Cas :
+>   `tests/test_gabarit_chaine.py` (classe `ChaineModele`, 10 tests ; `test_modele` et `test_c1_verif_reelle` de
+>   `Chaine` serrés), `tests/test_avant_acte.py` (`test_k7_verif_du_sceau`, `test_k7_chaque_commit_garde`).
+>
+> Empreintes de l'état final de la série (pas INT-19) :
+>
+> | fichier | sha256 |
+> |---|---|
+> | `avant_acte.py` | `150c57aae8510e537af053b4f594e2df74a9c397bb2cd63bc8d5f26a2b029ba6` |
+> | `garde_commun.py` | `a9e8a422bdb475e5c61e6a79eb37061601d1748d0fde33dd393d513f9e3845c1` |
+> | `fm11.py` | `e9c80fa1d98e54c202a82badf445081ce33557a4f6dfd4498bd1c1e8543e7a2d` |
+> | `SHA256SUMS` | `05b165af8048c3c9213dae6d80490e88b82c40cd7aa505812d54303cb69403cf` |
+> | `gabarits/chaine.sh` | `a2b3640a451138952e407a78281ea7f077868e0c3a77f9f406493e077ec4ee76` |
+> | `gabarits/chaine-modele.sh` | `3c78d1110985a5678dbc4c6ede2c9d7cc099d4b7b597cff5d0e906de33ca890b` |
+> | `gabarits/versement.py` | `8b18ebed6f41bf98b425651320374365bec0c9b6b6f5361ac381b67935a93f29` |
+> | `garde/.gitignore` | `a5da377801eb7fd464c7e6c84af9a7e20ebc8295f522fffcfd25b51c7efd6331` |
+> | `.gitignore` | `aa9a76a5ea7a2f94a947e7ce76c97750cb61dc3516792ae9a10598649fb4a0bd` |
+> | `.claude/hooks/garde_faits.py` | `3ac396570c22f0c4fddf6dd9cc659da43f6527ac4b3066dbc8f66188c2284c5b` |
+> | `.claude/hooks/tests/test_garde_faits.py` | `d58685ebf17ab4088a176c4d48e3071dbed4fbbd2bdb4ff37d008d5cc66e5ebe` |
+> | `.claude/skills/shogen-avant-lancer/SKILL.md` | `8c7f49501432edef1d0825a92fe758bae7e6657bd9d7954357f376796cb37348` |
+> | `.claude/skills/shogen-avant-committer/SKILL.md` | `1d9dbb620dbc80025a72612be69a54d5fc1ed70d674c16a51788c54ed6854da6` |
+>
+> Le groupe ajoute 26 tests ; la série (groupes C, B, A) en ajoute 46 ; plancher du job `controle-unittest`
+> 225.

@@ -357,7 +357,8 @@ def nommes(unite, prefixe):
     bornes, nombres de tête (GF-0 … GF-10b : 0 à 10) ou lettres de tête (DT15-a à DT15-m : a à m), de même sorte."""
     e, bord, borne = re.escape(prefixe), "(?<![A-Za-z0-9-])", "([0-9]+[a-z]?|[a-z]+[0-9]*)"
     vus = set(re.findall(bord + e + "([0-9A-Za-z]+)(?![A-Za-z0-9-])", unite))
-    plages = re.findall(bord + e + borne + " ?(?:à|a|au|…|[.]{2,3}) ?" + e + borne + "(?![0-9A-Za-z-])", unite)
+    sep = "(?: (?:à|a|au) | ?(?:…|[.]{2,3}) ?)"      # mot entre deux blancs (C-3 de la G2 : DT15-ba DT15-m, liste)
+    plages = re.findall(bord + e + borne + sep + e + borne + "(?![0-9A-Za-z-])", unite)
     return vus, [(rang(i), rang(j)) for i, j in plages if rang(i)[0] == rang(j)[0]]
 
 
@@ -699,14 +700,17 @@ def verser_blanc(a, fautes):
     with tempfile.TemporaryDirectory() as d:
         copie, env = copie_creuse(a.depot, d)
         avant, env_script = etat(), {k: v for k, v in env.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}
-        p = subprocess.Popen([sys.executable, "-B", os.path.abspath(a.script)], cwd=copie, stdout=subprocess.PIPE,
-                             stderr=subprocess.STDOUT, env=dict(env_script, SHOGEN_DEPOT=copie), start_new_session=True)
+        journal = os.path.join(d, "versement.log")      # hors de la copie ; un fichier, non un tuyau (C-5 de la G2)
+        with open(journal, "wb") as out:
+            p = subprocess.Popen([sys.executable, "-B", os.path.abspath(a.script)], cwd=copie, stdout=out,
+                                 stderr=subprocess.STDOUT, env=dict(env_script, SHOGEN_DEPOT=copie), start_new_session=True)
         try:
-            sortie = p.communicate(timeout=BORNE_VERSER)[0].decode("utf-8", "replace").strip()
+            p.wait(timeout=BORNE_VERSER)
         except subprocess.TimeoutExpired:
             os.killpg(p.pid, signal.SIGKILL)
-            p.communicate()
+            p.wait()
             raise Erreur(f"verser --blanc : script au-delà de {BORNE_VERSER} s, arrêté (groupe entier)")
+        sortie = lire(journal).decode("utf-8", "replace").strip()
         git(copie, "add", "-N", "-f", "--", ".", env=env)
         fichiers = GC.analyser_diff(git(copie, "diff", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
                                         "--src-prefix=a/", "--dst-prefix=b/", "-U0", env=env))
@@ -991,6 +995,7 @@ def portes(depot, nom, ajouts, fautes):
 SEP = set("();<>|&")
 TETE = {"then", "do", "else", "elif", "if", "while", "until", "!", "{", "time"}
 DEF_SH = re.compile("[ " + chr(9) + "]*(?:function +)?([A-Za-z_][A-Za-z0-9_]*) *[(][)] *[{](.*)$")
+LIT_N = re.compile("[$]([1-9])|[$][{]#?([1-9][0-9]*)(?![0-9]|:?[-?+=])")      # $N lu sans protection (C-2)
 
 
 def mots(ligne):
@@ -1003,6 +1008,25 @@ def mots(ligne):
     except ValueError:
         return []
     return vus + [y for x in vus if "$(" in x and len(x) > 2 for y in [";"] + mots(x.split("$(", 1)[1])]
+
+
+def litteraux_otes(texte):
+    """Texte d'un script sans ses chaînes entre apostrophes ni ses commentaires, lus comme bash : entre guillemets,
+    l'apostrophe est un caractère (l'arbre) ; un # en tête de mot ouvre un commentaire (relecture G2, C-2)."""
+    out, guillemets, k = [], False, 0
+    while k < len(texte):
+        c = texte[k]
+        if c == chr(92):
+            out.append(texte[k:k + 2])
+            k += 2
+        elif not guillemets and (c == "'" or c == "#" and (k == 0 or texte[k - 1] in " ;&|(" + chr(9) + chr(10))):
+            j = texte.find("'" if c == "'" else chr(10), k + 1)
+            k = len(texte) if j < 0 else j + (c == "'")
+        else:
+            guillemets ^= c == chr(34)
+            out.append(c)
+            k += 1
+    return "".join(out)
 
 
 def appels(vus):
@@ -1043,12 +1067,11 @@ def script(chemin, fautes):
             j = k if m[2].rstrip().endswith("}") else next((i for i in range(k + 1, len(lignes))
                                                             if lignes[i][1].strip() == "}"), len(lignes))
             texte = chr(10).join([m[2]] + [x for _n, x in lignes[k + 1:j]])
-            fonctions[m[1]] = max([0] + [int(a or b) for a, b in re.findall("[$]([1-9])|[$][{]([1-9])[}]",
-                                                                             re.sub("'[^']*'", "", texte))])
+            fonctions[m[1]] = max([0] + [int(a or b) for a, b in LIT_N.findall(litteraux_otes(texte))])
             corps |= set(range(k, j + 1))
         k += 1
     for i, (n, x) in enumerate(lignes):
-        if drapeau("u", "nounset") and i not in corps and re.search("[$][1-9]|[$][{][1-9][}]", re.sub("'[^']*'", "", x)):
+        if drapeau("u", "nounset") and i not in corps and LIT_N.search(litteraux_otes(x)):
             fautes.append(("refus", "K4", f"l.{n} : $N lu hors de toute fonction sous set -u : la chaîne se lance sans "
                            "argument (E34)", "écrire ${N:?raison} ou ${N:-défaut}", "-"))
         for cmd, nb, fin in appels(mots(DEF_SH.match(x)[2] if DEF_SH.match(x) else x)):
@@ -1058,6 +1081,21 @@ def script(chemin, fautes):
             if drapeau("u", "nounset") and nb < fonctions.get(cmd, 0):
                 fautes.append(("refus", "K4", f"l.{n} : {cmd} appelée avec {nb} argument(s), lit ${fonctions[cmd]} "
                                "sans protection sous set -u (E34)", "protéger l'argument optionnel : ${N:-}", "-"))
+
+
+GIT_OPT2 = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}      # options globales à valeur
+
+
+def commits_nus(ligne):
+    """Nombre de git commit d'une ligne (options globales de git sautées, mots lus par shlex) moins celui des acte
+    commit ... && qui les gardent sur la même ligne (K7 ; relecture G2, C-4)."""
+    w, n = mots(ligne) or ligne.split(), 0
+    for k, x in enumerate(w):
+        j = k + 1
+        while (x == "git" or x.endswith("/git")) and j < len(w) and w[j][:1] == "-":
+            j += 2 if w[j] in GIT_OPT2 else 1
+        n += (x == "git" or x.endswith("/git")) and j < len(w) and w[j] == "commit"
+    return n - len(re.findall("(?:acte|avant_acte[.]py)[^;&|]* commit[^;&|]*&&", ligne))
 
 
 def sceau_de_chaine(chemin, fautes):
@@ -1071,9 +1109,9 @@ def sceau_de_chaine(chemin, fautes):
         fautes.append(("refus", "K7", f"verif {'écrite dans la chaîne' if ecrite else 'non tirée du modèle'} : seule "
                        "celle de $OUTILS/gabarits/chaine.sh, tirée par source, est celle du sceau (C1)",
                        "copier gabarits/chaine-modele.sh, qui la tire par source", "-"))
-    texte = chr(10).join(lignes)
-    if re.search("git(?: -[Cc] [^ ]+)* commit", texte) and not re.search("(?:acte|avant_acte[.]py)[^;&|]* commit", texte):
-        fautes.append(("refus", "K7", "git commit sans acte commit : commit hors de la garde du sceau (C1)",
+    if any(commits_nus(x) > 0 for x in lignes):
+        fautes.append(("refus", "K7", "git commit sans acte commit ... && sur sa ligne : commit hors de la garde du "
+                       "sceau (C1)",
                        "commettre par acte commit ... && git commit, comme gabarits/chaine-modele.sh", "-"))
 
 

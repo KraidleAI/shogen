@@ -10,11 +10,12 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # scripts/controle
 FM11 = os.path.join(ICI, "fm11.py")
-SHA_FM11 = "b78a19e9303ab4675309cabb3d28f26f4c9b415c093f7be4d93a0bab6e8631b1"   # ATTRIBUTION-1 ; avant : 17caaa35… (Q-3), 4a0b8abc… (DT3-E), 886cc676… (B.35)
+SHA_FM11 = "e9c80fa1d98e54c202a82badf445081ce33557a4f6dfd4498bd1c1e8543e7a2d"   # G2-A C-1 ; avant : b78a19e9… (ATTRIBUTION-1), 17caaa35… (Q-3), 4a0b8abc…, 886cc676…
 SHA51 = "5cc89b563f73d213e38021165a360c3bf2e297e36be467786a007021c71db358"      # fm11.py l.12 (cartographie l.51)
 SHA14 = "0fe88f1a3810244ecce91b31c1f4e2117f397a7c65d381a75afdbf0b9954b71f"      # fm11.py l.13 (ADR-0025 l.14)
 CARTO = "".join(f"c{i:02d}|" for i in range(25))           # 100 caractères ; fragments aux rangs 0, 20 et 40
@@ -183,6 +184,21 @@ class Temoin(unittest.TestCase):
         self.assertEqual(vus, [("entrees", [[0, 1]]), ("resultats", [[1, 2]])])
         res = self.compter([texte("cat " + racine + "/lot/..x/a.txt " + racine + "/a..b/c")])
         self.assertEqual((res["entrees"], res["resultats"]), ({}, {}))
+
+    def test_sortie_du_scratchpad_temps_borne(self):
+        """Relecture G2 du groupe A de la phase 3, C-1 : le regard avant qui cherche un composant .. lit au plus 4096
+        caractères après scratchpad (PATH_MAX : un .. plus loin n'est pas dans le même chemin) ; une ligne sans blanc
+        qui porte 4000 chemins du scratchpad se juge en moins de 3 s (sans borne : 7,9 s mesurées, temps
+        quadratique), aucun n'est compté ; un .. à 5001 caractères de scratchpad : non compté, à 4001 : compté."""
+        s = "7ba84933" + "-ba6d-5813-9ef4-ca3ac4febd16"
+        racine = "/tmp/claude" + "-0/-home-user-shogen/" + s + "/scratchpad"
+        ligne = ",".join(chr(34) + racine + "/f" + str(i) + chr(34) for i in range(4000))
+        debut = time.perf_counter()
+        res = self.compter([resultat(ligne)])
+        self.assertLess(time.perf_counter() - debut, 3.0)
+        self.assertEqual(res["resultats"], {})
+        res = self.compter([texte(racine + "/" + "a" * 5000 + "/../x"), texte(racine + "/" + "a" * 4000 + "/../x")])
+        self.assertEqual(list(res["entrees"].values()), [[[1, 1]]])
 
 class Empreintes(unittest.TestCase):
     def test_fm11_verse_a_l_octet(self):
