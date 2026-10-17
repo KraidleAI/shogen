@@ -202,7 +202,8 @@ def faits_et_appels(entrees):
     for e in entrees:
         t = e.get("type")
         if t == "user":
-            for b in (e.get("message") or {}).get("content") or []:
+            c = (e.get("message") or {}).get("content")     # SHOGEN-GARDE-CROCHET-MESSAGE-CHAINE-1 : chaîne ou liste
+            for b in [c] if isinstance(c, str) else c or []:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
                     txt = contenus(b)
                     if MARQUE not in txt:
