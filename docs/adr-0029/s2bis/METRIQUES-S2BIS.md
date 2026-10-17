@@ -3059,3 +3059,31 @@ sans la borne (sites d'appel de `_entier`).
 
 Suite : 416 tests ; plancher du job : 416, égalité exigée (`--egal`). Compte de R-25 : 50 lignes de code ajoutées
 (tests, plancher) ; hors compte : FORMAT, METRIQUES.
+
+## INT-P2-13 (2026-10-17) : CB-16a, smoke sans prix (E-C-37 ; PROPOSITION l.224, l.278)
+
+Objet (lot INT-P2, sous-lot CB-16) : `collecte/smoke.py`, `jouer` : une lecture de chaque forme du pool et du témoin
+(au délai de `formes.json`), puis de chaque forme de la carte (au délai de `carte.json`), en série, décodée par le
+décodeur de sa forme, une seconde au moins avant une nouvelle lecture d'un hôte à `espace` vrai ; puis CryptoCompare
+(URL de S2), dont le 401 sans clé est re-confirmé. Une ligne par lecture : rôle (`pool`, `temoin` par la classe du
+décodeur, `carte`, `exclue`), forme, hôte, statut, code HTTP, sous-type, latence en ms, décodable ; jamais un prix, une
+valeur décodée, une fourchette ni un octet du corps (ADR-0029 l.222). Code 0 si et seulement si toutes les formes du
+pool et du témoin décodent. Lecture HTTP (`lire`), pause et sortie injectables : tests sur fixtures, sans réseau.
+
+Rouge : sur un squelette d'interface (noms présents, aucun comportement), les 4 tests neufs échouent par assertion
+(9 FAIL, sous-cas compris, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/smoke.py` | 48 | — |
+| `tests/test_smoke.py` | 129 | 4 (neuf : sortie sans prix, codes, requêtes et espacement, rôle) |
+
+Mutants (même commande, même outil) : 17 mutants, 17 tués par leur test visé, 0 vivant, 0 FATAL : prix imprimé ;
+octets du corps imprimés ; la carte change le code ; le témoin ne compte pas ; décodable lu sur le code HTTP ; rôle du
+témoin perdu ; espacement retiré, ou posé sans `espace` (hôte de Chainlink lu deux fois) ; délai du pool pour la
+carte ; 401 jamais contrôlé ; URL de CryptoCompare ; latence en secondes ; compte des formes décodées ; lecture non
+décodée ; nom de la forme au lieu de son décodeur (site d'appel) ; contexte TLS non transmis ; plancher.
+
+Suite : 420 tests ; plancher du job : 420, égalité exigée (`--egal`). Compte de R-25 : 178 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, la docstring de `smoke.py` est recoupée à 117
+colonnes (forme seule, mêmes mots : contrôle du lot).

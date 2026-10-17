@@ -75,7 +75,8 @@
   trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
   `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
   porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
-  par un test seul (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge.
+  par un test seul (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
+  le diff CB-16a écrit le smoke sans prix (`smoke.py`).
 
 ## 1. Ligne et chaîne (CB-1)
 
