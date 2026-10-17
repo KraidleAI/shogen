@@ -1088,6 +1088,54 @@ class ChaineABlanc(Depot):
         ag.ecrire(self.tmp, {"chaine.sh": script or self.SCRIPT})
         return self.lancer("chaine", "--blanc", "--script", os.path.join(self.tmp, "chaine.sh"), "--diffs", *diffs)
 
+    def test_k8_suite_sous_les_variables_du_lancement(self):
+        """K8 (E39) : avec --plan, la ligne du job controle-unittest de gates.yml de la copie est jouée dans la copie
+        sous l'environnement du lancement : une suite (ici factice) qui rougit quand DETACHE est posée fait refuser
+        K8 sous DETACHE=1 et passe sans ; sans --plan (diffs seuls), K8 n'est pas jouée ; ligne double : refus K8."""
+        job = "          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 1"
+        suite = NL.join(["import os, sys", "rouge = bool(os.environ.get('DETACHE'))",
+                         "print('FAIL: test_x (tests.t.C.test_x)' if rouge else 'OK')", "print('fin')",
+                         "sys.exit(1 if rouge else 0)", ""])
+        self.indexer({".github/workflows/gates.yml": job + NL, "enforcement/verdict-suite-s2.py": suite})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "gates")
+        shutil.rmtree(self.c)
+        shutil.copytree(self.d, self.c)
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        ag.ecrire(self.tmp, {"chaine.sh": self.SCRIPT, "cc.md": "GROUPES : aucun" + NL, "m1.txt": "X-1 : m" + NL,
+                             "plan": f"X-1|{d1}|{self.tmp}/m1.txt|{self.tmp}/m1.txt" + NL})
+        plan = ["chaine", "--blanc", "--script", os.path.join(self.tmp, "chaine.sh"), "--plan",
+                os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md"), "--detache"]
+        with mock.patch.dict(os.environ, {"DETACHE": "1"}):
+            self.assertEqual(self.lancer(*plan)[1][:9], "REFUS K8 ")
+            self.assertIn("FAIL: test_x (tests.t.C.test_x) | fin", self.lancer(*plan)[1])     # C-4 : cas nommé
+            self.assertEqual(self.blanc(d1), (0, ""))
+        with mock.patch.dict(os.environ, {}):
+            os.environ.pop("DETACHE", None)
+            self.assertEqual(self.lancer(*plan), (0, ""))
+        self.indexer({".github/workflows/gates.yml": job + NL + job + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "double")
+        with mock.patch.dict(os.environ, {}):
+            os.environ.pop("DETACHE", None)
+            self.assertEqual(self.lancer(*plan)[1][:9], "REFUS K8 ")
+
+    def test_motif_de_chaine_lu(self):
+        """Lot CAUSES : le motif de chaîne vient de garde/motif-chaine.txt (une ligne, ancrée), égal à MOTIF_CHAINE ;
+        fichier à deux lignes ou motif non ancré : erreur de l'outil."""
+        chemin = os.path.join(avant_acte.GC.RACINE_OUTILS, "scripts", "controle", "garde", "motif-chaine.txt")
+        with open(chemin, encoding="utf-8") as f:
+            texte = f.read()
+        self.assertEqual((texte.strip(), texte.count(NL)), (avant_acte.MOTIF_CHAINE, 1))
+        self.assertTrue(avant_acte.MOTIF_CHAINE.startswith("^"))
+        vus = ["bash /t/chaine_a.sh", "sh chaine.sh x", "/bin/bash -e ./chaine_int3.sh", "bash -Eu chaine.sh",
+               "bash scripts/controle/gabarits/chaine-modele.sh"]           # G2 du lot CAUSES (C-2)
+        hors = ["bash machaine.sh", "bash chaine_x.sh.bak", "tail -f chaine_int3.log", "pgrep -f ^bash /t.*chaine_[.]sh",
+                "/bin/bash -c source /r/s.sh && eval 'bash chaine.sh'", "python3 chaine.sh"]
+        self.assertEqual([bool(re.search(avant_acte.MOTIF_CHAINE, x)) for x in vus + hors], [True] * 5 + [False] * 6)
+        for faux in ("^a" + NL + "^b" + NL, "a" + NL):
+            with mock.patch("builtins.open", mock.mock_open(read_data=faux)):
+                with self.assertRaises(avant_acte.Erreur):
+                    avant_acte.motif_chaine()
+
     def test_e30_e31_diffs_a_blanc(self):
         """E30, E31 : chaque diff passe git apply --check sur HEAD plus les précédents : d1 puis d2 admis ; d2 seul
         (il suppose d1), dans le désordre, sans saut de ligne final (E30), à chemins absolus (E31) : refus K5 ; sans

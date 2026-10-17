@@ -123,6 +123,9 @@ Phase 3, groupe B (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : disque (DQ, GF-8b) mesure l
 celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT".
 Phase 3, groupe A, PLAGE-LETTRES : C3 (L-3) lit aussi une plage à bornes en lettres (DT15-a à DT15-m ; rang : lettres
 de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne forment pas de plage.
+Lot CAUSES (E39) : K8, avec --plan : la ligne du job controle-unittest de gates.yml de la copie jouée dans la copie
+à l'état final, sous l'environnement du lancement (refus si rouge ; borne BORNE_K8) ; le motif de chaîne (V7) est lu dans
+garde/motif-chaine.txt (motif_chaine), partagé avec le crochet et mutants.py.
 Phase 3, groupe A, RECALAGE-CHECK : chaine --blanc --script S [--diffs D...] (diffs du plan à défaut), avant le
 lancement (E30, E31, E36) : sur une copie creuse de HEAD (git archive, interdits exclus), chaque diff dans l'ordre : K0
 interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 (lu dans gates.yml) et G5 presg5 sur ses
@@ -185,11 +188,24 @@ REGISTRE = "docs/RENVOIS-LIGNES.tsv"
 EMPREINTE = re.compile("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})")
 BORNE_LIEE = 100
 PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
-MOTIF_CHAINE = "^(/usr/bin/|/bin/)?(bash|sh) ([^ ]*/)?chaine(_[^ /]*)?[.]sh( |$)"     # V7 (E28), ancré
+BORNE_K8 = 1800         # s, borne de la suite des contrôles jouée à blanc (K8, E39)
+
+
+def motif_chaine():
+    """Motif ancré d'une chaîne de commits (V7, E28 ; pgrep -f), lu dans garde/motif-chaine.txt : une seule ligne,
+    partagée avec le crochet GARDE-FAITS et mutants.py, jamais recopiée (lot CAUSES, E37, E39)."""
+    with open(os.path.join(GC.RACINE_OUTILS, "scripts", "controle", "garde", "motif-chaine.txt"), encoding="utf-8") as f:
+        lignes = [x for x in f.read().split(chr(10)) if x.strip()]
+    if len(lignes) != 1 or not lignes[0].startswith("^"):
+        raise Erreur("garde/motif-chaine.txt : une seule ligne, motif ancré par ^, attendue")
+    return lignes[0]
 
 
 class Erreur(Exception):
     """Erreur de l'outil : sortie 3, jamais un refus."""
+
+
+MOTIF_CHAINE = motif_chaine()       # après Erreur (G2 du lot CAUSES, C-4) : un fichier faux lève Erreur, non NameError
 
 
 def git(depot, *args, env=None):
@@ -1150,6 +1166,35 @@ def blanc(a, fautes):
                 return
             git(copie, "apply", os.path.abspath(x), env=env)
             portes(a.depot, nom, [(f["apres"], f["ajouts"]) for f in GC.analyser_diff(texte) if f["apres"]], fautes)
+        if a.plan:
+            suite_k8(copie, fautes)
+
+
+def suite_k8(copie, fautes):
+    """K8 (E39) : la ligne exacte du job controle-unittest de gates.yml de la copie, jouée dans la copie à l'état
+    final du plan, sous l'environnement du lancement tel quel (variables de la chaîne comprises : un cas qui en hérite
+    rougit ici, pas au premier pas) ; copie sans gates.yml (dépôt d'essai) : rien à jouer."""
+    gates = os.path.join(copie, ".github", "workflows", "gates.yml")
+    if not os.path.isfile(gates):
+        return
+    lignes = [x.strip() for x in lire(gates).decode("utf-8").split(chr(10)) if "verdict-suite-s2.py scripts/controle " in x]
+    if len(lignes) != 1:
+        fautes.append(("refus", "K8", "ligne du job controle-unittest introuvable ou double dans gates.yml de la copie (E39)",
+                       "une seule ligne verdict-suite-s2.py scripts/controle … dans gates.yml", "-"))
+        return
+    cmd = re.sub(r"^(- )?(run: )?", "", lignes[0])
+    try:
+        p = subprocess.run(["bash", "-c", cmd], cwd=copie, capture_output=True, text=True, timeout=BORNE_K8)
+    except subprocess.TimeoutExpired:
+        raise Erreur(f"K8 : suite scripts/controle au-delà de {BORNE_K8} s sur la copie")
+    if p.returncode:
+        sortie = [x for x in (p.stdout + p.stderr).split(chr(10)) if x.strip()]
+        cas = [x for x in sortie if x.startswith(("FAIL: ", "ERROR: "))][:1]       # G2 du lot CAUSES (C-4) : le cas
+        derniere = cas + (sortie[-1:] or ["(aucune sortie)"])                      # rouge nommé, puis le verdict
+        fautes.append(("refus", "K8", "suite scripts/controle rouge sur la copie à l'état final du plan, sous "
+                       f"l'environnement du lancement (E39) : {' | '.join(x[:160] for x in derniere)}",
+                       "lire le cas nommé : variable du lancement héritée (tests/aide_garde.env_git), processus de "
+                       "l'hôte lu (pgrep), plancher du job ; corriger le cas ou le diff, relancer", "-"))
 
 
 def chaine(a, fautes):
