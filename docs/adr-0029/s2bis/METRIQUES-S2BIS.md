@@ -3009,3 +3009,27 @@ Suite : 413 tests ; plancher du job : 413, égalité exigée (`--egal`). Compte 
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, trois lignes de plus de 120 caractères
 (FORMAT, `test_format`, `test_bout_en_bout`) sont recoupées : forme seule, texte égal aux blancs près (contrôle du
 lot), d'où deux lignes de plus.
+
+## INT-P2-11 (2026-10-17) : C-P2D-2, limites de la lecture Curve déclarées (SHOGEN-S2BIS-CURVE-DOC-1)
+
+Objet (lot INT-P2, correction C-P2D-2 ; adjudication de la tranche D, ajout daté du 2026-10-17 10:19:21 UTC, sur la
+lecture `s2bis/curve-doc/RAPPORT-LECTEUR.md`) : la docstring de `_curve` dit le sens lu de `get_dy` (unités natives,
+frais plats déduits ; source `StableSwap3Pool.vy`, branche `master`) et les trois limites : identité de la source
+`master` avec le bytecode déployé non vérifiée ; rattachement direct du pool NG à sa fabrique non lu ; absence du
+bogue d'oracle du pool NG non vérifiée sur chaîne. Même texte au FORMAT §9.1 (puce du témoin) ; puce « Partie P2,
+intégration ». Aucun changement de code exécuté.
+
+Rouge : sur la docstring et le FORMAT de INT-P2-10, les deux tests neufs échouent par assertion (2 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 356 | — |
+| `tests/test_temoin.py` | 301 | 17 (1 de plus : limites dans la docstring) |
+| `tests/test_format.py` | 329 | 20 (1 de plus : limites au §9.1, puce) |
+
+Mutants (même commande, même outil) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : chaque limite dite
+levée dans la docstring puis au FORMAT, source lue confondue, unités fausses, correction et item mal nommés, plancher.
+
+Suite : 415 tests ; plancher du job : 415, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
+(`.py`, `.yml`, docstring comprise) ; hors compte : FORMAT, METRIQUES. Après la campagne, une ligne de la docstring de
+`_curve` de plus de 120 caractères est recoupée (forme seule).

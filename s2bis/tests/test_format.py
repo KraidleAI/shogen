@@ -260,6 +260,17 @@ class Format(unittest.TestCase):
         self.assertEqual([all(x in p for x in ("C-P2D-1", "`temoin`")) for p in puces if p.startswith(
             "**Partie P2, intégration**")], [True])
 
+    def test_paragraphe_9_limites_de_la_lecture_curve(self):        # C-P2D-2 ; SHOGEN-S2BIS-CURVE-DOC-1
+        """§9.1 : les trois limites de la lecture Curve, mot pour mot (texte de l'adjudication de la tranche D, ajout
+        daté du 2026-10-17 10:19:21 UTC) ; puce « Partie P2, intégration » : C-P2D-2 et l'item."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ("identité de la source `master` avec le bytecode déployé non vérifiée",
+                    "rattachement direct du pool NG à sa fabrique non lu",
+                    "absence du bogue d'oracle du pool NG non vérifiée sur chaîne")
+        self.assertEqual([x in sections["9"] for x in attendus], [True] * 3)
+        self.assertEqual([all(x in p for x in ("C-P2D-2", "CURVE-DOC-1")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

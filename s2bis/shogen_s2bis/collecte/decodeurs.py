@@ -246,9 +246,14 @@ def _uniswap(j):
 
 def _curve(j):
     """`get_dy(1, 2, MONTANT)` (l.94) : un mot, dy, unités de USDT rendues pour MONTANT unités de USDC, net des frais
-    et du glissement ; prix = dy · 10^D_USDC / (MONTANT · 10^D_USDT), une division (`_quotient`). Limites
-    (PAIRES-ET-TEMOIN §4 point 8 ; SHOGEN-S2BIS-CURVE-DOC-1) : la documentation de `get_dy` lue vaut pour
-    Stableswap-NG, non pour le 3pool ; `price_oracle`, de sens non lu, n'est pas retenu."""
+    et du glissement ; prix = dy · 10^D_USDC / (MONTANT · 10^D_USDT), une division (`_quotient`). Sens lu
+    (SHOGEN-S2BIS-CURVE-DOC-1, lecture du 2026-10-17 : documentation des pools « plain » anciens et source
+    `StableSwap3Pool.vy` du dépôt officiel `curvefi/curve-contract`, branche `master`) : dx et dy en unités natives de
+    leurs coins, frais plats déduits (dénominateur 10^10). `price_oracle` du pool Stableswap-NG (moyenne mobile, ni
+    nette de frais ni échange simulé) n'est pas retenu. Limites déclarées (C-P2D-2) : identité de la source
+    `master` avec le bytecode déployé non vérifiée ; rattachement direct du pool NG à sa fabrique non lu (registre de
+    l'API et implémentation commune seulement) ; absence du bogue d'oracle du pool NG non vérifiée sur chaîne (pool
+    créé après la correction d'après l'API, inféré)."""
     (dy,) = _mots(j, 1)
     return _quotient(dy * 10 ** D_USDC, MONTANT * 10 ** D_USDT), None, {"dy": str(dy)}
 

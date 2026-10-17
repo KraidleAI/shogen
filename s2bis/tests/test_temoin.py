@@ -21,6 +21,9 @@ S = 79254659562179534821884273396                                   # sqrtPriceX
 U50 = "1.0006689913764853970918966905584960382210379896029"        # bc : 50 chiffres, le 51e vaut 2
 U28 = "1.000668991376485397091896691"                              # bc : 28 chiffres, la suite 558 arrondit en haut
 ZERO = "0" * 64
+LIMITES = ("identité de la source `master` avec le bytecode déployé non vérifiée",              # C-P2D-2
+           "rattachement direct du pool NG à sa fabrique non lu",
+           "absence du bogue d'oracle du pool NG non vérifiée sur chaîne")
 
 
 def lire(nom):
@@ -144,6 +147,13 @@ class Curve(unittest.TestCase):                                   # CB-9b ; Q-CA
         with mock.patch.object(decodeurs, "D_USDT", 18):
             self.assertEqual([prix(n, lire(n + ".bin"))[0] for n in ("uniswap_usdc_usdt", "curve_usdc_usdt")],
                              [U50 + "E-12", "1.000393E-12"])
+
+    def test_limites_de_la_lecture_declarees(self):                 # C-P2D-2 ; SHOGEN-S2BIS-CURVE-DOC-1
+        """Docstring du décodeur : sens lu (unités natives, net des frais, source `StableSwap3Pool.vy`), les trois
+        limites de la lecture du 2026-10-17 (adjudication de la tranche D, ajout daté), `price_oracle` non retenu."""
+        doc = " ".join(decodeurs._curve.__doc__.split())
+        self.assertEqual([x in doc for x in LIMITES + ("StableSwap3Pool.vy", "unités natives", "C-P2D-2",
+                                                       "`price_oracle`")], [True] * 7)
 
     def test_mot_maximal_et_formes_refusees(self):
         """dy = 2^256 − 1 : 50 chiffres (bc), sous un contexte du fil altéré, par `decoder` comme par le décodeur

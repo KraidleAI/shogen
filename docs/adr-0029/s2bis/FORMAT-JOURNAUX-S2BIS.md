@@ -73,7 +73,8 @@
   sceau »).
 - **Partie P2, intégration** (2026-10-17 ; lot INT-P2 : tranches C et D en une série) : le diff C-P2D-1 donne aux
   trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
-  `analyse.json` (§9.1).
+  `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
+  porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -378,6 +379,11 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers n'ont pas d'instant de source
      (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. Les trois sont de classe `temoin`, hors
      des classes USD et hors du vote (ADR-0029 l.174 ; C-P2D-1, adjudication Q-1 de la tranche D, 2026-10-17).
+     Lecture Curve (SHOGEN-S2BIS-CURVE-DOC-1, lecture du 2026-10-17) : `get_dy` rend la quantité de USDT en unités
+     natives, nette de frais (source `StableSwap3Pool.vy` du dépôt officiel, branche `master`) ; `price_oracle` du
+     pool Stableswap-NG n'est pas retenu. Limites déclarées (C-P2D-2) : identité de la source `master` avec le bytecode
+     déployé non vérifiée ; rattachement direct du pool NG à sa fabrique non lu ; absence du bogue d'oracle du pool NG
+     non vérifiée sur chaîne (pool créé après la correction d'après l'API, inféré).
    - **Instant ISO-8601** (C-5 de la G2 de P2A) : un instant de source écrit en ISO-8601 (Coinbase, champ `time`) est
      lu par un motif fixe : date `AAAA-MM-JJ`, « T » majuscule, heure `hh:mm:ss`, fraction de chiffres facultative
      (tronquée à la microseconde, comme en S2), puis « Z » majuscule, `±hh:mm` ou rien (instant lu en UTC). « t »,
