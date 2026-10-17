@@ -9,6 +9,7 @@ import json
 import os
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 from shogen_s2bis.collecte import decodeurs
 
@@ -116,6 +117,79 @@ class Places(unittest.TestCase):
         self.assertEqual(sorted((n, a, d) for n, (a, d, _c, _l) in decodeurs.DECODEURS.items() if a == "ETH" and
                                 n.startswith(("binance", "okx"))), [("binance_eth", "ETH", "USDT"),
                                                                      ("okx_ticker_eth", "ETH", "USDT")])
+
+
+def releves(classe, *lignes):
+    return ("ok", [{"actif": a, "classe": classe, "devise": "USD", "extra": x, "prix": p, "ts_source": t}
+                   for a, p, t, x in lignes])
+
+
+def groupe(*releves_rendus, actif=None, devise="USD", classe="agregateur"):
+    """Décodeur regroupé injecté, qui rend `releves_rendus` [(actif, prix, ts, extra)] quel que soit le corps."""
+    return mock.patch.dict(decodeurs.DECODEURS, g=(actif, devise, classe, lambda j: list(releves_rendus)))
+
+
+class Groupes(unittest.TestCase):             # CB-8a : lectures regroupées (E-C-09 ; ADR-0029 l.236 ; FORMAT §9.1)
+    def test_coingecko_regroupe_quatre_releves(self):              # PROPOSITION du G0 de collecte l.263
+        """Une lecture, quatre relevés, dans l'ordre BTC, ETH, USDC, USDT ; instants par actif (pièce l.51 :
+        1791488055 = 19:34:15Z, 1791488110 = 19:35:10Z, date -u -d) ; BTC repris de la fixture de S2."""
+        self.assertEqual(decodeurs.decoder("coingecko_groupe", lire(FIX, "coingecko_groupe.bin")), releves(
+            "agregateur", ("BTC", "64432", 1785946180000000, {}), ("ETH", "2456.08", 1791488055000000, {}),
+            ("USDC", "0.999622", 1791488110000000, {}), ("USDT", "0.999319", 1791488055000000, {})))
+
+    def test_defillama_regroupe_quatre_releves(self):
+        c = {"confidence": "0.99"}                                  # pièce l.52 : 1791487701 = 19:28:21Z
+        self.assertEqual(decodeurs.decoder("defillama_groupe", lire(FIX, "defillama_groupe.bin")), releves(
+            "agregateur", ("BTC", "64436.511163191906", 1785946190000000, c), ("ETH", "2455.7712345",
+                                                                                1791487701000000, c),
+            ("USDC", "0.99963", 1791487702000000, c), ("USDT", "0.9993", 1791487703000000, c)))
+
+    def test_bitfinex_regroupe_positions_des_champs(self):         # PROPOSITION du G0 de collecte l.264
+        """`v2/tickers` : symbole à l'indice 0, dernier prix à l'indice 7 (6 dans `v2/ticker` seul), codes UDC et UST
+        (pièce l.29, l.50) ; ligne où chaque champ diffère des autres (garde : douze valeurs distinctes)."""
+        self.assertEqual(decodeurs.decoder("bitfinex_groupe", lire(FIX, "bitfinex_groupe.bin")), releves(
+            "sans_horodatage", ("BTC", "64545", None, {}), ("ETH", "2455.4", None, {}), ("USDC", "1.0001", None, {}),
+            ("USDT", "0.99962", None, {})))
+        lignes = json.loads(lire(FIX, "bitfinex_groupe.bin"))
+        lignes[1] = ["tETHUSD", *range(101, 112)]
+        r = decodeurs.decoder("bitfinex_groupe", json.dumps(lignes).encode())
+        self.assertEqual((len(set(map(str, lignes[1]))), [x["prix"] for x in r[1] or []]),
+                         (12, ["64545", "107", "1.0001", "0.99962"]))
+
+    def test_identifiants_exacts_pannes_identiques_entre_actifs(self):
+        """Identifiant manquant, en trop ou répété, ligne de Bitfinex trop courte, prix d'un seul actif nul : la lecture
+        entière est `panne_decode` (pannes identiques entre actifs d'un regroupement, déclarées : ADR-0029 l.236)."""
+        cg, ll = (json.loads(lire(FIX, n + ".bin")) for n in ("coingecko_groupe", "defillama_groupe"))
+        bf = json.loads(lire(FIX, "bitfinex_groupe.bin"))
+        cas = [("coingecko_groupe", {k: v for k, v in cg.items() if k != "tether"}),
+               ("coingecko_groupe", {**cg, "ripple": cg["tether"]}), ("coingecko_groupe", {**cg, "tether": {
+                   **cg["tether"], "usd": 0}}), ("coingecko_groupe", [cg]),
+               ("defillama_groupe", {"coins": {k: v for k, v in ll["coins"].items() if k != "coingecko:bitcoin"}}),
+               ("defillama_groupe", {"coins": {**ll["coins"], "coingecko:dai": ll["coins"]["coingecko:tether"]}}),
+               ("bitfinex_groupe", bf[:3]), ("bitfinex_groupe", bf + [bf[0]]), ("bitfinex_groupe", bf[:3] + [
+                   bf[0][:1] + bf[3][1:]]), ("bitfinex_groupe", bf[:3] + [bf[3][:10]]), ("bitfinex_groupe", [
+                   *bf[:3], ["tUSTUSD", *bf[3][1:7], "NaN", *bf[3][8:]]])]
+        for nom, corps in cas:
+            with self.subTest(nom=nom, corps=json.dumps(corps)[:60]):
+                self.assertEqual(decodeurs.decoder(nom, json.dumps(corps).encode()), PANNE)
+
+    def test_au_plus_un_releve_par_actif(self):                     # plafond : un relevé par actif (FORMAT §9.1)
+        """Plafond du nombre de relevés d'une lecture : un par actif de la liste fermée, quatre au plus ; aucun relevé,
+        un actif répété ou hors de la liste : `panne_decode` ; quatre actifs distincts : rendus."""
+        quatre = [(a, "1", None, {}) for a in ("BTC", "ETH", "USDC", "USDT")]
+        for rendus, statut in (([], "panne_decode"), (quatre[:1] * 2, "panne_decode"), (quatre + quatre[:1],
+                               "panne_decode"), ([("XRP", "1", None, {})], "panne_decode"), (quatre, "ok")):
+            with self.subTest(rendus=rendus), groupe(*rendus):
+                self.assertEqual(decodeurs.decoder("g", b"{}")[0], statut)
+
+    def test_actif_devise_classe_de_la_liste_fermee(self):           # FORMAT §9.1
+        for actif, devise, classe, statut in (("XRP", "USD", "agregateur", "panne_decode"),
+                                              ("BTC", "EUR", "agregateur", "panne_decode"),
+                                              ("BTC", "USD", "oracle_pyth", "panne_decode"),
+                                              ("ETH", "USDT", "place_horodatee", "ok")):
+            with self.subTest(actif=actif, devise=devise, classe=classe), mock.patch.dict(
+                    decodeurs.DECODEURS, h=(actif, devise, classe, lambda j: ("1", None, {}))):
+                self.assertEqual(decodeurs.decoder("h", b"{}")[0], statut)
 
 
 class Types(unittest.TestCase):                                   # SHOGEN-S2BIS-DECODEURS-TYPES-1

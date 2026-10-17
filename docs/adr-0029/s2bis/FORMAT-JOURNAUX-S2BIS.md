@@ -61,7 +61,8 @@
 - **Partie P2, tranche C** (2026-10-17 ; sous-lots CB-7, CB-8) : le diff CB-7a écrit au §9.1 la sorte des conteneurs et
   ferme SHOGEN-S2BIS-DECODEURS-TYPES-1 ;
   le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1) ;
-  le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1).
+  le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1) ;
+  le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -382,6 +383,15 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
    - **Sorte des conteneurs** (CB-7a, SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque objet ou liste qu'un décodeur lit est de
      la sorte attendue, sinon `panne_decode`. Écart à S2, qui indexait une chaîne comme une liste : Kraken `c` écrit en
      chaîne y rendait son premier caractère comme prix (« 6 »).
+   - **Lectures regroupées** (CB-8a ; E-C-09 ; ADR-0029 l.236) : CoinGecko (`simple/price`), DefiLlama
+     (`prices/current`) et Bitfinex (`v2/tickers`) sont lus en une lecture par hôte pour les quatre actifs ; le
+     décodeur rend un relevé par actif, dans l'ordre BTC, ETH, USDC, USDT. Les identifiants rendus sont exactement
+     ceux de la requête (CoinGecko `bitcoin`, `ethereum`, `usd-coin`, `tether` ; DefiLlama les mêmes, préfixés de
+     `coingecko:` ; Bitfinex `tBTCUSD`, `tETHUSD`, `tUDCUSD`, `tUSTUSD`, symbole à l'indice 0 et dernier prix à
+     l'indice 7) ; un identifiant manquant, en trop ou répété, ou un prix refusé pour un seul actif, rend la lecture
+     entière `panne_decode` : les pannes d'un regroupement sont identiques entre actifs, comme l'ADR le déclare.
+   - **Plafond du nombre de relevés** (CB-8a) : une lecture rend au plus un relevé par actif, donc quatre ; aucun
+     relevé, un actif répété, ou un actif, une devise ou une classe hors des listes ci-dessus : `panne_decode`.
 2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
    restent sous 2^53 : tout lecteur JSON les lit exactement.
 3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un

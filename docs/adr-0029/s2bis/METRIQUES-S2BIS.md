@@ -2806,3 +2806,29 @@ vivant ; relevé `ps` de fin vide) : 7 mutants, 7 tués par leur test visé, 0 v
 okx) ; symbole ou instrument ETH/USD ; champ `askPx` ; classe changée ; plancher non relevé. Suite : 380 tests ;
 plancher du job : 380, égalité exigée (`--egal`). Compte de R-25 : 17 lignes de code ajoutées (`.py`, `.yml`) ; hors
 compte : 2 fixtures, FORMAT (§9.1).
+
+## CB-8a (2026-10-17) : lectures regroupées, plafond d'un relevé par actif (E-C-09 ; ADR-0029 l.236)
+
+Objet : CoinGecko (`simple/price`), DefiLlama (`prices/current`) et Bitfinex (`v2/tickers`) en une lecture par hôte pour
+les quatre actifs (E-C-09 ; PROPOSITION du G0 de collecte l.263-264 ; PROPOSITION de CALIB-ACTIFS §2.2) : un relevé par
+actif, dans l'ordre BTC, ETH, USDC, USDT ; identifiants rendus exactement ceux de la requête, sinon la lecture entière
+est `panne_decode` (pannes identiques entre actifs, déclarées par l'ADR) ; Bitfinex : symbole à l'indice 0, dernier prix
+à l'indice 7, onze éléments au moins, symbole unique. `decoder` : un relevé par actif au plus (plafond de quatre), aucun
+relevé ou un actif répété : panne ; actif, devise et classe des listes fermées du §9.1.
+
+Rouge : sur le code de CB-7c, les six tests de `Groupes` échouent par assertion (7 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 248 | — |
+| `tests/test_decodeurs_actifs.py` | 211 | 12 (6 de plus : CoinGecko et DefiLlama à quatre relevés ; positions de Bitfinex ; identifiants exacts ; un relevé par actif ; listes fermées) |
+| `tests/fixtures/actifs/` | — | 3 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL : actif répété ou aucun
+relevé admis ; actif, devise ou classe hors des listes ; identifiant en trop ; Bitfinex à l'indice 6 ou 8, ligne de 8
+éléments, symbole répété, code UDC changé ; USDC et USDT échangés ; objet `coins` non lu ; classe de CoinGecko ; site
+d'appel de CoinGecko ; plancher non relevé. Suite : 386 tests ; plancher du job : 386, égalité exigée (`--egal`). Compte
+de R-25 : 120 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puces « Lectures regroupées »
+et « Plafond du nombre de relevés »).
