@@ -113,8 +113,12 @@ référence que B2 admet : un fichier ou une ligne inexistants y sont refusés c
 Phase 3, groupe C (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 cherche le nom de la fonction en code ou en signature au README
 (nomme_en_code), non comme mot courant : une fonction suivi n'est pas nommée par « non suivi ».
 Phase 3, groupe C (SHOGEN-MOTIFS-ARBRE-REDOS-1) : motifs --arbre, RX sur tous les motifs de l'arbre (appels de re des
-.py lus par l'arbre d'ast, motifs YAML) de scripts/controle/, .claude/hooks/ et enforcement/ (motifs_arbre)."""
+.py lus par l'arbre d'ast, motifs YAML) de scripts/controle/, .claude/hooks/ et enforcement/ (motifs_arbre).
+Phase 3, groupe C (SHOGEN-GARDE-FOUS-ORCH-1, phase 3) : refus [--depuis J] [--journal F], relevé du journal des refus
+du crochet GARDE-FAITS (refus, regles_du_crochet)."""
 import argparse
+import ast
+import collections
 import contextlib
 import fnmatch
 import hashlib
@@ -125,6 +129,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from datetime import timedelta
 
 
 def _module(nom, chemin=None):
@@ -984,9 +989,50 @@ def brief(a, fautes):
     faisable(a, texte, fautes)
 
 
+REFUS_TSV = os.path.join("scripts", "controle", "garde", "refus.tsv")
+CROCHET = os.path.join(GC.RACINE_OUTILS, ".claude", "hooks", "garde_faits.py")
+
+
+def regles_du_crochet(chemin=CROCHET):
+    """Règles du crochet GARDE-FAITS (R1, R2…) nommées dans la docstring de son module, triées par numéro."""
+    doc = ast.get_docstring(ast.parse(lire(chemin).decode("utf-8"))) or ""
+    return sorted(set(re.findall("(?<![A-Za-z0-9-])(R[0-9]+)(?![0-9])", doc)), key=lambda r: int(r[1:]))
+
+
+def refus(a, fautes):
+    """refus [--depuis AAAA-MM-JJ] [--journal F] (phase 3, SHOGEN-GARDE-FOUS-ORCH-1) : relevé du journal des refus du
+    crochet (REFUS_TSV du dépôt) : refus par règle et par jour, dix actes refusés les plus fréquents, règles du crochet
+    sans refus depuis trente jours (date -u), passages (permis, erreur) ; ligne illisible comptée ; journal absent : 3."""
+    if a.depuis and not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", a.depuis):
+        raise Erreur("refus --depuis : AAAA-MM-JJ")
+    brut = [x for x in lire(a.journal or os.path.join(a.depot, REFUS_TSV)).decode("utf-8", "replace").split(chr(10))
+            if x.strip() and not x.startswith("heure" + chr(9))]
+    lignes = [c for c in (x.split(chr(9)) for x in brut) if len(c) == 5 and re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}T", c[0])]
+    vus = [x for x in lignes if x[0][:10] >= (a.depuis or "")]
+    regle = lambda x: re.fullmatch("R[0-9]+", x[2]) is not None      # noqa: E731
+    numero = lambda r: int(r[1:])      # noqa: E731
+    refuses = [x for x in vus if regle(x)]
+    print(f"journal des refus : {len(lignes)} ligne(s) lue(s), {len(brut) - len(lignes)} illisible(s) ; depuis "
+          f"{a.depuis or 'le début'} : {len(refuses)} refus")
+    print("refus par règle et par jour :")
+    par_jour = collections.Counter((x[0][:10], x[2]) for x in refuses)
+    for (jour, r), n in sorted(par_jour.items(), key=lambda kv: (kv[0][0], numero(kv[0][1]))):
+        print(f"  {jour}{chr(9)}{r}{chr(9)}{n}")
+    print("actes refusés les plus fréquents (dix au plus) :")
+    for acte, n in sorted(collections.Counter(x[3] for x in refuses).items(), key=lambda kv: (-kv[1], kv[0]))[:10]:
+        regles = ",".join(sorted({x[2] for x in refuses if x[3] == acte}, key=numero))
+        print(f"  {n}{chr(9)}{regles}{chr(9)}{acte}")
+    borne = (GC.maintenant() - timedelta(days=30)).strftime("%Y-%m-%d")
+    actives = {x[2] for x in lignes if regle(x) and x[0][:10] >= borne}
+    muettes = [r for r in regles_du_crochet() if r not in actives]
+    print(f"règles sans refus depuis trente jours (depuis le {borne}, candidates à relire) : {', '.join(muettes) or '-'}")
+    passages = [x[2] for x in vus if x[2] in ("permis", "erreur")]
+    print(f"passages : {len(passages)} (dont {passages.count('erreur')} erreur(s) interne(s), acte permis sans contrôle)")
+
+
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
              "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief,
-             "motifs": motifs_arbre}
+             "motifs": motifs_arbre, "refus": refus}
 
 
 def journal(a, fautes):
@@ -1035,6 +1081,9 @@ def parseur():
     s.add_argument("--texte", required=True)
     s.add_argument("--fiche")
     sp.add_parser("motifs").add_argument("--arbre", action="store_true", required=True)
+    s = sp.add_parser("refus")
+    s.add_argument("--depuis")
+    s.add_argument("--journal")
     return p
 
 

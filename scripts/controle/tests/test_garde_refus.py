@@ -2,8 +2,11 @@
 SHOGEN-GARDE-FOUS-ORCH-1) : une ligne par refus et par passage, acte abrégé sans secret, en-tête unique. Le crochet du
 dépôt est lancé tel quel sur des journaux synthétiques (nom en .txt), son journal des refus dans un dossier temporaire
 (SHOGEN_GARDE_REFUS), l'heure fixée par un faux date en tête du PATH.
-Relevé des refus au premier message d'une session (classe Journal)."""
+Relevé des refus au premier message d'une session (classe Journal).
+Lecteur du journal : avant_acte.py refus (classe Lecteur)."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -11,6 +14,8 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+
+import avant_acte
 
 RACINE = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 GARDE = os.path.join(RACINE, ".claude", "hooks", "garde_faits.py")
@@ -119,3 +124,44 @@ class Journal(Base):
         self.assertEqual((code, sortie.split(NL)[0][:31], sortie.split(NL)[-2]),
                          (0, "RELEVÉ (crochet du dépôt, E26) ", RELEVE + "1 refus depuis le début du journal : R5 ×1"
                           + DETAIL))
+
+
+class Lecteur(Base):
+    """avant_acte.py refus : relevé du journal des refus (heure du jour fixée à H)."""
+    def releve(self, *argv):
+        sortie = io.StringIO()
+        with mock.patch.dict(os.environ, self.env), contextlib.redirect_stdout(sortie), contextlib.redirect_stderr(
+                io.StringIO()):
+            code = avant_acte.main(["--depot", self.t, "refus", *argv])
+        return code, sortie.getvalue().split(NL)[:-1]
+
+    def test_refus_lecteur(self):
+        """Refus par règle et par jour (numéro de règle croissant), dix actes au plus (plus fréquent, puis ordre des
+        textes, non ordre du journal ; règles jointes par numéro), règles du crochet sans refus depuis trente jours (borne comprise, tout le journal),
+        passages (permis, erreur ; releve exclu), lignes illisibles, --depuis ; date fausse, journal absent : 3."""
+        b = "PreToolUse:Bash"
+        lignes = [["2026-09-15T08:00:00Z", b, "R1", "rm -rf w"], ["2026-09-16T08:00:00Z", "Stop", "R6", "-"],
+                  ["2026-09-30T08:00:00Z", b, "permis", "ls"]]
+        lignes += [[f"2026-10-15T0{k}:00:00Z", b, "R5", "git commit -m x"] for k in (1, 2, 3)]
+        lignes += [["2026-10-16T03:00:00Z", b, "R7", "sleep 5"], ["2026-10-16T04:00:00Z", "PreToolUse:Agent", "R11",
+                                                                  "sleep 5"]]
+        lignes += [[f"2026-10-16T0{k}:00:00Z", b, "R2", "sed -i s f"] for k in (1, 2)]
+        lignes += [[f"2026-10-16T1{k}:00:00Z", "PreToolUse:Agent", "R11", f"acte-0{k}"] for k in range(9, 0, -1)]
+        lignes += [["2026-10-16T05:00:00Z", "UserPromptSubmit", "releve", "3 refus"]]
+        lignes += [["2026-10-16T06:00:00Z", b, "permis", "ls"]] * 2 + [["2026-10-16T07:00:00Z", b, "erreur", "-"]]
+        os.makedirs(os.path.join(self.t, "scripts", "controle", "garde"))
+        with open(os.path.join(self.t, "scripts", "controle", "garde", "refus.tsv"), "w", encoding="utf-8") as f:
+            f.write(ENTETE + "".join(TAB.join([*x, "principal"]) + NL for x in lignes) + "x" + NL
+                    + TAB.join(["2026-10-16T08:00:00Z", "Stop", "R6", "-"]) + NL)
+        self.assertEqual(self.releve("--depuis", "2026-10-01"), (0, [
+            "journal des refus : 23 ligne(s) lue(s), 2 illisible(s) ; depuis 2026-10-01 : 16 refus",
+            "refus par règle et par jour :", "  2026-10-15" + TAB + "R5" + TAB + "3", "  2026-10-16" + TAB + "R2" + TAB
+            + "2", "  2026-10-16" + TAB + "R7" + TAB + "1", "  2026-10-16" + TAB + "R11" + TAB + "10",
+            "actes refusés les plus fréquents (dix au plus) :",
+            "  3" + TAB + "R5" + TAB + "git commit -m x", "  2" + TAB + "R2" + TAB + "sed -i s f",
+            "  2" + TAB + "R7,R11" + TAB + "sleep 5"] + ["  1" + TAB + "R11" + TAB + f"acte-0{k}" for k in range(1, 8)] + [
+            "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10",
+            "passages : 3 (dont 1 erreur(s) interne(s), acte permis sans contrôle)"]))
+        self.assertEqual(self.releve()[1][0], "journal des refus : 23 ligne(s) lue(s), 2 illisible(s) ; depuis le "
+                         "début : 18 refus")
+        self.assertEqual((self.releve("--depuis", "2026-10-1")[0], self.releve("--journal", self.j)[0]), (3, 3))
