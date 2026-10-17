@@ -1,0 +1,1 @@
+PR 15 : tête fd6aa96 ; fusion 745f40c ; 27 contrôles : 24 success, 3 skipped ; CodeQL success ; lu par pull_request_read get_check_runs le 2026-10-17 19:11:57 UTC

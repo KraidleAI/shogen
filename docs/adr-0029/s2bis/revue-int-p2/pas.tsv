@@ -1,0 +1,20 @@
+id	sujet	n_tests
+INT-P2-01	CB-7a : sorte des conteneurs lus par les décodeurs (_champ), décodeurs BTC lus par elle ; ferme SHOGEN-S2BIS-DECODEURS-TYPES-1	375
+INT-P2-02	CB-7b : décodeurs ETH, USDC et USDT des places, instrument rendu exigé, paires non servies sans décodeur	379
+INT-P2-03	CB-7c : ETH coté en USDT chez binance (ETHUSDT) et okx (ETH-USDT), Q-CA-01 (a)	380
+INT-P2-04	CB-8a : lectures regroupées CoinGecko, DefiLlama, Bitfinex (quatre actifs), un relevé par actif au plus	386
+INT-P2-05	CB-8b : Chainlink ETH, USDC et USDT ; plafond 1,05 des stables porté en extra, jamais appliqué	388
+INT-P2-06	CB-8c : formes du pool (config/formes-pool.json, 30 formes), requêtes BTC de S2 gardées ; ferme SHOGEN-S2BIS-FORMES-BTC-1	394
+INT-P2-07	CB-9a rebasé : témoin OKX USDC-USDT et Uniswap v3 slot0, corps eth_call construit ; C-3 de la G2 repliee : ligne de la piece G6 pour les fixtures du temoin	400
+INT-P2-08	CB-9b rebasé : témoin Curve 3pool get_dy(1, 2, 10^6)	404
+INT-P2-09	CB-9c rebasé : règles corps-du-decodeur et rpc-par-unite (une unité on-chain = un hôte RPC), FORMAT §9.1 et §14.1	410
+INT-P2-10	C-P2D-1 : classe temoin des trois lectures du témoin ; le recalcul la refuse dans tau_sigma (ANALYSE/temoin)	413
+INT-P2-11	C-P2D-2 : limites de la lecture Curve déclarées (docstring de _curve, FORMAT §9.1) ; SHOGEN-S2BIS-CURVE-DOC-1	415
+INT-P2-12	C-P2C-1 : test Bornes de test_decodeurs indépendant de la charge (aucun temps réel dans un verdict)	416
+INT-P2-13	CB-16a : smoke sans prix (smoke.py) : une lecture par forme du pool, du témoin et de la carte, CryptoCompare re-confirmée	420
+INT-P2-14	CB-16b : commande smoke du collecteur, FORMAT §18	422
+INT-P2-15	formes du témoin dans formes-pool.json (Q-1 adjugée) : OKX USDC-USDT, Uniswap sur eth.drpc.org, Curve sur rpc.mevblocker.io ; lues et décodées par le smoke	425
+INT-P2-16	commande capture (Q-5 adjugée, AVIS Q-C-05) : octets bruts de chaque forme écrits dans un dossier avec leur manifeste, rien d imprimé	430
+INT-P2-17	C-1 et C-2 de la G2 : ouverture exclusive de capture fixee par un test (aucun ecrasement) ; smoke et capture relevent le port de la forme et le contexte TLS	431
+INT-P2-18	alerte CodeQL n 1 (py/insecure-protocol) : version minimale TLS 1.2 ecrite dans le contexte de http.py (ADR-0015 pt 5), test ContexteTls	432
+INT-P2-19	alerte CodeQL n 5 (py/redos) : motif de reference ANCIEN de test_garde_codeql.py reecrit sans ambiguite, meme langage (equivalence verifiee sur 2 396 744 chaines)	432
