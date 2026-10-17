@@ -3111,3 +3111,30 @@ témoin ; puce sans §18 ; plancher.
 
 Suite : 422 tests ; plancher du job : 422, égalité exigée (`--egal`). Compte de R-25 : 93 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## INT-P2-15 (2026-10-17) : formes du témoin dans `formes-pool.json` (Q-1 adjugée ; E-C-37)
+
+Objet (lot INT-P2, adjudication de l'orchestrateur sur Q-1) : les trois formes du témoin entrent dans
+`s2bis/config/formes-pool.json` (33 formes) : OKX `USDC-USDT` (GET, `espace` vrai comme les autres lectures d'OKX :
+cinq par fenêtre, plan de 0 à 4 s, budget de 20 s tenu) ; Uniswap sur `eth.drpc.org` et Curve sur
+`rpc.mevblocker.io` (Q-CA-10), `POST` du corps de leur décodeur. Les règles `corps-du-decodeur` et `rpc-par-unite`
+entrent au contrôle de `test_formes_pool` ; la liste des décodeurs sans forme revient aux trois BTC regroupés. Le
+smoke lit les 33 formes, chacune servie par la fixture de son décodeur : toutes décodées, rôle `temoin` pour les trois
+formes du témoin. FORMAT §14.1 et puce « Partie P2, intégration ».
+
+Rouge : sur `formes-pool.json` de INT-P2-14, 7 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes-pool.json` | 35 | données, 33 formes |
+| `tests/test_formes_pool.py` | 112 | 6 (1 de plus : formes du témoin) |
+| `tests/test_smoke.py` | 211 | 6 (1 de plus : les 33 formes lues et décodées par le smoke) |
+| `tests/test_format.py` | 348 | 22 (1 de plus : §14.1) |
+
+Mutants (même commande, même outil) : 12 mutants, 12 tués par leur test visé, 0 vivant, 0 FATAL : Uniswap sur l'hôte
+de Chainlink ; Curve sur l'hôte d'Uniswap ; paire non servie demandée ; OKX du témoin non espacé, ou sur un autre hôte
+; corps d'Uniswap autre que celui du décodeur ; Curve lu par le décodeur d'Uniswap ; OKX du témoin lu comme USDT/USD ;
+Uniswap espacé ; FORMAT ; puce ; plancher.
+
+Suite : 425 tests ; plancher du job : 425, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `formes-pool.json` (4 lignes de données), FORMAT, METRIQUES.

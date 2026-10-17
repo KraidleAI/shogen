@@ -283,6 +283,13 @@ class Format(unittest.TestCase):
         self.assertEqual([all(x in p for x in ("CB-16a", "CB-16b", "§18")) for p in puces if p.startswith(
             "**Partie P2, intégration**")], [True])
 
+    def test_paragraphe_14_formes_du_temoin(self):                  # INT-P2-15 (Q-1 adjugée)
+        """§14.1 : les trois formes du témoin dans `formes-pool.json`, avec leurs hôtes RPC ; puce de l'intégration."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual([x in sections["14"] for x in ("les trois formes du témoin", "`eth.drpc.org`",
+                                                        "`rpc.mevblocker.io`")], [True] * 3)
+        self.assertEqual([("INT-P2-15" in p) for p in puces if p.startswith("**Partie P2, intégration**")], [True])
+
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
         nomme l'item. §11.5 : `run_params` y est placé, en tête de la première fenêtre admise d'une exécution, avant

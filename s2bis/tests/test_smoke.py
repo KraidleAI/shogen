@@ -11,6 +11,7 @@ from unittest import mock
 from shogen_s2bis.collecte import decodeurs, entree, http, smoke
 from shogen_s2bis.collecte.lecture import Lecture
 from tests.test_entree import configurations
+from tests.test_formes_pool import formes as formes_pool
 from tests.test_secondaire import carte, fichiers
 
 FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
@@ -129,6 +130,33 @@ class Smoke(unittest.TestCase):
                                                                 "curve_usdc_usdt", "okx_ticker_usdt", "chainlink_usdc",
                                                                 "inconnu")],
                          ["temoin"] * 3 + ["pool"] * 3)
+
+
+class Pool(unittest.TestCase):                                     # INT-P2-15 (Q-1 adjugée) ; E-C-37
+    def test_formes_du_pool_et_du_temoin_lues_et_decodees(self):
+        """Smoke sur les 33 formes de `config/formes-pool.json`, chacune servie par la fixture de son décodeur : toutes
+        lues et décodées, rôle `temoin` pour les trois formes du témoin et elles seules, code 0."""
+        f, lignes = formes_pool(), []
+        par = {(x["hote"], x["chemin"], x["corps"]): x["decodeur"] for x in f}
+
+        def piece(d):
+            if d.endswith("_btc"):
+                return "btc/" + {"okx_ticker_btc": "okx_ticker", "okx_index_btc": "okx_index"}.get(d, d[:-4]) + ".bin"
+            return ("temoin/" if d.endswith("_usdc_usdt") else "actifs/") + d + ".bin"
+
+        def faux(req, suivi, delai, tls):
+            if req.hote == "min-api.cryptocompare.com":
+                return Lecture("panne_http", 0, 1_000, code=401)
+            d = par[(req.hote, req.chemin, (req.corps or b"").decode())]
+            return Lecture("ok", 0, 2_000, code=200, octets=lire(piece(d)))
+        code = smoke.jouer(f, [], (POOL, CARTE), lire=faux, pause=lambda s: None, sortie=lignes.append)
+        self.assertEqual((code, len(lignes), lignes[-1:]), (0, 35, [
+            "smoke : OK (33/33 formes du pool et du témoin décodées)"]))
+        self.assertEqual([x for x in lignes if x.startswith("temoin ")], [
+            "temoin okx_usdc_usdt www.okx.com ok 200 - 2 ms décodable oui",
+            "temoin uniswap_usdc_usdt eth.drpc.org ok 200 - 2 ms décodable oui",
+            "temoin curve_usdc_usdt rpc.mevblocker.io ok 200 - 2 ms décodable oui"])
+        self.assertEqual(sum(x.startswith("pool ") and x.endswith(" ok 200 - 2 ms décodable oui") for x in lignes), 30)
 
 
 class Commande(unittest.TestCase):                                 # CB-16b ; FORMAT §18

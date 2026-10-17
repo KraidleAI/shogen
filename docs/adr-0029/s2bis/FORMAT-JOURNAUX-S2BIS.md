@@ -75,8 +75,9 @@
   trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
   `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
   porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
-  par un test seul (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
-  le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18).
+  par des tests seuls (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
+  le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
+  les formes du témoin dans `formes-pool.json` (§14.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -657,6 +658,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
      `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
      reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
+     les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
+     autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
+     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent ;
      les autres champs de `formes.json` (`w`, `delta`, `tolerance`, `delai`, `marge`, `places`) restent à sceller
      au gel du collecteur (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
