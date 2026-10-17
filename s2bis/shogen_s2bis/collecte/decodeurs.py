@@ -24,7 +24,8 @@ identifiants exacts ; plafond d'un relevé par actif ; actif, devise et classe d
 CB-8b : Chainlink ETH, USDC et USDT, plafond de 1,05 des stables en extra (E-C-10).
 CB-9a (témoin USDC/USDT, ADR-0029 l.174 ; adresses, sélecteurs et décimales lus sur
 `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §3.1) : OKX `USDC-USDT` ; Uniswap v3, `slot0` du pool 0,01 % ; requête
-`eth_call` construite (`eth_call`, CORPS), l'hôte RPC restant celui de la forme (`formes.json`)."""
+`eth_call` construite (`eth_call`, CORPS), l'hôte RPC restant celui de la forme (`formes.json`).
+CB-9b : Curve, `get_dy` du 3pool (Q-CA-09 du G0 de CALIB-ACTIFS)."""
 import datetime
 import decimal
 import json
@@ -181,6 +182,8 @@ def _chainlink(plafond=None):
 
 D_USDC = D_USDT = 6                                         # decimals() de USDC et de USDT (PAIRES-ET-TEMOIN l.89)
 UNISWAP, SLOT0 = "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6", "0x3850c7bd"   # pool 0,01 %, token0 USDC (l.90)
+CURVE, GET_DY = "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7", "0x5e0d443f"    # 3pool : coins DAI, USDC, USDT (l.94)
+MONTANT = 10 ** 6                                                   # dx de get_dy : 1 USDC, à 6 décimales (l.94)
 
 
 def eth_call(adresse, selecteur, *arguments):
@@ -237,7 +240,17 @@ def _uniswap(j):
         "sqrt_price_x96": str(s), "tick": str(tick - (1 << 256 if tick >= 1 << 255 else 0))}
 
 
-CORPS = {"uniswap_usdc_usdt": eth_call(UNISWAP, SLOT0)}             # corps de la requête, lié au décodeur de la réponse
+def _curve(j):
+    """`get_dy(1, 2, MONTANT)` (l.94) : un mot, dy, unités de USDT rendues pour MONTANT unités de USDC, net des frais
+    et du glissement ; prix = dy · 10^D_USDC / (MONTANT · 10^D_USDT), une division (`_quotient`). Limites
+    (PAIRES-ET-TEMOIN §4 point 8 ; SHOGEN-S2BIS-CURVE-DOC-1) : la documentation de `get_dy` lue vaut pour
+    Stableswap-NG, non pour le 3pool ; `price_oracle`, de sens non lu, n'est pas retenu."""
+    (dy,) = _mots(j, 1)
+    return _quotient(dy * 10 ** D_USDC, MONTANT * 10 ** D_USDT), None, {"dy": str(dy)}
+
+
+CORPS = {"uniswap_usdc_usdt": eth_call(UNISWAP, SLOT0),              # corps de requête, lié au décodeur de la réponse
+         "curve_usdc_usdt": eth_call(CURVE, GET_DY, 1, 2, MONTANT)}  # i = 1 (USDC), j = 2 (USDT)
 H, P = "place_horodatee", "sans_horodatage"
 CG = {"bitcoin": "BTC", "ethereum": "ETH", "usd-coin": "USDC", "tether": "USDT"}          # identifiants de CoinGecko
 DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON lu) ; S2 : SPECS, SIGMA_CLASS_OF_FLUX
@@ -279,6 +292,7 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "chainlink_usdt": ("USDT", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
     "okx_usdc_usdt": ("USDC", "USDT", "place_horodatee", _okx_temoin),      # témoin : USDT par USDC, hors du vote
     "uniswap_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _uniswap),
+    "curve_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _curve),
 }
 
 

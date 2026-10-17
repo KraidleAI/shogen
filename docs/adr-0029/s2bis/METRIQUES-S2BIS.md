@@ -2919,3 +2919,31 @@ Mutants (commande du job s2bis-unittest par `scripts/controle/mutants.py`, borne
 VIVANT) : 20 mutants, 20 tués (19 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL.
 
 Suite : 400 tests ; plancher du job : 400, égalité exigée (`--egal`).
+
+## CB-9b (2026-10-17) : témoin, Curve 3pool `get_dy` (E-C-06, E-C-07 ; Q-CA-09 du G0 de CALIB-ACTIFS)
+
+Objet : décodeur `curve_usdc_usdt` : `get_dy(1, 2, 10^6)` du 3pool (PAIRES-ET-TEMOIN l.94), prix dy · 10^6 / (10^6 ·
+10^6), une division sous le contexte nommé ; corps `eth_call` construit (i = 1, USDC ; j = 2, USDT ; dx = 10^6) ;
+`get_dy` retenu, non `price_oracle`, dont le sens n'est pas lu (PAIRES-ET-TEMOIN §4 point 8 ; limite
+SHOGEN-S2BIS-CURVE-DOC-1, ouverte). Un test des décimales distinctes (USDT à 18, valeur de test) sépare D_USDC de
+D_USDT pour les deux pièces sur chaîne.
+
+Rouge : sur le code de CB-9a, avec un squelette d'interface (`_curve` muet), les 4 tests neufs échouent par
+assertion (0 erreur).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 338 | — |
+| `tests/test_temoin.py` | 161 | 10 (4 de plus : requête, fixture, mot maximal, décimales distinctes) |
+| `tests/test_formes_pool.py` | 101 | inchangé (décodeur Curve du témoin sans forme du pool) |
+
+Rebasage (lot INT-P2, 2026-10-17) : conflits de texte (docstring de `decodeurs.py`, `_curve` et CORPS avant les lignes
+`H, P` et `CG` de la tranche C, plancher 400 + 4, fin de ce fichier) ; conflit de sens : `curve_usdc_usdt` ajouté à la
+liste fermée des décodeurs sans forme du pool (`test_requete_btc_de_s2_gardee`). Rouge et mutants : ceux du générateur,
+sur 2a07ae6, non rejoués.
+
+Mutants (même commande) : 13 mutants, 13 tués (12 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL ;
+décimales permutées dans chaque pièce, tuées par le test des décimales distinctes (à 6 et 6, ces mutants sont
+équivalents sur la fixture de la pièce).
+
+Suite : 404 tests ; plancher du job : 404, égalité exigée (`--egal`).

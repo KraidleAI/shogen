@@ -7,6 +7,7 @@ import json
 import os
 import unittest
 from decimal import ROUND_DOWN, Context, Decimal, DefaultContext, localcontext
+from unittest import mock
 
 from shogen_s2bis.collecte import decodeurs
 
@@ -114,6 +115,46 @@ class Uniswap(unittest.TestCase):
         self.assertEqual((r[1] and r[1][0]["prix"], str(seul)), (U50, U50))
         with localcontext(DefaultContext):
             self.assertEqual(str(Decimal(S * S) / (1 << 192)), U28)
+
+
+class Curve(unittest.TestCase):                                   # CB-9b ; Q-CA-09 : 3pool, get_dy(1, 2, 10^6)
+    MAX = "1.1579208923731619542357098500868790785326998466564E+71"   # bc : (2^256 − 1) / 10^6, 50 chiffres
+
+    def test_requete_get_dy_construite(self):
+        """Corps écrit à la main : 3pool (l.94), sélecteur de get_dy (l.94), i = 1 (USDC), j = 2 (USDT), dx = 10^6
+        (1 USDC à 6 décimales ; 10^6 = 0xf4240 par printf), chacun sur 32 octets."""
+        data = "0x5e0d443f" + "0" * 63 + "1" + "0" * 63 + "2" + "0" * 59 + "f4240"
+        self.assertEqual(decodeurs.CORPS.get("curve_usdc_usdt"), '{"jsonrpc": "2.0", "id": 1, "method": "eth_call", '
+                         '"params": [{"to": "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7", "data": "' + data + '"}, '
+                         '"latest"]}')
+
+    def test_fixture_de_la_piece(self):
+        """l.94 : get_dy(1, 2, 10^6) = 1 000 393, soit 1,000393 USDT pour 1 USDC, net des frais ; aucun instant."""
+        self.assertEqual(decodeurs.decoder("curve_usdc_usdt", lire("curve_usdc_usdt.bin")), ("ok", [
+            {"actif": "USDC", "classe": "sans_horodatage", "devise": "USDT", "extra": {"dy": "1000393"},
+             "prix": "1.000393", "ts_source": None}]))
+
+    def test_decimales_portees_par_les_deux_pieces(self):
+        """Décimales distinctes (USDT à 18, valeur de test) : le prix de chaque pièce est multiplié par 10^(6 − 18),
+        valeurs écrites à la main ; D_USDC et D_USDT permutées donneraient 10^12."""
+        with mock.patch.object(decodeurs, "D_USDT", 18):
+            self.assertEqual([prix(n, lire(n + ".bin"))[0] for n in ("uniswap_usdc_usdt", "curve_usdc_usdt")],
+                             [U50 + "E-12", "1.000393E-12"])
+
+    def test_mot_maximal_et_formes_refusees(self):
+        """dy = 2^256 − 1 : 50 chiffres (bc), sous un contexte du fil altéré, par `decoder` comme par le décodeur
+        appelé seul ; garde : le contexte par défaut rend 28 chiffres. dy nul, deux mots, 63 chiffres, erreur
+        JSON-RPC : panne."""
+        with fil_hostile():
+            r = prix("curve_usdc_usdt", rpc("0x" + "f" * 64))
+            seul = decodeurs._curve({"result": "0x" + "f" * 64})[0]
+        self.assertEqual((r[0], str(seul), r[2]), (self.MAX, self.MAX, {"dy": str((1 << 256) - 1)}))
+        with localcontext(DefaultContext):
+            self.assertEqual(str(Decimal((1 << 256) - 1) / 10 ** 6), "1.157920892373161954235709850E+71")
+        for x in (rpc("0x" + ZERO), rpc("0x" + ZERO + f"{1000393:064x}"), rpc("0x" + ZERO[1:]), rpc(1000393),
+                  b'{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"execution reverted"}}'):
+            with self.subTest(x=x[:48]):
+                self.assertEqual(decodeurs.decoder("curve_usdc_usdt", x), PANNE)
 
 
 if __name__ == "__main__":
