@@ -67,7 +67,9 @@ capitales internes, sigles, domaine d'un courriel) au JOURNAL et dans docs/publi
 en contexte et le garde (garde-faits.releve) ; au Stop, si le dernier message de l'humain porte un nom propre, une
 réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du tour (résultat d'outil, relevé) est
 refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se lit dans le fichier versé
-scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien."""
+scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien.
+Phase 3 (journal des refus, SHOGEN-GARDE-FOUS-ORCH-1) : chaque refus et chaque passage écrit une ligne au journal
+scripts/controle/garde/refus.tsv (consigner : heure, événement, règle ou permis, acte abrégé sans secret, agent)."""
 import importlib.util
 import json
 import os
@@ -132,6 +134,14 @@ NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z]{
                         r"(?![\w-])")
 RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 FORGE_HOTE = re.compile(r"(?i)(?<![\w-])api\.github\.com(?![\w-])")     # hôte de la forge dans le texte (sens sûr)
+ENTETE_REFUS = chr(9).join(["heure", "evenement", "regle", "acte", "agent"]) + chr(10)
+REGLE = ["permis"]         # règle du refus en cours (phase 3, journal des refus) : posée par refuser et par juger
+CLE_SECRETE = re.compile("(?i)((?:api[_-]?key|secret|token|passw(?:or)?d|authorization|bearer)[^ =:]*[ ]*[=:]?[ ]*"
+                         "(?:(?:bearer|basic|token) )?)([^ '" + chr(34) + "]+|'[^']*'|" + chr(34) + "[^" + chr(34) + "]*"
+                         + chr(34) + ")")
+JETON_SECRET = re.compile("(?<![A-Za-z0-9_+/=-])(?:(?=[A-Za-z0-9_+/=-]*[0-9])(?=[A-Za-z0-9_+/=-]*[a-z])"
+                          "(?=[A-Za-z0-9_+/=-]*[A-Z])[A-Za-z0-9_+/=-]{24,}|(?:sk-|ghp_|gho_|github_pat_|xox[baprs]-|AIza"
+                          "|AKIA)[A-Za-z0-9_-]{8,})")
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
@@ -284,6 +294,7 @@ def hex_affiche(h, hexs):
 
 
 def refuser(motif):
+    REGLE[0] = (re.match("R[0-9]+", motif) or ["?"])[0]
     sys.stderr.write(f"{MARQUE} : REFUS. {motif}\n")
     sys.exit(2)
 
@@ -293,6 +304,51 @@ def journaliser(dossier, ligne):
         with open(os.path.join(dossier, "garde-faits.log"), "a", encoding="utf-8") as f:
             f.write(ligne.rstrip("\n") + "\n")
     except OSError:
+        pass
+
+
+def abreger(texte):
+    """Acte abrégé du journal des refus : blancs réduits (ni tabulation ni saut de ligne), secrets masqués (***),
+    80 caractères au plus (le masque passe avant la coupe)."""
+    t = CLE_SECRETE.sub(lambda m: m[1] + "***", " ".join(str(texte).split()))
+    return JETON_SECRET.sub("***", t)[:80]
+
+
+def chemin_refus():
+    """Journal des refus (phase 3) : SHOGEN_GARDE_REFUS si posé (les tests le posent ; /dev/null : éteint), sinon
+    scripts/controle/garde/refus.tsv du dépôt du crochet (non versionné : .gitignore du dossier)."""
+    return os.environ.get("SHOGEN_GARDE_REFUS") or os.path.join(RACINE, "scripts", "controle", "garde", "refus.tsv")
+
+
+def consigner(entree, regle, acte="-"):
+    """Phase 3 : une ligne au journal des refus (heure lue par date -u, événement, règle ou permis, erreur, releve,
+    acte abrégé, agent) ; en-tête posé par lien d'un fichier complet (jamais deux, jamais à demi), ligne ajoutée d'un
+    seul write en O_APPEND (atomique entre crochets concurrents) ; dossier absent, erreur, chemin en .jsonl : rien,
+    jamais un refus."""
+    try:
+        chemin = chemin_refus()
+        if chemin.endswith(".jsonl"):
+            return
+        heure = subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, timeout=10).stdout
+        ev = entree.get("hook_event_name", "") + (":" + entree["tool_name"] if entree.get("tool_name") else "")
+        champs = [heure, ev, regle, abreger(acte), entree.get("agent_id") or "principal"]
+        ligne = chr(9).join(" ".join(str(x).split()) or "-" for x in champs) + chr(10)
+        if not os.path.exists(chemin):
+            tmp = f"{chemin}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(ENTETE_REFUS)
+            try:
+                os.link(tmp, chemin)
+            except FileExistsError:
+                pass
+            finally:
+                os.unlink(tmp)
+        fd = os.open(chemin, os.O_WRONLY | os.O_APPEND)
+        try:
+            os.write(fd, ligne.encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception:
         pass
 
 
@@ -845,10 +901,23 @@ def stop(entree, sous_agent):
 
 
 def main():
+    """Phase 3 : chaque passage (permis, erreur) et chaque refus (règle) du crochet consigné au journal des refus."""
     try:
         entree = json.load(sys.stdin)
     except Exception:
         return 0
+    acte = texte_appel(entree.get("tool_name") or "", entree.get("tool_input") if isinstance(entree.get(
+        "tool_input"), dict) else {}) if entree.get("tool_name") else "-"
+    try:
+        code = juger(entree)
+    except SystemExit as e:
+        consigner(entree, REGLE[0] if e.code == 2 else "permis", acte)
+        raise
+    consigner(entree, REGLE[0] if code == 2 or REGLE[0] == "erreur" else "permis", acte)
+    return code
+
+
+def juger(entree):
     ev = entree.get("hook_event_name", "")
     dossier = os.path.dirname(entree.get("transcript_path") or "") or "."
     try:
@@ -858,8 +927,10 @@ def main():
             return soumission(entree)
         if ev in ("Stop", "SubagentStop"):
             manque = dossiers_sans_releve(entree) if ev == "Stop" else []
+            REGLE[0] = "R6"
             code = stop(entree, ev == "SubagentStop")
             if manque:
+                REGLE[0] = "R10"
                 sys.stderr.write(f"{MARQUE} : REFUS. R10 (E26) : la réponse nomme {', '.join(manque)} sans relevé du "
                                  "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
                                  "docs/publication/), puis rattacher.\n")
@@ -871,6 +942,7 @@ def main():
             journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} agent={entree.get('agent_id', '')}")
         raise
     except Exception as exc:  # jamais un refus aveugle
+        REGLE[0] = "erreur"
         sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; acte permis sans contrôle.\n")
         journaliser(dossier, f"ERREUR {ev} {exc!r}")
         return 0
