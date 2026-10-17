@@ -120,7 +120,9 @@ Phase 3, groupe B (SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : chaque passage en --l
 journal garde/lecture-seule.tsv des outils (JOURNAL_LS, ignoré par git) : heure lue par date -u, sous-commande, tête du
 dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3.
 Phase 3, groupe B (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : disque (DQ, GF-8b) mesure le système de fichiers du dépôt, et
-celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT"."""
+celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT".
+Phase 3, groupe A, PLAGE-LETTRES : C3 (L-3) lit aussi une plage à bornes en lettres (DT15-a à DT15-m ; rang : lettres
+de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne forment pas de plage."""
 import argparse
 import ast
 import collections
@@ -329,22 +331,29 @@ def unites(texte):
     return vus + ([chr(10).join(cour)] if cour else [])
 
 
+def rang(suffixe):
+    """Rang d'un suffixe de diff dans une plage : nombre de tête (0, n), ou lettres de tête (1, longueur, lettres), z
+    avant aa (DT7-a … DT7-aa) ; None sans l'un ni l'autre (PLAGE-LETTRES)."""
+    m = re.match("([0-9]+)|([a-z]+)", suffixe)
+    return None if not m else (0, int(m[1])) if m[1] else (1, len(m[2]), m[2])
+
+
 def nommes(unite, prefixe):
-    """(suffixes, plages) des diffs du préfixe nommés dans un passage ; plage N à M (ou a, au, …, ..) : nombres de tête
-    des deux bornes (GF-0 … GF-10b : 0 à 10)."""
-    e, bord = re.escape(prefixe), "(?<![A-Za-z0-9-])"
+    """(suffixes, plages) des diffs du préfixe nommés dans un passage ; plage N à M (ou a, au, …, ..) : rangs des deux
+    bornes, nombres de tête (GF-0 … GF-10b : 0 à 10) ou lettres de tête (DT15-a à DT15-m : a à m), de même sorte."""
+    e, bord, borne = re.escape(prefixe), "(?<![A-Za-z0-9-])", "([0-9]+[a-z]?|[a-z]+[0-9]*)"
     vus = set(re.findall(bord + e + "([0-9A-Za-z]+)(?![A-Za-z0-9-])", unite))
-    plages = re.findall(bord + e + "([0-9]+)[a-z]? ?(?:à|a|au|…|[.]{2,3}) ?" + e + "([0-9]+)[a-z]?(?![0-9A-Za-z-])", unite)
-    return vus, [(int(i), int(j)) for i, j in plages]
+    plages = re.findall(bord + e + borne + " ?(?:à|a|au|…|[.]{2,3}) ?" + e + borne + "(?![0-9A-Za-z-])", unite)
+    return vus, [(rang(i), rang(j)) for i, j in plages if rang(i)[0] == rang(j)[0]]
 
 
 def attribuer(ident, corps, sources, ajoute, juges, fautes):
     """C3, L-3 : mot du message lu dans les sources, que seuls des passages qui nomment d'autres diffs du préfixe
     de ident portent (sans ident, ni une plage qui le couvre), absent des lignes ajoutées : refus."""
     prefixe, suffixe = ident.rsplit("-", 1)
-    tete = int(re.match("[0-9]*", suffixe)[0] or -1)
+    tete = rang(suffixe)
     autre = lambda vus, plages: (vus - {suffixe} or plages) and suffixe not in vus and not any(
-        i <= tete <= j for i, j in plages)
+        tete is not None and i <= tete <= j for i, j in plages)
     passages = [(u, nommes(u, prefixe + "-")) for s in sources for u in unites(s)]
     for genre, juge in juges:
         for x in sorted(juge(corps)):

@@ -342,6 +342,24 @@ class Attribution(Source):
         self.assertEqual(self.juger("C-1 : Q-4"), (0, ""))
 
 
+    def test_plage_a_bornes_en_lettres(self):
+        """SHOGEN-GARDE-ATTRIBUTION-PLAGE-LETTRES-1 : plage à bornes en lettres (DT15-a à DT15-m, faux refus mesuré
+        par la G2 du groupe C de la phase 2) ou à zéros de tête (INT-01 à INT-25) : un diff de la plage, bornes
+        comprises, suffixe lettre et chiffre (DT15-b2) compris, est admis ; un diff hors de la plage (DT15-n, DT15-aa,
+        rangé après z, INT-26) est refusé."""
+        self.SOURCE = NL.join(["Série DT15-a à DT15-m : G2 neuve ACCEPTE-AVEC-CORRECTIONS, C-1 à C-10 reprises.", "",
+                               "Série INT-01 à INT-25 : SHOGEN-GARDE-INTEGRATION-1.", ""])
+        admis = [("x : G2 neuve ACCEPTE-AVEC-CORRECTIONS, C-1 à C-10 reprises", "DT15-j"),
+                 ("x : ACCEPTE-AVEC-CORRECTIONS, C-10", "DT15-a"), ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-m"),
+                 ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-b2"), ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-07"),
+                 ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-25")]
+        for corps, ident in admis:
+            self.assertEqual(self.juger(corps, ident), (0, ""), ident)
+        for corps, ident in [("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-n"), ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-aa"),
+                             ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-26")]:
+            code, sortie = self.juger(corps, ident)
+            self.assertEqual((code, sortie[:30]), (1, "REFUS C3 : attribué par les so"), ident)
+
 class CommitSuite(Source):
     CORPS = "x : contre-contrôle CONFORME en deux passes"
 
