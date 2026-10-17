@@ -19,6 +19,7 @@ H, P = "place_horodatee", "sans_horodatage"
 # nom : (actif, classe, devise, préfixe du prix dans la fixture, prix, instant en µs)
 PLACES = {"binance_usdc": ("USDC", P, "USD", b'"price":', "0.99996000", None),                  # pièce l.23
           "binance_usdt": ("USDT", P, "USD", b'"price":', "0.99933000", None),
+          "binance_eth": ("ETH", P, "USDT", b'"price":', "2455.94000000", None),        # CB-7c, Q-CA-01 (a) ; l.23
           # 2026-10-08T19:29:04Z = 1791487744 (date -u -d), fraction de 9 chiffres tronquée ; pièce l.45
           "coinbase_eth": ("ETH", H, "USD", b'"price":', "2454.47", 1791487744979476),
           "coinbase_usdt": ("USDT", H, "USD", b'"price":', "0.9992", 1791487746512000),          # 19:29:06Z
@@ -27,6 +28,7 @@ PLACES = {"binance_usdc": ("USDC", P, "USD", b'"price":', "0.99996000", None),  
           "kraken_usdt": ("USDT", P, "USD", b'"c":[', "0.99921000", None),
           # ts 1791487760072 = 19:29:20.072Z (pièce l.47, date -u -d)
           "okx_ticker_usdt": ("USDT", H, "USD", b'"last":', "0.99939", 1791487760072000),
+          "okx_ticker_eth": ("ETH", H, "USDT", b'"last":', "2455.7", 1791487760101000),    # CB-7c ; l.26, ts construit
           "bitstamp_eth": ("ETH", H, "USD", b'"last":', "2455.08", 1791487745000000),            # 19:29:05Z
           "bitstamp_usdc": ("USDC", H, "USD", b'"last":', "0.99976", 1791487746000000),
           "bitstamp_usdt": ("USDT", H, "USD", b'"last":', "0.99919", 1791487747000000),
@@ -99,12 +101,21 @@ class Places(unittest.TestCase):
             with self.subTest(nom=nom):
                 self.assertEqual(decodeurs.decoder(nom, lire(FIX, autre + ".bin")), PANNE)
         self.assertEqual(decodeurs.decoder("okx_ticker_usdt", lire(BTC, "okx_ticker.bin")), PANNE)
+        self.assertEqual([decodeurs.decoder(n, lire(FIX, a + ".bin")) for n, a in (("binance_eth", "binance_usdt"), (
+            "okx_ticker_eth", "okx_ticker_usdt"), ("okx_ticker_usdt", "okx_ticker_eth"))], [PANNE] * 3)     # CB-7c
 
     def test_paires_absentes_sans_decodeur(self):
         """Coinbase USDC/USD, OKX ETH/USD et USDC/USD ne sont pas servies (pièce l.24, l.26) : aucun décodeur."""
         self.assertEqual([n for n, (a, d, _c, _l) in decodeurs.DECODEURS.items() if n.startswith("coinbase") and
                           a == "USDC" or n.startswith("okx") and (a == "USDC" or (a, d) == ("ETH", "USD"))], [])
 
+
+    def test_eth_cote_en_usdt_chez_binance_et_okx(self):                # CB-7c
+        """Q-CA-01 (a) du G0 de CALIB-ACTIFS (avis l.41, adopté) : binance `ETHUSDT` et okx `ETH-USDT`, cotés en USDT
+        comme pour BTC (ADR-0029 l.98) ; aucun ETH de ces deux hôtes coté en USD."""
+        self.assertEqual(sorted((n, a, d) for n, (a, d, _c, _l) in decodeurs.DECODEURS.items() if a == "ETH" and
+                                n.startswith(("binance", "okx"))), [("binance_eth", "ETH", "USDT"),
+                                                                     ("okx_ticker_eth", "ETH", "USDT")])
 
 
 class Types(unittest.TestCase):                                   # SHOGEN-S2BIS-DECODEURS-TYPES-1

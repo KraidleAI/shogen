@@ -2785,3 +2785,24 @@ vivant ; relevé `ps` de fin vide) : 15 mutants, 15 tués par leur test visé, 0
 échangés ; décodeurs de substitution Coinbase USDC/USD et OKX ETH/USD ; plancher non relevé. Suite : 379 tests ;
 plancher du job : 379, égalité exigée (`--egal`). Compte de R-25 : 108 lignes de code ajoutées (`.py`, `.yml`) ; hors
 compte : 14 fixtures (une ligne chacune), FORMAT (puce « Places » du §9.1), G6 (fixtures construites).
+
+## CB-7c (2026-10-17) : ETH coté en USDT chez binance et okx (Q-CA-01 (a) du G0 de CALIB-ACTIFS)
+
+Objet : binance `ETHUSDT` et okx `ETH-USDT`, cotés en USDT comme BTC (avis de CALIB-ACTIFS l.41, adopté ; ADR-0029
+l.98) ; aucun ETH de ces deux hôtes coté en USD. Diff séparé pour rester retirable : le brief demandait de rendre la
+question d'OKX ETH/USD sans décodeur de substitution, la décision (a) est lue au G0 adjugé (rapport du lot).
+
+Rouge : sur le code de CB-7b, les tests de `Places` échouent par assertion (3 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 209 | — |
+| `tests/test_decodeurs_actifs.py` | 137 | 6 (1 de plus : ETH en USDT chez binance et okx) |
+| `tests/fixtures/actifs/` | — | 2 fichiers `.bin` de plus |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 7 mutants, 7 tués par leur test visé, 0 vivant, 0 FATAL : devise USD (binance,
+okx) ; symbole ou instrument ETH/USD ; champ `askPx` ; classe changée ; plancher non relevé. Suite : 380 tests ;
+plancher du job : 380, égalité exigée (`--egal`). Compte de R-25 : 17 lignes de code ajoutées (`.py`, `.yml`) ; hors
+compte : 2 fixtures, FORMAT (§9.1).

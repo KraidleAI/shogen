@@ -17,7 +17,8 @@ indexait une chaîne comme une liste.
 CB-7b (E-C-06 ; G0 de CALIB-ACTIFS, PROPOSITION §2.2) : un décodeur par (hôte, actif) pour ETH, USDC et USDT des places,
 paires lues sur pièce (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1), classe de S2 pour l'hôte, devise de
 la paire ; l'instrument que la réponse rend (Binance `symbol`, Kraken clé, OKX `instId`) est exigé, sauf pour BTC (S2
-ne le lisait pas) ; aucun décodeur pour une paire non servie (Coinbase USDC/USD, OKX ETH/USD et USDC/USD)."""
+ne le lisait pas) ; aucun décodeur pour une paire non servie (Coinbase USDC/USD, OKX ETH/USD et USDC/USD).
+CB-7c : ETH coté en USDT chez binance et okx (Q-CA-01 (a) du G0 de CALIB-ACTIFS)."""
 import datetime
 import decimal
 import json
@@ -167,6 +168,9 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "okx_ticker_usdt": ("USDT", "USD", H, _okx("last", "USDT-USD")),
     **{f"{h}_{a.lower()}": (a, "USD", H, lire) for h, lire in (("bitstamp", _bitstamp), ("gemini", _gemini))
        for a in ("ETH", "USDC", "USDT")},
+    # CB-7c : ETH coté en USDT chez binance et okx, comme BTC (Q-CA-01 (a) du G0 de CALIB-ACTIFS ; ADR-0029 l.98)
+    "binance_eth": ("ETH", "USDT", P, _binance("ETHUSDT")),
+    "okx_ticker_eth": ("ETH", "USDT", H, _okx("last", "ETH-USDT")),
 }
 
 

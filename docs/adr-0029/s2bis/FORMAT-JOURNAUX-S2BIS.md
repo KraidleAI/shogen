@@ -60,7 +60,8 @@
   les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
 - **Partie P2, tranche C** (2026-10-17 ; sous-lots CB-7, CB-8) : le diff CB-7a écrit au §9.1 la sorte des conteneurs et
   ferme SHOGEN-S2BIS-DECODEURS-TYPES-1 ;
-  le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1).
+  le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1) ;
+  le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -376,6 +377,8 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      ETH/USD et USDC/USD) n'a de décodeur. L'instrument que la réponse nomme (Binance `symbol`, Kraken clé de `result`,
      OKX `instId`) est celui du décodeur, sinon `panne_decode` : une forme qui demanderait une autre paire ne range
      jamais son prix sous un autre actif ou une autre devise. Les décodeurs BTC ne le lisent pas (S2 non plus).
+     ETH est coté en USDT chez binance (`ETHUSDT`) et okx (`ETH-USDT`), comme BTC (CB-7c ; Q-CA-01 (a) du G0 de
+     CALIB-ACTIFS ; ADR-0029 l.98).
    - **Sorte des conteneurs** (CB-7a, SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque objet ou liste qu'un décodeur lit est de
      la sorte attendue, sinon `panne_decode`. Écart à S2, qui indexait une chaîne comme une liste : Kraken `c` écrit en
      chaîne y rendait son premier caractère comme prix (« 6 »).
