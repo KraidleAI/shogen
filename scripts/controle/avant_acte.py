@@ -111,7 +111,9 @@ Relecture G2 du groupe A, C-3 (E22) : B2 lit aussi les sujets au pluriel et le c
 Relecture G2 du groupe A, C-4 (E23) : B3 lit aussi chemin l.N et `chemin` l.N (plage l.N-M comprise), la forme de
 référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N.
 Phase 3, groupe C (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 cherche le nom de la fonction en code ou en signature au README
-(nomme_en_code), non comme mot courant : une fonction suivi n'est pas nommée par « non suivi »."""
+(nomme_en_code), non comme mot courant : une fonction suivi n'est pas nommée par « non suivi ».
+Phase 3, groupe C (SHOGEN-MOTIFS-ARBRE-REDOS-1) : motifs --arbre, RX sur tous les motifs de l'arbre (appels de re des
+.py lus par l'arbre d'ast, motifs YAML) de scripts/controle/, .claude/hooks/ et enforcement/ (motifs_arbre)."""
 import argparse
 import contextlib
 import fnmatch
@@ -498,9 +500,10 @@ def workflows(depot, fichiers, fautes, env=None, racine=None):
         raise Erreur(f"enforcement/workflows-yaml.py : sortie {p.returncode}")
 
 
-def motifs(fichiers, fautes):
-    """RX (E12) : motifs des lignes ajoutées à retour arrière exponentiel ; admis par redos-admis sur la ligne."""
-    for chemin, n, motif, ligne in GC.motifs_ajoutes(fichiers):
+def motifs(fichiers, fautes, liste=None):
+    """RX (E12) : motifs des lignes ajoutées (ou de liste, [(chemin, ligne, motif, texte)]) à retour arrière
+    exponentiel ; admis par redos-admis sur la ligne."""
+    for chemin, n, motif, ligne in GC.motifs_ajoutes(fichiers) if liste is None else liste:
         codes = GC.motifs_suspects(motif)
         if codes == ["motif-illisible"]:
             fautes.append(("avertissement", "RX", f"{chemin}:{n} : motif illisible par re, non jugé", "", "-"))
@@ -510,6 +513,40 @@ def motifs(fichiers, fautes):
             fautes.append(("refus", "RX", f"{chemin}:{n} : motif à retour arrière exponentiel ({', '.join(codes)}) "
                            "(E12)", "réécrire sans répétition ambiguë (forme de DT5-24 : séparateur obligatoire entre "
                            "deux répétitions) ; motif voulu : redos-admis et sa raison sur la ligne", "-"))
+
+
+DOSSIERS_MOTIFS = ("scripts/controle", ".claude/hooks", "enforcement")
+
+
+def motifs_arbre(a, fautes):
+    """motifs --arbre (SHOGEN-MOTIFS-ARBRE-REDOS-1) : RX sur les motifs de l'arbre (fichiers .py, .yml et .yaml de
+    DOSSIERS_MOTIFS, interdits et __pycache__ sautés) : appels de re lus par GC.motifs_du_code, motifs YAML par
+    GC.motifs_ajoutes ; chaque motif construit autrement (non lu) imprimé NON-LU chemin:ligne, puis un bilan."""
+    liste, lus, non_lus = [], 0, []
+    for d in DOSSIERS_MOTIFS:
+        for base, dossiers, fichiers in os.walk(os.path.join(a.depot, d)):
+            dossiers[:] = sorted(x for x in dossiers if x != "__pycache__" and not GC.chemin_interdit(os.path.join(base, x)))
+            for x in sorted(f for f in fichiers if f.endswith((".py", ".yml", ".yaml"))):
+                chemin = os.path.join(base, x)
+                if GC.chemin_interdit(chemin):
+                    continue
+                rel, lignes = os.path.relpath(chemin, a.depot), lire(chemin).decode("utf-8", "replace").split(chr(10))
+                if not x.endswith(".py"):
+                    vus = GC.motifs_ajoutes([{"apres": rel, "ajouts": list(enumerate(lignes, 1))}])
+                    liste, lus = liste + vus, lus + len(vus)
+                    continue
+                try:
+                    appels = GC.motifs_du_code(chr(10).join(lignes))
+                except (SyntaxError, ValueError):
+                    fautes.append(("avertissement", "RX", f"{rel} : code illisible par ast, non jugé", "", "-"))
+                    continue
+                non_lus += [f"{rel}:{n}" for n, _f, m in appels if m is None]
+                vus = [(rel, n, m, chr(10).join(lignes[n - 1:fin])) for n, fin, m in appels if m is not None]
+                liste, lus = liste + vus, lus + len(vus)
+    for x in non_lus:
+        print("NON-LU " + x + " : motif construit hors littéraux, non jugé")
+    print(f"motifs --arbre : {lus} motif(s) lu(s), {len(non_lus)} non lu(s), dossiers {', '.join(DOSSIERS_MOTIFS)}")
+    motifs(None, fautes, liste)
 
 
 def presg5(depot, textes, fautes):
@@ -948,7 +985,8 @@ def brief(a, fautes):
 
 
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
-             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief}
+             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief,
+             "motifs": motifs_arbre}
 
 
 def journal(a, fautes):
@@ -996,6 +1034,7 @@ def parseur():
     s = sp.add_parser("brief")
     s.add_argument("--texte", required=True)
     s.add_argument("--fiche")
+    sp.add_parser("motifs").add_argument("--arbre", action="store_true", required=True)
     return p
 
 
