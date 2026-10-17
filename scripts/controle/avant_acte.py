@@ -109,7 +109,9 @@ dans le refus ; une commande git précédée d'options globales (-C, -c, --no-pa
 Relecture G2 du groupe A, C-3 (E22) : B2 lit aussi les sujets au pluriel et le contre-contrôleur, les verbes au pluriel
 (relèvent, signalent, constatent, rapportent) et les participes accordés, et d'après comme selon.
 Relecture G2 du groupe A, C-4 (E23) : B3 lit aussi chemin l.N et `chemin` l.N (plage l.N-M comprise), la forme de
-référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N."""
+référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N.
+Phase 3, groupe C (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 cherche le nom de la fonction en code ou en signature au README
+(nomme_en_code), non comme mot courant : une fonction suivi n'est pas nommée par « non suivi »."""
 import argparse
 import contextlib
 import fnmatch
@@ -577,6 +579,15 @@ DEF_TEST = re.compile(" *def (test_[A-Za-z0-9_]*)[(]")
 TUE = re.compile("(?i)(?<![a-zà-ÿ])(?:tués?|tuées?|killed)(?![a-zà-ÿ])")
 
 
+def nomme_en_code(nom, texte):
+    """D3 (SHOGEN-GARDE-D3-MOT-COMMUN-1) : vrai si texte nomme la fonction nom en code (passage entre accents graves
+    qui est le nom seul ou qualifié : `nom`, `module.nom`) ou en signature (nom( , en code ou non : `nom(a, b)`) ; un mot
+    courant (non suivi) ou un passage de code qui ne fait que porter le mot (`le suivi des diffs`) ne compte pas."""
+    code = "(?:[A-Za-z0-9_]+[.])*" + re.escape(nom)
+    return any(re.fullmatch(code, x.strip()) for x in re.findall("`([^`" + chr(10) + "]*)`", texte)) or bool(
+        re.search("(?<![A-Za-z0-9_.])" + re.escape(nom) + "[(]", texte))
+
+
 def suivi(a, fichiers, env, fautes):
     """D3 et D4 (E13) : README des contrôles d'après le diff (index temporaire env), rapport du générateur."""
     ajouts = [(f["apres"], n, x) for f in fichiers if (f["apres"] or "").endswith(".py") for n, x in f["ajouts"]]
@@ -587,7 +598,7 @@ def suivi(a, fichiers, env, fautes):
     except Erreur:
         readme = ""
     for c, n, nom in publiques:
-        if not re.search("(?<![A-Za-z0-9_])" + re.escape(nom) + "(?![A-Za-z0-9_])", readme):
+        if not nomme_en_code(nom, readme):
             fautes.append(("refus", "D3", f"{c}:{n} : fonction publique {nom} absente de scripts/controle/README.md "
                            "(E13)", "la nommer dans l'ajout daté du README (rôle, usage)", "-"))
     tests = [(c, n, m[1]) for c, n, x in ajouts if "/tests/" in "/" + c for m in [DEF_TEST.match(x)] if m]
