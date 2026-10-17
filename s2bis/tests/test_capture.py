@@ -27,11 +27,12 @@ class Capture(unittest.TestCase):
     def setUp(self):
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
-        self.d, self.appels = d.name, []
+        self.d, self.appels, self.vus = d.name, [], []
 
     def faux(self, servies):
         def lire_faux(req, suivi, delai, tls):
             self.appels.append((req.hote, req.chemin, delai))
+            self.vus.append((req.port, tls is capture.http.CONTEXTE))
             dec = req.chemin[1:]
             return servies.get(dec, Lecture("ok", 1_000 + len(self.appels), 9_000, code=200, octets=lire(PIECES[dec])))
         return lire_faux
@@ -39,8 +40,8 @@ class Capture(unittest.TestCase):
     def capturer(self, **servies):
         out, err = io.StringIO(), io.StringIO()
         with redirect_stdout(out), redirect_stderr(err):
-            code = capture.capturer([forme(d) for d in FORMES], [forme("kraken_eth")], (POOL, CARTE), self.d,
-                                    lire=self.faux(servies), pause=lambda s: self.appels.append(("pause", s)))
+            code = capture.capturer([forme(d) for d in FORMES], [{**forme("kraken_eth"), "port": 8443}], (POOL, CARTE),
+                                    self.d, lire=self.faux(servies), pause=lambda s: self.appels.append(("pause", s)))
         return code, out.getvalue(), err.getvalue()
 
     def lu(self, nom):                                                # None : fichier absent
@@ -50,7 +51,8 @@ class Capture(unittest.TestCase):
 
     def test_octets_ecrits_et_manifeste_rien_sur_la_sortie(self):
         """Octets bruts de chaque forme dans `<rôle>-<forme>.bin`, égaux à la fixture servie ; manifeste : fichier,
-        sha256, statut, code, départ ; aucune ligne imprimée (garde : les fichiers portent les prix décodables)."""
+        sha256, statut, code, départ ; aucune ligne imprimée (garde : les fichiers portent les prix décodables) ; port
+        de chaque forme (8443 pour la carte) et contexte TLS transmis (C-2 de la G2 de la série)."""
         code, out, err = self.capturer()
         noms = ["pool-binance-btc.bin", "temoin-okx-usdc-usdt.bin", "pool-binance-usdc.bin",
                 "temoin-curve-usdc-usdt.bin", "carte-kraken-eth.bin"]
@@ -68,6 +70,7 @@ class Capture(unittest.TestCase):
             ("api.binance.com", "/binance_btc", POOL), ("www.okx.com", "/okx_usdc_usdt", POOL), ("pause", 1),
             ("api.binance.com", "/binance_usdc", POOL), ("rpc.mevblocker.io", "/curve_usdc_usdt", POOL),
             ("api.kraken.com", "/kraken_eth", CARTE)])
+        self.assertEqual(self.vus, [(443, True)] * 4 + [(8443, True)])
 
     def test_code_1_si_le_pool_ou_le_temoin_echoue_carte_declaree(self):
         """Témoin en panne de transport : 1, fichier vide écrit et déclaré ; carte seule en panne : 0, déclarée."""
@@ -96,6 +99,23 @@ class Capture(unittest.TestCase):
                 self.assertEqual(str(e.exception).split(" : ")[0], motif)
         self.assertEqual((self.appels, self.lu("pool-binance-btc.bin"), sorted(os.listdir(self.d))),
                          ([], b"avant", ["captures.txt", "pool-binance-btc.bin"]))
+
+    def test_jamais_ecrase_apres_le_controle(self):              # C-1 de la G2 de la série INT-P2
+        """Un fichier apparu après le contrôle des noms (pendant la lecture précédente) n'est jamais écrasé, octets
+        ni manifeste (ouverture exclusive) : FileExistsError, ses octets gardés (le contrôle seul laisse une course)."""
+        for cible, pendant in (("pool-binance-usdc.bin", "/binance_btc"), ("captures.txt", "/kraken_eth")):
+            self.setUp()
+
+            def planter(req, suivi, delai, tls, lire=self.faux({}), cible=cible, pendant=pendant):
+                if req.chemin == pendant:
+                    with open(os.path.join(self.d, cible), "wb") as f:
+                        f.write(b"avant")
+                return lire(req, suivi, delai, tls)
+            with self.subTest(cible=cible):
+                with self.assertRaises(FileExistsError):
+                    capture.capturer([forme(d) for d in FORMES], [forme("kraken_eth")], (POOL, CARTE), self.d,
+                                     lire=planter, pause=lambda s: None)
+                self.assertEqual(self.lu(cible), b"avant")
 
     def test_commande_capture_rien_sur_la_sortie(self):
         """`capture --formes F [--carte C] --dossier D` : sortie 0 et rien d'imprimé ; refus (dossier absent) : 2,

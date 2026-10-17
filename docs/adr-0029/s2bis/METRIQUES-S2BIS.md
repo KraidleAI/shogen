@@ -3166,3 +3166,28 @@ FORMAT §19 ; plancher.
 
 Suite : 430 tests ; plancher du job : 430, égalité exigée (`--egal`). Compte de R-25 : 197 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Lignes de plus de 120 caractères recoupées avant la campagne.
+
+## INT-P2-17 (2026-10-17) : C-1 et C-2 de la G2 de la série, `capture` jamais écrasante, port et TLS figés
+
+Objet (relecture G2 neuve de la série INT-P2, corrections C-1 et C-2 ; code inchangé) :
+- C-1 : le contrôle des noms de `capturer` précède toute lecture ; entre lui et l'écriture, un fichier peut apparaître
+  (autre capture dans le même dossier, fichier posé pendant une lecture). L'ouverture exclusive (`xb` pour les octets,
+  `x` pour le manifeste) refuse alors d'écraser ; aucun test ne la fixait : les mutants `wb` et `w` restaient
+  vivants (G2-23, G2-24 de la G2). Test neuf : un fichier d'octets, puis le manifeste, posés pendant la lecture qui les
+  précède : FileExistsError, octets gardés. FORMAT §19 (point 3) et puce de l'intégration.
+- C-2 : `smoke.jouer` et `capture.capturer` construisent chaque requête avec le port de sa forme et lisent sous le
+  contexte TLS reçu ; les tests ne regardaient ni l'un ni l'autre (toutes les formes de test sur 443 ; contexte de
+  `capture` jamais relevé) : les mutants port 443 en dur (smoke, capture) et `tls=None` (capture) restaient
+  vivants (G2-27, G2-28, G2-29 de la G2). Tests renforcés : la forme de la carte sur le port 8443, port et contexte
+  relevés à chaque lecture.
+
+Rouge : sous chacun des cinq mutants, un test échoue par assertion (FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_capture.py` | 140 | 5 (1 de plus : ouverture exclusive après le contrôle ; port et contexte relevés) |
+| `tests/test_smoke.py` | 214 | 6 (inchangé : port relevé) |
+
+Suite : 431 tests ; plancher du job : 431, égalité exigée (`--egal`). Compte de R-25 : 33 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Pas neuf après INT-P2-16 : y replier C-1 porterait INT-P2-16 à
+214 lignes de code, au-delà de R-25.

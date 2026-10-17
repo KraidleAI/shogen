@@ -49,13 +49,13 @@ class Smoke(unittest.TestCase):
         appels, lignes = [], []
 
         def faux(req, suivi, delai, tls):
-            appels.append((req.hote, req.chemin, req.methode, req.corps, suivi, delai, tls is TLS))
+            appels.append((req.hote, req.chemin, req.methode, req.corps, suivi, delai, tls is TLS, req.port))
             dec = req.chemin[1:]
             if req.hote == "min-api.cryptocompare.com":
                 return servies.get("cc", Lecture("panne_http", 0, 87_000, code=401, octets=b'{"Response":"Error"}'))
             return servies.get(dec, Lecture("ok", 10 ** 15, 10 ** 15 + 123_456, code=200, octets=lire(PIECES[dec])))
         formes = [forme(d) for d in list(PIECES)[:-1]]
-        code = smoke.jouer(formes, [forme("kraken_eth")], (POOL, CARTE), lire=faux,
+        code = smoke.jouer(formes, [{**forme("kraken_eth"), "port": 8443}], (POOL, CARTE), lire=faux,
                            pause=lambda s: appels.append(("pause", s)), tls=TLS, sortie=lignes.append)
         return code, lignes, appels
 
@@ -102,9 +102,10 @@ class Smoke(unittest.TestCase):
                          ["smoke : ÉCHEC (7/9 formes du pool et du témoin décodées)"])
 
     def test_requetes_delais_et_espacement(self):
-        """Requête de chaque forme (méthode, corps du décodeur sur chaîne), suivi neuf, délai du pool ou de la carte,
-        contexte TLS transmis ; une seconde de pause avant la seconde lecture de binance (espace vrai), aucune avant
-        la seconde lecture de l'hôte de Chainlink (sans espace) ; CryptoCompare : GET de l'URL de S2, délai du pool."""
+        """Requête de chaque forme (méthode, port, corps du décodeur sur chaîne), suivi neuf, délai du pool ou de la
+        carte, contexte TLS transmis ; une seconde de pause avant la seconde lecture de binance (espace vrai), aucune
+        avant la seconde lecture de l'hôte de Chainlink (sans espace) ; CryptoCompare : GET de l'URL de S2, délai du
+        pool."""
         _c, _l, appels = self.jouer()
         vus = [(a[0], a[1], a[2], a[5]) if a[0] != "pause" else a for a in appels]
         self.assertEqual(vus, [("api.binance.com", "/binance_btc", "GET", POOL),
@@ -122,6 +123,8 @@ class Smoke(unittest.TestCase):
         self.assertEqual([(a[3], a[4], a[6]) for a in lus if a[0] == "rpc.mevblocker.io"],
                          [(decodeurs.CORPS["curve_usdc_usdt"].encode(), {}, True)])
         self.assertEqual({(a[3] is None) == (a[2] == "GET") and a[4] == {} and a[6] for a in lus}, {True})
+        self.assertEqual({a[0]: a[7] for a in lus}, {**dict.fromkeys(HOTES.values(), 443), "api.kraken.com": 8443,
+                                                     "min-api.cryptocompare.com": 443})    # C-2 : port de la forme
         self.assertEqual(smoke.CRYPTOCOMPARE, http.Requete("min-api.cryptocompare.com",
                                                            "/data/price?fsym=BTC&tsyms=USD", 443, "GET", None))
 

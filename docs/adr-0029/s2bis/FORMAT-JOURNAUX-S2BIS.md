@@ -77,7 +77,8 @@
   porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
   par des tests seuls (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge ;
   le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
-  les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19).
+  les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19) ;
+  le diff INT-P2-17 (C-1 de la G2 de la série) fige son ouverture exclusive (§19).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -984,6 +985,8 @@ commande séparée, qui écrit les octets dans un fichier sans rien imprimer »)
 2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
 3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
    `carte`), puis `captures.txt`, une ligne par lecture : `<fichier> <sha256> <statut> <code ou -> <départ>` (départ
-   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40).
+   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Chaque fichier, manifeste compris, est
+   ouvert en création exclusive : un fichier apparu après le contrôle des noms n'est pas écrasé non plus ; la
+   capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
 4. **Rien n'est imprimé** sur la sortie standard : ni octet, ni prix, ni valeur décodée (ADR-0029 l.222). Code de
    sortie : 0 si toutes les lectures du pool et du témoin sont `ok` ; 1 sinon ; 2 refus.
