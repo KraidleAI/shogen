@@ -1,0 +1,5 @@
+Contrôles de la PR n° 13 sur la tête 72c2381610c88a0be2f092ed0113fa16822787e4 (lus par l'API de la forge, mcp__github__pull_request_read get_check_runs, 2026-10-16 21:04 UTC).
+Verts : CodeQL (117187701686) ; Analyze (actions) ; Analyze (javascript-typescript) ; Analyze (python) ; Analyze (rust) ; mutation du diff (budget 10 min) ; sim-bis-unittest ; calib-actifs-unittest ; g5-no-naked-todo ; g3-secrets ; s2bis-unittest ; g1-model-pinning ; s2-harness-unittest ; controle-unittest ; fuzz (15 min) ; fuzz instrumenté cargo-fuzz / libFuzzer (Linux) ; fuzz instrumenté cargo-afl / AFL++ (Linux) ; squelette (windows-2025) ; squelette (ubuntu-24.04) ; compagnon (windows-2025) ; compagnon (ubuntu-24.04) ; temoignage (windows-2025) ; temoignage (ubuntu-24.04) ; double-build D6 (x86_64-unknown-linux-gnu).
+Sautés par construction : mutation complète (cœur, seuil 80 %) ; mutation de la pousse (diff before..sha) ; fuzz nightly (4 h).
+CodeQL vert au premier passage ; aucune relance de job.
+Fusion : commit de fusion 8024a184b91127ce63b84794efb1cea87a1c4010, mergeable_state clean, 12 commits, 17 fichiers, +883 / −45.

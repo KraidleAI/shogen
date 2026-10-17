@@ -41,7 +41,10 @@ Relecture G2 du groupe A, C-1 (E6) : soldé et sans objet ferment aussi un item,
 ec5d0eb : SHOGEN-SCEAU-OTS-1 l.1500, items soldés l.405) ; tranché n'en ferme pas (une question tranchée laisse son
 item ouvert).
 Relecture G2 du groupe A, C-7 (E12) : sous IGNORECASE (drapeau du motif ou groupe (?i:…)), les jeux de caractères
-sont clos par la casse (`(?i)(?:A+a+)+` était un faux vert, exponentiel mesuré)."""
+sont clos par la casse (`(?i)(?:A+a+)+` était un faux vert, exponentiel mesuré).
+Phase 3, groupe C (SHOGEN-MOTIFS-ARBRE-REDOS-1) : `motifs_du_code`, motifs des appels de re d'un code python entier, lus
+sur l'arbre d'ast (appel sur plusieurs lignes, concaténation, chr(N), sep.join, noms de premier niveau, drapeaux re.I
+et re.X) ; un motif construit autrement est rendu None (non lu), jamais deviné."""
 import ast
 import fnmatch
 import functools
@@ -518,4 +521,65 @@ def motifs_ajoutes(fichiers):
             else:
                 vus = []
             out += [(chemin, n, m, x) for m in vus if m]
+    return out
+
+
+DRAPEAUX_RE = {"compile": 1, "match": 2, "search": 2, "fullmatch": 2, "findall": 2, "finditer": 2, "split": 3, "sub": 4,
+               "subn": 4}      # rang positionnel de flags par fonction de re
+
+
+def _plier_motif(n, noms):
+    """Chaîne d'un nœud fait de littéraux, de chr(N), de + , de sep.join([…]) et de noms de premier niveau qui en sont
+    faits ; None sinon (motif construit autrement)."""
+    if isinstance(n, ast.Constant) and isinstance(n.value, (str, bytes)):
+        return n.value.decode("latin-1") if isinstance(n.value, bytes) else n.value
+    if isinstance(n, ast.Name):
+        return noms.get(n.id)
+    if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Add):
+        g, d = _plier_motif(n.left, noms), _plier_motif(n.right, noms)
+        return None if g is None or d is None else g + d
+    if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "chr" and len(n.args) == 1 and isinstance(
+            n.args[0], ast.Constant) and isinstance(n.args[0].value, int):
+        return chr(n.args[0].value)
+    if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "join" and len(n.args) == 1 and (
+            isinstance(n.args[0], (ast.List, ast.Tuple))):
+        sep, parts = _plier_motif(n.func.value, noms), [_plier_motif(x, noms) for x in n.args[0].elts]
+        return None if sep is None or None in parts else sep.join(parts)
+    return None
+
+
+def motifs_du_code(texte):
+    """[(ligne, fin, motif ou None)] des appels re.compile, match, search… d'un code python (arbre d'ast, appels sur
+    plusieurs lignes compris) : premier argument plié par _plier_motif, (?i) ou (?x) en tête si l'appel passe
+    re.I ou re.X (IGNORECASE, VERBOSE) ; None : motif construit autrement, non lu (SHOGEN-MOTIFS-ARBRE-REDOS-1)."""
+    arbre, noms, out = ast.parse(texte), {}, []
+    for n in arbre.body:
+        if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+            v = _plier_motif(n.value, noms)
+            noms.update({n.targets[0].id: v} if v is not None else {})
+    for n in ast.walk(arbre):
+        f = n.func if isinstance(n, ast.Call) else None
+        if not (isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name) and f.value.id == "re"
+                and f.attr in DRAPEAUX_RE and n.args):
+            continue
+        drapeaux = n.args[DRAPEAUX_RE[f.attr]:DRAPEAUX_RE[f.attr] + 1] + [k.value for k in n.keywords if k.arg == "flags"]
+        lus = {x.attr for d in drapeaux for x in ast.walk(d) if isinstance(x, ast.Attribute)}
+        tete = "(?i)" * bool(lus & {"I", "IGNORECASE"}) + "(?x)" * bool(lus & {"X", "VERBOSE"})
+        motif = _plier_motif(n.args[0], noms)
+        out.append((n.lineno, n.end_lineno, None if motif is None else tete + motif))
+    return sorted(out, key=lambda x: x[:2])
+
+
+def rangees_fautives(lignes, numeros):
+    """[(n, cellules, cellules de l'en-tête)] des rangées de tableau aux numéros donnés (1 à N) dont le compte de
+    cellules diffère de celui de l'en-tête de leur tableau, première ligne du bloc de lignes qui commencent par une
+    barre (marques de citation > ôtées) ; barres de bord ôtées, barre échappée non comptée (E32 : compte lu)."""
+    rangee = lambda x: re.sub("^[ >]*", "", x).rstrip()
+    compte = lambda x: len(re.split("(?<!" + chr(92) * 2 + ")[|]", rangee(x)[1:].removesuffix("|")))
+    out = []
+    for n in [n for n in numeros if 0 < n <= len(lignes) and rangee(lignes[n - 1]).startswith("|")]:
+        k = n - 1
+        while k > 0 and rangee(lignes[k - 1]).startswith("|"):
+            k -= 1
+        out += [(n, compte(lignes[n - 1]), compte(lignes[k]))] if compte(lignes[n - 1]) != compte(lignes[k]) else []
     return out

@@ -181,6 +181,21 @@ def muter(x, m: dict, groupes: set, dossier: str) -> tuple:
     return r
 
 
+def chaine_en_cours() -> bool:
+    """Lot CAUSES (E37) : vrai si une chaîne de commits tourne sur l'hôte (pgrep -f du motif ancré lu dans
+    garde/motif-chaine.txt, partagé avec avant_acte.py et le crochet) ; motif absent ou pgrep en erreur : ValueError
+    (sortie 3 : une campagne ne part jamais sans savoir)."""
+    chemin = os.path.join(os.path.dirname(os.path.realpath(__file__)), "garde", "motif-chaine.txt")
+    with open(chemin, encoding="utf-8") as f:
+        lignes = [x for x in f.read().split(chr(10)) if x.strip()]
+    if len(lignes) != 1 or not lignes[0].startswith("^"):
+        raise ValueError("garde/motif-chaine.txt : une seule ligne, motif ancré par ^, attendue")
+    p = subprocess.run(["pgrep", "-f", lignes[0]], capture_output=True, text=True, timeout=30)
+    if p.returncode not in (0, 1):
+        raise ValueError(f"pgrep : sortie {p.returncode}")
+    return p.returncode == 0
+
+
 def main(argv: list) -> int:
     a = argparse.ArgumentParser(prog="mutants.py")
     a.add_argument("copie"), a.add_argument("job"), a.add_argument("mutants"), a.add_argument("--sortie", required=True)
@@ -188,6 +203,9 @@ def main(argv: list) -> int:
     x, groupes, dossier = a.parse_args(argv), set(), tempfile.mkdtemp(prefix="mutants_")
     x.moissonneur = moissonneur()                   # R-2 : avant toute étape
     try:
+        if chaine_en_cours():                       # lot CAUSES (E37) : un seul lot lourd à la fois sur l'hôte
+            raise ValueError("une chaîne de commits tourne sur l'hôte (garde/motif-chaine.txt) : campagne refusée, "
+                             "attendre sa fin (until ! pgrep -f <motif> ; do sleep 30; done)")
         pas = etapes(x.copie, x.job)
         with open(x.mutants, encoding="utf-8") as f:
             mutants = json.load(f)

@@ -102,3 +102,48 @@ class Branchement(unittest.TestCase):
                                        + "D = re.compile('(a+)+' + E)" + NL + "F = re.search('(a', x)" + NL}),
                          (0, ["ADMIS RX : r.py:2 : quantificateurs-imbriques, admis par redos-admis",
                               "AVERTISSEMENT RX : r.py:4 : motif illisible par re, non jugé"]))
+
+
+class Arbre(unittest.TestCase):
+    """SHOGEN-MOTIFS-ARBRE-REDOS-1 (annexe B, B.109) : motifs --arbre juge les motifs déjà dans l'arbre, dans une copie
+    (dépôt git temporaire isolé) où des motifs suspects sont plantés."""
+    def test_motifs_arbre(self):
+        """Plantés sous scripts/controle/, .claude/hooks/ et enforcement/ : concaténation de noms et de chr(92), drapeaux
+        re.I et re.X, sep.join, appel sur deux lignes, clé YAML : refus RX à leur ligne ; redos-admis (sur la dernière ligne d'un
+        appel sur deux lignes compris) : admis ; motif fait d'une variable : NON-LU ; code illisible : avertissement ;
+        hors des trois dossiers ou sous __pycache__ : non jugé. G2, C-5 : méthode d'un motif compilé (SAIN.search) dont
+        l'argument est un sujet, non un motif : non jugée."""
+        t = tempfile.TemporaryDirectory()
+        self.addCleanup(t.cleanup)
+        q = chr(34)
+        d, env = ag.depot(t.name, {
+            "scripts/controle/x.py": NL.join(["import re", "B = chr(92)", "SAIN = re.compile(" + q + "[a-z]+" + q + ")",
+                                              "MAUVAIS = re.compile(" + q + "(?:" + q + " + B + " + q + "s*," + q + " + B + "
+                                              + q + "s*)*$" + q + ")", "VAR = re.compile(motif)",
+                                              "CASSE = re.compile(" + q + "(?:A+a+)+$" + q + ", re.I)",
+                                              "JOINT = re.search(" + q + q + ".join([" + q + "(a+)" + q + ", " + q + "+" + q
+                                              + "]), x)", "VERB = re.compile(" + q + "(a +)+" + q + ", re.X)",
+                                              "SUJET = SAIN.search(" + q + "(a+)+" + q + ")", ""]),
+            ".claude/hooks/h.py": NL.join(["import re", "NOM = re.compile(r" + q + "(a+)" + q, "                 r" + q
+                                           + "+$" + q + ")", "ADMIS = re.compile(" + q + "(b+)+" + q + ")  # redos-admis",
+                                           "DEUX = re.compile(" + q + "(c+)" + q, "                  " + q + "+$" + q
+                                           + ")  # redos-admis", ""]),
+            "scripts/controle/__pycache__/z.py": "import re" + NL + "Z = re.compile(" + q + "(a+)+" + q + ")" + NL,
+            "enforcement/w.yml": "pattern: '(a|aa)*$'" + NL, "enforcement/c.py": "def f(:" + NL,
+            "scripts/autre.py": "import re" + NL + "X = re.compile(" + q + "(a+)+" + q + ")" + NL})
+        sortie = io.StringIO()
+        with mock.patch.dict(os.environ, env, clear=True), contextlib.redirect_stdout(sortie):
+            code = avant_acte.main(["--depot", d, "motifs", "--arbre"])
+        refus = "REFUS RX : {} : motif à retour arrière exponentiel ({}) (E12)"
+        self.assertEqual((code, [x.split(" ; à faire")[0] for x in sortie.getvalue().split(NL)[:-1]]), (1, [
+            "NON-LU scripts/controle/x.py:5 : motif construit hors littéraux, non jugé",
+            "motifs --arbre : 9 motif(s) lu(s), 1 non lu(s), dossiers scripts/controle, .claude/hooks, enforcement",
+            "AVERTISSEMENT RX : enforcement/c.py : code illisible par ast, non jugé",
+            refus.format("scripts/controle/x.py:4", "quantificateurs-imbriques"),
+            refus.format("scripts/controle/x.py:6", "quantificateurs-imbriques"),
+            refus.format("scripts/controle/x.py:7", "quantificateurs-imbriques"),
+            refus.format("scripts/controle/x.py:8", "quantificateurs-imbriques"),
+            refus.format(".claude/hooks/h.py:2", "quantificateurs-imbriques"),
+            "ADMIS RX : .claude/hooks/h.py:4 : quantificateurs-imbriques, admis par redos-admis",
+            "ADMIS RX : .claude/hooks/h.py:5 : quantificateurs-imbriques, admis par redos-admis",
+            refus.format("enforcement/w.yml:1", "alternatives-ambigues")]))

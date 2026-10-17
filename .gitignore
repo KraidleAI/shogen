@@ -36,3 +36,7 @@ __pycache__/
 # 1/min × 2 semaines) et se régénère — jamais dans le dépôt. Les fixtures de
 # test (tests/fixtures/) sont versionnées, elles ; c'est voulu.
 s2-harness/data/
+
+# Journal local des passages de scripts/controle/avant_acte.py --lecture-seule (GARDE-FOUS phase 3, groupe B ;
+# SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : jamais versionné, il ne salit pas l'arbre d'une chaîne qui tourne.
+scripts/controle/garde/lecture-seule.tsv

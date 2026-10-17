@@ -4,7 +4,9 @@ deux faux refus de la sonde du contre-contrôle (R3 puis R5 sur une commande qui
 heredoc python portant un commit) passent ; les vrais refus restent ; R5 lit le fichier de git commit -F.
 R7 (E18, E28) : sleep d'avant-plan ; pkill -f et pgrep -f à motif non ancré. R8 (E20) : PR sans preuve que la forge
 lance des jobs sur le dépôt. R9 (E27) : seuil de coût des workflows et des agents vivants, jeton de l'investisseur.
-R10 (E26) : relevé des noms propres d'un message au JOURNAL (UserPromptSubmit), dossier nommé sans relevé (Stop)."""
+R10 (E26) : relevé des noms propres d'un message au JOURNAL (UserPromptSubmit), dossier nommé sans relevé (Stop).
+R13 (lot CAUSES ; E37, E39, E40) : processus lourd pendant une chaîne ; chaîne lancée hors du modèle ; cause de refus
+d'une gate nommée sans la ligne VIOLATION lue."""
 import json
 import os
 import shutil
@@ -52,8 +54,8 @@ class Crochet(unittest.TestCase):
         for x in ("garde_faits.py", "acte_shell.py"):
             shutil.copy(os.path.join(os.path.dirname(GARDE), x), os.path.join(a, ".claude", "hooks"))
         os.makedirs(os.path.join(a, "scripts", "controle", "garde"), exist_ok=True)
-        shutil.copy(os.path.join(RACINE, "scripts", "controle", "garde", "dossiers.txt"),
-                    os.path.join(a, "scripts", "controle", "garde"))
+        for g in ("dossiers.txt", "motif-chaine.txt"):
+            shutil.copy(os.path.join(RACINE, "scripts", "controle", "garde", g), os.path.join(a, "scripts", "controle", "garde"))
         for chemin, texte in fichiers.items():
             os.makedirs(os.path.dirname(os.path.join(a, chemin)), exist_ok=True)
             with open(os.path.join(a, chemin), "w", encoding="utf-8") as f:
@@ -212,6 +214,98 @@ class Forge(Crochet):
     PR = {"tool_name": "mcp__github__create_pull_request",
           "tool_input": {"owner": "o", "repo": "r", "title": "t", "head": "b", "base": "main"}}
     LISTE = {"method": "list_workflow_runs", "owner": "o", "repo": "r"}
+
+    def pgrep(self, code):
+        """Faux pgrep en tête du PATH (R13 a) : sortie `code` (0 : une chaîne tourne ; 1 : aucune)."""
+        faux = os.path.join(self.t, "faux-pgrep")
+        os.makedirs(faux, exist_ok=True)
+        with open(os.path.join(faux, "pgrep"), "w", encoding="utf-8") as f:
+            f.write("#!/bin/sh" + NL + f"exit {code}" + NL)
+        os.chmod(os.path.join(faux, "pgrep"), 0o755)
+        ancien = os.environ["PATH"]
+        os.environ["PATH"] = faux + os.pathsep + ancien
+        self.addCleanup(os.environ.__setitem__, "PATH", ancien)
+
+    def test_r13_processus_lourd_pendant_une_chaine(self):
+        """R13 (E37) : une chaîne tourne (pgrep du motif de garde/motif-chaine.txt : 0) : cargo, xtask ou mutants.py
+        refusés, une lecture permise ; aucune chaîne (pgrep : 1) : cargo permis ; motif absent : rien détecté."""
+        garde = self.arbre({"scripts/controle/gabarits/chaine-modele.sh": "#!/usr/bin/env bash" + NL})
+        self.pgrep(0)
+        for cmd in ("cargo --locked xtask verify", "python3 -B scripts/controle/mutants.py c j m.json --sortie s",
+                    "timeout 600 env -u X cargo test -p xtask", "bash -c 'cd d && cargo build'"):
+            self.refus([], cmd, "R13 (E37)", garde=garde)
+        self.permis(appel("ls"), "git status", garde=garde)
+        for cmd in ("grep cargo x.txt", "echo cargo", "ls target/debug/xtask", "git log -1 --grep xtask"):
+            self.permis(appel("ls"), cmd, garde=garde)          # G2 du lot CAUSES (C-2) : nommé, non lancé
+        self.refus([], "python3 -X dev -B scripts/controle/mutants.py c j m.json --sortie s", "R13 (E37)", garde=garde)
+        copie = os.path.join(self.t, "chaine_int3.sh")
+        with open(copie, "w", encoding="utf-8") as f:
+            f.write("#!/usr/bin/env bash" + NL)
+        self.refus(appel("ls"), f"setsid nohup timeout 60 bash -c 'bash \"$1\"' _ {copie} > {self.t}/c.log 2>&1 &",
+                   "R13 (E37)", garde=garde)                   # C-2 : une seconde chaîne pendant la première
+        self.pgrep(1)
+        self.permis(appel("ls"), "cargo --locked xtask verify", garde=garde)
+        self.permis(appel("ls"), f"bash {copie}", garde=garde)
+        sans = self.arbre({})
+        os.remove(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(sans))), "scripts", "controle", "garde", "motif-chaine.txt"))
+        self.pgrep(0)
+        self.permis(appel("ls"), "cargo --locked xtask verify", garde=sans)
+
+    def test_r13_chaine_lancee_hors_du_modele(self):
+        """R13 (E39) : une chaîne lancée (chaine.sh, chaine_x.sh, aussi derrière setsid nohup timeout bash -c) doit être
+        la copie à l'octet de gabarits/chaine-modele.sh : copie égale admise ; script différent, illisible ou modèle
+        absent du dépôt : refus."""
+        modele = "#!/usr/bin/env bash" + NL + "set -Eeuo pipefail" + NL + "echo FIN" + NL
+        garde = self.arbre({"scripts/controle/gabarits/chaine-modele.sh": modele})
+        self.pgrep(1)
+        with open(os.path.join(self.t, "chaine_int3.sh"), "w", encoding="utf-8") as f:
+            f.write(modele)
+        with open(os.path.join(self.t, "chaine_main.sh"), "w", encoding="utf-8") as f:
+            f.write(modele + "git commit -q -m x" + NL)
+        egal, autre = os.path.join(self.t, "chaine_int3.sh"), os.path.join(self.t, "chaine_main.sh")
+        self.permis(appel("ls"), f"DETACHE=1 setsid nohup timeout 13680 bash -c 'bash \"$1\"' _ {egal} > c.log 2>&1 &", garde=garde)
+        self.permis(appel("ls"), f"bash {egal}", garde=garde)
+        self.refus(appel("ls"), f"bash {autre}", "R13 (E39)", garde=garde)
+        self.refus(appel("ls"), f"setsid nohup bash {os.path.join(self.t, 'chaine_absente.sh')} &", "R13 (E39)", garde=garde)
+        self.assertIn("script différent du modèle", self.lancer(appel("ls"), f"bash {autre}", garde=garde)[1])
+        for cmd in (f"cp {egal} {os.path.join(self.t, 'chaine_neuf.sh')}", f"cat {autre}", "grep -n chaine.sh notes.txt",
+                    f"bash -c 'bash {egal}'"):
+            self.permis(appel("ls"), cmd, garde=garde)          # G2 du lot CAUSES (C-2) : nommé, non lancé ; -c lu
+        for cmd in (f"bash -e {autre}", f"source {autre}", f". {autre}"):
+            self.refus(appel("ls"), cmd, "R13 (E39)", garde=garde)
+        os.makedirs(os.path.join(self.t, "sous"))
+        with open(os.path.join(self.t, "sous", "chaine_int3.sh"), "w", encoding="utf-8") as f:
+            f.write(modele + "git commit -q -m x" + NL)
+        self.refus(appel("ls"), f"cd {os.path.join(self.t, 'sous')} && bash chaine_int3.sh", "R13 (E39)", garde=garde)
+        sans = self.arbre({})
+        os.remove(os.path.join(self.t, "arbre", "scripts", "controle", "gabarits", "chaine-modele.sh"))
+        self.refus(appel("ls"), f"bash {egal}", "R13 (E39)", garde=sans)
+        self.assertIn("modèle scripts/controle/gabarits/chaine-modele.sh absent", self.lancer(appel("ls"), f"bash {egal}", garde=sans)[1])
+
+    def test_r13_cause_de_refus_sans_la_ligne_de_la_gate(self):
+        """R13 (E40) : une consigne (SendMessage, Agent) qui dit qu'une gate a rougi cite une ligne VIOLATION … ou
+        REFUS … lue dans un résultat d'outil : citée telle quelle : permis ; cause déduite sans ligne : refus ; ligne
+        citée mais absente du journal : refus ; consigne sans mot de rougeur : permis."""
+        ligne = "VIOLATION docs/x.md:45 — « guaranteed » dans la voix du projet — qualificatif interdit (09)"
+        vu = outil("Bash", {"command": "grep -n VIOLATION sortie.log"}, "  " + ligne, 1)
+        def consigne(texte, nom="SendMessage"):
+            cle = "message" if nom == "SendMessage" else "prompt"
+            return {"tool_name": nom, "tool_input": {cle: texte}}
+        self.permis(vu, "", entree=consigne("La vérification est ROUGE à la gate S-G4 : " + ligne + " ; mets le mot en code."))
+        self.refus(vu, "", "R13 (E40)", entree=consigne("La vérification est ROUGE à la gate S-G4 : le mot garanti est en clair dans la table."))
+        self.refus(vu, "", "R13 (E40)", entree=consigne("Refusé par la gate S-G4 : VIOLATION docs/y.md:3 — « verified » en clair.", "Agent"))
+        self.permis(vu, "", entree=consigne("Contrôles rejoués : S-G5, presg5 : 0 fragment ; R-13 : 0 marqueur ; suite verte."))
+        courte, guillemets = "VIOLATION docs/a.md:3 — « verified »", 'REFUS R-13 : marqueur "TODO" nu, docs/b.md:12'
+        vu2 = vu + outil("Bash", {"command": "grep -n REFUS r.log"}, courte + NL + guillemets, 2)
+        for juste in ("La gate S-G4 est rouge : " + courte + " ; mets le mot en code.", "Le job g5 est rouge : " + guillemets,
+                      "Rouge avant, vert après : chaque cas rouge sans son correctif, puis vert.",
+                      "Rejoue S-G4 sur les pièces : aucune violation attendue."):
+            self.permis(vu2, "", entree=consigne(juste))        # G2 du lot CAUSES (C-3)
+        for faux in ("La gate S-G4 a échoué sur le mot garanti.", "S-G4 failed: garanti in the table.",
+                     "Le passage à blanc a donné REFUS K8 : test_e25 hérite de DETACHE.",
+                     "S-G4 rouge : " + ligne + " ; et VIOLATION docs/y.md:9 — « garanti ».",
+                     "La chaîne est bloquée par S-G4 : mot garanti."):
+            self.refus(vu2, "", "R13 (E40)", entree=consigne(faux))
 
     def test_e20_forge_sans_job(self):
         """Cas réel E20 : dépôt privé, la forge ne lance aucun job (runner_id 0, échec en 2 s) : refus R8, avant

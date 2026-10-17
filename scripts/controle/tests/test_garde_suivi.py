@@ -69,3 +69,20 @@ class Suivi(unittest.TestCase):
                                                                        "test_temps_borne sans mutant tué au rapport (E13)"]))
         self.assertEqual(self.diff_de(test, "--rapport", self.rapport("| M-1 | test_temps_borne | tué |" + NL)), (0, []))
         self.assertEqual(self.diff_de({"scripts/controle/tests/test_x.py": "import unittest  # suite" + NL}), (0, []))
+
+    def test_d3_mot_commun(self):
+        """SHOGEN-GARDE-D3-MOT-COMMUN-1 (annexe B, B.108) : fonction suivi ajoutée, README qui ne porte suivi que comme
+        mot courant (non suivi), dans un autre mot (`suivis`, poursuivi(x)) ou dans un passage de code, ou suivi( dans une
+        URL, un chemin ou un identifiant composé (G2, C-1) : refus D3 ; nommée en code (`suivi`, `avant_acte.suivi`) ou
+        en signature, qualifiée ou non (suivi(a, f), `avant_acte.suivi(a, f)`) : conforme."""
+        fonction = {"scripts/controle/x.py": "import re" + NL + "def suivi(a, f):" + NL + "    return a" + NL}
+        refus = (1, ["REFUS D3 : scripts/controle/x.py:2 : fonction publique suivi absente de scripts/controle/README.md "
+                     "(E13)"])
+        for texte in ("Un chemin non suivi est refusé.", "Voir `suivis` et `le suivi des diffs`x.", "poursuivi(x).",
+                      "Voir https://exemple.org/wiki/suivi(x).", "La fonction non-suivi(x).", "Variable $suivi(x)."):
+            readme = {"scripts/controle/README.md": "# Outils" + NL + texte + NL}
+            self.assertEqual(self.diff_de({**fonction, **readme}), refus, texte)
+        for texte in ("D3 : `suivi`, contrôle du README.", "Signature : suivi(a, fichiers), non suivi.",
+                      "Voir `avant_acte.suivi`.", "Appel `avant_acte.suivi(a, f)`."):
+            readme = {"scripts/controle/README.md": "# Outils" + NL + texte + NL}
+            self.assertEqual(self.diff_de({**fonction, **readme}), (0, []), texte)

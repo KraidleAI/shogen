@@ -109,18 +109,51 @@ dans le refus ; une commande git précédée d'options globales (-C, -c, --no-pa
 Relecture G2 du groupe A, C-3 (E22) : B2 lit aussi les sujets au pluriel et le contre-contrôleur, les verbes au pluriel
 (relèvent, signalent, constatent, rapportent) et les participes accordés, et d'après comme selon.
 Relecture G2 du groupe A, C-4 (E23) : B3 lit aussi chemin l.N et `chemin` l.N (plage l.N-M comprise), la forme de
-référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N."""
+référence que B2 admet : un fichier ou une ligne inexistants y sont refusés comme dans chemin:N.
+Phase 3, groupe C (SHOGEN-GARDE-D3-MOT-COMMUN-1) : D3 cherche le nom de la fonction en code ou en signature au README
+(nomme_en_code), non comme mot courant : une fonction suivi n'est pas nommée par « non suivi ».
+Phase 3, groupe C (SHOGEN-MOTIFS-ARBRE-REDOS-1) : motifs --arbre, RX sur tous les motifs de l'arbre (appels de re des
+.py lus par l'arbre d'ast, motifs YAML) de scripts/controle/, .claude/hooks/ et enforcement/ (motifs_arbre).
+Phase 3, groupe C (SHOGEN-GARDE-FOUS-ORCH-1, phase 3) : refus [--depuis J] [--journal F], relevé du journal des refus
+du crochet GARDE-FAITS (refus, regles_du_crochet).
+Phase 3, groupe B (SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : chaque passage en --lecture-seule ajoute une ligne au
+journal garde/lecture-seule.tsv des outils (JOURNAL_LS, ignoré par git) : heure lue par date -u, sous-commande, tête du
+dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3.
+Phase 3, groupe B (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : disque (DQ, GF-8b) mesure le système de fichiers du dépôt, et
+celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT".
+Phase 3, groupe A, PLAGE-LETTRES : C3 (L-3) lit aussi une plage à bornes en lettres (DT15-a à DT15-m ; rang : lettres
+de tête, z avant aa) ; deux bornes de sortes différentes (nombre, lettres) ne forment pas de plage.
+Lot CAUSES (E39) : K8, avec --plan : la ligne du job controle-unittest de gates.yml de la copie jouée dans la copie
+à l'état final, sous l'environnement du lancement (refus si rouge ; borne BORNE_K8) ; le motif de chaîne (V7) est lu dans
+garde/motif-chaine.txt (motif_chaine), partagé avec le crochet et mutants.py.
+Phase 3, groupe A, RECALAGE-CHECK : chaine --blanc --script S [--diffs D...] (diffs du plan à défaut), avant le
+lancement (E30, E31, E36) : sur une copie creuse de HEAD (git archive, interdits exclus), chaque diff dans l'ordre : K0
+interdit, K5 git apply --check après les précédents, K6 motif R-13 du job g5 (lu dans gates.yml) et G5 presg5 sur ses
+seules lignes ajoutées.
+Phase 3, groupe A, RECALAGE-CHECK, script (E34, E36, E18) : chaine --blanc juge d'abord le script : K1 bash -n ; K2
+trap ... ERR sous set -E ; K3 sleep d'avant-plan ; K4, sous set -u, $N lu sans protection par une fonction appelée
+avec moins de N arguments, ou hors de toute fonction (corps des documents en ligne sautés) ; K7 (CHAINE-ORCH-MODELE),
+verif écrite dans la chaîne ou non tirée par source de $OUTILS/gabarits/chaine.sh, git commit sans acte commit.
+Phase 3, groupe A, RECALAGE-CHECK, versement : verser --blanc --script S (E32, E33, E35) : V8, script qui ne lit pas
+SHOGEN_DEPOT (jamais lancé), qui sort hors de 0 (écriture avant contrôle nommée) ou qui écrit dans le dépôt ; sur ce
+qu'il écrit dans la copie creuse : K6 et G5 (lignes ajoutées), V9 rangée de tableau dont le compte de cellules diffère
+de l'en-tête (garde_commun.rangees_fautives)."""
 import argparse
+import ast
+import collections
 import contextlib
 import fnmatch
 import hashlib
 import importlib.util
 import os
 import re
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+from datetime import timedelta
 
 
 def _module(nom, chemin=None):
@@ -149,16 +182,30 @@ SHA = re.compile("(?<![A-Za-z0-9-])(?=[0-9a-f]*[a-f])(?=[0-9a-f]*[0-9])([0-9a-f]
 PIEDS = ("Source-Sha:", "Diff-Id:", "Co-Authored-By:", "Claude-Session:", "Décalage admis :")
 CITES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lignes-citees.txt")
 HORS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "hors-distant.txt")
+JOURNAL_LS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "garde", "lecture-seule.tsv")    # ignoré par git
 MODELE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gabarits", "chaine.sh")
 REGISTRE = "docs/RENVOIS-LIGNES.tsv"
 EMPREINTE = re.compile("([^ :]+):([0-9]+)(?:-([0-9]+))? ([0-9a-f]{16,64})")
 BORNE_LIEE = 100
 PIECES_MAX, OCTETS_MAX = 5000, 512 * 2 ** 20      # verser : borne d'un dossier de pièces (R-7)
-MOTIF_CHAINE = "^(/usr/bin/|/bin/)?(bash|sh) ([^ ]*/)?chaine(_[^ /]*)?[.]sh( |$)"     # V7 (E28), ancré
+BORNE_K8 = 1800         # s, borne de la suite des contrôles jouée à blanc (K8, E39)
+
+
+def motif_chaine():
+    """Motif ancré d'une chaîne de commits (V7, E28 ; pgrep -f), lu dans garde/motif-chaine.txt : une seule ligne,
+    partagée avec le crochet GARDE-FAITS et mutants.py, jamais recopiée (lot CAUSES, E37, E39)."""
+    with open(os.path.join(GC.RACINE_OUTILS, "scripts", "controle", "garde", "motif-chaine.txt"), encoding="utf-8") as f:
+        lignes = [x for x in f.read().split(chr(10)) if x.strip()]
+    if len(lignes) != 1 or not lignes[0].startswith("^"):
+        raise Erreur("garde/motif-chaine.txt : une seule ligne, motif ancré par ^, attendue")
+    return lignes[0]
 
 
 class Erreur(Exception):
     """Erreur de l'outil : sortie 3, jamais un refus."""
+
+
+MOTIF_CHAINE = motif_chaine()       # après Erreur (G2 du lot CAUSES, C-4) : un fichier faux lève Erreur, non NameError
 
 
 def git(depot, *args, env=None):
@@ -314,22 +361,30 @@ def unites(texte):
     return vus + ([chr(10).join(cour)] if cour else [])
 
 
+def rang(suffixe):
+    """Rang d'un suffixe de diff dans une plage : nombre de tête (0, n), ou lettres de tête (1, longueur, lettres), z
+    avant aa (DT7-a … DT7-aa) ; None sans l'un ni l'autre (PLAGE-LETTRES)."""
+    m = re.match("([0-9]+)|([a-z]+)", suffixe)
+    return None if not m else (0, int(m[1])) if m[1] else (1, len(m[2]), m[2])
+
+
 def nommes(unite, prefixe):
-    """(suffixes, plages) des diffs du préfixe nommés dans un passage ; plage N à M (ou a, au, …, ..) : nombres de tête
-    des deux bornes (GF-0 … GF-10b : 0 à 10)."""
-    e, bord = re.escape(prefixe), "(?<![A-Za-z0-9-])"
+    """(suffixes, plages) des diffs du préfixe nommés dans un passage ; plage N à M (ou a, au, …, ..) : rangs des deux
+    bornes, nombres de tête (GF-0 … GF-10b : 0 à 10) ou lettres de tête (DT15-a à DT15-m : a à m), de même sorte."""
+    e, bord, borne = re.escape(prefixe), "(?<![A-Za-z0-9-])", "([0-9]+[a-z]?|[a-z]+[0-9]*)"
     vus = set(re.findall(bord + e + "([0-9A-Za-z]+)(?![A-Za-z0-9-])", unite))
-    plages = re.findall(bord + e + "([0-9]+)[a-z]? ?(?:à|a|au|…|[.]{2,3}) ?" + e + "([0-9]+)[a-z]?(?![0-9A-Za-z-])", unite)
-    return vus, [(int(i), int(j)) for i, j in plages]
+    sep = "(?: (?:à|a|au) | ?(?:…|[.]{2,3}) ?)"      # mot entre deux blancs (C-3 de la G2 : DT15-ba DT15-m, liste)
+    plages = re.findall(bord + e + borne + sep + e + borne + "(?![0-9A-Za-z-])", unite)
+    return vus, [(rang(i), rang(j)) for i, j in plages if rang(i)[0] == rang(j)[0]]
 
 
 def attribuer(ident, corps, sources, ajoute, juges, fautes):
     """C3, L-3 : mot du message lu dans les sources, que seuls des passages qui nomment d'autres diffs du préfixe
     de ident portent (sans ident, ni une plage qui le couvre), absent des lignes ajoutées : refus."""
     prefixe, suffixe = ident.rsplit("-", 1)
-    tete = int(re.match("[0-9]*", suffixe)[0] or -1)
+    tete = rang(suffixe)
     autre = lambda vus, plages: (vus - {suffixe} or plages) and suffixe not in vus and not any(
-        i <= tete <= j for i, j in plages)
+        tete is not None and i <= tete <= j for i, j in plages)
     passages = [(u, nommes(u, prefixe + "-")) for s in sources for u in unites(s)]
     for genre, juge in juges:
         for x in sorted(juge(corps)):
@@ -496,9 +551,10 @@ def workflows(depot, fichiers, fautes, env=None, racine=None):
         raise Erreur(f"enforcement/workflows-yaml.py : sortie {p.returncode}")
 
 
-def motifs(fichiers, fautes):
-    """RX (E12) : motifs des lignes ajoutées à retour arrière exponentiel ; admis par redos-admis sur la ligne."""
-    for chemin, n, motif, ligne in GC.motifs_ajoutes(fichiers):
+def motifs(fichiers, fautes, liste=None):
+    """RX (E12) : motifs des lignes ajoutées (ou de liste, [(chemin, ligne, motif, texte)]) à retour arrière
+    exponentiel ; admis par redos-admis sur la ligne."""
+    for chemin, n, motif, ligne in GC.motifs_ajoutes(fichiers) if liste is None else liste:
         codes = GC.motifs_suspects(motif)
         if codes == ["motif-illisible"]:
             fautes.append(("avertissement", "RX", f"{chemin}:{n} : motif illisible par re, non jugé", "", "-"))
@@ -508,6 +564,40 @@ def motifs(fichiers, fautes):
             fautes.append(("refus", "RX", f"{chemin}:{n} : motif à retour arrière exponentiel ({', '.join(codes)}) "
                            "(E12)", "réécrire sans répétition ambiguë (forme de DT5-24 : séparateur obligatoire entre "
                            "deux répétitions) ; motif voulu : redos-admis et sa raison sur la ligne", "-"))
+
+
+DOSSIERS_MOTIFS = ("scripts/controle", ".claude/hooks", "enforcement")
+
+
+def motifs_arbre(a, fautes):
+    """motifs --arbre (SHOGEN-MOTIFS-ARBRE-REDOS-1) : RX sur les motifs de l'arbre (fichiers .py, .yml et .yaml de
+    DOSSIERS_MOTIFS, interdits et __pycache__ sautés) : appels de re lus par GC.motifs_du_code, motifs YAML par
+    GC.motifs_ajoutes ; chaque motif construit autrement (non lu) imprimé NON-LU chemin:ligne, puis un bilan."""
+    liste, lus, non_lus = [], 0, []
+    for d in DOSSIERS_MOTIFS:
+        for base, dossiers, fichiers in os.walk(os.path.join(a.depot, d)):
+            dossiers[:] = sorted(x for x in dossiers if x != "__pycache__" and not GC.chemin_interdit(os.path.join(base, x)))
+            for x in sorted(f for f in fichiers if f.endswith((".py", ".yml", ".yaml"))):
+                chemin = os.path.join(base, x)
+                if GC.chemin_interdit(chemin):
+                    continue
+                rel, lignes = os.path.relpath(chemin, a.depot), lire(chemin).decode("utf-8", "replace").split(chr(10))
+                if not x.endswith(".py"):
+                    vus = GC.motifs_ajoutes([{"apres": rel, "ajouts": list(enumerate(lignes, 1))}])
+                    liste, lus = liste + vus, lus + len(vus)
+                    continue
+                try:
+                    appels = GC.motifs_du_code(chr(10).join(lignes))
+                except (SyntaxError, ValueError):
+                    fautes.append(("avertissement", "RX", f"{rel} : code illisible par ast, non jugé", "", "-"))
+                    continue
+                non_lus += [f"{rel}:{n}" for n, _f, m in appels if m is None]
+                vus = [(rel, n, m, chr(10).join(lignes[n - 1:fin])) for n, fin, m in appels if m is not None]
+                liste, lus = liste + vus, lus + len(vus)
+    for x in non_lus:
+        print("NON-LU " + x + " : motif construit hors littéraux, non jugé")
+    print(f"motifs --arbre : {lus} motif(s) lu(s), {len(non_lus)} non lu(s), dossiers {', '.join(DOSSIERS_MOTIFS)}")
+    motifs(None, fautes, liste)
 
 
 def presg5(depot, textes, fautes):
@@ -577,6 +667,16 @@ DEF_TEST = re.compile(" *def (test_[A-Za-z0-9_]*)[(]")
 TUE = re.compile("(?i)(?<![a-zà-ÿ])(?:tués?|tuées?|killed)(?![a-zà-ÿ])")
 
 
+def nomme_en_code(nom, texte):
+    """D3 (SHOGEN-GARDE-D3-MOT-COMMUN-1) : vrai si texte nomme la fonction nom en code (passage entre accents graves
+    qui est le nom seul ou qualifié : `nom`, `module.nom`) ou en signature (nom( , en code ou non, qualifiée ou non :
+    `nom(a, b)`, `module.nom(a)`) ; un mot courant (non suivi), un passage de code qui ne fait que porter le mot (`le
+    suivi des diffs`) ou nom( après / - ou $ (URL, chemin, identifiant composé) ne compte pas (G2 du groupe C, C-1)."""
+    code = "(?:[A-Za-z0-9_]+[.])*" + re.escape(nom)
+    return any(re.fullmatch(code, x.strip()) for x in re.findall("`([^`" + chr(10) + "]*)`", texte)) or bool(
+        re.search("(?<![A-Za-z0-9_./$-])" + code + "[(]", texte))
+
+
 def suivi(a, fichiers, env, fautes):
     """D3 et D4 (E13) : README des contrôles d'après le diff (index temporaire env), rapport du générateur."""
     ajouts = [(f["apres"], n, x) for f in fichiers if (f["apres"] or "").endswith(".py") for n, x in f["ajouts"]]
@@ -587,7 +687,7 @@ def suivi(a, fichiers, env, fautes):
     except Erreur:
         readme = ""
     for c, n, nom in publiques:
-        if not re.search("(?<![A-Za-z0-9_])" + re.escape(nom) + "(?![A-Za-z0-9_])", readme):
+        if not nomme_en_code(nom, readme):
             fautes.append(("refus", "D3", f"{c}:{n} : fonction publique {nom} absente de scripts/controle/README.md "
                            "(E13)", "la nommer dans l'ajout daté du README (rôle, usage)", "-"))
     tests = [(c, n, m[1]) for c, n, x in ajouts if "/tests/" in "/" + c for m in [DEF_TEST.match(x)] if m]
@@ -602,7 +702,58 @@ def suivi(a, fichiers, env, fautes):
                            "muter le code que le test garde, le voir rouge, consigner le mutant tué", "-"))
 
 
+BORNE_VERSER = 300      # s, borne du script de versement joué à blanc
+
+
+def verser_blanc(a, fautes):
+    """RECALAGE-CHECK, versement (E32, E33, E35, E36) : le script tourne sur une copie creuse (SHOGEN_DEPOT), dans
+    un groupe de processus neuf, sous BORNE_VERSER ; puis ce qu'il a écrit (fichiers neufs compris) est jugé."""
+    if b"SHOGEN_DEPOT" not in lire(a.script):
+        fautes.append(("refus", "V8", "le script ne lit pas SHOGEN_DEPOT : il écrirait dans le dépôt (non lancé)",
+                       "lire la racine dans SHOGEN_DEPOT (gabarits/versement.py)", "-"))
+        return
+    etat = lambda: git(a.depot, "status", "--porcelain", "--untracked-files=all")
+    with tempfile.TemporaryDirectory() as d:
+        copie, env = copie_creuse(a.depot, d)
+        avant, env_script = etat(), {k: v for k, v in env.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}
+        journal = os.path.join(d, "versement.log")      # hors de la copie ; un fichier, non un tuyau (C-5 de la G2)
+        with open(journal, "wb") as out:
+            p = subprocess.Popen([sys.executable, "-B", os.path.abspath(a.script)], cwd=copie, stdout=out,
+                                 stderr=subprocess.STDOUT, env=dict(env_script, SHOGEN_DEPOT=copie), start_new_session=True)
+        try:
+            p.wait(timeout=BORNE_VERSER)
+        except subprocess.TimeoutExpired:
+            os.killpg(p.pid, signal.SIGKILL)
+            p.wait()
+            raise Erreur(f"verser --blanc : script au-delà de {BORNE_VERSER} s, arrêté (groupe entier)")
+        sortie = lire(journal).decode("utf-8", "replace").strip()
+        git(copie, "add", "-N", "-f", "--", ".", env=env)
+        fichiers = GC.analyser_diff(git(copie, "diff", "--no-renames", "--no-color", "--no-ext-diff", "--no-textconv",
+                                        "--src-prefix=a/", "--dst-prefix=b/", "-U0", env=env))
+        if etat() != avant:
+            fautes.append(("refus", "V8", "le script a écrit dans le dépôt, hors de la copie (contrat SHOGEN_DEPOT)",
+                           "remettre le dépôt propre, n'écrire que sous SHOGEN_DEPOT", "-"))
+        if p.returncode:
+            ecrit = f", après avoir écrit {len(fichiers)} fichier(s) : écrire après tous les contrôles (E32)"
+            fautes.append(("refus", "V8", f"le versement sort en {p.returncode}{ecrit if fichiers else ''} : "
+                           + (sortie.split(chr(10)) or [""])[-1][:160], "corriger le script ou ses cibles", "-"))
+            return
+        portes(a.depot, "versement", [(f["apres"], f["ajouts"]) for f in fichiers if f["apres"]], fautes)
+        for f in [f for f in fichiers if (f["apres"] or "").endswith(".md")]:
+            with open(os.path.join(copie, f["apres"]), encoding="utf-8") as x:
+                lignes = x.read().split(chr(10))
+            for n, nb, tete in GC.rangees_fautives(lignes, [n for n, _x in f["ajouts"]]):
+                fautes.append(("refus", "V9", f"{f['apres']}:{n} : {nb} cellules, en-tête de {tete} (E32)",
+                               "lire l'en-tête du tableau, écrire la rangée à son compte", "-"))
+
+
 def verser(a, fautes):
+    if not a.pieces and not (a.blanc and a.script) or bool(a.blanc) != bool(a.script):
+        raise Erreur("verser : --pieces D, ou --blanc --script S (ou les deux)")
+    if a.blanc:
+        verser_blanc(a, fautes)
+    if not a.pieces:
+        return
     racine = os.path.abspath(a.pieces)
     if not os.path.isdir(racine) or GC.chemin_interdit(racine):
         raise Erreur("dossier de pièces absent ou interdit (non lu)")
@@ -789,11 +940,23 @@ def cibles(racine, profondeur=4):
     return trouves
 
 
+def lieux_disque(depot):
+    """SHOGEN-GARDE-DISQUE-DU-DEPOT-1 : chemins dont disque mesure le système de fichiers (os.statvfs, par
+    GC.etat_disque) : le dépôt, puis TMPDIR s'il est sur un autre système de fichiers (st_dev) ; jamais / par défaut."""
+    lieux = [os.path.realpath(depot)]
+    tmp = os.path.realpath(os.environ.get("TMPDIR") or tempfile.gettempdir())
+    if os.path.isdir(tmp) and os.stat(tmp).st_dev != os.stat(lieux[0]).st_dev:
+        lieux.append(tmp)
+    return lieux
+
+
 def disque(a, fautes):
-    etat, libre = GC.etat_disque("/", a.min_go)
-    if etat != "ok":
-        fautes.append(("refus" if etat == "refus" else "avertissement", "DQ", f"{libre:.1f} Gio libres sur / (E4)",
-                       "lister les cibles cargo des lots clos (disque --lister <dossier>), puis les supprimer", "-"))
+    for lieu in lieux_disque(a.depot):
+        etat, libre = GC.etat_disque(lieu, a.min_go)
+        if etat != "ok":
+            fautes.append(("refus" if etat == "refus" else "avertissement", "DQ", f"{libre:.1f} Gio libres sur {lieu} "
+                           "(E4)", "lister les cibles cargo des lots clos (disque --lister <dossier>), puis les "
+                           "supprimer", "-"))
     for racine in a.lister:
         if GC.racine_dangereuse(racine, a.depot):
             raise Erreur("disque --lister : racine refusée (/, dépôt ou ancêtre, dossier docs, interdit)")
@@ -802,7 +965,245 @@ def disque(a, fautes):
 
 
 
+def copie_creuse(depot, dossier):
+    """Copie de HEAD (git archive ; préfixes INTERDITS de la gate et *.jsonl exclus, jamais extraits) dans
+    dossier/copie, dépôt git neuf dont l'index porte la copie ; le dépôt n'est que lu. Rend (copie, env de git)."""
+    pre = GC.constante(os.path.join(GC.RACINE_OUTILS, "enforcement", "docs-sha256sums.py"), "INTERDITS")
+    hors = [":(exclude" + (")" + p.rstrip("/") if p.endswith("/") else ",glob)" + p + "*") for p in pre]
+    tar = subprocess.run(["git", "-C", depot, "archive", "--format=tar", "HEAD", "--", ".", *hors,
+                          ":(exclude,glob)**/*.jsonl"], capture_output=True)
+    copie, env = os.path.join(dossier, "copie"), dict(os.environ, GIT_CONFIG_GLOBAL=os.devnull, GIT_CONFIG_NOSYSTEM="1")
+    os.makedirs(copie)
+    if tar.returncode or subprocess.run(["tar", "-x", "-C", copie], input=tar.stdout, capture_output=True).returncode:
+        raise Erreur("git archive ou tar : copie creuse non faite")
+    git(copie, "init", "-q", env=env)
+    git(copie, "add", "-A", "-f", env=env)
+    return copie, env
+
+
+def motif_r13():
+    """(motif, exclusions) de l'étape R-13 du job g5 de gates.yml des outils : lus, jamais recopiés (E35)."""
+    with open(os.path.join(GC.RACINE_OUTILS, ".github", "workflows", "gates.yml"), encoding="utf-8") as f:
+        ligne = [x for x in f.read().split(chr(10)) if "git grep -nE '" in x]
+    if len(ligne) != 1:
+        raise Erreur("étape R-13 du job g5 introuvable dans gates.yml")
+    return ligne[0].split("git grep -nE '", 1)[1].split("'", 1)[0], re.findall("':!([^']+)'", ligne[0])
+
+
+def portes(depot, nom, ajouts, fautes):
+    """Portes textuelles sur les seules lignes ajoutées, jamais un fichier entier (E36) : K6, motif R-13 du job g5
+    hors de ses exclusions (E35) ; G5, presg5 sur celles des .md (E33). ajouts : [(chemin, [(n, ligne)])]."""
+    motif, hors = motif_r13()
+    juges = [(c, n, x) for c, lignes in ajouts if not any(c == h.rstrip("/") or c.startswith(h.rstrip("/") + "/")
+                                                          for h in hors) for n, x in lignes]
+    with tempfile.TemporaryDirectory() as d:
+        with open(os.path.join(d, "ajouts"), "w", encoding="utf-8") as f:
+            f.writelines(x + chr(10) for _c, _n, x in juges)
+        p = subprocess.run(["grep", "-nE", "--", motif, os.path.join(d, "ajouts")], capture_output=True, text=True)
+    if p.returncode not in (0, 1):
+        raise Erreur(f"grep : sortie {p.returncode}")
+    for c, n, _x in [juges[int(x.split(":", 1)[0]) - 1] for x in p.stdout.split(chr(10)) if x]:
+        fautes.append(("refus", "K6", f"{nom} : {c}:{n} : marqueur de dette nu (motif R-13 du job g5, E35)",
+                       "mettre le mot en code, ou inscrire la dette au registre (R-13)", "-"))
+    presg5(depot, [(f"{nom} : {c}", place(lignes)) for c, lignes in ajouts if c.endswith(".md")], fautes)
+
+
+SEP = set("();<>|&")
+TETE = {"then", "do", "else", "elif", "if", "while", "until", "!", "{", "time"}
+DEF_SH = re.compile("[ " + chr(9) + "]*(?:function +)?([A-Za-z_][A-Za-z0-9_]*) *[(][)] *[{](.*)$")
+LIT_N = re.compile("[$]([1-9])|[$][{]#?([1-9][0-9]*)(?![0-9]|:?[-?+=])")      # $N lu sans protection (C-2)
+
+
+def mots(ligne):
+    """Mots d'une ligne de shell (shlex, ponctuation à part, commentaires ôtés), le texte de $( ) entre guillemets
+    relu à part ; ligne illisible : []."""
+    s = shlex.shlex(ligne, posix=True, punctuation_chars=True)
+    s.whitespace_split, s.commenters = True, "#"
+    try:
+        vus = list(s)
+    except ValueError:
+        return []
+    return vus + [y for x in vus if "$(" in x and len(x) > 2 for y in [";"] + mots(x.split("$(", 1)[1])]
+
+
+def litteraux_otes(texte):
+    """Texte d'un script sans ses chaînes entre apostrophes ni ses commentaires, lus comme bash : entre guillemets,
+    l'apostrophe est un caractère (l'arbre) ; un # en tête de mot ouvre un commentaire (relecture G2, C-2)."""
+    out, guillemets, k = [], False, 0
+    while k < len(texte):
+        c = texte[k]
+        if c == chr(92):
+            out.append(texte[k:k + 2])
+            k += 2
+        elif not guillemets and (c == "'" or c == "#" and (k == 0 or texte[k - 1] in " ;&|(" + chr(9) + chr(10))):
+            j = texte.find("'" if c == "'" else chr(10), k + 1)
+            k = len(texte) if j < 0 else j + (c == "'")
+        else:
+            guillemets ^= c == chr(34)
+            out.append(c)
+            k += 1
+    return "".join(out)
+
+
+def appels(vus):
+    """(commande, nombre d'arguments avant la première ponctuation, séparateur qui la termine, redirections passées)
+    de chaque commande simple d'une liste de mots."""
+    coupe, out = lambda x: set(x) <= SEP and not re.fullmatch("[<>]+&?", x), []
+    for k, x in enumerate(vus):
+        if (k == 0 or coupe(vus[k - 1]) or vus[k - 1] in TETE) and not set(x) <= SEP and x not in TETE:
+            j = next((i for i in range(k + 1, len(vus)) if set(vus[i]) <= SEP), len(vus))
+            out.append((x, j - k - 1, next((y for y in vus[j:] if coupe(y)), "")))
+    return out
+
+
+def script(chemin, fautes):
+    """K1 à K4 sur le script d'une chaîne (E34, E36, E18), corps des documents en ligne (<<) sautés."""
+    p = subprocess.run(["bash", "-n", chemin], capture_output=True, text=True)
+    if p.returncode:
+        fautes.append(("refus", "K1", "bash -n : " + p.stderr.strip()[:160], "corriger la syntaxe du script", "-"))
+        return
+    lignes, fin = [], None
+    for n, x in enumerate(lire(chemin).decode("utf-8").split(chr(10)), 1):
+        if fin is None:
+            lignes.append((n, x))
+            fin = (re.findall("(?<!<)<<-?[ ]*['" + chr(34) + "]?([A-Za-z_][A-Za-z0-9_]*)", x) or [None])[0]
+        elif x.strip() == fin:
+            fin = None
+    sets = [x.split()[1:] for _n, x in lignes if x.split()[:1] == ["set"]]
+    drapeau = lambda c, nom: any(nom in s or any(o[:1] == "-" and o[1:2] != "-" and c in o[1:] for o in s)
+                                 for s in sets)
+    if not (drapeau("E", "errtrace") and any(re.match("[ " + chr(9) + "]*trap .*[ ]ERR(?:[ ;]|$)", x) for _n, x in lignes)):
+        fautes.append(("refus", "K2", "aucun trap ... ERR sous set -E (errtrace) : la chaîne peut sortir sans un mot, "
+                       "d'une substitution sous set -e comme d'une fonction (E36)", "ajouter après set : set -E et "
+                       "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND, code $? >&2' ERR", "-"))
+    corps, fonctions, k = set(), {}, 0
+    while k < len(lignes):
+        m = DEF_SH.match(lignes[k][1])
+        if m:
+            j = k if m[2].rstrip().endswith("}") else next((i for i in range(k + 1, len(lignes))
+                                                            if lignes[i][1].strip() == "}"), len(lignes))
+            texte = chr(10).join([m[2]] + [x for _n, x in lignes[k + 1:j]])
+            fonctions[m[1]] = max([0] + [int(a or b) for a, b in LIT_N.findall(litteraux_otes(texte))])
+            corps |= set(range(k, j + 1))
+        k += 1
+    for i, (n, x) in enumerate(lignes):
+        if drapeau("u", "nounset") and i not in corps and LIT_N.search(litteraux_otes(x)):
+            fautes.append(("refus", "K4", f"l.{n} : $N lu hors de toute fonction sous set -u : la chaîne se lance sans "
+                           "argument (E34)", "écrire ${N:?raison} ou ${N:-défaut}", "-"))
+        for cmd, nb, fin in appels(mots(DEF_SH.match(x)[2] if DEF_SH.match(x) else x)):
+            if cmd == "sleep" and fin != "&":
+                fautes.append(("refus", "K3", f"l.{n} : sleep d'avant-plan (E18)",
+                               "attendre une condition (boucle bornée sur un fichier ou un PID), jamais une durée", "-"))
+            if drapeau("u", "nounset") and nb < fonctions.get(cmd, 0):
+                fautes.append(("refus", "K4", f"l.{n} : {cmd} appelée avec {nb} argument(s), lit ${fonctions[cmd]} "
+                               "sans protection sous set -u (E34)", "protéger l'argument optionnel : ${N:-}", "-"))
+
+
+GIT_OPT2 = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}      # options globales à valeur
+
+
+def commits_nus(ligne):
+    """Nombre de git commit d'une ligne (options globales de git sautées, mots lus par shlex) moins celui des acte
+    commit ... && qui les gardent sur la même ligne (K7 ; relecture G2, C-4)."""
+    w, n = mots(ligne) or ligne.split(), 0
+    for k, x in enumerate(w):
+        j = k + 1
+        while (x == "git" or x.endswith("/git")) and j < len(w) and w[j][:1] == "-":
+            j += 2 if w[j] in GIT_OPT2 else 1
+        n += (x == "git" or x.endswith("/git")) and j < len(w) and w[j] == "commit"
+    return n - len(re.findall("(?:acte|avant_acte[.]py)[^;&|]* commit[^;&|]*&&", ligne))
+
+
+def sceau_de_chaine(chemin, fautes):
+    """K7 (CHAINE-ORCH-MODELE) : une chaîne tire sa verif par source de $OUTILS/gabarits/chaine.sh, celle que le sceau
+    et C1 jugent ; une verif écrite ou recopiée, ou absente, et un git commit sans acte commit sont refusés."""
+    lignes = [x for x in lire(chemin).decode("utf-8").split(chr(10)) if not x.lstrip().startswith("#")]
+    ecrite = any(DEF_SH.match(x) and DEF_SH.match(x)[1] == "verif" for x in lignes)
+    tiree = any(re.search("(?:^|[ ;&|(])(?:source|[.]) ", x) and "verif" in x and
+                re.search("[$][{]?OUTILS[}]?/gabarits/chaine[.]sh", x) for x in lignes)
+    if ecrite or not tiree:
+        fautes.append(("refus", "K7", f"verif {'écrite dans la chaîne' if ecrite else 'non tirée du modèle'} : seule "
+                       "celle de $OUTILS/gabarits/chaine.sh, tirée par source, est celle du sceau (C1)",
+                       "copier gabarits/chaine-modele.sh, qui la tire par source", "-"))
+    if any(commits_nus(x) > 0 for x in lignes):
+        fautes.append(("refus", "K7", "git commit sans acte commit ... && sur sa ligne : commit hors de la garde du "
+                       "sceau (C1)",
+                       "commettre par acte commit ... && git commit, comme gabarits/chaine-modele.sh", "-"))
+
+
+def blanc(a, fautes):
+    """RECALAGE-CHECK (E30, E31, E34, E36) : script de la chaîne (K1 à K4), puis chaque diff, dans l'ordre, sur une
+    copie creuse de HEAD qui porte déjà les précédents (K0, K5, K6, G5)."""
+    if not a.script:
+        raise Erreur("chaine --blanc : --script exigé")
+    script(a.script, fautes)
+    sceau_de_chaine(a.script, fautes)
+    plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()] if a.plan else []
+    faits = set(re.findall("(?m)^Diff-Id: (.+)$", git(a.depot, "log", "--format=%B", "HEAD"))) if plan else set()
+    diffs = a.diffs or [d for x in plan if x.split("|")[0] not in faits for d in x.split("|")[1].split(",")]
+    if not (diffs or plan):
+        raise Erreur("chaine --blanc : aucun diff (--diffs, ou --plan)")
+    with tempfile.TemporaryDirectory() as d:
+        copie, env = copie_creuse(a.depot, d)
+        for x in diffs:
+            texte, nom = lire(x).decode("utf-8"), os.path.basename(x)
+            try:
+                noms = chemins_du_patch(copie, texte, x)
+            except Erreur:      # patch illisible : aucun message de git recopié (un chemin interdit n'est pas nommé)
+                noms = None
+            if noms and any(GC.chemin_interdit(os.path.join(os.path.abspath(a.depot), c)) for c in noms):
+                fautes.append(("refus", "K0", f"{nom} : fichier(s) sous un interdit (ni lus ni nommés)",
+                               "retirer ces fichiers du diff", "-"))
+                return
+            p = subprocess.run(["git", "-C", copie, "apply", "--check", os.path.abspath(x)], capture_output=True,
+                               text=True, env=env)
+            if noms is None or p.returncode:
+                raison = (p.stderr.strip() + chr(10)).split(chr(10))[0][:160] if noms is not None else "patch illisible"
+                fautes.append(("refus", "K5", f"{nom} ne s'applique pas sur HEAD plus les diffs qui le précèdent "
+                               f"(E30, E31) : {raison}", "refaire le "
+                               "diff sur l'état d'après les précédents, chemins a/ et b/ relatifs au dépôt, saut de "
+                               "ligne final", "-"))
+                return
+            git(copie, "apply", os.path.abspath(x), env=env)
+            portes(a.depot, nom, [(f["apres"], f["ajouts"]) for f in GC.analyser_diff(texte) if f["apres"]], fautes)
+        if a.plan:
+            suite_k8(copie, fautes)
+
+
+def suite_k8(copie, fautes):
+    """K8 (E39) : la ligne exacte du job controle-unittest de gates.yml de la copie, jouée dans la copie à l'état
+    final du plan, sous l'environnement du lancement tel quel (variables de la chaîne comprises : un cas qui en hérite
+    rougit ici, pas au premier pas) ; copie sans gates.yml (dépôt d'essai) : rien à jouer."""
+    gates = os.path.join(copie, ".github", "workflows", "gates.yml")
+    if not os.path.isfile(gates):
+        return
+    lignes = [x.strip() for x in lire(gates).decode("utf-8").split(chr(10)) if "verdict-suite-s2.py scripts/controle " in x]
+    if len(lignes) != 1:
+        fautes.append(("refus", "K8", "ligne du job controle-unittest introuvable ou double dans gates.yml de la copie (E39)",
+                       "une seule ligne verdict-suite-s2.py scripts/controle … dans gates.yml", "-"))
+        return
+    cmd = re.sub(r"^(- )?(run: )?", "", lignes[0])
+    try:
+        p = subprocess.run(["bash", "-c", cmd], cwd=copie, capture_output=True, text=True, timeout=BORNE_K8)
+    except subprocess.TimeoutExpired:
+        raise Erreur(f"K8 : suite scripts/controle au-delà de {BORNE_K8} s sur la copie")
+    if p.returncode:
+        sortie = [x for x in (p.stdout + p.stderr).split(chr(10)) if x.strip()]
+        cas = [x for x in sortie if x.startswith(("FAIL: ", "ERROR: "))][:1]       # G2 du lot CAUSES (C-4) : le cas
+        derniere = cas + (sortie[-1:] or ["(aucune sortie)"])                      # rouge nommé, puis le verdict
+        fautes.append(("refus", "K8", "suite scripts/controle rouge sur la copie à l'état final du plan, sous "
+                       f"l'environnement du lancement (E39) : {' | '.join(x[:160] for x in derniere)}",
+                       "lire le cas nommé : variable du lancement héritée (tests/aide_garde.env_git), processus de "
+                       "l'hôte lu (pgrep), plancher du job ; corriger le cas ou le diff, relancer", "-"))
+
+
 def chaine(a, fautes):
+    if (a.plan is None) != (a.cc is None) or not (a.plan or a.blanc):
+        raise Erreur("chaine : --plan et --cc ensemble, ou --blanc --script S --diffs D...")
+    if a.blanc:
+        blanc(a, fautes)
+    if a.plan is None:
+        return
     plan = [x for x in lire(a.plan).decode("utf-8").split(chr(10)) if x.strip()]
     duree = len(plan) * a.duree_pas
     if duree > BORNE_LIEE and not a.detache:
@@ -936,8 +1337,50 @@ def brief(a, fautes):
     faisable(a, texte, fautes)
 
 
+REFUS_TSV = os.path.join("scripts", "controle", "garde", "refus.tsv")
+CROCHET = os.path.join(GC.RACINE_OUTILS, ".claude", "hooks", "garde_faits.py")
+
+
+def regles_du_crochet(chemin=CROCHET):
+    """Règles du crochet GARDE-FAITS (R1, R2…) nommées dans la docstring de son module, triées par numéro."""
+    doc = ast.get_docstring(ast.parse(lire(chemin).decode("utf-8"))) or ""
+    return sorted(set(re.findall("(?<![A-Za-z0-9-])(R[0-9]+)(?![0-9])", doc)), key=lambda r: int(r[1:]))
+
+
+def refus(a, fautes):
+    """refus [--depuis AAAA-MM-JJ] [--journal F] (phase 3, SHOGEN-GARDE-FOUS-ORCH-1) : relevé du journal des refus du
+    crochet (REFUS_TSV du dépôt) : refus par règle et par jour, dix actes refusés les plus fréquents, règles du crochet
+    sans refus depuis trente jours (date -u), passages (permis, erreur) ; ligne illisible comptée ; journal absent : 3."""
+    if a.depuis and not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", a.depuis):
+        raise Erreur("refus --depuis : AAAA-MM-JJ")
+    brut = [x for x in lire(a.journal or os.path.join(a.depot, REFUS_TSV)).decode("utf-8", "replace").split(chr(10))
+            if x.strip() and not x.startswith("heure" + chr(9))]
+    lignes = [c for c in (x.split(chr(9)) for x in brut) if len(c) == 5 and re.match("[0-9]{4}-[0-9]{2}-[0-9]{2}T", c[0])]
+    vus = [x for x in lignes if x[0][:10] >= (a.depuis or "")]
+    regle = lambda x: re.fullmatch("R[0-9]+", x[2]) is not None      # noqa: E731
+    numero = lambda r: int(r[1:])      # noqa: E731
+    refuses = [x for x in vus if regle(x)]
+    print(f"journal des refus : {len(lignes)} ligne(s) lue(s), {len(brut) - len(lignes)} illisible(s) ; depuis "
+          f"{a.depuis or 'le début'} : {len(refuses)} refus")
+    print("refus par règle et par jour :")
+    par_jour = collections.Counter((x[0][:10], x[2]) for x in refuses)
+    for (jour, r), n in sorted(par_jour.items(), key=lambda kv: (kv[0][0], numero(kv[0][1]))):
+        print(f"  {jour}{chr(9)}{r}{chr(9)}{n}")
+    print("actes refusés les plus fréquents (dix au plus) :")
+    for acte, n in sorted(collections.Counter(x[3] for x in refuses).items(), key=lambda kv: (-kv[1], kv[0]))[:10]:
+        regles = ",".join(sorted({x[2] for x in refuses if x[3] == acte}, key=numero))
+        print(f"  {n}{chr(9)}{regles}{chr(9)}{acte}")
+    borne = (GC.maintenant() - timedelta(days=30)).strftime("%Y-%m-%d")
+    actives = {x[2] for x in lignes if regle(x) and x[0][:10] >= borne}
+    muettes = [r for r in regles_du_crochet() if r not in actives]
+    print(f"règles sans refus depuis trente jours (depuis le {borne}, candidates à relire) : {', '.join(muettes) or '-'}")
+    passages = [x[2] for x in vus if x[2] in ("permis", "erreur")]
+    print(f"passages : {len(passages)} (dont {passages.count('erreur')} erreur(s) interne(s), acte permis sans contrôle)")
+
+
 COMMANDES = {"sceller": sceller, "commit": commit, "diff": diff, "verser": verser, "pousser": pousser,
-             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief}
+             "publier": publier, "existe": existe, "disque": disque, "chaine": chaine, "brief": brief,
+             "motifs": motifs_arbre, "refus": refus}
 
 
 def journal(a, fautes):
@@ -968,7 +1411,10 @@ def parseur():
     s = sp.add_parser("diff")
     s.add_argument("--fichier", required=True)
     s.add_argument("--rapport")
-    sp.add_parser("verser").add_argument("--pieces", required=True)
+    s = sp.add_parser("verser")
+    s.add_argument("--pieces")
+    s.add_argument("--blanc", action="store_true")
+    s.add_argument("--script")
     s = sp.add_parser("pousser")
     for option in ("--distant", "--branche", "--acte"):
         s.add_argument(option)
@@ -978,14 +1424,34 @@ def parseur():
     s.add_argument("--min-go", type=float)
     s.add_argument("--lister", nargs="+", default=[])
     s = sp.add_parser("chaine")
-    s.add_argument("--plan", required=True)
-    s.add_argument("--cc", required=True)
+    s.add_argument("--plan")
+    s.add_argument("--cc")
     s.add_argument("--duree-pas", type=float, default=6)
     s.add_argument("--detache", action="store_true")
+    s.add_argument("--blanc", action="store_true")
+    s.add_argument("--script")
+    s.add_argument("--diffs", nargs="+", default=[])
     s = sp.add_parser("brief")
     s.add_argument("--texte", required=True)
     s.add_argument("--fiche")
+    sp.add_parser("motifs").add_argument("--arbre", action="store_true", required=True)
+    s = sp.add_parser("refus")
+    s.add_argument("--depuis")
+    s.add_argument("--journal")
     return p
+
+
+def journal_lecture_seule(a, verdict):
+    """SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1 : une ligne par passage en --lecture-seule au journal JOURNAL_LS des outils
+    (heure lue par date -u, sous-commande, tête du dépôt lu ou -, verdict : conforme, refus, erreur) ; le dépôt lu
+    n'est pas écrit."""
+    try:
+        tete = git(a.racine, "rev-parse", "--verify", "HEAD").strip()
+    except Erreur:
+        tete = "-"
+    ligne = [GC.maintenant().strftime("%Y-%m-%dT%H:%M:%SZ"), a.cmd, tete, verdict]
+    with open(JOURNAL_LS, "a", encoding="utf-8") as f:
+        f.write(chr(9).join(ligne) + chr(10))
 
 
 def main(argv=None):
@@ -993,7 +1459,20 @@ def main(argv=None):
         a = parseur().parse_args(argv)
     except SystemExit as e:
         return 0 if e.code == 0 else 3
-    fautes, a.racine = [], a.depot
+    a.racine = a.depot
+    code = _jouer(a)
+    if a.lecture_seule:
+        try:
+            journal_lecture_seule(a, {0: "conforme", 1: "refus"}.get(code, "erreur"))
+        except Exception as e:      # journal de lecture seule non écrit : erreur de l'outil, jamais 0 ni 1
+            print(f"ERREUR journal de lecture seule : {type(e).__name__} : {e}", file=sys.stderr)
+            return 3
+    return code
+
+
+def _jouer(a):
+    """Sous-commande jouée (dépôt jetable sous --lecture-seule), fautes imprimées, journal du dépôt : 0, 1 ou 3."""
+    fautes = []
     with contextlib.ExitStack() as pile:
         try:
             if a.lecture_seule:

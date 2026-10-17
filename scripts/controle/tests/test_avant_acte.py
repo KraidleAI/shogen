@@ -60,6 +60,9 @@ class Depot(unittest.TestCase):
         env = mock.patch.dict(os.environ, self.env, clear=True)
         env.start()
         self.addCleanup(env.stop)
+        ls = mock.patch.object(avant_acte, "JOURNAL_LS", os.path.join(self.tmp, "lecture-seule.tsv"), create=True)
+        ls.start()          # journal de --lecture-seule détourné, jamais celui de l'arbre (JOURNAL-LECTURE-SEULE-1)
+        self.addCleanup(ls.stop)
 
     def lancer(self, *argv, depot=None):
         sortie = io.StringIO()
@@ -338,6 +341,37 @@ class Attribution(Source):
         self.indexer({"a.md": "un" + NL + "deux, Q-4" + NL})
         self.assertEqual(self.juger("C-1 : Q-4"), (0, ""))
 
+
+    def test_plage_a_bornes_en_lettres(self):
+        """SHOGEN-GARDE-ATTRIBUTION-PLAGE-LETTRES-1 : plage à bornes en lettres (DT15-a à DT15-m, faux refus mesuré
+        par la G2 du groupe C de la phase 2) ou à zéros de tête (INT-01 à INT-25) : un diff de la plage, bornes
+        comprises, suffixe lettre et chiffre (DT15-b2) compris, est admis ; un diff hors de la plage (DT15-n, DT15-aa,
+        rangé après z, INT-26) est refusé."""
+        self.SOURCE = NL.join(["Série DT15-a à DT15-m : G2 neuve ACCEPTE-AVEC-CORRECTIONS, C-1 à C-10 reprises.", "",
+                               "Série INT-01 à INT-25 : SHOGEN-GARDE-INTEGRATION-1.", ""])
+        admis = [("x : G2 neuve ACCEPTE-AVEC-CORRECTIONS, C-1 à C-10 reprises", "DT15-j"),
+                 ("x : ACCEPTE-AVEC-CORRECTIONS, C-10", "DT15-a"), ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-m"),
+                 ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-b2"), ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-07"),
+                 ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-25")]
+        for corps, ident in admis:
+            self.assertEqual(self.juger(corps, ident), (0, ""), ident)
+        for corps, ident in [("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-n"), ("x : ACCEPTE-AVEC-CORRECTIONS", "DT15-aa"),
+                             ("x : SHOGEN-GARDE-INTEGRATION-1", "INT-26")]:
+            code, sortie = self.juger(corps, ident)
+            self.assertEqual((code, sortie[:30]), (1, "REFUS C3 : attribué par les so"), ident)
+
+    def test_plage_liste_et_bornes_melees(self):
+        """Relecture G2 du groupe A de la phase 3, C-3 : deux diffs nommés à la suite, sans virgule, dont le premier
+        finit par a (DT15-ba DT15-m) ne forment pas la plage DT15-b a DT15-m (séparateur à, a, au entre deux blancs) :
+        DT15-c refusé, DT15-ba admis ; deux bornes de sortes différentes (DT15-3 à DT15-c) ne forment pas de plage :
+        DT15-5 et DT15-b refusés."""
+        self.SOURCE = NL.join(["Série DT15-ba DT15-m : SHOGEN-GARDE-LISTE-1.", "",
+                               "Série DT15-3 à DT15-c : SHOGEN-GARDE-MELEE-1.", ""])
+        self.assertEqual(self.juger("x : SHOGEN-GARDE-LISTE-1", "DT15-ba"), (0, ""))
+        for corps, ident in [("x : SHOGEN-GARDE-LISTE-1", "DT15-c"), ("x : SHOGEN-GARDE-MELEE-1", "DT15-5"),
+                             ("x : SHOGEN-GARDE-MELEE-1", "DT15-b")]:
+            code, sortie = self.juger(corps, ident)
+            self.assertEqual((code, sortie[:30]), (1, "REFUS C3 : attribué par les so"), ident)
 
 class CommitSuite(Source):
     CORPS = "x : contre-contrôle CONFORME en deux passes"
@@ -1025,3 +1059,287 @@ class PlanDeChaine(Depot):
                            capture_output=True, text=True, env=self.env, timeout=120)
         self.assertEqual((p.returncode, p.stdout, p.stderr.startswith("ERREUR chaine : ")), (3, "", True))
         self.assertEqual(self.lancer("publier", "--texte", os.path.join(self.tmp, "absent.md")), (3, ""))
+
+
+class ChaineABlanc(Depot):
+    """SHOGEN-GARDE-RECALAGE-CHECK-1 : chaine --blanc, la chaîne jouée à blanc avant son lancement (E30, E31, E34,
+    E35, E36) ; diffs faits dans une copie de travail, l'un après l'autre (le suivant suppose le précédent)."""
+    SOURCE = "source <(sed -n '/^verif() {/,/^# --- fin de verif/p' " + chr(34) + "$OUTILS/gabarits/chaine.sh" + chr(34) + ")"
+    SCRIPT = NL.join(["#!/usr/bin/env bash", "set -Eeuo pipefail", "trap 'echo ROUGE l.$LINENO : $BASH_COMMAND >&2' ERR", SOURCE,
+                      'un() { local d="$1" m="$2" r="${3:-}"; echo "$d $m $r"; }', 'un X-1 "message"',
+                      "x=$(un X-2 m r)", ""])
+    VIEUX = "# Journal" + NL + chr(171) + " the old message is not here " + chr(187) + " ; " + "TO" + "DO: vieux" + NL
+
+    def setUp(self):
+        super().setUp()
+        self.indexer({"biblio/INDEX.md": "# index" + NL, "JOURNAL.md": self.VIEUX})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "base")
+        self.c = os.path.join(self.tmp, "travail")
+        shutil.copytree(self.d, self.c)
+
+    def faire(self, nom, fichiers):
+        ag.ecrire(self.c, fichiers)
+        ag.git(self.c, self.env, "add", "-A")
+        ag.ecrire(self.tmp, {nom: ag.git(self.c, self.env, "diff", "--cached")})
+        ag.git(self.c, self.env, "commit", "-q", "-m", nom)
+        return os.path.join(self.tmp, nom)
+
+    def blanc(self, *diffs, script=None):
+        ag.ecrire(self.tmp, {"chaine.sh": script or self.SCRIPT})
+        return self.lancer("chaine", "--blanc", "--script", os.path.join(self.tmp, "chaine.sh"), "--diffs", *diffs)
+
+    def test_k8_suite_sous_les_variables_du_lancement(self):
+        """K8 (E39) : avec --plan, la ligne du job controle-unittest de gates.yml de la copie est jouée dans la copie
+        sous l'environnement du lancement : une suite (ici factice) qui rougit quand DETACHE est posée fait refuser
+        K8 sous DETACHE=1 et passe sans ; sans --plan (diffs seuls), K8 n'est pas jouée ; ligne double : refus K8."""
+        job = "          python3 -B enforcement/verdict-suite-s2.py scripts/controle --aucun-saut --egal --plancher 1"
+        suite = NL.join(["import os, sys", "rouge = bool(os.environ.get('DETACHE'))",
+                         "print('FAIL: test_x (tests.t.C.test_x)' if rouge else 'OK')", "print('fin')",
+                         "sys.exit(1 if rouge else 0)", ""])
+        self.indexer({".github/workflows/gates.yml": job + NL, "enforcement/verdict-suite-s2.py": suite})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "gates")
+        shutil.rmtree(self.c)
+        shutil.copytree(self.d, self.c)
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        ag.ecrire(self.tmp, {"chaine.sh": self.SCRIPT, "cc.md": "GROUPES : aucun" + NL, "m1.txt": "X-1 : m" + NL,
+                             "plan": f"X-1|{d1}|{self.tmp}/m1.txt|{self.tmp}/m1.txt" + NL})
+        plan = ["chaine", "--blanc", "--script", os.path.join(self.tmp, "chaine.sh"), "--plan",
+                os.path.join(self.tmp, "plan"), "--cc", os.path.join(self.tmp, "cc.md"), "--detache"]
+        with mock.patch.dict(os.environ, {"DETACHE": "1"}):
+            self.assertEqual(self.lancer(*plan)[1][:9], "REFUS K8 ")
+            self.assertIn("FAIL: test_x (tests.t.C.test_x) | fin", self.lancer(*plan)[1])     # C-4 : cas nommé
+            self.assertEqual(self.blanc(d1), (0, ""))
+        with mock.patch.dict(os.environ, {}):
+            os.environ.pop("DETACHE", None)
+            self.assertEqual(self.lancer(*plan), (0, ""))
+        self.indexer({".github/workflows/gates.yml": job + NL + job + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "double")
+        with mock.patch.dict(os.environ, {}):
+            os.environ.pop("DETACHE", None)
+            self.assertEqual(self.lancer(*plan)[1][:9], "REFUS K8 ")
+
+    def test_motif_de_chaine_lu(self):
+        """Lot CAUSES : le motif de chaîne vient de garde/motif-chaine.txt (une ligne, ancrée), égal à MOTIF_CHAINE ;
+        fichier à deux lignes ou motif non ancré : erreur de l'outil."""
+        chemin = os.path.join(avant_acte.GC.RACINE_OUTILS, "scripts", "controle", "garde", "motif-chaine.txt")
+        with open(chemin, encoding="utf-8") as f:
+            texte = f.read()
+        self.assertEqual((texte.strip(), texte.count(NL)), (avant_acte.MOTIF_CHAINE, 1))
+        self.assertTrue(avant_acte.MOTIF_CHAINE.startswith("^"))
+        vus = ["bash /t/chaine_a.sh", "sh chaine.sh x", "/bin/bash -e ./chaine_int3.sh", "bash -Eu chaine.sh",
+               "bash scripts/controle/gabarits/chaine-modele.sh"]           # G2 du lot CAUSES (C-2)
+        hors = ["bash machaine.sh", "bash chaine_x.sh.bak", "tail -f chaine_int3.log", "pgrep -f ^bash /t.*chaine_[.]sh",
+                "/bin/bash -c source /r/s.sh && eval 'bash chaine.sh'", "python3 chaine.sh"]
+        self.assertEqual([bool(re.search(avant_acte.MOTIF_CHAINE, x)) for x in vus + hors], [True] * 5 + [False] * 6)
+        for faux in ("^a" + NL + "^b" + NL, "a" + NL):
+            with mock.patch("builtins.open", mock.mock_open(read_data=faux)):
+                with self.assertRaises(avant_acte.Erreur):
+                    avant_acte.motif_chaine()
+
+    def test_e30_e31_diffs_a_blanc(self):
+        """E30, E31 : chaque diff passe git apply --check sur HEAD plus les précédents : d1 puis d2 admis ; d2 seul
+        (il suppose d1), dans le désordre, sans saut de ligne final (E30), à chemins absolus (E31) : refus K5 ; sans
+        --script, ou plan sans rapport : erreur 3."""
+        d1, d2 = self.faire("d1.diff", {"b.md": "b" + NL}), self.faire("d2.diff", {"b.md": "b" + NL + "c" + NL})
+        self.assertEqual(self.blanc(d1, d2), (0, ""))
+        with open(d2, encoding="utf-8") as f:
+            texte = f.read()
+        ag.ecrire(self.tmp, {"e30.diff": texte[:-1], "e31.diff": f"--- {self.c}/b.md" + NL + f"+++ {self.c}/b.md" + NL
+                             + texte[texte.index("@@"):]})
+        for cas in ([d2], [d2, d1], [d1, os.path.join(self.tmp, "e30.diff")], [d1, os.path.join(self.tmp, "e31.diff")]):
+            self.assertEqual(self.blanc(*cas)[1][:9], "REFUS K5 ", cas)
+        self.assertEqual(self.lancer("chaine", "--blanc", "--diffs", d1)[0], 3)
+        self.assertEqual(self.lancer("chaine", "--plan", d1)[0], 3)
+
+    def test_e35_e36_portes_sur_lignes_ajoutees(self):
+        """E36 : les portes textuelles jugent les seules lignes ajoutées : un ajout propre à un journal qui porte un
+        vieux fragment anglais et un vieux marqueur de dette : admis ; E35 : marqueur de dette nu ajouté : refus K6 ;
+        E33 : fragment anglais ajouté entre guillemets français : refus G5 ; marqueur sous une exclusion du job g5
+        (.claude/) : admis ; K0 : diff qui touche un interdit (ni lu ni nommé)."""
+        self.assertEqual(self.blanc(self.faire("j.diff", {"JOURNAL.md": self.VIEUX + "Ajout du jour." + NL})), (0, ""))
+        code, sortie = self.blanc(self.faire("k.diff", {"c.md": "Comptes ; " + "TO" + "DO : 0" + NL}))
+        self.assertEqual((code, sortie[:30]), (1, "REFUS K6 : k.diff : c.md:1 : m"))
+        e9 = chr(171) + " fatal: not a git repository (or any of the parent directories) " + chr(187)
+        self.assertEqual(self.blanc(self.faire("g.diff", {"g.md": "Refus : " + e9 + NL}))[1][:9], "REFUS G5 ")
+        self.assertEqual(self.blanc(self.faire("x.diff", {".claude/n.md": "Comptes ; " + "TO" + "DO : 0" + NL})), (0, ""))
+        self.assertEqual(self.blanc(self.faire("i.diff", {"docs/rapports/n.md": "n" + NL}))[1][:9], "REFUS K0 ")
+
+    def test_e34_e36_script(self):
+        """Script de la chaîne : K1 bash -n ; K2 trap ERR absent, ou sans set -E (E36) ; K3 sleep d'avant-plan ;
+        K4 sous set -u, fonction appelée avec moins d'arguments qu'elle n'en lit sans protection (E34), aussi dans
+        un $( ) entre guillemets, ou $1 lu hors de toute fonction ; sleep en arrière-plan, $1 protégé, corps d'un document en ligne : admis."""
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        self.assertEqual(self.blanc(d1), (0, ""))
+        cas = [("K1", self.SCRIPT + "if true; then" + NL), ("K2", self.SCRIPT.replace("set -Eeuo", "set -euo")),
+               ("K2", self.SCRIPT.replace("trap", "# trap")), ("K3", self.SCRIPT + "sle" + "ep 60" + NL),
+               ("K4", self.SCRIPT.replace('r="${3:-}"', 'r="$3"')), ("K4", self.SCRIPT + 'echo "$1"' + NL),
+               ("K4", self.SCRIPT.replace('r="${3:-}"', 'r="$3"').replace('"message"', "m r") + 'y="$(un X-3 m)"' + NL)]
+        for code, texte in cas:
+            self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS " + code + " ", texte)
+        admis = self.SCRIPT + "sle" + "ep 1 > /dev/null &" + NL + 'echo "${1:-}"' + NL + "cat <<'F'" + NL + "$1" + NL
+        self.assertEqual(self.blanc(d1, script=admis + "F" + NL + "wait" + NL), (0, ""))
+
+    def test_k4_apostrophes_et_formes(self):
+        """Relecture G2 du groupe A de la phase 3, C-2 (E34) : une apostrophe entre guillemets (l'arbre) ou dans un
+        commentaire n'ouvre pas une chaîne et ne cache pas un $N lu sans protection, sur une ligne ou d'une ligne à
+        l'autre du corps d'une fonction ; ${N:0:1}, ${#N} et ${10} sont des lectures sans protection ; $1 écrit dans
+        un commentaire, hors de toute fonction, n'est pas lu."""
+        d1, a, h = self.faire("d1.diff", {"b.md": "b" + NL}), chr(39), chr(35)
+        corps = [['echo "l' + a + 'arbre $2 n' + a + 'est pas propre"'],
+                 ['echo "l' + a + 'étape commence"', 'local x="$2"', 'echo "c' + a + 'est fini"'],
+                 [h + " l" + a + "étape", 'local x="$2"', h + " c" + a + "est fini"],
+                 ['echo "${2:0:1}"'], ['echo "${' + h + '2}"'], ['echo "${10}"']]
+        for c in corps:
+            texte = self.SCRIPT + NL.join(["f() {"] + ["  " + x for x in c] + ["}", "f a"]) + NL
+            self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS K4 ", c)
+        self.assertEqual(self.blanc(d1, script=self.SCRIPT + h + " usage : $1" + NL), (0, ""))
+
+
+    def test_k7_verif_du_sceau(self):
+        """SHOGEN-GARDE-CHAINE-ORCH-MODELE-1 : une chaîne tire sa verif du modèle par source ($OUTILS/gabarits/
+        chaine.sh, celle que C1 juge) : sans elle, ou avec une verif écrite ou recopiée (forme de chaine_int.sh), ou
+        source d'un autre fichier, ou git commit sans acte commit (hors de la garde du sceau) : refus K7 ; le modèle
+        gabarits/chaine-modele.sh lui-même : admis."""
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        commit = 'acte commit --message m --source s && git -C "$DEPOT" commit -q -F m' + NL
+        self.assertEqual(self.blanc(d1, script=self.SCRIPT + commit), (0, ""))
+        cas = [self.SCRIPT.replace(self.SOURCE, "true"), self.SCRIPT + "verif() {" + NL + "  true" + NL + "}" + NL,
+               self.SCRIPT.replace("$OUTILS/gabarits", "$SP/gabarits"), self.SCRIPT + 'git -C "$DEPOT" -c a=b commit -q -F m' + NL]
+        for texte in cas:
+            self.assertEqual(self.blanc(d1, script=texte)[1][:9], "REFUS K7 ", texte)
+        modele = os.path.join(os.path.dirname(os.path.abspath(avant_acte.__file__)), "gabarits", "chaine-modele.sh")
+        self.assertEqual(self.lancer("chaine", "--blanc", "--script", modele, "--diffs", d1), (0, ""))
+
+    def test_k7_chaque_commit_garde(self):
+        """Relecture G2 du groupe A de la phase 3, C-4 : chaque git commit de la chaîne suit, sur sa ligne, un acte
+        commit ... && : un second commit nu après un commit gardé, git --no-pager commit, git -c avec une valeur entre
+        guillemets, acte commit suivi de ; et non de && , git nommé par son chemin (CC de l'intégration P3, R-4) :
+        refus K7 ; git log ou git commit-tree : pas un commit ;
+        commit gardé : admis. Verif tirée par une ligne commentée, ou par un source du fichier entier (sans verif) :
+        refus K7."""
+        d1 = self.faire("d1.diff", {"b.md": "b" + NL})
+        garde = 'acte commit --message m --source s && git -C "$DEPOT" commit -q -F m' + NL
+        for x in ['git -C "$DEPOT" commit -q -m x', "git --no-pager commit -q -m x", 'git -c user.name="b c" commit -q',
+                  "acte commit --message m ; git commit -q -F m", '/usr/bin/git -C "$DEPOT" commit -q -m x']:
+            self.assertEqual(self.blanc(d1, script=self.SCRIPT + garde + x + NL)[1][:9], "REFUS K7 ", x)
+        for texte in [self.SCRIPT.replace(self.SOURCE, chr(35) + " " + self.SOURCE),
+                      self.SCRIPT.replace(self.SOURCE, 'source "$OUTILS/gabarits/chaine.sh"')]:
+            self.assertEqual(self.blanc(d1, script=texte + garde)[1][:9], "REFUS K7 ", texte)
+        autres = 'git -C "$DEPOT" log --format=%B | grep -F commit > /dev/null || true' + NL + "git commit-tree -h || true" + NL
+        self.assertEqual(self.blanc(d1, script=self.SCRIPT + garde + autres), (0, ""))
+
+    def test_copie_creuse_exclut_les_interdits(self):
+        """Relecture G2 du groupe A de la phase 3, C-6 : copie_creuse n'extrait ni un chemin sous un préfixe INTERDITS
+        (docs/rapports/, docs/15-) ni un *.jsonl, à toute profondeur ; le reste de HEAD y est."""
+        self.indexer({"docs/rapports/n.md": "n" + NL, "docs/15-x.md": "x" + NL, "a.jsonl": "{}" + NL,
+                      "sous/b.jsonl": "{}" + NL})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "interdits")
+        noms = ("docs/rapports/n.md", "docs/15-x.md", "a.jsonl", "sous/b.jsonl", "JOURNAL.md")
+        with tempfile.TemporaryDirectory() as d:
+            copie, _env = avant_acte.copie_creuse(self.d, d)
+            vus = [os.path.exists(os.path.join(copie, x)) for x in noms]
+        self.assertEqual(vus, [False, False, False, False, True])
+
+class VersementABlanc(Depot):
+    """SHOGEN-GARDE-RECALAGE-CHECK-1 : verser --blanc --script S, le script de versement joué sur une copie creuse
+    (contrat SHOGEN_DEPOT), puis jugé sur ce qu'il y a écrit (E32, E33, E35, E36) ; gabarits/versement.py."""
+    INDEX = NL.join(["# index", "| nom | a | b | c | d | e | f |", "|---|---|---|---|---|---|---|",
+                     "| `x.pdf` | 1 | 2 | 3 | 4 | 5 | 6 |", ""])
+    HUIT, SEPT = "| `y.pdf` | 1 | 2 | 3 | 4 | 5 | 6 | 7 |" + NL, "| `y.pdf` | 1 | 2 | 3 | 4 | 5 | 6 |" + NL
+
+    def setUp(self):
+        super().setUp()
+        ici = os.path.dirname(os.path.abspath(avant_acte.__file__))
+        with open(os.path.join(ici, "gabarits", "versement.py"), encoding="utf-8") as f:
+            self.gabarit = f.read()
+        with open(os.path.join(ici, "garde_commun.py"), encoding="utf-8") as f:      # lu par le gabarit dans le dépôt
+            commun = f.read()
+        self.indexer({"biblio/INDEX.md": self.INDEX, "JOURNAL.md": ChaineABlanc.VIEUX, ".gitignore": "*.log" + NL,
+                      "scripts/controle/garde_commun.py": commun, "suivi.log": "x ; " + "TO" + "DO : 0" + NL})
+        ag.git(self.d, self.env, "add", "-f", "suivi.log")      # suivi mais ignoré : dans la copie, jamais compté écrit
+        ag.git(self.d, self.env, "commit", "-q", "-m", "base")
+
+    def verser(self, corps=None, actes=None):
+        """Script écrit (corps, ou le gabarit aux ACTES donnés), joué à blanc ; rend (code, sortie, état du dépôt)."""
+        texte = corps if actes is None else self.gabarit.replace("ACTES = []", "ACTES = " + repr(actes))
+        ag.ecrire(self.tmp, {"verser.py": texte})
+        code, sortie = self.lancer("verser", "--blanc", "--script", os.path.join(self.tmp, "verser.py"))
+        return code, sortie, ag.git(self.d, self.env, "status", "--porcelain")
+
+    def test_e32_rangee_lue_et_ordre(self):
+        """E32 : gabarit, rangée de huit cellules sous un en-tête de sept : refus du gabarit avant toute écriture,
+        V8 ; rangée de sept : admis ; script qui écrit la rangée de huit lui-même : V9 (compte lu) ; script qui écrit
+        puis échoue sur son contrôle : V8, écriture avant contrôle nommée ; le dépôt n'est jamais écrit."""
+        code, sortie, etat = self.verser(actes=[("biblio/INDEX.md", self.HUIT)])
+        self.assertEqual((code, sortie[:22], "écrit" in sortie, etat), (1, "REFUS V8 : le versemen", False, ""))
+        self.assertEqual(self.verser(actes=[("biblio/INDEX.md", self.SEPT)]), (0, "", ""))
+        self.assertEqual(self.verser(actes=[]), (0, "", ""))
+        lien = "import os" + NL + "D = os.environ['SHOGEN_DEPOT']" + NL
+        ecrire = "open(os.path.join(D, 'biblio', 'INDEX.md'), 'a').write(" + repr(self.HUIT) + ")" + NL
+        code, sortie, etat = self.verser(lien + ecrire)
+        v9 = sortie.startswith("REFUS V9 : biblio/INDEX.md:5 : 8 cellules, en-tête de 7 (E32)")
+        self.assertEqual((code, v9, etat), (1, True, ""))
+        code, sortie, etat = self.verser(lien + "open(os.path.join(D, 'd17.md'), 'a').write('x')" + NL + "assert 0" + NL)
+        self.assertEqual((code, sortie[:9], "après avoir écrit 1 fichier" in sortie, etat), (1, "REFUS V8 ", True, ""))
+
+    def test_e33_e35_portes_et_contrat(self):
+        """E33, E35, E36 : pièce neuve à fragment anglais entre guillemets : G5 ; marqueur de dette nu ajouté : K6 ;
+        ajout propre à un journal qui porte de vieux fragments : admis ; script sans SHOGEN_DEPOT : V8, jamais lancé ;
+        script qui écrit dans le dépôt lui-même : V8."""
+        e9 = chr(171) + " fatal: not a git repository (or any of the parent directories) " + chr(187)
+        self.assertEqual(self.verser(actes=[("docs/piece.md", "Refus : " + e9 + NL)])[1][:9], "REFUS G5 ")
+        self.assertEqual(self.verser(actes=[("JOURNAL.md", "Comptes ; " + "TO" + "DO : 0" + NL)])[1][:9], "REFUS K6 ")
+        self.assertEqual(self.verser(actes=[("JOURNAL.md", "Ajout du jour." + NL)]), (0, "", ""))
+        temoin = os.path.join(self.tmp, "lance")
+        code, sortie, _e = self.verser("open(" + repr(temoin) + ", 'w')" + NL)
+        self.assertEqual((code, sortie[:9], os.path.exists(temoin)), (1, "REFUS V8 ", False))
+        code, sortie, etat = self.verser("# SHOGEN_DEPOT ignoré" + NL + "open(" + repr(os.path.join(self.d, "z.md"))
+                                         + ", 'w').write('z')" + NL)
+        self.assertEqual((code, sortie[:9], etat), (1, "REFUS V8 ", "?? z.md" + NL))
+
+    def test_borne_et_descendant_detache(self):
+        """Relecture G2 du groupe A de la phase 3, C-5 : un descendant du script, dans sa propre session, qui garde la
+        sortie ouverte ne retient pas verser --blanc : script sorti à 0 : sortie 0 en moins de 10 s (avant : la vie du
+        descendant, 30 s, et une erreur de borne) ; script qui boucle au-delà de la borne (1 s ici) : erreur 3 en
+        moins de 10 s, et son enfant du même groupe arrêté avec lui (groupe entier). Descendants arrêtés par le test."""
+        pid, dort = os.path.join(self.tmp, "descendants.pid"), "[sys.executable, '-c', 'import time; time.sleep(30)']"
+        lance = NL.join(["import os, subprocess, sys", "D = os.environ['SHOGEN_DEPOT']",
+                         "p = subprocess.Popen(" + dort + ", start_new_session=True)", "q = subprocess.Popen(" + dort + ")",
+                         "open(" + repr(pid) + ", 'w').write(str(p.pid) + ' ' + str(q.pid))", ""])
+
+        def mort(n):
+            for _k in range(50):
+                try:
+                    with open(f"/proc/{n}/stat", encoding="utf-8") as f:
+                        if f.read().rsplit(")", 1)[1].split()[0] == "Z":
+                            return True
+                except FileNotFoundError:
+                    return True
+                time.sleep(0.1)
+            return False
+        for fin, borne, attendu in (("", 300, (0, True, False)), ("while True: pass" + NL, 1, (3, True, True))):
+            debut = time.monotonic()
+            try:
+                with mock.patch.object(avant_acte, "BORNE_VERSER", borne):
+                    code = self.verser(lance + fin)[0]
+                with open(pid, encoding="utf-8") as f:
+                    p, q = [int(x) for x in f.read().split()]
+                self.assertEqual((code, time.monotonic() - debut < 10, borne == 1 and mort(q)), attendu, borne)
+            finally:
+                with open(pid, encoding="utf-8") as f:
+                    for x in f.read().split():
+                        with contextlib.suppress(ProcessLookupError):
+                            os.kill(int(x), 9)
+
+    def test_gabarit_refus_et_barre_echappee(self):
+        """Relecture G2 du groupe A de la phase 3, C-6 : le gabarit refuse avant toute écriture une cible hors du dépôt
+        et une cible sans saut de ligne final (V8, rien d'écrit) ; une barre échappée n'est pas une cellule : rangée
+        de sept cellules dont l'une porte une barre échappée, admise (V9 et gabarit)."""
+        self.indexer({"sans-fin.md": "x"})
+        ag.git(self.d, self.env, "commit", "-q", "-m", "sans fin")
+        for actes, motif in (([("../hors.md", "x" + NL)], "hors du dépôt"), ([("sans-fin.md", "y" + NL)], "saut de ligne")):
+            code, sortie, etat = self.verser(actes=actes)
+            self.assertEqual((code, sortie[:22], motif in sortie, "écrit" in sortie, etat),
+                             (1, "REFUS V8 : le versemen", True, False, ""), motif)
+        echappee = "| `y.pdf` | a " + chr(92) + "| b | 2 | 3 | 4 | 5 | 6 |" + NL
+        self.assertEqual(self.verser(actes=[("biblio/INDEX.md", echappee)]), (0, "", ""))

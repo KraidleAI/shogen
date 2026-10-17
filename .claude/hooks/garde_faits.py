@@ -39,7 +39,7 @@ nombre d'un ou deux chiffres suivi d'une unité ou d'une grandeur de la feuille 
 ni décimal, qu'aucun outil n'a affiché (séparateurs de milliers admis : 1 715, 1,715, 1 715). Au second arrêt
 du même tour, laisser passer et le consigner (fichier d'état sous le dossier de la session).
 Journal des décisions : <dossier de session>/garde-faits.log (une ligne par refus et par passage consigné).
-Sortie : 0 permis ; 2 refusé ; 0 avec note sur stderr si le journal est illisible (jamais un refus aveugle).
+Sortie : 0 permis ; 2 refusé ; journal illisible ou erreur interne : voir SHOGEN-GARDE-ERREUR-INTERNE-1 en fin de texte.
 Acte lu, non texte (phase 2, SHOGEN-GARDE-CROCHET-ACTE-1, LN-6) : R1, R2, R3 et le texte de R5 se lisent sur les actes
 de la commande (acte_shell.py, voisin : rm récursif, git worktree remove, redirections, tee, sed -i, open en écriture
 d'un code python, git commit et push, gh et curl vers la forge) ; un commit cité dans un heredoc ou un argument n'en est
@@ -67,11 +67,34 @@ capitales internes, sigles, domaine d'un courriel) au JOURNAL et dans docs/publi
 en contexte et le garde (garde-faits.releve) ; au Stop, si le dernier message de l'humain porte un nom propre, une
 réponse qui nomme un dossier de DOSSIERS absent du message et de tout fait du tour (résultat d'outil, relevé) est
 refusée une fois (stop_hook_active : passage consigné). G2, C-5 : DOSSIERS se lit dans le fichier versé
-scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien."""
+scripts/controle/garde/dossiers.txt (un nom par ligne, # : commentaire) ; absent ou vide : R10 ne refuse rien.
+Phase 3 (journal des refus, SHOGEN-GARDE-FOUS-ORCH-1) : chaque refus et chaque passage écrit une ligne au journal
+scripts/controle/garde/refus.tsv (consigner : heure, événement, règle ou permis, acte abrégé sans secret, agent) ; au
+premier message d'une session, UserPromptSubmit affiche les refus depuis le dernier relevé (releve_refus).
+SHOGEN-GARDE-ERREUR-INTERNE-1 (GARDE-FOUS phase 3, groupe B ; G2 du correctif CQ-1, C-1) : sens sûr par règle. Une
+erreur interne, ou un journal illisible, pendant le jugement d'un acte qui écrit, commet, pousse, supprime ou crée une
+PR (R1 à R3, R5, R8 : tout PreToolUse hors lecture pure) est un refus qui nomme l'erreur ; une lecture pure
+(lecture_pure : commandes simples de LECTURE, git en GIT_LECTURE, sans redirection d'écriture, substitution,
+affectation ni $ sur git ; outils mcp__github__ get_, list_, search_) reste permise, l'erreur écrite sur stderr et au
+journal des décisions ; Stop, SubagentStop et UserPromptSubmit : permis, erreur écrite (ni écriture ni acte).
+R12 (E29, SHOGEN-GARDE-REPONSE-INVESTISSEUR-1), Stop seul : chaque nombre à unité de la réponse (texte de l'agent après
+son dernier appel d'outil ; unités de R12_NOMBRE) doit être porté, avec une forme de son unité (R12_FORMES, française
+ou anglaise) sur la même ligne, par un résultat d'outil ou une pièce jointe du tour, ou par le message de l'humain qui
+l'ouvre ; fenêtre : depuis le dernier message de l'humain (tour_humain). Sinon refus qui nomme le nombre et demande la
+lecture de la pièce ; au second arrêt du tour (stop_hook_active), passage consigné. R6 n'est pas modifiée.
+R13 (lot CAUSES ; E37, E39, E40), PreToolUse : (a) une chaîne de commits tourne (pgrep -f du motif ancré lu dans
+scripts/controle/garde/motif-chaine.txt, partagé avec avant_acte et mutants.py) : tout Bash qui lance un processus lourd
+(cargo, xtask, mutants.py) ou une seconde chaîne est refusé, un seul lot lourd à la fois sur l'hôte ; (b) tout Bash
+qui lance une chaîne (script chaine.sh, chaine_*.sh ou chaine-*.sh lancé par un shell, source, . ou par son nom ; un
+argument de cp, cat ou grep n'est pas lancé) ne lance qu'une copie à l'octet de scripts/controle/gabarits/chaine-modele.sh
+(sha256 égal), jamais une chaîne écrite à la main ; (c) une consigne (Agent, Workflow, SendMessage) qui dit qu'une gate ou un
+contrôle a rougi cite une ligne VIOLATION … ou REFUS … lue telle quelle dans un résultat d'outil du journal de l'agent,
+jamais une cause déduite ; motif-chaine.txt absent : (a) ne détecte rien, (b) et (c) jugent."""
 import importlib.util
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from urllib.parse import urlsplit
@@ -132,6 +155,16 @@ NOM_PROPRE = re.compile(r"(?<![\w@./-])([A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+|[A-Z]{
                         r"(?![\w-])")
 RAPPEL = re.compile(r"<system-reminder>.*?</system-reminder>", re.S)
 FORGE_HOTE = re.compile(r"(?i)(?<![\w-])api\.github\.com(?![\w-])")     # hôte de la forge dans le texte (sens sûr)
+ENTETE_REFUS = chr(9).join(["heure", "evenement", "regle", "acte", "agent"]) + chr(10)
+REGLE = ["permis"]         # règle du refus en cours (phase 3, journal des refus) : posée par refuser et par juger
+CLE_SECRETE = re.compile("(?i)((?:api[_-]?key|secret|token|passw(?:or)?d|authorization|bearer)[^ =:]*[ ]*[=:]?[ ]*"
+                         "(?:(?:bearer|basic|token) )?)([^ '" + chr(34) + "]+|'[^']*'|" + chr(34) + "[^" + chr(34) + "]*"
+                         + chr(34) + ")")
+JETON_SECRET = re.compile("(?<![A-Za-z0-9_+/=-])(?:(?=[A-Za-z0-9_+/=-]*[0-9])(?=[A-Za-z0-9_+/=-]*[a-z])"
+                          "(?=[A-Za-z0-9_+/=-]*[A-Z])[A-Za-z0-9_+/=-]{24,}|(?:sk-|ghp_|gho_|github_pat_|xox[baprs]-|AIza"
+                          "|AKIA)[A-Za-z0-9_-]{8,})")
+MOT_DE_PASSE = re.compile("(?i)(?<![a-z0-9+.-])([a-z][a-z0-9+.-]*://[^/ :@]*:)[^/ @]+(?=@)"      # URL user:mot@hôte
+                          "|(?<![^ ])((?:-u|--user)[ =]?[^ :]*:)[^ ]+")      # curl -u user:mot (G2 du groupe C, C-2)
 FORGE_JOB = re.compile(r'"runner_id"\s*:\s*[1-9]|"conclusion"\s*:\s*"success"|\bcompleted\s+success\b')
 
 
@@ -182,12 +215,13 @@ def faits_et_appels(entrees):
     for e in entrees:
         t = e.get("type")
         if t == "user":
-            for b in (e.get("message") or {}).get("content") or []:
+            c = (e.get("message") or {}).get("content")     # SHOGEN-GARDE-CROCHET-MESSAGE-CHAINE-1 : chaîne ou liste
+            for b in [c] if isinstance(c, str) else c or []:
                 if isinstance(b, dict) and b.get("type") == "tool_result":
                     txt = contenus(b)
                     if MARQUE not in txt:
                         faits.append(txt)
-                else:
+                elif MARQUE not in contenus(b):      # refus du crochet : jamais un texte humain (R5 ; G2 B, C-2)
                     humain.append(contenus(b))
             tur = e.get("toolUseResult")
             if tur is not None:
@@ -284,6 +318,7 @@ def hex_affiche(h, hexs):
 
 
 def refuser(motif):
+    REGLE[0] = (re.match("R[0-9]+", motif) or ["?"])[0]
     sys.stderr.write(f"{MARQUE} : REFUS. {motif}\n")
     sys.exit(2)
 
@@ -294,6 +329,104 @@ def journaliser(dossier, ligne):
             f.write(ligne.rstrip("\n") + "\n")
     except OSError:
         pass
+
+
+def abreger(texte):
+    """Acte abrégé du journal des refus : blancs réduits (ni tabulation ni saut de ligne), secrets masqués (***),
+    80 caractères au plus (le masque passe avant la coupe) ; mot de passe d'une URL et de curl -u masqué (G2, C-2)."""
+    t = CLE_SECRETE.sub(lambda m: m[1] + "***", " ".join(str(texte).split()))
+    t = MOT_DE_PASSE.sub(lambda m: (m[1] or m[2]) + "***", t)
+    return JETON_SECRET.sub("***", t)[:80]
+
+
+def chemin_refus():
+    """Journal des refus (phase 3) : SHOGEN_GARDE_REFUS si posé (les tests le posent ; /dev/null : éteint), sinon
+    scripts/controle/garde/refus.tsv du dépôt du crochet (non versionné : .gitignore du dossier)."""
+    return os.environ.get("SHOGEN_GARDE_REFUS") or os.path.join(RACINE, "scripts", "controle", "garde", "refus.tsv")
+
+
+def consigner(entree, regle, acte="-"):
+    """Phase 3 : une ligne au journal des refus (heure lue par date -u, événement, règle ou permis, erreur, releve,
+    acte abrégé, agent) ; en-tête posé par lien d'un fichier complet (jamais deux, jamais à demi), ligne ajoutée d'un
+    seul write en O_APPEND (atomique entre crochets concurrents) ; dossier absent, erreur, chemin en .jsonl : rien,
+    jamais un refus."""
+    try:
+        chemin = chemin_refus()
+        if chemin.endswith(".jsonl"):
+            return
+        heure = subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, timeout=10).stdout
+        ev = entree.get("hook_event_name", "") + (":" + entree["tool_name"] if entree.get("tool_name") else "")
+        champs = [heure, ev, regle, abreger(acte), entree.get("agent_id") or "principal"]
+        ligne = chr(9).join(" ".join(str(x).split()) or "-" for x in champs) + chr(10)
+        if not os.path.exists(chemin):
+            tmp = f"{chemin}.{os.getpid()}.tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(ENTETE_REFUS)
+            try:
+                os.link(tmp, chemin)
+            except FileExistsError:
+                pass
+            finally:
+                os.unlink(tmp)
+        fd = os.open(chemin, os.O_WRONLY | os.O_APPEND)
+        try:
+            os.write(fd, ligne.encode("utf-8"))
+        finally:
+            os.close(fd)
+    except Exception:
+        pass
+
+
+def lire_tete(chemin):
+    """Entrées JSON du journal de session, lues une à une depuis son début (releve_refus, G2 du groupe C, C-3 : le
+    premier message de l'humain est en tête ; la queue d'un journal de plus de QUEUE octets ne le porte plus)."""
+    try:
+        with open(chemin, "rb") as f:
+            for ligne in f:
+                try:
+                    yield json.loads(ligne)
+                except ValueError:
+                    continue
+    except OSError:
+        return
+
+
+def releve_refus(entree):
+    """Phase 3 : au premier message d'une session (aucun autre message de l'humain à son journal), ligne du relevé :
+    refus du journal depuis la dernière ligne releve, par règle ; une ligne releve est écrite ; sinon None (journal
+    éteint, /dev/null, compris). G2, C-3 : journal de session lu depuis sa tête (lire_tete) ; journal des refus absent
+    ou non écrit après la ligne releve : le relevé le dit, jamais « 0 refus »."""
+    prompt = (entree.get("prompt") or "").strip()
+    if chemin_refus() == os.devnull:
+        return None
+    for e in lire_tete(entree.get("transcript_path") or ""):
+        c = (e.get("message") or {}).get("content") if e.get("type") == "user" and not e.get("isMeta") else None
+        blocs = [c] if isinstance(c, str) else [b for b in c or [] if isinstance(b, dict) and b.get("type") == "text"]
+        txt = RAPPEL.sub("", chr(10).join(contenus(b) for b in blocs)).strip()
+        outils = isinstance(c, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in c)
+        if txt and txt != prompt and MARQUE not in txt and not outils:
+            return None
+    try:
+        with open(chemin_refus(), "rb") as f:
+            f.seek(0, 2)
+            n = f.tell()
+            f.seek(max(0, n - QUEUE))
+            brut = f.read().decode("utf-8", "replace").split(chr(10))[1 if n > QUEUE else 0:]
+    except OSError:
+        brut = []
+    lignes = [x.split(chr(9)) for x in brut if x.count(chr(9)) == 4]
+    k = max((i for i, x in enumerate(lignes) if x[2] == "releve"), default=-1)
+    refus = [x[2] for x in lignes[k + 1:] if re.fullmatch("R[0-9]+", x[2])]
+    regles = sorted(set(refus), key=lambda r: (-refus.count(r), int(r[1:])))
+    consigner(entree, "releve", f"{len(refus)} refus")
+    if not os.path.isfile(chemin_refus()):
+        return (f"RELEVÉ DES REFUS (crochet du dépôt, phase 3) : journal {chemin_refus()} absent ou non écrit : aucun "
+                "refus relevé")
+    return (f"RELEVÉ DES REFUS (crochet du dépôt, phase 3) : {len(refus)} refus depuis "
+            + (f"le dernier relevé ({lignes[k][0]})" if k >= 0 else "le début du journal")
+            + (" : " + ", ".join(f"{r} ×{refus.count(r)}" for r in regles) if regles else "")
+            + " ; détail : python3 -I -B scripts/controle/avant_acte.py refus"
+            + (f" --depuis {lignes[k][0][:10]}" if k >= 0 else ""))
 
 
 def journal_de_l_agent(entree):
@@ -526,9 +659,15 @@ def releve(noms):
 
 
 def soumission(entree):
-    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0."""
+    """UserPromptSubmit (R10, E26) : relevé des noms propres du message, affiché en contexte et gardé ; sortie 0. Phase
+    3 : au premier message d'une session, la ligne du relevé des refus (releve_refus) en dernier."""
+    try:
+        ligne = releve_refus(entree)
+    except Exception:      # G2 du groupe C, C-3 : le relevé des refus ne fait jamais tomber le relevé E26
+        ligne = None
     noms = noms_propres(entree.get("prompt") or "")
     if not noms:
+        print(ligne or "", end=chr(10) if ligne else "")
         return 0
     texte = (f"RELEVÉ (crochet du dépôt, E26) : noms propres du message : {', '.join(noms)}. Avant de rattacher ce "
              "message à un dossier, lire ces lignes (grep -n) :\n" + "\n".join(releve(noms)))
@@ -538,7 +677,7 @@ def soumission(entree):
             f.write(json.dumps(noms, ensure_ascii=False) + "\n" + texte)
     except OSError:
         pass
-    print(texte)
+    print(texte + (chr(10) + ligne if ligne else ""))
     return 0
 
 
@@ -546,6 +685,128 @@ def dossiers():
     """Dossiers du projet (R10, E26 ; G2, C-5), lus dans scripts/controle/garde/dossiers.txt : un nom par ligne."""
     texte = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "dossiers.txt"))
     return [x.strip() for x in texte.split("\n") if x.strip() and not x.lstrip().startswith("#")]
+
+
+def motif_chaine():
+    """R13 : motif ancré d'une chaîne de commits, lu dans scripts/controle/garde/motif-chaine.txt (une ligne) ;
+    absent : chaîne de caractères vide (aucune détection)."""
+    texte = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "motif-chaine.txt")).strip()
+    return texte if texte.startswith("^") and "\n" not in texte else ""
+
+
+def chaine_en_cours():
+    """R13 (a) : vrai si un processus de l'hôte répond au motif de chaîne (pgrep -f) ; motif vide ou pgrep en erreur :
+    faux (rien d'affirmé)."""
+    motif = motif_chaine()
+    if not motif:
+        return False
+    try:
+        p = subprocess.run(["pgrep", "-f", motif], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return p.returncode == 0
+
+
+LOURD = re.compile(r"(^|/)(cargo|xtask|mutants\.py)$")
+CHAINE_SH = re.compile(r"(^|/)chaine([-_][^/]*)?\.sh$")
+SHELLS_R13, PYTHON_R13 = ("bash", "sh", "dash", "zsh", "ksh"), re.compile(r"^python[0-9.]*$")
+
+
+def lances(acte):
+    """R13 (G2 du lot CAUSES, C-2) : mots qu'un acte lance : son programme (après les enveloppes timeout, env, setsid,
+    nohup…), le script d'un shell, de source ou de ., les arguments d'un sh -c (le texte du -c est lu en actes), le
+    script d'un python ; un argument d'un autre programme (grep cargo, cp … chaine_x.sh) n'est pas lancé."""
+    mots, prog = acte["mots"], acte["prog"]
+    if not mots:
+        return []
+    if prog in ("source", "."):
+        return mots[1:2]
+    if prog not in SHELLS_R13 and not PYTHON_R13.match(prog):
+        return mots[:1]
+    k = 1
+    while k < len(mots) and mots[k][:1] in "-+" and mots[k] not in ("-", "--"):
+        if prog in SHELLS_R13 and not mots[k].startswith("--") and "c" in mots[k][1:]:
+            return mots[k + 2:]
+        if prog not in SHELLS_R13 and mots[k] in ("-c", "-m"):
+            return []
+        k += 2 if mots[k] in ("-o", "+o", "-O", "+O", "-X", "-W") else 1
+    k += 1 if k < len(mots) and mots[k] == "--" else 0
+    return mots[k:k + 1]
+
+
+def processus_lourd(actes):
+    """R13 (a) : programmes lourds (cargo, xtask, mutants.py) que lancent les actes, enveloppes comprises (bash -c,
+    timeout, env, setsid, nohup, python3 … mutants.py) ; un mot qui les nomme sans les lancer (grep cargo) ne compte
+    pas (G2 du lot CAUSES, C-2)."""
+    return [m for a in actes or [] for m in lances(a) if LOURD.search(m)]
+
+
+def chaines_lancees(actes, cwd):
+    """R13 (b) : [(mot, chemin)] des scripts chaine.sh, chaine_*.sh ou chaine-*.sh que les actes lancent, résolus depuis
+    cwd ; après un cd ou un pushd, un mot relatif ne se résout pas (chemin vide : refus, G2 du lot CAUSES, C-2)."""
+    cd = any(a["prog"] in ("cd", "pushd") for a in actes or [])
+    return [(m, m if os.path.isabs(m) else "" if cd else os.path.join(cwd, m)) for a in actes or [] for m in lances(a)
+            if CHAINE_SH.search(m)]
+
+
+def sha256_fichier(chemin):
+    import hashlib
+    try:
+        with open(chemin, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+def chaine_hors_modele(actes, cwd):
+    """R13 (b) : [(chemin, raison)] des chaînes lancées qui ne sont pas une copie à l'octet du modèle versé
+    scripts/controle/gabarits/chaine-modele.sh (modèle absent : toute chaîne est refusée)."""
+    modele = sha256_fichier(os.path.join(RACINE, "scripts", "controle", "gabarits", "chaine-modele.sh"))
+    fautes = []
+    for m, c in chaines_lancees(actes, cwd):
+        h = sha256_fichier(c) if c else ""
+        if not modele:
+            fautes.append((m, "modèle scripts/controle/gabarits/chaine-modele.sh absent du dépôt"))
+        elif not c:
+            fautes.append((m, "chemin relatif après un cd : chemin absolu exigé"))
+        elif not h:
+            fautes.append((c, "script illisible"))
+        elif h != modele:
+            fautes.append((c, "script différent du modèle (sha256)"))
+    return fautes
+
+
+SUJET_GATE = r"(gates?|S-G[0-9]+|R-?[0-9]+|K[0-9]+|V[0-9]+|presg5|jobs?|crochet|contrôles?|vérifications?|verif|xtask|lint)"
+ROUGEUR = (r"(rougi[ets]?|rouges?|refus[ée]*s?|refuse|violations?|échou[ée]*s?|échoue|échecs?|bloqu[ée]*s?|failed|fails?|"
+           r"red|refused|rejected|blocked)")
+GATE_ROUGE = re.compile(rf"\b{SUJET_GATE}\b[^.;:\n]{{0,60}}?\b{ROUGEUR}\b|\b{ROUGEUR}\b[^.;:\n]{{0,20}}?\b(par|à|by)\s+"
+                        rf"((la|une|le|the|a)\s+)?{SUJET_GATE}\b", re.I)
+CITATION = re.compile(r"VIOLATION [^\s:]+:[0-9]+|REFUS[.]? [A-Z][A-Za-z0-9-]*")
+
+
+def textes_de(x):
+    """R13 (c) : textes bruts d'une entrée d'outil (valeurs chaînes, en profondeur), jamais son JSON (guillemets et
+    sauts de ligne échappés : G2 du lot CAUSES, C-3)."""
+    if isinstance(x, str):
+        return x
+    if isinstance(x, dict):
+        return "\n".join(textes_de(v) for v in x.values())
+    if isinstance(x, list):
+        return "\n".join(textes_de(v) for v in x)
+    return ""
+
+
+def cause_sans_ligne(texte, entrees):
+    """R13 (c) : vrai si la consigne dit qu'une gate ou un contrôle a rougi (sujet de gate et mot de rougeur, français
+    ou anglais, GATE_ROUGE) sans citer une ligne VIOLATION chemin:ligne … ou REFUS <règle> …, ou si une ligne qu'elle
+    cite n'est pas, entière, la fin d'une ligne d'un résultat d'outil du journal (G2 du lot CAUSES, C-3 : toute
+    citation jugée, une ligne inventée refusée même sans mot de rougeur)."""
+    cits = [m.start() for m in CITATION.finditer(texte)]
+    if not cits:
+        return bool(GATE_ROUGE.search(texte))
+    lues = {ligne[m.start():].rstrip() for _n, _i, r in appels_resultats(entrees) if r for ligne in r.split("\n")
+            for m in CITATION.finditer(ligne)}
+    return not all(any(texte.startswith(x, i) for x in lues) for i in cits)
 
 
 def dossiers_sans_releve(entree):
@@ -607,7 +868,12 @@ def pre_tool_use(entree):
     chemin, dossier = journal_de_l_agent(entree)
     entrees = lire_queue(chemin)
     if entrees is None:
-        sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; acte permis sans contrôle.\n")
+        if acte_qui_ecrit(entree):          # SHOGEN-GARDE-ERREUR-INTERNE-1 : sens sûr
+            refuser(f"R0 (erreur interne) : journal illisible ({chemin}) : un acte qui écrit, commet, pousse, supprime "
+                    "ou crée une PR ne se juge pas sans lui (R1 à R3, R5, R8) ; relire le chemin du journal, ou agir "
+                    "par une lecture.")
+        REGLE[0] = "erreur"          # journal des refus : lecture permise sans contrôle (CC de l'intégration P3, R-1)
+        sys.stderr.write(f"{MARQUE} : journal illisible ({chemin}) ; lecture pure permise sans contrôle.\n")
         return 0
     faits, appels, agent, humain = faits_et_appels(entrees)
     cmds = commandes_git_recentes(appels)
@@ -664,6 +930,15 @@ def pre_tool_use(entree):
             refuser(attente)
         if motifs and re.search(r"\bp(kill|grep)\s[^;&|]*-[a-zA-Z]*f", c) and not re.search(r"\s['\"]?\^", c):
             refuser(ancre)
+        # R13 (E37, E39) : un seul lot lourd à la fois ; une chaîne lancée est le modèle, à l'octet
+        lourds = processus_lourd(fc["actes"]) if fc["actes"] is not None else re.findall(r"\b(cargo|xtask|mutants\.py)\b", c)
+        lourds += [os.path.basename(m) for m, _c in chaines_lancees(fc["actes"], cwd)]     # C-2 : une chaîne est un lot lourd
+        if lourds and chaine_en_cours():
+            refuser(f"R13 (E37) : {lourds[0]} pendant qu'une chaîne de commits tourne sur l'hôte (un seul lot lourd à la "
+                    "fois) ; attendre la fin de la chaîne (until ! pgrep -f '<motif de garde/motif-chaine.txt>' ; do sleep 30; done).")
+        for chemin_chaine, raison in chaine_hors_modele(fc["actes"], cwd):
+            refuser(f"R13 (E39) : chaîne {os.path.basename(chemin_chaine)} lancée hors du modèle : {raison} ; copier "
+                    "scripts/controle/gabarits/chaine-modele.sh tel quel (cp, cmp) et le lancer avec PLAN, CC, OUTILS.")
     elif nom in ("Edit", "MultiEdit", "Write"):
         fp = inp.get("file_path", "")
         if fp.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
@@ -678,6 +953,9 @@ def pre_tool_use(entree):
                 refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
         if nom in ("Agent", "Workflow"):
             controler_briefs(inp, cwd)      # R11
+        if cause_sans_ligne(textes_de(inp), entrees):     # R13 (c), E40
+            refuser("R13 (E40) : la consigne dit qu'une gate ou un contrôle a rougi sans citer une ligne VIOLATION … ou "
+                    "REFUS … lue dans un résultat d'outil ; afficher la sortie de la gate (grep VIOLATION) et la citer telle quelle.")
         # R9 (E27) : seuil de coût
         n = 1 if nom == "Agent" else agents_du_workflow(inp) if nom == "Workflow" else 0
         vivants = agents_vivants(entree) if n else 0
@@ -844,11 +1122,114 @@ def stop(entree, sous_agent):
     return 2
 
 
+BLANC = "[ " + chr(0xa0) + chr(0x202f) + "]"        # espace, insécable, fine insécable (R12)
+R12_NOMBRE = re.compile(r"(?<![\w.,:/-])(\d+(?:[.,]\d+)?)" + BLANC + "?(" + r"jours?|semaines?|mois|heures?|minutes?"
+                        r"|années?|ans?|%|commits?|tests?|fichiers?)(?![A-Za-zà-ÿ])", re.I)
+R12_FORMES = {"jour": "jours?|days?", "semaine": "semaines?|weeks?", "mois": "mois|months?", "heure": "heures?|hours?",
+              "minute": "minutes?", "an": "ans?|années?|years?", "%": "%|pour ?cent|percent", "commit": "commits?",
+              "test": "tests?", "fichier": "fichiers?|files?"}
+
+
+def piece_porte(n, unite, lignes):
+    """R12 : vrai si une ligne porte le nombre n (virgule ou point décimal) et une forme de son unité."""
+    formes = {n, n.replace(",", "."), n.replace(".", ",")}
+    r_n = re.compile(r"(?<![\w.,:/-])(?:" + "|".join(map(re.escape, formes)) + r")(?![\d]|[.,]\d)")
+    r_u = re.compile(r"(?<![A-Za-zà-ÿ])(?:" + R12_FORMES[unite] + r")(?![A-Za-zà-ÿ])", re.I)
+    return any(r_n.search(x) and r_u.search(x) for x in lignes)
+
+
+def nombres_sans_piece(entree):
+    """R12 (E29) : nombres à unité de la réponse du tour qu'aucune pièce du tour ne porte avec leur unité ; au second
+    arrêt (stop_hook_active), passage consigné, rien rendu."""
+    entrees = lire_queue(entree.get("transcript_path") or "") or []
+    i, pieces = tour_humain(entrees)
+    pieces, reponse = list(pieces), []
+    for e in entrees[i + 1:] if i is not None else entrees:
+        if e.get("type") == "attachment":
+            pieces.append(contenus(e.get("attachment")))
+        c = (e.get("message") or {}).get("content")
+        for b in [b for b in (c if isinstance(c, list) else []) if isinstance(b, dict)]:
+            if b.get("type") == "tool_result" and MARQUE not in contenus(b):
+                pieces.append(contenus(b))
+            elif b.get("type") == "tool_use":
+                reponse = []
+            elif b.get("type") == "text" and e.get("type") == "assistant":
+                reponse.append(b.get("text", ""))
+    lignes = "\n".join(pieces).split("\n")
+    unite = lambda u: "an" if u in ("an", "ans") or u.startswith("ann") else u if u in ("%", "mois") else u.rstrip("s")  # noqa: E731
+    nus = comptes_nus(entrees[i + 1:] if i is not None else entrees)      # comptes lus par wc, grep -c (G2, C-4)
+    manque = list(dict.fromkeys(m[0] for m in R12_NOMBRE.finditer(RAPPEL.sub("", "\n".join(reponse)))
+                                if not piece_porte(m[1], unite(m[2].lower()), lignes) and not (
+                                    unite(m[2].lower()) in ("commit", "test", "fichier") and m[1].isdigit()
+                                    and int(m[1]) in nus)))
+    if manque and entree.get("stop_hook_active"):
+        journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
+                    f"PASSAGE R12 au second arrêt : {manque[:8]}")
+        return []
+    return manque
+
+
+LECTURE = {"cat", "head", "tail", "grep", "ls", "wc", "sha256sum", "cmp", "diff", "od", "stat", "pwd", "echo",
+           "df", "du", "cut", "tr", "nl", "basename", "dirname", "realpath", "readlink", "true", "cd"}
+GIT_LECTURE = {"status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "blame", "cat-file"}
+
+
+def lecture_pure(c):
+    """Vrai seulement si chaque commande simple de c est une lecture connue (SHOGEN-GARDE-ERREUR-INTERNE-1) : programme
+    de LECTURE, ou git (options -C, --no-pager, --no-optional-locks) en GIT_LECTURE sans --output ni $ ; aucune
+    redirection d'écriture (hors 2>&1 et vers /dev/null), substitution, affectation en tête. Découpe aux séparateurs
+    avant shlex : un séparateur entre guillemets fait une commande illisible, donc pas une lecture (sens sûr). G2 du
+    groupe B, C-1 : programme nommé sans chemin (./cat, /x/git : refus) ; >&N suivi d'un mot n'est pas un descripteur
+    (>&1b écrit le fichier 1b) ; printf hors de LECTURE (printf -v affecte une variable, PATH compris)."""
+    reste = re.sub(r"[0-9]?>&[0-9]+(?![^\s;&|])|[0-9]?>[ ]*/dev/null(?![^\s;&|])", "", c)
+    if re.search(r"[>`]|\$\(|<\(", reste):
+        return False
+    for seg in re.split(r"&&|\|\||[;&|\n]", reste):
+        mots = shlex.split(seg)
+        if mots and "=" in mots[0]:
+            return False
+        if mots and mots[0] == "git":
+            k = 1
+            while mots[k:k + 1] and mots[k] in ("-C", "--no-pager", "--no-optional-locks"):
+                k += 2 if mots[k] == "-C" else 1
+            if not (mots[k:k + 1] and mots[k] in GIT_LECTURE) or "$" in seg or any(
+                    m.startswith("--output") for m in mots):
+                return False
+        elif mots and mots[0] not in LECTURE:
+            return False
+    return True
+
+
+def acte_qui_ecrit(entree):
+    """Vrai sauf lecture pure (SHOGEN-GARDE-ERREUR-INTERNE-1) : un PreToolUse Bash dont la commande n'est pas une
+    lecture_pure, tout autre outil que mcp__github__ get_, list_ ou search_ ; une erreur ici même : vrai (sens sûr)."""
+    try:
+        nom = entree.get("tool_name", "")
+        if nom.startswith("mcp__github__"):
+            return not nom.split("__")[-1].startswith(("get_", "list_", "search_"))
+        return nom != "Bash" or not lecture_pure((entree.get("tool_input") or {}).get("command", ""))
+    except Exception:
+        return True
+
+
 def main():
+    """Phase 3 : chaque passage (permis, erreur) et chaque refus (règle) du crochet consigné au journal des refus."""
     try:
         entree = json.load(sys.stdin)
     except Exception:
         return 0
+    acte = texte_appel(entree.get("tool_name") or "", entree.get("tool_input") if isinstance(entree.get(
+        "tool_input"), dict) else {}) if entree.get("tool_name") else "-"
+    try:
+        code = juger(entree)
+    except SystemExit as e:
+        consigner(entree, REGLE[0] if e.code == 2 else "permis", acte)
+        raise
+    consigner(entree, REGLE[0] if code == 2 or REGLE[0] == "erreur" else "permis", acte)
+    return code
+
+
+def juger(entree):
     ev = entree.get("hook_event_name", "")
     dossier = os.path.dirname(entree.get("transcript_path") or "") or "."
     try:
@@ -858,20 +1239,37 @@ def main():
             return soumission(entree)
         if ev in ("Stop", "SubagentStop"):
             manque = dossiers_sans_releve(entree) if ev == "Stop" else []
+            REGLE[0] = "R6"
             code = stop(entree, ev == "SubagentStop")
             if manque:
+                REGLE[0] = "R10"
                 sys.stderr.write(f"{MARQUE} : REFUS. R10 (E26) : la réponse nomme {', '.join(manque)} sans relevé du "
                                  "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
                                  "docs/publication/), puis rattacher.\n")
                 journaliser(dossier, f"REFUS Stop R10 : {manque}")
+                code = 2
+            sans = nombres_sans_piece(entree) if ev == "Stop" else []      # R12 (E29), jugée aussi après R6 ou R10 (G2, C-3)
+            if sans:
+                REGLE[0] = "R12"
+                sys.stderr.write(f"{MARQUE} : REFUS. R12 (E29) : la réponse porte {', '.join(sans[:8])}, qu'aucun "
+                                 "résultat d'outil ni pièce du tour ne porte avec son unité ; lire la pièce qui porte "
+                                 "chaque nombre (Read, grep -n), puis répondre.\n")
+                journaliser(dossier, f"REFUS Stop R12 : {sans[:8]}")
                 return 2
             return code
     except SystemExit as e:
         if e.code == 2:
             journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} agent={entree.get('agent_id', '')}")
         raise
-    except Exception as exc:  # jamais un refus aveugle
-        sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; acte permis sans contrôle.\n")
+    except Exception as exc:  # SHOGEN-GARDE-ERREUR-INTERNE-1 : sens sûr par règle, jamais un refus aveugle
+        if ev == "PreToolUse" and acte_qui_ecrit(entree):
+            REGLE[0] = "R0"           # journal des refus : marque R0 (refus sur erreur interne ; intégration P3)
+            sys.stderr.write(f"{MARQUE} : REFUS. erreur interne ({exc!r}) pendant le jugement d'un acte qui écrit, "
+                             "commet, pousse, supprime ou crée une PR (R1 à R3, R5, R8) : acte refusé (sens sûr).\n")
+            journaliser(dossier, f"REFUS {ev} {entree.get('tool_name', '')} erreur interne {exc!r}")
+            return 2
+        REGLE[0] = "erreur"
+        sys.stderr.write(f"{MARQUE} : erreur interne ({exc!r}) ; lecture pure ou arrêt : permis, erreur écrite.\n")
         journaliser(dossier, f"ERREUR {ev} {exc!r}")
         return 0
     return 0

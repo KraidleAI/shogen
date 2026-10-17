@@ -20,15 +20,21 @@ GATES = ["jobs:", "  essai:", "    steps:",                 # checkout du gabari
          "          python3 -B cible.py", "          echo fin"]
 
 
-def lancer(d: str, mutants: list, *plus, gates=GATES, job="essai") -> tuple:
-    """Copie jetable sous d (gates.yml, cible.py), campagne des mutants : (code, lignes JSON, stderr, copie)."""
+def lancer(d: str, mutants: list, *plus, gates=GATES, job="essai", chaine=False) -> tuple:
+    """Copie jetable sous d (gates.yml, cible.py), campagne des mutants : (code, lignes JSON, stderr, copie). G2 du lot
+    CAUSES (C-1) : faux pgrep en tête du PATH (sortie 0 si `chaine`, 1 sinon) : le cas ne lit jamais les processus de
+    l'hôte, où tourne la chaîne même dont la verif joue cette suite (sinon rouge à chaque pas, et K8 rouge à blanc)."""
     c = os.path.join(d, "copie")
     os.makedirs(os.path.join(c, ".github", "workflows"), exist_ok=True)
+    os.makedirs(os.path.join(d, "faux-pgrep"), exist_ok=True)
     for chemin, texte in ((os.path.join(c, ".github", "workflows", "gates.yml"), NL.join(gates) + NL),
-                          (os.path.join(c, "cible.py"), CIBLE), (os.path.join(d, "m.json"), json.dumps(mutants))):
+                          (os.path.join(c, "cible.py"), CIBLE), (os.path.join(d, "m.json"), json.dumps(mutants)),
+                          (os.path.join(d, "faux-pgrep", "pgrep"), "#!/bin/sh" + NL + f"exit {0 if chaine else 1}" + NL)):
         with open(chemin, "w", encoding="utf-8") as f:
             f.write(texte)
+    os.chmod(os.path.join(d, "faux-pgrep", "pgrep"), 0o755)
     env = {k: v for k, v in os.environ.items() if k != "SHOGEN_S2_CAMPAGNE_CONTROL"}
+    env["PATH"] = os.path.join(d, "faux-pgrep") + os.pathsep + env.get("PATH", "")
     p = subprocess.run([sys.executable, "-B", OUTIL, c, job, os.path.join(d, "m.json"), "--sortie", os.path.join(
         d, "s"), *plus], capture_output=True, text=True, timeout=120, env=env)
     return p.returncode, [json.loads(x) for x in p.stdout.splitlines()], p.stderr, c
@@ -122,6 +128,27 @@ class Mutants(unittest.TestCase):
             code, lignes, err, c = lancer(d, m[3:4], "--tue", "1", "--tue", "3",       # FETCH admis (R-1)
                                           gates=GATES[:6] + ["          fetch-depth: 0"] + GATES[6:])
             self.assertEqual((code, lignes[1]["classement"]), (0, "tué"), err)
+
+    def test_e37_campagne_refusee_pendant_une_chaine(self):
+        """Lot CAUSES (E37) : une chaîne de commits tourne (faux pgrep en tête du PATH : 0) : sortie 3, aucun mutant
+        joué, message qui nomme le motif ; aucune chaîne (pgrep : 1) : la campagne part (témoin joué). G2 du lot
+        CAUSES (C-1) : un vrai processus `bash …/chaine_essai_<pid>.sh` vit sur l'hôte (comme la chaîne dont la verif
+        joue cette suite) : les cas qui ne posent pas de chaîne n'en voient aucune (témoin joué)."""
+        with tempfile.TemporaryDirectory() as d:
+            for code in (0, 1):
+                rc, lignes, err, _c = lancer(os.path.join(d, f"c{code}"), [], chaine=code == 0)
+                if code == 0:
+                    self.assertEqual((rc, lignes, "motif-chaine.txt" in err), (3, [], True), err)
+                else:
+                    self.assertEqual((rc, [m["id"] for m in lignes]), (0, ["témoin"]), err)
+            script = os.path.join(d, f"chaine_essai_{os.getpid()}.sh")
+            with open(script, "w", encoding="utf-8") as f:
+                f.write("sleep 30" + NL)
+            vraie = subprocess.Popen(["bash", script], start_new_session=True)
+            self.addCleanup(lambda: (os.killpg(vraie.pid, signal.SIGKILL), vraie.wait()))
+            time.sleep(0.5)
+            rc, lignes, err, _c = lancer(os.path.join(d, "hote"), [])
+            self.assertEqual((rc, [m["id"] for m in lignes]), (0, ["témoin"]), err)
 
     def test_refus_avant_tout_mutant(self):
         """Témoin non vivant, étape non admise (if:), job absent, première étape autre que le checkout (G2 du lot
