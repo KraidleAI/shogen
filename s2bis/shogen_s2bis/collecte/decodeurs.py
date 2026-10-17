@@ -13,7 +13,11 @@ laissait sortir AttributeError) ; sous CONTEXTE, recopie du contexte nommé de S
 de plus de VALEURS octets canoniques ne sont jamais rendues : la lecture est `panne_decode` ; `appliquer` décode le
 corps d'une lecture `ok` dans le fil de la lecture.
 CB-7a (SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque conteneur lu est de la sorte attendue (`_champ`), écart à S2 qui
-indexait une chaîne comme une liste."""
+indexait une chaîne comme une liste.
+CB-7b (E-C-06 ; G0 de CALIB-ACTIFS, PROPOSITION §2.2) : un décodeur par (hôte, actif) pour ETH, USDC et USDT des places,
+paires lues sur pièce (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1), classe de S2 pour l'hôte, devise de
+la paire ; l'instrument que la réponse rend (Binance `symbol`, Kraken clé, OKX `instId`) est exigé, sauf pour BTC (S2
+ne le lisait pas) ; aucun décodeur pour une paire non servie (Coinbase USDC/USD, OKX ETH/USD et USDC/USD)."""
 import datetime
 import decimal
 import json
@@ -70,20 +74,37 @@ def _champ(j, *chemin):
     return j
 
 
-def _okx(champ):
+def _okx(champ, inst=None):
+    """OKX : code "0", premier élément de `data` ; `instId` rendu égal à `inst` (None pour BTC, comme S2)."""
     def lire(j):
         if str(_champ(j, "code")) != "0":
             raise ValueError(f"okx : code {j['code']}")
         d = _champ(j, "data", 0)
+        if inst is not None and _champ(d, "instId") != inst:
+            raise ValueError("okx : instrument")
         return _champ(d, champ), _entier(_champ(d, "ts")) * 1000, {}
     return lire
 
 
-def _kraken(j):
-    if type(j) is not dict or j.get("error"):                       # liste d'erreurs absente admise (S2)
-        raise ValueError("kraken : erreur")
-    (paire,) = _champ(j, "result").values()                         # une paire demandée : une clé rendue (XXBTZUSD)
-    return _champ(paire, "c", 0), None, {}
+def _kraken(cle=None):
+    """Kraken : erreurs dans une liste, pas dans le statut ; une paire demandée, une clé rendue (XXBTZUSD ; XETHZUSD,
+    USDCUSD, USDTZUSD : pièce, tableau 1.2), égale à `cle` (None pour BTC, comme S2)."""
+    def lire(j):
+        if type(j) is not dict or j.get("error"):                   # liste d'erreurs absente admise (S2)
+            raise ValueError("kraken : erreur")
+        ((k, paire),) = _champ(j, "result").items()
+        if cle is not None and k != cle:
+            raise ValueError("kraken : clé")
+        return _champ(paire, "c", 0), None, {}
+    return lire
+
+
+def _binance(symbole=None):
+    def lire(j):
+        if symbole is not None and _champ(j, "symbol") != symbole:
+            raise ValueError("binance : symbole")
+        return _champ(j, "price"), None, {}
+    return lire
 
 
 def _coinbase(j):
@@ -124,9 +145,9 @@ def _chainlink(j):
 
 H, P = "place_horodatee", "sans_horodatage"
 DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON lu) ; S2 : SPECS, SIGMA_CLASS_OF_FLUX
-    "binance_btc": ("BTC", "USDT", P, lambda j: (_champ(j, "price"), None, {})),
+    "binance_btc": ("BTC", "USDT", P, _binance()),
     "coinbase_btc": ("BTC", "USD", H, _coinbase),
-    "kraken_btc": ("BTC", "USD", P, _kraken),
+    "kraken_btc": ("BTC", "USD", P, _kraken()),
     "okx_ticker_btc": ("BTC", "USDT", H, _okx("last")),
     "okx_index_btc": ("BTC", "USD", H, _okx("idxPx")),
     "bitstamp_btc": ("BTC", "USD", H, _bitstamp),
@@ -135,6 +156,17 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "coingecko_btc": ("BTC", "USD", "agregateur", lambda j: _coingecko(_champ(j, "bitcoin"))),
     "defillama_btc": ("BTC", "USD", "agregateur", lambda j: _defillama(_champ(j, "coins", "coingecko:bitcoin"))),
     "chainlink_btc": ("BTC", "USD", "oracle_chainlink", _chainlink),
+    # CB-7b : places, paires de la pièce (tableau 1.1) et formes de la PROPOSITION de CALIB-ACTIFS (§2.2)
+    "binance_usdc": ("USDC", "USD", P, _binance("USDCUSD")),
+    "binance_usdt": ("USDT", "USD", P, _binance("USDTUSD")),
+    "coinbase_eth": ("ETH", "USD", H, _coinbase),
+    "coinbase_usdt": ("USDT", "USD", H, _coinbase),
+    "kraken_eth": ("ETH", "USD", P, _kraken("XETHZUSD")),
+    "kraken_usdc": ("USDC", "USD", P, _kraken("USDCUSD")),
+    "kraken_usdt": ("USDT", "USD", P, _kraken("USDTZUSD")),
+    "okx_ticker_usdt": ("USDT", "USD", H, _okx("last", "USDT-USD")),
+    **{f"{h}_{a.lower()}": (a, "USD", H, lire) for h, lire in (("bitstamp", _bitstamp), ("gemini", _gemini))
+       for a in ("ETH", "USDC", "USDT")},
 }
 
 

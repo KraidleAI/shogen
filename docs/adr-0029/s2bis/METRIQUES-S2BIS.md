@@ -2755,3 +2755,33 @@ vivant ; relevé `ps` de fin vide) : 5 mutants, 5 tués par leur test visé, 0 v
 indice entier admis sur une chaîne ; Kraken `c` lu sans `_champ` (S2) ; sortes échangées ; plancher non relevé. Suite :
 375 tests ; plancher du job : 375, égalité exigée (`--egal`). Compte de R-25 : 117 lignes de code ajoutées (`.py`,
 `.yml`) ; hors compte : FORMAT (puce « Sorte des conteneurs » du §9.1, puce « Partie P2, tranche C »).
+
+## CB-7b (2026-10-17) : décodeurs ETH, USDC et USDT des places (E-C-06, E-C-08)
+
+Objet : un décodeur par (hôte, actif) sur les paires servies lues sur pièce
+(`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1 ; formes de la PROPOSITION du G0 de CALIB-ACTIFS §2.2,
+adoptée par l'avis) : Binance USDC, USDT ; Coinbase ETH, USDT ; Kraken ETH, USDC, USDT ; OKX USDT ; Bitstamp et Gemini
+ETH, USDC, USDT ; classe de source de S2 pour l'hôte, devise de la paire (USD). L'instrument que la réponse nomme
+(Binance `symbol`, Kraken clé de `result`, OKX `instId`) est exigé ; aucun décodeur pour une paire non servie (Coinbase
+USDC/USD, OKX ETH/USD et USDC/USD ; test qui le fige). Fixtures écrites octet pour octet depuis les formes de réponse de
+la pièce (tableau 1.2), valeurs mesurées du tableau 1.1, champs élidés construits (rapport du lot) ; finitude contrôlée
+à chaque place ; corps OKX où chaque champ de prix diffère (dans la fixture, `bidPx` égale `last`, pièce l.47).
+
+Rouge : sur le code de CB-7a, les tests neufs et le test de sorte (fixtures neuves) échouent par assertion (16 FAIL, 0
+ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 205 | — |
+| `tests/test_decodeurs_actifs.py` | 126 | 5 (4 de plus : paires servies ; finitude à chaque place ; instrument exigé ; paires absentes) |
+| `tests/test_decodeurs.py` | 260 | 20 (un compte filtré sur les décodeurs BTC) |
+| `tests/fixtures/actifs/` | — | 14 fichiers `.bin`, construits |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 15 mutants, 15 tués par leur test visé, 0 vivant, 0 FATAL : instrument non exigé
+(OKX, Kraken, Binance) ; clé demandée de Kraken au lieu de la clé rendue ; devise, classe ou actif changés ; champ
+`bidPx` d'OKX ; site d'appel d'OKX et de Binance (instrument d'une autre paire) ; Bitstamp et Gemini sans USDT ou
+échangés ; décodeurs de substitution Coinbase USDC/USD et OKX ETH/USD ; plancher non relevé. Suite : 379 tests ;
+plancher du job : 379, égalité exigée (`--egal`). Compte de R-25 : 108 lignes de code ajoutées (`.py`, `.yml`) ; hors
+compte : 14 fixtures (une ligne chacune), FORMAT (puce « Places » du §9.1), G6 (fixtures construites).

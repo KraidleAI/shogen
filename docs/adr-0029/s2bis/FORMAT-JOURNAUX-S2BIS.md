@@ -59,7 +59,8 @@
   diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17) ; le diff DT6-k porte
   les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
 - **Partie P2, tranche C** (2026-10-17 ; sous-lots CB-7, CB-8) : le diff CB-7a écrit au §9.1 la sorte des conteneurs et
-  ferme SHOGEN-S2BIS-DECODEURS-TYPES-1.
+  ferme SHOGEN-S2BIS-DECODEURS-TYPES-1 ;
+  le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -369,6 +370,12 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      l'atteint : son refus (`JOURNAL/…`) arrêterait le processus, que systemd relancerait avec un trou à chaque
      fenêtre. Avec un corps de 1 048 576 octets (point 4) et des valeurs à leur borne, une `lecture` fait moins de
      3 500 000 octets, sous LIMITE (§7.1).
+   - **Places ETH, USDC et USDT** (CB-7b ; G0 de CALIB-ACTIFS, PROPOSITION §2.2, adoptée par l'avis) : un décodeur par
+     (hôte, actif) sur les seules paires servies (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`, tableau 1.1), avec la
+     classe de source de S2 pour l'hôte et la devise de la paire ; aucune paire non servie (Coinbase USDC/USD, OKX
+     ETH/USD et USDC/USD) n'a de décodeur. L'instrument que la réponse nomme (Binance `symbol`, Kraken clé de `result`,
+     OKX `instId`) est celui du décodeur, sinon `panne_decode` : une forme qui demanderait une autre paire ne range
+     jamais son prix sous un autre actif ou une autre devise. Les décodeurs BTC ne le lisent pas (S2 non plus).
    - **Sorte des conteneurs** (CB-7a, SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque objet ou liste qu'un décodeur lit est de
      la sorte attendue, sinon `panne_decode`. Écart à S2, qui indexait une chaîne comme une liste : Kraken `c` écrit en
      chaîne y rendait son premier caractère comme prix (« 6 »).

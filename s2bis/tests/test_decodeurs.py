@@ -49,7 +49,7 @@ class Reprise(unittest.TestCase):
         """Un relevé par fixture : prix de S2 à la lettre, instant de S2 (secondes) en microsecondes exactes, devise,
         extra ; classe de S2 ; « sans horodatage » si et seulement si aucun instant (concordance de S2, l.301-304)."""
         attendu = json.loads(lire(S2, "expected.json"), parse_float=Decimal)
-        self.assertEqual(sorted(decodeurs.DECODEURS), sorted(f + "_btc" for f in FLUX))
+        self.assertEqual(sorted(n for n in decodeurs.DECODEURS if n.endswith("_btc")), sorted(f + "_btc" for f in FLUX))
         for f, classe in FLUX.items():
             e = attendu[f]
             ts = None if e["source_ts"] is None else int(e["source_ts"] * 10 ** 6)
