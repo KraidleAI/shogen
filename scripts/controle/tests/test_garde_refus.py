@@ -201,7 +201,7 @@ class Lecteur(Base):
             "actes refusés les plus fréquents (dix au plus) :",
             "  4" + TAB + "R0,R5" + TAB + "git commit -m x", "  2" + TAB + "R2" + TAB + "sed -i s f",
             "  2" + TAB + "R7,R11" + TAB + "sleep 5"] + ["  1" + TAB + "R11" + TAB + f"acte-0{k}" for k in range(1, 8)] + [
-            "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10, R12",
+            "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10, R12, R13",
             "passages : 3 (dont 1 erreur(s) interne(s), acte permis sans contrôle)"]))
         self.assertEqual(self.releve()[1][0], "journal des refus : 24 ligne(s) lue(s), 2 illisible(s) ; depuis le "
                          "début : 19 refus")

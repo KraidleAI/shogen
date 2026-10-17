@@ -81,7 +81,15 @@ R12 (E29, SHOGEN-GARDE-REPONSE-INVESTISSEUR-1), Stop seul : chaque nombre à uni
 son dernier appel d'outil ; unités de R12_NOMBRE) doit être porté, avec une forme de son unité (R12_FORMES, française
 ou anglaise) sur la même ligne, par un résultat d'outil ou une pièce jointe du tour, ou par le message de l'humain qui
 l'ouvre ; fenêtre : depuis le dernier message de l'humain (tour_humain). Sinon refus qui nomme le nombre et demande la
-lecture de la pièce ; au second arrêt du tour (stop_hook_active), passage consigné. R6 n'est pas modifiée."""
+lecture de la pièce ; au second arrêt du tour (stop_hook_active), passage consigné. R6 n'est pas modifiée.
+R13 (lot CAUSES ; E37, E39, E40), PreToolUse : (a) une chaîne de commits tourne (pgrep -f du motif ancré lu dans
+scripts/controle/garde/motif-chaine.txt, partagé avec avant_acte et mutants.py) : tout Bash qui lance un processus lourd
+(cargo, xtask, mutants.py) ou une seconde chaîne est refusé, un seul lot lourd à la fois sur l'hôte ; (b) tout Bash
+qui lance une chaîne (script chaine.sh, chaine_*.sh ou chaine-*.sh lancé par un shell, source, . ou par son nom ; un
+argument de cp, cat ou grep n'est pas lancé) ne lance qu'une copie à l'octet de scripts/controle/gabarits/chaine-modele.sh
+(sha256 égal), jamais une chaîne écrite à la main ; (c) une consigne (Agent, Workflow, SendMessage) qui dit qu'une gate ou un
+contrôle a rougi cite une ligne VIOLATION … ou REFUS … lue telle quelle dans un résultat d'outil du journal de l'agent,
+jamais une cause déduite ; motif-chaine.txt absent : (a) ne détecte rien, (b) et (c) jugent."""
 import importlib.util
 import json
 import os
@@ -679,6 +687,128 @@ def dossiers():
     return [x.strip() for x in texte.split("\n") if x.strip() and not x.lstrip().startswith("#")]
 
 
+def motif_chaine():
+    """R13 : motif ancré d'une chaîne de commits, lu dans scripts/controle/garde/motif-chaine.txt (une ligne) ;
+    absent : chaîne de caractères vide (aucune détection)."""
+    texte = lire_texte(os.path.join(RACINE, "scripts", "controle", "garde", "motif-chaine.txt")).strip()
+    return texte if texte.startswith("^") and "\n" not in texte else ""
+
+
+def chaine_en_cours():
+    """R13 (a) : vrai si un processus de l'hôte répond au motif de chaîne (pgrep -f) ; motif vide ou pgrep en erreur :
+    faux (rien d'affirmé)."""
+    motif = motif_chaine()
+    if not motif:
+        return False
+    try:
+        p = subprocess.run(["pgrep", "-f", motif], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return p.returncode == 0
+
+
+LOURD = re.compile(r"(^|/)(cargo|xtask|mutants\.py)$")
+CHAINE_SH = re.compile(r"(^|/)chaine([-_][^/]*)?\.sh$")
+SHELLS_R13, PYTHON_R13 = ("bash", "sh", "dash", "zsh", "ksh"), re.compile(r"^python[0-9.]*$")
+
+
+def lances(acte):
+    """R13 (G2 du lot CAUSES, C-2) : mots qu'un acte lance : son programme (après les enveloppes timeout, env, setsid,
+    nohup…), le script d'un shell, de source ou de ., les arguments d'un sh -c (le texte du -c est lu en actes), le
+    script d'un python ; un argument d'un autre programme (grep cargo, cp … chaine_x.sh) n'est pas lancé."""
+    mots, prog = acte["mots"], acte["prog"]
+    if not mots:
+        return []
+    if prog in ("source", "."):
+        return mots[1:2]
+    if prog not in SHELLS_R13 and not PYTHON_R13.match(prog):
+        return mots[:1]
+    k = 1
+    while k < len(mots) and mots[k][:1] in "-+" and mots[k] not in ("-", "--"):
+        if prog in SHELLS_R13 and not mots[k].startswith("--") and "c" in mots[k][1:]:
+            return mots[k + 2:]
+        if prog not in SHELLS_R13 and mots[k] in ("-c", "-m"):
+            return []
+        k += 2 if mots[k] in ("-o", "+o", "-O", "+O", "-X", "-W") else 1
+    k += 1 if k < len(mots) and mots[k] == "--" else 0
+    return mots[k:k + 1]
+
+
+def processus_lourd(actes):
+    """R13 (a) : programmes lourds (cargo, xtask, mutants.py) que lancent les actes, enveloppes comprises (bash -c,
+    timeout, env, setsid, nohup, python3 … mutants.py) ; un mot qui les nomme sans les lancer (grep cargo) ne compte
+    pas (G2 du lot CAUSES, C-2)."""
+    return [m for a in actes or [] for m in lances(a) if LOURD.search(m)]
+
+
+def chaines_lancees(actes, cwd):
+    """R13 (b) : [(mot, chemin)] des scripts chaine.sh, chaine_*.sh ou chaine-*.sh que les actes lancent, résolus depuis
+    cwd ; après un cd ou un pushd, un mot relatif ne se résout pas (chemin vide : refus, G2 du lot CAUSES, C-2)."""
+    cd = any(a["prog"] in ("cd", "pushd") for a in actes or [])
+    return [(m, m if os.path.isabs(m) else "" if cd else os.path.join(cwd, m)) for a in actes or [] for m in lances(a)
+            if CHAINE_SH.search(m)]
+
+
+def sha256_fichier(chemin):
+    import hashlib
+    try:
+        with open(chemin, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return ""
+
+
+def chaine_hors_modele(actes, cwd):
+    """R13 (b) : [(chemin, raison)] des chaînes lancées qui ne sont pas une copie à l'octet du modèle versé
+    scripts/controle/gabarits/chaine-modele.sh (modèle absent : toute chaîne est refusée)."""
+    modele = sha256_fichier(os.path.join(RACINE, "scripts", "controle", "gabarits", "chaine-modele.sh"))
+    fautes = []
+    for m, c in chaines_lancees(actes, cwd):
+        h = sha256_fichier(c) if c else ""
+        if not modele:
+            fautes.append((m, "modèle scripts/controle/gabarits/chaine-modele.sh absent du dépôt"))
+        elif not c:
+            fautes.append((m, "chemin relatif après un cd : chemin absolu exigé"))
+        elif not h:
+            fautes.append((c, "script illisible"))
+        elif h != modele:
+            fautes.append((c, "script différent du modèle (sha256)"))
+    return fautes
+
+
+SUJET_GATE = r"(gates?|S-G[0-9]+|R-?[0-9]+|K[0-9]+|V[0-9]+|presg5|jobs?|crochet|contrôles?|vérifications?|verif|xtask|lint)"
+ROUGEUR = (r"(rougi[ets]?|rouges?|refus[ée]*s?|refuse|violations?|échou[ée]*s?|échoue|échecs?|bloqu[ée]*s?|failed|fails?|"
+           r"red|refused|rejected|blocked)")
+GATE_ROUGE = re.compile(rf"\b{SUJET_GATE}\b[^.;:\n]{{0,60}}?\b{ROUGEUR}\b|\b{ROUGEUR}\b[^.;:\n]{{0,20}}?\b(par|à|by)\s+"
+                        rf"((la|une|le|the|a)\s+)?{SUJET_GATE}\b", re.I)
+CITATION = re.compile(r"VIOLATION [^\s:]+:[0-9]+|REFUS[.]? [A-Z][A-Za-z0-9-]*")
+
+
+def textes_de(x):
+    """R13 (c) : textes bruts d'une entrée d'outil (valeurs chaînes, en profondeur), jamais son JSON (guillemets et
+    sauts de ligne échappés : G2 du lot CAUSES, C-3)."""
+    if isinstance(x, str):
+        return x
+    if isinstance(x, dict):
+        return "\n".join(textes_de(v) for v in x.values())
+    if isinstance(x, list):
+        return "\n".join(textes_de(v) for v in x)
+    return ""
+
+
+def cause_sans_ligne(texte, entrees):
+    """R13 (c) : vrai si la consigne dit qu'une gate ou un contrôle a rougi (sujet de gate et mot de rougeur, français
+    ou anglais, GATE_ROUGE) sans citer une ligne VIOLATION chemin:ligne … ou REFUS <règle> …, ou si une ligne qu'elle
+    cite n'est pas, entière, la fin d'une ligne d'un résultat d'outil du journal (G2 du lot CAUSES, C-3 : toute
+    citation jugée, une ligne inventée refusée même sans mot de rougeur)."""
+    cits = [m.start() for m in CITATION.finditer(texte)]
+    if not cits:
+        return bool(GATE_ROUGE.search(texte))
+    lues = {ligne[m.start():].rstrip() for _n, _i, r in appels_resultats(entrees) if r for ligne in r.split("\n")
+            for m in CITATION.finditer(ligne)}
+    return not all(any(texte.startswith(x, i) for x in lues) for i in cits)
+
+
 def dossiers_sans_releve(entree):
     """R10 (E26) : dossiers que le dernier texte du tour nomme sans relevé, si le message de l'humain porte un nom
     propre ; au second arrêt (stop_hook_active), passage consigné, rien rendu."""
@@ -800,6 +930,15 @@ def pre_tool_use(entree):
             refuser(attente)
         if motifs and re.search(r"\bp(kill|grep)\s[^;&|]*-[a-zA-Z]*f", c) and not re.search(r"\s['\"]?\^", c):
             refuser(ancre)
+        # R13 (E37, E39) : un seul lot lourd à la fois ; une chaîne lancée est le modèle, à l'octet
+        lourds = processus_lourd(fc["actes"]) if fc["actes"] is not None else re.findall(r"\b(cargo|xtask|mutants\.py)\b", c)
+        lourds += [os.path.basename(m) for m, _c in chaines_lancees(fc["actes"], cwd)]     # C-2 : une chaîne est un lot lourd
+        if lourds and chaine_en_cours():
+            refuser(f"R13 (E37) : {lourds[0]} pendant qu'une chaîne de commits tourne sur l'hôte (un seul lot lourd à la "
+                    "fois) ; attendre la fin de la chaîne (until ! pgrep -f '<motif de garde/motif-chaine.txt>' ; do sleep 30; done).")
+        for chemin_chaine, raison in chaine_hors_modele(fc["actes"], cwd):
+            refuser(f"R13 (E39) : chaîne {os.path.basename(chemin_chaine)} lancée hors du modèle : {raison} ; copier "
+                    "scripts/controle/gabarits/chaine-modele.sh tel quel (cp, cmp) et le lancer avec PLAN, CC, OUTILS.")
     elif nom in ("Edit", "MultiEdit", "Write"):
         fp = inp.get("file_path", "")
         if fp.endswith((".md", ".txt", ".tsv", ".yml", ".yaml", ".json")):
@@ -814,6 +953,9 @@ def pre_tool_use(entree):
                 refuser("R4 : lancer un sous-agent sur un arbre git exige l'état de cet arbre lu avant (git status ou git log).")
         if nom in ("Agent", "Workflow"):
             controler_briefs(inp, cwd)      # R11
+        if cause_sans_ligne(textes_de(inp), entrees):     # R13 (c), E40
+            refuser("R13 (E40) : la consigne dit qu'une gate ou un contrôle a rougi sans citer une ligne VIOLATION … ou "
+                    "REFUS … lue dans un résultat d'outil ; afficher la sortie de la gate (grep VIOLATION) et la citer telle quelle.")
         # R9 (E27) : seuil de coût
         n = 1 if nom == "Agent" else agents_du_workflow(inp) if nom == "Workflow" else 0
         vivants = agents_vivants(entree) if n else 0
