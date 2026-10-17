@@ -3033,3 +3033,29 @@ levée dans la docstring puis au FORMAT, source lue confondue, unités fausses, 
 Suite : 415 tests ; plancher du job : 415, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
 (`.py`, `.yml`, docstring comprise) ; hors compte : FORMAT, METRIQUES. Après la campagne, une ligne de la docstring de
 `_curve` de plus de 120 caractères est recoupée (forme seule).
+
+## INT-P2-12 (2026-10-17) : C-P2C-1, test `Bornes` indépendant de la charge (I-1 du générateur de P2C)
+
+Objet (lot INT-P2, correction C-P2C-1 de l'adjudication de la tranche C) : `test_decodeurs.Bornes` ne mesure plus
+aucun temps réel. Chaque champ d'instant converti par int() (OKX `ts`, Bitstamp `timestamp`, Gemini
+`volume.timestamp`, CoinGecko `last_updated_at`, DefiLlama `timestamp`) est servi par des valeurs hors bornes
+(1E+1000000, entiers et texte de 10^6 chiffres, 1E+199999, 1E+200000) ; `_entier` est enveloppé, et le test exige
+pour chacune la panne et une seule note, le refus de borne (« instant : hors bornes avant int() », texte écrit à la
+main) ; le témoin dans les bornes est converti. Un décodeur qui convertirait sans `_entier` ne laisse aucune note :
+tué sans mesure de temps. Test neuf : le code de la classe (AST) ne nomme aucune horloge. Puce « Partie P2,
+intégration » du FORMAT.
+
+Rouge : l'ancien test, sous une horloge monotone truquée (+0,2 s à chaque lecture), échoue : 6 FAIL sur 6 ; le
+nouveau y passe (6 OK). Rejoué dix fois pendant la campagne m12 (mutant M12-01 en cours) : dix verts. Le test
+neuf échoue sur l'ancien test (1 FAIL : `monotonic` et `time` nommés).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_decodeurs.py` | 298 | 21 (1 de plus : aucune horloge nommée dans `Bornes` ; six tests réécrits) |
+
+Mutants (même commande, même outil) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : borne d'exposant
+relâchée, retirée, décalée d'un chiffre ; borne de texte relâchée, multipliée ; chacun des cinq décodeurs convertit
+sans la borne (sites d'appel de `_entier`).
+
+Suite : 416 tests ; plancher du job : 416, égalité exigée (`--egal`). Compte de R-25 : 50 lignes de code ajoutées
+(tests, plancher) ; hors compte : FORMAT, METRIQUES.

@@ -3,11 +3,13 @@ code : `s2-harness/tests/expected.json` (capturé et décodé par S2), lu en Dec
 octet pour octet ; classes de S2 (`sources.py` l.305-313) ; instants par date -u -d, mots de Chainlink par printf, 2^53
 et roundId par bc ; contexte de S2 par lecture de r1.py l.62-68 (journal G1). CB-6c : lecture décodée, valeurs
 refusées par l'écrivain jamais rendues (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1), tailles comptées par `json.dumps`."""
+import ast
 import hashlib
+import inspect
 import json
 import os
 import sys
-import time
+import textwrap
 import unittest
 from decimal import Context, Decimal, localcontext
 from unittest import mock
@@ -133,20 +135,44 @@ class Finitude(unittest.TestCase):                               # E-C-06 ; anal
             self.assertEqual(prix("binance_btc", b'{"price":"1E+999999"}'), ("1E+999999", None))
 
 
+BORNE = "instant : hors bornes avant int()"                  # texte du refus de `_entier`, écrit à la main
+
+
 class Bornes(unittest.TestCase):          # C-1 de la G2 de P2A : un test par champ d'instant converti par int()
+    def refus(self):
+        """C-P2C-1 (I-1 de P2C) : aucune mesure de temps réel dans un verdict. `_entier` est enveloppé : chaque appel
+        est noté, refus de borne (texte de son ValueError) ou « converti » ; une valeur hors bornes doit être refusée
+        par la borne, avant int() (sans elle, int(1E+1000000) coûte 10 s : mesuré ; un décodeur qui convertirait sans
+        `_entier` n'y laisse aucune note). Rend la liste des notes, vidée par l'appelant."""
+        vrai, notes = decodeurs._entier, []
+
+        def enveloppe(x):
+            try:
+                v = vrai(x)
+            except ValueError as e:
+                notes.append(str(e))
+                raise
+            notes.append("converti")
+            return v
+        p = mock.patch.object(decodeurs, "_entier", enveloppe)
+        p.start()
+        self.addCleanup(p.stop)
+        return notes
+
     def champ(self, gabarits, temoin):
         """Nombre JSON 1E+1000000, entier de 10^6 chiffres (positif, négatif), texte de 10^6 chiffres, limite de
-        l'interpréteur levée : `panne_decode` en moins de 0,1 s (sans la borne, 1E+1000000 coûte 10 s : mesuré) ;
-        témoin (valeur de la fixture, écrite à la main) : relevé ok. Le premier écart arrête le test (un seul
-        décodage lent par champ sous un mutant)."""
+        l'interpréteur levée : `panne_decode`, refusé par la borne de `_entier` avant int() ; témoin (valeur de la
+        fixture, écrite à la main) : relevé ok, converti. Le premier écart arrête le test."""
         self.addCleanup(sys.set_int_max_str_digits, sys.get_int_max_str_digits())
         sys.set_int_max_str_digits(0)
+        notes = self.refus()
         for nom, g in gabarits.items():
             for v in ("1E+1000000", "1" * 10 ** 6, "-" + "1" * 10 ** 6, '"' + "1" * 10 ** 6 + '"'):
-                t = time.monotonic()
+                notes.clear()
                 r = decodeurs.decoder(nom, (g % v).encode())
-                self.assertEqual((nom, v[:12], r, time.monotonic() - t < 0.1), (nom, v[:12], PANNE, True))
-            self.assertEqual(prix(nom, (g % temoin[0]).encode()), ("1", temoin[1]))
+                self.assertEqual((nom, v[:12], r, notes), (nom, v[:12], PANNE, [BORNE]))
+            notes.clear()
+            self.assertEqual((prix(nom, (g % temoin[0]).encode()), notes), (("1", temoin[1]), ["converti"]))
 
     def test_okx_ts(self):
         self.champ({n: '{"code":"0","data":[{"' + c + '":"1","ts":%s}]}' for n, c in (
@@ -169,8 +195,8 @@ class Bornes(unittest.TestCase):          # C-1 de la G2 de P2A : un test par ch
         """Borne de `_entier` (exposant ajusté de 16) : 9E+15 et 9,999999999999999E+15 convertis, valeurs écrites à la
         main ; 1E+16, 1E+17, 10000000000000000 (exposant ajusté de 16) et 0E+16 (l'instant 0, sans objet pour une
         source : docstring) refusés avant int(). Nombres JSON 1E+199999 et 1E+200000 à chaque champ d'instant :
-        `panne_decode` en moins de 0,1 s (une borne relâchée à 200 000 laisse int() convertir 1E+199999 : 0,51 s,
-        mesuré par le contre-contrôle de P2A)."""
+        `panne_decode`, refusés par la borne avant int() (C-P2C-1 : une borne relâchée à 200 000 laisse int()
+        convertir 1E+199999, 0,51 s mesurées par le contre-contrôle de P2A)."""
         self.assertEqual([decodeurs._entier(Decimal(x)) for x in ("9E+15", "9.999999999999999E+15")],
                          [9000000000000000, 9999999999999999])
         for x in ("1E+16", "1E+17", "10000000000000000", "0E+16"):
@@ -180,11 +206,23 @@ class Bornes(unittest.TestCase):          # C-1 de la G2 de P2A : un test par ch
                     '{"last":"1","timestamp":%s}', "gemini_btc": '{"last":"1","volume":{"timestamp":%s}}',
                     "coingecko_btc": '{"bitcoin":{"usd":1,"last_updated_at":%s}}',
                     "defillama_btc": '{"coins":{"coingecko:bitcoin":{"price":1,"timestamp":%s}}}'}
+        notes = self.refus()
         for nom, g in gabarits.items():
             for v in ("1E+199999", "1E+200000"):
-                t = time.monotonic()
+                notes.clear()
                 r = decodeurs.decoder(nom, (g % v).encode())
-                self.assertEqual((nom, v, r, time.monotonic() - t < 0.1), (nom, v, PANNE, True))
+                self.assertEqual((nom, v, r, notes), (nom, v, PANNE, [BORNE]))
+
+    def test_aucune_horloge_dans_la_classe(self):                     # C-P2C-1 : aucun temps réel dans un verdict
+        """Le code de la classe ne nomme aucune horloge (module `time`, `monotonic`, `perf_counter`, `process_time`,
+        `now`, variantes en nanosecondes) : ses verdicts ne dépendent pas de la charge (I-1 du générateur de P2C).
+        Contrôle sur le texte du code (AST), sans rien remplacer : aucun fil d'un autre test n'est touché."""
+        arbre = ast.parse(textwrap.dedent(inspect.getsource(Bornes)))
+        noms = {n.id for n in ast.walk(arbre) if isinstance(n, ast.Name)} | {
+            n.attr for n in ast.walk(arbre) if isinstance(n, ast.Attribute)}
+        horloges = {"time", "monotonic", "monotonic_ns", "perf_counter", "perf_counter_ns", "process_time",
+                    "process_time_ns", "time_ns", "now", "utcnow", "clock_gettime"}
+        self.assertEqual((sorted(noms & horloges), "refus" in noms), ([], True))
 
 
 class Illisible(unittest.TestCase):

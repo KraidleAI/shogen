@@ -74,7 +74,8 @@
 - **Partie P2, intégration** (2026-10-17 ; lot INT-P2 : tranches C et D en une série) : le diff C-P2D-1 donne aux
   trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
   `analyse.json` (§9.1) ; le diff C-P2D-2 déclare les limites de la lecture Curve (§9.1, docstring du décodeur) et
-  porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D).
+  porte la fermeture de SHOGEN-S2BIS-CURVE-DOC-1 avec ces limites (adjudication de la tranche D) ; le diff C-P2C-1,
+  par un test seul (`test_decodeurs`, `Bornes`), rend le contrôle des bornes d'instant indépendant de la charge.
 
 ## 1. Ligne et chaîne (CB-1)
 
