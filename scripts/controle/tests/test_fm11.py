@@ -14,7 +14,7 @@ import unittest
 
 ICI = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))          # scripts/controle
 FM11 = os.path.join(ICI, "fm11.py")
-SHA_FM11 = "17caaa358ce471c8a9b734873f874794f8c97e66f0125fa05a9dc0cff04452b7"   # Q-3 ; avant : 4a0b8abc… (DT3-E), 886cc676… (B.35)
+SHA_FM11 = "b78a19e9303ab4675309cabb3d28f26f4c9b415c093f7be4d93a0bab6e8631b1"   # ATTRIBUTION-1 ; avant : 17caaa35… (Q-3), 4a0b8abc… (DT3-E), 886cc676… (B.35)
 SHA51 = "5cc89b563f73d213e38021165a360c3bf2e297e36be467786a007021c71db358"      # fm11.py l.12 (cartographie l.51)
 SHA14 = "0fe88f1a3810244ecce91b31c1f4e2117f397a7c65d381a75afdbf0b9954b71f"      # fm11.py l.13 (ADR-0025 l.14)
 CARTO = "".join(f"c{i:02d}|" for i in range(25))           # 100 caractères ; fragments aux rangs 0, 20 et 40
@@ -157,6 +157,32 @@ class Temoin(unittest.TestCase):
         vus = [(role, v) for role in ("entrees", "resultats") for v in res[role].values()]
         self.assertEqual(vus, [("entrees", [[0, 1]]), ("resultats", [[1, 2]])])
 
+
+    def test_attribution_claude_session(self):
+        """SHOGEN-FM11-MOTIF-ATTRIBUTION-1 : le pied Claude-Session: d'un message de commit (attribution que le dépôt
+        exige) n'est pas un fragment de session, en entrée comme en résultat ; la même session nommée ailleurs (URL
+        sans la clé, texte libre) l'est, une fois par occurrence. Identifiant formé en deux morceaux."""
+        s = "session_" + "013dvmubgZfL1zNfWnTTzBmw"
+        pied = "Claude-Session: https://claude.ai/code/" + s
+        res = self.compter([texte("git commit -q -F m.txt ; cat m.txt" + chr(10) + pied),
+                            resultat("[main 1a2b3c4] x" + chr(10) + chr(10) + pied + chr(10))])
+        self.assertEqual((res["entrees"], res["resultats"]), ({}, {}))
+        res = self.compter([texte("voir https://claude.ai/code/" + s), resultat("Session: " + s + " et " + pied)])
+        vus = [(role, v) for role in ("entrees", "resultats") for v in res[role].values()]
+        self.assertEqual(vus, [("entrees", [[0, 1]]), ("resultats", [[1, 1]])])
+
+    def test_sortie_du_scratchpad_comptee(self):
+        """SHOGEN-FM11-MOTIF-ATTRIBUTION-1, second volet (G2-C, item 2) : un chemin qui ressort du scratchpad par un
+        composant .. (juste après scratchpad, ou plus loin) nomme le dossier de la session : compté ; un composant
+        qui commence par .. sans l'être (..x, a..b) reste dans le scratchpad : non compté."""
+        s = "7ba84933" + "-ba6d-5813-9ef4-ca3ac4febd16"
+        racine = "/tmp/claude" + "-0/-home-user-shogen/" + s + "/scratchpad"
+        res = self.compter([texte("cat " + racine + "/../subagents/a.txt"),
+                            resultat(racine + "/lot/../../tasks/b.output et " + racine + "/..")])
+        vus = [(role, v) for role in ("entrees", "resultats") for v in res[role].values()]
+        self.assertEqual(vus, [("entrees", [[0, 1]]), ("resultats", [[1, 2]])])
+        res = self.compter([texte("cat " + racine + "/lot/..x/a.txt " + racine + "/a..b/c")])
+        self.assertEqual((res["entrees"], res["resultats"]), ({}, {}))
 
 class Empreintes(unittest.TestCase):
     def test_fm11_verse_a_l_octet(self):

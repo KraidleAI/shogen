@@ -20,7 +20,7 @@ for k,v in interdites.items():
 frags = {k: {v[i:i+40] for i in range(0, max(1,len(v)-40), 20)} | {v[-40:]} for k,v in interdites.items()}
 motifs = [r'cartographie-2026-09-29', r'CARTOGRAPHIE-2026-09-29', r'adr-0025', r'ADR-0025\.md', r'shogen-carto',
           r'shogen-j28', r'campagne-copie', r'shogen-campagne', r'measure-M009a', r'lot-m009', r'ADR-M002',
-          r'PAROXYSME-Shogen', r'paroxysme-2026-09-27', r'session_013dvmub', r'7ba84933-ba6d(?![0-9a-f-]*/scratchpad(?![\w.-]))', r'shogen-g2-lotA',
+          r'PAROXYSME-Shogen', r'paroxysme-2026-09-27', r'(?<!Claude-Session: https://claude[.]ai/code/)session_013dvmub', r'7ba84933-ba6d(?![0-9a-f-]*/scratchpad(?![\w.-])(?!\S*?/[.][.](?![\w.-])))', r'shogen-g2-lotA',
           r'ARCHIVE-shogen-interne', r'AVIS-advisor-2026-09-26', r'baseline_step0', r'SHA256SUMS-cloture',
           r'(?<![\w-])(control|journal|raw)\.jsonl']
 def textes(obj):
