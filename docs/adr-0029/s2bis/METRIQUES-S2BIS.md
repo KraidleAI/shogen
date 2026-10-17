@@ -2856,3 +2856,32 @@ vivant ; relevé `ps` de fin vide) : 8 mutants, 8 tués par leur test visé, 0 v
 USDC sans plafond ; ETH plafonné ; plafond appliqué au prix ; actif changé ; instant au mot 3 ; `roundId` au mot 5 ;
 plancher non relevé. Suite : 388 tests ; plancher du job : 388, égalité exigée (`--egal`). Compte de R-25 : 59 lignes de
 code ajoutées (`.py`, `.yml`) ; hors compte : 3 fixtures, FORMAT (puce « Chainlink ETH, USDC et USDT »).
+
+## CB-8c (2026-10-17) : formes du pool, requêtes BTC de S2 gardées (SHOGEN-S2BIS-FORMES-BTC-1)
+
+Objet : `s2bis/config/formes-pool.json`, 30 formes (une par lecture du pool), contrôlées par le schéma `FORME` et les
+règles de forme de `formes.json` (noms uniques, méthode et corps, hôte, chemin, espace par hôte, décodeur connu) : huit
+flux BTC gardés, URL et corps de S2 octet pour octet (`sources.py` l.221-281) ; CoinGecko, DefiLlama et Bitfinex
+regroupés (aucune forme BTC seule pour eux) ; chemins des paires et des regroupements de la PROPOSITION de CALIB-ACTIFS
+§2.2 ; Chainlink : proxy principal par actif (pièce §2) ; lectures par hôte (binance 4, coinbase 3, kraken 4, okx 4,
+bitstamp 4, gemini 4, bitfinex 1, coingecko 1, defillama 1, chainlink 4) ; OKX à cinq avec le témoin de CB-9 : plan de 0
+à 4 s, budget 5 + 4 + 10 + 1 = 20 s ; une sixième forme d'OKX est refusée par la boucle (`BOUCLE/hote`, Q-C-10). Les
+autres champs de `formes.json` restent au gel (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
+
+Rouge : une seule forme (`binance_btc`, chemin « / ») et FORMAT de CB-8b : les tests neufs échouent par assertion (6
+FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_formes_pool.py` | 100 | 5 (neuf : formes contrôlées ; requêtes BTC de S2 ; chemins ; proxys ; lectures par hôte et budget) |
+| `tests/test_format.py` | 294 | 17 (1 de plus : phrases du §9.1, du §14.1 et puce de la tranche C) |
+| `config/formes-pool.json` | 32 | données, 30 formes |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 10 mutants, 10 tués par leur test visé, 0 vivant, 0 FATAL : symbole BTC de Binance ;
+corps de Chainlink compacté ; proxy d'un autre actif ; bitcoin retiré de CoinGecko ; décodeur d'une autre forme ;
+sixième lecture d'OKX ; `espace` faux pour une forme d'OKX ; phrase du FORMAT changée ; chemin de Gemini USDT ; plancher
+non relevé. Suite : 394 tests ; plancher du job : 394, égalité exigée (`--egal`). Compte de R-25 : 115 lignes de code
+ajoutées (`.py`, `.yml`) ; hors compte : `formes-pool.json` (32 lignes de données), FORMAT (§14.1, puce de la tranche
+C).

@@ -191,6 +191,20 @@ class Format(unittest.TestCase):
         self.assertEqual([("CB-6c" in p, "ECRIVAIN-REFUS-ARRET-1" in p) for p in puces if p.startswith(
             "**Partie P2, tranche A**")], [(True, True)])
 
+    def test_paragraphes_9_et_14_decodeurs_de_cb_7_et_cb_8(self):    # CB-8c : phrases de la tranche C de P2
+        """§9.1 : paires non servies, sorte des conteneurs, ETH en USDT, regroupés et identifiants exacts, plafond d'un
+        relevé par actif, plafond des stables jamais appliqué ; §14.1 : formes du pool ; puce « Partie P2, tranche C » :
+        six diffs et deux items."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        attendus = ["n'a de décodeur", "SHOGEN-S2BIS-DECODEURS-TYPES-1", "binance (`ETHUSDT`) et okx (`ETH-USDT`)",
+                    "rend la lecture entière `panne_decode`", "au plus un relevé par actif, donc quatre",
+                    "le collecteur ne l'applique jamais"]
+        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes-pool.json`" in sections[
+            "14"]], [True] * 7)
+        self.assertEqual([(all(f"CB-{d}" in p for d in ("7a", "7b", "7c", "8a", "8b", "8c")), "DECODEURS-TYPES-1" in p,
+                           "FORMES-BTC-1" in p) for p in puces if p.startswith("**Partie P2, tranche C**")],
+                         [(True, True, True)])
+
     def test_paragraphes_8_et_13_items_de_cb_6d(self):                # CB-6d : trois items de l'annexe B
         """§8.3 : niveaux comptés sur les octets avant le décodeur ; §8.4 : valeurs comptées par occurrence ; §13.6 :
         résultat rendu avant la place ; la puce « Partie P2 » nomme CB-6d et les trois items."""

@@ -63,7 +63,8 @@
   le diff CB-7b, les décodeurs ETH, USDC et USDT des places (§9.1) ;
   le diff CB-7c, ETH coté en USDT chez binance et okx (§9.1) ;
   le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1) ;
-  le diff CB-8b, Chainlink ETH, USDC et USDT et le plafond des stables (§9.1).
+  le diff CB-8b, Chainlink ETH, USDC et USDT et le plafond des stables (§9.1) ;
+  le diff CB-8c, les formes du pool (§14.1), et ferme SHOGEN-S2BIS-FORMES-BTC-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -621,6 +622,11 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
      chaque lecture `ok` de la forme, §9.1).
+     Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
+     `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
+     reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
+     les autres champs de `formes.json` (`w`, `delta`, `tolerance`, `delai`, `marge`, `places`) restent à sceller
+     au gel du collecteur (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +
