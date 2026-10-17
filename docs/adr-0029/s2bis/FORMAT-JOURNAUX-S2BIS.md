@@ -65,6 +65,12 @@
   le diff CB-8a, les lectures regroupées et le plafond d'un relevé par actif (§9.1) ;
   le diff CB-8b, Chainlink ETH, USDC et USDT et le plafond des stables (§9.1) ;
   le diff CB-8c, les formes du pool (§14.1), et ferme SHOGEN-S2BIS-FORMES-BTC-1.
+- **Partie P2, tranche D** (2026-10-17 ; sous-lot CB-9, témoin USDC/USDT de l'ADR-0029 l.174) : les diffs CB-9a et
+  CB-9b versent les décodeurs du témoin (OKX `USDC-USDT`, Uniswap v3 `slot0`, Curve 3pool `get_dy`) et les corps
+  `eth_call` construits ; le diff CB-9c écrit leurs relevés (§9.1) et les règles `corps-du-decodeur` et
+  `rpc-par-unite` de `formes.json` (§14.1), qui tiennent la règle « une unité on-chain = un hôte RPC » de
+  SHOGEN-S2BIS-TEMOIN-RPC-1 (hôtes en configuration, aucun dans le code ; l'item reste ouvert, déclencheur « avant le
+  sceau »).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -359,6 +365,14 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      microsecondes entières de 0 à 2^53 exclu, null pour une source sans horodatage ; `extra`, objet de chaînes propre
      à la source. Un corps que le décodeur ne lit pas, ou dont le prix n'est pas fini, est nul ou négatif, donne
      `panne_decode`, `code` et `brut` gardés, `valeurs` null.
+   - **Témoin USDC/USDT** (CB-9 ; ADR-0029 l.174) : `actif` `USDC`, `devise` `USDT` (prix en USDT par USDC), trois
+     décodeurs : `okx_usdc_usdt` (classe `place_horodatee` ; instrument `USDC-USDT` contrôlé ; `ts_source` lu de
+     `ts`, en millisecondes ; `extra` : `askPx` et `bidPx`, finis et > 0, sans ordre exigé) ; `uniswap_usdc_usdt`
+     (`slot0` du pool 0,01 % : prix sqrtPriceX96² / 2^192, décimales 6 et 6, une division en 50 chiffres sous le
+     contexte nommé, jamais celui du fil ; `extra` : `sqrt_price_x96` et `tick`) ; `curve_usdc_usdt` (`get_dy(1, 2,
+     10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers sont de classe `sans_horodatage` : la
+     réponse `eth_call` ne porte pas le bloc lu. La classe de source du témoin n'est nommée ni par l'ADR ni par le
+     G0 : ces classes, prises dans la liste ci-dessus, sont un choix du lot, rendu en question à l'orchestrateur.
    - **Instant ISO-8601** (C-5 de la G2 de P2A) : un instant de source écrit en ISO-8601 (Coinbase, champ `time`) est
      lu par un motif fixe : date `AAAA-MM-JJ`, « T » majuscule, heure `hh:mm:ss`, fraction de chiffres facultative
      (tronquée à la microseconde, comme en S2), puis « Z » majuscule, `±hh:mm` ou rien (instant lu en UTC). « t »,
@@ -621,7 +635,12 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      chemin, methode, corps, espace, decodeur}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
      la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
-     chaque lecture `ok` de la forme, §9.1).
+     chaque lecture `ok` de la forme, §9.1). Règle `corps-du-decodeur` (CB-9c) : une forme dont le décodeur lit la
+     réponse d'un `eth_call` construit par le code (Uniswap, Curve) est un `POST` de ce corps exact, octet pour
+     octet ; règle `rpc-par-unite` (CB-9c ; ADR-0029 l.174, « une unité on-chain = un hôte RPC ») : parmi les formes
+     lues sur chaîne (Chainlink, toute forme de la classe `oracle_chainlink` comprise, Uniswap, Curve), chaque unité a
+     un seul hôte et chaque hôte une seule unité. L'hôte RPC n'est écrit que dans `formes.json`, jamais dans le code
+     des décodeurs.
      Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
      `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
      reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;

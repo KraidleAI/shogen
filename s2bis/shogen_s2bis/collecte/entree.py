@@ -23,7 +23,10 @@ CB-17b (E-C-38) : commande `status`, santé seule lue au journal du pool, sans r
 sur la sortie ; 1 et un refus nommé. CB-17c : commande `resume`, résumés par jour publiés au dépôt : 0 ; 1 refus du
 journal ou du dépôt ; 2 refus du descripteur. CB-17d : `status` avec `--depot` et `--descripteur` ajoute le compte à
 quorum ; `--depot` sans `--descripteur` : sortie 2. DT6-h (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : une configuration
-dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal."""
+dont `run_params` passerait LIMITE est un refus de configuration (CONFIG/taille), levé avant l'ouverture du journal.
+CB-9c (témoin, ADR-0029 l.174) : règles `corps-du-decodeur` (une forme dont le décodeur lit un `eth_call` construit
+porte ce corps exact ; `methode-corps` en fait un POST) et `rpc-par-unite` (une unité sur chaîne = un hôte RPC, hôtes
+pris en configuration) ; elles valent aussi pour `carte.json` (COHERENCE_CARTE), non entre le pool et la carte."""
 import argparse
 import collections
 import ipaddress
@@ -72,6 +75,13 @@ def _plan(f):
                             {x["hote"] for x in f["formes"] if x["espace"]})
 
 
+def _rpc(f):
+    """Une unité sur chaîne = un hôte RPC (ADR-0029 l.174 ; SHOGEN-S2BIS-TEMOIN-RPC-1) : parmi les formes dont le
+    décodeur lit une chaîne (`decodeurs.unite_sur_chaine`), unités et hôtes en bijection."""
+    paires = {(x["hote"], u) for x in f["formes"] for u in [decodeurs.unite_sur_chaine(x["decodeur"])] if u}
+    return len(paires) == len({h for h, _u in paires}) == len({u for _h, u in paires})
+
+
 COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("marge-delta-fenetre", lambda f: f["marge"] < f["delta"] <= f["w"] * S),
                         ("noms-uniques", lambda f: len({x["nom"] for x in f["formes"]}) == len(f["formes"])),
@@ -83,7 +93,10 @@ COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                             {x["hote"] for x in f["formes"]})),
                         ("budget", lambda f: f["tolerance"] + _plan(f)[-1][0] + f["delai"] + f["marge"] <= f["delta"]),
                         ("places-formes", lambda f: f["places"] >= len(f["formes"])),
-                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"]))),
+                        ("decodeur-connu", lambda f: all(x["decodeur"] in decodeurs.DECODEURS for x in f["formes"])),
+                        ("corps-du-decodeur", lambda f: all(x["corps"] == decodeurs.CORPS[x["decodeur"]] for x in
+                                                            f["formes"] if x["decodeur"] in decodeurs.CORPS)),
+                        ("rpc-par-unite", _rpc)),
              "sante": (("temoins-ipv4", lambda s: all(map(_ipv4, s["temoins"]))),
                        ("noms-dns", lambda s: all(map(_nom_dns, s["noms"])))),
              "descripteur": (("observateur-nom", lambda d: re.fullmatch("[a-z0-9]{1,16}", d["observateur"])),

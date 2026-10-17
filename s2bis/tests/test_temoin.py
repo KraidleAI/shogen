@@ -5,11 +5,15 @@ d'Uniswap par bc (s²/2^192 exact, arrondi à 50 et à 28 chiffres à la main) ;
 d'après le corps de Chainlink en S2 (`s2-harness/shogen_s2/sources.py` l.278-282) ; doc OKX lue au registre biblio/."""
 import json
 import os
+import tempfile
 import unittest
 from decimal import ROUND_DOWN, Context, Decimal, DefaultContext, localcontext
 from unittest import mock
 
-from shogen_s2bis.collecte import decodeurs
+from shogen_s2bis.collecte import decodeurs, entree, http
+from shogen_s2bis.collecte.lecture import Lecture
+from tests.test_entree import COMMIT, configurations, refus
+from tests.test_secondaire import carte, fichiers
 
 FIX = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures", "temoin")
 PANNE = ("panne_decode", None)
@@ -155,6 +159,122 @@ class Curve(unittest.TestCase):                                   # CB-9b ; Q-CA
                   b'{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"execution reverted"}}'):
             with self.subTest(x=x[:48]):
                 self.assertEqual(decodeurs.decoder("curve_usdc_usdt", x), PANNE)
+
+
+class Configuration(unittest.TestCase):                           # CB-9c ; SHOGEN-S2BIS-TEMOIN-RPC-1 (annexe B, B.81)
+    """Hôtes RPC du témoin retenus (Q-CA-10 du G0 de CALIB-ACTIFS) : `eth.drpc.org` pour Uniswap, `rpc.mevblocker.io`
+    pour Curve ; Chainlink : `ethereum-rpc.publicnode.com` (ADR-0029 l.168). Écrits ici, en configuration de test."""
+    HOTES = {"chainlink_btc": "ethereum-rpc.publicnode.com", "uniswap_usdc_usdt": "eth.drpc.org",
+             "curve_usdc_usdt": "rpc.mevblocker.io", "okx_usdc_usdt": "www.okx.com"}
+
+    def formes(self, **hotes):
+        """formes.json de test : une forme par décodeur, nommée autrement que lui (hôte de HOTES, ou de `hotes`),
+        corps du décodeur lu sur chaîne ; les autres configurations de test_entree."""
+        f, s, d = configurations(443)
+        modele = {**f["formes"][0], "chemin": "/", "methode": "POST"}
+        f["formes"] = [{**modele, "nom": "f-" + n, "decodeur": n, "hote": hotes.get(n, h),
+                        "corps": decodeurs.CORPS.get(n, "{}")} for n, h in self.HOTES.items()]
+        f["formes"][3].update(methode="GET", corps="", chemin="/api/v5/market/ticker?instId=USDC-USDT")
+        return f, s, d
+
+    def charger(self, f, s, d):
+        with tempfile.TemporaryDirectory() as t:
+            chemins = {}
+            for nom, x in (("formes", f), ("sante", s), ("descripteur", d)):
+                chemins[nom] = os.path.join(t, nom + ".json")
+                with open(chemins[nom], "w", encoding="utf-8") as fichier:
+                    json.dump(x, fichier)
+            return refus(lambda: entree.configurer(chemins, COMMIT))
+
+    def test_corps_lie_au_decodeur(self):
+        """Uniswap et Curve : `POST` du corps exact de leur décodeur ; corps de l'autre pièce, bloc autre que
+        « latest », `GET` sans corps : refus `corps-du-decodeur`."""
+        f, s, d = self.formes()
+        self.assertIsNone(self.charger(f, s, d))
+        autre = dict(enumerate(({"corps": decodeurs.CORPS.get("curve_usdc_usdt")},
+                                {"corps": str(decodeurs.CORPS.get("uniswap_usdc_usdt")).replace("latest", "pending")},
+                                {"methode": "GET", "corps": ""})))
+        for k, x in autre.items():
+            g = json.loads(json.dumps(f))
+            g["formes"][1].update(x)
+            with self.subTest(cas=k):
+                self.assertEqual(str(self.charger(g, s, d))[:37], "CONFIG/incoherent : corps-du-decodeur")
+
+    def test_une_unite_sur_chaine_un_hote_rpc(self):
+        """Une unité sur chaîne = un hôte RPC (ADR-0029 l.174) : Uniswap sur l'hôte de Chainlink, Curve sur celui
+        d'Uniswap : refus `rpc-par-unite` ; deux flux de la classe de Chainlink (un flux injecté de plus) sur un
+        seul hôte : admis, sur deux : refusé ; OKX (hors chaîne) sur l'hôte d'Uniswap : admis."""
+        cas = [({}, None), ({"uniswap_usdc_usdt": "ethereum-rpc.publicnode.com"}, "rpc-par-unite"),
+               ({"curve_usdc_usdt": "eth.drpc.org"}, "rpc-par-unite"), ({"okx_usdc_usdt": "eth.drpc.org"}, None)]
+        for hotes, regle in cas:
+            with self.subTest(hotes=hotes):
+                r = self.charger(*self.formes(**hotes))
+                self.assertEqual(r and r.split(" : ")[:2], regle and ["CONFIG/incoherent", regle])
+        f, s, d = self.formes()
+        eth = {**f["formes"][0], "nom": "eth", "decodeur": "chainlink_eth"}
+        with mock.patch.dict(decodeurs.DECODEURS, chainlink_eth=("ETH", "USD", "oracle_chainlink", lambda j: j)):
+            for hote, regle in (("ethereum-rpc.publicnode.com", None), ("ethereum.publicnode.com", "rpc-par-unite")):
+                with self.subTest(hote=hote):
+                    r = self.charger({**f, "places": 5, "formes": f["formes"] + [{**eth, "hote": hote}]}, s, d)
+                    self.assertEqual(r and r.split(" : ")[:2], regle and ["CONFIG/incoherent", regle])
+        self.assertEqual([decodeurs.unite_sur_chaine(n) for n in ("chainlink_btc", "uniswap_usdc_usdt",
+                                                                    "curve_usdc_usdt", "okx_usdc_usdt", "inconnu")],
+                         ["chainlink", "uniswap", "curve", None, None])
+
+    def test_regles_aussi_dans_la_carte(self):
+        """`carte.json` porte les mêmes règles de forme (COHERENCE_CARTE) : corps d'Uniswap altéré, Uniswap et Curve
+        sur un hôte : refus nommés ; les deux pièces chacune sur son hôte : admis."""
+        f, _s, d = configurations(1)
+        x = {**carte(1)["formes"][0], "methode": "POST", "chemin": "/"}
+        u = {**x, "nom": "u", "decodeur": "uniswap_usdc_usdt", "corps": decodeurs.CORPS.get("uniswap_usdc_usdt", "{}")}
+        c = {**x, "nom": "c", "decodeur": "curve_usdc_usdt", "corps": decodeurs.CORPS.get("curve_usdc_usdt", "{}")}
+        cas = [([u, {**c, "hote": "127.0.0.2"}], None), ([{**u, "corps": "{}"}], "corps-du-decodeur"),
+               ([u, c], "rpc-par-unite")]
+        with tempfile.TemporaryDirectory() as t:
+            for formes, regle in cas:
+                with self.subTest(regle=regle):
+                    r = refus(lambda: entree.configurer_secondaire(fichiers(t, formes=f, carte=carte(1, formes=formes),
+                                                                            descripteur=d), COMMIT))
+                    self.assertEqual(r and r.split(" : ")[:2], regle and ["CONFIG/incoherent", regle])
+
+    def test_requetes_construites_hote_de_la_configuration(self):
+        """Câblage (`construire`) : chaque requête porte l'hôte de sa forme et le corps de son décodeur ; octets de
+        la requête d'Uniswap écrits à la main (FORMAT §9.3) ; réponses servies par les fixtures, décodées. Aucun envoi :
+        `http.lire` est remplacé."""
+        f, s, d = self.formes()
+        vues, servies = {}, {"uniswap_usdc_usdt": "uniswap_usdc_usdt.bin", "curve_usdc_usdt": "curve_usdc_usdt.bin",
+                             "okx_usdc_usdt": "okx_usdc_usdt.bin", "chainlink_btc": "uniswap_usdc_usdt.bin"}
+
+        def lire_faux(req, suivi, delai, tls):
+            vues[req.hote] = req
+            nom = next(n for n, h in self.HOTES.items() if h == req.hote)
+            return Lecture("ok", 1, 2, code=200, octets=lire(servies[nom]))
+        with tempfile.TemporaryDirectory() as t, mock.patch.object(entree.http, "lire", side_effect=lire_faux):
+            lus = {n: entree.construire(f, s, d, t)[1].lectures["f-" + n]({}) for n in self.HOTES}
+        corps = ('{"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": '
+                 '"0x3416cF6C708Da44DB2624D63ea0AAef7113527C6", "data": "0x3850c7bd"}, "latest"]}')
+        self.assertEqual(http.octets(vues["eth.drpc.org"]), (
+            "POST / HTTP/1.1\r\nAccept-Encoding: identity\r\nContent-Length: %d\r\nHost: eth.drpc.org\r\n"
+            "User-Agent: Mozilla/5.0 (Shogen-S2-harness; +https://github.com/KraidleAI/shogen)\r\n"
+            "Accept: application/json\r\nContent-Type: application/json\r\nConnection: close\r\n\r\n%s"
+            % (len(corps), corps)).encode())
+        self.assertEqual({h: (r.methode, r.chemin, r.corps and r.corps.decode()) for h, r in vues.items()}, {
+            "ethereum-rpc.publicnode.com": ("POST", "/", "{}"), "eth.drpc.org": ("POST", "/", corps),
+            "rpc.mevblocker.io": ("POST", "/", decodeurs.CORPS.get("curve_usdc_usdt")),
+            "www.okx.com": ("GET", "/api/v5/market/ticker?instId=USDC-USDT", None)})
+        self.assertEqual({n: (x.statut, x.valeurs and x.valeurs[0]["prix"]) for n, x in lus.items()}, {
+            "chainlink_btc": ("panne_decode", None), "uniswap_usdc_usdt": ("ok", U50),
+            "curve_usdc_usdt": ("ok", "1.000393"), "okx_usdc_usdt": ("ok", "1.00062")})
+
+    def test_aucun_hote_en_dur_dans_les_decodeurs(self):
+        """Le code des décodeurs ne nomme aucun hôte (ni ceux de PAIRES-ET-TEMOIN §3.2, ni celui d'OKX) : l'hôte
+        est celui de la forme (SHOGEN-S2BIS-TEMOIN-RPC-1)."""
+        with open(decodeurs.__file__, encoding="utf-8") as fichier:
+            source = fichier.read().lower()
+        hotes = ["publicnode", "drpc", "mevblocker", "blastapi", "tenderly", "1rpc", "ankr", "cloudflare-eth",
+                 "llamarpc", "merkle.io", "flashbots", "meowrpc", "omniatech", "blockpi", "payload.de", "okx.com",
+                 "https:", "http:"]
+        self.assertEqual([h for h in hotes if h in source], [])
 
 
 if __name__ == "__main__":

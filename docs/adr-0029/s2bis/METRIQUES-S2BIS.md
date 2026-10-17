@@ -2947,3 +2947,34 @@ décimales permutées dans chaque pièce, tuées par le test des décimales dist
 équivalents sur la fixture de la pièce).
 
 Suite : 404 tests ; plancher du job : 404, égalité exigée (`--egal`).
+
+## CB-9c (2026-10-17) : témoin, une unité sur chaîne = un hôte RPC, corps lié au décodeur (FORMAT §9.1, §14.1)
+
+Objet : règles `corps-du-decodeur` (une forme dont le décodeur lit un `eth_call` construit porte ce corps exact) et
+`rpc-par-unite` (ADR-0029 l.174 : parmi les formes lues sur chaîne, unités et hôtes en bijection ; « chainlink » pour
+toute forme de la classe `oracle_chainlink`) dans `formes.json` et `carte.json`, non entre les deux ; hôtes RPC du
+témoin (`eth.drpc.org`, `rpc.mevblocker.io`, Q-CA-10) en configuration seule, aucun dans le code (test). FORMAT :
+puce « Partie P2, tranche D », §9.1 (relevés du témoin, classe en question), §14.1 (les deux règles).
+
+Rouge : sur le code de CB-9b, avec un squelette d'interface (`unite_sur_chaine` muette), 3 tests neufs échouent par
+assertion (9 sous-cas, 0 erreur) ; sur le FORMAT d'avant, le test du FORMAT échoue par assertion. Deux tests neufs
+sont verts dès avant le code (caractérisation du câblage : requêtes construites et hôte de la configuration ; aucun
+hôte dans le code des décodeurs).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 349 | — |
+| `shogen_s2bis/collecte/entree.py` | 298 | — |
+| `tests/test_temoin.py` | 281 | 15 (5 de plus : corps lié, un hôte par unité, carte, câblage, aucun hôte en dur) |
+| `tests/test_format.py` | 308 | 18 (1 de plus : §9.1, §14.1 et puce « Partie P2, tranche D ») |
+
+Rebasage (lot INT-P2, 2026-10-17) : conflits de texte (docstring de `decodeurs.py` ; puce « Partie P2, tranche D »
+après celle de la tranche C ; §14.1, règles de CB-9c avant la phrase des formes du pool de CB-8c ; plancher 404 + 6 ;
+fin de ce fichier) ; aucun conflit de sens. Rouge et mutants : ceux du générateur, sur 2a07ae6, non rejoués.
+
+Mutants (même commande) : 14 mutants, 14 tués (13 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL ;
+dont trois sites d'appel ou sources sous étiquette (corps d'une autre pièce, nom de la forme au lieu de son
+décodeur, Chainlink reconnu par son seul nom) ; le mutant « méthode non contrôlée » est équivalent (`methode-corps`
+fait d'un corps non vide un POST) : la règle ne contrôle que le corps.
+
+Suite : 410 tests ; plancher du job : 410, égalité exigée (`--egal`).

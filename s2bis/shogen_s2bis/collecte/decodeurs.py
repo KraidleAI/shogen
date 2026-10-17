@@ -25,7 +25,9 @@ CB-8b : Chainlink ETH, USDC et USDT, plafond de 1,05 des stables en extra (E-C-1
 CB-9a (témoin USDC/USDT, ADR-0029 l.174 ; adresses, sélecteurs et décimales lus sur
 `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §3.1) : OKX `USDC-USDT` ; Uniswap v3, `slot0` du pool 0,01 % ; requête
 `eth_call` construite (`eth_call`, CORPS), l'hôte RPC restant celui de la forme (`formes.json`).
-CB-9b : Curve, `get_dy` du 3pool (Q-CA-09 du G0 de CALIB-ACTIFS)."""
+CB-9b : Curve, `get_dy` du 3pool (Q-CA-09 du G0 de CALIB-ACTIFS).
+CB-9c : unité sur chaîne de chaque décodeur (`unite_sur_chaine`), qui porte la règle « une unité on-chain = un hôte
+RPC » de `formes.json` (entree.py)."""
 import datetime
 import decimal
 import json
@@ -294,6 +296,15 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "uniswap_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _uniswap),
     "curve_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _curve),
 }
+
+
+SUR_CHAINE = {"uniswap_usdc_usdt": "uniswap", "curve_usdc_usdt": "curve"}           # pièces du témoin sur chaîne
+
+
+def unite_sur_chaine(nom):
+    """Unité sur chaîne que lit le décodeur `nom` (ADR-0029 l.174) : « chainlink » pour tout flux de la classe
+    `oracle_chainlink` (une seule unité du pool, ADR-0029 l.168), la pièce du témoin sinon ; None hors chaîne."""
+    return "chainlink" if DECODEURS.get(nom, (None,) * 4)[2] == "oracle_chainlink" else SUR_CHAINE.get(nom)
 
 
 def _releve(actif, devise, classe, prix, ts, extra):
