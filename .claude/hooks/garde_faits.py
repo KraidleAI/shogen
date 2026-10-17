@@ -76,7 +76,12 @@ erreur interne, ou un journal illisible, pendant le jugement d'un acte qui écri
 PR (R1 à R3, R5, R8 : tout PreToolUse hors lecture pure) est un refus qui nomme l'erreur ; une lecture pure
 (lecture_pure : commandes simples de LECTURE, git en GIT_LECTURE, sans redirection d'écriture, substitution,
 affectation ni $ sur git ; outils mcp__github__ get_, list_, search_) reste permise, l'erreur écrite sur stderr et au
-journal des décisions ; Stop, SubagentStop et UserPromptSubmit : permis, erreur écrite (ni écriture ni acte)."""
+journal des décisions ; Stop, SubagentStop et UserPromptSubmit : permis, erreur écrite (ni écriture ni acte).
+R12 (E29, SHOGEN-GARDE-REPONSE-INVESTISSEUR-1), Stop seul : chaque nombre à unité de la réponse (texte de l'agent après
+son dernier appel d'outil ; unités de R12_NOMBRE) doit être porté, avec une forme de son unité (R12_FORMES, française
+ou anglaise) sur la même ligne, par un résultat d'outil ou une pièce jointe du tour, ou par le message de l'humain qui
+l'ouvre ; fenêtre : depuis le dernier message de l'humain (tour_humain). Sinon refus qui nomme le nombre et demande la
+lecture de la pièce ; au second arrêt du tour (stop_hook_active), passage consigné. R6 n'est pas modifiée."""
 import importlib.util
 import json
 import os
@@ -974,6 +979,50 @@ def stop(entree, sous_agent):
     return 2
 
 
+BLANC = "[ " + chr(0xa0) + chr(0x202f) + "]"        # espace, insécable, fine insécable (R12)
+R12_NOMBRE = re.compile(r"(?<![\w.,:/-])(\d+(?:[.,]\d+)?)" + BLANC + "?(" + r"jours?|semaines?|mois|heures?|minutes?"
+                        r"|années?|ans?|%|commits?|tests?|fichiers?)(?![A-Za-zà-ÿ])", re.I)
+R12_FORMES = {"jour": "jours?|days?", "semaine": "semaines?|weeks?", "mois": "mois|months?", "heure": "heures?|hours?",
+              "minute": "minutes?", "an": "ans?|années?|years?", "%": "%|pour ?cent|percent", "commit": "commits?",
+              "test": "tests?", "fichier": "fichiers?|files?"}
+
+
+def piece_porte(n, unite, lignes):
+    """R12 : vrai si une ligne porte le nombre n (virgule ou point décimal) et une forme de son unité."""
+    formes = {n, n.replace(",", "."), n.replace(".", ",")}
+    r_n = re.compile(r"(?<![\w.,:/-])(?:" + "|".join(map(re.escape, formes)) + r")(?![\d]|[.,]\d)")
+    r_u = re.compile(r"(?<![A-Za-zà-ÿ])(?:" + R12_FORMES[unite] + r")(?![A-Za-zà-ÿ])", re.I)
+    return any(r_n.search(x) and r_u.search(x) for x in lignes)
+
+
+def nombres_sans_piece(entree):
+    """R12 (E29) : nombres à unité de la réponse du tour qu'aucune pièce du tour ne porte avec leur unité ; au second
+    arrêt (stop_hook_active), passage consigné, rien rendu."""
+    entrees = lire_queue(entree.get("transcript_path") or "") or []
+    i, pieces = tour_humain(entrees)
+    pieces, reponse = list(pieces), []
+    for e in entrees[i + 1:] if i is not None else entrees:
+        if e.get("type") == "attachment":
+            pieces.append(contenus(e.get("attachment")))
+        c = (e.get("message") or {}).get("content")
+        for b in [b for b in (c if isinstance(c, list) else []) if isinstance(b, dict)]:
+            if b.get("type") == "tool_result" and MARQUE not in contenus(b):
+                pieces.append(contenus(b))
+            elif b.get("type") == "tool_use":
+                reponse = []
+            elif b.get("type") == "text" and e.get("type") == "assistant":
+                reponse.append(b.get("text", ""))
+    lignes = "\n".join(pieces).split("\n")
+    unite = lambda u: "an" if u in ("an", "ans") or u.startswith("ann") else u if u in ("%", "mois") else u.rstrip("s")  # noqa: E731
+    manque = list(dict.fromkeys(m[0] for m in R12_NOMBRE.finditer(RAPPEL.sub("", "\n".join(reponse)))
+                                if not piece_porte(m[1], unite(m[2].lower()), lignes)))
+    if manque and entree.get("stop_hook_active"):
+        journaliser(os.path.dirname(entree.get("transcript_path") or "") or ".",
+                    f"PASSAGE R12 au second arrêt : {manque[:8]}")
+        return []
+    return manque
+
+
 LECTURE = {"cat", "head", "tail", "grep", "ls", "wc", "sha256sum", "cmp", "diff", "od", "stat", "pwd", "echo", "printf",
            "df", "du", "cut", "tr", "nl", "basename", "dirname", "realpath", "readlink", "true", "cd"}
 GIT_LECTURE = {"status", "log", "diff", "show", "rev-parse", "ls-files", "ls-tree", "blame", "cat-file"}
@@ -1050,6 +1099,14 @@ def juger(entree):
                                  "tour : relever d'abord les noms propres du message (grep -n <nom> JOURNAL.md "
                                  "docs/publication/), puis rattacher.\n")
                 journaliser(dossier, f"REFUS Stop R10 : {manque}")
+                return 2
+            sans = nombres_sans_piece(entree) if ev == "Stop" and not code else []      # R12 (E29)
+            if sans:
+                REGLE[0] = "R12"
+                sys.stderr.write(f"{MARQUE} : REFUS. R12 (E29) : la réponse porte {', '.join(sans[:8])}, qu'aucun "
+                                 "résultat d'outil ni pièce du tour ne porte avec son unité ; lire la pièce qui porte "
+                                 "chaque nombre (Read, grep -n), puis répondre.\n")
+                journaliser(dossier, f"REFUS Stop R12 : {sans[:8]}")
                 return 2
             return code
     except SystemExit as e:

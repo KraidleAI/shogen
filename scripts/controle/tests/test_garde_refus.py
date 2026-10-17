@@ -59,7 +59,8 @@ class Journal(Base):
         d'une valeur après tabulation (masqués, abrégé à 80) : une ligne chacun, en-tête une fois ; dossier du journal absent : rien.
         G2, C-4 : refus R11 (consigne longue sans brief) et R10 (dossier nommé sans relevé) consignés sous leur règle.
         Intégration P3 (SHOGEN-GARDE-ERREUR-INTERNE-1) : erreur interne ou journal illisible sur un acte qui écrit :
-        refus consigné R0 ; erreur interne sur une lecture pure : permis, consigné erreur."""
+        refus consigné R0 ; erreur interne sur une lecture pure : permis, consigné erreur. Refus R12 (nombre à unité
+        sans pièce, R6 couverte par un 28 affiché sans unité) : consigné R12."""
         secret = ("echo " + chr(34) + "token=s3cr3tValeur" + chr(34) + " sk-ant-" + "api03-AbCdEf0123456789xyzXYZ0" + TAB
                   + "password:" + TAB + "motdepasse" + TAB)
         texte = {"type": "assistant", "uuid": "u1", "message": {"content": [{"type": "text", "text": "Il y a 4321 cas."}]}}
@@ -74,15 +75,22 @@ class Journal(Base):
                              transcript_path=os.path.join(self.t, "absent.txt"))[0],
                  self.lancer("PreToolUse", tool_name="Agent", tool_input={"prompt": "x" * 1600})[0],
                  self.lancer("Stop", [{"type": "user", "message": {"content": "Note de Zorglubien."}}, {
-                     "type": "assistant", "uuid": "u2", "message": {"content": [{"type": "text", "text": "Voir MONARK."}]}}])[0]]
+                     "type": "assistant", "uuid": "u2", "message": {"content": [{"type": "text", "text": "Voir MONARK."}]}}])[0],
+                 self.lancer("Stop", [{"type": "user", "message": {"content": "Quelle durée ?"}}, {
+                     "type": "assistant", "message": {"content": [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {
+                         "command": "grep -n collecte notes.txt"}}]}}, {"type": "user", "message": {"content": [{
+                             "type": "tool_result", "tool_use_id": "t1", "content": "28:collecte"}]}}, {
+                     "type": "assistant", "uuid": "u3", "message": {"content": [{"type": "text", "text": "Pendant les 28 "
+                                                                                 "jours de collecte."}]}}])[0]]
         abrege = "echo " + chr(34) + "token=***" + chr(34) + " *** password: *** "
         lignes = [["PreToolUse:Bash", "permis", "ls", "principal"], ["PreToolUse:Bash", "R7", "sleep 5", "principal"],
                   ["PreToolUse:Bash", "permis", abrege + "x" * (80 - len(abrege)), "principal"],
                   ["PreToolUse:Bash", "permis", "ls", "a1"], ["Stop", "R6", "-", "principal"],
                   ["PreToolUse:Bash", "R0", "-", "principal"], ["PreToolUse:Bash", "erreur", "ls", "principal"],
                   ["PreToolUse:Bash", "R0", "git commit -m x", "principal"],
-                  ["PreToolUse:Agent", "R11", '{"prompt": "' + "x" * 68, "principal"], ["Stop", "R10", "-", "principal"]]
-        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 2, 0, 2, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
+                  ["PreToolUse:Agent", "R11", '{"prompt": "' + "x" * 68, "principal"], ["Stop", "R10", "-", "principal"],
+                  ["Stop", "R12", "-", "principal"]]
+        self.assertEqual((codes, self.lire()), ([0, 2, 0, 0, 2, 2, 0, 2, 2, 2, 2], ENTETE + "".join(TAB.join([H, *x]) + NL
                                                                                     for x in lignes)))
         self.assertNotIn("motdepasse", self.lire())
         self.env["SHOGEN_GARDE_REFUS"] = os.path.join(self.t, "absent", "refus.tsv")
@@ -187,7 +195,7 @@ class Lecteur(Base):
             "actes refusés les plus fréquents (dix au plus) :",
             "  3" + TAB + "R5" + TAB + "git commit -m x", "  2" + TAB + "R2" + TAB + "sed -i s f",
             "  2" + TAB + "R7,R11" + TAB + "sleep 5"] + ["  1" + TAB + "R11" + TAB + f"acte-0{k}" for k in range(1, 8)] + [
-            "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10",
+            "règles sans refus depuis trente jours (depuis le 2026-09-16, candidates à relire) : R1, R3, R4, R8, R9, R10, R12",
             "passages : 3 (dont 1 erreur(s) interne(s), acte permis sans contrôle)"]))
         self.assertEqual(self.releve()[1][0], "journal des refus : 23 ligne(s) lue(s), 2 illisible(s) ; depuis le "
                          "début : 18 refus")
