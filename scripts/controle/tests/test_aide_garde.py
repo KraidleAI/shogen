@@ -26,9 +26,10 @@ class EnvironnementAmbiant(unittest.TestCase):
 
     def test_e39_lancement_lie_sous_lancement_detache(self):
         """E39, cas réel : test_e25_lancement_lie (refus d'un lancement lié trop long) rejoué sous DETACHE=1 et
-        DUREE_PAS=60 posés dans l'environnement ambiant, comme pendant la vérification d'une chaîne lancée détachée : vert."""
+        DUREE_PAS=60 posés dans l'environnement ambiant, comme pendant la vérification d'une chaîne lancée détachée : vert.
+        Relecture G2, C-3 : ROUGE=X-1 ambiant (variable du faux verif des cas) ne rougit pas le premier pas."""
         cas = tgc.Chaine("test_e25_lancement_lie")
-        with mock.patch.dict(os.environ, {"DETACHE": "1", "DUREE_PAS": "60"}):
+        with mock.patch.dict(os.environ, {"DETACHE": "1", "DUREE_PAS": "60", "ROUGE": "X-1"}):
             resultat = unittest.TestResult()
             cas.run(resultat)
         self.assertEqual((resultat.failures, resultat.errors, resultat.testsRun), ([], [], 1))

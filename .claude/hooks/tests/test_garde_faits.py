@@ -11,7 +11,7 @@ ICI = os.path.dirname(os.path.abspath(__file__))
 GARDE = os.path.join(os.path.dirname(ICI), "garde_faits.py")
 SHA = "9f8e7d6"           # identifiant fictif, jamais affiché sauf où le cas le dit
 SHA2 = "abc1234"
-os.environ.setdefault("SHOGEN_GARDE_REFUS", os.devnull)      # GARDE-FOUS phase 3 : jamais le journal des refus du dépôt
+os.environ["SHOGEN_GARDE_REFUS"] = os.devnull      # GARDE-FOUS phase 3 : jamais le journal des refus du dépôt (G2 ISOLE-ENV, C-2)
 
 
 def entree_appel(nom, inp):

@@ -165,6 +165,19 @@ class Journal(Base):
                                                                      + " absent ou non écrit : aucun refus relevé" + NL))
 
 
+class JournalJamaisHerite(unittest.TestCase):
+    def test_c2_valeur_ambiante_ecartee(self):
+        """Relecture G2 du lot ISOLE-ENV, C-2 : SHOGEN_GARDE_REFUS posé dans l'environnement ambiant (une chaîne,
+        une session) ne gagne jamais : l'import du paquet des tests le pose à os.devnull (avant : setdefault ; le
+        journal ambiant recevait les refus des cas et test_e26_releve_puis_rattachement rougissait)."""
+        code = "import os, sys; sys.path.insert(0, sys.argv[1]); import tests; print(os.environ['SHOGEN_GARDE_REFUS'])"
+        with tempfile.TemporaryDirectory() as t:
+            env = dict(os.environ, SHOGEN_GARDE_REFUS=os.path.join(t, "ambiant.tsv"))
+            p = subprocess.run([sys.executable, "-I", "-B", "-c", code, os.path.join(RACINE, "scripts", "controle")],
+                               capture_output=True, text=True, timeout=60, env=env)
+        self.assertEqual((p.returncode, p.stdout), (0, os.devnull + NL), p.stderr)
+
+
 class Lecteur(Base):
     """avant_acte.py refus : relevé du journal des refus (heure du jour fixée à H)."""
     def releve(self, *argv):

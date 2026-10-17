@@ -64,8 +64,9 @@ class Chaine(unittest.TestCase):
                                                        f"Diff-Id: X-{i}", ""])})
 
     def lancer(self, **variables):
+        """ROUGE, lue par le faux verif, posée vide sauf demande : jamais héritée (relecture G2 du lot ISOLE-ENV, C-3)."""
         env = dict(self.env, DEPOT=self.d, PLAN=os.path.join(self.tmp, "plan"), OUTILS=self.outils,
-                   PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"))
+                   PYTHON=sys.executable, CC=os.path.join(self.tmp, "cc.md"), ROUGE="")
         env.update(variables)
         p = subprocess.run(["bash", self.chaine], env=env, capture_output=True, text=True, timeout=300)
         self.erreur, self.sortie = p.stderr, p.stdout

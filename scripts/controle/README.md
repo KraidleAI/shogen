@@ -947,3 +947,6 @@ dépendent des tests du harnais qu'ils importent.
 > | `tests/test_mutants.py` | `c64b6b35866770c51ce49d21cd9c9b06ae226b2bbeef8c5c16465765d12fe5e1` |
 >
 > Le lot ajoute 6 tests ; plancher du job `controle-unittest` 231.
+
+
+> *Ajout daté du 2026-10-17 01:50:32 UTC (`date -u` ; pas INT-23, corrections C-2 et C-3 de la relecture G2 du lot ISOLE-ENV, reprises à l octet)* : les cas de `scripts/controle/tests` et du crochet posent `SHOGEN_GARDE_REFUS` par affectation (plus `setdefault`) : une valeur ambiante de la session n écrit plus dans son journal pendant la suite (cas `JournalJamaisHerite.test_c2_valeur_ambiante_ecartee`) ; la variable `ROUGE` lue par le faux `verif` des cas de chaîne est posée vide par `lancer()` et n est jamais héritée (cas rejoué sous `ROUGE=X-1` ambiant). Le pas ajoute 1 test ; plancher du job `controle-unittest` 232.
