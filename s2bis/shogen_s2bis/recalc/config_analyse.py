@@ -29,6 +29,7 @@ TAU_ORACLES = {"ETH": "0.0075", "USDC": "0.00375", "USDT": "0.00375"}
 SIGMA_ORACLES = {"USDC": 124200, "USDT": 129600}
 GRILLE_BTC = Decimal("0.0005")
 SIGMA_BTC = ("place_horodatee", "agregateur")
+TEMOIN = "temoin"   # classe des lectures du témoin (C-P2D-1) : hors des classes USD et hors du vote (ADR-0029 l.174)
 
 
 class RefusAnalyse(Exception):
@@ -69,7 +70,9 @@ def _table(actif, v, ou):
     """τ et σ d'un actif par classe de source : sous-ensemble non vide des classes ; σ null pour les places sans
     horodatage (staleness non évaluable, `r1.classify_ecart`), entier au moins égal au plancher ailleurs (celui de la
     classe, et celui de l'oracle de l'actif) ; τ au moins égal au plancher de l'oracle de l'actif, sur la grille pour
-    BTC."""
+    BTC. La classe du témoin est refusée par son nom (C-P2D-1)."""
+    if type(v) is dict and TEMOIN in v:
+        _refus("ANALYSE/temoin", f"{ou} : classe du témoin, hors du vote (ADR-0029 l.174)")
     if type(v) is not dict or not v or v.keys() - PLANCHERS.keys():
         _refus("ANALYSE/classe", f"{ou} : {sorted(v) if type(v) is dict else v!r}")
     for classe, x in v.items():

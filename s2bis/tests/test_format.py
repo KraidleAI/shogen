@@ -243,12 +243,22 @@ class Format(unittest.TestCase):
         puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
         regles = [n for n, _r in entree.COHERENCE["formes"]][-2:]
         attendus = [(sections["9"], f"`{n}`") for n in ("okx_usdc_usdt", "uniswap_usdc_usdt", "curve_usdc_usdt")]
-        attendus += [(sections["9"], "`devise` `USDT` (prix en USDT par USDC)"), (sections["9"], "rendu en question à "
-                     "l'orchestrateur"), (sections["14"], "« une unité on-chain = un hôte RPC »"), (sections["14"],
+        attendus += [(sections["9"], "`devise` `USDT` (prix en USDT par USDC)"),
+                     (sections["9"], "de classe `temoin`, hors des classes USD et hors du vote"),
+                     (sections["14"], "« une unité on-chain = un hôte RPC »"), (sections["14"],
                      f"Règle `{regles[0]}`"), (sections["14"], f"règle `{regles[1]}`")]
         self.assertEqual((regles, [x in s for s, x in attendus]), (["corps-du-decodeur", "rpc-par-unite"], [True] * 8))
         self.assertEqual([all(x in p for x in ("CB-9a", "CB-9c", "TEMOIN-RPC-1")) for p in puces if p.startswith(
             "**Partie P2, tranche D**")], [True])
+
+    def test_paragraphe_9_classe_temoin(self):                      # C-P2D-1 (adjudication Q-1 de la tranche D)
+        """§9.1 : `temoin` dans la liste fermée des classes, avec le refus du recalcul qui la tient hors du vote ;
+        puce « Partie P2, intégration » : C-P2D-1 et la classe."""
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual(["`oracle_chainlink` (noms d'`analyse.json`) ou `temoin`" in sections["9"],
+                          "`ANALYSE/temoin`" in sections["9"]], [True, True])
+        self.assertEqual([all(x in p for x in ("C-P2D-1", "`temoin`")) for p in puces if p.startswith(
+            "**Partie P2, intégration**")], [True])
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et

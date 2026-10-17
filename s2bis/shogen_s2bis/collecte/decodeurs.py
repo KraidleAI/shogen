@@ -27,7 +27,9 @@ CB-9a (témoin USDC/USDT, ADR-0029 l.174 ; adresses, sélecteurs et décimales l
 `eth_call` construite (`eth_call`, CORPS), l'hôte RPC restant celui de la forme (`formes.json`).
 CB-9b : Curve, `get_dy` du 3pool (Q-CA-09 du G0 de CALIB-ACTIFS).
 CB-9c : unité sur chaîne de chaque décodeur (`unite_sur_chaine`), qui porte la règle « une unité on-chain = un hôte
-RPC » de `formes.json` (entree.py)."""
+RPC » de `formes.json` (entree.py).
+C-P2D-1 (adjudication Q-1 de la tranche D) : classe `temoin` des trois lectures du témoin, hors des classes du recalcul
+(ADR-0029 l.174 : « hors des classes USD et hors du vote »)."""
 import datetime
 import decimal
 import json
@@ -47,7 +49,7 @@ EPOQUE = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 MOTS = re.compile("0x[0-9a-fA-F]{320}")                             # latestRoundData : cinq mots de 32 octets
 CHIFFRES, TEXTE = 16, 4300                      # bornes de `_entier` : instant sous 10^16 ; texte de int()
 ACTIFS, DEVISES = ("BTC", "ETH", "USDC", "USDT"), ("USD", "USDT")           # listes fermées du FORMAT §9.1
-CLASSES = ("place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink")
+CLASSES = ("place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink", "temoin")    # témoin : C-P2D-1
 PLAFOND = "1.05000000"      # maxSubmissionValue 105000000 à 8 décimales, USDC/USD et USDT/USD (pièce §2 l.72 ; E-C-10)
 
 
@@ -292,9 +294,9 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "chainlink_eth": ("ETH", "USD", "oracle_chainlink", _chainlink()),
     "chainlink_usdc": ("USDC", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
     "chainlink_usdt": ("USDT", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
-    "okx_usdc_usdt": ("USDC", "USDT", "place_horodatee", _okx_temoin),      # témoin : USDT par USDC, hors du vote
-    "uniswap_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _uniswap),
-    "curve_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _curve),
+    "okx_usdc_usdt": ("USDC", "USDT", "temoin", _okx_temoin),      # témoin : USDT par USDC, hors du vote
+    "uniswap_usdc_usdt": ("USDC", "USDT", "temoin", _uniswap),
+    "curve_usdc_usdt": ("USDC", "USDT", "temoin", _curve),
 }
 
 

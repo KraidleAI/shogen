@@ -46,7 +46,7 @@ class Okx(unittest.TestCase):
         """l.87 : last 1,00062 ; bid 1,00062 ; ask 1,00063 ; ts 1791487760439 ms (date -u -d @1791487760 :
         2026-10-08 19:29:20 UTC) ; USDC coté en USDT, place horodatée (ts : génération du ticker, doc OKX)."""
         self.assertEqual(decodeurs.decoder("okx_usdc_usdt", lire("okx_usdc_usdt.bin")), ("ok", [
-            {"actif": "USDC", "classe": "place_horodatee", "devise": "USDT", "extra": {"askPx": "1.00063",
+            {"actif": "USDC", "classe": "temoin", "devise": "USDT", "extra": {"askPx": "1.00063",
              "bidPx": "1.00062"}, "prix": "1.00062", "ts_source": 1791487760439000}]))
 
     def test_instrument_code_et_champs_exiges(self):
@@ -86,7 +86,7 @@ class Uniswap(unittest.TestCase):
         """sqrtPriceX96 de l.90 : prix (s / 2^96)² en 50 chiffres (bc), 1,000669 arrondi (valeur de la pièce) ;
         tick 6 ; décimales 6 et 6 (l.89) ; aucun instant (le bloc n'est pas rendu)."""
         self.assertEqual(decodeurs.decoder("uniswap_usdc_usdt", lire("uniswap_usdc_usdt.bin")), ("ok", [
-            {"actif": "USDC", "classe": "sans_horodatage", "devise": "USDT", "extra": {"sqrt_price_x96": str(S),
+            {"actif": "USDC", "classe": "temoin", "devise": "USDT", "extra": {"sqrt_price_x96": str(S),
              "tick": "6"}, "prix": U50, "ts_source": None}]))
         self.assertEqual(round(Decimal(U50), 6), Decimal("1.000669"))
 
@@ -135,7 +135,7 @@ class Curve(unittest.TestCase):                                   # CB-9b ; Q-CA
     def test_fixture_de_la_piece(self):
         """l.94 : get_dy(1, 2, 10^6) = 1 000 393, soit 1,000393 USDT pour 1 USDC, net des frais ; aucun instant."""
         self.assertEqual(decodeurs.decoder("curve_usdc_usdt", lire("curve_usdc_usdt.bin")), ("ok", [
-            {"actif": "USDC", "classe": "sans_horodatage", "devise": "USDT", "extra": {"dy": "1000393"},
+            {"actif": "USDC", "classe": "temoin", "devise": "USDT", "extra": {"dy": "1000393"},
              "prix": "1.000393", "ts_source": None}]))
 
     def test_decimales_portees_par_les_deux_pieces(self):
@@ -159,6 +159,16 @@ class Curve(unittest.TestCase):                                   # CB-9b ; Q-CA
                   b'{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"execution reverted"}}'):
             with self.subTest(x=x[:48]):
                 self.assertEqual(decodeurs.decoder("curve_usdc_usdt", x), PANNE)
+
+
+class Classe(unittest.TestCase):                                  # C-P2D-1 (adjudication Q-1 de la tranche D)
+    def test_classe_temoin_pour_les_trois_lectures(self):
+        """Les trois lectures du témoin, et elles seules, sont de classe `temoin` (ADR-0029 l.174 : « hors des
+        classes USD et hors du vote ») ; liste fermée des classes : les quatre du recalcul, puis `temoin`."""
+        self.assertEqual(sorted(n for n, x in decodeurs.DECODEURS.items() if x[2] == "temoin"),
+                         ["curve_usdc_usdt", "okx_usdc_usdt", "uniswap_usdc_usdt"])
+        self.assertEqual(decodeurs.CLASSES, ("place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink",
+                                             "temoin"))
 
 
 class Configuration(unittest.TestCase):                           # CB-9c ; SHOGEN-S2BIS-TEMOIN-RPC-1 (annexe B, B.81)

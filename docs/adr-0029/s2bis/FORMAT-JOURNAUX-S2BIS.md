@@ -71,6 +71,9 @@
   `rpc-par-unite` de `formes.json` (§14.1), qui tiennent la règle « une unité on-chain = un hôte RPC » de
   SHOGEN-S2BIS-TEMOIN-RPC-1 (hôtes en configuration, aucun dans le code ; l'item reste ouvert, déclencheur « avant le
   sceau »).
+- **Partie P2, intégration** (2026-10-17 ; lot INT-P2 : tranches C et D en une série) : le diff C-P2D-1 donne aux
+  trois lectures du témoin la classe `temoin`, hors des classes USD et du vote, que le recalcul refuse dans
+  `analyse.json` (§9.1).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -360,19 +363,21 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      (`decodeur` de `formes.json`, §14.1), un par actif que la réponse porte ; chaque relevé est un objet aux clés
      exactes `actif`, `classe`, `devise`, `prix`, `ts_source` et `extra` : `actif`, l'un de `BTC`, `ETH`, `USDC`,
      `USDT` ; `classe`, la classe de source, l'un de `place_horodatee`, `sans_horodatage`, `agregateur`,
-     `oracle_chainlink` (noms d'`analyse.json`) ; `devise`, la devise de cotation (`USD`, `USDT`) ; `prix`, décimal en
-     chaîne, texte d'un Decimal fini et strictement positif ; `ts_source`, l'instant que porte la source, en
+     `oracle_chainlink` (noms d'`analyse.json`) ou `temoin` (lectures du témoin seules, C-P2D-1 : classe absente
+     d'`analyse.json`, que le recalcul refuse dans `tau_sigma` par `ANALYSE/temoin`) ; `devise`, la devise de
+     cotation (`USD`, `USDT`) ; `prix`, décimal en chaîne, texte d'un Decimal fini et strictement positif ;
+     `ts_source`, l'instant que porte la source, en
      microsecondes entières de 0 à 2^53 exclu, null pour une source sans horodatage ; `extra`, objet de chaînes propre
      à la source. Un corps que le décodeur ne lit pas, ou dont le prix n'est pas fini, est nul ou négatif, donne
      `panne_decode`, `code` et `brut` gardés, `valeurs` null.
    - **Témoin USDC/USDT** (CB-9 ; ADR-0029 l.174) : `actif` `USDC`, `devise` `USDT` (prix en USDT par USDC), trois
-     décodeurs : `okx_usdc_usdt` (classe `place_horodatee` ; instrument `USDC-USDT` contrôlé ; `ts_source` lu de
+     décodeurs : `okx_usdc_usdt` (instrument `USDC-USDT` contrôlé ; `ts_source` lu de
      `ts`, en millisecondes ; `extra` : `askPx` et `bidPx`, finis et > 0, sans ordre exigé) ; `uniswap_usdc_usdt`
      (`slot0` du pool 0,01 % : prix sqrtPriceX96² / 2^192, décimales 6 et 6, une division en 50 chiffres sous le
      contexte nommé, jamais celui du fil ; `extra` : `sqrt_price_x96` et `tick`) ; `curve_usdc_usdt` (`get_dy(1, 2,
-     10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers sont de classe `sans_horodatage` : la
-     réponse `eth_call` ne porte pas le bloc lu. La classe de source du témoin n'est nommée ni par l'ADR ni par le
-     G0 : ces classes, prises dans la liste ci-dessus, sont un choix du lot, rendu en question à l'orchestrateur.
+     10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers n'ont pas d'instant de source
+     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. Les trois sont de classe `temoin`, hors
+     des classes USD et hors du vote (ADR-0029 l.174 ; C-P2D-1, adjudication Q-1 de la tranche D, 2026-10-17).
    - **Instant ISO-8601** (C-5 de la G2 de P2A) : un instant de source écrit en ISO-8601 (Coinbase, champ `time`) est
      lu par un motif fixe : date `AAAA-MM-JJ`, « T » majuscule, heure `hh:mm:ss`, fraction de chiffres facultative
      (tronquée à la microseconde, comme en S2), puis « Z » majuscule, `±hh:mm` ou rien (instant lu en UTC). « t »,

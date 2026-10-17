@@ -2978,3 +2978,34 @@ décodeur, Chainlink reconnu par son seul nom) ; le mutant « méthode non contr
 fait d'un corps non vide un POST) : la règle ne contrôle que le corps.
 
 Suite : 410 tests ; plancher du job : 410, égalité exigée (`--egal`).
+
+## INT-P2-10 (2026-10-17) : C-P2D-1, classe `temoin` des lectures du témoin (adjudication Q-1 de la tranche D)
+
+Objet (lot INT-P2, correction C-P2D-1) : les trois décodeurs du témoin (`okx_usdc_usdt`, `uniswap_usdc_usdt`,
+`curve_usdc_usdt`) rendent la classe `temoin`, ajoutée à la liste fermée `CLASSES` de `decodeurs.py` ; le recalcul la
+tient hors du vote : `config_analyse.TEMOIN`, refus nommé `ANALYSE/temoin` d'une classe `temoin` dans `tau_sigma`,
+avant le refus générique `ANALYSE/classe` ; `temoin` n'entre ni dans `PLANCHERS` ni dans `SIGMA_BTC` (ADR-0029 l.174 :
+« hors des classes USD et hors du vote »). FORMAT §9.1 (liste des classes, puce du témoin) et puce « Partie P2,
+intégration » ; `test_bout_en_bout` lit la liste des classes du FORMAT.
+
+Rouge : sur le code et le FORMAT de INT-P2-09, les tests neufs et modifiés échouent par assertion (9 FAIL, 0 ERROR).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 351 | — |
+| `shogen_s2bis/recalc/config_analyse.py` | 171 | — |
+| `tests/test_temoin.py` | 291 | 16 (1 de plus : classe des trois lectures ; trois relevés attendus en `temoin`) |
+| `tests/test_config_analyse.py` | 219 | 14 (1 de plus : refus nommé `ANALYSE/temoin`) |
+| `tests/test_format.py` | 318 | 19 (1 de plus : §9.1 et puce de l'intégration) |
+| `tests/test_bout_en_bout.py` | 227 | inchangé (liste des classes du FORMAT) |
+
+Mutants (commande du job s2bis-unittest par `scripts/controle/mutants.py` d'une extraction de 2a07ae6, à part de la
+copie mutée ; borne 300 s ; python3 3.11.15 ; réseau isolé ; témoin vivant ; relevé `ps` de fin vide) : 14 mutants,
+14 tués par leur test visé, 0 vivant, 0 FATAL : `temoin` retiré de CLASSES ; chacune des trois lectures rendue à sa
+classe d'avant ; un flux du vote rangé au témoin ; refus nommé retiré, code confondu, nom altéré, refus du témoin
+seul ; `temoin` ajouté à PLANCHERS, à SIGMA_BTC ; site d'appel de CLASSES dans `_releve` ; FORMAT ; plancher.
+
+Suite : 413 tests ; plancher du job : 413, égalité exigée (`--egal`). Compte de R-25 : 54 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES. Après la campagne, trois lignes de plus de 120 caractères
+(FORMAT, `test_format`, `test_bout_en_bout`) sont recoupées : forme seule, texte égal aux blancs près (contrôle du
+lot), d'où deux lignes de plus.
