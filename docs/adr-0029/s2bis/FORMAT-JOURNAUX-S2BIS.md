@@ -58,6 +58,8 @@
   SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (§15) ; le diff DT6-h achève SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 (§14.4) ; le
   diff DT6-i, par des tests seuls (`test_format`), SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (§16, §17) ; le diff DT6-k porte
   les corrections C-1 à C-10 de la G2 du lot (§13.3, §17.2, §17.4).
+- **Partie P2, tranche C** (2026-10-17 ; sous-lots CB-7, CB-8) : le diff CB-7a écrit au §9.1 la sorte des conteneurs et
+  ferme SHOGEN-S2BIS-DECODEURS-TYPES-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -367,6 +369,9 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      l'atteint : son refus (`JOURNAL/…`) arrêterait le processus, que systemd relancerait avec un trou à chaque
      fenêtre. Avec un corps de 1 048 576 octets (point 4) et des valeurs à leur borne, une `lecture` fait moins de
      3 500 000 octets, sous LIMITE (§7.1).
+   - **Sorte des conteneurs** (CB-7a, SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque objet ou liste qu'un décodeur lit est de
+     la sorte attendue, sinon `panne_decode`. Écart à S2, qui indexait une chaîne comme une liste : Kraken `c` écrit en
+     chaîne y rendait son premier caractère comme prix (« 6 »).
 2. Tout instant d'un enregistrement de lecture est un entier : microsecondes depuis l'époque Unix (UTC). Les valeurs
    restent sous 2^53 : tout lecteur JSON les lit exactement.
 3. La requête HTTP reprend octet pour octet celle qu'envoyait urllib en S2 (ordre des en-têtes compris, mesuré sur un

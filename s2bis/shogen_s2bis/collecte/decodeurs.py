@@ -11,7 +11,9 @@ hexadécimal strict, prix construit exactement (mantisse, exposant -8), sans div
 laissait sortir AttributeError) ; sous CONTEXTE, recopie du contexte nommé de S2 (r1.py l.62-68 ; Q-C-14). CB-6c
 (SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1 ; FORMAT §9.1) : des valeurs que l'écrivain refuserait (`journal.canonique`) ou
 de plus de VALEURS octets canoniques ne sont jamais rendues : la lecture est `panne_decode` ; `appliquer` décode le
-corps d'une lecture `ok` dans le fil de la lecture."""
+corps d'une lecture `ok` dans le fil de la lecture.
+CB-7a (SHOGEN-S2BIS-DECODEURS-TYPES-1) : chaque conteneur lu est de la sorte attendue (`_champ`), écart à S2 qui
+indexait une chaîne comme une liste."""
 import datetime
 import decimal
 import json
@@ -58,36 +60,61 @@ def _entier(x):
     return int(x)
 
 
+def _champ(j, *chemin):
+    """j[c1][c2]… : une clé de texte lit un objet JSON, un indice entier une liste ; toute autre sorte lève
+    (SHOGEN-S2BIS-DECODEURS-TYPES-1, O-1 de la G2 de P2A : Kraken `c` en chaîne rendait son premier caractère)."""
+    for c in chemin:
+        if type(j) is not (list if type(c) is int else dict):
+            raise TypeError(f"{c!r} : conteneur {type(j).__name__}")
+        j = j[c]
+    return j
+
+
 def _okx(champ):
     def lire(j):
-        if str(j.get("code")) != "0":
-            raise ValueError(f"okx : code {j.get('code')}")
-        d = j["data"][0]
-        return d[champ], _entier(d["ts"]) * 1000, {}
+        if str(_champ(j, "code")) != "0":
+            raise ValueError(f"okx : code {j['code']}")
+        d = _champ(j, "data", 0)
+        return _champ(d, champ), _entier(_champ(d, "ts")) * 1000, {}
     return lire
 
 
 def _kraken(j):
-    if j.get("error"):                                              # erreurs dans une liste, pas dans le statut
+    if type(j) is not dict or j.get("error"):                       # liste d'erreurs absente admise (S2)
         raise ValueError("kraken : erreur")
-    (paire,) = j["result"].values()                                 # une paire demandée : une clé rendue (XXBTZUSD)
-    return paire["c"][0], None, {}
+    (paire,) = _champ(j, "result").values()                         # une paire demandée : une clé rendue (XXBTZUSD)
+    return _champ(paire, "c", 0), None, {}
+
+
+def _coinbase(j):
+    return _champ(j, "price"), _iso_us(str(_champ(j, "time"))), {}
+
+
+def _bitstamp(j):
+    return _champ(j, "last"), _entier(_champ(j, "timestamp")) * S, {}
+
+
+def _gemini(j):
+    return _champ(j, "last"), _entier(_champ(j, "volume", "timestamp")) * 1000, {}
 
 
 def _bitfinex(j):
-    if not isinstance(j, list) or len(j) < 10:                      # LAST_PRICE en position 6 (11 champs rendus)
+    if type(j) is not list or len(j) < 10:                          # LAST_PRICE en position 6 (11 champs rendus)
         raise ValueError("bitfinex : forme")
     return j[6], None, {}
 
 
-def _defillama(j):
-    c = j["coins"]["coingecko:bitcoin"]
-    return c["price"], _entier(c["timestamp"]) * S, (
+def _coingecko(c):
+    return _champ(c, "usd"), _entier(_champ(c, "last_updated_at")) * S, {}
+
+
+def _defillama(c):
+    return _champ(c, "price"), _entier(_champ(c, "timestamp")) * S, (
         {"confidence": str(c["confidence"])} if "confidence" in c else {})
 
 
 def _chainlink(j):
-    h = j["result"]
+    h = _champ(j, "result")
     if type(h) is not str or not MOTS.fullmatch(h):
         raise ValueError("chainlink : cinq mots attendus")
     mots = [int(h[2 + 64 * i:66 + 64 * i], 16) for i in range(5)]
@@ -95,19 +122,18 @@ def _chainlink(j):
     return Decimal(f"{reponse}E-8"), mots[3] * S, {"round_id": str(mots[0])}
 
 
+H, P = "place_horodatee", "sans_horodatage"
 DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON lu) ; S2 : SPECS, SIGMA_CLASS_OF_FLUX
-    "binance_btc": ("BTC", "USDT", "sans_horodatage", lambda j: (j["price"], None, {})),
-    "coinbase_btc": ("BTC", "USD", "place_horodatee", lambda j: (j["price"], _iso_us(str(j["time"])), {})),
-    "kraken_btc": ("BTC", "USD", "sans_horodatage", _kraken),
-    "okx_ticker_btc": ("BTC", "USDT", "place_horodatee", _okx("last")),
-    "okx_index_btc": ("BTC", "USD", "place_horodatee", _okx("idxPx")),
-    "bitstamp_btc": ("BTC", "USD", "place_horodatee", lambda j: (j["last"], _entier(j["timestamp"]) * S, {})),
-    "gemini_btc": ("BTC", "USD", "place_horodatee", lambda j: (j["last"], _entier(j["volume"]["timestamp"]) * 1000,
-                                                               {})),
-    "bitfinex_btc": ("BTC", "USD", "sans_horodatage", _bitfinex),
-    "coingecko_btc": ("BTC", "USD", "agregateur", lambda j: (j["bitcoin"]["usd"],
-                                                             _entier(j["bitcoin"]["last_updated_at"]) * S, {})),
-    "defillama_btc": ("BTC", "USD", "agregateur", _defillama),
+    "binance_btc": ("BTC", "USDT", P, lambda j: (_champ(j, "price"), None, {})),
+    "coinbase_btc": ("BTC", "USD", H, _coinbase),
+    "kraken_btc": ("BTC", "USD", P, _kraken),
+    "okx_ticker_btc": ("BTC", "USDT", H, _okx("last")),
+    "okx_index_btc": ("BTC", "USD", H, _okx("idxPx")),
+    "bitstamp_btc": ("BTC", "USD", H, _bitstamp),
+    "gemini_btc": ("BTC", "USD", H, _gemini),
+    "bitfinex_btc": ("BTC", "USD", P, _bitfinex),
+    "coingecko_btc": ("BTC", "USD", "agregateur", lambda j: _coingecko(_champ(j, "bitcoin"))),
+    "defillama_btc": ("BTC", "USD", "agregateur", lambda j: _defillama(_champ(j, "coins", "coingecko:bitcoin"))),
     "chainlink_btc": ("BTC", "USD", "oracle_chainlink", _chainlink),
 }
 

@@ -2730,3 +2730,28 @@ Mutants (commande exacte du job s2bis-unittest ; borne de 300 s ; python3.12 ; r
 par `test_sondes_en_parallele_arguments_et_ordre`, 0 vivant, 0 FATAL.
 
 Suite : 358 tests ; plancher du job : 358, égalité exigée (`--egal`).
+
+## CB-7a (2026-10-17) : sorte des conteneurs lus par les décodeurs (SHOGEN-S2BIS-DECODEURS-TYPES-1)
+
+Objet (partie P2, tranche C ; sous-lot CB-7 de la PROPOSITION ; item de l'annexe B au déclencheur « G0 de CB-7 ») :
+`decodeurs._champ` lit chaque conteneur à sa sorte (une clé de texte lit un objet, un indice entier une liste ; sinon
+TypeError, donc `panne_decode`) ; les décodeurs BTC repris de S2 lisent par elle (Binance, Coinbase, Kraken, OKX,
+Bitstamp, Gemini, CoinGecko, DefiLlama, Chainlink ; Bitfinex : `type(j) is list`). Écart à S2, nommé au FORMAT §9.1 :
+Kraken `c` écrit en chaîne y rendait son premier caractère comme prix (« 6 », O-1 de la G2 de P2A). Test neuf : chaque
+conteneur de chaque fixture BTC, racine comprise, remplacé par son texte JSON, par l'autre sorte de conteneur ou par
+l'un de ses enfants scalaires : `panne_decode` ou la même valeur, jamais une autre.
+
+Rouge : sur le code d'avant (t0), le test neuf échoue par assertion (2 FAIL, 0 ERROR) ; une sonde des onze décodeurs BTC
+sur ce code montre que seul `kraken_btc` rend une autre valeur (« 6 »).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 173 | — |
+| `tests/test_decodeurs_actifs.py` | 65 | 1 (neuf : sorte des conteneurs) |
+
+Mutants (commande du job s2bis-unittest : le runner, puis la ligne s2bis de `gates.yml` telle qu'écrite ; borne de
+300 s ; python3 3.11.15 ; réseau isolé ; outil `scripts/controle/mutants.py` lancé depuis une copie relue ; témoin
+vivant ; relevé `ps` de fin vide) : 5 mutants, 5 tués par leur test visé, 0 vivant, 0 FATAL : contrôle de sorte retiré ;
+indice entier admis sur une chaîne ; Kraken `c` lu sans `_champ` (S2) ; sortes échangées ; plancher non relevé. Suite :
+375 tests ; plancher du job : 375, égalité exigée (`--egal`). Compte de R-25 : 117 lignes de code ajoutées (`.py`,
+`.yml`) ; hors compte : FORMAT (puce « Sorte des conteneurs » du §9.1, puce « Partie P2, tranche C »).
