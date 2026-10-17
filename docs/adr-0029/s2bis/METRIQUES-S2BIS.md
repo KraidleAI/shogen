@@ -2885,3 +2885,37 @@ sixième lecture d'OKX ; `espace` faux pour une forme d'OKX ; phrase du FORMAT c
 non relevé. Suite : 394 tests ; plancher du job : 394, égalité exigée (`--egal`). Compte de R-25 : 115 lignes de code
 ajoutées (`.py`, `.yml`) ; hors compte : `formes-pool.json` (32 lignes de données), FORMAT (§14.1, puce de la tranche
 C).
+
+## CB-9a (2026-10-17) : témoin, OKX `USDC-USDT` et Uniswap v3 `slot0`, requête `eth_call` construite (E-C-06 à E-C-08)
+
+Objet : deux décodeurs du témoin USDC/USDT (ADR-0029 l.174 ; PROPOSITION l.217 ; adresses, sélecteurs et décimales lus
+sur `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §3.1) : `okx_usdc_usdt` (`last`, `ts` en ms, `askPx` et `bidPx` en
+extra, instrument contrôlé) ; `uniswap_usdc_usdt` (`slot0` du pool 0,01 %, prix sqrtPriceX96² / 2^192 en une division
+sous une copie du contexte nommé, jamais celui du fil, E-C-07 ; `tick` en extra). Corps `eth_call` construit
+(`decodeurs.eth_call`, `CORPS`), forme du corps de Chainlink en S2, jamais envoyé. Fixtures construites hors du code
+(bc, printf) depuis les valeurs de la pièce (l.87, l.90) ; trois fichiers `.bin` hors du compte de R-25 (733 octets).
+
+Rouge : sur le code de la tête, avec un squelette d'interface (`CORPS` vide, `eth_call` et `_uniswap` muets), les 6
+tests neufs échouent par assertion (0 erreur).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 324 | — |
+| `tests/test_temoin.py` | 120 | 6 (neuf : OKX, Uniswap, requête, contexte nommé) |
+| `tests/test_decodeurs.py` | 260 | 20 (relevés de S2 filtrés sur les décodeurs `_btc`) |
+| `tests/test_decodeurs_actifs.py` | 248 | inchangé (paire OKX absente lue en USD) |
+| `tests/test_formes_pool.py` | 101 | inchangé (décodeurs du témoin sans forme du pool) |
+
+Rebasage (lot INT-P2, 2026-10-17 ; adjudication Q-3 de la tranche D) : diff écrit d'abord sur 2a07ae6, rebasé sur la
+tranche C (CB-7a à CB-8c) par fusion à trois. Conflits de texte : docstring de `decodeurs.py` (phrase de CB-9a mise
+après celle de CB-8b), table `DECODEURS` (bloc du témoin avant la table de la tranche C, ses deux entrées en fin de
+table), plancher de `gates.yml` (394 + 6), fin de ce fichier ; la ligne 52 de `test_decodeurs.py`, identique dans les
+deux séries, n'est plus dans ce diff. Conflits de sens, deux tests de la tranche C à listes fermées : OKX `USDC-USDT`
+n'est pas la paire non servie USDC/USD (`test_paires_absentes_sans_decodeur`) ; les décodeurs du témoin n'ont pas de
+forme dans `formes-pool.json` (`test_requete_btc_de_s2_gardee`). Rouge (ci-dessus) et mutants (ci-dessous) : ceux du
+générateur, sur 2a07ae6, non rejoués.
+
+Mutants (commande du job s2bis-unittest par `scripts/controle/mutants.py`, borne 300 s, réseau isolé, témoin
+VIVANT) : 20 mutants, 20 tués (19 par leur test visé, 1 par la ligne du job), 0 vivant, 0 FATAL.
+
+Suite : 400 tests ; plancher du job : 400, égalité exigée (`--egal`).

@@ -108,7 +108,7 @@ class Places(unittest.TestCase):
     def test_paires_absentes_sans_decodeur(self):
         """Coinbase USDC/USD, OKX ETH/USD et USDC/USD ne sont pas servies (pièce l.24, l.26) : aucun décodeur."""
         self.assertEqual([n for n, (a, d, _c, _l) in decodeurs.DECODEURS.items() if n.startswith("coinbase") and
-                          a == "USDC" or n.startswith("okx") and (a == "USDC" or (a, d) == ("ETH", "USD"))], [])
+                          a == "USDC" or n.startswith("okx") and (a, d) in (("USDC", "USD"), ("ETH", "USD"))], [])
 
 
     def test_eth_cote_en_usdt_chez_binance_et_okx(self):                # CB-7c

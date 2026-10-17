@@ -21,7 +21,10 @@ ne le lisait pas) ; aucun décodeur pour une paire non servie (Coinbase USDC/USD
 CB-7c : ETH coté en USDT chez binance et okx (Q-CA-01 (a) du G0 de CALIB-ACTIFS).
 CB-8a : lectures regroupées (CoinGecko, DefiLlama, Bitfinex : quatre actifs, une lecture par hôte, E-C-09),
 identifiants exacts ; plafond d'un relevé par actif ; actif, devise et classe des listes fermées du FORMAT §9.1.
-CB-8b : Chainlink ETH, USDC et USDT, plafond de 1,05 des stables en extra (E-C-10)."""
+CB-8b : Chainlink ETH, USDC et USDT, plafond de 1,05 des stables en extra (E-C-10).
+CB-9a (témoin USDC/USDT, ADR-0029 l.174 ; adresses, sélecteurs et décimales lus sur
+`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` §3.1) : OKX `USDC-USDT` ; Uniswap v3, `slot0` du pool 0,01 % ; requête
+`eth_call` construite (`eth_call`, CORPS), l'hôte RPC restant celui de la forme (`formes.json`)."""
 import datetime
 import decimal
 import json
@@ -176,6 +179,65 @@ def _chainlink(plafond=None):
     return lire
 
 
+D_USDC = D_USDT = 6                                         # decimals() de USDC et de USDT (PAIRES-ET-TEMOIN l.89)
+UNISWAP, SLOT0 = "0x3416cF6C708Da44DB2624D63ea0AAef7113527C6", "0x3850c7bd"   # pool 0,01 %, token0 USDC (l.90)
+
+
+def eth_call(adresse, selecteur, *arguments):
+    """Corps JSON-RPC d'un `eth_call` au bloc « latest », sous la forme du corps de Chainlink en S2 (sources.py
+    l.278-282 : json.dumps, séparateurs par défaut) : `data` = sélecteur de 4 octets, puis chaque argument, entier de 0
+    à 2^256 exclu, sur 32 octets big-endian. Jamais envoyé ici : la forme qui le porte nomme l'hôte RPC."""
+    if not (re.fullmatch("0x[0-9a-fA-F]{40}", adresse) and re.fullmatch("0x[0-9a-f]{8}", selecteur) and all(
+            type(a) is int and 0 <= a < 1 << 256 for a in arguments)):
+        raise ValueError("eth_call : adresse, sélecteur ou argument")
+    return json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [
+        {"to": adresse, "data": selecteur + "".join(f"{a:064x}" for a in arguments)}, "latest"]})
+
+
+def _mots(j, n):
+    """`result` d'une réponse `eth_call` : exactement n mots de 32 octets en hexadécimal strict (règle de MOTS)."""
+    h = j["result"]
+    if type(h) is not str or not re.fullmatch("0x[0-9a-fA-F]{%d}" % (64 * n), h):
+        raise ValueError(f"eth_call : {n} mots attendus")
+    return [int(h[2 + 64 * i:66 + 64 * i], 16) for i in range(n)]
+
+
+def _quotient(a, b):
+    """a / b, entiers, en une seule division sous une copie de CONTEXTE, jamais sous le contexte du fil (E-C-07)."""
+    with decimal.localcontext(CONTEXTE):
+        return Decimal(a) / Decimal(b)
+
+
+def _fini(x):
+    """Texte d'une valeur lue en chaîne ou en Decimal, finie, > 0, exposant dans les bornes (règle du prix)."""
+    p = Decimal(x) if type(x) in (str, Decimal) else None
+    if p is None or not (p.is_finite() and p > 0 and CONTEXTE.Emin <= p.adjusted() <= CONTEXTE.Emax):
+        raise ValueError("valeur non finie, nulle, négative ou hors bornes")
+    return str(p)
+
+
+def _okx_temoin(j):
+    """OKX `USDC-USDT` (l.87) : instrument contrôlé, `last` et `ts` comme `_okx` ; `askPx` et `bidPx` finis et > 0, en
+    extra, sans ordre exigé (« Best ask price may be lower than the best bid price during the pre-open period »,
+    documentation d'OKX, « GET / Ticker », copie du registre biblio/)."""
+    prix, ts, _extra = _okx("last")(j)
+    if j["data"][0]["instId"] != "USDC-USDT":
+        raise ValueError("okx : instrument")
+    return prix, ts, {k: _fini(j["data"][0][k]) for k in ("askPx", "bidPx")}
+
+
+def _uniswap(j):
+    """`slot0()` (l.90) : sept mots ; sqrtPriceX96, mot 1, Q64.96 (de 1 à 2^160 exclu) ; prix de token1 (USDT) par
+    token0 (USDC) = sqrtPriceX96² / 2^192 · 10^(D_USDC − D_USDT), une seule division (`_quotient`) ; tick, mot 2,
+    entier signé sur 32 octets, en extra. Le bloc lu n'est pas rendu : aucun instant de source."""
+    s, tick = _mots(j, 7)[:2]
+    if not 0 < s < 1 << 160:
+        raise ValueError("uniswap : sqrtPriceX96 hors de Q64.96")
+    return _quotient(s * s * 10 ** D_USDC, 10 ** D_USDT << 192), None, {
+        "sqrt_price_x96": str(s), "tick": str(tick - (1 << 256 if tick >= 1 << 255 else 0))}
+
+
+CORPS = {"uniswap_usdc_usdt": eth_call(UNISWAP, SLOT0)}             # corps de la requête, lié au décodeur de la réponse
 H, P = "place_horodatee", "sans_horodatage"
 CG = {"bitcoin": "BTC", "ethereum": "ETH", "usd-coin": "USDC", "tether": "USDT"}          # identifiants de CoinGecko
 DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON lu) ; S2 : SPECS, SIGMA_CLASS_OF_FLUX
@@ -215,6 +277,8 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "chainlink_eth": ("ETH", "USD", "oracle_chainlink", _chainlink()),
     "chainlink_usdc": ("USDC", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
     "chainlink_usdt": ("USDT", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
+    "okx_usdc_usdt": ("USDC", "USDT", "place_horodatee", _okx_temoin),      # témoin : USDT par USDC, hors du vote
+    "uniswap_usdc_usdt": ("USDC", "USDT", "sans_horodatage", _uniswap),
 }
 
 

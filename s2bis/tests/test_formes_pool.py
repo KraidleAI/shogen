@@ -69,7 +69,8 @@ class Formes(unittest.TestCase):
                          {n: (u + "/" * (u.count("/") == 2), "POST" if n in PROXYS else "GET", CORPS_S2 % PROXYS[n]
                               if n in PROXYS else "") for n, u in S2.items()})
         self.assertEqual(sorted(n for n in decodeurs.DECODEURS if n not in f),
-                         ["bitfinex_btc", "coingecko_btc", "defillama_btc"])
+                         ["bitfinex_btc", "coingecko_btc", "defillama_btc", "okx_usdc_usdt",
+                          "uniswap_usdc_usdt"])                     # témoin (CB-9) : formes hors du pool
         self.assertEqual(sorted(x["decodeur"] for x in f.values()), sorted(f))      # décodeur = nom de la forme
 
     def test_chemins_des_paires_et_des_regroupements(self):          # CB-7, CB-8 : une forme par décodeur neuf
