@@ -1,0 +1,12 @@
+# Adjudication du lot CAUSES (orchestrateur, 2026-10-17 01:53:36 UTC, `date -u`)
+
+- **G2 neuve** (`g2/RAPPORT-G2.md`, `shogen-worker` distinct du générateur ; Gate 0 `claude-opus-5-5` : 231 occurrences, aucune autre ; FM-1.1 : 0 ; `SHA256SUMS` : 97 lignes, toutes justes) : **ACCEPTE-AVEC-CORRECTIONS**, liste fermée C-1 à C-5.
+- **C-1** (bloquante : les cas de `mutants.py` interrogeaient le vrai `pgrep` et rougissaient dès qu'une chaîne vit sur l'hôte, donc pendant la chaîne elle-même ; faux `pgrep` injecté, le cas réel garde un vrai processus) : **adoptée**, repliée dans INT-22.
+- **C-2** (R13 a et b jugent ce que l'acte lance, non tous ses mots : cinq faux refus levés, `cp` du modèle admis, seconde chaîne refusée, chemin relatif après `cd` refusé) : **adoptée**, repliée dans INT-20 (motif, cas de l'outil) et INT-21 (crochet, cas du crochet).
+- **C-3** (R13 c sur le texte brut, ligne citée entière, toutes les citations jugées, vocabulaire français et anglais) : **adoptée**, repliée dans INT-21.
+- **C-4** (refus K8 nomme le premier cas rouge ; `MOTIF_CHAINE` posé après `class Erreur`) : **adoptée**, repliée dans INT-20.
+- **C-5** (README rendu, plancher et empreintes) : **adoptée dans sa substance** : `readme/D.txt` garde ses jetons (`<DATE>`, `<tête + 52>`, rendus par la chaîne, tête 179) et ses huit empreintes recalculées sur l'état replié.
+- **Preuve de clôture** : série repliée égale à l'octet à l'état prouvé par le réviseur (suite 231 en normal, sous variables de lancement et avec une chaîne factice vivante ; 26 cas du crochet ; K8 à blanc 0) ; aucune passe de plus (décision de l'investisseur du 2026-10-17 : ne pas s'éterniser). Les vérifications restantes sont celles de la chaîne (passage à blanc K0 à K8 : code 0 ; verif à chaque pas).
+- **Items I-1 à I-7 du réviseur** (détection par le nom de script seul, gêne entre deux suites sur un même hôte, et les autres) : un item daté, SHOGEN-GARDE-R13-RESIDUS-1, propriétaire orchestrateur, traité au premier lot de contrôle qui touche le crochet, butoir 2026-11-15 ; aucune dette nue.
+- **Écarts du réviseur** E-1 (vrai modèle lancé dans un espace de PID privé, arrêté à sa ligne 12 avant tout acte) et E-2 (chaîne factice visible de l'hôte quelques secondes) : admis, sans effet sur le dépôt ; E-2 noté comme cause possible d'un rouge passager de l'autre réviseur.
+- **Signal Haiku** : non employé sur ce lot (rapport lu directement).
