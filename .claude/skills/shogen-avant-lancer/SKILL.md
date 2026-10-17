@@ -11,7 +11,8 @@ description: >-
 
 Erreurs visées : E3, E4, E6, E11, E18, E22, E23, E24, E25 (liste de l'orchestrateur, lot GARDE-FOUS-ORCH).
 
-1. Avant tout lancement : `df -h /`, puis `python3 -I -B scripts/controle/avant_acte.py disque`. Sortie 1 :
+1. Avant tout lancement : `python3 -I -B scripts/controle/avant_acte.py --depot <dépôt> disque` (système de
+   fichiers du dépôt, et de TMPDIR s'il diffère ; jamais `/`, E4). Sortie 1 :
    `python3 -I -B scripts/controle/avant_acte.py disque --lister <dossier du scratchpad>`, supprimer les cibles
    cargo des lots clos, relancer le contrôle.
 2. Chaîne de commits : copier `scripts/controle/gabarits/chaine.sh` ; une ligne de plan par commit ; rapport du

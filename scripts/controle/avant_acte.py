@@ -118,7 +118,9 @@ Phase 3, groupe C (SHOGEN-GARDE-FOUS-ORCH-1, phase 3) : refus [--depuis J] [--jo
 du crochet GARDE-FAITS (refus, regles_du_crochet).
 Phase 3, groupe B (SHOGEN-GARDE-JOURNAL-LECTURE-SEULE-1) : chaque passage en --lecture-seule ajoute une ligne au
 journal garde/lecture-seule.tsv des outils (JOURNAL_LS, ignoré par git) : heure lue par date -u, sous-commande, tête du
-dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3."""
+dépôt lu, verdict (conforme, refus, erreur) ; journal non écrit : sortie 3.
+Phase 3, groupe B (SHOGEN-GARDE-DISQUE-DU-DEPOT-1) : disque (DQ, GF-8b) mesure le système de fichiers du dépôt, et
+celui de TMPDIR s'il en diffère (lieux_disque), non / ; le modèle de chaîne l'appelle avec --depot "$DEPOT"."""
 import argparse
 import ast
 import collections
@@ -847,11 +849,23 @@ def cibles(racine, profondeur=4):
     return trouves
 
 
+def lieux_disque(depot):
+    """SHOGEN-GARDE-DISQUE-DU-DEPOT-1 : chemins dont disque mesure le système de fichiers (os.statvfs, par
+    GC.etat_disque) : le dépôt, puis TMPDIR s'il est sur un autre système de fichiers (st_dev) ; jamais / par défaut."""
+    lieux = [os.path.realpath(depot)]
+    tmp = os.path.realpath(os.environ.get("TMPDIR") or tempfile.gettempdir())
+    if os.path.isdir(tmp) and os.stat(tmp).st_dev != os.stat(lieux[0]).st_dev:
+        lieux.append(tmp)
+    return lieux
+
+
 def disque(a, fautes):
-    etat, libre = GC.etat_disque("/", a.min_go)
-    if etat != "ok":
-        fautes.append(("refus" if etat == "refus" else "avertissement", "DQ", f"{libre:.1f} Gio libres sur / (E4)",
-                       "lister les cibles cargo des lots clos (disque --lister <dossier>), puis les supprimer", "-"))
+    for lieu in lieux_disque(a.depot):
+        etat, libre = GC.etat_disque(lieu, a.min_go)
+        if etat != "ok":
+            fautes.append(("refus" if etat == "refus" else "avertissement", "DQ", f"{libre:.1f} Gio libres sur {lieu} "
+                           "(E4)", "lister les cibles cargo des lots clos (disque --lister <dossier>), puis les "
+                           "supprimer", "-"))
     for racine in a.lister:
         if GC.racine_dangereuse(racine, a.depot):
             raise Erreur("disque --lister : racine refusée (/, dépôt ou ancêtre, dossier docs, interdit)")
