@@ -3,21 +3,23 @@ hors de tout fil qui écrit. Horloges et attentes injectées (`test_boucle.Temps
 `chaine`. Fenêtres : m(3) = 2026-10-04 23:01 UTC = 1791154860 (date -u -d) ; 1791154860 mod 120 = 60 (bc). CB-13b
 (E-C-32, E-C-33) : `carte.json`, budget de débit partagé par hôte, règles croisées, commande `secondaire` ; isolement
 du pool éprouvé de bout en bout, les deux processus ensemble, carte pendue et carte refusée."""
+import contextlib
+import io
 import json
 import os
 import pathlib
 import re
-import socket
 import subprocess
 import sys
+import tempfile
 import threading
 from unittest import mock
 
-from shogen_s2bis.collecte import entree, secondaire
-from shogen_s2bis.collecte.lecture import S
-from tests.test_boucle import Temps, borne, rapide
+from shogen_s2bis.collecte import boucle, entree, secondaire, tetes
+from shogen_s2bis.collecte.lecture import S, Lecture
+from tests.test_boucle import Temps, borne, pendue, rapide
 from tests.test_asn import CORPS as RIPESTAT, V, serveur_dns
-from tests.test_bout_en_bout import CHAMPS, DNS, HARNAIS, anomalies, brut_intact, servir
+from tests.test_bout_en_bout import CHAMPS, DNS, anomalies, brut_intact, servir
 from tests.test_entree import COMMIT, RACINE, configurations, port_ferme, refus
 from tests.test_journal import Base, chaine
 from tests.test_reprise import m, sans_chaine
@@ -63,6 +65,42 @@ class Secondaire(Base):
         borne(self, self.b.tourner, n)
         return [(e["type"], e.get("ws"), e.get("hote", e.get("lance"))) for e in sans_chaine(chaine(
             self.etat()["secondaire-2026-10-04-0.jsonl"])[2])[1:]]
+
+    def test_tete_du_secondaire_exportee_au_point(self):             # C-10 ; SHOGEN-S2BIS-TETE-SECONDAIRE-1
+        """Avec un dépôt, la fenêtre qui clôt l'heure (m(1), 2026-10-04 22:59 UTC) : la tête du point du journal
+        `secondaire` est exportée en `o1-secondaire.tete` (seq du point, sha256 pris au `prec` qui le suit, comme au
+        pool) ; aucun enregistrement `tetes` au journal du secondaire (il reste au pool) ; `lire_tetes` la lit sous
+        la liste fermée."""
+        dep = tempfile.TemporaryDirectory()
+        self.addCleanup(dep.cleanup)
+        t = Temps(m(0) * S + 5 * S)
+        jl = borne(self, self.journal, m(0), "secondaire")
+        b = secondaire.Secondaire(jl, {"c": rapide}, [(0, "c")], 4, ["a.example"], "127.0.9.53", 86400, 0,
+                                  releve=lambda h, r: {**NUL, "hote": h}, horloge=t, dormir=t.dormir,
+                                  attendre=t.attendre, monotone=t.monotone, delta=55 * S,
+                                  depot=tetes.Depot(dep.name, "o1", "secondaire"))
+        borne(self, b.tourner, 2)
+        enrs = chaine(self.etat()["secondaire-2026-10-04-0.jsonl"])[2]
+        i = [e["type"] for e in enrs].index("point")
+        attendu = {"journal": "secondaire", "observateur": "o1", "seq": enrs[i]["seq"], "sha256": enrs[i + 1]["prec"],
+                   "ws": m(1)}
+        self.assertEqual(("tetes" in {e["type"] for e in enrs}, enrs[i]["ws"], sorted(os.listdir(dep.name)),
+                          tetes.lire_tetes(dep.name, propre="o2", liste=["o1", "o2", "o3", "o4"])),
+                         (False, m(1), ["o1-secondaire.tete"], ([attendu], [], 0)))
+
+    def test_commande_secondaire_avec_depot(self):                   # C-10
+        """`secondaire --depot P` câble un dépôt au nom de l'observateur du descripteur, journal `secondaire` ; sans
+        lui, aucun ; observateur o3 (le nom de test o1 ne séparerait pas un nom écrit en dur)."""
+        f, _s, d = configurations(port_ferme())
+        ch = fichiers(self.d, formes=f, carte=carte(1), descripteur={**d, "observateur": "o3"})
+        os.mkdir(j := os.path.join(self.d, "j"))
+        vus = []
+        with mock.patch.object(secondaire.Secondaire, "tourner", lambda b, n: vus.append(b.depot)):
+            for plus in (["--depot", self.d], []):
+                self.assertEqual(entree.main(["secondaire", *[x for n in ("formes", "carte", "descripteur") for x in (
+                    "--" + n, ch[n])], "--journal", j, "--commit", COMMIT, *plus]), 0)
+        self.assertEqual([x and (x.dossier, x.observateur, x.journal) for x in vus],
+                         [(self.d, "o3", "secondaire"), None])
 
     def test_carte_part_a_ws_plus_5_secondes_sans_sondes(self):     # E-C-32 : hors de δ, D-1 à D-5 du pool
         self.tourner(1, lambda h, r: {**NUL, "hote": h}, periode=86400, decalage=0)
@@ -169,44 +207,45 @@ class Configuration(Base):                                         # CB-13b (E-C
 
 
 class Isolement(Base):                                             # E-C-32 ; PROPOSITION §2.4, processus secondaire
-    def test_carte_pendue_ou_refusee_le_pool_intact(self):
-        """Pool et secondaires ensemble, trois fenêtres (w = 1 s) : la carte lit un serveur qui accepte et ne répond
-        jamais ; un second secondaire, au budget dépassé, sort en 2 sans rien écrire. Le journal du pool ne porte que
-        ses lectures (a, b, c), aucun fil abandonné, trois marqueurs ; celui du secondaire, sa lecture en panne."""
-        pendu, tenues = socket.create_server(("127.0.0.1", 0)), []
-        self.addCleanup(lambda: [x.close() for x in (pendu, *tenues)])
+    def test_carte_pendue_ou_refusee_le_pool_intact(self):          # C-11 (I-7 de la G2 du lot de gel)
+        """Horloges et attentes injectées (`test_boucle.Temps`), lectures injectées, trois fenêtres chacun : la carte
+        lit une forme pendue (lecture en panne de transport, fil abandonné à chaque fenêtre) ; puis le pool, dans le
+        même processus, ses fils de carte encore pendus : il ne porte que ses lectures (a, b, c), aucun fil
+        abandonné, trois marqueurs ; un secondaire au budget dépassé sort en 2 sans rien écrire. C-11 : avant, trois
+        processus à w = 1 s en temps réel (faux rouge sous 3.11 : `b` en délai sous la charge) ; les deux processus
+        sont séparés par le déploiement (deux unités), et la carte d'un processus réel est éprouvée par `Conformite`
+        ci-dessous."""
+        porte = threading.Event()
+        self.addCleanup(porte.set)
+        temps = [Temps(m(2) * S + 5 * S), Temps(m(2) * S + 5 * S)]
+        horloges = [{"horloge": h, "dormir": h.dormir, "attendre": h.attendre, "monotone": h.monotone} for h in temps]
+        jc, jp = (borne(self, self.journal, m(2), x) for x in ("secondaire", "pool"))
+        carte_ = secondaire.Secondaire(jc, {"m0": pendue(porte, True)}, [(0, "m0")], 4, [], "127.0.9.53", 86400, 0,
+                                       releve=lambda h, r: NUL, delta=55 * S, **horloges[0])
+        def b(s):
+            return Lecture("panne_http", s["depart"], s["depart"] + 9, code=503)
 
-        def tenir():
-            try:
-                while True:
-                    tenues.append(pendu.accept()[0])
-            except OSError:                                         # serveur fermé à la fin du test
-                return
-        threading.Thread(target=tenir, daemon=True).start()
-        f, s, d = configurations(servir(self))
-        f["formes"].append({**f["formes"][0], "nom": "c", "port": port_ferme(), "chemin": "/c"})
-        s["commande"], s["delai"], d["config_resolveur"] = ["/bin/echo", "suivi"], S // 5, os.path.join(self.d, "r")
-        ch = fichiers(self.d, formes=f, sante=s, descripteur=d, carte=carte(pendu.getsockname()[1]), trop=carte(1, 4))
-        lancer, dossiers = [], {}
-        for nom, cmd, cfg in (("pool", "pool", ("formes", "sante", "descripteur")), ("sec", "secondaire", ("formes",
-                              "carte", "descripteur")), ("trop", "secondaire", ("formes", "trop", "descripteur"))):
-            os.mkdir(dossiers.setdefault(nom, os.path.join(self.d, "j-" + nom)))
-            args = [x for c in cfg for x in ("--" + c.replace("trop", "carte"), ch[c])]
-            harnais = [HARNAIS] if cmd == "pool" else [SECONDAIRE, str(port_ferme()), str(port_ferme())]
-            lancer.append(subprocess.Popen([sys.executable, "-B", "-c", *harnais, cmd, *args, "--journal",
-                                            dossiers[nom], "--commit", COMMIT, "--fenetres", "3"], cwd=RACINE,
-                                           stderr=subprocess.PIPE))
-            self.addCleanup(lambda p=lancer[-1]: (p.kill(), p.wait(), p.stderr.close()))
-        refuse = [b"collecte", b"refus", b"CONFIG/incoherent", b"budget-partage"]
-        self.assertEqual([(p.communicate(timeout=60)[1].strip().split(b" : "), p.returncode) for p in lancer],
-                         [([b""], 0), ([b""], 0), (refuse, 2)])
-        lus = {n: chaine(b"".join(pathlib.Path(x, y).read_bytes() for y in sorted(os.listdir(x)) if y.endswith(
-            ".jsonl")))[2] if os.listdir(x) else [] for n, x in dossiers.items()}
-        lectures = [[(e["forme"], e["statut"]) for e in lus[n] if e["type"] == "lecture"] for n in ("pool", "sec")]
-        self.assertEqual(lectures, [[("a", "ok"), ("b", "panne_http"), ("c", "panne_transport")] * 3,
-                                    [("m0", "panne_transport")] * 3])
-        self.assertEqual(([e["fils"]["abandonnes"] for e in lus["pool"] if e["type"] == "sante"], [len([e for e in lus[
-            n] if e["type"] == "marqueur"]) for n in ("pool", "sec")], lus["trop"]), ([0] * 3, [3, 3], []))
+        def c(s):
+            return Lecture("panne_transport", s["depart"], s["depart"] + 9, sous_type="connexion")
+        pool = boucle.Boucle(jp, {"a": rapide, "b": b, "c": c}, [(0, "a"), (0, "b"), (0, "c")], 4, **horloges[1])
+        borne(self, carte_.tourner, 3)
+        borne(self, pool.tourner, 3)
+        lus = {n: chaine(self.etat()[f"{n}-2026-10-04-0.jsonl"])[2] for n in ("pool", "secondaire")}
+        self.assertEqual([[(e["forme"], e["statut"]) for e in lus[n] if e["type"] == "lecture"] for n in (
+            "pool", "secondaire")], [[("a", "ok"), ("b", "panne_http"), ("c", "panne_transport")] * 3,
+                                     [("m0", "panne_transport")] * 3])
+        self.assertEqual(tuple([e["fils"]["abandonnes"] for e in lus[n] if e["type"] == "sante"] for n in (
+            "pool", "secondaire")), ([0] * 3, [1, 2, 3]))
+        self.assertEqual([len([e for e in lus[n] if e["type"] == "marqueur"]) for n in lus], [3, 3])
+        f, _s, d = configurations(1)
+        ch = fichiers(self.d, formes=f, carte=carte(1, 4), descripteur=d)
+        os.mkdir(j := os.path.join(self.d, "j-trop"))
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = entree.main(["secondaire", *[x for n in ("formes", "carte", "descripteur") for x in ("--" + n, ch[n])],
+                              "--journal", j, "--commit", COMMIT, "--fenetres", "3"])
+        self.assertEqual((rc, err.getvalue().split(" : ")[:4], os.listdir(j)), (
+            2, ["collecte", "refus", "CONFIG/incoherent", "budget-partage\n"], []))
 
 
 class Conformite(Base):         # DT6-g, SHOGEN-S2BIS-SECONDAIRE-CONFORMITE-1 (O-5 de la G2 de P2A ; E-C-24)

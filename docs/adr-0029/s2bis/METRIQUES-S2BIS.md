@@ -3203,3 +3203,358 @@ Le contexte `ssl.create_default_context()` laissait la version minimale au défa
 `TLSVersion.TLSv1_2`, ce que l'ADR-0015 pt 5 admet (TLS 1.2 accepté par le pool, mesure du 2026-08-13) ; TLS 1.0 et
 1.1 refusées par construction, la version maximale reste celle de la bibliothèque. Suite : 432 tests ; plancher du job :
 432, égalité exigée (`--egal`). Compte de R-25 : 12 lignes de code ajoutées (`.py`, `.yml`).
+
+## GEL-1 (2026-10-17) : `formes.json` de production, formes fondues et paramètres scellés (Q-5 de P2C ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet (lot GEL-COLLECTEUR-1, gel du collecteur, Q-C-06 du G0) : `s2bis/config/formes.json` remplace
+`formes-pool.json` (supprimé) : les 33 formes dans leur ordre, puis les paramètres de la boucle, `w` 60 (ADR-0029
+l.88), `delta` 20 000 000 µs et `delai` 10 000 000 µs (l.233), `tolerance` 5 000 000 µs (l.107), `marge`
+1 000 000 µs (l.233), `places` 40 (sept places de marge, décision de l'orchestrateur). `test_formes_pool` charge le
+fichier par le schéma et toutes les règles de `entree`, fige l'ordre des formes, lie chaque valeur à sa ligne de
+l'ADR (constantes littérales commentées, texte des lignes cherché dans l'ADR), le budget à l'égalité (5 + 4 + 10 + 1
+= 20 s) et passe le fichier à `entree.configurer`. FORMAT §14.1 (« scellées au gel ») et puce « Gel du collecteur ».
+
+Rouge : sur un squelette (`formes.json` aux formes de `formes-pool.json` et à des paramètres de remplissage,
+`formes-pool.json` présent, FORMAT inchangé), 4 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes.json` | 36 | données, 33 formes et six paramètres |
+| `tests/test_formes_pool.py` | 154 | 7 (1 de plus : valeurs scellées liées à l'ADR) |
+| `tests/test_smoke.py` | 214 | 6 (inchangé) |
+| `tests/test_format.py` | 362 | 23 (inchangé : §14.1 du gel ajouté au test de INT-P2-15) |
+
+Mutants (`scripts/controle/mutants.py`, commande du job `s2bis-unittest`, borne de 300 s) : 11 mutants, 11 tués par
+leur test visé, 0 vivant, 0 FATAL compté : `w`, `delta`, `tolerance`, `delai`, `marge` et `places` changés ; une forme
+renommée ; deux formes permutées ; FORMAT (`places`, puce) ; plancher. Un premier mutant de la puce, au texte avant
+absent (FATAL, inapplicable), a été réécrit et rejoué (tué).
+
+Suite : 433 tests ; plancher du job : 433, égalité exigée (`--egal`). Compte de R-25 : 61 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `formes.json` (données), FORMAT, METRIQUES.
+
+## GEL-2 (2026-10-18) : hôte de Binance, `data-api.binance.vision`, et remplaçants écrits d'avance (Q-7 de P2C ; Q-C-08)
+
+Objet : les quatre formes `binance_*` de `formes.json` lisent `data-api.binance.vision` (chemins et décodeurs
+inchangés) ; l'écart à l'URL de S2 est déclaré au test des URL (`ECART`, hôte seul) et au FORMAT §14.1 ;
+`G6-PAQUET-S2BIS.md` §4 « Remplaçants écrits d'avance » : `api.binance.com` pour l'unité binance (même chemin, même
+décodeur, hors du vote ; motif : code 451 mesuré depuis le poste de mesure, réponse depuis des hôtes européens non
+mesurée, `smoke` à DB-2) et `www.cern.ch` pour les noms témoins de D-5 (adjudication de la lecture DNS du lot).
+
+Rouge : sur les tests neufs et la configuration de GEL-1, 3 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes.json` | 36 | données (quatre hôtes changés) |
+| `tests/test_formes_pool.py` | 159 | 7 (inchangé : URL de S2 hors de l'écart, hôtes de Binance) |
+| `tests/test_format.py` | 368 | 23 (inchangé : §14.1 et §4 du paquet au test de INT-P2-15) |
+
+Mutants (même commande, même outil) : 8 mutants, 8 tués par leur test visé, 0 vivant, 0 FATAL : hôte de S2 rendu à
+une forme BTC, puis ETH ; chemin USDC changé ; remplaçant D-5 changé ; section du paquet renommée ; « hôte seul »
+retiré du FORMAT ; « hors du vote » retiré du paquet ; écart du test annulé.
+
+Suite : 433 tests ; plancher du job : 433, inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors
+compte : `formes.json`, FORMAT, paquet, METRIQUES.
+
+## GEL-3 (2026-10-18) : règle `nom-forme` des formes (SHOGEN-S2BIS-NOM-FORME-1)
+
+Objet : règle de cohérence `nom-forme` de `formes.json` et de `carte.json` (`entree.COHERENCE`, donc
+`COHERENCE_CARTE`) : nom de forme au motif `NOM` de `capture` (`[a-z0-9_][a-z0-9_.-]{0,63}`), une seule constante
+(`entree.NOM` est `capture.NOM`) ; le refus `nom` de `capture` reste en défense. FORMAT §14.1, §19 point 1 et puce.
+
+Rouge : sur un squelette (`entree.NOM` à None, aucune règle), 3 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 332 | — |
+| `tests/test_entree.py` | 317 | 1 de plus (`test_regle_nom_forme` : admis, refusés, carte, constante unique) |
+| `tests/test_formes_pool.py` | 161 | 7 (inchangé : noms de `formes.json` au motif, règle présente) |
+| `tests/test_format.py` | 371 | 23 (inchangé : §14.1, §19 et puce) |
+
+Mutants (même commande, même outil) : 15 joués, 14 tués, 1 vivant déclaré équivalent, 0 FATAL : règle retirée ;
+motif élargi aux majuscules, au point initial, au tiret initial ; longueur réduite à 63 ; `match` au lieu de
+`fullmatch` ; `any` au lieu de `all` ; règle sur la première forme seule ; règle retirée de la carte ; refus `nom` de
+`capture` retiré ; constante dupliquée sous un autre texte ; FORMAT §19 ; plancher ; une règle voisine
+(`chemin-forme`, mutant mal visé, rejoué sur `nom-forme`). Vivant : constante recompilée au même texte
+(`re.compile` rend l'objet de son cache : même objet, équivalent).
+
+Suite : 434 tests ; plancher du job : 434, égalité exigée (`--egal`). Compte de R-25 : 29 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## GEL-4 (2026-10-18) : reprise de capture (SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; FORMAT §19)
+
+Objet : `capture.capturer` crée le manifeste en exclusif avant la première lecture, puis écrit et vide (`flush`) la
+ligne de chaque lecture après son fichier ; option `reprise` (commande : `--reprise`) : manifeste lu (absent,
+illisible, ligne coupée ou à autre que cinq champs, fichier hors du plan ou répété : refus `manifeste`), sha256 de
+chaque fichier listé recontrôlé (écart ou fichier absent : refus `somme`), fichier présent non listé refusé
+(`fichier`), formes listées sautées (leur statut compte au code), lectures restantes ajoutées. Sans `reprise`,
+comportement d'avant, au manifeste près. FORMAT §19 (points 1, 3, point 5 neuf) et puce.
+
+Rouge : sur un squelette (paramètre et option acceptés, sans effet), 11 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/capture.py` | 85 | — |
+| `shogen_s2bis/collecte/entree.py` | 334 | — |
+| `tests/test_capture.py` | 217 | 7 (2 de plus : capture coupée puis reprise ; reprise refusée) |
+| `tests/test_format.py` | 376 | 23 (inchangé : §19 et puce) |
+
+Mutants (même commande, même outil) : 17 mutants classés, 17 tués par leur test visé, 0 vivant, 0 FATAL compté :
+`flush` retiré ; manifeste ouvert en `w` au départ, ou en `w` à la reprise ; forme listée relue ; son statut ignoré,
+ou lu `ok` ; somme non contrôlée ; fichier absent admis ; ligne coupée admise ; champs comptés autrement ; ligne
+répétée admise ; fichier hors du plan admis ; manifeste compté présent à la reprise ; manifeste non lu ; option
+non transmise ; FORMAT §19.5 ; plancher. Un premier mutant du statut lu, au texte avant absent (FATAL, inapplicable),
+a été réécrit et rejoué (tué).
+
+Suite : 436 tests ; plancher du job : 436, égalité exigée (`--egal`). Compte de R-25 : 148 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-4 de la G2 du lot (2026-10-18 ; diff distinct après GEL-9 : GEL-4 et C-4 ensemble passeraient 200 lignes,
+R-25) : à la reprise, le manifeste et chaque fichier listé sont ouverts sans suivre de lien ni attendre (`_ordinaire` :
+`O_NOFOLLOW`, `O_NONBLOCK`, fichier ordinaire exigé), le manifeste en ajout (`O_APPEND`) : un lien au nom du manifeste
+faisait écrire les lignes de la reprise hors du dossier, et un tube nommé bloquait la commande (limite déclarée par le
+générateur). Tests : liens et tubes au nom du manifeste ou d'un fichier listé (refus `manifeste` ou `somme`, sans
+attente, rien d'écrit hors du dossier) ; somme du manifeste altérée au dernier chiffre ; lien posé entre la lecture du
+manifeste et son ajout ; capture coupée à la première lecture (manifeste vide) puis reprise entière ; carte listée en
+panne, hors du code (mutants R-05, R-06 et R-07 de la G2, vivants sur GEL-4). FORMAT §19.5. Rouge, sur le code de la
+série : 5 FAIL (deux liens admis, deux tubes `bloqué`, le lien posé après la lecture suivi) et 1 FAIL du FORMAT. Mutants
+(même outil, même commande) : 8 (K-05 à K-12), 8 tués, après un premier passage où K-08 (ajout par le chemin, lien
+suivi) vivait : le lien était refusé dès la lecture du manifeste ; cas de course ajouté (lien posé entre la lecture et
+l'ajout), campagne rejouée. Suite : 442 tests, plancher inchangé. Compte de R-25 : 82 lignes de code ajoutées (`.py`) ;
+hors compte : FORMAT, METRIQUES.
+
+## GEL-5 (2026-10-18) : bloc du témoin, requête JSON-RPC groupée encadrée (SHOGEN-S2BIS-TEMOIN-BLOC-1 ; FORMAT §9.1)
+
+Objet (avis de l'advisor du lot, Q-B, option 2 encadrée, adopté) : le corps d'Uniswap et de Curve (`decodeurs.CORPS`,
+fonction `lot`) est la requête groupée `[eth_blockNumber (id 1), eth_call « latest » (id 2), eth_blockNumber (id 3)]`,
+`json.dumps` aux séparateurs par défaut ; `_lot` lit la liste, apparie par `id`, exige trois réponses avec `result` et
+sans `error`, blocs en hexadécimal strict (64 bits au plus), puis décode l'appel ; extra : `bloc_avant`, `bloc_apres`
+en chaînes décimales ; lot incomplet ou de plus de trois, `error`, bloc illisible, `bloc_apres` < `bloc_avant` :
+panne entière. `formes.json` porte les deux corps neufs (règle `corps-du-decodeur`). Fixtures d'Uniswap et de Curve
+réécrites à la main (`printf`) en réponses groupées (Curve dans l'ordre 3, 1, 2), documentées au test et au paquet.
+FORMAT §9.1 (« Bloc du témoin », non atomique, écart attendu d'au plus un bloc) et puce.
+
+Rouge : sur les tests et fixtures neufs, code de GEL-4 : 16 FAIL, 1 ERROR (le smoke itère des valeurs absentes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 393 | — |
+| `tests/fixtures/temoin/uniswap_usdc_usdt.bin` | 580 octets | données |
+| `tests/fixtures/temoin/curve_usdc_usdt.bin` | 196 octets | données |
+| `tests/test_temoin.py` | 343 | 1 de plus (`Lot` : appariement, blocs, refus) ; corps et fixtures reportés |
+| `tests/test_capture.py` | 217 | 7 (inchangé : sha256 de la fixture de Curve) |
+| `tests/test_format.py` | 380 | 23 (inchangé : §9.1 et puce) |
+
+Mutants (même commande, même outil) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL, après un premier
+passage où deux mutants vivaient (lot de quatre admis par `len(j) < 3` ; bloc de 17 chiffres admis) : leurs cas de
+test ne séparaient pas (`bloc_apres` < `bloc_avant` les refusait aussi) ; cas réécrits (élément répété à
+l'identique ; blocs égaux aux deux bouts), campagne entière rejouée. Mutants : `id` de la requête ; quatre réponses ;
+`error` admis ; `id` non numérique ; 17 chiffres ; contrôle du bloc retiré ; écart d'un bloc à rebours admis ; blocs
+permutés ; réponse du bloc décodée comme l'appel ; bloc en hexadécimal ; Uniswap sans `_lot` ; Curve décodé comme
+Uniswap ; corps de Curve sans lot ; `eth_call` en id 1 ; FORMAT ; plancher.
+
+Suite : 437 tests ; plancher du job : 437, égalité exigée (`--egal`). Compte de R-25 : 116 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : fixtures, `formes.json`, FORMAT, paquet, METRIQUES.
+
+## GEL-7 (2026-10-18) : liste fermée des observateurs et TSA (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; volet Q-7 de SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet : `s2bis/config/observateurs.json` : `observateurs` `o1` à `o4` (ADR-0029 l.78-82) ; schéma
+`entree.OBSERVATEURS` et règles `observateurs-noms`, `observateurs-uniques`, `observateurs-quatre` ; `tsa` facultative
+et absente au gel (correction C-1, adjudication du 2026-10-18 : TSA scellée à DB-3 (Certigna, acte extérieur),
+décision de l'investisseur du 2026-10-08), relue sous `entree.TSA` (règle `tsa-https`) quand elle est le seul champ de
+plus ; `entree._liste` exige l'observateur du descripteur dans la liste (`CONFIG/observateur`). `status` (avec
+`--depot`, `--observateurs` exigée), `resume` et `jeton` (`--observateurs` exigée) la lisent : résumé ou tête d'un nom
+hors de la liste ignoré et nommé ; `jeton` refuse un `--envoi` sans `tsa` scellée, ou autre qu'elle (`CONFIG/tsa`,
+sortie 2), et écrit au dépôt `<observateur>-<jour>.armement` (`{arme, jour, observateur, tsa}`, Q-1 adjugée). Le
+manifeste n'est pas changé : ses octets sont liés par empreinte aux jetons de test d'`openssl ts -reply` (clé
+détruite). FORMAT §14.1, §16.8, §17.5, §17.6 et puce.
+
+Rouge : sur un squelette (`_liste` vide, options et paramètres acceptés sans effet), 5 FAIL, 2 ERROR (envoi non
+refusé, arrêté par la garde réseau ; `.armement` absent) ; C-1, sur le code de la première version : 2 FAIL, 1 ERROR
+(`.tsq` absent : envoi sans TSA non refusé).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/observateurs.json` | 1 | données |
+| `shogen_s2bis/collecte/entree.py` | 368 | — |
+| `shogen_s2bis/collecte/status.py` | 284 | — |
+| `shogen_s2bis/collecte/tetes.py` | 323 | — |
+| `tests/test_entree.py` | 342 | 1 de plus (liste scellée, `tsa` facultative, refus) |
+| `tests/test_status.py` | 583 | 1 de plus (quorum sur la liste fermée) ; commandes reportées |
+| `tests/test_tetes.py` | 599 | 1 de plus (têtes hors de la liste, armement) ; commande reportée, envoi sans TSA |
+| `tests/test_format.py` | 391 | 23 (inchangé : §14.1, §16, §17 et puce) |
+
+Mutants (même commande, même outil), campagne entière rejouée après C-1 : 25 mutants, 25 tués, 0 vivant, 0 FATAL :
+règles de la liste (quatre, unicité, minuscules, https) ; appartenance non contrôlée ; `--envoi` non comparé ; envoi
+admis sans TSA ; messages du refus permutés ; relecture sous le schéma de la TSA retirée, ou étendue à tout champ
+inconnu ; règle `tsa-https` retirée ; TSA ajoutée à la configuration ; têtes hors liste gardées ou non nommées ;
+`arme` et `tsa` de `.armement` figés ; résumé hors liste lu ou non nommé ; liste non transmise par `status` ou par
+`jeton` ; `--observateurs` non exigée avec `--depot` ; URL non transmise à `.armement` ; FORMAT (deux) ; plancher.
+
+Suite : 440 tests ; plancher du job : 440, égalité exigée (`--egal`). Compte de R-25 : 173 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `observateurs.json`, FORMAT, METRIQUES.
+
+Correction C-3 de la G2 du lot (2026-10-18 ; diff distinct après GEL-9 : GEL-7 et C-3 ensemble passeraient 200 lignes,
+R-25) : la liste fermée filtre les noms des fichiers de tête avant la borne de lecture (`lire_tetes(…, liste)`, NOMBRE =
+16) : seize têtes valides d'un nom hors de la liste, triées avant `o2`, évinçaient sa tête du manifeste du jeton ; les
+noms ignorés sont ceux des fichiers de tête hors de la liste, non lus. Un `--envoi` préfixe, extension ou hôte seul de
+la TSA scellée est refusé (`CONFIG/tsa`) : le mutant R-09 de la G2 (comparaison par préfixe) vivait sur GEL-7. FORMAT
+§16.8 (remis à 120 colonnes, `C-1` qualifié). Rouge, sur le code de la série : 1 FAIL (`o2` absente du manifeste) et 1
+FAIL du FORMAT. Mutants (même outil, même commande) : 4 (K-01 à K-04), 4 tués. Suite : 442 tests, plancher inchangé.
+Compte de R-25 : 31 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-5 du lot (2026-10-18 ; I-1 de la G2, adjugée ; diff distinct après C-4) : l'enregistrement `tetes` de la
+boucle lit la liste fermée comme `jeton` : `tetes.Depot(…, liste)` écarte les fichiers de tête d'un nom hors de la liste
+avant la borne NOMBRE, en nomme seize au plus au refus `TETES/liste` et compte le reste aux `ignores` ; la commande
+`pool` avec `--depot` exige `--observateurs` (`CONFIG/options`), refuse un observateur hors de la liste
+(`CONFIG/observateur`) et porte la liste à `run_params` (`sha256.observateurs` et contenu). FORMAT §14.3, §14.4,
+§16.5, puce. Rouge, sur un squelette (paramètre et option acceptés sans effet) : 2 FAIL (tête d'`o2` évincée par dix-sept
+têtes hors liste ; liste absente du dépôt câblé). Mutants (même outil, même commande) : 14, 14 tués (liste non
+transmise à la lecture ; refus `TETES/liste` retiré, mal codé ou non borné ; reste non compté ; test d'appartenance
+inversé ; liste non câblée au dépôt, ou perdue au point d'entrée ; `--observateurs` non exigée ; liste absente de
+`run_params` ; sha256 falsifié ; observateur figé ; FORMAT ; plancher). Suite : 443 tests ; plancher du job : 443,
+égalité exigée. Compte de R-25 : 66 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-7 de la G2 du lot (2026-10-18 ; documentation et tests) : FORMAT §14.4 nomme le contenu `observateurs` que
+`run_params` porte avec `--observateurs` (le code l'écrit, `entree._run_params`, et
+`test_point_d_entree_depot_et_nom_d_observateur` le lit ; le FORMAT ne nommait que son sha256) ; §14.3 : sans `--depot`,
+`--observateurs` reste admise, contrôlée et portée à `run_params`. Mutants S-03 (liste ignorée sans dépôt) et S-05
+(débord de `lire_tetes` écrasé aux `ignores`) de la G2, vivants sur C-5 : cas ajoutés. Rouge : 1 FAIL du FORMAT. Suite :
+443 tests, plancher inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-8 du lot (2026-10-18 ; I-4 de la G2, adjugée ; diff distinct après C-7) : liste fermée des journaux des
+têtes, `tetes.JOURNAUX` = (`pool`, `secondaire`), les deux journaux du code ; avec la liste des observateurs,
+`lire_tetes` ne lit un fichier de tête que si son journal en est, et nomme les autres au refus `TETES/journal` (seize au
+plus, le reste aux `ignores`), au jeton comme à l'enregistrement `tetes` : au plus huit têtes lues, la borne de seize
+n'est jamais atteinte. Le cas de C-7 (dix-sept journaux inventés d'`o2`) donne désormais 1 + 1 `ignores` et seize
+refus `TETES/journal` ; le manifeste d'un jeton avec liste n'a plus la tête `carte` des tests (journal hors liste) :
+le cas armé de la commande relève la liaison demandée (`lier` espionné), la liaison réelle restant éprouvée par
+`test_jeton_lie_a_la_requete`. FORMAT §16.4, §16.5, puce. Rouge : 3 FAIL (`o3` évincée ; `ignores` de C-7 ; tête
+`carte` au manifeste). Mutants (même outil, même commande) : 11, 11 tués (filtre retiré, étendu sans liste, sur
+l'observateur, journaux élargis ; refus retiré, mal codé, non borné ; reste non compté ; journaux non retirés de la
+lecture ; FORMAT ; plancher). Suite : 444 tests ; plancher du job : 444, égalité exigée. Compte de R-25 : 45 lignes de
+code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-9 de la G2 du lot (2026-10-18 ; test seul) : une tête valide du journal `secondaire` d'un observateur de la
+liste est lue, à l'enregistrement `tetes` comme au manifeste du jeton : le mutant T-01 de la G2 (JOURNAUX réduit à
+`pool` dans le filtre) vivait sur C-8, aucun cas n'ayant une tête `secondaire`. Suite : 444 tests, plancher inchangé.
+Compte de R-25 : 8 lignes de code ajoutées (`.py`) ; hors compte : METRIQUES.
+
+## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
+
+Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD
+d'une part, `chainlink_usdc` et l'ensemble témoin d'autre part ; l'écart est un calcul de RB-2, Q-R-04 ; limite des
+trois à quatre places fiat de l'ADR-0029 l.171) et §6 (date de coupure de la carte = gel du collecteur ; aucun lot
+CB-14 avant le rendu ; carte vide admise par le schéma) ; la section des remplaçants (§4) est celle de GEL-2. Puce du
+FORMAT. Aucun code ni test : suite et plancher inchangés (440).
+
+## GEL-6 (2026-10-18) : `sante.json` de production (volet sondes de SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet : `s2bis/config/sante.json` : `commande` `["chronyc", "-n", "tracking"]` (FORMAT §13.3), `temoins`
+198.41.0.4, 192.36.148.17 et 193.0.14.129 (ADR-0029 l.109, E-C-27), `noms` `www.kernel.org` et `www.arin.net`
+(ADR-0029 l.110, E-C-28 ; lecture des noms témoins du lot et son adjudication du 2026-10-17 23:40:13 UTC), `delai`
+2 000 000 µs (l.109-110). `test_formes_pool` lie chaque valeur à sa source (constantes littérales commentées ; texte
+des lignes 109-110 cherché dans l'ADR ; commande du FORMAT ; noms du paquet §4) et passe les configurations de
+production à `entree.configurer` (2 + 1 ≤ 20 s). FORMAT §14.1 et puce.
+
+Rouge : sur un squelette (`sante.json` aux valeurs de remplissage), 2 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/sante.json` | 2 | données |
+| `tests/test_formes_pool.py` | 187 | 8 (1 de plus : sondes de production liées à leurs sources) |
+| `tests/test_format.py` | 392 | 23 (inchangé : §14.1 et puce) |
+
+Mutants (même commande, même outil) : 9 mutants, 9 tués, 0 vivant, 0 FATAL : option `-n` retirée ; témoin changé,
+ou retiré ; nom témoin remplacé par le remplaçant ; délai à 3 s, puis au-delà de la règle `delai-sondes` ; FORMAT ;
+paquet ; plancher.
+
+Suite : 441 tests ; plancher du job : 441, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `sante.json`, FORMAT, METRIQUES.
+
+## GEL-9 (2026-10-18) : `carte.json` de production, carte vide (correction C-2 ; adjudication de Q-4)
+
+Objet : `s2bis/config/carte.json` : `depart` 5 000 000 µs (E-C-32, FORMAT §15.2), `delai` 10 000 000 µs et `marge`
+1 000 000 µs (ceux du pool), `places` 1, `asn` `{periode 86 400, decalage 0}` (relevé quotidien, E-C-30), `formes`
+vide : carte vide au gel, sources après le rendu. `test_formes_pool` fige les valeurs et charge le fichier avec
+`formes.json` de production par `entree.configurer_secondaire` (règles croisées : `hors-delta` 5 + 10 ≤ 40 s,
+`marge-carte` 16 ≤ 60 s, `cadence`) ; paquet §6 et FORMAT §15.2, puce.
+
+Rouge : sur un squelette (`carte.json` aux valeurs de remplissage), 2 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/carte.json` | 2 | données |
+| `tests/test_formes_pool.py` | 207 | 9 (1 de plus : carte de production vide) |
+| `tests/test_format.py` | 397 | 23 (inchangé : §15.2 et puce) |
+
+Mutants (même commande, même outil) : 9 mutants, 9 tués, 0 vivant, 0 FATAL : `depart`, `delai`, `places`,
+`periode`, `decalage` changés ; `delai` au-delà de `hors-delta` ; FORMAT ; paquet ; plancher.
+
+Suite : 442 tests ; plancher du job : 442, égalité exigée (`--egal`). Compte de R-25 : 24 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.
+
+Correction C-6 du lot (2026-10-18 ; I-2 de la G2, adjugée avec Q-1 et Q-2 ; diff distinct après C-5) : la carte de
+production porte les quatre remplaçants de Binance (`binance_<actif>_remplacant`, `api.binance.com`, chemins et
+décodeurs des formes `binance_*` du pool, `espace` vrai), lus par le processus secondaire à chaque fenêtre, hors du
+vote ; `places` 4 (règle `places-formes`) ; le test charge la carte par `configurer_secondaire` (règles croisées : hôte
+absent du pool, aucun budget partagé ; `hors-delta` 5 + 3 + 10 ≤ 40 s) et lie chaque remplaçant à sa forme du pool.
+Paquet §4 (Q-1 : les 7 jours écrits comme la lecture de l'advisor de l'AVIS l.95 ; remplaçant lu par la carte) et §6
+(`carte au gel : remplaçants de Binance seuls ; sources de la carte après le rendu` ; Q-2 : `decalage` 0, décision de
+l'orchestrateur ; `places` porté de 1 à 4). FORMAT §15.2, puce ; trois lignes de plus de 120 colonnes de GEL-2, GEL-3
+et C-5 recoupées. Rouge, sur la carte vide de GEL-9 : 3 FAIL. Mutants (même outil, même commande) : 9, 9 tués
+(remplaçant sur l'hôte du pool : budget partagé dépassé ; chemin ; décodeur ; places 3 et 5 ; nom ; `espace` d'un
+seul ; FORMAT ; paquet). Suite : 443 tests, plancher inchangé (443). Compte de R-25 : 22 lignes de code ajoutées
+(`.py`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.
+
+## C-10 (2026-10-18) : tête du journal `secondaire` exportée au dépôt (SHOGEN-S2BIS-TETE-SECONDAIRE-1 ; I-6 de la G2 du lot de gel)
+
+Objet : la commande `secondaire` reçoit `--depot` (même forme que pour `pool`) ; `construire_secondaire` câble
+`tetes.Depot(depot, observateur, "secondaire")` ; la boucle du secondaire exporte la tête de chaque point de
+contrôle sans écrire d'enregistrement `tetes` (`Boucle(…, consigner=False)` : il ne lit pas les têtes des autres) ;
+la tête `<observateur>-secondaire.tete` est lue par `lire_tetes` sous la liste fermée (journal de JOURNAUX, C-8).
+`run_params` inchangé. FORMAT §15.6, §16.6, puce.
+
+Rouge : sur un squelette (option acceptée sans effet), 2 FAIL (`tetes` écrit au journal du secondaire ; dépôt non
+câblé), puis 1 FAIL du FORMAT.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 148 | — |
+| `shogen_s2bis/collecte/secondaire.py` | 48 | — |
+| `shogen_s2bis/collecte/entree.py` | 377 | — |
+| `tests/test_secondaire.py` | 290 | 2 de plus (tête exportée au point ; commande avec dépôt) |
+| `tests/test_format.py` | 408 | 23 (inchangé : §15.6, §16.6 et puce) |
+
+Mutants (même commande, même outil) : 10 classés, 10 tués après un rejeu : enregistrement `tetes` rétabli au
+secondaire (deux sites) ; dépôt non câblé, journal `carte`, observateur écrit en dur (vivant au premier passage : le
+descripteur de test portait `o1` ; test porté à `o3`, mutant rejoué avec les trois mutants du même test, tués) ;
+option non transmise ; export retiré ; défaut de `consigner` inversé ; FORMAT ; plancher.
+
+Suite : 446 tests ; plancher du job : 446, égalité exigée (`--egal`). Compte de R-25 : 60 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+Correction C-12 de la G2 du lot (2026-10-18 ; docstring de test seule) : l'heure de la fenêtre de
+`test_tete_du_secondaire_exportee_au_point` porte sa date (`m(1)`, 2026-10-04 22:59 UTC). Suite et plancher
+inchangés (446) ; aucune ligne de code ajoutée hors docstring.
+
+## C-11 (2026-10-18) : `test_carte_pendue_ou_refusee_le_pool_intact` déterministe (I-7 de la G2 du lot de gel)
+
+Objet (tests seuls) : le test d'isolement, qui faisait tourner trois processus à w = 1 s en temps réel (faux rouge
+mesuré par la G2 sous 3.11 : lecture `b` du pool en délai sous la charge), tourne en un processus, horloges et
+attentes injectées (`test_boucle.Temps`), lectures injectées : la carte lit trois fenêtres une forme pendue (fils
+abandonnés 1, 2, 3), puis le pool trois fenêtres, ces fils encore pendus : ses seules lectures (a, b, c), aucun fil
+abandonné, trois marqueurs ; le secondaire au budget dépassé (`entree.main`) sort en 2 sans rien écrire. La
+séparation des processus relève du déploiement ; un processus secondaire réel reste éprouvé par `Conformite`.
+Imports retirés : `socket`, `HARNAIS`.
+
+Rouge : sans objet (test seul, code inchangé) ; à la place, trois mutants du code que le test garde, tués : liste des
+fils abandonnés partagée entre boucles (deux sites ; le premier essai, un seul site, était équivalent : la liste est
+réassignée à chaque fenêtre) ; règle `budget-partage` retirée ; lecture du pool écrite sous un nom de la carte. Cinq
+passages isolés sous 3.11 (`-X dev -W error`) : verts, 1,8 s chacun.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_secondaire.py` | 292 | 10 (inchangé) |
+
+Suite : 446 tests ; plancher du job : 446, inchangé. Compte de R-25 : 44 lignes de code ajoutées (`.py`) ; hors compte :
+METRIQUES.

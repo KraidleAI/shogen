@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from shogen_s2bis.collecte import entree, journal
+from shogen_s2bis.collecte import capture, entree, journal
 from shogen_s2bis.collecte.lecture import S, Lecture
 from tests.test_boucle import borne
 from tests.test_journal import chaine
@@ -152,6 +152,48 @@ class Entree(unittest.TestCase):
             with self.subTest(formes=formes, sante=sante["delai"], commit=commit):
                 r = refus(lambda: entree.configurer(self.ecrire(formes, sante, d)[1], commit))
                 self.assertEqual(r and r.split(" : ")[:2], attendu)
+
+    def test_regle_nom_forme(self):                                  # GEL-3 ; SHOGEN-S2BIS-NOM-FORME-1
+        """Nom de forme au motif de `capture` (une seule constante), pour le pool et pour la carte (COHERENCE_CARTE) :
+        premier caractère minuscule, chiffre ou « _ », puis « . » et « - » admis, 64 caractères au plus (au-delà :
+        la borne du schéma) ; noms écrits à la main."""
+        self.assertIs(entree.NOM, capture.NOM)
+        f, s, d = configurations(1)
+        x, y = f["formes"]
+        cas = [(n, None) for n in ("c", "0_a.b-c", "_" + "z" * 63)]
+        cas += [(n, "nom-forme") for n in ("A", ".x", "-x", "a b", "é", "a/b", "a:b", "a" + chr(10))]
+        for nom, regle in cas:
+            with self.subTest(nom=nom):
+                r = refus(lambda: entree.configurer(self.ecrire({**f, "formes": [x, {**y, "nom": nom}]}, s, d)[1],
+                                                    COMMIT))
+                self.assertEqual(r and r.split(" : ")[:2], regle and ["CONFIG/incoherent", regle])
+                self.assertEqual(dict(entree.COHERENCE_CARTE)["nom-forme"]({"formes": [x, {**y, "nom": nom}]}),
+                                 regle is None)
+
+    def test_liste_des_observateurs_scellee(self):                   # GEL-7 ; SHOGEN-S2BIS-OBSERVATEURS-LISTE-1
+        """`config/observateurs.json` : quatre noms, O1 à O4 de l'ADR-0029 l.78-82 (M = 4, l.78), en minuscules
+        (grammaire `[a-z0-9]{1,16}` du descripteur) ; `tsa` facultative, absente au gel (C-1 : TSA scellée à DB-3,
+        Certigna, acte extérieur ; G0, ajout daté du 2026-10-10, point 6), admise si https ; refus nommés, un écart par
+        cas ; observateur du descripteur hors de la liste : CONFIG/observateur."""
+        chemin = os.path.join(RACINE, "config", "observateurs.json")
+        self.assertEqual(entree._liste(chemin, "o1"), {"observateurs": ["o1", "o2", "o3", "o4"]})
+        bon = {"observateurs": ["o1", "o2", "o3", "o4"], "tsa": "https://tsa.essai/tsr"}
+        pathlib.Path(self.d, "obs.json").write_text(json.dumps(bon), encoding="utf-8")
+        self.assertEqual(entree._liste(os.path.join(self.d, "obs.json"), "o1"), bon)
+        cas = [({**bon, "observateurs": ["o1", "o2", "o3"]}, "CONFIG/incoherent : observateurs-quatre"),
+               ({**bon, "observateurs": ["o1", "o2", "o3", "o4", "o5"]}, "CONFIG/borne"),
+               ({**bon, "observateurs": ["o1", "o2", "o3", "o3"]}, "CONFIG/incoherent : observateurs-uniques"),
+               ({**bon, "observateurs": ["o1", "o2", "o3", "O4"]}, "CONFIG/incoherent : observateurs-noms"),
+               ({**bon, "tsa": "http://tsa.essai/tsr"}, "CONFIG/incoherent : tsa-https"),
+               ({**bon, "tsa": "https://tsa.essai/t sr"}, "CONFIG/incoherent : tsa-https"),
+               ({"tsa": bon["tsa"]}, "CONFIG/champ-absent"), ({**bon, "x": 1}, "CONFIG/champ-inconnu"),
+               ({"observateurs": bon["observateurs"], "x": 1}, "CONFIG/champ-inconnu"),
+               ({**bon, "observateurs": ["o2", "o3", "o4", "o5"]}, "CONFIG/observateur")]
+        for x, attendu in cas:
+            with self.subTest(attendu=attendu, x=x):
+                pathlib.Path(self.d, "obs.json").write_text(json.dumps(x), encoding="utf-8")
+                self.assertTrue(str(refus(lambda: entree._liste(os.path.join(self.d, "obs.json"), "o1"))).startswith(
+                    attendu))
 
     def test_temoins_et_noms_bornes_au_schema(self):                    # CB-19b, C-1 (b) de la relecture d'intégration
         """Sept témoins et sept noms au plus (FORMAT §13.6, §14.1 : la plus grande `sante` reste sous LIMITE) : sept

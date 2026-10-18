@@ -1,0 +1,2 @@
+{"commande": ["chronyc", "-n", "tracking"], "temoins": ["198.41.0.4", "192.36.148.17", "193.0.14.129"],
+ "noms": ["www.kernel.org", "www.arin.net"], "delai": 2000000}

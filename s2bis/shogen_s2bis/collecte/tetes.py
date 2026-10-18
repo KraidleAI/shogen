@@ -15,7 +15,13 @@ de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/
 (RFC 3161 §3.4), armé par le point d'entrée seul, sous le go écrit de l'investisseur ; au `tetes`, le sha256 du dernier
 `.tsr` de l'observateur. CB-15f : au dépôt, seuls des fichiers ordinaires sont lus, ouverts sans attente (un tube nommé
 ne bloque ni la boucle ni une commande) ; l'écriture ne suit aucun lien ; au `tetes`, avec le `.tsr`, les sha256 de son
-manifeste et de sa requête (C-5)."""
+manifeste et de sa requête (C-5). GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : avec la liste fermée, les têtes d'un nom
+hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`). C-3 de la G2
+du lot : la liste filtre les noms avant la borne NOMBRE ; une tête hors de la liste n'est pas lue et n'en évince
+aucune de la liste. Correction C-5 du lot de gel (I-1 de sa G2) : l'enregistrement `tetes` de la boucle lit la même
+liste (`Depot.liste`), noms hors liste écartés avant la borne et nommés au refus. Correction C-8 (I-4 de la G2) :
+avec la liste, seuls les journaux de JOURNAUX sont lus ; les autres sont nommés au refus `TETES/journal` : au plus
+huit têtes lues, la borne NOMBRE n'est jamais atteinte."""
 import contextlib
 import hashlib
 import http.client
@@ -30,6 +36,7 @@ from shogen_s2bis.collecte import journal
 SHA256 = bytes.fromhex("0609608648016503040201")          # OBJECT IDENTIFIER 2.16.840.1.101.3.4.2.1 (sha256)
 SEQUENCE, INTEGER, BOOLEEN, OCTETS, NUL = 0x30, 0x02, 0x01, 0x04, 0x05
 NOM = re.compile("([a-z0-9]{1,16})-([a-z]{1,16})[.]tete")   # <observateur>-<journal>.tete
+JOURNAUX = ("pool", "secondaire")           # C-8 : liste fermée des journaux (entree.construire, construire_secondaire)
 CLES, TAILLE, NOMBRE = {"journal", "observateur", "seq", "sha256", "ws"}, 1024, 16   # octets, têtes lues au plus
 BORNES = {"seq": 10 ** 18, "ws": 10 ** 12}                  # entiers d'une tête lue : 0 ≤ v < borne
 SIGNE, TST = bytes.fromhex("2a864886f70d010702"), bytes.fromhex("2a864886f70d0109100104")   # contenus d'OID (G1)
@@ -217,9 +224,10 @@ def _lire_tete(chemin, observateur, nom_journal):
 
 class Depot:
     """Dépôt des têtes vu par le journal `nom_journal` de `observateur` (AVIS Q-D-03)."""
-    def __init__(self, dossier, observateur, nom_journal="pool", fsync=os.fsync):
+    def __init__(self, dossier, observateur, nom_journal="pool", fsync=os.fsync, liste=None):
         self.dossier, self.observateur, self.journal, self.fsync, self.echec = (dossier, observateur, nom_journal,
                                                                                fsync, None)
+        self.liste = liste                                          # C-5 du lot de gel : liste fermée, ou None
 
     def exporter(self, ws, tete):
         """Tête (seq, sha256) du point de contrôle de la fenêtre `ws`, au fichier `<observateur>-<journal>.tete` ;
@@ -235,11 +243,18 @@ class Depot:
         """Champs de l'enregistrement `tetes` : `tetes`, `refus`, `ignores` de `lire_tetes`, sauf le fichier de ce
         journal, les têtes de l'observateur d'abord (C-2) ; `jeton`, {fichier, sha256, manifeste, tsq} du dernier
         `.tsr` de l'observateur : sha256 de ses octets, de son manifeste et de sa requête (C-5 ; null pour un fichier
-        qui ne se lit pas), ou null ; `export`, échec du dernier export, ou null."""
+        qui ne se lit pas), ou null ; `export`, échec du dernier export, ou null. C-5 du lot de gel : avec `liste`,
+        les fichiers de tête d'un nom hors de la liste sont écartés avant la borne NOMBRE, nommés au refus
+        (`TETES/liste`, NOMBRE au plus), le reste compté aux `ignores`."""
         r = {"tetes": [], "refus": [], "ignores": 0, "jeton": None, "export": self.echec}
         try:
             r["tetes"], r["refus"], r["ignores"] = lire_tetes(self.dossier, (self.observateur, self.journal),
-                                                               self.observateur)
+                                                               self.observateur, self.liste)
+            if self.liste is not None:
+                hors = [n for n in sorted(os.listdir(self.dossier)) if (m := NOM.fullmatch(n)) and m[1] not in
+                        self.liste]
+                r["refus"] += [[n, "TETES/liste"] for n in hors[:NOMBRE]]
+                r["ignores"] += max(0, len(hors) - NOMBRE)
             jetons = sorted(n for n in os.listdir(self.dossier) if re.fullmatch(re.escape(self.observateur) + TSR, n))
         except Exception:                                           # attrape-tout : dossier absent ou illisible
             r["refus"].append([".", "TETES/depot"])
@@ -254,35 +269,47 @@ class Depot:
         return r
 
 
-def lire_tetes(dossier, exclure=None, propre=None):
+def lire_tetes(dossier, exclure=None, propre=None, liste=None):
     """(têtes valides, refus [nom, code], fichiers au-delà des bornes) des fichiers de tête de `dossier`, sauf celui de
     `exclure` (observateur, journal), dans l'ordre des noms : ceux de l'observateur `propre` d'abord, hors de la borne
     des autres (C-2 ; AVIS Q-D-03 (1) : sa tête est ancrée quoi qu'il arrive au dépôt), NOMBRE au plus de chaque
-    sorte ; dossier illisible : OSError."""
-    noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure]
+    sorte ; `liste` (C-3 de la G2 du lot de gel) : seuls les noms de la liste, filtrés avant la borne, et (C-8) les
+    journaux de JOURNAUX, les autres journaux d'un nom de la liste nommés au refus `TETES/journal`, NOMBRE au plus, le
+    reste compté aux fichiers au-delà des bornes ; dossier illisible : OSError."""
+    noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure and (
+        liste is None or m[1] in liste)]
+    journaux = [n for n, m in noms if liste is not None and m[2] not in JOURNAUX]
+    noms = [(n, m) for n, m in noms if n not in journaux]
     siens, autres = [x for x in noms if x[1][1] == propre], [x for x in noms if x[1][1] != propre]
     tetes, refus = [], []
     for n, m in siens[:NOMBRE] + autres[:NOMBRE]:
         t, code = _lire_tete(os.path.join(dossier, n), *m.groups())
         tetes.append(t) if t else refus.append([n, code])
-    return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE)
+    refus += [[n, "TETES/journal"] for n in journaux[:NOMBRE]]
+    return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE) + max(0, len(journaux) - NOMBRE)
 
 
-def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync):
+def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync, liste=None, ignores=None, url=None):
     """Jeton du jour (AVIS Q-D-03, point 1) ; rend (état, fichier, sha256 de ses octets). Un `.tsr` du jour présent :
     « déjà émis », rien n'est redemandé. Sinon manifeste des têtes valides du dépôt, les siennes d'abord (JETON/tete
     sans tête de l'observateur) et requête au `nonce`, écrits au dépôt ; sans `envoyer`, « non armé » ; armé,
     `envoyer(requête)` rend la réponse : conservée si son statut vaut 0 ou 1 et qu'elle est liée à la requête
-    (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé."""
+    (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé. GEL-7 : `liste`, noms
+    admis au manifeste, filtrés avant la borne de lecture (C-3 de la G2), les autres nommés dans `ignores` ;
+    `<observateur>-<jour>.armement` : {arme, jour, observateur, tsa (`url`)}, écrit avec la requête."""
     nom = os.path.join(dossier, f"{observateur}-{jour}")
     if os.path.exists(nom + ".tsr"):
         return "déjà émis", f"{observateur}-{jour}.tsr", empreinte(nom + ".tsr")
-    lues = lire_tetes(dossier, propre=observateur)[0]
+    lues = lire_tetes(dossier, propre=observateur, liste=liste)[0]
+    if liste is not None:
+        (ignores if ignores is not None else []).extend(sorted({x[1] for n in os.listdir(dossier) if (
+            x := NOM.fullmatch(n)) and x[1] not in liste}))
     if not any(t["observateur"] == observateur for t in lues):
         raise RefusJeton("JETON/tete", f"aucune tête de {observateur} au dépôt")
     m = manifeste(jour, observateur, lues)
     tsq = requete(emp := hashlib.sha256(m).digest(), nonce)
-    for suffixe, octets in ((".manifeste", m), (".tsq", tsq)):
+    armement = journal.canonique({"arme": envoyer is not None, "jour": jour, "observateur": observateur, "tsa": url})
+    for suffixe, octets in ((".manifeste", m), (".tsq", tsq), (".armement", armement)):
         ecrire(dossier, f"{observateur}-{jour}{suffixe}", octets, fsync)
     if envoyer is None:
         return "non armé", f"{observateur}-{jour}.tsq", hashlib.sha256(tsq).hexdigest()

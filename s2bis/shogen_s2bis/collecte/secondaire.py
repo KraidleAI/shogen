@@ -8,7 +8,9 @@ seule, sans relecture du journal (E-C-15 ; C-4 de la G2 de P2A). Un `releve_asn`
 (`lance`) ; il part sur un fil démon si le relevé précédent a rendu, sinon il est sauté (au plus un fil de relevé, comme
 les sondes, C-5). Chaque hôte relevé (`asn.releve`, CB-12b ; hôtes dans l'ordre des points de code)
 est remis par une file au fil de la boucle, seul écrivain (CB-18a), qui l'écrit en `asn` en tête de la fenêtre
-suivante ; un défaut imprévu du relevé d'un hôte s'écrit `asn` à `a` null, et le relevé continue."""
+suivante ; un défaut imprévu du relevé d'un hôte s'écrit `asn` à `a` null, et le relevé continue. Correction C-10 du
+lot de gel (SHOGEN-S2BIS-TETE-SECONDAIRE-1) : avec un dépôt (`depot`), la tête du point de contrôle du journal
+`secondaire` y est exportée, sans lire les têtes des autres (l'enregistrement `tetes` reste au pool)."""
 import queue
 import threading
 
@@ -19,7 +21,7 @@ class Secondaire(boucle.Boucle):
     def __init__(self, journal, lectures, plan, places, hotes, resolveur, periode, decalage, releve=asn.releve, **kw):
         """Boucle de la carte (`boucle.Boucle`, mêmes paramètres) ; `hotes` à relever par le résolveur `resolveur`
         (adresse IPv4 du descripteur), à la cadence (`periode`, `decalage`, secondes) ; `releve` injectable."""
-        super().__init__(journal, lectures, plan, places, **kw)
+        super().__init__(journal, lectures, plan, places, consigner=False, **kw)
         self.hotes, self.resolveur, self.periode, self.decalage = sorted(hotes), resolveur, periode, decalage
         self.releve, self.file, self.fil, self.vu = releve, queue.Queue(), None, None    # vu : dernière fenêtre lue
 

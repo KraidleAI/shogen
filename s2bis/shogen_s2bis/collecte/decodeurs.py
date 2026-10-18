@@ -29,7 +29,9 @@ CB-9b : Curve, `get_dy` du 3pool (Q-CA-09 du G0 de CALIB-ACTIFS).
 CB-9c : unité sur chaîne de chaque décodeur (`unite_sur_chaine`), qui porte la règle « une unité on-chain = un hôte
 RPC » de `formes.json` (entree.py).
 C-P2D-1 (adjudication Q-1 de la tranche D) : classe `temoin` des trois lectures du témoin, hors des classes du recalcul
-(ADR-0029 l.174 : « hors des classes USD et hors du vote »)."""
+(ADR-0029 l.174 : « hors des classes USD et hors du vote »).
+GEL-5 (SHOGEN-S2BIS-TEMOIN-BLOC-1 ; avis de l'advisor du lot de gel, Q-B, option 2 encadrée ; FORMAT §9.1) : Uniswap et
+Curve en requête groupée [eth_blockNumber, eth_call, eth_blockNumber] (`lot`), blocs encadrants en extra (`_lot`)."""
 import datetime
 import decimal
 import json
@@ -47,6 +49,7 @@ ISO = re.compile("([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{
                  "(Z|[+-][0-9]{2}:[0-9]{2})?")                    # date, heure, fraction, décalage (RFC 3339 §5.6)
 EPOQUE = datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
 MOTS = re.compile("0x[0-9a-fA-F]{320}")                             # latestRoundData : cinq mots de 32 octets
+BLOC = re.compile("0x[0-9a-fA-F]{1,16}")              # numéro de bloc (GEL-5) : hexadécimal strict, 64 bits au plus
 CHIFFRES, TEXTE = 16, 4300                      # bornes de `_entier` : instant sous 10^16 ; texte de int()
 ACTIFS, DEVISES = ("BTC", "ETH", "USDC", "USDT"), ("USD", "USDT")           # listes fermées du FORMAT §9.1
 CLASSES = ("place_horodatee", "sans_horodatage", "agregateur", "oracle_chainlink", "temoin")    # témoin : C-P2D-1
@@ -194,11 +197,45 @@ def eth_call(adresse, selecteur, *arguments):
     """Corps JSON-RPC d'un `eth_call` au bloc « latest », sous la forme du corps de Chainlink en S2 (sources.py
     l.278-282 : json.dumps, séparateurs par défaut) : `data` = sélecteur de 4 octets, puis chaque argument, entier de 0
     à 2^256 exclu, sur 32 octets big-endian. Jamais envoyé ici : la forme qui le porte nomme l'hôte RPC."""
+    return json.dumps(_appel(1, adresse, selecteur, *arguments))
+
+
+def _appel(n, adresse, selecteur, *arguments):
+    """Objet JSON-RPC de l'`eth_call` d'identifiant `n` ; adresse, sélecteur ou argument hors forme : ValueError."""
     if not (re.fullmatch("0x[0-9a-fA-F]{40}", adresse) and re.fullmatch("0x[0-9a-f]{8}", selecteur) and all(
             type(a) is int and 0 <= a < 1 << 256 for a in arguments)):
         raise ValueError("eth_call : adresse, sélecteur ou argument")
-    return json.dumps({"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [
-        {"to": adresse, "data": selecteur + "".join(f"{a:064x}" for a in arguments)}, "latest"]})
+    return {"jsonrpc": "2.0", "id": n, "method": "eth_call", "params": [
+        {"to": adresse, "data": selecteur + "".join(f"{a:064x}" for a in arguments)}, "latest"]}
+
+
+def lot(adresse, selecteur, *arguments):
+    """Requête groupée du témoin sur chaîne (GEL-5) : [eth_blockNumber (id 1), `eth_call` au bloc « latest » (id 2),
+    eth_blockNumber (id 3)], json.dumps aux séparateurs par défaut, comme `eth_call`."""
+    return json.dumps([{"jsonrpc": "2.0", "id": 1, "method": "eth_blockNumber", "params": []},
+                       _appel(2, adresse, selecteur, *arguments),
+                       {"jsonrpc": "2.0", "id": 3, "method": "eth_blockNumber", "params": []}])
+
+
+def _lot(lire):
+    """Réponse de `lot` (GEL-5) : trois réponses appariées par `id` (JSON-RPC 2.0 n'en impose pas l'ordre), chacune avec
+    `result` et sans `error` ; blocs (id 1 et 3) en hexadécimal strict ; `lire` décode la réponse de l'appel (id 2) ;
+    extra : `bloc_avant`, `bloc_apres` en décimal. Lot incomplet, `error`, bloc illisible, `bloc_apres` < `bloc_avant` :
+    la lecture entière est une panne. Non atomique : un bloc peut passer entre les appels (écart attendu ≤ 1 bloc)."""
+    def lire_lot(j):
+        if type(j) is not list or len(j) != 3 or not all(type(x) is dict and "result" in x and "error" not in x
+                                                         for x in j):
+            raise ValueError("lot : trois réponses sans erreur attendues")
+        par = {str(x["id"]): x for x in j if type(x.get("id")) is Decimal}
+        if sorted(par) != ["1", "2", "3"] or not all(type(par[k]["result"]) is str and BLOC.fullmatch(
+                par[k]["result"]) for k in "13"):
+            raise ValueError("lot : identifiants ou blocs")
+        avant, apres = (int(par[k]["result"], 16) for k in "13")
+        if apres < avant:
+            raise ValueError("lot : bloc_apres < bloc_avant")
+        p, ts, extra = lire(par["2"])
+        return p, ts, {**extra, "bloc_avant": str(avant), "bloc_apres": str(apres)}
+    return lire_lot
 
 
 def _mots(j, n):
@@ -236,7 +273,7 @@ def _okx_temoin(j):
 def _uniswap(j):
     """`slot0()` (l.90) : sept mots ; sqrtPriceX96, mot 1, Q64.96 (de 1 à 2^160 exclu) ; prix de token1 (USDT) par
     token0 (USDC) = sqrtPriceX96² / 2^192 · 10^(D_USDC − D_USDT), une seule division (`_quotient`) ; tick, mot 2,
-    entier signé sur 32 octets, en extra. Le bloc lu n'est pas rendu : aucun instant de source."""
+    entier signé sur 32 octets, en extra. Aucun instant de source : les blocs encadrants vont en extra (`_lot`)."""
     s, tick = _mots(j, 7)[:2]
     if not 0 < s < 1 << 160:
         raise ValueError("uniswap : sqrtPriceX96 hors de Q64.96")
@@ -258,8 +295,8 @@ def _curve(j):
     return _quotient(dy * 10 ** D_USDC, MONTANT * 10 ** D_USDT), None, {"dy": str(dy)}
 
 
-CORPS = {"uniswap_usdc_usdt": eth_call(UNISWAP, SLOT0),              # corps de requête, lié au décodeur de la réponse
-         "curve_usdc_usdt": eth_call(CURVE, GET_DY, 1, 2, MONTANT)}  # i = 1 (USDC), j = 2 (USDT)
+CORPS = {"uniswap_usdc_usdt": lot(UNISWAP, SLOT0),                   # corps de requête, lié au décodeur de la réponse
+         "curve_usdc_usdt": lot(CURVE, GET_DY, 1, 2, MONTANT)}       # i = 1 (USDC), j = 2 (USDT)
 H, P = "place_horodatee", "sans_horodatage"
 CG = {"bitcoin": "BTC", "ethereum": "ETH", "usd-coin": "USDC", "tether": "USDT"}          # identifiants de CoinGecko
 DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON lu) ; S2 : SPECS, SIGMA_CLASS_OF_FLUX
@@ -300,8 +337,8 @@ DECODEURS = {      # nom : (actif, devise, classe de source, décodeur du JSON l
     "chainlink_usdc": ("USDC", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
     "chainlink_usdt": ("USDT", "USD", "oracle_chainlink", _chainlink(PLAFOND)),
     "okx_usdc_usdt": ("USDC", "USDT", "temoin", _okx_temoin),      # témoin : USDT par USDC, hors du vote
-    "uniswap_usdc_usdt": ("USDC", "USDT", "temoin", _uniswap),
-    "curve_usdc_usdt": ("USDC", "USDT", "temoin", _curve),
+    "uniswap_usdc_usdt": ("USDC", "USDT", "temoin", _lot(_uniswap)),         # GEL-5 : requête groupée
+    "curve_usdc_usdt": ("USDC", "USDT", "temoin", _lot(_curve)),
 }
 
 

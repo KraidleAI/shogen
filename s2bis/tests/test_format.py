@@ -23,6 +23,7 @@ from shogen_s2bis.collecte import entree, journal, status, tetes
 NL = chr(10)
 FORMAT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs",
                       "adr-0029", "s2bis", "FORMAT-JOURNAUX-S2BIS.md")
+PAQUET = FORMAT.with_name("G6-PAQUET-S2BIS.md")                    # GEL-2 : remplaçants écrits d'avance (Q-C-08)
 W, WS = 60, 1791154680                                              # 2026-10-04 22:58 UTC
 
 
@@ -199,7 +200,7 @@ class Format(unittest.TestCase):
         attendus = ["n'a de décodeur", "SHOGEN-S2BIS-DECODEURS-TYPES-1", "binance (`ETHUSDT`) et okx (`ETH-USDT`)",
                     "rend la lecture entière `panne_decode`", "au plus un relevé par actif, donc quatre",
                     "le collecteur ne l'applique jamais"]
-        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes-pool.json`" in sections[
+        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes.json`" in sections[
             "14"]], [True] * 7)
         self.assertEqual([(all(f"CB-{d}" in p for d in ("7a", "7b", "7c", "8a", "8b", "8c")), "DECODEURS-TYPES-1" in p,
                            "FORMES-BTC-1" in p) for p in puces if p.startswith("**Partie P2, tranche C**")],
@@ -284,11 +285,30 @@ class Format(unittest.TestCase):
             "**Partie P2, intégration**")], [True])
 
     def test_paragraphe_14_formes_du_temoin(self):                  # INT-P2-15 (Q-1 adjugée)
-        """§14.1 : les trois formes du témoin dans `formes-pool.json`, avec leurs hôtes RPC ; puce de l'intégration."""
+        """§14.1 : les trois formes du témoin dans `formes.json`, avec leurs hôtes RPC ; puce de l'intégration. GEL-1 :
+        formes et paramètres scellés au gel, valeurs et lignes de l'ADR ; puce du gel."""
         puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
         self.assertEqual([x in sections["14"] for x in ("les trois formes du témoin", "`eth.drpc.org`",
                                                         "`rpc.mevblocker.io`")], [True] * 3)
         self.assertEqual([("INT-P2-15" in p) for p in puces if p.startswith("**Partie P2, intégration**")], [True])
+        gel = ("sont scellés au gel du collecteur", "`w` 60 (ADR-0029 l.88)", "`places` 40", "versées à part")
+        self.assertEqual([x in sections["14"] for x in gel], [True] * 3 + [False])
+        self.assertEqual([("GEL-1" in p and "CONFIG-PRODUCTION-1" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True])
+        binance = ("`data-api.binance.vision`", "hôte seul", "`api.binance.com`", "code 451")       # GEL-2, Q-7
+        self.assertEqual([x in sections["14"] for x in binance], [True] * 4)
+        paquet = " ".join(PAQUET.read_text(encoding="utf-8").split()).split("## 4. Remplaçants écrits d'avance")
+        carte = ("`s2bis/config/carte.json` de production", "remplaçants de Binance seuls")    # GEL-9 (C-2), C-6
+        self.assertEqual([x in sections["15"] for x in carte] + [("GEL-9" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True] * 3)
+        sondes = ("scellée au gel du collecteur (diff GEL-6,", "`www.kernel.org` et `www.arin.net`", "198.41.0.4")
+        self.assertEqual([x in sections["14"] for x in sondes] + [("GEL-6" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True] * 4)                                   # GEL-6 : sondes de production
+        noms = [("14", "règle `nom-forme`"), ("14", "`[a-z0-9_][a-z0-9_.-]{0,63}`"), ("19", "règle `nom-forme`")]
+        self.assertEqual([x in sections[s] for s, x in noms] + [("GEL-3" in p and "NOM-FORME-1" in p) for p in puces if
+                                                                 p.startswith("**Gel du collecteur**")], [True] * 4)
+        self.assertEqual([len(paquet)] + [x in paquet[-1] for x in ("`api.binance.com`", "hors du vote", "code 451",
+                                                                    "`smoke`", "`www.cern.ch`")], [2] + [True] * 5)
 
     def test_paragraphe_19_capture(self):                           # INT-P2-16 (Q-5 adjugée)
         """§19 : commande, refus, fichiers et manifeste, rien d'imprimé ; puce de l'intégration."""
@@ -298,6 +318,16 @@ class Format(unittest.TestCase):
         self.assertEqual([x in sections.get("19", "") for x in attendus], [True] * 4)
         self.assertEqual([("INT-P2-16" in p and "§19" in p) for p in puces if p.startswith(
             "**Partie P2, intégration**")], [True])
+        bloc = ("**Bloc du témoin**", "`bloc_avant`", "`bloc_apres`", "non atomique", "d'au plus un bloc",
+                "appariées par `id`")                                              # GEL-5, TEMOIN-BLOC-1
+        self.assertEqual([x in sections["9"] for x in bloc] + [("GEL-5" in p and "TEMOIN-BLOC-1" in p) for p in puces
+                                                               if p.startswith("**Gel du collecteur**")], [True] * 7)
+        reprise = ("créé avant la première lecture", "vidée (`flush`), après chaque fichier", "5. **Reprise**",
+                   "refus `manifeste`", "refus `somme`", "présent mais non listé est refusé (`fichier`",      # GEL-4
+                   "sans suivre de lien ni attendre", "seule exception à la création exclusive du point 3")     # C-4
+        self.assertEqual([x in sections.get("19", "") for x in reprise] + [("GEL-4" in p and "CAPTURE-PARTIELLE-1" in p)
+                                                                           for p in puces if p.startswith(
+                                                                               "**Gel du collecteur**")], [True] * 9)
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
@@ -331,6 +361,27 @@ class Format(unittest.TestCase):
                     "sans attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire", "en exclusif (`O_EXCL`)")
         self.assertEqual([x for x in attendus if x not in seize], [])
         self.assertEqual((tetes.TAILLE, tetes.NOMBRE, tetes.PLAFOND), (1024, 16, 65536))
+        liste = ["**Liste fermée et armement**", "(`CONFIG/tsa`, sortie 2)", "sans `tsa` scellée",
+                 "`<observateur>-<jour>.armement`", "`{arme, jour, observateur, tsa}`",
+                 "`jeton : têtes ignorées (hors de la liste) : <noms>`",                       # GEL-7
+                 "elles n'évincent aucune tête de la liste"]                           # C-3 de la G2 du lot
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual([x for x in liste if x not in seize] + [x for x in (
+            "`s2bis/config/observateurs.json`", "`observateurs-quatre`", "`tsa-https`", "`CONFIG/observateur`",
+            "facultative et absente au gel", "TSA scellée à DB-3 (Certigna, acte extérieur)") if x not
+            in sections["14"]] + [x for x in ("`résumés ignorés (hors de la liste) : <fichier> ; …`",
+                                              "sans `--observateurs`") if x not in sections["17"]], [])
+        c5 = [(seize, "refus `TETES/liste`"), (seize, "aucun nom hors de la liste n'évince une tête de la liste"),
+              (sections["14"], "`--observateurs L` est exigée"), (sections["14"], "et `observateurs` avec"),     # C-5
+              (sections["14"], "`descripteur` et, avec `--observateurs`, `observateurs`"),          # C-7 de la G2
+              (sections["14"], "sans `--depot`, `--observateurs L` reste admise"),
+              (seize, "refus `TETES/journal`"), (seize, "aucune éviction n'est possible"),             # C-8
+              (seize, "le journal est de la liste fermée `pool`, `secondaire`"),
+              (sections["15"], "`--depot DOSSIER` (correction C-10"), (seize, "Au processus secondaire (C-10)")]
+        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") + p.count("le diff C-8") + p.count(
+            "le diff C-10") for p in puces if p.startswith("**Gel du collecteur**")], [3])
+        self.assertEqual([("GEL-7" in p and "OBSERVATEURS-LISTE-1" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True])
 
     def test_paragraphe_17_status_et_resumes(self):             # DT6-i, SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1)
         """§17 : lecture sans verrou, `lecture` reconnue à sa première clé, fichiers ordinaires, arrêts nommés,

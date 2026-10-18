@@ -79,6 +79,20 @@
   le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
   les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19) ;
   le diff INT-P2-17 (C-1 de la G2 de la série) fige son ouverture exclusive (§19).
+- **Gel du collecteur** (2026-10-17 ; lot GEL-COLLECTEUR-1, Q-C-06 du G0) : le diff GEL-1 scelle `formes.json` de
+  production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
+  paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1 ; le diff
+  GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; le diff GEL-5,
+  le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1 ; le diff GEL-7, la liste fermée des observateurs et
+  la TSA (§14.1, §16.8, §17.5, §17.6), qui ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 et le volet Q-7 de
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-8, documentation seule, écrit au paquet Q-C-07 et la date de coupure
+  de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
+  de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
+  (§15.2) ; les diffs C-3 et C-4 de la G2 du lot (§16, §19) ; le diff C-5, la liste fermée dans l'enregistrement
+  `tetes` et à `run_params` (§14.3, §14.4, §16.5) ; le diff C-6, les remplaçants de Binance à la carte (§15.2) ;
+  le diff C-8, la liste fermée des journaux des têtes (§16.4, §16.5) ; le diff C-10, l'export de la tête du
+  secondaire (§15.6, §16.6).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -381,7 +395,16 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      (`slot0` du pool 0,01 % : prix sqrtPriceX96² / 2^192, décimales 6 et 6, une division en 50 chiffres sous le
      contexte nommé, jamais celui du fil ; `extra` : `sqrt_price_x96` et `tick`) ; `curve_usdc_usdt` (`get_dy(1, 2,
      10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers n'ont pas d'instant de source
-     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. Les trois sont de classe `temoin`, hors
+     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. **Bloc du témoin** (diff GEL-5,
+     SHOGEN-S2BIS-TEMOIN-BLOC-1) : leur corps est une requête JSON-RPC groupée, `[eth_blockNumber (id 1), eth_call au
+     bloc « latest » (id 2), eth_blockNumber (id 3)]`, en un seul aller (règle `corps-du-decodeur`, §14.1) ; la
+     réponse est une liste de trois réponses appariées par `id` (JSON-RPC 2.0 n'impose pas leur ordre), chacune avec
+     `result` et sans `error`, blocs en hexadécimal strict (64 bits au plus) ; `extra` porte en plus `bloc_avant` et
+     `bloc_apres`, les deux numéros en chaînes décimales. Sémantique : numéros de bloc courants du nœud avant et après
+     l'appel, dans la même requête groupée, non atomique avec lui : un bloc peut passer entre les appels, écart attendu
+     d'au plus un bloc ; le recalcul date la mesure par ces blocs (RB-2). Lot incomplet ou de plus de trois réponses,
+     `id` répété ou non entier, élément `error`, bloc illisible, ou `bloc_apres` < `bloc_avant` : la lecture entière
+     est `panne_decode`. Les trois sont de classe `temoin`, hors
      des classes USD et hors du vote (ADR-0029 l.174 ; C-P2D-1, adjudication Q-1 de la tranche D, 2026-10-17).
      Lecture Curve (SHOGEN-S2BIS-CURVE-DOC-1, lecture du 2026-10-17) : `get_dy` rend la quantité de USDT en unités
      natives, nette de frais (source `StableSwap3Pool.vy` du dépôt officiel, branche `master`) ; `price_oracle` du
@@ -647,8 +670,11 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    types, bornes, puis règles de cohérence nommées) :
    - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `tolerance`, `delai`,
      `marge` (µs ; `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port,
-     chemin, methode, corps, espace, decodeur}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
-     la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
+     chemin, methode, corps, espace, decodeur}` (noms uniques ; nom de forme `[a-z0-9_][a-z0-9_.-]{0,63}`, règle
+     `nom-forme`, diff GEL-3, SHOGEN-S2BIS-NOM-FORME-1 : le motif `NOM` de la commande `capture`, une seule constante,
+     qui fait aussi le nom de ses fichiers, §19 ; elle vaut pour `carte.json`, §15 ; `GET` sans corps ou `POST` avec
+     corps ; `espace` vrai : la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes
+     les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
      chaque lecture `ok` de la forme, §9.1). Règle `corps-du-decodeur` (CB-9c) : une forme dont le décodeur lit la
      réponse d'un `eth_call` construit par le code (Uniswap, Curve) est un `POST` de ce corps exact, octet pour
@@ -656,14 +682,22 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      lues sur chaîne (Chainlink, toute forme de la classe `oracle_chainlink` comprise, Uniswap, Curve), chaque unité a
      un seul hôte et chaque hôte une seule unité. L'hôte RPC n'est écrit que dans `formes.json`, jamais dans le code
      des décodeurs.
-     Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
-     `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
-     reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
+     Les formes du pool et du témoin, une par lecture, et les paramètres de la boucle sont scellés au gel du collecteur
+     (diff GEL-1 ; Q-5 de P2C ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1) dans `s2bis/config/formes.json`, contrôlé par le
+     schéma et toutes les règles ci-dessus : les formes de `formes-pool.json` (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) y
+     sont fondues dans leur ordre, et ce fichier est supprimé ; les huit flux BTC gardés
+     reprennent l'URL et le corps de S2 octet pour octet, hors d'un écart déclaré, hôte seul (diff GEL-2 ; Q-7 de
+     P2C) : les quatre formes de Binance lisent `data-api.binance.vision`, chemins et décodeurs inchangés, au lieu de
+     `api.binance.com` de S2, qui rend le code 451 depuis le poste de mesure
+     (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; `api.binance.com` est écrit au paquet comme
+     remplaçant, hors du vote (`G6-PAQUET-S2BIS.md` §4,
+     Q-C-08) ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
      les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
      autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
-     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent ;
-     les autres champs de `formes.json` (`w`, `delta`, `tolerance`, `delai`, `marge`, `places`) restent à sceller
-     au gel du collecteur (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
+     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent.
+     Valeurs scellées : `w` 60 (ADR-0029 l.88), `delta` 20 000 000 µs et `delai` 10 000 000 µs (l.233), `tolerance`
+     5 000 000 µs (D-2, l.107), `marge` 1 000 000 µs (échéance à ws + w − 1 s, l.233), `places` 40 (33 formes et
+     sept places de marge, décision de l'orchestrateur) ; `test_formes_pool` lie chaque valeur à sa ligne de l'ADR.
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +
@@ -676,13 +710,29 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      autre chemin à chaque fenêtre, §10.4) ;
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
      littérales canoniques, sept au plus), `noms` (D-5, noms DNS valides, sept au plus ; bornes du §13.6), `delai`
-     (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ;
+     (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ; scellée au gel du
+     collecteur (diff GEL-6, volet sondes de SHOGEN-S2BIS-CONFIG-PRODUCTION-1) dans `s2bis/config/sante.json` :
+     `commande` `["chronyc", "-n", "tracking"]` (§13.3), `temoins` 198.41.0.4, 192.36.148.17 et 193.0.14.129
+     (ADR-0029 l.109, E-C-27), `noms` `www.kernel.org` et `www.arin.net` (D-5, ADR-0029 l.110, E-C-28 ; lecture des
+     noms témoins du 2026-10-17 et son adjudication : TTL servi d'au plus 60 s sur les sondages, aucun serveur de noms
+     ni opérateur commun, adresses et autorités hors des ASN du pool ; TTL d'origine et ASN à confirmer au rodage ;
+     remplaçant écrit d'avance `www.cern.ch`, paquet §4), `delai` 2 000 000 µs (l.109-110) ; `test_formes_pool` lie
+     chaque valeur à sa source ;
    - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur` (de forme
      `[a-z0-9]{1,16}`, règle `observateur-nom`, CB-15c : il nomme ses fichiers au dépôt, §16.4 ; minuscules seules,
      C-6 de la G2 de P2B : un jumeau de casse n'est pas un autre observateur), `fournisseur`,
      `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
      configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256
-     de la configuration déployée, 64 chiffres hexadécimaux minuscules).
+     de la configuration déployée, 64 chiffres hexadécimaux minuscules) ;
+   - `observateurs.json` (diff GEL-7, SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; volet Q-7 de
+     SHOGEN-S2BIS-CONFIG-PRODUCTION-1), configuration scellée `s2bis/config/observateurs.json` : `observateurs`, liste
+     fermée des quatre observateurs `o1` à `o4` (O1 à O4 de l'ADR-0029 l.78-82 ; règles `observateurs-noms`, grammaire
+     `[a-z0-9]{1,16}` du descripteur, `observateurs-uniques`, `observateurs-quatre`, M = 4), et `tsa`, URL https de la
+     TSA, facultative et absente au gel (correction C-1 : TSA scellée à DB-3 (Certigna, acte extérieur), décision de
+     l'investisseur du 2026-10-08, ajout daté du 2026-10-10 au G0, point 6 ; règle `tsa-https` quand elle est
+     présente ; un autre champ inconnu est refusé) ; lue par `status` (avec
+     `--depot`), `resume` et `jeton` (option `--observateurs`, §16.8, §17.5, §17.6), qui refusent un descripteur dont
+     l'observateur n'y est pas (`CONFIG/observateur`, sortie 2).
 
    Le commit est celui, scellé, de l'archive déployée : 40 chiffres hexadécimaux minuscules (aucune opération git sur
    l'observateur). Tout écart est un refus nommé (`CONFIG/…` ou `BOUCLE/…`), levé avant l'ouverture du journal.
@@ -693,11 +743,15 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 3. **Commande** (CB-18d) : `python3 -m shogen_s2bis.collecte pool --formes F --sante S --descripteur D --journal
    DOSSIER --commit SHA` (code de référence : `s2bis/shogen_s2bis/collecte/entree.py`). `--fenetres N` arrête après N
    fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. `--depot DOSSIER` (CB-15c) : dépôt des
-   têtes (§16) ; sans elle, ni enregistrement `tetes` ni export. Un refus de configuration donne la sortie 2
-   et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
+   têtes (§16) ; sans elle, ni enregistrement `tetes` ni export ; avec elle, `--observateurs L` est exigée
+   (correction C-5 du lot de gel ; `CONFIG/options` sinon ; observateur du descripteur hors de la liste :
+   `CONFIG/observateur`) : la liste fermée va au dépôt (§16.5) ; sans `--depot`, `--observateurs L` reste admise,
+   contrôlée de même et portée à `run_params` (correction C-7 de la G2 du lot). Un refus de configuration donne
+   la sortie 2 et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
-   `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
-   `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
+   `commit`, `sha256` (`{formes, sante, descripteur}`, et `observateurs` avec `--observateurs`, C-5 : sha256 des
+   octets lus), les contenus `formes` (dont `tolerance`, CB-18g), `sante`, `descripteur` et, avec `--observateurs`,
+   `observateurs` (C-5 ; correction C-7 de la G2 du lot), `python` (version de l'interpréteur). Une fenêtre qui porte
    `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8). Une configuration dont `run_params`,
    `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE est un refus de configuration (`CONFIG/taille`,
    sortie 2), levé avant l'ouverture du journal (DT6-h, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : l'écrivain refuserait la
@@ -735,7 +789,15 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    - `cadence` : `periode` et `decalage` multiples de w, `decalage` < `periode`.
 
    En production, `depart` vaut 5 s (E-C-32, valeur scellée). Tout écart est un refus nommé (`CONFIG/…`), levé avant
-   l'ouverture du journal.
+   l'ouverture du journal. Au gel (diff GEL-9, correction C-2, amendé par la correction C-6) :
+   `s2bis/config/carte.json` de production, `depart` 5 000 000 µs, `delai` 10 000 000 µs, `marge` 1 000 000 µs,
+   `places` 4, `asn` `{periode 86 400, decalage 0}` (relevé ASN quotidien à minuit UTC) ; `formes` : les
+   remplaçants de Binance seuls (C-6, I-2 de la G2 du lot de gel, Q-C-08), `binance_<actif>_remplacant` pour BTC,
+   USDC, USDT et ETH, sur `api.binance.com`, chemins et décodeurs des formes `binance_*` du pool : le processus
+   secondaire les lit à chaque fenêtre, hors du vote (la carte n'y entre pas), et mesure ainsi depuis chaque
+   observateur la disponibilité du remplaçant (code 451 attendu depuis certains lieux,
+   `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37) ; l'hôte n'est pas au pool : aucun budget partagé. Sources de la
+   carte après le rendu (`G6-PAQUET-S2BIS.md` §6) ; `test_formes_pool` le charge par `configurer_secondaire`.
 3. **Boucle de la carte** : celle du pool (§11), départ D = ws + `depart` (δ de la carte : w − `depart`), échéance
    E = ws + w − `marge`, `places` de la carte, une lecture par forme au `delai` de la carte, décodée par le décodeur de
    sa forme (§9.1), et sans sondes : la `sante` porte les champs des sondes nuls ou vides (§13.1). Mêmes
@@ -777,7 +839,10 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    `test_asn.Decodage.test_plus_grand_releve_sous_limite`.
 6. **Commande** (CB-13b) : `python3 -m shogen_s2bis.collecte secondaire --formes F --carte C --descripteur D --journal
    DOSSIER --commit SHA` ; `--fenetres`, sorties, refus et fermeture comme aux §14.3 et §14.5 ; `run_params` comme au
-   §14.4, `sha256` et contenus `{formes, carte, descripteur}`.
+   §14.4, `sha256` et contenus `{formes, carte, descripteur}`. `--depot DOSSIER` (correction C-10 du lot de gel ;
+   SHOGEN-S2BIS-TETE-SECONDAIRE-1) : à chaque point de contrôle, la tête du journal `secondaire` est exportée au dépôt
+   en `<observateur>-secondaire.tete` (§16.4), sans enregistrement `tetes` : le secondaire ne lit pas les têtes des
+   autres ; `run_params` inchangé.
 
 ## 16. Têtes, dépôt et jeton quotidien (CB-15 ; E-C-35, E-C-36)
 
@@ -815,7 +880,8 @@ collecteur.
    `observateur` ; `tetes` : les têtes lues au dépôt, triées par observateur puis journal. Son sha256 est l'empreinte
    de la requête.
 4. **Fichier de tête** (CB-15b ; E-C-35) : au dépôt, `<observateur>-<journal>.tete` (observateur `[a-z0-9]{1,16}`,
-   journal `[a-z]{1,16}`, préfixe du journal), une ligne JSON canonique `{journal, observateur, seq, sha256, ws}` :
+   journal `[a-z]{1,16}`, préfixe du journal ; lu avec la liste fermée des observateurs, le journal est de la liste
+   fermée `pool`, `secondaire`, correction C-8), une ligne JSON canonique `{journal, observateur, seq, sha256, ws}` :
    la tête (§1.4) du point de contrôle (`point`, §2) de la fenêtre `ws`. Elle est écrite à chaque point de contrôle,
    par écriture atomique : fichier temporaire `.<nom>.tmp` écrit et synchronisé, renommé, dossier synchronisé ; un
    lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel. Un échec de l'export ne lève pas : il est
@@ -827,9 +893,17 @@ collecteur.
    (plus de 1 024 octets), `TETES/forme` (pas une ligne JSON canonique aux clés exactes, ou entier de plus de 640
    chiffres), `TETES/champs` (observateur ou journal autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à
    10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible :
-   `TETES/depot`. Champs rendus : `tetes` (têtes valides, les siennes d'abord), `refus` (`[nom, code]`), `ignores`
-   (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256, manifeste, tsq}` : sha256 du dernier
-   `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son manifeste et de sa requête du même jour, null
+   `TETES/depot`. Liste fermée (correction C-5 du lot de gel, I-1 de sa G2 ; la même que celle de `jeton`, C-3) :
+   pour l'enregistrement `tetes`, les fichiers de tête d'un observateur hors de la liste sont écartés avant ces
+   bornes ; les 16 premiers par ordre des noms sont nommés au refus `TETES/liste`, les autres comptés aux `ignores` :
+   aucun nom hors de la liste n'évince une tête de la liste. Liste fermée des journaux (correction C-8, I-4 de la G2 ;
+   au jeton comme à l'enregistrement `tetes`) : avec la liste, un fichier de tête d'un observateur de la liste n'est
+   lu que si son journal est `pool` ou `secondaire` (les deux journaux du code) ; les autres sont nommés au refus
+   `TETES/journal`, 16 au plus, le reste compté aux `ignores` ; au plus huit têtes sont lues : la borne de 16 n'est
+   jamais atteinte, aucune éviction n'est possible. Champs rendus : `tetes` (têtes valides, les siennes
+   d'abord), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier,
+   sha256, manifeste, tsq}` : sha256 du dernier `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son
+   manifeste et de sa requête du même jour, null
    pour un fichier qui ne se lit pas (CB-15f ; C-5 de la G2 de P2B : la chaîne ancre la requête qui a eu le jeton) ; ou
    null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export ou null). Toute valeur rendue
    est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement
@@ -838,7 +912,8 @@ collecteur.
    3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
    lecture du dépôt (point 5), faite au relevé de l'échéance : les têtes des autres journaux sont consignées dès leur
    lecture. Après le marqueur et le point de contrôle, la tête du point, celle que rend l'écrivain, est exportée
-   (point 4). Sans dépôt, ni l'un ni l'autre.
+   (point 4). Sans dépôt, ni l'un ni l'autre. Au processus secondaire (C-10), avec un dépôt, l'export seul (§15.6) :
+   sa tête est lue par l'enregistrement `tetes` du pool et par le jeton (journal `secondaire` de la liste fermée).
 7. **Jeton du jour** (CB-15d ; E-C-36 ; AVIS Q-D-03, point 1) : un `<observateur>-<jour>.tsr` présent au dépôt : « déjà
    émis », rien n'est redemandé. Sinon : manifeste (point 3) des têtes valides du dépôt (point 5, les siennes d'abord,
    hors de la borne des autres ; aucune exclue ; sans tête de l'observateur, refus `JETON/tete`, rien n'est écrit),
@@ -858,7 +933,15 @@ collecteur.
    une réponse 200 d'au plus 65 536 octets passe au point 7, un autre code ou une réponse plus longue est le refus
    `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
    <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
-   jour refusé.
+   jour refusé. **Liste fermée et armement** (diff GEL-7) : `--observateurs L` est exigée (§14.1) ; un `--envoi` est
+   refusé sans `tsa` scellée (au gel : correction C-1 du lot GEL-COLLECTEUR-1), ou s'il est autre que la `tsa` de la
+   liste (`CONFIG/tsa`, sortie 2) : `--envoi` reste le seul armement, et l'URL armée est celle de la configuration
+   scellée ; les têtes d'un observateur hors de la liste sont ignorées (hors du manifeste), filtrées par leur nom avant
+   la borne de lecture du point 5 (non lues, elles n'évincent aucune tête de la liste : correction C-3 de la G2 du
+   lot) et nommées sur une seconde ligne, `jeton : têtes ignorées (hors de la liste) : <noms>` ; avec le manifeste et la
+   requête, la commande écrit au dépôt `<observateur>-<jour>.armement`, ligne canonique `{arme, jour, observateur,
+   tsa}` (`arme` vrai si et seulement si l'envoi est armé ; `tsa` : l'URL armée, ou null), par écriture atomique :
+   l'état d'armement du jour est lisible au dépôt.
 9. **Fichiers du dépôt** (CB-15f) : toute lecture au dépôt (têtes, `.tsr`, résumés du §17.6) ouvre le fichier sans
    attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire : un tube nommé, un dossier ou un périphérique au nom
    d'un fichier attendu ne bloque ni la boucle ni une commande ; il est le refus `TETES/lecture` (`RESUME/lecture`
@@ -927,13 +1010,15 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    passager disparaît à la lecture suivante ; persistant, il dit une queue (§7). Aucun nombre à virgule, aucun
    statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
 5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
-   DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
+   DOSSIER --depot DOSSIER --descripteur D` (et `--observateurs L`, diff GEL-7 : l'observateur doit être de la liste,
+   §14.1) ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
    `<observateur>-<jour>.resume` au dépôt (écriture atomique, §16.4), une ligne canonique `{jour, observateur,
    fenetres}`, `fenetres` : `[ws, codes]` de chaque fenêtre du jour (codes vides : fenêtre valide). Aucune autre clé :
    c'est la liste blanche du résumé, que l'orchestrateur peut lire au rodage (lectures admises, ADR-0029 l.221) ;
    aucun statut de source. Le résumé est une projection des enregistrements du journal : il se recalcule sur le
    journal. Sortie 0 et `resume : <fichiers>` ; 1 refus du journal ou du dépôt ; 2 refus du descripteur.
-6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F` ajoute au
+6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F
+   --observateurs L` (`--observateurs` depuis le diff GEL-7) ajoute au
    rapport, après le compte local : `quorum (au moins 2 observateurs valides) : calme <n> ; stress <n>` et
    `résumés lus : <o> jusqu'à <heure> UTC (âge <n> s) ; …`, ou `quorum : aucun résumé d'un autre observateur lisible` ;
    puis, s'il y en a, `résumés refusés : <fichier> (<code>) ; …`. Sont lus les résumés des autres observateurs pour les
@@ -943,8 +1028,10 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    fenêtre), `RESUME/lecture` (illisible, ou pas un fichier ordinaire : §16.9) ; aucun résumé ne fait échouer `status`,
    ni un dépôt illisible : `quorum : dépôt illisible (<exception>)`, après le compte local (CB-15f). Une fenêtre compte
    à quorum si M_j ≥ 2 (ADR-0029 §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur
-   dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans
-   `--descripteur` : refus `CONFIG/options`, sortie 2.
+   dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. Liste fermée (diff
+   GEL-7) : le résumé d'un observateur hors de la liste n'est pas lu ; il est nommé en dernière ligne, `résumés ignorés
+   (hors de la liste) : <fichier> ; …`. `--depot` sans `--descripteur` ou sans `--observateurs` : refus
+   `CONFIG/options`, sortie 2.
 
 ## 18. Commande `smoke` (CB-16 ; E-C-37)
 
@@ -980,13 +1067,27 @@ commande séparée, qui écrit les octets dans un fichier sans rien imprimer »)
 
 1. **Commande** : `python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` ; configurations
    contrôlées comme pour `smoke` (§18, point 1). Refus avant toute lecture : dossier absent (`dossier`), nom de forme
-   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom`), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
-   `capture : refus : …` sur l'erreur standard, sortie 2.
+   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom` ; déjà refusé au chargement par la règle `nom-forme` du §14.1, même
+   constante : le refus `nom` reste en défense), fichier déjà présent, jamais écrasé (`fichier`) ; option
+   `--reprise` : refus du point 5 ; un refus imprime `capture : refus : …` sur l'erreur standard, sortie 2.
 2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
-3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
-   `carte`), puis `captures.txt`, une ligne par lecture : `<fichier> <sha256> <statut> <code ou -> <départ>` (départ
-   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Chaque fichier, manifeste compris, est
-   ouvert en création exclusive : un fichier apparu après le contrôle des noms n'est pas écrasé non plus ; la
-   capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
+3. **Fichiers** : le manifeste `captures.txt` est créé avant la première lecture (diff GEL-4) ; les octets bruts du
+   corps de chaque lecture vont dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou `carte`), puis la ligne de la
+   lecture est écrite au manifeste et vidée (`flush`), après chaque fichier : `<fichier> <sha256> <statut> <code ou
+   -> <départ>` (départ en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Une capture coupée
+   laisse ainsi un manifeste qui liste les fichiers écrits (au plus un fichier non listé, celui de la lecture en
+   cours). Chaque fichier, manifeste compris, est ouvert en création exclusive : un fichier apparu après le contrôle
+   des noms n'est pas écrasé non plus ; la capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
 4. **Rien n'est imprimé** sur la sortie standard : ni octet, ni prix, ni valeur décodée (ADR-0029 l.222). Code de
    sortie : 0 si toutes les lectures du pool et du témoin sont `ok` ; 1 sinon ; 2 refus.
+5. **Reprise** (diff GEL-4, SHOGEN-S2BIS-CAPTURE-PARTIELLE-1) : `--reprise` complète une capture coupée, dans le même
+   dossier et pour les mêmes configurations. Avant toute lecture : le manifeste est lu (absent, illisible, dernière
+   ligne coupée, ligne qui n'a pas cinq champs, d'un fichier hors du plan ou répétée : refus `manifeste`) ; le sha256
+   des octets de chaque fichier listé est recontrôlé (écart, ou fichier absent : refus `somme`) ; un fichier du plan
+   présent mais non listé est refusé (`fichier` : jamais écrasé, il se retire à la main). Les formes listées sont
+   sautées, leur statut compte au code de sortie ; les lectures restantes, dans l'ordre du plan, sont faites et
+   ajoutées au manifeste. Le manifeste et chaque fichier listé sont ouverts sans suivre de lien ni attendre
+   (`O_NOFOLLOW`, `O_NONBLOCK`), fichier ordinaire exigé : un lien ou un tube nommé à leur nom est le refus
+   `manifeste` (manifeste) ou `somme` (fichier listé) ; le manifeste est rouvert en ajout (`O_APPEND`), seule
+   exception à la création exclusive du point 3 : rien n'est lu ni écrit hors du dossier (correction C-4 de la G2
+   du lot). Sans `--reprise`, la commande est celle des points 1 à 4.
