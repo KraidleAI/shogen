@@ -298,6 +298,9 @@ class Format(unittest.TestCase):
         binance = ("`data-api.binance.vision`", "hôte seul", "`api.binance.com`", "code 451")       # GEL-2, Q-7
         self.assertEqual([x in sections["14"] for x in binance], [True] * 4)
         paquet = " ".join(PAQUET.read_text(encoding="utf-8").split()).split("## 4. Remplaçants écrits d'avance")
+        carte = ("`s2bis/config/carte.json` de production", "carte vide (`formes` : [])")         # GEL-9 (C-2)
+        self.assertEqual([x in sections["15"] for x in carte] + [("GEL-9" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True] * 3)
         sondes = ("scellée au gel du collecteur (diff GEL-6,", "`www.kernel.org` et `www.arin.net`", "198.41.0.4")
         self.assertEqual([x in sections["14"] for x in sondes] + [("GEL-6" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True] * 4)                                   # GEL-6 : sondes de production

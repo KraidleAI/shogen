@@ -88,7 +88,8 @@
   la TSA (§14.1, §16.8, §17.5, §17.6), qui ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 et le volet Q-7 de
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-8, documentation seule, écrit au paquet Q-C-07 et la date de coupure
   de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
-  de SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
+  de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
+  (§15.2).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -779,7 +780,10 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    - `cadence` : `periode` et `decalage` multiples de w, `decalage` < `periode`.
 
    En production, `depart` vaut 5 s (E-C-32, valeur scellée). Tout écart est un refus nommé (`CONFIG/…`), levé avant
-   l'ouverture du journal.
+   l'ouverture du journal. Au gel (diff GEL-9, correction C-2) : `s2bis/config/carte.json` de production, carte vide
+   (`formes` : []), `depart` 5 000 000 µs, `delai` 10 000 000 µs, `marge` 1 000 000 µs, `places` 1, `asn`
+   `{periode 86 400, decalage 0}` (relevé ASN quotidien à minuit UTC) : sources après le rendu
+   (`G6-PAQUET-S2BIS.md` §6) ; `test_formes_pool` le charge par `configurer_secondaire`.
 3. **Boucle de la carte** : celle du pool (§11), départ D = ws + `depart` (δ de la carte : w − `depart`), échéance
    E = ws + w − `marge`, `places` de la carte, une lecture par forme au `delai` de la carte, décodée par le décodeur de
    sa forme (§9.1), et sans sondes : la `sante` porte les champs des sondes nuls ou vides (§13.1). Mêmes

@@ -31,6 +31,13 @@ SONDES = {"commande": ["chronyc", "-n", "tracking"],     # FORMAT §13.3 : comma
           "delai": 2_000_000}                             # l.109-110 : « 2 s », en µs
 PHRASES_SANTE = ("a.root (198.41.0.4, Verisign, ASN 7342), i.root (192.36.148.17, Netnod, ASN 29216), k.root "
                  "(193.0.14.129, RIPE NCC, ASN 25152)", "| 2 sur 3 ; 2 s |", "| 2 sur 2 ; 2 s |")
+CARTE = os.path.join(RACINE, "config", "carte.json")                 # GEL-9 (C-2) : carte de production
+CARTE_GEL = {"depart": 5_000_000,       # E-C-32 (ADR-0029 l.235) ; FORMAT §15.2 : « En production, `depart` vaut 5 s »
+             "delai": 10_000_000,       # délai par requête du pool (l.233)
+             "marge": 1_000_000,        # échéance à ws + w − 1 s, comme le pool (l.233)
+             "places": 1,               # pool de fils minimal : aucune forme
+             "asn": {"periode": 86_400, "decalage": 0},    # relevé ASN quotidien (E-C-30), à minuit UTC
+             "formes": []}              # carte vide au gel, sources après le rendu (AVIS du G0, Q-G-04, l.77)
 PHRASES = ("w = 60 s", "δ = 20 s, délai 10 s par requête, échéance dure à ws + w − 1 s", "plus de 5 s après",
            "(5 + 4 + 10 + 1 = 20 ≤ 20 s)")                      # texte des lignes citées, cherché dans l'ADR
 S2 = {"binance_btc": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",              # sources.py l.241-
@@ -181,6 +188,19 @@ class Formes(unittest.TestCase):
             lus = entree.configurer({"formes": FORMES, "sante": SANTE, "descripteur": os.path.join(d, "d.json")},
                                     "0" * 40)
         self.assertEqual(lus["sante"][0]["delai"] + lus["formes"][0]["marge"], 3_000_000)
+
+    def test_carte_de_production_vide(self):                        # GEL-9 ; correction C-2
+        """`config/carte.json` égal aux constantes écrites ici ; chargé avec `formes.json` de production par
+        `entree.configurer_secondaire` (schéma CARTE, règles de forme et règles croisées : `hors-delta` 5 + 10 ≤ 40 s,
+        `marge-carte` 16 ≤ 60 s, `cadence`) ; la phrase du paquet (§6) le dit."""
+        descripteur = {"observateur": "o1", "fournisseur": "essai", "region": "essai", "asn": 64512, "resolveur":
+                       "127.0.9.53", "config_resolveur": "resolv.conf", "versions": ["python3"], "empreinte": "e" * 64}
+        with tempfile.TemporaryDirectory() as d:
+            pathlib.Path(d, "d.json").write_text(json.dumps(descripteur), encoding="utf-8")
+            lus = entree.configurer_secondaire({"formes": FORMES, "carte": CARTE, "descripteur": os.path.join(
+                d, "d.json")}, "0" * 40)
+        paquet = " ".join((ADR.parent / "s2bis" / "G6-PAQUET-S2BIS.md").read_text(encoding="utf-8").split())
+        self.assertEqual((lus["carte"][0], "carte vide au gel, sources après le rendu" in paquet), (CARTE_GEL, True))
 
 
 if __name__ == "__main__":

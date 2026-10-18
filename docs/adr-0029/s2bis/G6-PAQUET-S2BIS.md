@@ -82,4 +82,5 @@ la date de coupure de la carte égale au gel du collecteur` ; Q-C-09, AVIS l.98)
 celle du gel du collecteur, c'est-à-dire du commit qui verse ce lot. Aucun lot CB-14 n'est prêt à cette date : aucune
 source n'entre à la carte avant le rendu ; les sources passent après le rendu, hors paquet (AVIS l.77). Le processus
 secondaire tourne alors avec une carte vide, que le schéma admet (`entree.CARTE`, `formes` : liste vide admise ; le
-relevé ASN tourne sans carte, FORMAT §15).
+relevé ASN tourne sans carte, FORMAT §15). Correction C-2 (diff GEL-9) : carte vide au gel, sources après le rendu ;
+la configuration scellée est `s2bis/config/carte.json` (`formes` : [], FORMAT §15.2).

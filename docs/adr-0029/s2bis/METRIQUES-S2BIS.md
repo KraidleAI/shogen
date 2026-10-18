@@ -3410,3 +3410,25 @@ paquet ; plancher.
 
 Suite : 441 tests ; plancher du job : 441, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `sante.json`, FORMAT, METRIQUES.
+
+## GEL-9 (2026-10-18) : `carte.json` de production, carte vide (correction C-2 ; adjudication de Q-4)
+
+Objet : `s2bis/config/carte.json` : `depart` 5 000 000 µs (E-C-32, FORMAT §15.2), `delai` 10 000 000 µs et `marge`
+1 000 000 µs (ceux du pool), `places` 1, `asn` `{periode 86 400, decalage 0}` (relevé quotidien, E-C-30), `formes`
+vide : carte vide au gel, sources après le rendu. `test_formes_pool` fige les valeurs et charge le fichier avec
+`formes.json` de production par `entree.configurer_secondaire` (règles croisées : `hors-delta` 5 + 10 ≤ 40 s,
+`marge-carte` 16 ≤ 60 s, `cadence`) ; paquet §6 et FORMAT §15.2, puce.
+
+Rouge : sur un squelette (`carte.json` aux valeurs de remplissage), 2 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/carte.json` | 2 | données |
+| `tests/test_formes_pool.py` | 207 | 9 (1 de plus : carte de production vide) |
+| `tests/test_format.py` | 397 | 23 (inchangé : §15.2 et puce) |
+
+Mutants (même commande, même outil) : 9 mutants, 9 tués, 0 vivant, 0 FATAL : `depart`, `delai`, `places`,
+`periode`, `decalage` changés ; `delai` au-delà de `hors-delta` ; FORMAT ; paquet ; plancher.
+
+Suite : 442 tests ; plancher du job : 442, égalité exigée (`--egal`). Compte de R-25 : 24 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.
