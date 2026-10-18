@@ -374,8 +374,10 @@ class Format(unittest.TestCase):
         c5 = [(seize, "refus `TETES/liste`"), (seize, "aucun nom hors de la liste n'évince une tête de la liste"),
               (sections["14"], "`--observateurs L` est exigée"), (sections["14"], "et `observateurs` avec"),     # C-5
               (sections["14"], "`descripteur` et, avec `--observateurs`, `observateurs`"),          # C-7 de la G2
-              (sections["14"], "sans `--depot`, `--observateurs L` reste admise")]
-        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") + p.count("le diff C-6") for p in
+              (sections["14"], "sans `--depot`, `--observateurs L` reste admise"),
+              (seize, "refus `TETES/journal`"), (seize, "aucune éviction n'est possible"),             # C-8
+              (seize, "le journal est de la liste fermée `pool`, `secondaire`")]
+        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") + p.count("le diff C-8") for p in
                                                              puces if p.startswith("**Gel du collecteur**")], [2])
         self.assertEqual([("GEL-7" in p and "OBSERVATEURS-LISTE-1" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True])

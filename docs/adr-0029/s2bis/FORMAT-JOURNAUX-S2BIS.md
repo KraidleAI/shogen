@@ -90,7 +90,8 @@
   de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
   de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
   (§15.2) ; les diffs C-3 et C-4 de la G2 du lot (§16, §19) ; le diff C-5, la liste fermée dans l'enregistrement
-  `tetes` et à `run_params` (§14.3, §14.4, §16.5) ; le diff C-6, les remplaçants de Binance à la carte (§15.2).
+  `tetes` et à `run_params` (§14.3, §14.4, §16.5) ; le diff C-6, les remplaçants de Binance à la carte (§15.2) ;
+  le diff C-8, la liste fermée des journaux des têtes (§16.4, §16.5).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -875,7 +876,8 @@ collecteur.
    `observateur` ; `tetes` : les têtes lues au dépôt, triées par observateur puis journal. Son sha256 est l'empreinte
    de la requête.
 4. **Fichier de tête** (CB-15b ; E-C-35) : au dépôt, `<observateur>-<journal>.tete` (observateur `[a-z0-9]{1,16}`,
-   journal `[a-z]{1,16}`, préfixe du journal), une ligne JSON canonique `{journal, observateur, seq, sha256, ws}` :
+   journal `[a-z]{1,16}`, préfixe du journal ; lu avec la liste fermée des observateurs, le journal est de la liste
+   fermée `pool`, `secondaire`, correction C-8), une ligne JSON canonique `{journal, observateur, seq, sha256, ws}` :
    la tête (§1.4) du point de contrôle (`point`, §2) de la fenêtre `ws`. Elle est écrite à chaque point de contrôle,
    par écriture atomique : fichier temporaire `.<nom>.tmp` écrit et synchronisé, renommé, dossier synchronisé ; un
    lecteur voit l'ancien fichier ou le nouveau, jamais un fichier partiel. Un échec de l'export ne lève pas : il est
@@ -890,7 +892,11 @@ collecteur.
    `TETES/depot`. Liste fermée (correction C-5 du lot de gel, I-1 de sa G2 ; la même que celle de `jeton`, C-3) :
    pour l'enregistrement `tetes`, les fichiers de tête d'un observateur hors de la liste sont écartés avant ces
    bornes ; les 16 premiers par ordre des noms sont nommés au refus `TETES/liste`, les autres comptés aux `ignores` :
-   aucun nom hors de la liste n'évince une tête de la liste. Champs rendus : `tetes` (têtes valides, les siennes
+   aucun nom hors de la liste n'évince une tête de la liste. Liste fermée des journaux (correction C-8, I-4 de la G2 ;
+   au jeton comme à l'enregistrement `tetes`) : avec la liste, un fichier de tête d'un observateur de la liste n'est
+   lu que si son journal est `pool` ou `secondaire` (les deux journaux du code) ; les autres sont nommés au refus
+   `TETES/journal`, 16 au plus, le reste compté aux `ignores` ; au plus huit têtes sont lues : la borne de 16 n'est
+   jamais atteinte, aucune éviction n'est possible. Champs rendus : `tetes` (têtes valides, les siennes
    d'abord), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier,
    sha256, manifeste, tsq}` : sha256 du dernier `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son
    manifeste et de sa requête du même jour, null

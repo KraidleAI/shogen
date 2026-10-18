@@ -190,7 +190,25 @@ class Depot(unittest.TestCase):
         self.assertEqual((avec["tetes"], avec["refus"], avec["ignores"]),
                          ([tete("o2")], [[f"a{k:02d}-pool.tete", "TETES/liste"] for k in range(16)], 1))
         self.poser({f"o2-j{chr(97 + k)}.tete": tete("o2", "j" + chr(97 + k)) for k in range(17)})  # C-7 de la G2 (S-05)
-        self.assertEqual(tetes.Depot(self.d, "o1", liste=["o1", "o2", "o3", "o4"]).lire()["ignores"], 2 + 1)
+        lu = tetes.Depot(self.d, "o1", liste=["o1", "o2", "o3", "o4"]).lire()                         # C-8 : 1 + 1
+        self.assertEqual((lu["ignores"], [c for _n, c in lu["refus"]].count("TETES/journal")), (1 + 1, 16))
+
+    def test_journaux_inventes_n_evincent_rien(self):                # C-8 (I-4 de la G2 du lot de gel)
+        """Seize têtes d'o2 à des journaux inventés (o2-ja à o2-jp, triées avant o3) : sans liste, la tête d'o3 est
+        évincée par la borne de seize (garde : la fixture sépare) ; avec la liste, seuls les journaux de JOURNAUX sont
+        lus : o3 est lue, à l'enregistrement `tetes` comme au manifeste du jeton, et les seize sont nommées au refus
+        `TETES/journal` ; la borne est inatteignable : quatre observateurs, deux journaux, 8 ≤ NOMBRE."""
+        liste = ["o1", "o2", "o3", "o4"]
+        self.poser({**{f"o2-j{chr(97 + k)}.tete": tete("o2", "j" + chr(97 + k)) for k in range(16)},
+                    "o3-pool.tete": tete("o3"), "o1-pool.tete": tete("o1")})
+        sans, avec = tetes.Depot(self.d, "o1").lire(), tetes.Depot(self.d, "o1", liste=liste).lire()
+        self.assertEqual((tete("o3") in sans["tetes"], avec["tetes"], avec["refus"], avec["ignores"]), (
+            False, [tete("o3")], [[f"o2-j{chr(97 + k)}.tete", "TETES/journal"] for k in range(16)], 0))
+        tetes.jeton(self.d, "o1", "2026-10-05", 1, liste=liste)
+        self.assertEqual([(x["observateur"], x["journal"]) for x in json.loads(pathlib.Path(
+            self.d, "o1-2026-10-05.manifeste").read_bytes())["tetes"]], [("o1", "pool"), ("o3", "pool")])
+        self.assertEqual((tetes.JOURNAUX, set(entree.FICHIERS), len(liste) * len(tetes.JOURNAUX) <= tetes.NOMBRE),
+                         (("pool", "secondaire"), {"pool", "secondaire"}, True))
 
     def test_export_atomique_a_chaque_point(self):
         """Ligne canonique {journal, observateur, seq, sha256, ws} (octets écrits à la main), écrite dans un fichier
@@ -418,14 +436,17 @@ class Jeton(unittest.TestCase):
 
     def test_jeton_liste_fermee_et_armement(self):                 # GEL-7 ; SHOGEN-S2BIS-OBSERVATEURS-LISTE-1
         """Liste fermée : la tête d'o9, valide, est ignorée et nommée, le manifeste est celui du dépôt sans elle (octets
-        écrits à la main, en setUp) ; garde : sans liste, elle y entre. `.armement` : non armé, puis armé (ligne
+        écrits à la main ; C-8 : sans la tête du journal `carte` d'o1, hors de JOURNAUX) ; garde : sans liste, elle y
+        entre. `.armement` : non armé, puis armé (ligne
         canonique écrite à la main). C-3 de la G2 du lot : seize têtes valides hors de la liste, triées avant `o2`, ne
         l'évincent pas du manifeste (filtre avant la borne NOMBRE) ; garde : sans la liste, elles l'évincent."""
         pathlib.Path(self.d, "o9-pool.tete").write_bytes(ligne_tete(tete("o9")))
         ignores = []
         tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708, liste=["o1", "o2", "o3", "o4"], ignores=ignores)
+        sans_carte = ('{"jour":"2026-10-05","observateur":"o1","tetes":[' + ",".join(
+            ligne_tete(t).decode()[:-1] for t in (tete("o1"), tete("o2", seq=40, sha=B))) + ']}\n').encode()   # C-8
         self.assertEqual((ignores, self.lu("o1-2026-10-05.manifeste"), self.lu("o1-2026-10-05.armement")), (
-            ["o9"], self.manifeste, b'{"arme":false,"jour":"2026-10-05","observateur":"o1","tsa":null}\n'))
+            ["o9"], sans_carte, b'{"arme":false,"jour":"2026-10-05","observateur":"o1","tsa":null}\n'))
         self.assertIn(b'"o9"', (tetes.jeton(self.d, "o1", "2026-10-06", 1), self.lu("o1-2026-10-06.manifeste"))[1])
         self.assertEqual(code(lambda: tetes.jeton(self.d, "o1", "2026-10-07", 1, lambda q: b"<html>",
                                                   url="https://tsa.essai/tsr")), "JETON/reponse")
@@ -436,7 +457,7 @@ class Jeton(unittest.TestCase):
         ignores = []
         tetes.jeton(self.d, "o1", "2026-10-08", 0x0102030405060708, liste=["o1", "o2", "o3", "o4"], ignores=ignores)
         self.assertEqual((ignores, self.lu("o1-2026-10-08.manifeste")), ([f"a{i:02d}" for i in range(16)] + ["o9"],
-                                                                         self.manifeste.replace(b"10-05", b"10-08")))
+                                                                         sans_carte.replace(b"10-05", b"10-08")))
         tetes.jeton(self.d, "o1", "2026-10-09", 1)                        # garde : sans la liste, o2 est évincée
         self.assertNotIn(b'"o2"', self.lu("o1-2026-10-09.manifeste"))
 
@@ -532,9 +553,12 @@ class Jeton(unittest.TestCase):
         self.assertEqual((rc, out.split(" : ")[:3], err, tirage.call_args_list),
                          (0, ["jeton", "non armé", "o1-2026-10-05.tsq"], "", [mock.call(64)] * 2))
         self.assertNotEqual(*[self.lu(f"o1-2026-10-0{j}.tsq")[56:-3] for j in (5, 6)])       # nonces tirés (G-16)
-        with mock.patch.object(entree.secrets, "randbits", return_value=0x0102030405060708):
+        with mock.patch.object(entree.secrets, "randbits", return_value=0x0102030405060708), mock.patch.object(
+                tetes, "lier") as lier:            # C-8 : manifeste sans la tête `carte`, autre que celui de JETONS
             rc, out, err = lancer("--jour", "2026-10-05", "--envoi", "https://tsa.essai/tsr", envoyer=lambda u, q, c:
                                   JETONS["juste"] if (u, c) == ("https://tsa.essai/tsr", None) else b"")
+        self.assertEqual(lier.call_args_list, [mock.call(JETONS["juste"], hashlib.sha256(self.lu(
+            "o1-2026-10-05.manifeste")).digest(), 0x0102030405060708)])     # liaison : test_jeton_lie_a_la_requete
         self.assertEqual((rc, out, err), (0, "jeton : émis : o1-2026-10-05.tsr : sha256 " + hashlib.sha256(
             JETONS["juste"]).hexdigest() + "\n", ""))
         self.assertEqual(self.lu("o1-2026-10-05.armement"), b'{"arme":true,"jour":"2026-10-05","observateur":"o1",'

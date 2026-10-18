@@ -19,7 +19,9 @@ manifeste et de sa requête (C-5). GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : a
 hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`). C-3 de la G2
 du lot : la liste filtre les noms avant la borne NOMBRE ; une tête hors de la liste n'est pas lue et n'en évince
 aucune de la liste. Correction C-5 du lot de gel (I-1 de sa G2) : l'enregistrement `tetes` de la boucle lit la même
-liste (`Depot.liste`), noms hors liste écartés avant la borne et nommés au refus."""
+liste (`Depot.liste`), noms hors liste écartés avant la borne et nommés au refus. Correction C-8 (I-4 de la G2) :
+avec la liste, seuls les journaux de JOURNAUX sont lus ; les autres sont nommés au refus `TETES/journal` : au plus
+huit têtes lues, la borne NOMBRE n'est jamais atteinte."""
 import contextlib
 import hashlib
 import http.client
@@ -34,6 +36,7 @@ from shogen_s2bis.collecte import journal
 SHA256 = bytes.fromhex("0609608648016503040201")          # OBJECT IDENTIFIER 2.16.840.1.101.3.4.2.1 (sha256)
 SEQUENCE, INTEGER, BOOLEEN, OCTETS, NUL = 0x30, 0x02, 0x01, 0x04, 0x05
 NOM = re.compile("([a-z0-9]{1,16})-([a-z]{1,16})[.]tete")   # <observateur>-<journal>.tete
+JOURNAUX = ("pool", "secondaire")           # C-8 : liste fermée des journaux (entree.construire, construire_secondaire)
 CLES, TAILLE, NOMBRE = {"journal", "observateur", "seq", "sha256", "ws"}, 1024, 16   # octets, têtes lues au plus
 BORNES = {"seq": 10 ** 18, "ws": 10 ** 12}                  # entiers d'une tête lue : 0 ≤ v < borne
 SIGNE, TST = bytes.fromhex("2a864886f70d010702"), bytes.fromhex("2a864886f70d0109100104")   # contenus d'OID (G1)
@@ -270,16 +273,20 @@ def lire_tetes(dossier, exclure=None, propre=None, liste=None):
     """(têtes valides, refus [nom, code], fichiers au-delà des bornes) des fichiers de tête de `dossier`, sauf celui de
     `exclure` (observateur, journal), dans l'ordre des noms : ceux de l'observateur `propre` d'abord, hors de la borne
     des autres (C-2 ; AVIS Q-D-03 (1) : sa tête est ancrée quoi qu'il arrive au dépôt), NOMBRE au plus de chaque
-    sorte ; `liste` (C-3 de la G2 du lot de gel) : seuls les noms de la liste, filtrés avant la borne ; dossier
-    illisible : OSError."""
+    sorte ; `liste` (C-3 de la G2 du lot de gel) : seuls les noms de la liste, filtrés avant la borne, et (C-8) les
+    journaux de JOURNAUX, les autres journaux d'un nom de la liste nommés au refus `TETES/journal`, NOMBRE au plus, le
+    reste compté aux fichiers au-delà des bornes ; dossier illisible : OSError."""
     noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure and (
         liste is None or m[1] in liste)]
+    journaux = [n for n, m in noms if liste is not None and m[2] not in JOURNAUX]
+    noms = [(n, m) for n, m in noms if n not in journaux]
     siens, autres = [x for x in noms if x[1][1] == propre], [x for x in noms if x[1][1] != propre]
     tetes, refus = [], []
     for n, m in siens[:NOMBRE] + autres[:NOMBRE]:
         t, code = _lire_tete(os.path.join(dossier, n), *m.groups())
         tetes.append(t) if t else refus.append([n, code])
-    return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE)
+    refus += [[n, "TETES/journal"] for n in journaux[:NOMBRE]]
+    return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE) + max(0, len(journaux) - NOMBRE)
 
 
 def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync, liste=None, ignores=None, url=None):

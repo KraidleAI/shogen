@@ -3421,6 +3421,19 @@ Correction C-7 de la G2 du lot (2026-10-18 ; documentation et tests) : FORMAT §
 (débord de `lire_tetes` écrasé aux `ignores`) de la G2, vivants sur C-5 : cas ajoutés. Rouge : 1 FAIL du FORMAT. Suite :
 443 tests, plancher inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-8 du lot (2026-10-18 ; I-4 de la G2, adjugée ; diff distinct après C-7) : liste fermée des journaux des
+têtes, `tetes.JOURNAUX` = (`pool`, `secondaire`), les deux journaux du code ; avec la liste des observateurs,
+`lire_tetes` ne lit un fichier de tête que si son journal en est, et nomme les autres au refus `TETES/journal` (seize au
+plus, le reste aux `ignores`), au jeton comme à l'enregistrement `tetes` : au plus huit têtes lues, la borne de seize
+n'est jamais atteinte. Le cas de C-7 (dix-sept journaux inventés d'`o2`) donne désormais 1 + 1 `ignores` et seize
+refus `TETES/journal` ; le manifeste d'un jeton avec liste n'a plus la tête `carte` des tests (journal hors liste) :
+le cas armé de la commande relève la liaison demandée (`lier` espionné), la liaison réelle restant éprouvée par
+`test_jeton_lie_a_la_requete`. FORMAT §16.4, §16.5, puce. Rouge : 3 FAIL (`o3` évincée ; `ignores` de C-7 ; tête
+`carte` au manifeste). Mutants (même outil, même commande) : 11, 11 tués (filtre retiré, étendu sans liste, sur
+l'observateur, journaux élargis ; refus retiré, mal codé, non borné ; reste non compté ; journaux non retirés de la
+lecture ; FORMAT ; plancher). Suite : 444 tests ; plancher du job : 444, égalité exigée. Compte de R-25 : 45 lignes de
+code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
 ## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
 
 Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD
