@@ -87,7 +87,8 @@
   le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1 ; le diff GEL-7, la liste fermée des observateurs et
   la TSA (§14.1, §16.8, §17.5, §17.6), qui ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 et le volet Q-7 de
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-8, documentation seule, écrit au paquet Q-C-07 et la date de coupure
-  de la carte (`G6-PAQUET-S2BIS.md` §5, §6).
+  de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
+  de SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -703,7 +704,14 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      autre chemin à chaque fenêtre, §10.4) ;
    - `sante.json`, configuration scellée des sondes : `commande` (D-3, liste d'arguments), `temoins` (D-4, IPv4
      littérales canoniques, sept au plus), `noms` (D-5, noms DNS valides, sept au plus ; bornes du §13.6), `delai`
-     (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ;
+     (µs ; `delai` + `marge` ≤ `delta`, égalité admise : les sondes sont jointes avant l'échéance) ; scellée au gel du
+     collecteur (diff GEL-6, volet sondes de SHOGEN-S2BIS-CONFIG-PRODUCTION-1) dans `s2bis/config/sante.json` :
+     `commande` `["chronyc", "-n", "tracking"]` (§13.3), `temoins` 198.41.0.4, 192.36.148.17 et 193.0.14.129
+     (ADR-0029 l.109, E-C-27), `noms` `www.kernel.org` et `www.arin.net` (D-5, ADR-0029 l.110, E-C-28 ; lecture des
+     noms témoins du 2026-10-17 et son adjudication : TTL servi d'au plus 60 s sur les sondages, aucun serveur de noms
+     ni opérateur commun, adresses et autorités hors des ASN du pool ; TTL d'origine et ASN à confirmer au rodage ;
+     remplaçant écrit d'avance `www.cern.ch`, paquet §4), `delai` 2 000 000 µs (l.109-110) ; `test_formes_pool` lie
+     chaque valeur à sa source ;
    - le **descripteur** de l'observateur, écrit au premier démarrage (lot DEPLOI-BIS) : `observateur` (de forme
      `[a-z0-9]{1,16}`, règle `observateur-nom`, CB-15c : il nomme ses fichiers au dépôt, §16.4 ; minuscules seules,
      C-6 de la G2 de P2B : un jumeau de casse n'est pas un autre observateur), `fournisseur`,

@@ -24,6 +24,13 @@ SCELLEES = {"w": 60,                    # ADR-0029 l.88 : « fenêtre j (w = 60 
             "tolerance": 5_000_000,     # l.107, D-2 : « plus de 5 s après » (ajout daté du 2026-10-04 17:03:38 UTC)
             "marge": 1_000_000,         # l.233 : « échéance dure à ws + w − 1 s » ; budget « 5 + 10 + 1 ≤ 20 »
             "places": 40}               # décision de l'orchestrateur (brief du gel) : 33 formes, sept places de marge
+SANTE = os.path.join(RACINE, "config", "sante.json")                 # GEL-6 : sondes de production
+SONDES = {"commande": ["chronyc", "-n", "tracking"],     # FORMAT §13.3 : commande scellée de D-3 (ADR-0029 l.83, l.108)
+          "temoins": ["198.41.0.4", "192.36.148.17", "193.0.14.129"],      # l.109, D-4 : a.root, i.root, k.root
+          "noms": ["www.kernel.org", "www.arin.net"],    # l.110, D-5 : adjudication de la lecture DNS du lot (GEL-6)
+          "delai": 2_000_000}                             # l.109-110 : « 2 s », en µs
+PHRASES_SANTE = ("a.root (198.41.0.4, Verisign, ASN 7342), i.root (192.36.148.17, Netnod, ASN 29216), k.root "
+                 "(193.0.14.129, RIPE NCC, ASN 25152)", "| 2 sur 3 ; 2 s |", "| 2 sur 2 ; 2 s |")
 PHRASES = ("w = 60 s", "δ = 20 s, délai 10 s par requête, échéance dure à ws + w − 1 s", "plus de 5 s après",
            "(5 + 4 + 10 + 1 = 20 ≤ 20 s)")                      # texte des lignes citées, cherché dans l'ADR
 S2 = {"binance_btc": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",              # sources.py l.241-
@@ -155,6 +162,25 @@ class Formes(unittest.TestCase):
                 chemins[nom] = os.path.join(d, nom + ".json")
                 pathlib.Path(chemins[nom]).write_text(json.dumps(x), encoding="utf-8")
             self.assertEqual(entree.configurer(chemins, "0" * 40)["formes"][0], f)
+
+    def test_sante_de_production_liee_a_l_adr(self):              # GEL-6 ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1
+        """`config/sante.json` égal aux constantes écrites ici, chacune sous sa source ; le texte des lignes de l'ADR
+        y figure, la commande est celle du FORMAT §13.3 et les noms ceux du paquet (§4) ; les configurations de
+        production passent `entree.configurer` (règle `delai-sondes` : 2 + 1 ≤ 20 s)."""
+        self.assertEqual(config.charger(SANTE, entree.SCHEMAS["sante"], entree.COHERENCE["sante"])[0], SONDES)
+        texte = " ".join(ADR.read_text(encoding="utf-8").split())
+        docs = ADR.parent / "s2bis"
+        format_, paquet = (" ".join((docs / n).read_text(encoding="utf-8").split()) for n in (
+            "FORMAT-JOURNAUX-S2BIS.md", "G6-PAQUET-S2BIS.md"))
+        self.assertEqual(([p for p in PHRASES_SANTE if p not in texte], "la commande scellée est `chronyc -n tracking`"
+                          in format_, "`www.kernel.org`, `www.arin.net`" in paquet), ([], True, True))
+        descripteur = {"observateur": "o1", "fournisseur": "essai", "region": "essai", "asn": 64512, "resolveur":
+                       "127.0.9.53", "config_resolveur": "resolv.conf", "versions": ["python3"], "empreinte": "e" * 64}
+        with tempfile.TemporaryDirectory() as d:
+            pathlib.Path(d, "d.json").write_text(json.dumps(descripteur), encoding="utf-8")
+            lus = entree.configurer({"formes": FORMES, "sante": SANTE, "descripteur": os.path.join(d, "d.json")},
+                                    "0" * 40)
+        self.assertEqual(lus["sante"][0]["delai"] + lus["formes"][0]["marge"], 3_000_000)
 
 
 if __name__ == "__main__":

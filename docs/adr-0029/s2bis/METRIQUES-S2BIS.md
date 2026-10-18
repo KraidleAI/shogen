@@ -3386,3 +3386,27 @@ d'une part, `chainlink_usdc` et l'ensemble témoin d'autre part ; l'écart est u
 trois à quatre places fiat de l'ADR-0029 l.171) et §6 (date de coupure de la carte = gel du collecteur ; aucun lot
 CB-14 avant le rendu ; carte vide admise par le schéma) ; la section des remplaçants (§4) est celle de GEL-2. Puce du
 FORMAT. Aucun code ni test : suite et plancher inchangés (440).
+
+## GEL-6 (2026-10-18) : `sante.json` de production (volet sondes de SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet : `s2bis/config/sante.json` : `commande` `["chronyc", "-n", "tracking"]` (FORMAT §13.3), `temoins`
+198.41.0.4, 192.36.148.17 et 193.0.14.129 (ADR-0029 l.109, E-C-27), `noms` `www.kernel.org` et `www.arin.net`
+(ADR-0029 l.110, E-C-28 ; lecture des noms témoins du lot et son adjudication du 2026-10-17 23:40:13 UTC), `delai`
+2 000 000 µs (l.109-110). `test_formes_pool` lie chaque valeur à sa source (constantes littérales commentées ; texte
+des lignes 109-110 cherché dans l'ADR ; commande du FORMAT ; noms du paquet §4) et passe les configurations de
+production à `entree.configurer` (2 + 1 ≤ 20 s). FORMAT §14.1 et puce.
+
+Rouge : sur un squelette (`sante.json` aux valeurs de remplissage), 2 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/sante.json` | 2 | données |
+| `tests/test_formes_pool.py` | 187 | 8 (1 de plus : sondes de production liées à leurs sources) |
+| `tests/test_format.py` | 392 | 23 (inchangé : §14.1 et puce) |
+
+Mutants (même commande, même outil) : 9 mutants, 9 tués, 0 vivant, 0 FATAL : option `-n` retirée ; témoin changé,
+ou retiré ; nom témoin remplacé par le remplaçant ; délai à 3 s, puis au-delà de la règle `delai-sondes` ; FORMAT ;
+paquet ; plancher.
+
+Suite : 441 tests ; plancher du job : 441, égalité exigée (`--egal`). Compte de R-25 : 30 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `sante.json`, FORMAT, METRIQUES.
