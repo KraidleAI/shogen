@@ -86,7 +86,8 @@
   GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; le diff GEL-5,
   le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1 ; le diff GEL-7, la liste fermée des observateurs et
   la TSA (§14.1, §16.8, §17.5, §17.6), qui ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 et le volet Q-7 de
-  SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-8, documentation seule, écrit au paquet Q-C-07 et la date de coupure
+  de la carte (`G6-PAQUET-S2BIS.md` §5, §6).
 
 ## 1. Ligne et chaîne (CB-1)
 

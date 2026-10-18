@@ -3378,3 +3378,11 @@ inconnu ; règle `tsa-https` retirée ; TSA ajoutée à la configuration ; tête
 
 Suite : 440 tests ; plancher du job : 440, égalité exigée (`--egal`). Compte de R-25 : 173 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `observateurs.json`, FORMAT, METRIQUES.
+
+## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
+
+Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD
+d'une part, `chainlink_usdc` et l'ensemble témoin d'autre part ; l'écart est un calcul de RB-2, Q-R-04 ; limite des
+trois à quatre places fiat de l'ADR-0029 l.171) et §6 (date de coupure de la carte = gel du collecteur ; aucun lot
+CB-14 avant le rendu ; carte vide admise par le schéma) ; la section des remplaçants (§4) est celle de GEL-2. Puce du
+FORMAT. Aucun code ni test : suite et plancher inchangés (440).

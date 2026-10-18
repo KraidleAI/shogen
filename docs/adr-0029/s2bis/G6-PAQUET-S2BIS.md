@@ -51,3 +51,35 @@ sceau, et refait le rodage selon Q-C-06 (7 jours, dont un week-end, AVIS l.95).
 |---|---|---|---|---|
 | binance (pool, quatre formes `binance_*`) | `data-api.binance.vision` | `api.binance.com` (hôte de S2) | oui : chemins `/api/v3/ticker/price?symbol=…` et décodeurs `binance_*` inchangés | `api.binance.com` rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; la réponse de l'un et l'autre hôte depuis des hôtes européens n'est pas mesurée : à vérifier par `smoke` à DB-2, depuis chaque observateur. Limite : une restriction par la localisation de l'adresse source frapperait aussi le remplaçant, qui ne vaut que contre une panne propre à `data-api.binance.vision` (avis de l'advisor, Q-A) |
 | nom témoin de D-5 (`sante.json`, `noms` : `www.kernel.org`, `www.arin.net`) | les deux noms | `www.cern.ch` | sans objet (sonde D-5, requête A au résolveur de l'observateur) | lecture des noms témoins du 2026-10-17 et son adjudication (lot GEL-COLLECTEUR-1) : TTL servi de 60 s, autorités et adresses hors des ASN du pool et distinctes de celles des deux témoins ; réserve : un seul opérateur (AS513) ; TTL d'origine et ASN à confirmer au rodage (ADR-0029 l.110) |
+
+## 5. USDC : les deux mesures et leur écart (Q-C-07)
+
+*Ajout daté du 2026-10-18 (lot GEL-COLLECTEUR-1, diff GEL-8 ; Q-C-07 du G0 COLLECTE-RECALC-DEPLOI, PROPOSITION
+l.342-346, AVIS l.96 ; avis de l'advisor du lot, Q-C, adopté). Numéros de l'ADR-0029 au commit `e16956b`, convention
+de `FORMAT-JOURNAUX-S2BIS.md`.* Réponse acceptée à la q. 10 : `USDC : les deux mesures, contre le dollar réel et telle
+que la DeFi la consomme, avec leur écart` (JOURNAL l.382, texte recopié à la PROPOSITION l.343-344). Traduction
+retenue, **aucune forme nouvelle** au gel de `s2bis/config/formes.json` :
+
+- **contre le dollar réel** : la classe USDC/USD des places qui servent la paire (ADR-0029 l.171), formes
+  `kraken_usdc`, `bitstamp_usdc`, `gemini_usdc`, `binance_usdc` et `bitfinex_groupe` (`tUDCUSD`), avec les
+  agrégateurs `coingecko_groupe` et `defillama_groupe` (`usd-coin`) ;
+- **telle que la DeFi la consomme** : `chainlink_usdc`, classe « borné » au recalcul, plafond de 1,05 porté en extra
+  et jamais appliqué par le collecteur (FORMAT §9.1), et l'ensemble témoin sur chaîne et chez OKX, `okx_usdc_usdt`,
+  `uniswap_usdc_usdt`, `curve_usdc_usdt`, de classe `temoin`, hors des classes USD et hors du vote (ADR-0029 l.172),
+  porteur de P_j ;
+- **leur écart** : un calcul sur ces relevés, non une lecture : il relève de RB-2 (Q-R-04 : écart au pair des médianes
+  des classes USD ; P_j du témoin ; filtre de la classe `temoin` hors des classes USD et du vote,
+  SHOGEN-S2BIS-TEMOIN-RECALC-1), daté pour le témoin par ses blocs (FORMAT §9.1, bloc du témoin, diff GEL-5).
+
+Limite écrite, recopiée de l'ADR-0029 l.171 : trois places liquides seulement cotent USDC contre le dollar fiat
+(Kraken, Bitstamp, Bitfinex ; Gemini liste la paire ; aucun marché USDC-USD chez Coinbase) ; la condition N ≥ 4
+répondantes de la classe USDC/USD dépend donc des agrégateurs et de l'oracle.
+
+## 6. Carte descriptive : date de coupure
+
+*Ajout daté du 2026-10-18 (lot GEL-COLLECTEUR-1, diff GEL-8 ; Q-G-04 de l'AVIS du G0, l.72-78 : `fixer maintenant
+la date de coupure de la carte égale au gel du collecteur` ; Q-C-09, AVIS l.98).* La date de coupure de la carte est
+celle du gel du collecteur, c'est-à-dire du commit qui verse ce lot. Aucun lot CB-14 n'est prêt à cette date : aucune
+source n'entre à la carte avant le rendu ; les sources passent après le rendu, hors paquet (AVIS l.77). Le processus
+secondaire tourne alors avec une carte vide, que le schéma admet (`entree.CARTE`, `formes` : liste vide admise ; le
+relevé ASN tourne sans carte, FORMAT §15).
