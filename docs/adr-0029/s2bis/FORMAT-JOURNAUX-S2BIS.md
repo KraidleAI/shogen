@@ -82,7 +82,8 @@
 - **Gel du collecteur** (2026-10-17 ; lot GEL-COLLECTEUR-1, Q-C-06 du G0) : le diff GEL-1 scelle `formes.json` de
   production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
-  paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1.
+  paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1 ; le diff
+  GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -994,13 +995,22 @@ commande séparée, qui écrit les octets dans un fichier sans rien imprimer »)
 1. **Commande** : `python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` ; configurations
    contrôlées comme pour `smoke` (§18, point 1). Refus avant toute lecture : dossier absent (`dossier`), nom de forme
    hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom` ; déjà refusé au chargement par la règle `nom-forme` du §14.1, même
-   constante : le refus `nom` reste en défense), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
-   `capture : refus : …` sur l'erreur standard, sortie 2.
+   constante : le refus `nom` reste en défense), fichier déjà présent, jamais écrasé (`fichier`) ; option
+   `--reprise` : refus du point 5 ; un refus imprime `capture : refus : …` sur l'erreur standard, sortie 2.
 2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
-3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
-   `carte`), puis `captures.txt`, une ligne par lecture : `<fichier> <sha256> <statut> <code ou -> <départ>` (départ
-   en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Chaque fichier, manifeste compris, est
-   ouvert en création exclusive : un fichier apparu après le contrôle des noms n'est pas écrasé non plus ; la
-   capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
+3. **Fichiers** : le manifeste `captures.txt` est créé avant la première lecture (diff GEL-4) ; les octets bruts du
+   corps de chaque lecture vont dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou `carte`), puis la ligne de la
+   lecture est écrite au manifeste et vidée (`flush`), après chaque fichier : `<fichier> <sha256> <statut> <code ou
+   -> <départ>` (départ en microsecondes UTC) : date et sha256 de chaque fixture capturée (E-C-40). Une capture coupée
+   laisse ainsi un manifeste qui liste les fichiers écrits (au plus un fichier non listé, celui de la lecture en
+   cours). Chaque fichier, manifeste compris, est ouvert en création exclusive : un fichier apparu après le contrôle
+   des noms n'est pas écrasé non plus ; la capture s'arrête sur l'erreur (`capture : refus : …`, sortie 2).
 4. **Rien n'est imprimé** sur la sortie standard : ni octet, ni prix, ni valeur décodée (ADR-0029 l.222). Code de
    sortie : 0 si toutes les lectures du pool et du témoin sont `ok` ; 1 sinon ; 2 refus.
+5. **Reprise** (diff GEL-4, SHOGEN-S2BIS-CAPTURE-PARTIELLE-1) : `--reprise` complète une capture coupée, dans le même
+   dossier et pour les mêmes configurations. Avant toute lecture : le manifeste est lu (absent, illisible, dernière
+   ligne coupée, ligne qui n'a pas cinq champs, d'un fichier hors du plan ou répétée : refus `manifeste`) ; le sha256
+   des octets de chaque fichier listé est recontrôlé (écart, ou fichier absent : refus `somme`) ; un fichier du plan
+   présent mais non listé est refusé (`fichier` : jamais écrasé, il se retire à la main). Les formes listées sont
+   sautées, leur statut compte au code de sortie ; les lectures restantes, dans l'ordre du plan, sont faites et
+   ajoutées au manifeste. Sans `--reprise`, la commande est celle des points 1 à 4.

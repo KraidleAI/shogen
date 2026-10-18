@@ -3279,3 +3279,31 @@ motif élargi aux majuscules, au point initial, au tiret initial ; longueur réd
 
 Suite : 434 tests ; plancher du job : 434, égalité exigée (`--egal`). Compte de R-25 : 29 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## GEL-4 (2026-10-18) : reprise de capture (SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; FORMAT §19)
+
+Objet : `capture.capturer` crée le manifeste en exclusif avant la première lecture, puis écrit et vide (`flush`) la
+ligne de chaque lecture après son fichier ; option `reprise` (commande : `--reprise`) : manifeste lu (absent,
+illisible, ligne coupée ou à autre que cinq champs, fichier hors du plan ou répété : refus `manifeste`), sha256 de
+chaque fichier listé recontrôlé (écart ou fichier absent : refus `somme`), fichier présent non listé refusé
+(`fichier`), formes listées sautées (leur statut compte au code), lectures restantes ajoutées. Sans `reprise`,
+comportement d'avant, au manifeste près. FORMAT §19 (points 1, 3, point 5 neuf) et puce.
+
+Rouge : sur un squelette (paramètre et option acceptés, sans effet), 11 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/capture.py` | 85 | — |
+| `shogen_s2bis/collecte/entree.py` | 334 | — |
+| `tests/test_capture.py` | 217 | 7 (2 de plus : capture coupée puis reprise ; reprise refusée) |
+| `tests/test_format.py` | 376 | 23 (inchangé : §19 et puce) |
+
+Mutants (même commande, même outil) : 17 mutants classés, 17 tués par leur test visé, 0 vivant, 0 FATAL compté :
+`flush` retiré ; manifeste ouvert en `w` au départ, ou en `w` à la reprise ; forme listée relue ; son statut ignoré,
+ou lu `ok` ; somme non contrôlée ; fichier absent admis ; ligne coupée admise ; champs comptés autrement ; ligne
+répétée admise ; fichier hors du plan admis ; manifeste compté présent à la reprise ; manifeste non lu ; option
+non transmise ; FORMAT §19.5 ; plancher. Un premier mutant du statut lu, au texte avant absent (FATAL, inapplicable),
+a été réécrit et rejoué (tué).
+
+Suite : 436 tests ; plancher du job : 436, égalité exigée (`--egal`). Compte de R-25 : 148 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.

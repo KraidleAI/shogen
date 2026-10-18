@@ -30,7 +30,7 @@ pris en configuration) ; elles valent aussi pour `carte.json` (COHERENCE_CARTE),
 CB-16 (E-C-37 ; FORMAT §18) : commande `smoke` (smoke.py), `formes.json` et `carte.json` (facultative) contrôlés comme
 au démarrage, une lecture de chaque forme, sans prix : 0 pool et témoin décodés ; 1 sinon ; 2 refus de configuration.
 INT-P2-16 (Q-5 adjugée ; FORMAT §19) : commande `capture` (capture.py), mêmes configurations, octets bruts de chaque
-forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus. GEL-3
+forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus ; `--reprise` (GEL-4). GEL-3
 (SHOGEN-S2BIS-NOM-FORME-1 ; FORMAT §14.1) : règle `nom-forme`, nom de forme au motif NOM de `capture`, pool et carte."""
 import argparse
 import collections
@@ -266,7 +266,8 @@ def _smoke(a, tls):
             if not regle(f, c):
                 raise config.RefusConfig("CONFIG/incoherent", nom)
         if a.commande == "capture":
-            return capture.capturer(f["formes"], c["formes"], (f["delai"], c["delai"]), a.dossier, tls=tls)
+            return capture.capturer(f["formes"], c["formes"], (f["delai"], c["delai"]), a.dossier, tls=tls,
+                                    reprise=a.reprise)
     except (config.RefusConfig, boucle.RefusBoucle, capture.CaptureRefusee, OSError) as e:
         print(f"{a.commande} : refus : {e}", file=sys.stderr)
         return 2
@@ -304,6 +305,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     ca.add_argument("--formes", required=True)
     ca.add_argument("--carte", help="carte.json ; sans elle, pool et témoin seuls")
     ca.add_argument("--dossier", required=True)
+    ca.add_argument("--reprise", action="store_true", help="complète la capture du manifeste présent (GEL-4)")
     a = p.parse_args(argv)
     if a.commande in ("smoke", "capture"):
         return _smoke(a, tls)

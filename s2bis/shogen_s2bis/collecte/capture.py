@@ -6,7 +6,10 @@ dans `<dossier>/<rôle>-<forme>.bin` (rôle de `smoke.role`, ou `carte`), et une
 n'est imprimé, ni octet, ni prix (ADR-0029 l.222). Refus avant toute lecture (CaptureRefusee, motif `dossier`, `nom`
 ou `fichier`) : dossier absent, nom de forme hors de NOM, fichier déjà présent (jamais écrasé). Lecture HTTP et pause
 injectables : tests sur fixtures, sans réseau. Code 0 si toutes les lectures du pool et du témoin sont `ok` ;
-1 sinon."""
+1 sinon. GEL-4 (SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; FORMAT §19.5) : le manifeste est créé en exclusif avant la première
+lecture, et sa ligne écrite et vidée (`flush`) après chaque fichier ; `reprise` complète une capture coupée : lignes
+lues, sha256 de chaque fichier listé recontrôlé (refus `somme`), formes listées sautées, fichier présent non listé
+refusé (`fichier`), manifeste absent ou ligne illisible refusés (`manifeste`), lectures restantes ajoutées."""
 import hashlib
 import os
 import re
@@ -23,8 +26,35 @@ class CaptureRefusee(Exception):
         super().__init__(f"{motif} : {detail}")
 
 
-def capturer(formes, carte, delais, dossier, lire=None, pause=time.sleep, tls=http.CONTEXTE):
-    """Écrit les octets de chaque lecture puis le manifeste ; rend le code. `delais` : (pool, carte), en µs."""
+def _listes(dossier, noms):
+    """{fichier : statut} du manifeste d'une capture à reprendre (GEL-4) : lignes complètes de cinq champs, chacune d'un
+    fichier de `noms`, une fois, dont le sha256 des octets est celui de la ligne ; sinon CaptureRefusee."""
+    try:
+        with open(os.path.join(dossier, MANIFESTE), "rb") as f:
+            texte = f.read().decode("utf-8")
+    except (OSError, UnicodeError) as e:
+        raise CaptureRefusee("manifeste", type(e).__name__) from None
+    if texte and not texte.endswith("\n"):
+        raise CaptureRefusee("manifeste", "dernière ligne coupée")
+    lus = {}
+    for ligne in texte.split("\n")[:-1]:
+        c = ligne.split(" ")
+        if len(c) != 5 or c[0] not in noms or c[0] in lus:
+            raise CaptureRefusee("manifeste", ligne[:80])
+        try:
+            with open(os.path.join(dossier, c[0]), "rb") as f:
+                egal = hashlib.sha256(f.read()).hexdigest() == c[1]
+        except OSError:
+            egal = False
+        if not egal:
+            raise CaptureRefusee("somme", c[0])
+        lus[c[0]] = c[2]
+    return lus
+
+
+def capturer(formes, carte, delais, dossier, lire=None, pause=time.sleep, tls=http.CONTEXTE, reprise=False):
+    """Écrit le manifeste, puis les octets de chaque lecture et sa ligne ; rend le code. `delais` : (pool, carte), en
+    µs ; `reprise` : complète la capture du manifeste présent (GEL-4)."""
     lire, plan = lire or http.lire, [(x, delais[0], smoke.role(x)) for x in formes] + [
         (x, delais[1], "carte") for x in carte]
     noms = [f"{r}-{x['nom']}.bin" for x, _d, r in plan]
@@ -32,20 +62,24 @@ def capturer(formes, carte, delais, dossier, lire=None, pause=time.sleep, tls=ht
         raise CaptureRefusee("dossier", dossier)
     if not all(NOM.fullmatch(x["nom"]) for x, _d, _r in plan) or len(set(noms)) < len(noms):
         raise CaptureRefusee("nom", ", ".join(x["nom"] for x, _d, _r in plan))
-    if any(os.path.lexists(os.path.join(dossier, n)) for n in noms + [MANIFESTE]):
+    lus = _listes(dossier, noms) if reprise else {}
+    if any(os.path.lexists(os.path.join(dossier, n)) for n in noms + [MANIFESTE] * (not reprise) if n not in lus):
         raise CaptureRefusee("fichier", dossier)
-    vus, echecs, lignes = set(), 0, []
-    for (x, delai, r), nom in zip(plan, noms):
-        if x["espace"] and x["hote"] in vus:
-            pause(1)
-        vus.add(x["hote"])
-        req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
-        lu = lire(req, {}, delai=delai, tls=tls)
-        with open(os.path.join(dossier, nom), "xb") as f:
-            f.write(lu.octets)
-        echecs += r != "carte" and lu.statut != "ok"
-        code = "-" if lu.code is None else lu.code
-        lignes.append(f"{nom} {hashlib.sha256(lu.octets).hexdigest()} {lu.statut} {code} {lu.depart}\n")
-    with open(os.path.join(dossier, MANIFESTE), "x", encoding="utf-8") as f:
-        f.writelines(lignes)
+    vus, echecs = set(), 0
+    with open(os.path.join(dossier, MANIFESTE), "a" if reprise else "x", encoding="utf-8") as m:
+        for (x, delai, r), nom in zip(plan, noms):
+            if nom in lus:                                          # forme listée : sautée, son statut compte
+                echecs += r != "carte" and lus[nom] != "ok"
+                continue
+            if x["espace"] and x["hote"] in vus:
+                pause(1)
+            vus.add(x["hote"])
+            req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)
+            lu = lire(req, {}, delai=delai, tls=tls)
+            with open(os.path.join(dossier, nom), "xb") as f:
+                f.write(lu.octets)
+            echecs += r != "carte" and lu.statut != "ok"
+            code = "-" if lu.code is None else lu.code
+            m.write(f"{nom} {hashlib.sha256(lu.octets).hexdigest()} {lu.statut} {code} {lu.depart}\n")
+            m.flush()
     return 1 if echecs else 0

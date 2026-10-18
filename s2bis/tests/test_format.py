@@ -312,6 +312,11 @@ class Format(unittest.TestCase):
         self.assertEqual([x in sections.get("19", "") for x in attendus], [True] * 4)
         self.assertEqual([("INT-P2-16" in p and "§19" in p) for p in puces if p.startswith(
             "**Partie P2, intégration**")], [True])
+        reprise = ("créé avant la première lecture", "vidée (`flush`), après chaque fichier", "5. **Reprise**",
+                   "refus `manifeste`", "refus `somme`", "présent mais non listé est refusé (`fichier`")      # GEL-4
+        self.assertEqual([x in sections.get("19", "") for x in reprise] + [("GEL-4" in p and "CAPTURE-PARTIELLE-1" in p)
+                                                                           for p in puces if p.startswith(
+                                                                               "**Gel du collecteur**")], [True] * 7)
 
     def test_convention_des_citations_et_run_params_dans_l_ordre_de_la_fenetre(self):     # CB-18j
         """En-tête : une puce « Citations », une seule, dit que « ADR-0029 l.N » renvoie à l'ADR au commit e16956b et
