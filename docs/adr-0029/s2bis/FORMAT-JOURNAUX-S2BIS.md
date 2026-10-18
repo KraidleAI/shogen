@@ -83,7 +83,8 @@
   production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
   paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1 ; le diff
-  GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1.
+  GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; le diff GEL-5,
+  le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -386,7 +387,16 @@ prolonge un autre dans le même dossier fait refuser le plus court (`JOURNAL/nom
      (`slot0` du pool 0,01 % : prix sqrtPriceX96² / 2^192, décimales 6 et 6, une division en 50 chiffres sous le
      contexte nommé, jamais celui du fil ; `extra` : `sqrt_price_x96` et `tick`) ; `curve_usdc_usdt` (`get_dy(1, 2,
      10^6)` du 3pool : prix dy / 10^6 ; `extra` : `dy`). Ces deux derniers n'ont pas d'instant de source
-     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. Les trois sont de classe `temoin`, hors
+     (`ts_source` null) : la réponse `eth_call` ne porte pas le bloc lu. **Bloc du témoin** (diff GEL-5,
+     SHOGEN-S2BIS-TEMOIN-BLOC-1) : leur corps est une requête JSON-RPC groupée, `[eth_blockNumber (id 1), eth_call au
+     bloc « latest » (id 2), eth_blockNumber (id 3)]`, en un seul aller (règle `corps-du-decodeur`, §14.1) ; la
+     réponse est une liste de trois réponses appariées par `id` (JSON-RPC 2.0 n'impose pas leur ordre), chacune avec
+     `result` et sans `error`, blocs en hexadécimal strict (64 bits au plus) ; `extra` porte en plus `bloc_avant` et
+     `bloc_apres`, les deux numéros en chaînes décimales. Sémantique : numéros de bloc courants du nœud avant et après
+     l'appel, dans la même requête groupée, non atomique avec lui : un bloc peut passer entre les appels, écart attendu
+     d'au plus un bloc ; le recalcul date la mesure par ces blocs (RB-2). Lot incomplet ou de plus de trois réponses,
+     `id` répété ou non entier, élément `error`, bloc illisible, ou `bloc_apres` < `bloc_avant` : la lecture entière
+     est `panne_decode`. Les trois sont de classe `temoin`, hors
      des classes USD et hors du vote (ADR-0029 l.174 ; C-P2D-1, adjudication Q-1 de la tranche D, 2026-10-17).
      Lecture Curve (SHOGEN-S2BIS-CURVE-DOC-1, lecture du 2026-10-17) : `get_dy` rend la quantité de USDT en unités
      natives, nette de frais (source `StableSwap3Pool.vy` du dépôt officiel, branche `master`) ; `price_oracle` du

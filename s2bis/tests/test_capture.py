@@ -19,7 +19,7 @@ from tests.test_smoke import CARTE, PIECES, POOL, forme, lire
 SHA = {"binance_btc": "880903276bc688eecfb02e8b5e30f60c6a195dda6c372bce445063f8621f61f5",
        "binance_usdc": "17397032db28cad708617e8a1ee480dfa6a27ed10cb35a993bc0a7411d1bb5cc",
        "okx_usdc_usdt": "78044f24a858eb887fc0b38f124ddaf4c9ad3f5be624ef0876165854042b3ae8",
-       "curve_usdc_usdt": "82566c09417ff6d00d0ec28cfbe66f1a23c24b7933ff87742b43c8ea11613a99",
+       "curve_usdc_usdt": "596550e9eb1ab3d69a6206965241d4bea90544949752edb0ff6cef285fe61dd9",      # GEL-5
        "kraken_eth": "23a9650b0891b949dbba34c48fa869b0a4147955182df34f610849a2d59ce3a5"}
 VIDE = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 FORMES = ("binance_btc", "okx_usdc_usdt", "binance_usdc", "curve_usdc_usdt")

@@ -3307,3 +3307,36 @@ a été réécrit et rejoué (tué).
 
 Suite : 436 tests ; plancher du job : 436, égalité exigée (`--egal`). Compte de R-25 : 148 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## GEL-5 (2026-10-18) : bloc du témoin, requête JSON-RPC groupée encadrée (SHOGEN-S2BIS-TEMOIN-BLOC-1 ; FORMAT §9.1)
+
+Objet (avis de l'advisor du lot, Q-B, option 2 encadrée, adopté) : le corps d'Uniswap et de Curve (`decodeurs.CORPS`,
+fonction `lot`) est la requête groupée `[eth_blockNumber (id 1), eth_call « latest » (id 2), eth_blockNumber (id 3)]`,
+`json.dumps` aux séparateurs par défaut ; `_lot` lit la liste, apparie par `id`, exige trois réponses avec `result` et
+sans `error`, blocs en hexadécimal strict (64 bits au plus), puis décode l'appel ; extra : `bloc_avant`, `bloc_apres`
+en chaînes décimales ; lot incomplet ou de plus de trois, `error`, bloc illisible, `bloc_apres` < `bloc_avant` :
+panne entière. `formes.json` porte les deux corps neufs (règle `corps-du-decodeur`). Fixtures d'Uniswap et de Curve
+réécrites à la main (`printf`) en réponses groupées (Curve dans l'ordre 3, 1, 2), documentées au test et au paquet.
+FORMAT §9.1 (« Bloc du témoin », non atomique, écart attendu d'au plus un bloc) et puce.
+
+Rouge : sur les tests et fixtures neufs, code de GEL-4 : 16 FAIL, 1 ERROR (le smoke itère des valeurs absentes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/decodeurs.py` | 393 | — |
+| `tests/fixtures/temoin/uniswap_usdc_usdt.bin` | 580 octets | données |
+| `tests/fixtures/temoin/curve_usdc_usdt.bin` | 196 octets | données |
+| `tests/test_temoin.py` | 343 | 1 de plus (`Lot` : appariement, blocs, refus) ; corps et fixtures reportés |
+| `tests/test_capture.py` | 217 | 7 (inchangé : sha256 de la fixture de Curve) |
+| `tests/test_format.py` | 380 | 23 (inchangé : §9.1 et puce) |
+
+Mutants (même commande, même outil) : 16 mutants, 16 tués par leur test visé, 0 vivant, 0 FATAL, après un premier
+passage où deux mutants vivaient (lot de quatre admis par `len(j) < 3` ; bloc de 17 chiffres admis) : leurs cas de
+test ne séparaient pas (`bloc_apres` < `bloc_avant` les refusait aussi) ; cas réécrits (élément répété à
+l'identique ; blocs égaux aux deux bouts), campagne entière rejouée. Mutants : `id` de la requête ; quatre réponses ;
+`error` admis ; `id` non numérique ; 17 chiffres ; contrôle du bloc retiré ; écart d'un bloc à rebours admis ; blocs
+permutés ; réponse du bloc décodée comme l'appel ; bloc en hexadécimal ; Uniswap sans `_lot` ; Curve décodé comme
+Uniswap ; corps de Curve sans lot ; `eth_call` en id 1 ; FORMAT ; plancher.
+
+Suite : 437 tests ; plancher du job : 437, égalité exigée (`--egal`). Compte de R-25 : 116 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : fixtures, `formes.json`, FORMAT, paquet, METRIQUES.
