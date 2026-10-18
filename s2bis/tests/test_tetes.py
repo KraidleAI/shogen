@@ -197,16 +197,20 @@ class Depot(unittest.TestCase):
         """Seize têtes d'o2 à des journaux inventés (o2-ja à o2-jp, triées avant o3) : sans liste, la tête d'o3 est
         évincée par la borne de seize (garde : la fixture sépare) ; avec la liste, seuls les journaux de JOURNAUX sont
         lus : o3 est lue, à l'enregistrement `tetes` comme au manifeste du jeton, et les seize sont nommées au refus
-        `TETES/journal` ; la borne est inatteignable : quatre observateurs, deux journaux, 8 ≤ NOMBRE."""
+        `TETES/journal` ; la borne est inatteignable : quatre observateurs, deux journaux, 8 ≤ NOMBRE. C-9 de la G2 du
+        lot : la tête du journal `secondaire` d'o3 est lue aussi (les deux journaux de JOURNAUX sont admis)."""
         liste = ["o1", "o2", "o3", "o4"]
         self.poser({**{f"o2-j{chr(97 + k)}.tete": tete("o2", "j" + chr(97 + k)) for k in range(16)},
-                    "o3-pool.tete": tete("o3"), "o1-pool.tete": tete("o1")})
+                    "o3-pool.tete": tete("o3"), "o3-secondaire.tete": tete("o3", "secondaire"),   # C-9 de la G2
+                    "o1-pool.tete": tete("o1")})
         sans, avec = tetes.Depot(self.d, "o1").lire(), tetes.Depot(self.d, "o1", liste=liste).lire()
         self.assertEqual((tete("o3") in sans["tetes"], avec["tetes"], avec["refus"], avec["ignores"]), (
-            False, [tete("o3")], [[f"o2-j{chr(97 + k)}.tete", "TETES/journal"] for k in range(16)], 0))
+            False, [tete("o3"), tete("o3", "secondaire")], [[f"o2-j{chr(97 + k)}.tete", "TETES/journal"] for k in
+                                                                range(16)], 0))
         tetes.jeton(self.d, "o1", "2026-10-05", 1, liste=liste)
         self.assertEqual([(x["observateur"], x["journal"]) for x in json.loads(pathlib.Path(
-            self.d, "o1-2026-10-05.manifeste").read_bytes())["tetes"]], [("o1", "pool"), ("o3", "pool")])
+            self.d, "o1-2026-10-05.manifeste").read_bytes())["tetes"]], [("o1", "pool"), ("o3", "pool"), ("o3",
+                                                                                   "secondaire")])
         self.assertEqual((tetes.JOURNAUX, set(entree.FICHIERS), len(liste) * len(tetes.JOURNAUX) <= tetes.NOMBRE),
                          (("pool", "secondaire"), {"pool", "secondaire"}, True))
 

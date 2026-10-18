@@ -3434,6 +3434,11 @@ l'observateur, journaux élargis ; refus retiré, mal codé, non borné ; reste 
 lecture ; FORMAT ; plancher). Suite : 444 tests ; plancher du job : 444, égalité exigée. Compte de R-25 : 45 lignes de
 code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-9 de la G2 du lot (2026-10-18 ; test seul) : une tête valide du journal `secondaire` d'un observateur de la
+liste est lue, à l'enregistrement `tetes` comme au manifeste du jeton : le mutant T-01 de la G2 (JOURNAUX réduit à
+`pool` dans le filtre) vivait sur C-8, aucun cas n'ayant une tête `secondaire`. Suite : 444 tests, plancher inchangé.
+Compte de R-25 : 8 lignes de code ajoutées (`.py`) ; hors compte : METRIQUES.
+
 ## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
 
 Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD
