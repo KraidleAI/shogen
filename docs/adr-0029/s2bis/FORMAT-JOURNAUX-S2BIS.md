@@ -1059,4 +1059,8 @@ commande séparée, qui écrit les octets dans un fichier sans rien imprimer »)
    des octets de chaque fichier listé est recontrôlé (écart, ou fichier absent : refus `somme`) ; un fichier du plan
    présent mais non listé est refusé (`fichier` : jamais écrasé, il se retire à la main). Les formes listées sont
    sautées, leur statut compte au code de sortie ; les lectures restantes, dans l'ordre du plan, sont faites et
-   ajoutées au manifeste. Sans `--reprise`, la commande est celle des points 1 à 4.
+   ajoutées au manifeste. Le manifeste et chaque fichier listé sont ouverts sans suivre de lien ni attendre
+   (`O_NOFOLLOW`, `O_NONBLOCK`), fichier ordinaire exigé : un lien ou un tube nommé à leur nom est le refus
+   `manifeste` (manifeste) ou `somme` (fichier listé) ; le manifeste est rouvert en ajout (`O_APPEND`), seule
+   exception à la création exclusive du point 3 : rien n'est lu ni écrit hors du dossier (correction C-4 de la G2
+   du lot). Sans `--reprise`, la commande est celle des points 1 à 4.

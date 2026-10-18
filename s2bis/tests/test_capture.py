@@ -15,6 +15,7 @@ from shogen_s2bis.collecte.lecture import Lecture
 from tests.test_entree import configurations
 from tests.test_secondaire import carte, fichiers
 from tests.test_smoke import CARTE, PIECES, POOL, forme, lire
+from tests.test_tetes import sans_attente
 
 SHA = {"binance_btc": "880903276bc688eecfb02e8b5e30f60c6a195dda6c372bce445063f8621f61f5",
        "binance_usdc": "17397032db28cad708617e8a1ee480dfa6a27ed10cb35a993bc0a7411d1bb5cc",
@@ -141,7 +142,9 @@ class Capture(unittest.TestCase):
     def test_reprise_apres_une_capture_coupee(self):              # GEL-4 ; SHOGEN-S2BIS-CAPTURE-PARTIELLE-1
         """Capture coupée à la troisième lecture : deux fichiers et leurs deux lignes, écrites au fil ; relance sans
         `reprise` : refus `fichier` ; `reprise` : sommes recontrôlées, les deux formes listées sautées, les trois
-        autres lues et ajoutées ; code 1 : le témoin listé en panne compte."""
+        autres lues et ajoutées ; code 1 : le témoin listé en panne compte. C-4 de la G2 du lot : coupée à la première
+        lecture, le manifeste est vide et la reprise lit tout (R-07) ; la carte listée en panne ne compte pas au code
+        (R-06)."""
         delai = Lecture("panne_transport", 7, 10_000_007, sous_type="delai")
         with self.assertRaises(OSError):
             self.capturer(coupe=3, okx_usdc_usdt=delai)
@@ -160,11 +163,22 @@ class Capture(unittest.TestCase):
             f"pool-binance-usdc.bin {SHA['binance_usdc']} ok 200 1001",
             f"temoin-curve-usdc-usdt.bin {SHA['curve_usdc_usdt']} ok 200 1002",
             f"carte-kraken-eth.bin {SHA['kraken_eth']} ok 200 1003"])
+        self.setUp()                                                    # C-4 de la G2 (R-07) : manifeste vide
+        with self.assertRaises(OSError):
+            self.capturer(coupe=1)
+        self.assertEqual((self.lu("captures.txt"), sorted(os.listdir(self.d))), (b"", ["captures.txt"]))
+        self.assertEqual((self.capturer(reprise=True), self.lu("captures.txt").count(b"\n")), ((0, "", ""), 5))
+        self.setUp()                                                    # C-4 de la G2 (R-06) : carte listée en panne
+        self.assertEqual(self.capturer(kraken_eth=delai)[0], 0)
+        self.appels = []
+        self.assertEqual((self.capturer(reprise=True), self.appels), ((0, "", ""), []))
 
     def test_reprise_refusee_avant_toute_lecture(self):           # GEL-4
         """États écrits à la main : manifeste absent, ligne coupée, à quatre champs, d'un fichier hors du plan ou
         répétée (`manifeste`) ; fichier listé altéré ou absent (`somme`) ; fichier présent non listé (`fichier`).
-        Aucune lecture, rien d'écrit."""
+        Aucune lecture, rien d'écrit. C-4 de la G2 du lot : un lien (vers un fichier valide hors du dossier) ou un tube
+        nommé au nom du manifeste (`manifeste`) ou d'un fichier listé (`somme`), ou un lien posé au nom du manifeste
+        après sa lecture (course) : refus, sans attente, rien d'écrit hors du dossier."""
         ligne = f"pool-binance-btc.bin {SHA['binance_btc']} ok 200 1001\n"
         btc = lire(PIECES["binance_btc"])
         cas = [(None, {"pool-binance-btc.bin": btc}, "manifeste"), (ligne[:-1], {"pool-binance-btc.bin": btc},
@@ -173,6 +187,8 @@ class Capture(unittest.TestCase):
                (ligne.replace("pool-binance-btc", "pool-autre"), {"pool-autre.bin": btc}, "manifeste"),
                (ligne * 2, {"pool-binance-btc.bin": btc}, "manifeste"),
                (ligne, {"pool-binance-btc.bin": b"x"}, "somme"), (ligne, {}, "somme"),
+               (ligne.replace(SHA["binance_btc"], SHA["binance_btc"][:-1] + "0"), {"pool-binance-btc.bin": btc},
+                "somme"),                                       # C-4 de la G2 (R-05) : somme du manifeste altérée
                (ligne, {"pool-binance-btc.bin": btc, "temoin-okx-usdc-usdt.bin": b""}, "fichier")]
         for manifeste, fichiers_, motif in cas:
             self.setUp()
@@ -188,6 +204,45 @@ class Capture(unittest.TestCase):
                     self.capturer(reprise=True)
                 self.assertEqual((str(e.exception).split(" : ")[0], self.appels, {n: self.lu(n) for n in os.listdir(
                     self.d)}), (motif, [], avant))
+        dehors = tempfile.TemporaryDirectory()                        # C-4 de la G2 : liens et tubes nommés
+        self.addCleanup(dehors.cleanup)
+        cible = os.path.join(dehors.name, "cible")
+        for nom, sorte, motif in (("captures.txt", "lien", "manifeste"), ("pool-binance-btc.bin", "lien", "somme"),
+                                  ("captures.txt", "tube", "manifeste"), ("pool-binance-btc.bin", "tube", "somme")):
+            self.setUp()
+            for n, octets in (("captures.txt", ligne.encode()), ("pool-binance-btc.bin", btc)):
+                with open(cible if n == nom else os.path.join(self.d, n), "wb") as f:
+                    f.write(octets)                       # le lien mène à un état valide : suivi, il serait admis
+            (os.symlink(cible, os.path.join(self.d, nom)) if sorte == "lien" else os.mkfifo(os.path.join(self.d, nom)))
+            with self.subTest(nom=nom, sorte=sorte):
+                with open(cible, "rb") as f:
+                    octets = f.read()
+                lu = sans_attente(self.refus_reprise)            # `bloqué` si l'ouverture attend plus de 2 s
+                with open(cible, "rb") as f:
+                    self.assertEqual((lu, self.appels, f.read()), (motif, [], octets))
+        self.setUp()                                     # C-4 de la G2 (K-08) : lien posé après la lecture du manifeste
+        for n, octets in (("captures.txt", ligne.encode()), ("pool-binance-btc.bin", btc), (cible, b"")):
+            with open(os.path.join(self.d, n), "wb") as f:
+                f.write(octets)
+        lire_listes = capture._listes
+
+        def puis_lien(dossier, noms):
+            lus = lire_listes(dossier, noms)
+            os.remove(os.path.join(dossier, "captures.txt"))
+            os.symlink(cible, os.path.join(dossier, "captures.txt"))
+            return lus
+        with mock.patch.object(capture, "_listes", puis_lien):
+            lu = self.refus_reprise()
+        with open(cible, "rb") as f:
+            self.assertEqual((lu, self.appels, f.read()), ("manifeste", [], b""))
+
+    def refus_reprise(self):
+        """Motif du refus de la reprise (C-4 de la G2), ou None si elle n'est pas refusée."""
+        try:
+            self.capturer(reprise=True)
+        except capture.CaptureRefusee as e:
+            return str(e).split(" : ")[0]
+        return None
 
     def test_commande_capture_rien_sur_la_sortie(self):
         """`capture --formes F [--carte C] --dossier D` : sortie 0 et rien d'imprimé ; refus (dossier absent) : 2,

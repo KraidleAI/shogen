@@ -3308,6 +3308,20 @@ a été réécrit et rejoué (tué).
 Suite : 436 tests ; plancher du job : 436, égalité exigée (`--egal`). Compte de R-25 : 148 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-4 de la G2 du lot (2026-10-18 ; diff distinct après GEL-9 : GEL-4 et C-4 ensemble passeraient 200 lignes,
+R-25) : à la reprise, le manifeste et chaque fichier listé sont ouverts sans suivre de lien ni attendre (`_ordinaire` :
+`O_NOFOLLOW`, `O_NONBLOCK`, fichier ordinaire exigé), le manifeste en ajout (`O_APPEND`) : un lien au nom du manifeste
+faisait écrire les lignes de la reprise hors du dossier, et un tube nommé bloquait la commande (limite déclarée par le
+générateur). Tests : liens et tubes au nom du manifeste ou d'un fichier listé (refus `manifeste` ou `somme`, sans
+attente, rien d'écrit hors du dossier) ; somme du manifeste altérée au dernier chiffre ; lien posé entre la lecture du
+manifeste et son ajout ; capture coupée à la première lecture (manifeste vide) puis reprise entière ; carte listée en
+panne, hors du code (mutants R-05, R-06 et R-07 de la G2, vivants sur GEL-4). FORMAT §19.5. Rouge, sur le code de la
+série : 5 FAIL (deux liens admis, deux tubes `bloqué`, le lien posé après la lecture suivi) et 1 FAIL du FORMAT. Mutants
+(même outil, même commande) : 8 (K-05 à K-12), 8 tués, après un premier passage où K-08 (ajout par le chemin, lien
+suivi) vivait : le lien était refusé dès la lecture du manifeste ; cas de course ajouté (lien posé entre la lecture et
+l'ajout), campagne rejouée. Suite : 442 tests, plancher inchangé. Compte de R-25 : 82 lignes de code ajoutées (`.py`) ;
+hors compte : FORMAT, METRIQUES.
+
 ## GEL-5 (2026-10-18) : bloc du témoin, requête JSON-RPC groupée encadrée (SHOGEN-S2BIS-TEMOIN-BLOC-1 ; FORMAT §9.1)
 
 Objet (avis de l'advisor du lot, Q-B, option 2 encadrée, adopté) : le corps d'Uniswap et de Curve (`decodeurs.CORPS`,
