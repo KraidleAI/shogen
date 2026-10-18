@@ -13,6 +13,7 @@ import unittest
 from shogen_s2bis.collecte import decodeurs, entree, journal
 from shogen_s2bis.collecte.lecture import S, Lecture
 from shogen_s2bis.recalc import fusion
+from tests.test_reprise import ligne
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = os.path.join(RACINE, "config")
@@ -290,3 +291,37 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
                                                                                          "seq"} for x in o1["trous"]],
                           o1["demarrage"], m(5) in vues), ([{"ws": m(5), "suivante": m(2), "queue": None}], [
                               {"de": m(2), "a": m(5), "cause": "arret"}], True, False))
+
+    def test_refus_du_flux(self):
+        """Forme hors configuration, champ de `lecture` manquant, forme ou `sante` deux fois dans une fenêtre, ws en
+        recul (lignes écrites ici, l'écrivain le refusant), tête changée entre les deux passes : refus nommés."""
+        class Sans:                                         # lecture sans `phases`
+            def enregistrement(self):
+                return {k: v for k, v in ok("binance_btc", m(1)).enregistrement().items() if k != "phases"}
+        rp = self.obs.run_params("o1", "pool")
+        lignes, prec = [], "0" * 64
+        for e in ({"type": "ouverture", "jour": "2026-10-04", "suivante": m(1)}, {"type": "run_params", "ws": m(1),
+                  **rp}, {"type": "sante", "ws": m(2)}, {"type": "sante", "ws": m(1)}):
+            lignes.append(ligne(len(lignes), prec, **e))
+            prec = hashlib.sha256(lignes[-1]).hexdigest()
+        for code, fenetres, lire in (("FUSION/forme", [(m(1), [("inconnue", "binance_btc")])], ok),
+                                     ("FUSION/lecture", [(m(1), BTC[:1])], lambda x, ws: Sans()),
+                                     ("FUSION/double", [(m(1), BTC[:1] * 2)], ok),
+                                     ("FUSION/double", [(m(1), [])], None), ("FUSION/ordre", None, None)):
+            with self.subTest(code=code):
+                obs = Observateurs(tempfile.mkdtemp(dir=self.base))
+                d = obs.quatre(fenetres={("o1", "pool"): fenetres or ()}, lire=lire)
+                if lire is None:
+                    os.remove(os.path.join(d["o1"], "pool-2026-10-04-0.jsonl"))
+                    with open(os.path.join(d["o1"], "pool-2026-10-04-0.jsonl"), "wb") as f:
+                        f.write(b"".join(lignes) if fenetres is None else b"".join(lignes[:3]) + ligne(
+                            3, hashlib.sha256(lignes[2]).hexdigest(), type="sante", ws=m(2)))
+                with self.assertRaises(fusion.RefusFusion) as e:
+                    list(fusion.Fusion(d, CONFIG, COMMIT).fenetres())
+                self.assertEqual(e.exception.code, code)
+        d = self.obs.quatre()
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        self.obs.ecrire("o3", "secondaire", m(4))
+        with self.assertRaises(fusion.RefusFusion) as e:
+            list(f.fenetres())
+        self.assertEqual(e.exception.code, "FUSION/relecture")

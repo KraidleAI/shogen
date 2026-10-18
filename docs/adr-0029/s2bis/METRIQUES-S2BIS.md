@@ -3661,3 +3661,24 @@ enregistrements perdus ; plancher.
 
 Suite : 455 tests ; plancher du job : 455, égalité exigée (`--egal`). Compte de R-25 : 180 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-e (2026-10-18) : refus nommés du flux (ordre, relecture, lecture, forme, doubles)
+
+Objet : en passe 2, `ws` en recul dans un journal (FORMAT §3.2, impossible par l'écrivain de référence ; Q-RB2-7) :
+`FUSION/ordre` ; tête de la relecture autre que celle de la passe 1 : `FUSION/relecture` (Q-RB2-5) ; `lecture` aux
+champs propres autres que ceux du FORMAT §9.1 et §11.2 : `FUSION/lecture` ; forme hors de la configuration :
+`FUSION/forme` ; forme ou `sante` deux fois dans une fenêtre : `FUSION/double` (Q-RB2-8).
+
+Rouge : sur le code de RB2-d : 5 FAIL (sous-cas de refus non levés), 1 ERROR (forme inconnue : `KeyError`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 174 | — |
+| `tests/test_fusion.py` | 327 | 9 (1 de plus : `test_refus_du_flux`) |
+
+Mutants (même commande, même outil) : 10 classés, 10 tués, 0 vivant, 0 FATAL : ordre non contrôlé ; recul sauté en
+silence ; relecture non contrôlée ; relecture comparée à l'autre journal ; champ manquant admis ; forme inconnue admise
+; codes permutés ; forme double admise ; `sante` double admise ; plancher.
+
+Suite : 456 tests ; plancher du job : 456, égalité exigée (`--egal`). Compte de R-25 : 54 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

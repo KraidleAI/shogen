@@ -24,6 +24,8 @@ CONFIGS = ("formes", "sante", "observateurs", "carte")  # fichiers du paquet (s2
 SCELLES = {"pool": ("formes", "sante", "observateurs"), "secondaire": ("formes", "carte")}      # FORMAT §14.4, §15.6
 PORTEUSES = ("commit", "sha256", "descripteur")         # clés porteuses avec SCELLES ; `python` non porteuse (Q-RB2-2)
 STRUCTURE = ("type", "seq", "prec", "ws")               # champs communs, hors des champs propres
+LECTURE = ("forme", "prevu", "statut", "sous_type", "code", "depart", "fin", "phases", "adresse", "brut", "sha256",
+           "valeurs")                                   # champs propres exacts d'une `lecture` (FORMAT §9.1, §11.2)
 ENSEMBLE = {"pool": "pool", "secondaire": "carte"}      # ensemble des lectures de chaque journal
 ATTENTE = ("ruptures", "trous", "reprises")             # rattachés à la fenêtre qui les suit
 
@@ -120,8 +122,9 @@ class Fusion:
             yield ws, par
 
     def _flux(self, o, j):
-        """(ws, o, j, fenêtre) du journal `j` de `o` par ws croissant (FORMAT §3.2) ; ruptures, `trou` et `reprise`
-        rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit."""
+        """(ws, o, j, fenêtre) du journal `j` de `o` par ws croissant (FORMAT §3.2 ; sinon FUSION/ordre, Q-RB2-7) ;
+        ruptures, `trou` et `reprise` rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit ; tête
+        de la relecture égale à celle de la passe 1, sinon FUSION/relecture (Q-RB2-5)."""
         lec, f, attente = Lecteur(self.dossiers[o], j), None, {k: [] for k in ATTENTE}
         for genre, *x in lec:
             if genre == "rupture":
@@ -133,6 +136,8 @@ class Fusion:
             if e["type"] in RESERVES - {"marqueur"}:
                 continue
             if f is not None and e["ws"] != f["ws"]:
+                if e["ws"] < f["ws"]:
+                    raise RefusFusion("FUSION/ordre", f"{o}/{j}, seq {e['seq']} : ws {e['ws']} après {f['ws']}")
                 yield f["ws"], o, j, f
                 f = None
             f = f or fenetre(e["ws"])
@@ -142,18 +147,26 @@ class Fusion:
             self._ranger(o, j, f, e)
         if f is not None:
             yield f["ws"], o, j, f
+        if lec.tete != self.tetes[o, j]:
+            raise RefusFusion("FUSION/relecture", f"{o}/{j} : tête {lec.tete}, {self.tetes[o, j]} en passe 1")
         self.integrite[o, j] = {"tete": lec.tete, "ruptures": lec.ruptures, "queues": lec.queues,
                                 "queue_finale": lec.queue_finale}
 
     def _ranger(self, o, j, f, e):
-        """Range l'enregistrement de fenêtre `e` dans `f`, chaque `lecture` sous sa forme, avec l'hôte et le décodeur
-        de sa forme (formes.json, carte.json)."""
+        """Range l'enregistrement de fenêtre `e` dans `f` ; `lecture` aux champs exacts (FUSION/lecture), de forme
+        configurée (FUSION/forme) ; une forme ou une `sante` deux fois dans la fenêtre : FUSION/double."""
         t, c, ou = e["type"], champs(e), f"{o}/{j}, seq {e['seq']}"
         if t == "lecture":
-            x = self.formes[j][c["forme"]]
+            x = self.formes[j].get(c.get("forme")) if type(c.get("forme")) is str else None
+            if sorted(c) != sorted(LECTURE) or x is None:
+                raise RefusFusion("FUSION/lecture" if x else "FUSION/forme", f"{ou} : {sorted(c)}")
+            if c["forme"] in f[ENSEMBLE[j]]:
+                raise RefusFusion("FUSION/double", f"{ou} : {c['forme']}")
             f[ENSEMBLE[j]][c["forme"]] = {**{k: v for k, v in c.items() if k not in ("forme", "brut")},
                                           "hote": x["hote"], "decodeur": x["decodeur"]}
         elif t == "sante":
+            if f["sante"] is not None:
+                raise RefusFusion("FUSION/double", f"{ou} : sante")
             f["sante"] = c
         elif t in ("marqueur", "run_params"):
             f["marqueur" if t == "marqueur" else "demarrage"] = True
