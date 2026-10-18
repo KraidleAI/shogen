@@ -79,6 +79,9 @@
   le diff CB-16a écrit le smoke sans prix (`smoke.py`), le diff CB-16b sa commande (§18) ; le diff INT-P2-15 verse
   les formes du témoin dans `formes-pool.json` (§14.1) ; le diff INT-P2-16 écrit la commande `capture` (§19) ;
   le diff INT-P2-17 (C-1 de la G2 de la série) fige son ouverture exclusive (§19).
+- **Gel du collecteur** (2026-10-17 ; lot GEL-COLLECTEUR-1, Q-C-06 du G0) : le diff GEL-1 scelle `formes.json` de
+  production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -656,14 +659,17 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      lues sur chaîne (Chainlink, toute forme de la classe `oracle_chainlink` comprise, Uniswap, Curve), chaque unité a
      un seul hôte et chaque hôte une seule unité. L'hôte RPC n'est écrit que dans `formes.json`, jamais dans le code
      des décodeurs.
-     Les formes du pool, une par lecture, sont versées à part (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) :
-     `s2bis/config/formes-pool.json`, contrôlé par les règles de forme ci-dessus ; les huit flux BTC gardés
+     Les formes du pool et du témoin, une par lecture, et les paramètres de la boucle sont scellés au gel du collecteur
+     (diff GEL-1 ; Q-5 de P2C ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1) dans `s2bis/config/formes.json`, contrôlé par le
+     schéma et toutes les règles ci-dessus : les formes de `formes-pool.json` (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) y
+     sont fondues dans leur ordre, et ce fichier est supprimé ; les huit flux BTC gardés
      reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
      les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
      autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
-     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent ;
-     les autres champs de `formes.json` (`w`, `delta`, `tolerance`, `delai`, `marge`, `places`) restent à sceller
-     au gel du collecteur (SHOGEN-S2BIS-CONFIG-PRODUCTION-1).
+     de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent.
+     Valeurs scellées : `w` 60 (ADR-0029 l.88), `delta` 20 000 000 µs et `delai` 10 000 000 µs (l.233), `tolerance`
+     5 000 000 µs (D-2, l.107), `marge` 1 000 000 µs (échéance à ws + w − 1 s, l.233), `places` 40 (33 formes et
+     sept places de marge, décision de l'orchestrateur) ; `test_formes_pool` lie chaque valeur à sa ligne de l'ADR.
      `tolerance` est la tolérance de départ de D-2 : 5 s en production (ADR-0029 l.107, reformulée par l'ajout daté
      du 2026-10-04 17:03:38 UTC au §6 : « plus de 5 s après son instant planifié »). Règle `budget` (budget de
      l'ADR-0029 l.233-234 ; CB-18g, C-1 de la G2 de la tranche C) : `tolerance` + plus grand décalage du plan +

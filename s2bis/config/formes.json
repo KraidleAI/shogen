@@ -1,4 +1,5 @@
-{"formes": [
+{"w": 60, "delta": 20000000, "tolerance": 5000000, "delai": 10000000, "marge": 1000000, "places": 40,
+ "formes": [
  {"nom": "binance_btc", "hote": "api.binance.com", "port": 443, "chemin": "/api/v3/ticker/price?symbol=BTCUSDT", "methode": "GET", "corps": "", "espace": true, "decodeur": "binance_btc"},
  {"nom": "coinbase_btc", "hote": "api.exchange.coinbase.com", "port": 443, "chemin": "/products/BTC-USD/ticker", "methode": "GET", "corps": "", "espace": true, "decodeur": "coinbase_btc"},
  {"nom": "kraken_btc", "hote": "api.kraken.com", "port": 443, "chemin": "/0/public/Ticker?pair=XBTUSD", "methode": "GET", "corps": "", "espace": true, "decodeur": "kraken_btc"},

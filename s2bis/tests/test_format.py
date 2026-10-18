@@ -199,7 +199,7 @@ class Format(unittest.TestCase):
         attendus = ["n'a de décodeur", "SHOGEN-S2BIS-DECODEURS-TYPES-1", "binance (`ETHUSDT`) et okx (`ETH-USDT`)",
                     "rend la lecture entière `panne_decode`", "au plus un relevé par actif, donc quatre",
                     "le collecteur ne l'applique jamais"]
-        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes-pool.json`" in sections[
+        self.assertEqual([x in sections["9"] for x in attendus] + ["`s2bis/config/formes.json`" in sections[
             "14"]], [True] * 7)
         self.assertEqual([(all(f"CB-{d}" in p for d in ("7a", "7b", "7c", "8a", "8b", "8c")), "DECODEURS-TYPES-1" in p,
                            "FORMES-BTC-1" in p) for p in puces if p.startswith("**Partie P2, tranche C**")],
@@ -284,11 +284,16 @@ class Format(unittest.TestCase):
             "**Partie P2, intégration**")], [True])
 
     def test_paragraphe_14_formes_du_temoin(self):                  # INT-P2-15 (Q-1 adjugée)
-        """§14.1 : les trois formes du témoin dans `formes-pool.json`, avec leurs hôtes RPC ; puce de l'intégration."""
+        """§14.1 : les trois formes du témoin dans `formes.json`, avec leurs hôtes RPC ; puce de l'intégration. GEL-1 :
+        formes et paramètres scellés au gel, valeurs et lignes de l'ADR ; puce du gel."""
         puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
         self.assertEqual([x in sections["14"] for x in ("les trois formes du témoin", "`eth.drpc.org`",
                                                         "`rpc.mevblocker.io`")], [True] * 3)
         self.assertEqual([("INT-P2-15" in p) for p in puces if p.startswith("**Partie P2, intégration**")], [True])
+        gel = ("sont scellés au gel du collecteur", "`w` 60 (ADR-0029 l.88)", "`places` 40", "versées à part")
+        self.assertEqual([x in sections["14"] for x in gel], [True] * 3 + [False])
+        self.assertEqual([("GEL-1" in p and "CONFIG-PRODUCTION-1" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True])
 
     def test_paragraphe_19_capture(self):                           # INT-P2-16 (Q-5 adjugée)
         """§19 : commande, refus, fichiers et manifeste, rien d'imprimé ; puce de l'intégration."""

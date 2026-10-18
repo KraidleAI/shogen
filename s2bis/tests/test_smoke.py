@@ -137,7 +137,7 @@ class Smoke(unittest.TestCase):
 
 class Pool(unittest.TestCase):                                     # INT-P2-15 (Q-1 adjugée) ; E-C-37
     def test_formes_du_pool_et_du_temoin_lues_et_decodees(self):
-        """Smoke sur les 33 formes de `config/formes-pool.json`, chacune servie par la fixture de son décodeur : toutes
+        """Smoke sur les 33 formes de `config/formes.json`, chacune servie par la fixture de son décodeur : toutes
         lues et décodées, rôle `temoin` pour les trois formes du témoin et elles seules, code 0."""
         f, lignes = formes_pool(), []
         par = {(x["hote"], x["chemin"], x["corps"]): x["decodeur"] for x in f}

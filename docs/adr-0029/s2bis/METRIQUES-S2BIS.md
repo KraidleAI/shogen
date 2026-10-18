@@ -3203,3 +3203,31 @@ Le contexte `ssl.create_default_context()` laissait la version minimale au défa
 `TLSVersion.TLSv1_2`, ce que l'ADR-0015 pt 5 admet (TLS 1.2 accepté par le pool, mesure du 2026-08-13) ; TLS 1.0 et
 1.1 refusées par construction, la version maximale reste celle de la bibliothèque. Suite : 432 tests ; plancher du job :
 432, égalité exigée (`--egal`). Compte de R-25 : 12 lignes de code ajoutées (`.py`, `.yml`).
+
+## GEL-1 (2026-10-17) : `formes.json` de production, formes fondues et paramètres scellés (Q-5 de P2C ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet (lot GEL-COLLECTEUR-1, gel du collecteur, Q-C-06 du G0) : `s2bis/config/formes.json` remplace
+`formes-pool.json` (supprimé) : les 33 formes dans leur ordre, puis les paramètres de la boucle, `w` 60 (ADR-0029
+l.88), `delta` 20 000 000 µs et `delai` 10 000 000 µs (l.233), `tolerance` 5 000 000 µs (l.107), `marge`
+1 000 000 µs (l.233), `places` 40 (sept places de marge, décision de l'orchestrateur). `test_formes_pool` charge le
+fichier par le schéma et toutes les règles de `entree`, fige l'ordre des formes, lie chaque valeur à sa ligne de
+l'ADR (constantes littérales commentées, texte des lignes cherché dans l'ADR), le budget à l'égalité (5 + 4 + 10 + 1
+= 20 s) et passe le fichier à `entree.configurer`. FORMAT §14.1 (« scellées au gel ») et puce « Gel du collecteur ».
+
+Rouge : sur un squelette (`formes.json` aux formes de `formes-pool.json` et à des paramètres de remplissage,
+`formes-pool.json` présent, FORMAT inchangé), 4 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes.json` | 36 | données, 33 formes et six paramètres |
+| `tests/test_formes_pool.py` | 154 | 7 (1 de plus : valeurs scellées liées à l'ADR) |
+| `tests/test_smoke.py` | 214 | 6 (inchangé) |
+| `tests/test_format.py` | 362 | 23 (inchangé : §14.1 du gel ajouté au test de INT-P2-15) |
+
+Mutants (`scripts/controle/mutants.py`, commande du job `s2bis-unittest`, borne de 300 s) : 11 mutants, 11 tués par
+leur test visé, 0 vivant, 0 FATAL compté : `w`, `delta`, `tolerance`, `delai`, `marge` et `places` changés ; une forme
+renommée ; deux formes permutées ; FORMAT (`places`, puce) ; plancher. Un premier mutant de la puce, au texte avant
+absent (FATAL, inapplicable), a été réécrit et rejoué (tué).
+
+Suite : 433 tests ; plancher du job : 433, égalité exigée (`--egal`). Compte de R-25 : 61 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `formes.json` (données), FORMAT, METRIQUES.
