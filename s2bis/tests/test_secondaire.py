@@ -67,10 +67,10 @@ class Secondaire(Base):
             self.etat()["secondaire-2026-10-04-0.jsonl"])[2])[1:]]
 
     def test_tete_du_secondaire_exportee_au_point(self):             # C-10 ; SHOGEN-S2BIS-TETE-SECONDAIRE-1
-        """Avec un dépôt, la fenêtre qui clôt l'heure (m(1), `22:59`) : la tête du point du journal `secondaire` est
-        exportée en `o1-secondaire.tete` (seq du point, sha256 pris au `prec` qui le suit, comme au pool) ; aucun
-        enregistrement `tetes` au journal du secondaire (il reste au pool) ; `lire_tetes` la lit sous la liste
-        fermée."""
+        """Avec un dépôt, la fenêtre qui clôt l'heure (m(1), 2026-10-04 22:59 UTC) : la tête du point du journal
+        `secondaire` est exportée en `o1-secondaire.tete` (seq du point, sha256 pris au `prec` qui le suit, comme au
+        pool) ; aucun enregistrement `tetes` au journal du secondaire (il reste au pool) ; `lire_tetes` la lit sous
+        la liste fermée."""
         dep = tempfile.TemporaryDirectory()
         self.addCleanup(dep.cleanup)
         t = Temps(m(0) * S + 5 * S)

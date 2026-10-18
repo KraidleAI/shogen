@@ -3533,6 +3533,10 @@ option non transmise ; export retiré ; défaut de `consigner` inversé ; FORMAT
 Suite : 446 tests ; plancher du job : 446, égalité exigée (`--egal`). Compte de R-25 : 60 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-12 de la G2 du lot (2026-10-18 ; docstring de test seule) : l'heure de la fenêtre de
+`test_tete_du_secondaire_exportee_au_point` porte sa date (`m(1)`, 2026-10-04 22:59 UTC). Suite et plancher
+inchangés (446) ; aucune ligne de code ajoutée hors docstring.
+
 ## C-11 (2026-10-18) : `test_carte_pendue_ou_refusee_le_pool_intact` déterministe (I-7 de la G2 du lot de gel)
 
 Objet (tests seuls) : le test d'isolement, qui faisait tourner trois processus à w = 1 s en temps réel (faux rouge
