@@ -16,7 +16,9 @@ de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/
 `.tsr` de l'observateur. CB-15f : au dépôt, seuls des fichiers ordinaires sont lus, ouverts sans attente (un tube nommé
 ne bloque ni la boucle ni une commande) ; l'écriture ne suit aucun lien ; au `tetes`, avec le `.tsr`, les sha256 de son
 manifeste et de sa requête (C-5). GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : avec la liste fermée, les têtes d'un nom
-hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`)."""
+hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`). C-3 de la G2
+du lot : la liste filtre les noms avant la borne NOMBRE ; une tête hors de la liste n'est pas lue et n'en évince
+aucune de la liste."""
 import contextlib
 import hashlib
 import http.client
@@ -255,12 +257,14 @@ class Depot:
         return r
 
 
-def lire_tetes(dossier, exclure=None, propre=None):
+def lire_tetes(dossier, exclure=None, propre=None, liste=None):
     """(têtes valides, refus [nom, code], fichiers au-delà des bornes) des fichiers de tête de `dossier`, sauf celui de
     `exclure` (observateur, journal), dans l'ordre des noms : ceux de l'observateur `propre` d'abord, hors de la borne
     des autres (C-2 ; AVIS Q-D-03 (1) : sa tête est ancrée quoi qu'il arrive au dépôt), NOMBRE au plus de chaque
-    sorte ; dossier illisible : OSError."""
-    noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure]
+    sorte ; `liste` (C-3 de la G2 du lot de gel) : seuls les noms de la liste, filtrés avant la borne ; dossier
+    illisible : OSError."""
+    noms = [(n, m) for n in sorted(os.listdir(dossier)) if (m := NOM.fullmatch(n)) and m.groups() != exclure and (
+        liste is None or m[1] in liste)]
     siens, autres = [x for x in noms if x[1][1] == propre], [x for x in noms if x[1][1] != propre]
     tetes, refus = [], []
     for n, m in siens[:NOMBRE] + autres[:NOMBRE]:
@@ -275,15 +279,15 @@ def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync, liste
     sans tête de l'observateur) et requête au `nonce`, écrits au dépôt ; sans `envoyer`, « non armé » ; armé,
     `envoyer(requête)` rend la réponse : conservée si son statut vaut 0 ou 1 et qu'elle est liée à la requête
     (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé. GEL-7 : `liste`, noms
-    admis au manifeste, les autres ajoutés à `ignores` ; `<observateur>-<jour>.armement` : {arme, jour, observateur,
-    tsa (`url`)}, écrit avec la requête."""
+    admis au manifeste, filtrés avant la borne de lecture (C-3 de la G2), les autres nommés dans `ignores` ;
+    `<observateur>-<jour>.armement` : {arme, jour, observateur, tsa (`url`)}, écrit avec la requête."""
     nom = os.path.join(dossier, f"{observateur}-{jour}")
     if os.path.exists(nom + ".tsr"):
         return "déjà émis", f"{observateur}-{jour}.tsr", empreinte(nom + ".tsr")
-    lues = lire_tetes(dossier, propre=observateur)[0]
+    lues = lire_tetes(dossier, propre=observateur, liste=liste)[0]
     if liste is not None:
-        (ignores if ignores is not None else []).extend(sorted({t["observateur"] for t in lues} - set(liste)))
-        lues = [t for t in lues if t["observateur"] in liste]
+        (ignores if ignores is not None else []).extend(sorted({x[1] for n in os.listdir(dossier) if (
+            x := NOM.fullmatch(n)) and x[1] not in liste}))
     if not any(t["observateur"] == observateur for t in lues):
         raise RefusJeton("JETON/tete", f"aucune tête de {observateur} au dépôt")
     m = manifeste(jour, observateur, lues)

@@ -383,7 +383,8 @@ class Jeton(unittest.TestCase):
     def test_jeton_liste_fermee_et_armement(self):                 # GEL-7 ; SHOGEN-S2BIS-OBSERVATEURS-LISTE-1
         """Liste fermée : la tête d'o9, valide, est ignorée et nommée, le manifeste est celui du dépôt sans elle (octets
         écrits à la main, en setUp) ; garde : sans liste, elle y entre. `.armement` : non armé, puis armé (ligne
-        canonique écrite à la main)."""
+        canonique écrite à la main). C-3 de la G2 du lot : seize têtes valides hors de la liste, triées avant `o2`, ne
+        l'évincent pas du manifeste (filtre avant la borne NOMBRE) ; garde : sans la liste, elles l'évincent."""
         pathlib.Path(self.d, "o9-pool.tete").write_bytes(ligne_tete(tete("o9")))
         ignores = []
         tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708, liste=["o1", "o2", "o3", "o4"], ignores=ignores)
@@ -394,6 +395,14 @@ class Jeton(unittest.TestCase):
                                                   url="https://tsa.essai/tsr")), "JETON/reponse")
         self.assertEqual(self.lu("o1-2026-10-07.armement"), b'{"arme":true,"jour":"2026-10-07","observateur":"o1",'
                                                             b'"tsa":"https://tsa.essai/tsr"}\n')
+        for i in range(tetes.NOMBRE):              # C-3 de la G2 du lot : seize têtes hors de la liste, avant `o2`
+            pathlib.Path(self.d, f"a{i:02d}-pool.tete").write_bytes(ligne_tete(tete(f"a{i:02d}")))
+        ignores = []
+        tetes.jeton(self.d, "o1", "2026-10-08", 0x0102030405060708, liste=["o1", "o2", "o3", "o4"], ignores=ignores)
+        self.assertEqual((ignores, self.lu("o1-2026-10-08.manifeste")), ([f"a{i:02d}" for i in range(16)] + ["o9"],
+                                                                         self.manifeste.replace(b"10-05", b"10-08")))
+        tetes.jeton(self.d, "o1", "2026-10-09", 1)                        # garde : sans la liste, o2 est évincée
+        self.assertNotIn(b'"o2"', self.lu("o1-2026-10-09.manifeste"))
 
     def test_jeton_refuse(self):
         """Sans tête de l'observateur au dépôt : JETON/tete, rien n'est écrit ; réponse de rejet : JETON/rejet, aucun
@@ -465,8 +474,9 @@ class Jeton(unittest.TestCase):
     def test_commande_jeton(self):
         """`jeton --descripteur D --depot P --jour J [--envoi URL]` : 0 et une ligne sur la sortie, envoi non armé ou
         jeton émis ; 1 et un refus nommé sur la sortie d'erreur ; 2 pour un descripteur ou un jour refusé. Nonce de 64
-        bits tiré à chaque requête (G-16, C-5) ; sans `tls=`, le contexte TLS du point d'entrée va à l'envoi, et une
-        URL http y est refusée (G-17)."""
+        bits tiré à chaque requête (G-16, C-5) ; sans `tls=`, le contexte TLS du point d'entrée va à l'envoi (G-17 ;
+        l'URL http, refusée par `envoyer` : test_envoi_http_vers_la_boucle_locale) ; GEL-7 : `--envoi` autre que la
+        TSA scellée, préfixe ou extension compris (C-3 de la G2 du lot), ou sans TSA scellée : CONFIG/tsa, sortie 2."""
         f, s, o = configurations(port_ferme())
         pathlib.Path(self.d, "descripteur.json").write_text(json.dumps(o), encoding="utf-8")
         args = ["jeton", "--descripteur", os.path.join(self.d, "descripteur.json"), "--depot", self.d,
@@ -498,6 +508,9 @@ class Jeton(unittest.TestCase):
                defaut=True, tsa="https://x/tsr")
         rc, out, err = lancer("--jour", "2026-10-07", "--envoi", "https://y/tsr", defaut=True, tsa="https://x/tsr")
         self.assertEqual((vus, rc, err.split(" : ")[:3]), ([entree.http.CONTEXTE], 2, ["jeton", "refus", "CONFIG/tsa"]))
+        self.assertEqual([lancer("--jour", "2026-10-07", "--envoi", u, tsa="https://x/tsr")[::2] for u in (
+            "https://x/ts", "https://x/tsr/", "https://x")], [(2, "jeton : refus : CONFIG/tsa : --envoi autre que "
+                                                           "la TSA scellée\n")] * 3)          # C-3 de la G2 (R-09)
         self.assertEqual([lancer("--jour", "2026-10-09", *e, tsa=None) for e in ((), ("--envoi", "https://x/tsr"))],
                          [(0, "jeton : non armé : o1-2026-10-09.tsq : sha256 " + hashlib.sha256(self.lu(
                              "o1-2026-10-09.tsq")).hexdigest() + "\n", ""),

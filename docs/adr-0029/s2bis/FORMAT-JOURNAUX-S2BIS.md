@@ -907,12 +907,14 @@ collecteur.
    `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
    <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
    jour refusé. **Liste fermée et armement** (diff GEL-7) : `--observateurs L` est exigée (§14.1) ; un `--envoi` est
-   refusé sans `tsa` scellée (au gel : C-1), ou s'il est autre que la `tsa` de la liste (`CONFIG/tsa`, sortie 2) :
-   `--envoi` reste le seul armement, et l'URL armée est celle de la configuration scellée ; les têtes d'un observateur hors de la liste sont ignorées (hors du manifeste)
-   et nommées sur une seconde ligne, `jeton : têtes ignorées (hors de la liste) : <noms>` ; avec le manifeste et la
+   refusé sans `tsa` scellée (au gel : correction C-1 du lot GEL-COLLECTEUR-1), ou s'il est autre que la `tsa` de la
+   liste (`CONFIG/tsa`, sortie 2) : `--envoi` reste le seul armement, et l'URL armée est celle de la configuration
+   scellée ; les têtes d'un observateur hors de la liste sont ignorées (hors du manifeste), filtrées par leur nom avant
+   la borne de lecture du point 5 (non lues, elles n'évincent aucune tête de la liste : correction C-3 de la G2 du
+   lot) et nommées sur une seconde ligne, `jeton : têtes ignorées (hors de la liste) : <noms>` ; avec le manifeste et la
    requête, la commande écrit au dépôt `<observateur>-<jour>.armement`, ligne canonique `{arme, jour, observateur,
-   tsa}` (`arme` vrai si et seulement si l'envoi est armé ; `tsa` : l'URL armée, ou null), par écriture atomique : l'état
-   d'armement du jour est lisible au dépôt.
+   tsa}` (`arme` vrai si et seulement si l'envoi est armé ; `tsa` : l'URL armée, ou null), par écriture atomique :
+   l'état d'armement du jour est lisible au dépôt.
 9. **Fichiers du dépôt** (CB-15f) : toute lecture au dépôt (têtes, `.tsr`, résumés du §17.6) ouvre le fichier sans
    attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire : un tube nommé, un dossier ou un périphérique au nom
    d'un fichier attendu ne bloque ni la boucle ni une commande ; il est le refus `TETES/lecture` (`RESUME/lecture`

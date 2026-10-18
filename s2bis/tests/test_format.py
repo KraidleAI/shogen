@@ -362,7 +362,8 @@ class Format(unittest.TestCase):
         self.assertEqual((tetes.TAILLE, tetes.NOMBRE, tetes.PLAFOND), (1024, 16, 65536))
         liste = ["**Liste fermée et armement**", "(`CONFIG/tsa`, sortie 2)", "sans `tsa` scellée",
                  "`<observateur>-<jour>.armement`", "`{arme, jour, observateur, tsa}`",
-                 "`jeton : têtes ignorées (hors de la liste) : <noms>`"]                                       # GEL-7
+                 "`jeton : têtes ignorées (hors de la liste) : <noms>`",                       # GEL-7
+                 "elles n'évincent aucune tête de la liste"]                           # C-3 de la G2 du lot
         puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
         self.assertEqual([x for x in liste if x not in seize] + [x for x in (
             "`s2bis/config/observateurs.json`", "`observateurs-quatre`", "`tsa-https`", "`CONFIG/observateur`",

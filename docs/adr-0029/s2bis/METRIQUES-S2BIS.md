@@ -3379,6 +3379,15 @@ inconnu ; règle `tsa-https` retirée ; TSA ajoutée à la configuration ; tête
 Suite : 440 tests ; plancher du job : 440, égalité exigée (`--egal`). Compte de R-25 : 173 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `observateurs.json`, FORMAT, METRIQUES.
 
+Correction C-3 de la G2 du lot (2026-10-18 ; diff distinct après GEL-9 : GEL-7 et C-3 ensemble passeraient 200 lignes,
+R-25) : la liste fermée filtre les noms des fichiers de tête avant la borne de lecture (`lire_tetes(…, liste)`, NOMBRE =
+16) : seize têtes valides d'un nom hors de la liste, triées avant `o2`, évinçaient sa tête du manifeste du jeton ; les
+noms ignorés sont ceux des fichiers de tête hors de la liste, non lus. Un `--envoi` préfixe, extension ou hôte seul de
+la TSA scellée est refusé (`CONFIG/tsa`) : le mutant R-09 de la G2 (comparaison par préfixe) vivait sur GEL-7. FORMAT
+§16.8 (remis à 120 colonnes, `C-1` qualifié). Rouge, sur le code de la série : 1 FAIL (`o2` absente du manifeste) et 1
+FAIL du FORMAT. Mutants (même outil, même commande) : 4 (K-01 à K-04), 4 tués. Suite : 442 tests, plancher inchangé.
+Compte de R-25 : 31 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
+
 ## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
 
 Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD
