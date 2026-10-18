@@ -181,13 +181,16 @@ class Depot(unittest.TestCase):
     def test_liste_fermee_avant_la_borne(self):                     # C-5 (I-1 de la G2 du lot de gel)
         """Dix-sept têtes de noms hors de la liste (a00 à a16), triées avant o2 : sans liste, la tête d'o2 est évincée
         par la borne de seize (garde : la fixture sépare) ; avec la liste, elles sont écartées avant la borne, nommées
-        au refus (`TETES/liste`, seize au plus, le reste compté aux `ignores`), et la tête d'o2 est lue."""
+        au refus (`TETES/liste`, seize au plus, le reste compté aux `ignores`), et la tête d'o2 est lue. C-7 de la G2 du
+        lot : dix-huit têtes d'o2 (journaux inventés) en plus : les deux débords s'ajoutent aux `ignores` (2 + 1)."""
         self.poser({**{f"a{k:02d}-pool.tete": tete(f"a{k:02d}") for k in range(17)}, "o2-pool.tete": tete("o2")})
         sans = tetes.Depot(self.d, "o1").lire()
         avec = tetes.Depot(self.d, "o1", liste=["o1", "o2", "o3", "o4"]).lire()
         self.assertEqual((tete("o2") in sans["tetes"], sans["ignores"]), (False, 2))
         self.assertEqual((avec["tetes"], avec["refus"], avec["ignores"]),
                          ([tete("o2")], [[f"a{k:02d}-pool.tete", "TETES/liste"] for k in range(16)], 1))
+        self.poser({f"o2-j{chr(97 + k)}.tete": tete("o2", "j" + chr(97 + k)) for k in range(17)})  # C-7 de la G2 (S-05)
+        self.assertEqual(tetes.Depot(self.d, "o1", liste=["o1", "o2", "o3", "o4"]).lire()["ignores"], 2 + 1)
 
     def test_export_atomique_a_chaque_point(self):
         """Ligne canonique {journal, observateur, seq, sha256, ws} (octets écrits à la main), écrite dans un fichier
@@ -300,7 +303,8 @@ class Branchement(Base):
         """`--depot` câble un dépôt au nom de l'observateur du descripteur, journal `pool` ; sans lui, aucun ; un nom
         d'observateur hors de `[a-z0-9]{1,16}` est refusé avant l'ouverture du journal (sortie 2). C-5 : `--depot`
         exige `--observateurs` ; la liste va au dépôt, le sha256 de ses octets et son contenu à `run_params` ; un
-        observateur hors de la liste est refusé (sortie 2)."""
+        observateur hors de la liste est refusé (sortie 2). C-7 de la G2 du lot : sans `--depot`, `--observateurs`
+        est contrôlée de même et portée à `run_params`."""
         obs = os.path.join(RACINE, "config", "observateurs.json")
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
@@ -325,6 +329,13 @@ class Branchement(Base):
         self.assertEqual((rp["sha256"]["observateurs"], rp["observateurs"]), (hashlib.sha256(pathlib.Path(
             obs).read_bytes()).hexdigest(), {"observateurs": ["o1", "o2", "o3", "o4"]}))
         self.assertEqual(lancer("o1"), (0, [None], ""))
+        self.assertEqual(lancer("o1", "--observateurs", obs), (0, [None], ""))    # C-7 de la G2 (S-03) : sans dépôt
+        lignes = [json.loads(x) for n in sorted(os.listdir(jdir)) for x in pathlib.Path(jdir, n).read_bytes(
+        ).splitlines()]
+        self.assertEqual([x for x in lignes if x["type"] == "run_params"][-1]["observateurs"],
+                         {"observateurs": ["o1", "o2", "o3", "o4"]})
+        self.assertEqual(lancer("o9", "--observateurs", obs),
+                         (2, [], "collecte : refus : CONFIG/observateur : o9 hors de la liste\n"))
         self.assertEqual(lancer("o1", "--depot", d.name), (2, [], "collecte : refus : CONFIG/options : --depot exige "
                                                                   "--observateurs\n"))
         self.assertEqual(lancer("o9", "--depot", d.name, "--observateurs", obs),

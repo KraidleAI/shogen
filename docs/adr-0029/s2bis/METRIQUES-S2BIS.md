@@ -3414,6 +3414,13 @@ inversé ; liste non câblée au dépôt, ou perdue au point d'entrée ; `--obse
 `run_params` ; sha256 falsifié ; observateur figé ; FORMAT ; plancher). Suite : 443 tests ; plancher du job : 443,
 égalité exigée. Compte de R-25 : 66 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-7 de la G2 du lot (2026-10-18 ; documentation et tests) : FORMAT §14.4 nomme le contenu `observateurs` que
+`run_params` porte avec `--observateurs` (le code l'écrit, `entree._run_params`, et
+`test_point_d_entree_depot_et_nom_d_observateur` le lit ; le FORMAT ne nommait que son sha256) ; §14.3 : sans `--depot`,
+`--observateurs` reste admise, contrôlée et portée à `run_params`. Mutants S-03 (liste ignorée sans dépôt) et S-05
+(débord de `lire_tetes` écrasé aux `ignores`) de la G2, vivants sur C-5 : cas ajoutés. Rouge : 1 FAIL du FORMAT. Suite :
+443 tests, plancher inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
+
 ## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
 
 Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD

@@ -743,12 +743,13 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. `--depot DOSSIER` (CB-15c) : dépôt des
    têtes (§16) ; sans elle, ni enregistrement `tetes` ni export ; avec elle, `--observateurs L` est exigée
    (correction C-5 du lot de gel ; `CONFIG/options` sinon ; observateur du descripteur hors de la liste :
-   `CONFIG/observateur`) : la liste fermée va au dépôt (§16.5). Un refus de configuration donne la sortie 2
-   et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
+   `CONFIG/observateur`) : la liste fermée va au dépôt (§16.5) ; sans `--depot`, `--observateurs L` reste admise,
+   contrôlée de même et portée à `run_params` (correction C-7 de la G2 du lot). Un refus de configuration donne
+   la sortie 2 et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
    `commit`, `sha256` (`{formes, sante, descripteur}`, et `observateurs` avec `--observateurs`, C-5 : sha256 des
-   octets lus), les contenus `formes` (dont
-   `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
+   octets lus), les contenus `formes` (dont `tolerance`, CB-18g), `sante`, `descripteur` et, avec `--observateurs`,
+   `observateurs` (C-5 ; correction C-7 de la G2 du lot), `python` (version de l'interpréteur). Une fenêtre qui porte
    `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8). Une configuration dont `run_params`,
    `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE est un refus de configuration (`CONFIG/taille`,
    sortie 2), levé avant l'ouverture du journal (DT6-h, SHOGEN-S2BIS-ECRIVAIN-REFUS-ARRET-1) : l'écrivain refuserait la
