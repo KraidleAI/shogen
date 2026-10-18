@@ -476,6 +476,20 @@ class Resumes(Base):
             "quorum : aucun résumé d'un autre observateur lisible",
             "résumés refusés : o4-2026-10-04.resume (RESUME/forme)"])
 
+    def test_quorum_sur_la_liste_fermee(self):                      # GEL-7 ; SHOGEN-S2BIS-OBSERVATEURS-LISTE-1
+        """Avec la liste fermée, le résumé d'un nom hors de la liste (o9) est ignoré et nommé, et le rapport est celui
+        du dépôt sans lui ; garde : sans la liste, o9 compte (le cas sépare)."""
+        valide = {"jour": "2026-10-04", "observateur": "o9", "fenetres": [[m(n), []] for n in range(1, 62)]}
+        self.poser({"o9-2026-10-04.resume": valide, "o2-2026-10-04.resume": {**valide, "observateur": "o2",
+                                                                              "fenetres": [[m(2), []]]}})
+        liste = ["o1", "o2", "o3", "o4"]
+        avec, sans_liste = (status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW, liste=x)
+                            for x in (liste, None))
+        os.remove(os.path.join(self.depot, "o9-2026-10-04.resume"))
+        seul = status.rapport(self.jdir, depot=self.depot, observateur="o1", maintenant=NOW, liste=liste)
+        self.assertEqual(avec, seul + ["résumés ignorés (hors de la liste) : o9-2026-10-04.resume"])
+        self.assertNotEqual(sans_liste[7], seul[7])
+
     def test_resumes_hostiles_refuses(self):
         """Un défaut par fichier : taille, forme non canonique, clé en trop, observateur autre que le nom, ws hors du
         jour ou hors grille, booléen, code inconnu ou en double, code qui n'est pas un texte, fenêtres vides ; un jour
@@ -521,23 +535,30 @@ class Resumes(Base):
                          local + ["quorum : dépôt illisible (FileNotFoundError)"])
 
     def test_commande_status_avec_depot(self):
-        """`status` avec `--depot` et `--descripteur` ajoute le compte à quorum ; `--depot` sans `--descripteur` :
-        refus, sortie 2."""
+        """`status` avec `--depot`, `--descripteur` et `--observateurs` (GEL-7) ajoute le compte à quorum ; `--depot`
+        sans `--descripteur` ou sans `--observateurs` : refus, sortie 2."""
         _f, _s, o = configurations(port_ferme())
         pathlib.Path(desc := os.path.join(self.d, "descripteur.json")).write_text(json.dumps(o), encoding="utf-8")
+        obs = os.path.join(RACINE, "config", "observateurs.json")
+        self.poser({"o9-2026-10-04.resume": {"jour": "2026-10-04", "observateur": "o9", "fenetres": [[m(1), []]]}})
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot, "--descripteur",
-                                          desc]), 0)
-        self.assertEqual(out.getvalue().split("\n")[7:], ["quorum : aucun résumé d'un autre observateur lisible", ""])
+                                          desc, "--observateurs", obs]), 0)
+        self.assertEqual(out.getvalue().split("\n")[7:], [
+            "quorum : aucun résumé d'un autre observateur lisible",
+            "résumés ignorés (hors de la liste) : o9-2026-10-04.resume", ""])
         err = io.StringIO()
         with contextlib.redirect_stderr(err):
             self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot]), 2)
-        self.assertEqual(err.getvalue(), "status : refus : CONFIG/options : --depot exige --descripteur\n")
+            self.assertEqual(entree.main(["status", "--journal", self.jdir, "--depot", self.depot, "--descripteur",
+                                          desc]), 2)
+        self.assertEqual(err.getvalue(), "status : refus : CONFIG/options : --depot exige --descripteur et "
+                                         "--observateurs\n" * 2)
 
     def test_commande_resume(self):
-        """`resume --journal J --depot D --descripteur F` écrit les résumés du journal, sortie 0 ; descripteur refusé :
-        sortie 2 ; journal absent : sortie 1."""
+        """`resume --journal J --depot D --descripteur F --observateurs L` écrit les résumés du journal, sortie 0 ;
+        descripteur refusé, ou observateur hors de la liste (GEL-7) : sortie 2 ; journal absent : sortie 1."""
         _f, _s, o = configurations(port_ferme())
         desc = os.path.join(self.d, "descripteur.json")
         pathlib.Path(desc).write_text(json.dumps(o), encoding="utf-8")
@@ -545,7 +566,8 @@ class Resumes(Base):
         def lancer(jdir):
             out, err = io.StringIO(), io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-                rc = entree.main(["resume", "--journal", jdir, "--depot", self.depot, "--descripteur", desc])
+                rc = entree.main(["resume", "--journal", jdir, "--depot", self.depot, "--descripteur", desc,
+                                  "--observateurs", os.path.join(RACINE, "config", "observateurs.json")])
             return rc, out.getvalue(), err.getvalue()
         self.assertEqual(lancer(self.jdir), (0, "resume : o1-2026-10-04.resume, o1-2026-10-05.resume\n", ""))
         self.assertEqual({n: pathlib.Path(self.depot, n).read_bytes() for n in os.listdir(self.depot)},
@@ -553,6 +575,8 @@ class Resumes(Base):
         self.assertEqual(lancer(self.depot)[0], 1)
         pathlib.Path(desc).write_text(json.dumps({**o, "observateur": "o-1"}), encoding="utf-8")
         self.assertEqual(lancer(self.jdir), (2, "", "resume : refus : CONFIG/incoherent : observateur-nom\n"))
+        pathlib.Path(desc).write_text(json.dumps({**o, "observateur": "o9"}), encoding="utf-8")
+        self.assertEqual(lancer(self.jdir), (2, "", "resume : refus : CONFIG/observateur : o9 hors de la liste\n"))
 
 
 if __name__ == "__main__":

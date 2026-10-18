@@ -3340,3 +3340,41 @@ Uniswap ; corps de Curve sans lot ; `eth_call` en id 1 ; FORMAT ; plancher.
 
 Suite : 437 tests ; plancher du job : 437, égalité exigée (`--egal`). Compte de R-25 : 116 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : fixtures, `formes.json`, FORMAT, paquet, METRIQUES.
+
+## GEL-7 (2026-10-18) : liste fermée des observateurs et TSA (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; volet Q-7 de SHOGEN-S2BIS-CONFIG-PRODUCTION-1)
+
+Objet : `s2bis/config/observateurs.json` : `observateurs` `o1` à `o4` (ADR-0029 l.78-82) ; schéma
+`entree.OBSERVATEURS` et règles `observateurs-noms`, `observateurs-uniques`, `observateurs-quatre` ; `tsa` facultative
+et absente au gel (correction C-1, adjudication du 2026-10-18 : TSA scellée à DB-3 (Certigna, acte extérieur),
+décision de l'investisseur du 2026-10-08), relue sous `entree.TSA` (règle `tsa-https`) quand elle est le seul champ de
+plus ; `entree._liste` exige l'observateur du descripteur dans la liste (`CONFIG/observateur`). `status` (avec
+`--depot`, `--observateurs` exigée), `resume` et `jeton` (`--observateurs` exigée) la lisent : résumé ou tête d'un nom
+hors de la liste ignoré et nommé ; `jeton` refuse un `--envoi` sans `tsa` scellée, ou autre qu'elle (`CONFIG/tsa`,
+sortie 2), et écrit au dépôt `<observateur>-<jour>.armement` (`{arme, jour, observateur, tsa}`, Q-1 adjugée). Le
+manifeste n'est pas changé : ses octets sont liés par empreinte aux jetons de test d'`openssl ts -reply` (clé
+détruite). FORMAT §14.1, §16.8, §17.5, §17.6 et puce.
+
+Rouge : sur un squelette (`_liste` vide, options et paramètres acceptés sans effet), 5 FAIL, 2 ERROR (envoi non
+refusé, arrêté par la garde réseau ; `.armement` absent) ; C-1, sur le code de la première version : 2 FAIL, 1 ERROR
+(`.tsq` absent : envoi sans TSA non refusé).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/observateurs.json` | 1 | données |
+| `shogen_s2bis/collecte/entree.py` | 368 | — |
+| `shogen_s2bis/collecte/status.py` | 284 | — |
+| `shogen_s2bis/collecte/tetes.py` | 323 | — |
+| `tests/test_entree.py` | 342 | 1 de plus (liste scellée, `tsa` facultative, refus) |
+| `tests/test_status.py` | 583 | 1 de plus (quorum sur la liste fermée) ; commandes reportées |
+| `tests/test_tetes.py` | 599 | 1 de plus (têtes hors de la liste, armement) ; commande reportée, envoi sans TSA |
+| `tests/test_format.py` | 391 | 23 (inchangé : §14.1, §16, §17 et puce) |
+
+Mutants (même commande, même outil), campagne entière rejouée après C-1 : 25 mutants, 25 tués, 0 vivant, 0 FATAL :
+règles de la liste (quatre, unicité, minuscules, https) ; appartenance non contrôlée ; `--envoi` non comparé ; envoi
+admis sans TSA ; messages du refus permutés ; relecture sous le schéma de la TSA retirée, ou étendue à tout champ
+inconnu ; règle `tsa-https` retirée ; TSA ajoutée à la configuration ; têtes hors liste gardées ou non nommées ;
+`arme` et `tsa` de `.armement` figés ; résumé hors liste lu ou non nommé ; liste non transmise par `status` ou par
+`jeton` ; `--observateurs` non exigée avec `--depot` ; URL non transmise à `.armement` ; FORMAT (deux) ; plancher.
+
+Suite : 440 tests ; plancher du job : 440, égalité exigée (`--egal`). Compte de R-25 : 173 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : `observateurs.json`, FORMAT, METRIQUES.

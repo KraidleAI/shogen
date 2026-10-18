@@ -380,6 +380,21 @@ class Jeton(unittest.TestCase):
         lu = tetes.Depot(self.d, "o1").lire()
         self.assertEqual((lu["tetes"][0], len(lu["tetes"]), lu["ignores"]), (tete("o1", "carte", 5), 17, 3))
 
+    def test_jeton_liste_fermee_et_armement(self):                 # GEL-7 ; SHOGEN-S2BIS-OBSERVATEURS-LISTE-1
+        """Liste fermée : la tête d'o9, valide, est ignorée et nommée, le manifeste est celui du dépôt sans elle (octets
+        écrits à la main, en setUp) ; garde : sans liste, elle y entre. `.armement` : non armé, puis armé (ligne
+        canonique écrite à la main)."""
+        pathlib.Path(self.d, "o9-pool.tete").write_bytes(ligne_tete(tete("o9")))
+        ignores = []
+        tetes.jeton(self.d, "o1", "2026-10-05", 0x0102030405060708, liste=["o1", "o2", "o3", "o4"], ignores=ignores)
+        self.assertEqual((ignores, self.lu("o1-2026-10-05.manifeste"), self.lu("o1-2026-10-05.armement")), (
+            ["o9"], self.manifeste, b'{"arme":false,"jour":"2026-10-05","observateur":"o1","tsa":null}\n'))
+        self.assertIn(b'"o9"', (tetes.jeton(self.d, "o1", "2026-10-06", 1), self.lu("o1-2026-10-06.manifeste"))[1])
+        self.assertEqual(code(lambda: tetes.jeton(self.d, "o1", "2026-10-07", 1, lambda q: b"<html>",
+                                                  url="https://tsa.essai/tsr")), "JETON/reponse")
+        self.assertEqual(self.lu("o1-2026-10-07.armement"), b'{"arme":true,"jour":"2026-10-07","observateur":"o1",'
+                                                            b'"tsa":"https://tsa.essai/tsr"}\n')
+
     def test_jeton_refuse(self):
         """Sans tête de l'observateur au dépôt : JETON/tete, rien n'est écrit ; réponse de rejet : JETON/rejet, aucun
         `.tsr` ; réponse mal formée : JETON/reponse ; au `tetes`, un `.tsr` illisible est un refus nommé."""
@@ -454,9 +469,12 @@ class Jeton(unittest.TestCase):
         URL http y est refusée (G-17)."""
         f, s, o = configurations(port_ferme())
         pathlib.Path(self.d, "descripteur.json").write_text(json.dumps(o), encoding="utf-8")
-        args = ["jeton", "--descripteur", os.path.join(self.d, "descripteur.json"), "--depot", self.d]
+        args = ["jeton", "--descripteur", os.path.join(self.d, "descripteur.json"), "--depot", self.d,
+                "--observateurs", os.path.join(self.d, "obs.json")]
 
-        def lancer(*plus, envoyer=None, defaut=False):
+        def lancer(*plus, envoyer=None, defaut=False, tsa="https://tsa.essai/tsr"):
+            pathlib.Path(self.d, "obs.json").write_text(json.dumps({"observateurs": ["o1", "o2", "o3", "o4"], **(
+                {"tsa": tsa} if tsa else {})}), encoding="utf-8")                  # C-1 : sans TSA scellée
             out, err = io.StringIO(), io.StringIO()
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), mock.patch.object(
                     tetes, "envoyer", envoyer or tetes.envoyer):
@@ -469,19 +487,30 @@ class Jeton(unittest.TestCase):
                          (0, ["jeton", "non armé", "o1-2026-10-05.tsq"], "", [mock.call(64)] * 2))
         self.assertNotEqual(*[self.lu(f"o1-2026-10-0{j}.tsq")[56:-3] for j in (5, 6)])       # nonces tirés (G-16)
         with mock.patch.object(entree.secrets, "randbits", return_value=0x0102030405060708):
-            rc, out, err = lancer("--jour", "2026-10-05", "--envoi", "http://127.0.0.1:9/tsr", envoyer=lambda u, q, c:
-                                  JETONS["juste"] if (u, c) == ("http://127.0.0.1:9/tsr", None) else b"")
+            rc, out, err = lancer("--jour", "2026-10-05", "--envoi", "https://tsa.essai/tsr", envoyer=lambda u, q, c:
+                                  JETONS["juste"] if (u, c) == ("https://tsa.essai/tsr", None) else b"")
         self.assertEqual((rc, out, err), (0, "jeton : émis : o1-2026-10-05.tsr : sha256 " + hashlib.sha256(
             JETONS["juste"]).hexdigest() + "\n", ""))
+        self.assertEqual(self.lu("o1-2026-10-05.armement"), b'{"arme":true,"jour":"2026-10-05","observateur":"o1",'
+                                                            b'"tsa":"https://tsa.essai/tsr"}\n')          # GEL-7
         vus = []
         lancer("--jour", "2026-10-07", "--envoi", "https://x/tsr", envoyer=lambda u, q, c: vus.append(c) or b"",
-               defaut=True)
-        rc, out, err = lancer("--jour", "2026-10-07", "--envoi", "http://127.0.0.1:9/tsr", defaut=True)
-        self.assertEqual((vus, rc, err.split(" : ")[:3]), ([entree.http.CONTEXTE], 1, ["jeton", "refus", "JETON/url"]))
-        rc, out, err = lancer("--jour", "2026-10-06", "--envoi", "http://127.0.0.1:9/tsr",
+               defaut=True, tsa="https://x/tsr")
+        rc, out, err = lancer("--jour", "2026-10-07", "--envoi", "https://y/tsr", defaut=True, tsa="https://x/tsr")
+        self.assertEqual((vus, rc, err.split(" : ")[:3]), ([entree.http.CONTEXTE], 2, ["jeton", "refus", "CONFIG/tsa"]))
+        self.assertEqual([lancer("--jour", "2026-10-09", *e, tsa=None) for e in ((), ("--envoi", "https://x/tsr"))],
+                         [(0, "jeton : non armé : o1-2026-10-09.tsq : sha256 " + hashlib.sha256(self.lu(
+                             "o1-2026-10-09.tsq")).hexdigest() + "\n", ""),
+                          (2, "", "jeton : refus : CONFIG/tsa : --envoi sans TSA scellée\n")])           # C-1
+        rc, out, err = lancer("--jour", "2026-10-06", "--envoi", "https://tsa.essai/tsr",
                               envoyer=mock.Mock(side_effect=ConnectionRefusedError(111, "refus")))
         self.assertEqual((rc, out, err.split(" : ")[:3]), (1, "", ["jeton", "refus", "ConnectionRefusedError"]))
         self.assertEqual([lancer("--jour", j)[0] for j in ("2026-1-05", "05-10-2026")], [2, 2])
+        pathlib.Path(self.d, "o9-pool.tete").write_bytes(ligne_tete(tete("o9")))
+        self.assertEqual(lancer("--jour", "2026-10-08")[1].split("\n")[1:], [
+            "jeton : têtes ignorées (hors de la liste) : o9", ""])
+        pathlib.Path(self.d, "descripteur.json").write_text(json.dumps({**o, "observateur": "o9"}), encoding="utf-8")
+        self.assertEqual(lancer("--jour", "2026-10-05")[:2], (2, ""))
         pathlib.Path(self.d, "descripteur.json").write_text(json.dumps({**o, "observateur": "o-1"}), encoding="utf-8")
         self.assertEqual(lancer("--jour", "2026-10-05")[:2], (2, ""))
 

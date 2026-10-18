@@ -15,7 +15,8 @@ de la TSA se contrôlent hors ligne (`openssl ts -verify`, comme `scripts/sceau/
 (RFC 3161 §3.4), armé par le point d'entrée seul, sous le go écrit de l'investisseur ; au `tetes`, le sha256 du dernier
 `.tsr` de l'observateur. CB-15f : au dépôt, seuls des fichiers ordinaires sont lus, ouverts sans attente (un tube nommé
 ne bloque ni la boucle ni une commande) ; l'écriture ne suit aucun lien ; au `tetes`, avec le `.tsr`, les sha256 de son
-manifeste et de sa requête (C-5)."""
+manifeste et de sa requête (C-5). GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : avec la liste fermée, les têtes d'un nom
+hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`)."""
 import contextlib
 import hashlib
 import http.client
@@ -268,21 +269,27 @@ def lire_tetes(dossier, exclure=None, propre=None):
     return tetes, refus, max(0, len(siens) - NOMBRE) + max(0, len(autres) - NOMBRE)
 
 
-def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync):
+def jeton(dossier, observateur, jour, nonce, envoyer=None, fsync=os.fsync, liste=None, ignores=None, url=None):
     """Jeton du jour (AVIS Q-D-03, point 1) ; rend (état, fichier, sha256 de ses octets). Un `.tsr` du jour présent :
     « déjà émis », rien n'est redemandé. Sinon manifeste des têtes valides du dépôt, les siennes d'abord (JETON/tete
     sans tête de l'observateur) et requête au `nonce`, écrits au dépôt ; sans `envoyer`, « non armé » ; armé,
     `envoyer(requête)` rend la réponse : conservée si son statut vaut 0 ou 1 et qu'elle est liée à la requête
-    (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé."""
+    (`lier`) (« émis ») ; sinon JETON/rejet, JETON/reponse ou JETON/liaison, rien de conservé. GEL-7 : `liste`, noms
+    admis au manifeste, les autres ajoutés à `ignores` ; `<observateur>-<jour>.armement` : {arme, jour, observateur,
+    tsa (`url`)}, écrit avec la requête."""
     nom = os.path.join(dossier, f"{observateur}-{jour}")
     if os.path.exists(nom + ".tsr"):
         return "déjà émis", f"{observateur}-{jour}.tsr", empreinte(nom + ".tsr")
     lues = lire_tetes(dossier, propre=observateur)[0]
+    if liste is not None:
+        (ignores if ignores is not None else []).extend(sorted({t["observateur"] for t in lues} - set(liste)))
+        lues = [t for t in lues if t["observateur"] in liste]
     if not any(t["observateur"] == observateur for t in lues):
         raise RefusJeton("JETON/tete", f"aucune tête de {observateur} au dépôt")
     m = manifeste(jour, observateur, lues)
     tsq = requete(emp := hashlib.sha256(m).digest(), nonce)
-    for suffixe, octets in ((".manifeste", m), (".tsq", tsq)):
+    armement = journal.canonique({"arme": envoyer is not None, "jour": jour, "observateur": observateur, "tsa": url})
+    for suffixe, octets in ((".manifeste", m), (".tsq", tsq), (".armement", armement)):
         ecrire(dossier, f"{observateur}-{jour}{suffixe}", octets, fsync)
     if envoyer is None:
         return "non armé", f"{observateur}-{jour}.tsq", hashlib.sha256(tsq).hexdigest()

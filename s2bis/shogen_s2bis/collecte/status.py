@@ -16,6 +16,8 @@ CB-17c (AVIS Q-D-03, point 2) : résumé par jour, `[ws, codes]` de chaque fenê
 `resume` : une projection du journal, recalculable ; grille bornée par le jour des fichiers présents (C-3).
 CB-17d (AVIS Q-D-03, point 3) : avec un dépôt, `status` ajoute le compte à quorum (au moins deux observateurs
 valides, ADR-0029 §2.2 pt 5) sur les résumés lisibles des autres, lus strictement (liste blanche), avec leur âge.
+GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : avec la liste fermée des observateurs, un résumé d'un nom hors de la liste
+est ignoré et nommé au rapport.
 DT6-c (SHOGEN-S2BIS-JOURNAL-FICHIER-SPECIAL-1) : un fichier du journal est ouvert sans attente et lu s'il est un fichier
 ordinaire (`journal.ordinaire`) ; un tube nommé à son nom bloquait `status`. DT6-d (SHOGEN-S2BIS-STATUS-QUEUES-1) : un
 fichier arrêté avant sa fin est nommé au rapport, avec son motif ; la grille compte GRILLE fenêtres au plus, au-delà le
@@ -224,18 +226,22 @@ def lire_resume(chemin, observateur, jour):
     return {x[0]: not x[1] for x in f}
 
 
-def quorum(grille, depot, observateur, maintenant):
+def quorum(grille, depot, observateur, maintenant, liste=None):
     """Lignes du compte à quorum sur les fenêtres de `grille` : résumés des autres observateurs pour les jours de la
     grille, lus strictement ; M_j = 1 si la fenêtre est valide ici, plus un par autre observateur qui la dit valide ;
     âge (s) de chaque résumé lu, au bout de sa dernière fenêtre, à `maintenant` (µs). Dépôt illisible : une ligne qui
-    le dit, le compte local reste (CB-15f)."""
-    jours, autres, refus = {journal.jour(ws) for ws in grille}, {}, []
+    le dit, le compte local reste (CB-15f). `liste` (GEL-7) : noms admis ; un résumé d'un autre nom, ignoré, est
+    nommé."""
+    jours, autres, refus, ignores = {journal.jour(ws) for ws in grille}, {}, [], []
     try:
         noms = sorted(os.listdir(depot))
     except OSError as e:
         return [f"quorum : dépôt illisible ({type(e).__name__})"]
     for n in noms:
         if (x := RESUME.fullmatch(n)) and x[1] != observateur and x[2] in jours:
+            if liste is not None and x[1] not in liste:
+                ignores.append(n)
+                continue
             try:
                 lu = lire_resume(os.path.join(depot, n), x[1], x[2])
             except OSError:
@@ -249,10 +255,11 @@ def quorum(grille, depot, observateur, maintenant):
         lignes = [f"quorum (au moins 2 observateurs valides) : calme {compte['calme']} ; stress {compte['stress']}",
                   "résumés lus : " + " ; ".join(f"{o} jusqu'à {heure(max(v))} UTC (âge {maintenant // S - max(v) - W}"
                                                 f" s)" for o, v in sorted(autres.items()))]
-    return lignes + (["résumés refusés : " + " ; ".join(refus)] if refus else [])
+    return lignes + (["résumés refusés : " + " ; ".join(refus)] if refus else []) + (
+        ["résumés ignorés (hors de la liste) : " + " ; ".join(ignores)] if ignores else [])
 
 
-def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=None):
+def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=None, liste=None):
     """Lignes du rapport : fenêtres, tête, disque, dégradations par code, dernière fenêtre, valides par strate ; avec
     un dépôt, le compte à quorum (`quorum`)."""
     arrets = []
@@ -274,4 +281,4 @@ def rapport(dossier, prefixe="pool", depot=None, observateur=None, maintenant=No
         "dégradations : " + " ; ".join(f"{c} {compte[c]}" for c in CODES),
         "dernière fenêtre : " + (f"dégradée ({', '.join(grille[fin])})" if grille[fin] else "valide"),
         f"fenêtres valides (compte local) : calme {strates['calme']} ; stress {strates['stress']}",
-        *arretes] + (quorum(grille, depot, observateur, maintenant) if depot else [])
+        *arretes] + (quorum(grille, depot, observateur, maintenant, liste) if depot else [])

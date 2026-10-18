@@ -354,6 +354,17 @@ class Format(unittest.TestCase):
                     "sans attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire", "en exclusif (`O_EXCL`)")
         self.assertEqual([x for x in attendus if x not in seize], [])
         self.assertEqual((tetes.TAILLE, tetes.NOMBRE, tetes.PLAFOND), (1024, 16, 65536))
+        liste = ["**Liste fermée et armement**", "(`CONFIG/tsa`, sortie 2)", "sans `tsa` scellée",
+                 "`<observateur>-<jour>.armement`", "`{arme, jour, observateur, tsa}`",
+                 "`jeton : têtes ignorées (hors de la liste) : <noms>`"]                                       # GEL-7
+        puces, sections = decoupe(FORMAT.read_text(encoding="utf-8"))
+        self.assertEqual([x for x in liste if x not in seize] + [x for x in (
+            "`s2bis/config/observateurs.json`", "`observateurs-quatre`", "`tsa-https`", "`CONFIG/observateur`",
+            "facultative et absente au gel", "TSA scellée à DB-3 (Certigna, acte extérieur)") if x not
+            in sections["14"]] + [x for x in ("`résumés ignorés (hors de la liste) : <fichier> ; …`",
+                                              "sans `--observateurs`") if x not in sections["17"]], [])
+        self.assertEqual([("GEL-7" in p and "OBSERVATEURS-LISTE-1" in p) for p in puces if p.startswith(
+            "**Gel du collecteur**")], [True])
 
     def test_paragraphe_17_status_et_resumes(self):             # DT6-i, SHOGEN-S2BIS-FORMAT-P2B-TESTS-1 (O-B1)
         """§17 : lecture sans verrou, `lecture` reconnue à sa première clé, fichiers ordinaires, arrêts nommés,

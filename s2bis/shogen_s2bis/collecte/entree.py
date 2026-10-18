@@ -31,7 +31,11 @@ CB-16 (E-C-37 ; FORMAT §18) : commande `smoke` (smoke.py), `formes.json` et `ca
 au démarrage, une lecture de chaque forme, sans prix : 0 pool et témoin décodés ; 1 sinon ; 2 refus de configuration.
 INT-P2-16 (Q-5 adjugée ; FORMAT §19) : commande `capture` (capture.py), mêmes configurations, octets bruts de chaque
 forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus ; `--reprise` (GEL-4). GEL-3
-(SHOGEN-S2BIS-NOM-FORME-1 ; FORMAT §14.1) : règle `nom-forme`, nom de forme au motif NOM de `capture`, pool et carte."""
+(SHOGEN-S2BIS-NOM-FORME-1 ; FORMAT §14.1) : règle `nom-forme`, nom de forme au motif NOM de `capture`, pool et carte.
+GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; FORMAT §14.1, §16.8, §17) : `observateurs.json`, liste fermée des quatre
+observateurs et URL de la TSA, lue par `status` (avec `--depot`), `resume` et `jeton` (`--observateurs`) : l'observateur
+du descripteur doit y être (CONFIG/observateur) ; `jeton` refuse un `--envoi` sans TSA scellée, ou autre qu'elle
+(CONFIG/tsa) ; C-1 : `tsa` facultative, absente au gel, scellée à DB-3 (Certigna, acte extérieur)."""
 import argparse
 import collections
 import ipaddress
@@ -56,6 +60,13 @@ SCHEMAS = {"formes": {"w": (int, 1, 3600), "delta": (int, 1, MAX), "tolerance": 
            "descripteur": {"observateur": (str, 1, 16), "fournisseur": (str, 1, 64), "region": (str, 1, 64),
                            "asn": (int, 1, 4294967295), "resolveur": (str, 7, 15), "config_resolveur": (str, 1, 4096),
                            "versions": [(str, 1, 256)], "empreinte": (str, 64, 64)}}
+OBSERVATEURS = {"observateurs": [(str, 1, 16), 4]}           # GEL-7 : liste fermée ; `tsa` facultative (C-1)
+COHERENCE_OBSERVATEURS = (
+    ("observateurs-noms", lambda o: all(re.fullmatch("[a-z0-9]{1,16}", n) for n in o["observateurs"])),
+    ("observateurs-uniques", lambda o: len(set(o["observateurs"])) == len(o["observateurs"])),
+    ("observateurs-quatre", lambda o: len(o["observateurs"]) == 4))                       # M = 4 (ADR-0029 l.78)
+TSA = ({**OBSERVATEURS, "tsa": (str, 1, 2048)}, COHERENCE_OBSERVATEURS + (               # TSA scellée à DB-3
+    ("tsa-https", lambda o: re.fullmatch("https://[a-z0-9.-]{1,253}(/[!-~]*)?", o["tsa"]) is not None),))
 CARTE = {"depart": (int, 0, MAX), "delai": (int, 1, MAX), "marge": (int, 1, MAX), "places": (int, 1, 4096),
          "asn": {"periode": (int, 1, 86400), "decalage": (int, 0, 86399)},       # relevé au moins quotidien (E-C-30)
          "formes": [FORME, 4096, 0]}                                # vide admise : le relevé ASN tourne sans carte
@@ -200,23 +211,45 @@ def _observateur(chemin):
     return config.charger(chemin, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
 
 
+def _liste(chemin, o):
+    """`observateurs.json` contrôlé (GEL-7), dont l'observateur `o` du descripteur doit être : sinon RefusConfig.
+    Avec le seul champ inconnu `tsa`, relu sous le schéma de la TSA (C-1 : absente au gel)."""
+    try:
+        liste = config.charger(chemin, OBSERVATEURS, COHERENCE_OBSERVATEURS)[0]
+    except config.RefusConfig as e:
+        if e.code != "CONFIG/champ-inconnu" or str(e).split(" : ")[-1] != "tsa":
+            raise
+        liste = config.charger(chemin, *TSA)[0]
+    if o not in liste["observateurs"]:
+        raise config.RefusConfig("CONFIG/observateur", f"{o} hors de la liste")
+    return liste
+
+
 def _jeton(a, tls, fsync):
-    """Commande `jeton` (CB-15e) : jour UTC de l'horloge, ou `--jour` ; observateur du descripteur scellé."""
+    """Commande `jeton` (CB-15e) : jour UTC de l'horloge, ou `--jour` ; observateur du descripteur scellé, dans la
+    liste ; `--envoi` égal à la TSA scellée de la liste (GEL-7 ; sans elle, refusé : C-1)."""
     try:
         o = _observateur(a.descripteur)
+        liste = _liste(a.observateurs, o)
+        if a.envoi is not None and a.envoi != liste.get("tsa"):
+            raise config.RefusConfig("CONFIG/tsa", "--envoi " + ("autre que la TSA scellée" if "tsa" in liste else
+                                                                 "sans TSA scellée"))
         jour = a.jour or journal.jour(horloge() // S)
         if not re.fullmatch("[0-9]{4}-[0-9]{2}-[0-9]{2}", jour):
             raise config.RefusConfig("CONFIG/jour", jour)
     except (config.RefusConfig, OSError) as e:
         print(f"jeton : refus : {e}", file=sys.stderr)
         return 2
-    envoi = a.envoi and (lambda tsq: tetes.envoyer(a.envoi, tsq, tls))
+    envoi, ignores = a.envoi and (lambda tsq: tetes.envoyer(a.envoi, tsq, tls)), []
     try:
-        etat, nom, h = tetes.jeton(a.depot, o, jour, secrets.randbits(64), envoi, fsync)
+        etat, nom, h = tetes.jeton(a.depot, o, jour, secrets.randbits(64), envoi, fsync, liste["observateurs"], ignores,
+                                   a.envoi)
     except (tetes.RefusJeton, journal.ErreurJournal, OSError, ValueError) as e:
         print(f"jeton : refus : {getattr(e, 'code', type(e).__name__)} : {e}", file=sys.stderr)
         return 1
     print(f"jeton : {etat} : {nom} : sha256 {h}")
+    if ignores:
+        print("jeton : têtes ignorées (hors de la liste) : " + ", ".join(ignores))
     return 0
 
 
@@ -224,15 +257,16 @@ def _status(a, fsync):
     """Commandes `status` (CB-17b ; compte à quorum avec `--depot`, CB-17d) et `resume` (CB-17c) : 0 ; 1 refus du
     journal ou du dépôt ; 2 refus du descripteur, ou `--depot` sans `--descripteur`."""
     try:
-        if a.depot and not a.descripteur:
-            raise config.RefusConfig("CONFIG/options", "--depot exige --descripteur")
+        if a.depot and not (a.descripteur and a.observateurs):
+            raise config.RefusConfig("CONFIG/options", "--depot exige --descripteur et --observateurs")
         o = a.descripteur and _observateur(a.descripteur)
+        liste = a.observateurs and _liste(a.observateurs, o)["observateurs"]
     except (config.RefusConfig, OSError) as e:
         print(f"{a.commande} : refus : {e}", file=sys.stderr)
         return 2
     try:
         if a.commande == "status":
-            print("\n".join(status.rapport(a.journal, depot=a.depot, observateur=o, maintenant=horloge())))
+            print("\n".join(status.rapport(a.journal, depot=a.depot, observateur=o, maintenant=horloge(), liste=liste)))
             return 0
         noms = status.resumes(a.journal, o)
         for nom, octets in noms.items():
@@ -288,7 +322,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         if nom == "pool":
             c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
     jeton = commandes.add_parser("jeton", help="jeton RFC 3161 du jour (FORMAT §16)")
-    for option in ("--descripteur", "--depot"):
+    for option in ("--descripteur", "--depot", "--observateurs"):
         jeton.add_argument(option, required=True)
     jeton.add_argument("--jour", help="jour UTC, AAAA-MM-JJ (défaut : celui de l'horloge)")
     jeton.add_argument("--envoi", help="URL https de la TSA : arme l'envoi (go écrit de l'investisseur)")
@@ -296,7 +330,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     re_ = commandes.add_parser("resume", help="résumés par jour (valide ou codes D) publiés au dépôt")
     for commande, requis in ((st, False), (re_, True)):
         commande.add_argument("--journal", required=True)
-        for option in ("--depot", "--descripteur"):
+        for option in ("--depot", "--descripteur", "--observateurs"):
             commande.add_argument(option, required=requis)
     sm = commandes.add_parser("smoke", help="une lecture de chaque forme du pool, du témoin et de la carte, sans prix")
     sm.add_argument("--formes", required=True)

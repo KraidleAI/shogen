@@ -84,7 +84,9 @@
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
   paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1 ; le diff
   GEL-4, la reprise de capture (§19, points 1, 3 et 5), qui ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1 ; le diff GEL-5,
-  le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1.
+  le bloc du témoin (§9.1), qui ferme SHOGEN-S2BIS-TEMOIN-BLOC-1 ; le diff GEL-7, la liste fermée des observateurs et
+  la TSA (§14.1, §16.8, §17.5, §17.6), qui ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 et le volet Q-7 de
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -706,7 +708,16 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      C-6 de la G2 de P2B : un jumeau de casse n'est pas un autre observateur), `fournisseur`,
      `region`, `asn` (mesuré), `resolveur` (IPv4 littérale canonique, cible de D-5), `config_resolveur` (chemin de la
      configuration du résolveur, dont l'empreinte va à `sante.resolveur`), `versions` (paquets), `empreinte` (sha256
-     de la configuration déployée, 64 chiffres hexadécimaux minuscules).
+     de la configuration déployée, 64 chiffres hexadécimaux minuscules) ;
+   - `observateurs.json` (diff GEL-7, SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; volet Q-7 de
+     SHOGEN-S2BIS-CONFIG-PRODUCTION-1), configuration scellée `s2bis/config/observateurs.json` : `observateurs`, liste
+     fermée des quatre observateurs `o1` à `o4` (O1 à O4 de l'ADR-0029 l.78-82 ; règles `observateurs-noms`, grammaire
+     `[a-z0-9]{1,16}` du descripteur, `observateurs-uniques`, `observateurs-quatre`, M = 4), et `tsa`, URL https de la
+     TSA, facultative et absente au gel (correction C-1 : TSA scellée à DB-3 (Certigna, acte extérieur), décision de
+     l'investisseur du 2026-10-08, ajout daté du 2026-10-10 au G0, point 6 ; règle `tsa-https` quand elle est
+     présente ; un autre champ inconnu est refusé) ; lue par `status` (avec
+     `--depot`), `resume` et `jeton` (option `--observateurs`, §16.8, §17.5, §17.6), qui refusent un descripteur dont
+     l'observateur n'y est pas (`CONFIG/observateur`, sortie 2).
 
    Le commit est celui, scellé, de l'archive déployée : 40 chiffres hexadécimaux minuscules (aucune opération git sur
    l'observateur). Tout écart est un refus nommé (`CONFIG/…` ou `BOUCLE/…`), levé avant l'ouverture du journal.
@@ -882,7 +893,13 @@ collecteur.
    une réponse 200 d'au plus 65 536 octets passe au point 7, un autre code ou une réponse plus longue est le refus
    `JETON/http` ; une URL qui n'est pas https : `JETON/url`. Sortie : 0 et `jeton : <état> : <fichier> : sha256
    <empreinte>` ; 1 et `jeton : refus : <code> : …` (refus, erreur du réseau ou du dépôt) ; 2 pour un descripteur ou un
-   jour refusé.
+   jour refusé. **Liste fermée et armement** (diff GEL-7) : `--observateurs L` est exigée (§14.1) ; un `--envoi` est
+   refusé sans `tsa` scellée (au gel : C-1), ou s'il est autre que la `tsa` de la liste (`CONFIG/tsa`, sortie 2) :
+   `--envoi` reste le seul armement, et l'URL armée est celle de la configuration scellée ; les têtes d'un observateur hors de la liste sont ignorées (hors du manifeste)
+   et nommées sur une seconde ligne, `jeton : têtes ignorées (hors de la liste) : <noms>` ; avec le manifeste et la
+   requête, la commande écrit au dépôt `<observateur>-<jour>.armement`, ligne canonique `{arme, jour, observateur,
+   tsa}` (`arme` vrai si et seulement si l'envoi est armé ; `tsa` : l'URL armée, ou null), par écriture atomique : l'état
+   d'armement du jour est lisible au dépôt.
 9. **Fichiers du dépôt** (CB-15f) : toute lecture au dépôt (têtes, `.tsr`, résumés du §17.6) ouvre le fichier sans
    attente (`O_NONBLOCK`) et n'admet qu'un fichier ordinaire : un tube nommé, un dossier ou un périphérique au nom
    d'un fichier attendu ne bloque ni la boucle ni une commande ; il est le refus `TETES/lecture` (`RESUME/lecture`
@@ -951,13 +968,15 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    passager disparaît à la lecture suivante ; persistant, il dit une queue (§7). Aucun nombre à virgule, aucun
    statut de source, aucune valeur lue : la sortie est la même avec ou sans enregistrements `lecture`.
 5. **Résumé par jour** (CB-17c ; AVIS Q-D-03, point 2) : commande `python3 -m shogen_s2bis.collecte resume --journal
-   DOSSIER --depot DOSSIER --descripteur D` ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
+   DOSSIER --depot DOSSIER --descripteur D` (et `--observateurs L`, diff GEL-7 : l'observateur doit être de la liste,
+   §14.1) ; pour chaque jour UTC des fenêtres jugées (point 3), le fichier
    `<observateur>-<jour>.resume` au dépôt (écriture atomique, §16.4), une ligne canonique `{jour, observateur,
    fenetres}`, `fenetres` : `[ws, codes]` de chaque fenêtre du jour (codes vides : fenêtre valide). Aucune autre clé :
    c'est la liste blanche du résumé, que l'orchestrateur peut lire au rodage (lectures admises, ADR-0029 l.221) ;
    aucun statut de source. Le résumé est une projection des enregistrements du journal : il se recalcule sur le
    journal. Sortie 0 et `resume : <fichiers>` ; 1 refus du journal ou du dépôt ; 2 refus du descripteur.
-6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F` ajoute au
+6. **Compte à quorum** (CB-17d ; AVIS Q-D-03, point 3) : `status --journal J --depot D --descripteur F
+   --observateurs L` (`--observateurs` depuis le diff GEL-7) ajoute au
    rapport, après le compte local : `quorum (au moins 2 observateurs valides) : calme <n> ; stress <n>` et
    `résumés lus : <o> jusqu'à <heure> UTC (âge <n> s) ; …`, ou `quorum : aucun résumé d'un autre observateur lisible` ;
    puis, s'il y en a, `résumés refusés : <fichier> (<code>) ; …`. Sont lus les résumés des autres observateurs pour les
@@ -967,8 +986,10 @@ tête de chaîne, espace disque) et le compte de fenêtres évaluables : aucun s
    fenêtre), `RESUME/lecture` (illisible, ou pas un fichier ordinaire : §16.9) ; aucun résumé ne fait échouer `status`,
    ni un dépôt illisible : `quorum : dépôt illisible (<exception>)`, après le compte local (CB-15f). Une fenêtre compte
    à quorum si M_j ≥ 2 (ADR-0029 §2.2 pt 5) : un pour l'observateur s'il y est valide, plus un par autre observateur
-   dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. `--depot` sans
-   `--descripteur` : refus `CONFIG/options`, sortie 2.
+   dont un résumé lu la dit valide. L'âge d'un résumé court depuis la fin de sa dernière fenêtre. Liste fermée (diff
+   GEL-7) : le résumé d'un observateur hors de la liste n'est pas lu ; il est nommé en dernière ligne, `résumés ignorés
+   (hors de la liste) : <fichier> ; …`. `--depot` sans `--descripteur` ou sans `--observateurs` : refus
+   `CONFIG/options`, sortie 2.
 
 ## 18. Commande `smoke` (CB-16 ; E-C-37)
 
