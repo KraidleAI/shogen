@@ -3532,3 +3532,25 @@ option non transmise ; export retiré ; défaut de `consigner` inversé ; FORMAT
 
 Suite : 446 tests ; plancher du job : 446, égalité exigée (`--egal`). Compte de R-25 : 60 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
+## C-11 (2026-10-18) : `test_carte_pendue_ou_refusee_le_pool_intact` déterministe (I-7 de la G2 du lot de gel)
+
+Objet (tests seuls) : le test d'isolement, qui faisait tourner trois processus à w = 1 s en temps réel (faux rouge
+mesuré par la G2 sous 3.11 : lecture `b` du pool en délai sous la charge), tourne en un processus, horloges et
+attentes injectées (`test_boucle.Temps`), lectures injectées : la carte lit trois fenêtres une forme pendue (fils
+abandonnés 1, 2, 3), puis le pool trois fenêtres, ces fils encore pendus : ses seules lectures (a, b, c), aucun fil
+abandonné, trois marqueurs ; le secondaire au budget dépassé (`entree.main`) sort en 2 sans rien écrire. La
+séparation des processus relève du déploiement ; un processus secondaire réel reste éprouvé par `Conformite`.
+Imports retirés : `socket`, `HARNAIS`.
+
+Rouge : sans objet (test seul, code inchangé) ; à la place, trois mutants du code que le test garde, tués : liste des
+fils abandonnés partagée entre boucles (deux sites ; le premier essai, un seul site, était équivalent : la liste est
+réassignée à chaque fenêtre) ; règle `budget-partage` retirée ; lecture du pool écrite sous un nom de la carte. Cinq
+passages isolés sous 3.11 (`-X dev -W error`) : verts, 1,8 s chacun.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_secondaire.py` | 292 | 10 (inchangé) |
+
+Suite : 446 tests ; plancher du job : 446, inchangé. Compte de R-25 : 44 lignes de code ajoutées (`.py`) ; hors compte :
+METRIQUES.
