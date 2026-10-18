@@ -1,0 +1,20 @@
+id	sujet	n_tests
+GEL-1	formes.json de production : formes fondues, valeurs scellees liees a l ADR par un test, formes-pool.json supprime (SHOGEN-S2BIS-CONFIG-PRODUCTION-1, volet formes)	433
+GEL-2	hote Binance data-api.binance.vision pour les quatre formes du pool ; remplacants ecrits d avance au paquet (Q-C-08)	433
+GEL-3	regle nom-forme du pool et de la carte, constante partagee avec capture ; ferme SHOGEN-S2BIS-NOM-FORME-1	434
+GEL-4	reprise de capture : manifeste ligne a ligne, option --reprise, refus manifeste, somme et fichier ; ferme SHOGEN-S2BIS-CAPTURE-PARTIELLE-1	436
+GEL-5	bloc du temoin : lot JSON-RPC encadre, bloc_avant et bloc_apres en extra, fixtures groupees ; ferme SHOGEN-S2BIS-TEMOIN-BLOC-1	437
+GEL-7	observateurs.json : liste fermee lue par status, resume et jeton ; --envoi refuse sans TSA scellee ; fichier .armement ; ferme SHOGEN-S2BIS-OBSERVATEURS-LISTE-1	440
+GEL-8	paquet : Q-C-07 sans forme nouvelle, date de coupure de la carte au gel (documentation seule)	440
+GEL-6	sante.json de production : chronyc, trois temoins IPv4 de la sonde reseau, noms www.kernel.org et www.arin.net de la sonde du resolveur	441
+GEL-9	carte.json de production, chargee par configurer_secondaire avec les regles croisees	442
+C-3	G2 : liste fermee filtree avant la borne NOMBRE du manifeste du jeton ; --envoi compare par egalite	442
+C-4	G2 : reprise de capture sans suivre les liens, O_NONBLOCK, O_APPEND, fichier ordinaire exige	442
+C-5	enregistrement tetes de la boucle sur la liste fermee, refus TETES/liste borne ; pool --depot exige --observateurs ; run_params porte la liste	443
+C-6	carte de production : quatre remplacants de Binance sur api.binance.com, places 4 ; paquet : lecture de l advisor pour les 7 jours, decalage 0 ratifie	443
+C-7	G2 : run_params porte le contenu de la liste des observateurs (FORMAT) ; deux cas de test de C-5	443
+C-8	liste fermee des journaux des tetes (pool, secondaire), refus TETES/journal borne : aucune eviction possible au jeton ni a la boucle	444
+C-9	G2 : une tete secondaire valide est lue au test, a l enregistrement tetes comme au manifeste du jeton	444
+C-10	commande secondaire --depot : tete du journal secondaire exportee a chaque point de controle, sans enregistrement tetes ; ferme SHOGEN-S2BIS-TETE-SECONDAIRE-1	446
+C-11	test d isolement du secondaire rendu deterministe (horloges, attentes et lectures injectees, un seul processus)	446
+C-12	G2 : heure sans date d une docstring du test de C-10 datee	446
