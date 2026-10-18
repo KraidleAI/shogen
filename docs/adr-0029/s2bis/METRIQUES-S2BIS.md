@@ -3636,3 +3636,28 @@ descripteurs des deux journaux ; `run_params` absent admis ; clé absente admise
 
 Suite : 453 tests ; plancher du job : 453, égalité exigée (`--egal`). Compte de R-25 : 187 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-d (2026-10-18) : passe 2 en flux, fenêtres fusionnées, ruptures rendues à leur place (Q-R-03 ; AVIS l.108)
+
+Objet : `Fusion.fenetres()` relit les huit journaux par le lecteur de RB-1 et les fusionne par ws croissant
+(`heapq.merge`, une fenêtre en mémoire par journal) : (ws, {observateur : {journal : fenêtre}}), une fenêtre ne portant
+que les journaux qui y ont écrit ; dans une fenêtre, lectures par forme (ensemble `pool` au journal du pool, `carte` au
+secondaire ; champs journalisés sans `brut`, hôte et décodeur de la forme lus au paquet), `sante`, marqueur, démarrage
+(`run_params`), autres enregistrements (`tetes`, `asn`, `releve_asn`) ; ruptures du lecteur, `trou` et `reprise`
+rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit, sans portée en fenêtres (RB-3) ; après
+l'itération, `integrite` par journal (tête, ruptures, queues déclarées, queue finale). Rien n'est imprimé.
+
+Rouge : sur le code de RB2-c : 2 ERROR (`fenetres` absente).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 161 | — |
+| `tests/test_fusion.py` | 292 | 8 (2 de plus : `Flux`) |
+
+Mutants (même commande, même outil) : 13 classés, 13 tués, 0 vivant, 0 FATAL : rupture perdue ; trou perdu ; attente
+jamais vidée ; une fenêtre par enregistrement ; clé de fusion inversée ; marqueur pris pour démarrage ; `brut` gardé ;
+formes du pool pour le secondaire ; ensemble du secondaire ; `sante` perdue ; intégrité sans ruptures ; autres
+enregistrements perdus ; plancher.
+
+Suite : 455 tests ; plancher du job : 455, égalité exigée (`--egal`). Compte de R-25 : 180 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

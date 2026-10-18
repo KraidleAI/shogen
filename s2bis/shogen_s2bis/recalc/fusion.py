@@ -6,18 +6,26 @@ d'`observateurs.json` ; dans chaque journal, un `run_params` au moins, et pour c
 `commit` égal au commit scellé, `sha256` et contenus des fichiers scellés égaux à ceux du paquet (CONFIGS, lus en
 octets), descripteur au nom de l'observateur, concordance avec le premier démarrage ; descripteur égal entre les deux
 journaux de l'observateur. Tout écart est un refus nommé (RefusFusion, `FUSION/…` ; ceux du lecteur, `LECTEUR/…`,
-remontent tels quels)."""
+remontent tels quels).
+Passe 2 (`fenetres`) : les huit journaux relus en flux et fusionnés par fenêtre, observateur et journal (lectures par
+forme, pannes comprises, `sante`, marqueur, démarrage, autres enregistrements), mémoire d'une fenêtre par journal ;
+ruptures du lecteur, `trou` et `reprise` rendus à leur place, dans la fenêtre qui les suit, sans portée en fenêtres
+(Q-R-03, AVIS l.108 : RB-3) ; rien n'est imprimé (rendu : RB-15, RB-16)."""
 import hashlib
+import heapq
+import itertools
 import json
 import os
 
-from .lecteur import Lecteur, _canonique
+from .lecteur import RESERVES, Lecteur, _canonique
 
 JOURNAUX = ("pool", "secondaire")                       # préfixes des deux journaux d'un observateur (FORMAT §15.1)
 CONFIGS = ("formes", "sante", "observateurs", "carte")  # fichiers du paquet (s2bis/config/) portés par `run_params`
 SCELLES = {"pool": ("formes", "sante", "observateurs"), "secondaire": ("formes", "carte")}      # FORMAT §14.4, §15.6
 PORTEUSES = ("commit", "sha256", "descripteur")         # clés porteuses avec SCELLES ; `python` non porteuse (Q-RB2-2)
 STRUCTURE = ("type", "seq", "prec", "ws")               # champs communs, hors des champs propres
+ENSEMBLE = {"pool": "pool", "secondaire": "carte"}      # ensemble des lectures de chaque journal
+ATTENTE = ("ruptures", "trous", "reprises")             # rattachés à la fenêtre qui les suit
 
 
 class RefusFusion(Exception):
@@ -45,6 +53,13 @@ def champs(e):
     return {k: v for k, v in e.items() if k not in STRUCTURE}
 
 
+def fenetre(ws):
+    """Fenêtre `ws` d'un journal : lectures par forme dans les ensembles `pool` et `carte`, `sante`, marqueur,
+    démarrage (`run_params`), autres enregistrements (`tetes`, `asn`, `releve_asn`), ruptures, trous et reprises."""
+    return {"ws": ws, **{k: {} for k in ENSEMBLE.values()}, "sante": None, "marqueur": False, "demarrage": False,
+            "autres": [], **{k: [] for k in ATTENTE}}
+
+
 class Fusion:
     def __init__(self, dossiers, config, commit):
         """Passe 1. `dossiers` : {observateur : dossier de ses journaux `pool` et `secondaire`} (Q-RB2-4) ; `config` :
@@ -59,6 +74,8 @@ class Fusion:
                 self.run_params[o, j], self.tetes[o, j] = self._demarrages(o, j)
             if len({_canonique(self.run_params[o, j]["descripteur"]) for j in JOURNAUX}) > 1:
                 raise RefusFusion("FUSION/descripteur", f"{o} : descripteurs du pool et du secondaire différents")
+        lus = {"pool": self.paquet["formes"][0], "secondaire": self.paquet["carte"][0]}
+        self.formes = {j: {x["nom"]: x for x in c["formes"]} for j, c in lus.items()}       # forme : hôte, décodeur
 
     def _demarrages(self, o, j):
         """(premier `run_params`, tête) du journal `j` de `o` ; chaque `run_params` contrôlé (`_controler`)."""
@@ -90,3 +107,55 @@ class Fusion:
             raise RefusFusion("FUSION/observateur", ou)
         if discordantes := [k for k in cles if _canonique(rp[k]) != _canonique(premier[k])]:
             raise RefusFusion("FUSION/run_params-discordant", f"{ou} : {discordantes}")
+
+    def fenetres(self):
+        """Passe 2 : (ws, {observateur : {journal : fenêtre}}) par ws croissant ; une fenêtre ne porte que les journaux
+        qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale}."""
+        self.integrite = {}
+        flux = heapq.merge(*(self._flux(o, j) for o in self.liste for j in JOURNAUX), key=lambda x: x[0])
+        for ws, groupe in itertools.groupby(flux, key=lambda x: x[0]):
+            par = {}
+            for _ws, o, j, f in groupe:
+                par.setdefault(o, {})[j] = f
+            yield ws, par
+
+    def _flux(self, o, j):
+        """(ws, o, j, fenêtre) du journal `j` de `o` par ws croissant (FORMAT §3.2) ; ruptures, `trou` et `reprise`
+        rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit."""
+        lec, f, attente = Lecteur(self.dossiers[o], j), None, {k: [] for k in ATTENTE}
+        for genre, *x in lec:
+            if genre == "rupture":
+                attente["ruptures"].append(x[0])
+                continue
+            e = x[1]
+            if e["type"] in ("trou", "reprise"):
+                attente[e["type"] + "s"].append({k: v for k, v in e.items() if k not in ("type", "prec")})
+            if e["type"] in RESERVES - {"marqueur"}:
+                continue
+            if f is not None and e["ws"] != f["ws"]:
+                yield f["ws"], o, j, f
+                f = None
+            f = f or fenetre(e["ws"])
+            for k in ATTENTE:
+                f[k] += attente[k]
+            attente = {k: [] for k in ATTENTE}
+            self._ranger(o, j, f, e)
+        if f is not None:
+            yield f["ws"], o, j, f
+        self.integrite[o, j] = {"tete": lec.tete, "ruptures": lec.ruptures, "queues": lec.queues,
+                                "queue_finale": lec.queue_finale}
+
+    def _ranger(self, o, j, f, e):
+        """Range l'enregistrement de fenêtre `e` dans `f`, chaque `lecture` sous sa forme, avec l'hôte et le décodeur
+        de sa forme (formes.json, carte.json)."""
+        t, c, ou = e["type"], champs(e), f"{o}/{j}, seq {e['seq']}"
+        if t == "lecture":
+            x = self.formes[j][c["forme"]]
+            f[ENSEMBLE[j]][c["forme"]] = {**{k: v for k, v in c.items() if k not in ("forme", "brut")},
+                                          "hote": x["hote"], "decodeur": x["decodeur"]}
+        elif t == "sante":
+            f["sante"] = c
+        elif t in ("marqueur", "run_params"):
+            f["marqueur" if t == "marqueur" else "demarrage"] = True
+        else:
+            f["autres"].append({"type": t, **c})

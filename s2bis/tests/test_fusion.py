@@ -10,12 +10,13 @@ import shutil
 import tempfile
 import unittest
 
-from shogen_s2bis.collecte import entree, journal
-from shogen_s2bis.collecte.lecture import S
+from shogen_s2bis.collecte import decodeurs, entree, journal
+from shogen_s2bis.collecte.lecture import S, Lecture
 from shogen_s2bis.recalc import fusion
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG = os.path.join(RACINE, "config")
+FIXTURES = os.path.join(RACINE, "tests", "fixtures")
 COMMIT = "c" * 40
 WS = 1791158220                         # 2026-10-04 23:57 UTC (`date -u -d @1791158220`)
 OBS = ("o1", "o2", "o3", "o4")          # liste fermée d'observateurs.json (GEL-7)
@@ -56,6 +57,29 @@ class Paquet(unittest.TestCase):                            # quatre fichiers lu
                     self.assertEqual(e.exception.code, "FUSION/observateurs")
 
 
+def m(n):                               # fenêtre n minutes après WS ; m(3) = 2026-10-05 00:00 UTC
+    return WS + 60 * n
+
+
+def corps(dec):
+    """Octets de la fixture du décodeur `dec` (fixtures/actifs, temoin, ou btc sans le suffixe `_btc`)."""
+    for chemin in (f"actifs/{dec}.bin", f"temoin/{dec}.bin", f"btc/{dec[:-4]}.bin"):
+        if os.path.exists(os.path.join(FIXTURES, chemin)):
+            with open(os.path.join(FIXTURES, chemin), "rb") as f:
+                return f.read()
+    raise KeyError(dec)
+
+
+def ok(dec, ws):
+    """Lecture `ok` de la fixture, décodée par le décodeur scellé comme dans la boucle (`decodeurs.appliquer`)."""
+    return decodeurs.appliquer(dec, Lecture("ok", ws * S + 40 * S, ws * S + 41 * S, code=200, octets=corps(dec)))
+
+
+def panne(_dec, ws):
+    return Lecture("panne_transport", ws * S + 40 * S, ws * S + 50 * S, sous_type="delai")
+
+
+BTC = [("binance_btc", "binance_btc"), ("coinbase_btc", "coinbase_btc")]
 class Observateurs:
     """Dossier d'essai : par observateur, un descripteur et un dossier de journaux `pool` et `secondaire`."""
 
@@ -104,7 +128,7 @@ class Observateurs:
     def quatre(self, ws0=WS, rp=None, fenetres=None, lire=None):
         """Les huit journaux, un démarrage chacun, ouverts à ws0 (`rp`, `fenetres` : {(o, j) : run_params, fenêtres}
         imposés, lectures de `lire`) ; {observateur : dossier}."""
-        return {o: [self.ecrire(o, j, ws0, (fenetres or {}).get((o, j), ()), (rp or {}).get((o, j)), lire)
+        return {o: [self.ecrire(o, j, ws0, (fenetres or {}).get((o, j), ()), (rp or {}).get((o, j)), lire or ok)
                     for j in fusion.JOURNAUX][0] for o in OBS}
 
 
@@ -185,3 +209,84 @@ class RunParams(Base):                                      # E-R-04 ; liste fer
                          "FUSION/descripteur")
         obs = Observateurs(tempfile.mkdtemp(dir=self.base))
         self.assertEqual(self.refus(obs.quatre(rp={("o1", "pool"): False}), CONFIG, COMMIT), "FUSION/run_params-absent")
+
+
+class Flux(Base):                                           # passe 2 ; Q-R-03 : ruptures rendues à leur place
+    def test_fenetres_fusionnees(self):
+        """Fenêtres par ws croissant, journaux présents seuls ; lectures par forme (hôte et décodeur de formes.json ou
+        de carte.json, forme et décodeur de noms différents, sans `brut`), panne gardée, `sante`, marqueur, démarrage
+        (`run_params` à la première fenêtre admise), autre enregistrement (`asn`, écrit ici par l'écrivain)."""
+        d = {"o1": self.obs.ecrire("o1", "pool", WS, [(m(1), BTC), (m(2), BTC)], lire=ok),
+             "o2": self.obs.ecrire("o2", "pool", m(1), [(m(2), BTC)], lire=lambda x, ws: (panne if x == "coinbase_btc"
+                                                                                           else ok)(x, ws))}
+        self.obs.ecrire("o1", "secondaire", WS, [(m(1), [("binance_btc_remplacant", "binance_btc")])], lire=ok)
+        self.obs.ecrire("o2", "secondaire", m(1))
+        d["o3"], d["o4"] = self.obs.ecrire("o3", "pool", m(2)), [self.obs.ecrire("o4", j, m(2)) for j in
+                                                                   fusion.JOURNAUX][0]
+        jl = journal.Journal(d["o3"], "secondaire", fsync=lambda fd: None).ouvrir(m(2))
+        jl.ecrire("run_params", m(3), **self.obs.run_params("o3", "secondaire"))
+        jl.ecrire("asn", m(3), hote="api.binance.com", a=None, ip=None, ripestat=None, cymru=None)
+        jl.fermer()
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        vues = list(f.fenetres())
+        self.assertEqual([(ws, {o: sorted(x) for o, x in par.items()}) for ws, par in vues], [
+            (m(1), {"o1": ["pool", "secondaire"]}), (m(2), {"o1": ["pool"], "o2": ["pool", "secondaire"]}),
+            (m(3), {"o3": ["pool", "secondaire"], "o4": ["pool", "secondaire"]})])
+        p = vues[0][1]["o1"]["pool"]
+        self.assertEqual({k: p[k] for k in p if k != "pool"}, {
+            "ws": m(1), "carte": {}, "sante": SANTE, "marqueur": True,
+            "demarrage": True, "autres": [], "ruptures": [], "trous": [], "reprises": []})
+        self.assertEqual({k: v for k, v in p["pool"]["binance_btc"].items() if k not in ("depart", "fin")}, {
+            "prevu": m(1) * S, "statut": "ok", "sous_type": None, "code": 200, "phases": {}, "adresse": None,
+            "sha256": hashlib.sha256(corps("binance_btc")).hexdigest(), "hote": "data-api.binance.vision",
+            "decodeur": "binance_btc", "valeurs": [{
+                "actif": "BTC", "classe": "sans_horodatage", "devise": "USDT", "extra": {}, "prix": "64529.50000000",
+                "ts_source": None}]})
+        o1, o2 = vues[1][1]["o1"]["pool"], vues[1][1]["o2"]["pool"]
+        self.assertEqual((o1["demarrage"], o1["pool"]["coinbase_btc"]["valeurs"][0]["ts_source"], o2["demarrage"],
+                          {k: o2["pool"]["coinbase_btc"][k] for k in ("statut", "sous_type", "valeurs", "hote")}),
+                         (False, 1785946281674372, True, {"statut": "panne_transport", "sous_type": "delai",
+                                                          "valeurs": None, "hote": "api.exchange.coinbase.com"}))
+        s = vues[1][1]["o2"]["secondaire"]
+        self.assertEqual((s["demarrage"], s["marqueur"], s["sante"], s["carte"]), (True, False, None, {}))
+        r = vues[0][1]["o1"]["secondaire"]["carte"]
+        self.assertEqual(({n: (x["hote"], x["decodeur"], x["statut"]) for n, x in r.items()},
+                          vues[2][1]["o3"]["secondaire"]["autres"]), ({"binance_btc_remplacant": (
+                              "api.binance.com", "binance_btc", "ok")}, [{"type": "asn", "hote": "api.binance.com", "a":
+                                                                         None, "ip": None, "ripestat": None,
+                                                                         "cymru": None}]))
+        self.assertEqual(sorted((k, v["ruptures"]) for k, v in f.integrite.items()), [
+            ((o, j), []) for o in OBS for j in fusion.JOURNAUX])
+
+    def test_ruptures_trous_et_reprises_a_leur_place(self):
+        """o2 : ligne `sante` de m(2) rendue non intègre au fichier du 2026-10-04 (octet 0xFF) : queue de ce fichier,
+        rupture LECTEUR/lien au fichier du 2026-10-05, rendue dans la fenêtre m(3), sans portée en fenêtres (RB-3).
+        o1 : arrêt après m(1), reprise à m(5) : `reprise` (FORMAT §2 : `suivante`, première fenêtre ni close ni
+        déclarée, m(2)) et `trou` (FORMAT §8.1 : de = suivante, a = ws − w, cause `arret`) dans la fenêtre m(6)."""
+        d = self.obs.quatre(fenetres={("o2", "pool"): [(m(n), BTC) for n in (1, 2, 3, 4)],
+                                      ("o1", "pool"): [(m(1), BTC)]})
+        chemin = os.path.join(d["o2"], "pool-2026-10-04-0.jsonl")
+        with open(chemin, "rb") as f:
+            lignes = f.readlines()
+        k = [i for i, x in enumerate(lignes) if b'"type":"sante"' in x and b'"ws":%d' % m(2) in x][0]
+        with open(chemin, "wb") as f:
+            f.write(b"".join(lignes[:k]) + lignes[k].replace(b'"non_parties"', b'"\xffon_parties"') + b"".join(
+                lignes[k + 1:]))
+        self.obs.ecrire("o1", "pool", m(5), [(m(6), BTC)], lire=ok)
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        vues = {ws: par for ws, par in f.fenetres()}
+        o2 = {ws: vues[ws]["o2"]["pool"] for ws in vues if "pool" in vues[ws].get("o2", {})}
+        r = f.integrite["o2", "pool"]["ruptures"]
+        self.assertEqual(([x["code"] for x in r], r[0]["fichier"], [(q["fichier"], q["position"], q["cause"]) for q in
+                                                                    r[0]["queues"]]), (
+            ["LECTEUR/lien"], "pool-2026-10-05-0.jsonl",
+            [("pool-2026-10-04-0.jsonl", len(b"".join(lignes[:k])), "LECTEUR/utf8")]))
+        formes = ["binance_btc", "coinbase_btc"]
+        self.assertEqual({ws: (x["ruptures"], x["sante"] is not None, x["marqueur"], sorted(x["pool"])) for ws, x in
+                          o2.items()}, {m(1): ([], True, True, formes), m(2): ([], False, False, formes),
+                                        m(3): (r, True, True, formes), m(4): ([], True, True, formes)})
+        o1 = vues[m(6)]["o1"]["pool"]
+        self.assertEqual(([{k: x[k] for k in x if k != "seq"} for x in o1["reprises"]], [{k: x[k] for k in x if k !=
+                                                                                         "seq"} for x in o1["trous"]],
+                          o1["demarrage"], m(5) in vues), ([{"ws": m(5), "suivante": m(2), "queue": None}], [
+                              {"de": m(2), "a": m(5), "cause": "arret"}], True, False))
