@@ -3558,3 +3558,31 @@ passages isolés sous 3.11 (`-X dev -W error`) : verts, 1,8 s chacun.
 
 Suite : 446 tests ; plancher du job : 446, inchangé. Compte de R-25 : 44 lignes de code ajoutées (`.py`) ; hors compte :
 METRIQUES.
+
+## RB2-a (2026-10-18) : frontière du recalcul ouverte aux seuls décodeurs scellés (E-R-03 ; décision de l'orchestrateur, brief de RB-2)
+
+Objet : la règle `recalc` de `tests/test_fitness.py` admet `shogen_s2bis.collecte.decodeurs` par `from … import` de ses
+seuls noms `DECODEURS` et `decoder` (table `NOMMES`, fonction `_admis`) ; `import` du module, autre nom, `*`,
+sous-module, autre module de `collecte` : refusés. `cibles` relève les imports (module, noms) ; test neuf
+`test_fermeture_des_decodeurs` : la fermeture transitive de l'import des décodeurs est exactement `decodeurs`,
+`journal`, `lecture` et leurs deux paquets parents, la bibliothèque standard hors du paquet, sans import dynamique
+(constat Q-RB2-1 : `decodeurs.py` importe `collecte.journal` et `collecte.lecture`). Docstring de
+`recalc/__init__.py` ; ajout daté au G0.
+
+Rouge : `cibles` posée d'abord (refactorisation seule), règle inchangée : 1 FAIL (`test_frontiere_refuse` : l'import
+admis des deux noms refusé) ; le test de fermeture fixe une propriété du code présent, vert dès l'origine, et ses
+mutants (a06 à a08, a11) le montrent discriminant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_fitness.py` | 158 | 7 (1 de plus : `test_fermeture_des_decodeurs`) |
+| `shogen_s2bis/recalc/__init__.py` | 2 | — |
+
+Mutants (commande du job `s2bis-unittest`, `scripts/controle/mutants.py` du dépôt, borne 300 s) : 12 classés, 12
+tués, 0 vivant, 0 FATAL : règle `recalc` sans les décodeurs ; nom `journal` admis ; préfixe appliqué au module nommé ;
+`import` simple admis ; un nom admis suffit ; import neuf de `collecte` dans `lecture.py`, dynamique dans
+`journal.py`, de `dns` dans le paquet parent, de `config` dans `decodeurs.py` ; niveau relatif décalé ; noms perdus ;
+plancher.
+
+Suite : 447 tests ; plancher du job : 447, égalité exigée (`--egal`). Compte de R-25 : 70 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : G0, METRIQUES.

@@ -98,3 +98,18 @@ résolveur de l'observateur ; une minuterie de DB-3 rafraîchira les ensembles p
 smoke de DB-2 constatera les adresses NTS négociées (Q-4, Q-5). (6) **E-D-22**, constat (e) : un N2 volontaire sur
 chaque observateur, après lequel le bail DHCP et la lecture des métadonnées du fournisseur sont constatés (L-5). Le
 texte validé de ce G0 reste tel quel.
+
+*Ajout daté du 2026-10-18 16:13:07 UTC (heure lue par `date -u` à la dernière écriture du texte ; lot RECALC-BIS,
+sous-lot RB-2, diff RB2-a ; décision de l'orchestrateur écrite au brief de RB-2, 2026-10-18 15:58:48 UTC)*, frontière
+d'imports du recalcul (PROPOSITION §1 pt 2 ; E-R-03) : (1) `recalc` importe `shogen_s2bis.collecte.decodeurs`, seul
+module de `collecte` qui lui soit ouvert, par `from … import` de ses seuls noms `DECODEURS` et `decoder` (table
+`NOMMES` de `s2bis/tests/test_fitness.py`, règle `recalc` de `REGLES`) ; `import` du module, autre nom, `*`, sous-module
+ou tout autre module de `collecte` restent refusés. Motif : E-R-03 exige que les octets bruts soient re-décodés « par
+les décodeurs scellés » ; une copie de leur code ferait deux décodeurs à tenir égaux, et la PROPOSITION §1 pt 2 admet
+déjà `collecte.decodeurs` pour le recalcul (la règle codée de RB-0a était plus serrée). (2) Constat du générateur
+(question Q-RB2-1, à adjuger) : `collecte/decodeurs.py` n'importe pas que la bibliothèque standard, mais aussi
+`collecte.journal` (`canonique`, borne de l'écrivain appliquée aux valeurs, CB-6c) et `collecte.lecture` (`Lecture`,
+pour `appliquer`) ; le module n'est pas modifié (code gelé). La fermeture transitive de l'import est fixée par
+`test_fermeture_des_decodeurs` : exactement ces trois modules et leurs paquets parents (`shogen_s2bis`,
+`shogen_s2bis.collecte`), hors du paquet la bibliothèque standard seule, aucun import dynamique ; un import neuf dans
+l'un d'eux fait échouer le test. Le texte validé de ce G0 reste tel quel.
