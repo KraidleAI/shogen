@@ -3586,3 +3586,26 @@ plancher.
 
 Suite : 447 tests ; plancher du job : 447, égalité exigée (`--egal`). Compte de R-25 : 70 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : G0, METRIQUES.
+
+## RB2-b (2026-10-18) : fusion, paquet lu en octets et liste fermée des observateurs (E-R-04 ; FORMAT §14.1)
+
+Objet : module neuf `shogen_s2bis/recalc/fusion.py` : `paquet(dossier)` lit en octets les quatre fichiers du paquet
+portés par `run_params` (`formes`, `sante`, `observateurs`, `carte` de `s2bis/config/`), rend données et sha256 (JSON
+illisible ou hors UTF-8 : `FUSION/config`) ; `Fusion(dossiers, config, commit)` refuse, avant toute lecture de journal,
+un ensemble d'observateurs autre que la liste fermée d'`observateurs.json` (`FUSION/observateurs`). Tests neufs :
+`tests/test_fusion.py`, classe `Paquet`.
+
+Rouge : sur un squelette (paquet sans lecture, aucun contrôle) : 6 FAIL (5 sous-cas de la liste fermée, empreintes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 42 | — |
+| `tests/test_fusion.py` | 53 | 2 (neufs) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : surnuméraires seuls refusés ; nombre seul
+comparé ; liste lue des dossiers ; empreinte d'un texte nettoyé ; latin-1 (vivant au criblage avant la campagne : le cas
+hors UTF-8 tombait aussi en JSON invalide ; cas réécrit, octet 0xFF dans une chaîne) ; erreur JSON non nommée ; `carte`
+hors du paquet ; deux codes ; liste vide admise ; plancher.
+
+Suite : 449 tests ; plancher du job : 449, égalité exigée (`--egal`). Compte de R-25 : 96 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
