@@ -35,7 +35,8 @@ forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sino
 GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1 ; FORMAT §14.1, §16.8, §17) : `observateurs.json`, liste fermée des quatre
 observateurs et URL de la TSA, lue par `status` (avec `--depot`), `resume` et `jeton` (`--observateurs`) : l'observateur
 du descripteur doit y être (CONFIG/observateur) ; `jeton` refuse un `--envoi` sans TSA scellée, ou autre qu'elle
-(CONFIG/tsa) ; C-1 : `tsa` facultative, absente au gel, scellée à DB-3 (Certigna, acte extérieur)."""
+(CONFIG/tsa) ; C-1 : `tsa` facultative, absente au gel, scellée à DB-3 (Certigna, acte extérieur). C-5 du gel : `pool`
+avec `--depot` exige `--observateurs` ; la liste va au dépôt (enregistrement `tetes`) et à `run_params`."""
 import argparse
 import collections
 import ipaddress
@@ -194,7 +195,7 @@ def _lecteur(x, delai, tls):
     return lambda suivi: decodeurs.appliquer(x["decodeur"], http.lire(req, suivi, delai=delai, tls=tls))
 
 
-def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
+def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None, liste=None):
     """(écrivain non ouvert, boucle) câblés depuis les configurations : une lecture par forme, plan par hôte, sondes
     de `sante.json` vers le résolveur du descripteur, disque du dossier du journal (PLAN-CABLAGE-1) ; dépôt des têtes
     au nom de l'observateur, journal `pool`, si `depot` (CB-15c)."""
@@ -203,7 +204,7 @@ def construire(f, s, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, depot=None):
     jl = journal.Journal(dossier, "pool", w=f["w"], fsync=fsync)
     return jl, boucle.Boucle(jl, {x["nom"]: _lecteur(x, f["delai"], tls) for x in f["formes"]}, _plan(f), f["places"],
                              w=f["w"], delta=f["delta"], marge=f["marge"], sondes=sondes,
-                             depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync))
+                             depot=depot and tetes.Depot(depot, d["observateur"], "pool", fsync, liste))
 
 
 def _observateur(chemin):
@@ -211,18 +212,19 @@ def _observateur(chemin):
     return config.charger(chemin, SCHEMAS["descripteur"], COHERENCE["descripteur"])[0]["observateur"]
 
 
-def _liste(chemin, o):
+def _liste(chemin, o, sha=False):
     """`observateurs.json` contrôlé (GEL-7), dont l'observateur `o` du descripteur doit être : sinon RefusConfig.
-    Avec le seul champ inconnu `tsa`, relu sous le schéma de la TSA (C-1 : absente au gel)."""
+    Avec le seul champ inconnu `tsa`, relu sous le schéma de la TSA (C-1 : absente au gel). `sha` (C-5) : rend
+    (données, sha256 des octets lus), comme `config.charger`."""
     try:
-        liste = config.charger(chemin, OBSERVATEURS, COHERENCE_OBSERVATEURS)[0]
+        lu = config.charger(chemin, OBSERVATEURS, COHERENCE_OBSERVATEURS)
     except config.RefusConfig as e:
         if e.code != "CONFIG/champ-inconnu" or str(e).split(" : ")[-1] != "tsa":
             raise
-        liste = config.charger(chemin, *TSA)[0]
-    if o not in liste["observateurs"]:
+        lu = config.charger(chemin, *TSA)
+    if o not in lu[0]["observateurs"]:
         raise config.RefusConfig("CONFIG/observateur", f"{o} hors de la liste")
-    return liste
+    return lu if sha else lu[0]
 
 
 def _jeton(a, tls, fsync):
@@ -321,6 +323,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         c.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
         if nom == "pool":
             c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
+            c.add_argument("--observateurs", help="liste fermée des observateurs (C-5) ; exigée avec --depot")
     jeton = commandes.add_parser("jeton", help="jeton RFC 3161 du jour (FORMAT §16)")
     for option in ("--descripteur", "--depot", "--observateurs"):
         jeton.add_argument(option, required=True)
@@ -350,9 +353,14 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
     pool, fichiers = a.commande == "pool", FICHIERS[a.commande]
     try:
         lus = (configurer if pool else configurer_secondaire)({n: getattr(a, n) for n in fichiers}, a.commit)
+        if pool and a.depot and not a.observateurs:
+            raise config.RefusConfig("CONFIG/options", "--depot exige --observateurs")
+        if pool and a.observateurs:                                 # C-5 : liste au dépôt et à `run_params`
+            lus["observateurs"] = _liste(a.observateurs, lus["descripteur"][0]["observateur"], sha=True)
         f, champs = lus["formes"][0], _run_params(lus, a.commit)
         args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
-        jl, b = construire(*args, a.depot) if pool else construire_secondaire(*args, releve)
+        liste = "observateurs" in lus and lus["observateurs"][0]["observateurs"]
+        jl, b = construire(*args, a.depot, liste or None) if pool else construire_secondaire(*args, releve)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2

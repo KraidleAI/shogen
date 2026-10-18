@@ -18,7 +18,8 @@ ne bloque ni la boucle ni une commande) ; l'écriture ne suit aucun lien ; au `t
 manifeste et de sa requête (C-5). GEL-7 (SHOGEN-S2BIS-OBSERVATEURS-LISTE-1) : avec la liste fermée, les têtes d'un nom
 hors de la liste sont ignorées et nommées ; l'état d'armement du jour est écrit au dépôt (`.armement`). C-3 de la G2
 du lot : la liste filtre les noms avant la borne NOMBRE ; une tête hors de la liste n'est pas lue et n'en évince
-aucune de la liste."""
+aucune de la liste. Correction C-5 du lot de gel (I-1 de sa G2) : l'enregistrement `tetes` de la boucle lit la même
+liste (`Depot.liste`), noms hors liste écartés avant la borne et nommés au refus."""
 import contextlib
 import hashlib
 import http.client
@@ -220,9 +221,10 @@ def _lire_tete(chemin, observateur, nom_journal):
 
 class Depot:
     """Dépôt des têtes vu par le journal `nom_journal` de `observateur` (AVIS Q-D-03)."""
-    def __init__(self, dossier, observateur, nom_journal="pool", fsync=os.fsync):
+    def __init__(self, dossier, observateur, nom_journal="pool", fsync=os.fsync, liste=None):
         self.dossier, self.observateur, self.journal, self.fsync, self.echec = (dossier, observateur, nom_journal,
                                                                                fsync, None)
+        self.liste = liste                                          # C-5 du lot de gel : liste fermée, ou None
 
     def exporter(self, ws, tete):
         """Tête (seq, sha256) du point de contrôle de la fenêtre `ws`, au fichier `<observateur>-<journal>.tete` ;
@@ -238,11 +240,18 @@ class Depot:
         """Champs de l'enregistrement `tetes` : `tetes`, `refus`, `ignores` de `lire_tetes`, sauf le fichier de ce
         journal, les têtes de l'observateur d'abord (C-2) ; `jeton`, {fichier, sha256, manifeste, tsq} du dernier
         `.tsr` de l'observateur : sha256 de ses octets, de son manifeste et de sa requête (C-5 ; null pour un fichier
-        qui ne se lit pas), ou null ; `export`, échec du dernier export, ou null."""
+        qui ne se lit pas), ou null ; `export`, échec du dernier export, ou null. C-5 du lot de gel : avec `liste`,
+        les fichiers de tête d'un nom hors de la liste sont écartés avant la borne NOMBRE, nommés au refus
+        (`TETES/liste`, NOMBRE au plus), le reste compté aux `ignores`."""
         r = {"tetes": [], "refus": [], "ignores": 0, "jeton": None, "export": self.echec}
         try:
             r["tetes"], r["refus"], r["ignores"] = lire_tetes(self.dossier, (self.observateur, self.journal),
-                                                               self.observateur)
+                                                               self.observateur, self.liste)
+            if self.liste is not None:
+                hors = [n for n in sorted(os.listdir(self.dossier)) if (m := NOM.fullmatch(n)) and m[1] not in
+                        self.liste]
+                r["refus"] += [[n, "TETES/liste"] for n in hors[:NOMBRE]]
+                r["ignores"] += max(0, len(hors) - NOMBRE)
             jetons = sorted(n for n in os.listdir(self.dossier) if re.fullmatch(re.escape(self.observateur) + TSR, n))
         except Exception:                                           # attrape-tout : dossier absent ou illisible
             r["refus"].append([".", "TETES/depot"])

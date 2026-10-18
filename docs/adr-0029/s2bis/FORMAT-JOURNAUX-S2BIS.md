@@ -89,7 +89,8 @@
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-8, documentation seule, écrit au paquet Q-C-07 et la date de coupure
   de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
   de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
-  (§15.2).
+  (§15.2) ; les diffs C-3 et C-4 de la G2 du lot (§16, §19) ; le diff C-5, la liste fermée dans l'enregistrement
+  `tetes` et à `run_params` (§14.3, §14.4, §16.5).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -738,10 +739,13 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
 3. **Commande** (CB-18d) : `python3 -m shogen_s2bis.collecte pool --formes F --sante S --descripteur D --journal
    DOSSIER --commit SHA` (code de référence : `s2bis/shogen_s2bis/collecte/entree.py`). `--fenetres N` arrête après N
    fenêtres (essais) ; sans elle, la boucle tourne sans fin, sous systemd. `--depot DOSSIER` (CB-15c) : dépôt des
-   têtes (§16) ; sans elle, ni enregistrement `tetes` ni export. Un refus de configuration donne la sortie 2
+   têtes (§16) ; sans elle, ni enregistrement `tetes` ni export ; avec elle, `--observateurs L` est exigée
+   (correction C-5 du lot de gel ; `CONFIG/options` sinon ; observateur du descripteur hors de la liste :
+   `CONFIG/observateur`) : la liste fermée va au dépôt (§16.5). Un refus de configuration donne la sortie 2
    et `collecte : refus : <code> : …` sur la sortie d'erreur, sans rien écrire.
 4. **`run_params`** (CB-18d), écrit à chaque démarrage, aussitôt le journal ouvert, à la première fenêtre admise :
-   `commit`, `sha256` (`{formes, sante, descripteur}` : sha256 des octets lus), les contenus `formes` (dont
+   `commit`, `sha256` (`{formes, sante, descripteur}`, et `observateurs` avec `--observateurs`, C-5 : sha256 des
+   octets lus), les contenus `formes` (dont
    `tolerance`, CB-18g), `sante` et `descripteur`, `python` (version de l'interpréteur). Une fenêtre qui porte
    `run_params` puis n'a pas de marqueur est déclarée par le `trou` suivant (§8). Une configuration dont `run_params`,
    `seq` et `ws` écrits sur 19 chiffres (10^18), passerait LIMITE est un refus de configuration (`CONFIG/taille`,
@@ -875,8 +879,11 @@ collecteur.
    (plus de 1 024 octets), `TETES/forme` (pas une ligne JSON canonique aux clés exactes, ou entier de plus de 640
    chiffres), `TETES/champs` (observateur ou journal autre que ceux du nom, `seq` ou `ws` qui n'est pas un entier de 0 à
    10^18 − 1, ou de 0 à 10^12 − 1, `sha256` qui n'a pas 64 chiffres hexadécimaux minuscules) ; dossier illisible :
-   `TETES/depot`. Champs rendus : `tetes` (têtes valides, les siennes d'abord), `refus` (`[nom, code]`), `ignores`
-   (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256, manifeste, tsq}` : sha256 du dernier
+   `TETES/depot`. Liste fermée (correction C-5 du lot de gel, I-1 de sa G2 ; la même que celle de `jeton`, C-3) :
+   pour l'enregistrement `tetes`, les fichiers de tête d'un observateur hors de la liste sont écartés avant ces
+   bornes ; les 16 premiers par ordre des noms sont nommés au refus `TETES/liste`, les autres comptés aux `ignores` :
+   aucun nom hors de la liste n'évince une tête de la liste. Champs rendus : `tetes` (têtes valides, les siennes
+   d'abord), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256, manifeste, tsq}` : sha256 du dernier
    `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son manifeste et de sa requête du même jour, null
    pour un fichier qui ne se lit pas (CB-15f ; C-5 de la G2 de P2B : la chaîne ancre la requête qui a eu le jeton) ; ou
    null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export ou null). Toute valeur rendue

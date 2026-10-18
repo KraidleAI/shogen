@@ -3402,6 +3402,18 @@ la TSA scellée est refusé (`CONFIG/tsa`) : le mutant R-09 de la G2 (comparaiso
 FAIL du FORMAT. Mutants (même outil, même commande) : 4 (K-01 à K-04), 4 tués. Suite : 442 tests, plancher inchangé.
 Compte de R-25 : 31 lignes de code ajoutées (`.py`) ; hors compte : FORMAT, METRIQUES.
 
+Correction C-5 du lot (2026-10-18 ; I-1 de la G2, adjugée ; diff distinct après C-4) : l'enregistrement `tetes` de la
+boucle lit la liste fermée comme `jeton` : `tetes.Depot(…, liste)` écarte les fichiers de tête d'un nom hors de la liste
+avant la borne NOMBRE, en nomme seize au plus au refus `TETES/liste` et compte le reste aux `ignores` ; la commande
+`pool` avec `--depot` exige `--observateurs` (`CONFIG/options`), refuse un observateur hors de la liste
+(`CONFIG/observateur`) et porte la liste à `run_params` (`sha256.observateurs` et contenu). FORMAT §14.3, §14.4,
+§16.5, puce. Rouge, sur un squelette (paramètre et option acceptés sans effet) : 2 FAIL (tête d'`o2` évincée par dix-sept
+têtes hors liste ; liste absente du dépôt câblé). Mutants (même outil, même commande) : 14, 14 tués (liste non
+transmise à la lecture ; refus `TETES/liste` retiré, mal codé ou non borné ; reste non compté ; test d'appartenance
+inversé ; liste non câblée au dépôt, ou perdue au point d'entrée ; `--observateurs` non exigée ; liste absente de
+`run_params` ; sha256 falsifié ; observateur figé ; FORMAT ; plancher). Suite : 443 tests ; plancher du job : 443,
+égalité exigée. Compte de R-25 : 66 lignes de code ajoutées (`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.
+
 ## GEL-8 (2026-10-18) : paquet, Q-C-07 et date de coupure de la carte (documentation seule)
 
 Objet : `G6-PAQUET-S2BIS.md` §5 (Q-C-07 : les deux mesures d'USDC sont des formes déjà présentes, classe USDC/USD

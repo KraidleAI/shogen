@@ -371,6 +371,10 @@ class Format(unittest.TestCase):
             "facultative et absente au gel", "TSA scellée à DB-3 (Certigna, acte extérieur)") if x not
             in sections["14"]] + [x for x in ("`résumés ignorés (hors de la liste) : <fichier> ; …`",
                                               "sans `--observateurs`") if x not in sections["17"]], [])
+        c5 = [(seize, "refus `TETES/liste`"), (seize, "aucun nom hors de la liste n'évince une tête de la liste"),
+              (sections["14"], "`--observateurs L` est exigée"), (sections["14"], "et `observateurs` avec")]   # C-5
+        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") for p in puces if p.startswith(
+            "**Gel du collecteur**")], [1])
         self.assertEqual([("GEL-7" in p and "OBSERVATEURS-LISTE-1" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True])
 

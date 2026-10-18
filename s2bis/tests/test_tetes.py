@@ -33,7 +33,7 @@ from unittest import mock
 from shogen_s2bis.collecte import boucle, entree, journal, tetes
 from shogen_s2bis.collecte.lecture import S
 from tests.test_boucle import Temps, borne, rapide
-from tests.test_entree import COMMIT, configurations, port_ferme
+from tests.test_entree import COMMIT, RACINE, configurations, port_ferme
 from tests.test_journal import FICHIER, Base, chaine
 from tests.test_reprise import m
 
@@ -178,6 +178,17 @@ class Depot(unittest.TestCase):
             p = pathlib.Path(self.d, nom)
             p.mkdir() if contenu is None else p.write_bytes(contenu if type(contenu) is bytes else ligne_tete(contenu))
 
+    def test_liste_fermee_avant_la_borne(self):                     # C-5 (I-1 de la G2 du lot de gel)
+        """Dix-sept têtes de noms hors de la liste (a00 à a16), triées avant o2 : sans liste, la tête d'o2 est évincée
+        par la borne de seize (garde : la fixture sépare) ; avec la liste, elles sont écartées avant la borne, nommées
+        au refus (`TETES/liste`, seize au plus, le reste compté aux `ignores`), et la tête d'o2 est lue."""
+        self.poser({**{f"a{k:02d}-pool.tete": tete(f"a{k:02d}") for k in range(17)}, "o2-pool.tete": tete("o2")})
+        sans = tetes.Depot(self.d, "o1").lire()
+        avec = tetes.Depot(self.d, "o1", liste=["o1", "o2", "o3", "o4"]).lire()
+        self.assertEqual((tete("o2") in sans["tetes"], sans["ignores"]), (False, 2))
+        self.assertEqual((avec["tetes"], avec["refus"], avec["ignores"]),
+                         ([tete("o2")], [[f"a{k:02d}-pool.tete", "TETES/liste"] for k in range(16)], 1))
+
     def test_export_atomique_a_chaque_point(self):
         """Ligne canonique {journal, observateur, seq, sha256, ws} (octets écrits à la main), écrite dans un fichier
         temporaire synchronisé, renommée, puis dossier synchronisé ; un export suivant remplace le fichier."""
@@ -287,7 +298,10 @@ class Branchement(Base):
 
     def test_point_d_entree_depot_et_nom_d_observateur(self):
         """`--depot` câble un dépôt au nom de l'observateur du descripteur, journal `pool` ; sans lui, aucun ; un nom
-        d'observateur hors de `[a-z0-9]{1,16}` est refusé avant l'ouverture du journal (sortie 2)."""
+        d'observateur hors de `[a-z0-9]{1,16}` est refusé avant l'ouverture du journal (sortie 2). C-5 : `--depot`
+        exige `--observateurs` ; la liste va au dépôt, le sha256 de ses octets et son contenu à `run_params` ; un
+        observateur hors de la liste est refusé (sortie 2)."""
+        obs = os.path.join(RACINE, "config", "observateurs.json")
         d = tempfile.TemporaryDirectory()
         self.addCleanup(d.cleanup)
         f, s, o = configurations(port_ferme())
@@ -301,11 +315,22 @@ class Branchement(Base):
             vus, err = [], io.StringIO()
             with mock.patch.object(boucle.Boucle, "tourner", lambda b, n: vus.append(b.depot)), \
                     contextlib.redirect_stderr(err):
-                return entree.main(args), [x and (x.dossier, x.observateur, x.journal) for x in vus], err.getvalue()
-        self.assertEqual(lancer("o1", "--depot", d.name), (0, [(d.name, "o1", "pool")], ""))
+                return entree.main(args), [x and (x.dossier, x.observateur, x.journal, x.liste) for x in vus], \
+                    err.getvalue()
+        self.assertEqual(lancer("o1", "--depot", d.name, "--observateurs", obs),
+                         (0, [(d.name, "o1", "pool", ["o1", "o2", "o3", "o4"])], ""))
+        lignes = [json.loads(x) for n in sorted(os.listdir(jdir)) for x in pathlib.Path(jdir, n).read_bytes(
+        ).splitlines()]
+        rp = [x for x in lignes if x["type"] == "run_params"][-1]
+        self.assertEqual((rp["sha256"]["observateurs"], rp["observateurs"]), (hashlib.sha256(pathlib.Path(
+            obs).read_bytes()).hexdigest(), {"observateurs": ["o1", "o2", "o3", "o4"]}))
         self.assertEqual(lancer("o1"), (0, [None], ""))
+        self.assertEqual(lancer("o1", "--depot", d.name), (2, [], "collecte : refus : CONFIG/options : --depot exige "
+                                                                  "--observateurs\n"))
+        self.assertEqual(lancer("o9", "--depot", d.name, "--observateurs", obs),
+                         (2, [], "collecte : refus : CONFIG/observateur : o9 hors de la liste\n"))
         for nom in ("O1", "o-1", "o/1", "Ö1", "o1 "):
-            self.assertEqual(lancer(nom, "--depot", d.name),
+            self.assertEqual(lancer(nom, "--depot", d.name, "--observateurs", obs),
                              (2, [], "collecte : refus : CONFIG/incoherent : observateur-nom\n"), nom)
 
 
