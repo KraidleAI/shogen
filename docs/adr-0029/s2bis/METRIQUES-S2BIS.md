@@ -3254,3 +3254,28 @@ retiré du FORMAT ; « hors du vote » retiré du paquet ; écart du test annul�
 
 Suite : 433 tests ; plancher du job : 433, inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors
 compte : `formes.json`, FORMAT, paquet, METRIQUES.
+
+## GEL-3 (2026-10-18) : règle `nom-forme` des formes (SHOGEN-S2BIS-NOM-FORME-1)
+
+Objet : règle de cohérence `nom-forme` de `formes.json` et de `carte.json` (`entree.COHERENCE`, donc
+`COHERENCE_CARTE`) : nom de forme au motif `NOM` de `capture` (`[a-z0-9_][a-z0-9_.-]{0,63}`), une seule constante
+(`entree.NOM` est `capture.NOM`) ; le refus `nom` de `capture` reste en défense. FORMAT §14.1, §19 point 1 et puce.
+
+Rouge : sur un squelette (`entree.NOM` à None, aucune règle), 3 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/entree.py` | 332 | — |
+| `tests/test_entree.py` | 317 | 1 de plus (`test_regle_nom_forme` : admis, refusés, carte, constante unique) |
+| `tests/test_formes_pool.py` | 161 | 7 (inchangé : noms de `formes.json` au motif, règle présente) |
+| `tests/test_format.py` | 371 | 23 (inchangé : §14.1, §19 et puce) |
+
+Mutants (même commande, même outil) : 15 joués, 14 tués, 1 vivant déclaré équivalent, 0 FATAL : règle retirée ;
+motif élargi aux majuscules, au point initial, au tiret initial ; longueur réduite à 63 ; `match` au lieu de
+`fullmatch` ; `any` au lieu de `all` ; règle sur la première forme seule ; règle retirée de la carte ; refus `nom` de
+`capture` retiré ; constante dupliquée sous un autre texte ; FORMAT §19 ; plancher ; une règle voisine
+(`chemin-forme`, mutant mal visé, rejoué sur `nom-forme`). Vivant : constante recompilée au même texte
+(`re.compile` rend l'objet de son cache : même objet, équivalent).
+
+Suite : 434 tests ; plancher du job : 434, égalité exigée (`--egal`). Compte de R-25 : 29 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.

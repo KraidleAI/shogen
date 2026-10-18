@@ -30,7 +30,8 @@ pris en configuration) ; elles valent aussi pour `carte.json` (COHERENCE_CARTE),
 CB-16 (E-C-37 ; FORMAT §18) : commande `smoke` (smoke.py), `formes.json` et `carte.json` (facultative) contrôlés comme
 au démarrage, une lecture de chaque forme, sans prix : 0 pool et témoin décodés ; 1 sinon ; 2 refus de configuration.
 INT-P2-16 (Q-5 adjugée ; FORMAT §19) : commande `capture` (capture.py), mêmes configurations, octets bruts de chaque
-forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus."""
+forme écrits dans `--dossier`, rien d'imprimé : 0 pool et témoin lus ; 1 sinon ; 2 refus. GEL-3
+(SHOGEN-S2BIS-NOM-FORME-1 ; FORMAT §14.1) : règle `nom-forme`, nom de forme au motif NOM de `capture`, pool et carte."""
 import argparse
 import collections
 import ipaddress
@@ -44,6 +45,7 @@ from shogen_s2bis.collecte import (asn, boucle, capture, config, decodeurs, dns,
 from shogen_s2bis.collecte.lecture import S, horloge
 
 MAX = 3600 * S
+NOM = capture.NOM                     # nom de forme (GEL-3) : une seule constante, celle des noms de fichier de capture
 HOTE = "[a-z0-9.-]{1,253}"            # nom d'hôte ou IPv4 : même règle que le recalcul (Q-RB-13 de sa tranche 1)
 FORME = {"nom": (str, 1, 64), "hote": (str, 1, 253), "port": (int, 1, 65535), "chemin": (str, 1, 2048),
          "methode": (str, 3, 4), "corps": (str, 0, 65536), "espace": (bool, None, None), "decodeur": (str, 1, 64)}
@@ -90,6 +92,7 @@ def _rpc(f):
 COHERENCE = {"formes": (("w-divise-l-heure", lambda f: 3600 % f["w"] == 0),
                         ("marge-delta-fenetre", lambda f: f["marge"] < f["delta"] <= f["w"] * S),
                         ("noms-uniques", lambda f: len({x["nom"] for x in f["formes"]}) == len(f["formes"])),
+                        ("nom-forme", lambda f: all(NOM.fullmatch(x["nom"]) for x in f["formes"])),
                         ("methode-corps", lambda f: all((x["methode"], x["corps"] == "") in (("GET", True), (
                             "POST", False)) for x in f["formes"])),
                         ("hote-forme", lambda f: all(re.fullmatch(HOTE, x["hote"]) for x in f["formes"])),

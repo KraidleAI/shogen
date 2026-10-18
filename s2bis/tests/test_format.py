@@ -298,6 +298,9 @@ class Format(unittest.TestCase):
         binance = ("`data-api.binance.vision`", "hôte seul", "`api.binance.com`", "code 451")       # GEL-2, Q-7
         self.assertEqual([x in sections["14"] for x in binance], [True] * 4)
         paquet = " ".join(PAQUET.read_text(encoding="utf-8").split()).split("## 4. Remplaçants écrits d'avance")
+        noms = [("14", "règle `nom-forme`"), ("14", "`[a-z0-9_][a-z0-9_.-]{0,63}`"), ("19", "règle `nom-forme`")]
+        self.assertEqual([x in sections[s] for s, x in noms] + [("GEL-3" in p and "NOM-FORME-1" in p) for p in puces if
+                                                                 p.startswith("**Gel du collecteur**")], [True] * 4)
         self.assertEqual([len(paquet)] + [x in paquet[-1] for x in ("`api.binance.com`", "hors du vote", "code 451",
                                                                     "`smoke`", "`www.cern.ch`")], [2] + [True] * 5)
 

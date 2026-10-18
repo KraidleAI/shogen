@@ -25,7 +25,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from shogen_s2bis.collecte import entree, journal
+from shogen_s2bis.collecte import capture, entree, journal
 from shogen_s2bis.collecte.lecture import S, Lecture
 from tests.test_boucle import borne
 from tests.test_journal import chaine
@@ -152,6 +152,23 @@ class Entree(unittest.TestCase):
             with self.subTest(formes=formes, sante=sante["delai"], commit=commit):
                 r = refus(lambda: entree.configurer(self.ecrire(formes, sante, d)[1], commit))
                 self.assertEqual(r and r.split(" : ")[:2], attendu)
+
+    def test_regle_nom_forme(self):                                  # GEL-3 ; SHOGEN-S2BIS-NOM-FORME-1
+        """Nom de forme au motif de `capture` (une seule constante), pour le pool et pour la carte (COHERENCE_CARTE) :
+        premier caractère minuscule, chiffre ou « _ », puis « . » et « - » admis, 64 caractères au plus (au-delà :
+        la borne du schéma) ; noms écrits à la main."""
+        self.assertIs(entree.NOM, capture.NOM)
+        f, s, d = configurations(1)
+        x, y = f["formes"]
+        cas = [(n, None) for n in ("c", "0_a.b-c", "_" + "z" * 63)]
+        cas += [(n, "nom-forme") for n in ("A", ".x", "-x", "a b", "é", "a/b", "a:b", "a" + chr(10))]
+        for nom, regle in cas:
+            with self.subTest(nom=nom):
+                r = refus(lambda: entree.configurer(self.ecrire({**f, "formes": [x, {**y, "nom": nom}]}, s, d)[1],
+                                                    COMMIT))
+                self.assertEqual(r and r.split(" : ")[:2], regle and ["CONFIG/incoherent", regle])
+                self.assertEqual(dict(entree.COHERENCE_CARTE)["nom-forme"]({"formes": [x, {**y, "nom": nom}]}),
+                                 regle is None)
 
     def test_temoins_et_noms_bornes_au_schema(self):                    # CB-19b, C-1 (b) de la relecture d'intégration
         """Sept témoins et sept noms au plus (FORMAT §13.6, §14.1 : la plus grande `sante` reste sous LIMITE) : sept

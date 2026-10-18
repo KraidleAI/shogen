@@ -12,7 +12,7 @@ import pathlib
 import tempfile
 import unittest
 
-from shogen_s2bis.collecte import boucle, config, decodeurs, entree, http
+from shogen_s2bis.collecte import boucle, capture, config, decodeurs, entree, http
 from shogen_s2bis.collecte.lecture import S
 
 RACINE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -78,6 +78,8 @@ class Formes(unittest.TestCase):
         f = formes()
         self.assertEqual((len(f), os.path.exists(os.path.join(RACINE, "config", "formes-pool.json"))), (33, False))
         self.assertEqual([x["nom"] for x in f], ORDRE)               # ordre de `formes-pool.json` gardé (GEL-1)
+        self.assertEqual(([x["nom"] for x in f if not capture.NOM.fullmatch(x["nom"])], "nom-forme" in dict(
+            entree.COHERENCE["formes"])), ([], True))                 # GEL-3 : règle des noms (NOM-FORME-1)
         for x in f:
             with self.subTest(nom=x["nom"]):
                 req = http.Requete(x["hote"], x["chemin"], x["port"], x["methode"], x["corps"].encode() or None)

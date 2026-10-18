@@ -82,7 +82,7 @@
 - **Gel du collecteur** (2026-10-17 ; lot GEL-COLLECTEUR-1, Q-C-06 du G0) : le diff GEL-1 scelle `formes.json` de
   production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
   SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
-  paquet (Q-C-08).
+  paquet (Q-C-08) ; le diff GEL-3, la règle `nom-forme` (§14.1, §19), qui ferme SHOGEN-S2BIS-NOM-FORME-1.
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -651,7 +651,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    types, bornes, puis règles de cohérence nommées) :
    - `formes.json`, configuration scellée de la boucle : `w` (s, divise 3 600), `delta`, `tolerance`, `delai`,
      `marge` (µs ; `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port,
-     chemin, methode, corps, espace, decodeur}` (noms uniques ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
+     chemin, methode, corps, espace, decodeur}` (noms uniques ; nom de forme `[a-z0-9_][a-z0-9_.-]{0,63}`, règle
+     `nom-forme`, diff GEL-3, SHOGEN-S2BIS-NOM-FORME-1 : le motif `NOM` de la commande `capture`, une seule constante,
+     qui fait aussi le nom de ses fichiers, §19 ; elle vaut pour `carte.json`, §15 ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
      la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
      chaque lecture `ok` de la forme, §9.1). Règle `corps-du-decodeur` (CB-9c) : une forme dont le décodeur lit la
@@ -991,7 +993,8 @@ commande séparée, qui écrit les octets dans un fichier sans rien imprimer »)
 
 1. **Commande** : `python3 -m shogen_s2bis.collecte capture --formes F [--carte C] --dossier D` ; configurations
    contrôlées comme pour `smoke` (§18, point 1). Refus avant toute lecture : dossier absent (`dossier`), nom de forme
-   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom`), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
+   hors de `[a-z0-9_][a-z0-9_.-]{0,63}` (`nom` ; déjà refusé au chargement par la règle `nom-forme` du §14.1, même
+   constante : le refus `nom` reste en défense), fichier déjà présent, jamais écrasé (`fichier`) ; un refus imprime
    `capture : refus : …` sur l'erreur standard, sortie 2.
 2. **Lectures** : celles du smoke (§18, point 2), sans décodage ni CryptoCompare.
 3. **Fichiers** : les octets bruts du corps de chaque lecture dans `<rôle>-<forme>.bin` (rôle `pool`, `temoin` ou
