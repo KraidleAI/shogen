@@ -3609,3 +3609,30 @@ hors du paquet ; deux codes ; liste vide admise ; plancher.
 
 Suite : 449 tests ; plancher du job : 449, égalité exigée (`--egal`). Compte de R-25 : 96 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-c (2026-10-18) : `run_params` de chaque journal, concordants et égaux au paquet, avant tout calcul (E-R-04)
+
+Objet : passe 1 à la construction de `Fusion` : chaque journal `pool` et `secondaire` des quatre observateurs lu par le
+lecteur de RB-1 ; au moins un `run_params` (`FUSION/run_params-absent`) ; pour chacun, clés porteuses présentes
+(`commit`, `sha256`, `descripteur`, puis `formes`, `sante`, `observateurs` au pool, `formes`, `carte` au secondaire ;
+`python` non porteuse, Q-RB2-2 ; `FUSION/run_params-cle`), commit égal au commit scellé (`FUSION/commit`), `sha256` aux
+clés exactes et égal au paquet (`FUSION/sha256`), contenus égaux au paquet sous forme canonique (`FUSION/contenu`,
+Q-RB2-3), descripteur au nom de l'observateur (`FUSION/observateur`), clés porteuses égales à celles du premier
+démarrage (`FUSION/run_params-discordant`) ; descripteur égal entre les deux journaux (`FUSION/descripteur`). Tests :
+classe `RunParams` (journaux écrits par `collecte/journal.py`, `run_params` par `entree.configurer`,
+`configurer_secondaire`, `_liste`, `_run_params` sur les configurations de production).
+
+Rouge : sur le code de RB2-b : 22 FAIL (sous-cas de refus non levés), 1 ERROR (`run_params` absent de l'objet).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 92 | — |
+| `tests/test_fusion.py` | 187 | 6 (4 de plus : `RunParams`) |
+
+Mutants (même commande, même outil) : 14 classés, 14 tués, 0 vivant, 0 FATAL : descripteur non porteur ; `python`
+porteuse ; `observateurs` hors des scellés ; commit non contrôlé ; sha256 du premier fichier seul ; clés du `sha256`
+libres ; contenus non contrôlés ; observateur non contrôlé ; concordance avec soi-même ; premier démarrage remplacé ;
+descripteurs des deux journaux ; `run_params` absent admis ; clé absente admise ; plancher.
+
+Suite : 453 tests ; plancher du job : 453, égalité exigée (`--egal`). Compte de R-25 : 187 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
