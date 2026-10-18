@@ -298,7 +298,7 @@ class Format(unittest.TestCase):
         binance = ("`data-api.binance.vision`", "hôte seul", "`api.binance.com`", "code 451")       # GEL-2, Q-7
         self.assertEqual([x in sections["14"] for x in binance], [True] * 4)
         paquet = " ".join(PAQUET.read_text(encoding="utf-8").split()).split("## 4. Remplaçants écrits d'avance")
-        carte = ("`s2bis/config/carte.json` de production", "carte vide (`formes` : [])")         # GEL-9 (C-2)
+        carte = ("`s2bis/config/carte.json` de production", "remplaçants de Binance seuls")    # GEL-9 (C-2), C-6
         self.assertEqual([x in sections["15"] for x in carte] + [("GEL-9" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True] * 3)
         sondes = ("scellée au gel du collecteur (diff GEL-6,", "`www.kernel.org` et `www.arin.net`", "198.41.0.4")
@@ -373,8 +373,8 @@ class Format(unittest.TestCase):
                                               "sans `--observateurs`") if x not in sections["17"]], [])
         c5 = [(seize, "refus `TETES/liste`"), (seize, "aucun nom hors de la liste n'évince une tête de la liste"),
               (sections["14"], "`--observateurs L` est exigée"), (sections["14"], "et `observateurs` avec")]   # C-5
-        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") for p in puces if p.startswith(
-            "**Gel du collecteur**")], [1])
+        self.assertEqual([x for s, x in c5 if x not in s] + [p.count("le diff C-5") + p.count("le diff C-6") for p in
+                                                             puces if p.startswith("**Gel du collecteur**")], [2])
         self.assertEqual([("GEL-7" in p and "OBSERVATEURS-LISTE-1" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True])
 

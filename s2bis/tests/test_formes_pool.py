@@ -35,9 +35,14 @@ CARTE = os.path.join(RACINE, "config", "carte.json")                 # GEL-9 (C-
 CARTE_GEL = {"depart": 5_000_000,       # E-C-32 (ADR-0029 l.235) ; FORMAT §15.2 : « En production, `depart` vaut 5 s »
              "delai": 10_000_000,       # délai par requête du pool (l.233)
              "marge": 1_000_000,        # échéance à ws + w − 1 s, comme le pool (l.233)
-             "places": 1,               # pool de fils minimal : aucune forme
+             "places": 4,               # C-6 : une place par forme (règle `places-formes`)
              "asn": {"periode": 86_400, "decalage": 0},    # relevé ASN quotidien (E-C-30), à minuit UTC
-             "formes": []}              # carte vide au gel, sources après le rendu (AVIS du G0, Q-G-04, l.77)
+             "formes": [{"nom": f"binance_{a}_remplacant", "hote": "api.binance.com", "port": 443, "chemin":
+                         "/api/v3/ticker/price?symbol=" + s, "methode": "GET", "corps": "", "espace": True,
+                         "decodeur": f"binance_{a}"} for a, s in (("btc", "BTCUSDT"), ("usdc", "USDCUSD"),
+                                                                  ("usdt", "USDTUSD"), ("eth", "ETHUSDT"))]}
+# C-6 (I-2 de la G2 du lot de gel, Q-C-08) : au gel, la carte ne porte que les remplaçants de Binance, hôte de S2 ;
+# sources de la carte après le rendu (AVIS du G0, Q-G-04, l.77)
 PHRASES = ("w = 60 s", "δ = 20 s, délai 10 s par requête, échéance dure à ws + w − 1 s", "plus de 5 s après",
            "(5 + 4 + 10 + 1 = 20 ≤ 20 s)")                      # texte des lignes citées, cherché dans l'ADR
 S2 = {"binance_btc": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT",              # sources.py l.241-
@@ -189,10 +194,12 @@ class Formes(unittest.TestCase):
                                     "0" * 40)
         self.assertEqual(lus["sante"][0]["delai"] + lus["formes"][0]["marge"], 3_000_000)
 
-    def test_carte_de_production_vide(self):                        # GEL-9 ; correction C-2
+    def test_carte_de_production(self):                             # GEL-9 ; corrections C-2 et C-6
         """`config/carte.json` égal aux constantes écrites ici ; chargé avec `formes.json` de production par
-        `entree.configurer_secondaire` (schéma CARTE, règles de forme et règles croisées : `hors-delta` 5 + 10 ≤ 40 s,
-        `marge-carte` 16 ≤ 60 s, `cadence`) ; la phrase du paquet (§6) le dit."""
+        `entree.configurer_secondaire` (schéma CARTE, règles de forme et règles croisées : `budget-partage`, l'hôte
+        `api.binance.com` n'étant pas au pool ; `hors-delta` 5 + 3 + 10 ≤ 40 s ; `marge-carte` 19 ≤ 60 s ;
+        `cadence`) ; C-6 : chaque remplaçant a le chemin et le décodeur de sa forme du pool, sur l'hôte de S2 (ECART) ;
+        la phrase du paquet (§6) le dit."""
         descripteur = {"observateur": "o1", "fournisseur": "essai", "region": "essai", "asn": 64512, "resolveur":
                        "127.0.9.53", "config_resolveur": "resolv.conf", "versions": ["python3"], "empreinte": "e" * 64}
         with tempfile.TemporaryDirectory() as d:
@@ -200,7 +207,13 @@ class Formes(unittest.TestCase):
             lus = entree.configurer_secondaire({"formes": FORMES, "carte": CARTE, "descripteur": os.path.join(
                 d, "d.json")}, "0" * 40)
         paquet = " ".join((ADR.parent / "s2bis" / "G6-PAQUET-S2BIS.md").read_text(encoding="utf-8").split())
-        self.assertEqual((lus["carte"][0], "carte vide au gel, sources après le rendu" in paquet), (CARTE_GEL, True))
+        self.assertEqual((lus["carte"][0], "carte au gel : remplaçants de Binance seuls ; sources de la carte après le "
+                          "rendu" in paquet), (CARTE_GEL, True))
+        pool = {x["nom"]: x for x in lus["formes"][0]["formes"]}
+        self.assertEqual({x["nom"]: (x["chemin"], x["decodeur"], "//" + x["hote"] + "/") for x in CARTE_GEL["formes"]},
+                         {n + "_remplacant": (x["chemin"], x["decodeur"], ECART["binance_btc"][0]) for n, x in
+                          pool.items() if n.startswith("binance_")})
+        self.assertNotIn("api.binance.com", {x["hote"] for x in pool.values()})
 
 
 if __name__ == "__main__":

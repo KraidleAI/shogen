@@ -1,2 +1,7 @@
-{"depart": 5000000, "delai": 10000000, "marge": 1000000, "places": 1, "asn": {"periode": 86400, "decalage": 0},
- "formes": []}
+{"depart": 5000000, "delai": 10000000, "marge": 1000000, "places": 4, "asn": {"periode": 86400, "decalage": 0},
+ "formes": [
+ {"nom": "binance_btc_remplacant", "hote": "api.binance.com", "port": 443, "chemin": "/api/v3/ticker/price?symbol=BTCUSDT", "methode": "GET", "corps": "", "espace": true, "decodeur": "binance_btc"},
+ {"nom": "binance_usdc_remplacant", "hote": "api.binance.com", "port": 443, "chemin": "/api/v3/ticker/price?symbol=USDCUSD", "methode": "GET", "corps": "", "espace": true, "decodeur": "binance_usdc"},
+ {"nom": "binance_usdt_remplacant", "hote": "api.binance.com", "port": 443, "chemin": "/api/v3/ticker/price?symbol=USDTUSD", "methode": "GET", "corps": "", "espace": true, "decodeur": "binance_usdt"},
+ {"nom": "binance_eth_remplacant", "hote": "api.binance.com", "port": 443, "chemin": "/api/v3/ticker/price?symbol=ETHUSDT", "methode": "GET", "corps": "", "espace": true, "decodeur": "binance_eth"}
+]}

@@ -3467,3 +3467,16 @@ Mutants (même commande, même outil) : 9 mutants, 9 tués, 0 vivant, 0 FATAL : 
 
 Suite : 442 tests ; plancher du job : 442, égalité exigée (`--egal`). Compte de R-25 : 24 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.
+
+Correction C-6 du lot (2026-10-18 ; I-2 de la G2, adjugée avec Q-1 et Q-2 ; diff distinct après C-5) : la carte de
+production porte les quatre remplaçants de Binance (`binance_<actif>_remplacant`, `api.binance.com`, chemins et
+décodeurs des formes `binance_*` du pool, `espace` vrai), lus par le processus secondaire à chaque fenêtre, hors du
+vote ; `places` 4 (règle `places-formes`) ; le test charge la carte par `configurer_secondaire` (règles croisées : hôte
+absent du pool, aucun budget partagé ; `hors-delta` 5 + 3 + 10 ≤ 40 s) et lie chaque remplaçant à sa forme du pool.
+Paquet §4 (Q-1 : les 7 jours écrits comme la lecture de l'advisor de l'AVIS l.95 ; remplaçant lu par la carte) et §6
+(`carte au gel : remplaçants de Binance seuls ; sources de la carte après le rendu` ; Q-2 : `decalage` 0, décision de
+l'orchestrateur ; `places` porté de 1 à 4). FORMAT §15.2, puce ; trois lignes de plus de 120 colonnes de GEL-2, GEL-3
+et C-5 recoupées. Rouge, sur la carte vide de GEL-9 : 3 FAIL. Mutants (même outil, même commande) : 9, 9 tués
+(remplaçant sur l'hôte du pool : budget partagé dépassé ; chemin ; décodeur ; places 3 et 5 ; nom ; `espace` d'un
+seul ; FORMAT ; paquet). Suite : 443 tests, plancher inchangé (443). Compte de R-25 : 22 lignes de code ajoutées
+(`.py`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.

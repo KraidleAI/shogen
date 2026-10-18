@@ -90,7 +90,7 @@
   de la carte (`G6-PAQUET-S2BIS.md` §5, §6) ; le diff GEL-6 scelle `sante.json` de production (§14.1), volet sondes
   de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
   (§15.2) ; les diffs C-3 et C-4 de la G2 du lot (§16, §19) ; le diff C-5, la liste fermée dans l'enregistrement
-  `tetes` et à `run_params` (§14.3, §14.4, §16.5).
+  `tetes` et à `run_params` (§14.3, §14.4, §16.5) ; le diff C-6, les remplaçants de Binance à la carte (§15.2).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -670,8 +670,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      `marge` (µs ; `marge` < `delta` ≤ w·10⁶), `places` (taille du pool), `formes` : liste de `{nom, hote, port,
      chemin, methode, corps, espace, decodeur}` (noms uniques ; nom de forme `[a-z0-9_][a-z0-9_.-]{0,63}`, règle
      `nom-forme`, diff GEL-3, SHOGEN-S2BIS-NOM-FORME-1 : le motif `NOM` de la commande `capture`, une seule constante,
-     qui fait aussi le nom de ses fichiers, §19 ; elle vaut pour `carte.json`, §15 ; `GET` sans corps ou `POST` avec corps ; `espace` vrai :
-     la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes les formes d'un hôte ;
+     qui fait aussi le nom de ses fichiers, §19 ; elle vaut pour `carte.json`, §15 ; `GET` sans corps ou `POST` avec
+     corps ; `espace` vrai : la limite de l'hôte impose l'espacement de 1 s entre ses lectures, même valeur pour toutes
+     les formes d'un hôte ;
      `decodeur`, CB-6c : nom d'un décodeur de la liste fermée du code, règle `decodeur-connu`, qui lit le corps de
      chaque lecture `ok` de la forme, §9.1). Règle `corps-du-decodeur` (CB-9c) : une forme dont le décodeur lit la
      réponse d'un `eth_call` construit par le code (Uniswap, Curve) est un `POST` de ce corps exact, octet pour
@@ -685,8 +686,9 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      sont fondues dans leur ordre, et ce fichier est supprimé ; les huit flux BTC gardés
      reprennent l'URL et le corps de S2 octet pour octet, hors d'un écart déclaré, hôte seul (diff GEL-2 ; Q-7 de
      P2C) : les quatre formes de Binance lisent `data-api.binance.vision`, chemins et décodeurs inchangés, au lieu de
-     `api.binance.com` de S2, qui rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`
-     l.37, l.131) ; `api.binance.com` est écrit au paquet comme remplaçant, hors du vote (`G6-PAQUET-S2BIS.md` §4,
+     `api.binance.com` de S2, qui rend le code 451 depuis le poste de mesure
+     (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; `api.binance.com` est écrit au paquet comme
+     remplaçant, hors du vote (`G6-PAQUET-S2BIS.md` §4,
      Q-C-08) ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
      les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
      autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
@@ -784,10 +786,15 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    - `cadence` : `periode` et `decalage` multiples de w, `decalage` < `periode`.
 
    En production, `depart` vaut 5 s (E-C-32, valeur scellée). Tout écart est un refus nommé (`CONFIG/…`), levé avant
-   l'ouverture du journal. Au gel (diff GEL-9, correction C-2) : `s2bis/config/carte.json` de production, carte vide
-   (`formes` : []), `depart` 5 000 000 µs, `delai` 10 000 000 µs, `marge` 1 000 000 µs, `places` 1, `asn`
-   `{periode 86 400, decalage 0}` (relevé ASN quotidien à minuit UTC) : sources après le rendu
-   (`G6-PAQUET-S2BIS.md` §6) ; `test_formes_pool` le charge par `configurer_secondaire`.
+   l'ouverture du journal. Au gel (diff GEL-9, correction C-2, amendé par la correction C-6) :
+   `s2bis/config/carte.json` de production, `depart` 5 000 000 µs, `delai` 10 000 000 µs, `marge` 1 000 000 µs,
+   `places` 4, `asn` `{periode 86 400, decalage 0}` (relevé ASN quotidien à minuit UTC) ; `formes` : les
+   remplaçants de Binance seuls (C-6, I-2 de la G2 du lot de gel, Q-C-08), `binance_<actif>_remplacant` pour BTC,
+   USDC, USDT et ETH, sur `api.binance.com`, chemins et décodeurs des formes `binance_*` du pool : le processus
+   secondaire les lit à chaque fenêtre, hors du vote (la carte n'y entre pas), et mesure ainsi depuis chaque
+   observateur la disponibilité du remplaçant (code 451 attendu depuis certains lieux,
+   `docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37) ; l'hôte n'est pas au pool : aucun budget partagé. Sources de la
+   carte après le rendu (`G6-PAQUET-S2BIS.md` §6) ; `test_formes_pool` le charge par `configurer_secondaire`.
 3. **Boucle de la carte** : celle du pool (§11), départ D = ws + `depart` (δ de la carte : w − `depart`), échéance
    E = ws + w − `marge`, `places` de la carte, une lecture par forme au `delai` de la carte, décodée par le décodeur de
    sa forme (§9.1), et sans sondes : la `sante` porte les champs des sondes nuls ou vides (§13.1). Mêmes
@@ -883,8 +890,9 @@ collecteur.
    pour l'enregistrement `tetes`, les fichiers de tête d'un observateur hors de la liste sont écartés avant ces
    bornes ; les 16 premiers par ordre des noms sont nommés au refus `TETES/liste`, les autres comptés aux `ignores` :
    aucun nom hors de la liste n'évince une tête de la liste. Champs rendus : `tetes` (têtes valides, les siennes
-   d'abord), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier, sha256, manifeste, tsq}` : sha256 du dernier
-   `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son manifeste et de sa requête du même jour, null
+   d'abord), `refus` (`[nom, code]`), `ignores` (fichiers au-delà de ces bornes), `jeton` (CB-15e : `{fichier,
+   sha256, manifeste, tsq}` : sha256 du dernier `<observateur>-<jour>.tsr` du dépôt par ordre des noms, puis de son
+   manifeste et de sa requête du même jour, null
    pour un fichier qui ne se lit pas (CB-15f ; C-5 de la G2 de P2B : la chaîne ancre la requête qui a eu le jeton) ; ou
    null ; un `.tsr` illisible : refus `TETES/lecture`), `export` (échec du dernier export ou null). Toute valeur rendue
    est admise par l'écrivain : un dépôt hostile ne fait jamais refuser l'enregistrement

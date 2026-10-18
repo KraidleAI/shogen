@@ -45,11 +45,13 @@ mêmes octets sous cinq graines de hachage) et la compilation de chaque module a
 *Ajout daté du 2026-10-17 (lot GEL-COLLECTEUR-1, diff GEL-2 ; Q-C-08 du G0 COLLECTE-RECALC-DEPLOI, PROPOSITION
 l.347-351, adoptée par l'AVIS l.97 ; Q-7 de P2C ; avis de l'advisor du lot, Q-A)*. Liste fermée, par unité : un
 remplaçant n'est lu que par le processus secondaire, hors du vote ; la bascule vers lui n'est possible qu'avant le
-sceau, et refait le rodage selon Q-C-06 (7 jours, dont un week-end, AVIS l.95).
+sceau, et refait le rodage selon Q-C-06. Durée de ce rodage refait (Q-1 de la G2 du lot, adjugée) : 7 jours, dont un
+week-end, lecture de l'advisor du lot (Q-A), adoptée par l'orchestrateur, de l'AVIS l.95, où les 7 jours valent pour
+un remplaçant d'observateur (ADR-0029 l.224) : ce n'est pas une règle de l'ADR.
 
 | unité ou rôle | en service au gel | remplaçant | même chemin et même décodeur | motif |
 |---|---|---|---|---|
-| binance (pool, quatre formes `binance_*`) | `data-api.binance.vision` | `api.binance.com` (hôte de S2) | oui : chemins `/api/v3/ticker/price?symbol=…` et décodeurs `binance_*` inchangés | `api.binance.com` rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; la réponse de l'un et l'autre hôte depuis des hôtes européens n'est pas mesurée : à vérifier par `smoke` à DB-2, depuis chaque observateur. Limite : une restriction par la localisation de l'adresse source frapperait aussi le remplaçant, qui ne vaut que contre une panne propre à `data-api.binance.vision` (avis de l'advisor, Q-A) |
+| binance (pool, quatre formes `binance_*`) | `data-api.binance.vision` | `api.binance.com` (hôte de S2) | oui : chemins `/api/v3/ticker/price?symbol=…` et décodeurs `binance_*` inchangés | `api.binance.com` rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; la réponse de l'un et l'autre hôte depuis des hôtes européens n'est pas mesurée : à vérifier par `smoke` à DB-2, depuis chaque observateur ; correction C-6 : le remplaçant est lu à chaque fenêtre par le processus secondaire (formes `binance_<actif>_remplacant` de `s2bis/config/carte.json`), qui en mesure la disponibilité depuis chaque observateur. Limite : une restriction par la localisation de l'adresse source frapperait aussi le remplaçant, qui ne vaut que contre une panne propre à `data-api.binance.vision` (avis de l'advisor, Q-A) |
 | nom témoin de D-5 (`sante.json`, `noms` : `www.kernel.org`, `www.arin.net`) | les deux noms | `www.cern.ch` | sans objet (sonde D-5, requête A au résolveur de l'observateur) | lecture des noms témoins du 2026-10-17 et son adjudication (lot GEL-COLLECTEUR-1) : TTL servi de 60 s, autorités et adresses hors des ASN du pool et distinctes de celles des deux témoins ; réserve : un seul opérateur (AS513) ; TTL d'origine et ASN à confirmer au rodage (ADR-0029 l.110) |
 
 ## 5. USDC : les deux mesures et leur écart (Q-C-07)
@@ -82,5 +84,8 @@ la date de coupure de la carte égale au gel du collecteur` ; Q-C-09, AVIS l.98)
 celle du gel du collecteur, c'est-à-dire du commit qui verse ce lot. Aucun lot CB-14 n'est prêt à cette date : aucune
 source n'entre à la carte avant le rendu ; les sources passent après le rendu, hors paquet (AVIS l.77). Le processus
 secondaire tourne alors avec une carte vide, que le schéma admet (`entree.CARTE`, `formes` : liste vide admise ; le
-relevé ASN tourne sans carte, FORMAT §15). Correction C-2 (diff GEL-9) : carte vide au gel, sources après le rendu ;
-la configuration scellée est `s2bis/config/carte.json` (`formes` : [], FORMAT §15.2).
+relevé ASN tourne sans carte, FORMAT §15). Correction C-2 (diff GEL-9), amendée par C-6 (I-2 de la G2 du lot) :
+carte au gel : remplaçants de Binance seuls ; sources de la carte après le rendu ; la configuration scellée est
+`s2bis/config/carte.json` (quatre formes `binance_<actif>_remplacant`, §4, FORMAT §15.2). `decalage` 0 : décision de
+l'orchestrateur (Q-2 de la G2 du lot) ; `places`, ratifié à 1 pour la carte vide, vaut 4 depuis C-6 (règle
+`places-formes` : une place par forme).
