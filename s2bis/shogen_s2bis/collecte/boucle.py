@@ -17,7 +17,8 @@ null, sur l'horloge monotone, et disque et empreinte se relèvent après l'état
 place ; une lecture non rendue tient donc toujours sa place (borne de `tardives`, FORMAT §13.6). CB-15c (E-C-35) : avec
 un dépôt des têtes, la fenêtre qui clôt l'heure porte un enregistrement `tetes` (têtes des autres journaux lues au
 dépôt) avant la `sante`, et la tête de son point de contrôle est exportée au dépôt après le marqueur ; le dépôt ne lève
-jamais (tetes.Depot)."""
+jamais (tetes.Depot). Correction C-10 du lot de gel : `consigner` faux (processus secondaire), la tête est exportée
+sans enregistrement `tetes`."""
 import concurrent.futures
 import threading
 import time
@@ -60,17 +61,18 @@ def jusqu_a(t, horloge, attente):
 
 class Boucle:
     def __init__(self, journal, lectures, plan, places, w=60, delta=DELTA, marge=MARGE, horloge=horloge,
-                 dormir=None, attendre=None, sondes=None, monotone=monotone, depot=None):
+                 dormir=None, attendre=None, sondes=None, monotone=monotone, depot=None, consigner=True):
         """`lectures` {nom: lire(suivi)} ; `plan` de `planifier` ; `places` : taille scellée du pool ; attentes à t ;
         `sondes` (sante.Sondes, CB-11) : lancées au départ, jointes avant l'échéance, versées à `sante` ; `monotone` :
         horloge monotone du relevé (C-4), des départs et des fins de sondes (CB-18b) ; `depot` (tetes.Depot, CB-15c)
-        ou None. Nom du plan sans lecture : BOUCLE/plan."""
+        ou None ; `consigner` : l'enregistrement `tetes` est écrit (pool), ou seule la tête est exportée (C-10). Nom du
+        plan sans lecture : BOUCLE/plan."""
         manquants = sorted({nom for _d, nom in plan} - lectures.keys())
         if manquants:
             raise RefusBoucle("BOUCLE/plan", f"noms du plan sans lecture : {manquants}")
         self.journal, self.lectures, self.plan, self.horloge, self.w = journal, lectures, plan, horloge, w
         self.sondes, self.monotone, self.repere = sondes, monotone, None    # repère : relevé (murale, monotone), C-4
-        self.depot = depot
+        self.depot, self.consigner = depot, consigner
         self.delta, self.marge, self.places, self.abandons = delta, marge, threading.BoundedSemaphore(places), []
         self.dormir = dormir or (lambda t: jusqu_a(t, horloge, lambda d: time.sleep(d / S)))
         self.attendre = attendre or (lambda futurs, t: jusqu_a(t, horloge, lambda d: not concurrent.futures.wait(
@@ -120,7 +122,7 @@ class Boucle:
                 self.abandons.append(futur)
             self.journal.ecrire("lecture", ws, forme=nom, prevu=prevu, **lu.enregistrement())
         heure = self.depot is not None and (ws + self.w) % HEURE == 0           # fenêtre suivie d'un point (CB-15c)
-        if heure:
+        if heure and self.consigner:
             self.journal.ecrire("tetes", ws, **self.depot.lire())
         self.journal.ecrire("sante", ws, d2={"retard_max": max(retards, default=None), "non_parties": non_parties},
                             fils={"abandonnes": len(self.abandons), "tardives": tardives, "sondes": vivantes},

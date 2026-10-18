@@ -10,10 +10,11 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 from unittest import mock
 
-from shogen_s2bis.collecte import entree, secondaire
+from shogen_s2bis.collecte import entree, secondaire, tetes
 from shogen_s2bis.collecte.lecture import S
 from tests.test_boucle import Temps, borne, rapide
 from tests.test_asn import CORPS as RIPESTAT, V, serveur_dns
@@ -63,6 +64,42 @@ class Secondaire(Base):
         borne(self, self.b.tourner, n)
         return [(e["type"], e.get("ws"), e.get("hote", e.get("lance"))) for e in sans_chaine(chaine(
             self.etat()["secondaire-2026-10-04-0.jsonl"])[2])[1:]]
+
+    def test_tete_du_secondaire_exportee_au_point(self):             # C-10 ; SHOGEN-S2BIS-TETE-SECONDAIRE-1
+        """Avec un dépôt, la fenêtre qui clôt l'heure (m(1), `22:59`) : la tête du point du journal `secondaire` est
+        exportée en `o1-secondaire.tete` (seq du point, sha256 pris au `prec` qui le suit, comme au pool) ; aucun
+        enregistrement `tetes` au journal du secondaire (il reste au pool) ; `lire_tetes` la lit sous la liste
+        fermée."""
+        dep = tempfile.TemporaryDirectory()
+        self.addCleanup(dep.cleanup)
+        t = Temps(m(0) * S + 5 * S)
+        jl = borne(self, self.journal, m(0), "secondaire")
+        b = secondaire.Secondaire(jl, {"c": rapide}, [(0, "c")], 4, ["a.example"], "127.0.9.53", 86400, 0,
+                                  releve=lambda h, r: {**NUL, "hote": h}, horloge=t, dormir=t.dormir,
+                                  attendre=t.attendre, monotone=t.monotone, delta=55 * S,
+                                  depot=tetes.Depot(dep.name, "o1", "secondaire"))
+        borne(self, b.tourner, 2)
+        enrs = chaine(self.etat()["secondaire-2026-10-04-0.jsonl"])[2]
+        i = [e["type"] for e in enrs].index("point")
+        attendu = {"journal": "secondaire", "observateur": "o1", "seq": enrs[i]["seq"], "sha256": enrs[i + 1]["prec"],
+                   "ws": m(1)}
+        self.assertEqual(("tetes" in {e["type"] for e in enrs}, enrs[i]["ws"], sorted(os.listdir(dep.name)),
+                          tetes.lire_tetes(dep.name, propre="o2", liste=["o1", "o2", "o3", "o4"])),
+                         (False, m(1), ["o1-secondaire.tete"], ([attendu], [], 0)))
+
+    def test_commande_secondaire_avec_depot(self):                   # C-10
+        """`secondaire --depot P` câble un dépôt au nom de l'observateur du descripteur, journal `secondaire` ; sans
+        lui, aucun ; observateur o3 (le nom de test o1 ne séparerait pas un nom écrit en dur)."""
+        f, _s, d = configurations(port_ferme())
+        ch = fichiers(self.d, formes=f, carte=carte(1), descripteur={**d, "observateur": "o3"})
+        os.mkdir(j := os.path.join(self.d, "j"))
+        vus = []
+        with mock.patch.object(secondaire.Secondaire, "tourner", lambda b, n: vus.append(b.depot)):
+            for plus in (["--depot", self.d], []):
+                self.assertEqual(entree.main(["secondaire", *[x for n in ("formes", "carte", "descripteur") for x in (
+                    "--" + n, ch[n])], "--journal", j, "--commit", COMMIT, *plus]), 0)
+        self.assertEqual([x and (x.dossier, x.observateur, x.journal) for x in vus],
+                         [(self.d, "o3", "secondaire"), None])
 
     def test_carte_part_a_ws_plus_5_secondes_sans_sondes(self):     # E-C-32 : hors de δ, D-1 à D-5 du pool
         self.tourner(1, lambda h, r: {**NUL, "hote": h}, periode=86400, decalage=0)

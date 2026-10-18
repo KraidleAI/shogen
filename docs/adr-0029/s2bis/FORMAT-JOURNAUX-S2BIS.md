@@ -91,7 +91,8 @@
   de SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-9 (correction C-2) verse `carte.json` de production, carte vide
   (§15.2) ; les diffs C-3 et C-4 de la G2 du lot (§16, §19) ; le diff C-5, la liste fermée dans l'enregistrement
   `tetes` et à `run_params` (§14.3, §14.4, §16.5) ; le diff C-6, les remplaçants de Binance à la carte (§15.2) ;
-  le diff C-8, la liste fermée des journaux des têtes (§16.4, §16.5).
+  le diff C-8, la liste fermée des journaux des têtes (§16.4, §16.5) ; le diff C-10, l'export de la tête du
+  secondaire (§15.6, §16.6).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -838,7 +839,10 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
    `test_asn.Decodage.test_plus_grand_releve_sous_limite`.
 6. **Commande** (CB-13b) : `python3 -m shogen_s2bis.collecte secondaire --formes F --carte C --descripteur D --journal
    DOSSIER --commit SHA` ; `--fenetres`, sorties, refus et fermeture comme aux §14.3 et §14.5 ; `run_params` comme au
-   §14.4, `sha256` et contenus `{formes, carte, descripteur}`.
+   §14.4, `sha256` et contenus `{formes, carte, descripteur}`. `--depot DOSSIER` (correction C-10 du lot de gel ;
+   SHOGEN-S2BIS-TETE-SECONDAIRE-1) : à chaque point de contrôle, la tête du journal `secondaire` est exportée au dépôt
+   en `<observateur>-secondaire.tete` (§16.4), sans enregistrement `tetes` : le secondaire ne lit pas les têtes des
+   autres ; `run_params` inchangé.
 
 ## 16. Têtes, dépôt et jeton quotidien (CB-15 ; E-C-35, E-C-36)
 
@@ -908,7 +912,8 @@ collecteur.
    3 600) porte, après ses `lecture` et avant sa `sante`, un enregistrement `tetes` dont les champs sont ceux de la
    lecture du dépôt (point 5), faite au relevé de l'échéance : les têtes des autres journaux sont consignées dès leur
    lecture. Après le marqueur et le point de contrôle, la tête du point, celle que rend l'écrivain, est exportée
-   (point 4). Sans dépôt, ni l'un ni l'autre.
+   (point 4). Sans dépôt, ni l'un ni l'autre. Au processus secondaire (C-10), avec un dépôt, l'export seul (§15.6) :
+   sa tête est lue par l'enregistrement `tetes` du pool et par le jeton (journal `secondaire` de la liste fermée).
 7. **Jeton du jour** (CB-15d ; E-C-36 ; AVIS Q-D-03, point 1) : un `<observateur>-<jour>.tsr` présent au dépôt : « déjà
    émis », rien n'est redemandé. Sinon : manifeste (point 3) des têtes valides du dépôt (point 5, les siennes d'abord,
    hors de la borne des autres ; aucune exclue ; sans tête de l'observateur, refus `JETON/tete`, rien n'est écrit),

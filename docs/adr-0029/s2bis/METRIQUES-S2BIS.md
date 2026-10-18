@@ -3505,3 +3505,30 @@ et C-5 recoupées. Rouge, sur la carte vide de GEL-9 : 3 FAIL. Mutants (même ou
 (remplaçant sur l'hôte du pool : budget partagé dépassé ; chemin ; décodeur ; places 3 et 5 ; nom ; `espace` d'un
 seul ; FORMAT ; paquet). Suite : 443 tests, plancher inchangé (443). Compte de R-25 : 22 lignes de code ajoutées
 (`.py`) ; hors compte : `carte.json`, FORMAT, paquet, METRIQUES.
+
+## C-10 (2026-10-18) : tête du journal `secondaire` exportée au dépôt (SHOGEN-S2BIS-TETE-SECONDAIRE-1 ; I-6 de la G2 du lot de gel)
+
+Objet : la commande `secondaire` reçoit `--depot` (même forme que pour `pool`) ; `construire_secondaire` câble
+`tetes.Depot(depot, observateur, "secondaire")` ; la boucle du secondaire exporte la tête de chaque point de
+contrôle sans écrire d'enregistrement `tetes` (`Boucle(…, consigner=False)` : il ne lit pas les têtes des autres) ;
+la tête `<observateur>-secondaire.tete` est lue par `lire_tetes` sous la liste fermée (journal de JOURNAUX, C-8).
+`run_params` inchangé. FORMAT §15.6, §16.6, puce.
+
+Rouge : sur un squelette (option acceptée sans effet), 2 FAIL (`tetes` écrit au journal du secondaire ; dépôt non
+câblé), puis 1 FAIL du FORMAT.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/collecte/boucle.py` | 148 | — |
+| `shogen_s2bis/collecte/secondaire.py` | 48 | — |
+| `shogen_s2bis/collecte/entree.py` | 377 | — |
+| `tests/test_secondaire.py` | 290 | 2 de plus (tête exportée au point ; commande avec dépôt) |
+| `tests/test_format.py` | 408 | 23 (inchangé : §15.6, §16.6 et puce) |
+
+Mutants (même commande, même outil) : 10 classés, 10 tués après un rejeu : enregistrement `tetes` rétabli au
+secondaire (deux sites) ; dépôt non câblé, journal `carte`, observateur écrit en dur (vivant au premier passage : le
+descripteur de test portait `o1` ; test porté à `o3`, mutant rejoué avec les trois mutants du même test, tués) ;
+option non transmise ; export retiré ; défaut de `consigner` inversé ; FORMAT ; plancher.
+
+Suite : 446 tests ; plancher du job : 446, égalité exigée (`--egal`). Compte de R-25 : 60 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : FORMAT, METRIQUES.

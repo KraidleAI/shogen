@@ -280,16 +280,17 @@ def _status(a, fsync):
     return 0
 
 
-def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
+def construire_secondaire(f, c, d, dossier, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve, depot=None):
     """(écrivain non ouvert, processus secondaire) câblés (CB-13b, FORMAT §15.3) : journal `secondaire` sur la grille
     du pool ; une lecture par forme de la carte, à son délai ; départ ws + `depart` (δ de la carte : w − `depart`),
     échéance ws + w − `marge`, places de la carte, sans sondes ; relevé ASN des hôtes du pool et de la carte au
-    résolveur du descripteur, à la cadence de `asn` ; `releve` injectable (tests sans réseau, DT6-f)."""
+    résolveur du descripteur, à la cadence de `asn` ; `releve` injectable (tests sans réseau, DT6-f) ; `depot`
+    (C-10) : export de la tête au nom de l'observateur, journal `secondaire`."""
     jl = journal.Journal(dossier, "secondaire", w=f["w"], fsync=fsync)
     return jl, secondaire.Secondaire(
         jl, {x["nom"]: _lecteur(x, c["delai"], tls) for x in c["formes"]}, _plan(c), c["places"], _par_hote(f, c),
         d["resolveur"], c["asn"]["periode"], c["asn"]["decalage"], w=f["w"], delta=f["w"] * S - c["depart"],
-        marge=c["marge"], releve=releve)
+        marge=c["marge"], releve=releve, depot=depot and tetes.Depot(depot, d["observateur"], "secondaire", fsync))
 
 
 def _smoke(a, tls):
@@ -321,8 +322,8 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         for option in FICHIERS[nom] + ("journal", "commit"):
             c.add_argument("--" + option, required=True)
         c.add_argument("--fenetres", type=int, help="nombre de fenêtres, puis sortie 0 (essais) ; sans fin par défaut")
+        c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")   # C-10
         if nom == "pool":
-            c.add_argument("--depot", help="dépôt des têtes (FORMAT §16) ; sans lui, ni `tetes` ni export")
             c.add_argument("--observateurs", help="liste fermée des observateurs (C-5) ; exigée avec --depot")
     jeton = commandes.add_parser("jeton", help="jeton RFC 3161 du jour (FORMAT §16)")
     for option in ("--descripteur", "--depot", "--observateurs"):
@@ -360,7 +361,7 @@ def main(argv, tls=http.CONTEXTE, fsync=os.fsync, releve=asn.releve):
         f, champs = lus["formes"][0], _run_params(lus, a.commit)
         args = (*(lus[n][0] for n in fichiers), a.journal, tls, fsync)
         liste = "observateurs" in lus and lus["observateurs"][0]["observateurs"]
-        jl, b = construire(*args, a.depot, liste or None) if pool else construire_secondaire(*args, releve)
+        jl, b = construire(*args, a.depot, liste or None) if pool else construire_secondaire(*args, releve, a.depot)
     except (config.RefusConfig, boucle.RefusBoucle, OSError) as e:
         print(f"collecte : refus : {e}", file=sys.stderr)
         return 2
