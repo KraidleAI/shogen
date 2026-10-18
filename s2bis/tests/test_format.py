@@ -23,6 +23,7 @@ from shogen_s2bis.collecte import entree, journal, status, tetes
 NL = chr(10)
 FORMAT = pathlib.Path(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "docs",
                       "adr-0029", "s2bis", "FORMAT-JOURNAUX-S2BIS.md")
+PAQUET = FORMAT.with_name("G6-PAQUET-S2BIS.md")                    # GEL-2 : remplaçants écrits d'avance (Q-C-08)
 W, WS = 60, 1791154680                                              # 2026-10-04 22:58 UTC
 
 
@@ -294,6 +295,11 @@ class Format(unittest.TestCase):
         self.assertEqual([x in sections["14"] for x in gel], [True] * 3 + [False])
         self.assertEqual([("GEL-1" in p and "CONFIG-PRODUCTION-1" in p) for p in puces if p.startswith(
             "**Gel du collecteur**")], [True])
+        binance = ("`data-api.binance.vision`", "hôte seul", "`api.binance.com`", "code 451")       # GEL-2, Q-7
+        self.assertEqual([x in sections["14"] for x in binance], [True] * 4)
+        paquet = " ".join(PAQUET.read_text(encoding="utf-8").split()).split("## 4. Remplaçants écrits d'avance")
+        self.assertEqual([len(paquet)] + [x in paquet[-1] for x in ("`api.binance.com`", "hors du vote", "code 451",
+                                                                    "`smoke`", "`www.cern.ch`")], [2] + [True] * 5)
 
     def test_paragraphe_19_capture(self):                           # INT-P2-16 (Q-5 adjugée)
         """§19 : commande, refus, fichiers et manifeste, rien d'imprimé ; puce de l'intégration."""

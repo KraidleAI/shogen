@@ -81,7 +81,8 @@
   le diff INT-P2-17 (C-1 de la G2 de la série) fige son ouverture exclusive (§19).
 - **Gel du collecteur** (2026-10-17 ; lot GEL-COLLECTEUR-1, Q-C-06 du G0) : le diff GEL-1 scelle `formes.json` de
   production, formes de `formes-pool.json` fondues et paramètres de la boucle liés à l'ADR (§14.1), volet formes de
-  SHOGEN-S2BIS-CONFIG-PRODUCTION-1.
+  SHOGEN-S2BIS-CONFIG-PRODUCTION-1 ; le diff GEL-2, l'hôte de Binance (§14.1) et les remplaçants écrits d'avance du
+  paquet (Q-C-08).
 
 ## 1. Ligne et chaîne (CB-1)
 
@@ -663,7 +664,11 @@ identifiant`), donc `forme` pour `interroger`, qui ne lève pas (avant CB-12a : 
      (diff GEL-1 ; Q-5 de P2C ; SHOGEN-S2BIS-CONFIG-PRODUCTION-1) dans `s2bis/config/formes.json`, contrôlé par le
      schéma et toutes les règles ci-dessus : les formes de `formes-pool.json` (CB-8c, SHOGEN-S2BIS-FORMES-BTC-1) y
      sont fondues dans leur ordre, et ce fichier est supprimé ; les huit flux BTC gardés
-     reprennent l'URL et le corps de S2 octet pour octet ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
+     reprennent l'URL et le corps de S2 octet pour octet, hors d'un écart déclaré, hôte seul (diff GEL-2 ; Q-7 de
+     P2C) : les quatre formes de Binance lisent `data-api.binance.vision`, chemins et décodeurs inchangés, au lieu de
+     `api.binance.com` de S2, qui rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md`
+     l.37, l.131) ; `api.binance.com` est écrit au paquet comme remplaçant, hors du vote (`G6-PAQUET-S2BIS.md` §4,
+     Q-C-08) ; CoinGecko, DefiLlama et Bitfinex sont regroupés (§9.1) ;
      les trois formes du témoin y sont versées par le diff INT-P2-15 (Q-1 adjugée) : OKX `USDC-USDT`, espacée comme les
      autres lectures d'OKX (cinq par fenêtre) ; Uniswap sur `eth.drpc.org` et Curve sur `rpc.mevblocker.io` (hôtes RPC
      de Q-CA-10), `POST` du corps de leur décodeur ; les règles `corps-du-decodeur` et `rpc-par-unite` les tiennent.

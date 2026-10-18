@@ -34,6 +34,8 @@ S2 = {"binance_btc": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT
       "bitstamp_btc": "https://www.bitstamp.net/api/v2/ticker/btcusd/",
       "gemini_btc": "https://api.gemini.com/v1/pubticker/btcusd",
       "chainlink_btc": "https://ethereum-rpc.publicnode.com"}         # l.223 : chemin vide, écrit « / »
+BINANCE = "data-api.binance.vision"      # GEL-2 (Q-7 de P2C) : api.binance.com rend 451 (PAIRES-ET-TEMOIN l.37)
+ECART = {"binance_btc": ("//api.binance.com/", "//" + BINANCE + "/")}   # écart à l'URL de S2 déclaré : hôte seul
 CORPS_S2 = ('{"jsonrpc": "2.0", "id": 1, "method": "eth_call", "params": [{"to": "%s", "data": "0xfeaf968c"}, '
             '"latest"]}')                                    # json.dumps de post_body (sources.py l.62, l.278-281)
 PROXYS = {"chainlink_btc": "0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88c", "chainlink_eth":
@@ -83,13 +85,16 @@ class Formes(unittest.TestCase):
 
     def test_requete_btc_de_s2_gardee(self):                            # SHOGEN-S2BIS-FORMES-BTC-1
         """Huit flux BTC gardés : URL et corps de S2, octet pour octet (chemin vide de Chainlink écrit « / » par
-        http.client, `putrequest` : « url = url or '/' », lu sous 3.10 à 3.13) ; CoinGecko, DefiLlama et Bitfinex
-        regroupés (E-C-09) : aucune forme BTC seule pour eux."""
+        http.client, `putrequest` : « url = url or '/' », lu sous 3.10 à 3.13), hors de l'écart déclaré (ECART : hôte
+        de Binance seul, GEL-2) ; CoinGecko, DefiLlama et Bitfinex regroupés (E-C-09) : aucune forme BTC seule pour eux.
+        Les quatre formes de Binance sur `data-api.binance.vision` (Q-7 de P2C), chemins inchangés."""
         f = {x["nom"]: x for x in formes()}
         self.assertEqual({n: ("https://" + f[n]["hote"] + f[n]["chemin"], f[n]["methode"], f[n]["corps"]) for n in S2
                           if n in f},
-                         {n: (u + "/" * (u.count("/") == 2), "POST" if n in PROXYS else "GET", CORPS_S2 % PROXYS[n]
-                              if n in PROXYS else "") for n, u in S2.items()})
+                         {n: ((u + "/" * (u.count("/") == 2)).replace(*ECART.get(n, ("", ""))), "POST" if n in PROXYS
+                              else "GET", CORPS_S2 % PROXYS[n] if n in PROXYS else "") for n, u in S2.items()})
+        self.assertEqual({n: x["hote"] for n, x in f.items() if n.startswith("binance")}, dict.fromkeys(
+            ("binance_btc", "binance_usdc", "binance_usdt", "binance_eth"), BINANCE))
         self.assertEqual(sorted(n for n in decodeurs.DECODEURS if n not in f),
                          ["bitfinex_btc", "coingecko_btc", "defillama_btc"])
         self.assertEqual(sorted(x["decodeur"] for x in f.values()), sorted(f))      # décodeur = nom de la forme
@@ -109,7 +114,7 @@ class Formes(unittest.TestCase):
         marge) ; un hôte RPC par pièce du témoin (Q-CA-10)."""
         f = formes()
         self.assertEqual(collections.Counter(x["hote"] for x in f), {
-            "api.binance.com": 4, "api.exchange.coinbase.com": 3, "api.kraken.com": 4, "www.okx.com": 5,
+            BINANCE: 4, "api.exchange.coinbase.com": 3, "api.kraken.com": 4, "www.okx.com": 5,
             "www.bitstamp.net": 4, "api.gemini.com": 4, "api-pub.bitfinex.com": 1, "api.coingecko.com": 1,
             "coins.llama.fi": 1, "ethereum-rpc.publicnode.com": 4, "eth.drpc.org": 1, "rpc.mevblocker.io": 1})
         plan = boucle.planifier([(x["nom"], x["hote"]) for x in f], {x["hote"] for x in f if x["espace"]})

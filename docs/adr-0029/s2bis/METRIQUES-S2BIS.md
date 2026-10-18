@@ -3231,3 +3231,26 @@ absent (FATAL, inapplicable), a été réécrit et rejoué (tué).
 
 Suite : 433 tests ; plancher du job : 433, égalité exigée (`--egal`). Compte de R-25 : 61 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : `formes.json` (données), FORMAT, METRIQUES.
+
+## GEL-2 (2026-10-18) : hôte de Binance, `data-api.binance.vision`, et remplaçants écrits d'avance (Q-7 de P2C ; Q-C-08)
+
+Objet : les quatre formes `binance_*` de `formes.json` lisent `data-api.binance.vision` (chemins et décodeurs
+inchangés) ; l'écart à l'URL de S2 est déclaré au test des URL (`ECART`, hôte seul) et au FORMAT §14.1 ;
+`G6-PAQUET-S2BIS.md` §4 « Remplaçants écrits d'avance » : `api.binance.com` pour l'unité binance (même chemin, même
+décodeur, hors du vote ; motif : code 451 mesuré depuis le poste de mesure, réponse depuis des hôtes européens non
+mesurée, `smoke` à DB-2) et `www.cern.ch` pour les noms témoins de D-5 (adjudication de la lecture DNS du lot).
+
+Rouge : sur les tests neufs et la configuration de GEL-1, 3 FAIL, 0 ERROR.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `config/formes.json` | 36 | données (quatre hôtes changés) |
+| `tests/test_formes_pool.py` | 159 | 7 (inchangé : URL de S2 hors de l'écart, hôtes de Binance) |
+| `tests/test_format.py` | 368 | 23 (inchangé : §14.1 et §4 du paquet au test de INT-P2-15) |
+
+Mutants (même commande, même outil) : 8 mutants, 8 tués par leur test visé, 0 vivant, 0 FATAL : hôte de S2 rendu à
+une forme BTC, puis ETH ; chemin USDC changé ; remplaçant D-5 changé ; section du paquet renommée ; « hôte seul »
+retiré du FORMAT ; « hors du vote » retiré du paquet ; écart du test annulé.
+
+Suite : 433 tests ; plancher du job : 433, inchangé. Compte de R-25 : 16 lignes de code ajoutées (`.py`) ; hors
+compte : `formes.json`, FORMAT, paquet, METRIQUES.

@@ -39,3 +39,15 @@ Aucune analyse statique de sécurité (SAST) ne tourne sur le paquet : un outil 
 R-8 et à la décision de l'orchestrateur (Q-G-05 de l'avis, même forme que SHOGEN-SAST-PYTHON-RECALCUL-1, annexe B
 l.916). En attendant : la présente limite, les fonctions de fitness (frontière d'imports, garde réseau des tests,
 mêmes octets sous cinq graines de hachage) et la compilation de chaque module avec les avertissements en erreur.
+
+## 4. Remplaçants écrits d'avance
+
+*Ajout daté du 2026-10-17 (lot GEL-COLLECTEUR-1, diff GEL-2 ; Q-C-08 du G0 COLLECTE-RECALC-DEPLOI, PROPOSITION
+l.347-351, adoptée par l'AVIS l.97 ; Q-7 de P2C ; avis de l'advisor du lot, Q-A)*. Liste fermée, par unité : un
+remplaçant n'est lu que par le processus secondaire, hors du vote ; la bascule vers lui n'est possible qu'avant le
+sceau, et refait le rodage selon Q-C-06 (7 jours, dont un week-end, AVIS l.95).
+
+| unité ou rôle | en service au gel | remplaçant | même chemin et même décodeur | motif |
+|---|---|---|---|---|
+| binance (pool, quatre formes `binance_*`) | `data-api.binance.vision` | `api.binance.com` (hôte de S2) | oui : chemins `/api/v3/ticker/price?symbol=…` et décodeurs `binance_*` inchangés | `api.binance.com` rend le code 451 depuis le poste de mesure (`docs/adr-0029/g0-calib/PAIRES-ET-TEMOIN.md` l.37, l.131) ; la réponse de l'un et l'autre hôte depuis des hôtes européens n'est pas mesurée : à vérifier par `smoke` à DB-2, depuis chaque observateur. Limite : une restriction par la localisation de l'adresse source frapperait aussi le remplaçant, qui ne vaut que contre une panne propre à `data-api.binance.vision` (avis de l'advisor, Q-A) |
+| nom témoin de D-5 (`sante.json`, `noms` : `www.kernel.org`, `www.arin.net`) | les deux noms | `www.cern.ch` | sans objet (sonde D-5, requête A au résolveur de l'observateur) | lecture des noms témoins du 2026-10-17 et son adjudication (lot GEL-COLLECTEUR-1) : TTL servi de 60 s, autorités et adresses hors des ASN du pool et distinctes de celles des deux témoins ; réserve : un seul opérateur (AS513) ; TTL d'origine et ASN à confirmer au rodage (ADR-0029 l.110) |
