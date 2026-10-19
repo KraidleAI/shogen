@@ -3758,3 +3758,32 @@ tout refus du lecteur pris pour une absence ; code du constat ; quorum non contr
 
 Suite : 463 tests ; plancher du job : 463, égalité exigée (`--egal`). Compte de R-25 : 75 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-G2 (2026-10-18) : corrections de la relecture G2 de RB-2 (C-1, C-2, C-3, C-5, C-7)
+
+Objet : `shogen_s2bis/recalc/fusion.py` : C-1, `brut` exigé égal au base64 canonique de ses octets (FORMAT §9.1 ;
+`b64decode(validate=True)` admet des bits de fin non nuls de 3.10 à 3.13 et un remplissage en trop de 3.10 à 3.12 :
+verdict qui changeait avec la version, mesuré), puis sha256 contrôlé avant le décodeur (octets non authentifiés jamais
+décodés) ; C-2, intégrité de la relecture (`releve` : tête, ruptures, queues déclarées, queue finale) égale à celle de
+la passe 1, sinon `FUSION/relecture` (un fichier antérieur réécrit entre les passes, tête inchangée, passait) ; C-3,
+ruptures, `trou` et `reprise` qu'aucun enregistrement de fenêtre ne suit rendus en `integrite[o, j]["sans_fenetre"]`
+(une `reprise` finale était perdue) ; C-5, un fichier à la place du dossier d'un observateur : `FUSION/dossier` (une
+`NotADirectoryError` remontait). Tests neufs : classe `RevueG2` de `tests/test_fusion.py` ; C-7, tests qui tuent les
+six mutants vivants de la relecture (comparaison des porteuses par `==`, `brut` nul ou non ASCII, témoin filtré par le
+nom de la forme, suffixe sans souligné, `blocs` d'une `panne_decode` du témoin, `panne_http` re-décodée).
+
+Rouge : les tests de C-1 à C-5 sur le code de RB2-h : 4 FAIL, 2 ERROR sous 3.11 (le remplissage en trop passe sous
+3.13) ; ceux de C-7 passent sur ce code et tuent chacun son mutant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 287 | — |
+| `tests/test_fusion.py` | 611 | 24 (8 de plus : `RevueG2`) |
+
+Mutants (même commande, même outil) : 14 classés, 14 tués, 0 vivant, 0 FATAL : les six vivants de la relecture rejoués
+(r02, r03, r05, r06, r11, r14) ; base64 non canonique admis ; sha256 non contrôlé ; sha256 après le décodeur ;
+relecture par la tête seule ; relecture sans les ruptures ; `sans_fenetre` perdu ; fichier pris pour une absence ;
+plancher.
+
+Suite : 471 tests ; plancher du job : 471, égalité exigée (`--egal`). Compte de R-25 : 156 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

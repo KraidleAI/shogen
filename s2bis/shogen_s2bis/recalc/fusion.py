@@ -12,9 +12,11 @@ remontent tels quels).
 Passe 2 (`fenetres`) : les huit journaux relus en flux et fusionnés par fenêtre, observateur et journal (lectures par
 forme, pannes comprises, `sante`, marqueur, démarrage, autres enregistrements), mémoire d'une fenêtre par journal ;
 ruptures du lecteur, `trou` et `reprise` rendus à leur place, dans la fenêtre qui les suit, sans portée en fenêtres
-(Q-R-03, AVIS l.108 : RB-3) ; rien n'est imprimé (rendu : RB-15, RB-16). Re-décodage (E-R-03) : chaque `lecture`
-`ok` ou `panne_decode` re-décodée en passe 2 par le décodeur scellé de sa forme (`collecte.decodeurs`, seule entrée de
-`collecte`, RB2-a), verdict `redecodage` : égalités comptées, écarts listés, jamais réparés. Filtres nommés : témoin
+(Q-R-03, AVIS l.108 : RB-3), ceux qu'aucun enregistrement de fenêtre ne suit en fin de journal (`sans_fenetre`,
+C-3 de la G2) ; intégrité relue égale à celle de la passe 1 (C-2 de la G2) ; rien n'est imprimé (rendu : RB-15,
+RB-16). Re-décodage (E-R-03) : chaque `lecture` `ok` ou `panne_decode` re-décodée en passe 2 par le décodeur scellé de
+sa forme (`collecte.decodeurs`, seule entrée de `collecte`, RB2-a), `brut` au base64 canonique et sha256 contrôlés
+d'abord (C-1 de la G2), verdict `redecodage` : égalités comptées, écarts listés, jamais réparés. Filtres nommés : témoin
 (`est_temoin`, SHOGEN-S2BIS-TEMOIN-RECALC-1 ; ADR-0029 l.174), hors des classes USD et de tout vote, dans l'ensemble
 descriptif `temoin`, daté par ses blocs ; remplaçants de la carte (`est_remplacant`,
 SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1 ; Q-C-08), hors des sources de la carte, dans l'ensemble `remplacants`."""
@@ -74,6 +76,13 @@ def _sans_extra(v):
     return [{k: x for k, x in r.items() if k != "extra"} if type(r) is dict else r for r in v] if type(v) is list else v
 
 
+def releve(lec):
+    """Intégrité d'une lecture complète du lecteur `lec` : tête, ruptures, queues déclarées, queue finale. Égale entre
+    les deux passes, elle fixe chaque ligne intègre (chaque tronçon de chaîne est fixé par la ligne qui le clôt : la
+    tête ou le `apres` de la rupture qui le suit) et chaque queue (sha256) : C-2 de la G2."""
+    return {"tete": lec.tete, "ruptures": lec.ruptures, "queues": lec.queues, "queue_finale": lec.queue_finale}
+
+
 def est_temoin(decodeur, valeurs):
     """Filtre du témoin (SHOGEN-S2BIS-TEMOIN-RECALC-1 ; ADR-0029 l.174 : « hors des classes USD et hors du vote ») :
     vrai si le décodeur scellé de la forme est de classe TEMOIN (pannes comprises), ou si un relevé journalisé l'est."""
@@ -121,10 +130,10 @@ class Fusion:
         self.absents = [c["observateur"] for c in self.constats]
         if len(self.presents) < QUORUM:
             raise RefusFusion("FUSION/quorum", f"{len(self.presents)} observateurs présents, {QUORUM} au moins")
-        self.run_params, self.tetes = {}, {}
+        self.run_params, self.passe1 = {}, {}
         for o in self.presents:
             for j in JOURNAUX:
-                self.run_params[o, j], self.tetes[o, j] = self._demarrages(o, j)
+                self.run_params[o, j], self.passe1[o, j] = self._demarrages(o, j)
             if len({_canonique(self.run_params[o, j]["descripteur"]) for j in JOURNAUX}) > 1:
                 raise RefusFusion("FUSION/descripteur", f"{o} : descripteurs du pool et du secondaire différents")
         lus = {"pool": self.paquet["formes"][0], "secondaire": self.paquet["carte"][0]}
@@ -137,13 +146,15 @@ class Fusion:
             return bool(Lecteur(self.dossiers[o], j).fichiers())
         except FileNotFoundError:
             return False
+        except NotADirectoryError:                          # C-5 de la G2 : refus nommé, jamais une absence
+            raise RefusFusion("FUSION/dossier", f"{o} : {self.dossiers[o]} n'est pas un dossier") from None
         except RefusLecteur as e:
             if e.code != "LECTEUR/absent":
                 raise
             return False
 
     def _demarrages(self, o, j):
-        """(premier `run_params`, tête) du journal `j` de `o` ; chaque `run_params` contrôlé (`_controler`)."""
+        """(premier `run_params`, intégrité) du journal `j` de `o` ; chaque `run_params` contrôlé (`_controler`)."""
         lec, premier = Lecteur(self.dossiers[o], j), None
         for genre, *x in lec:
             if genre == "enr" and x[1]["type"] == "run_params":
@@ -151,7 +162,7 @@ class Fusion:
                 self._controler(f"{o}/{j}, seq {x[1]['seq']}", o, j, champs(x[1]), premier)
         if premier is None:
             raise RefusFusion("FUSION/run_params-absent", f"{o}/{j}")
-        return premier, lec.tete
+        return premier, releve(lec)
 
     def _controler(self, ou, o, j, rp, premier):
         """Un `run_params` (E-R-04) : clés porteuses présentes ; commit scellé ; `sha256` aux clés exactes, égal au
@@ -175,8 +186,8 @@ class Fusion:
 
     def fenetres(self):
         """Passe 2 : (ws, {observateur : {journal : fenêtre}}) par ws croissant ; une fenêtre ne porte que les journaux
-        qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale} ;
-        `redecodage` : égalités, écarts {observateur, journal, seq, ws, forme, cause}."""
+        qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale,
+        `sans_fenetre`} ; `redecodage` : égalités, écarts {observateur, journal, seq, ws, forme, cause}."""
         self.integrite, self.redecodage = {}, {"egalites": 0, "ecarts": []}
         flux = heapq.merge(*(self._flux(o, j) for o in self.presents for j in JOURNAUX), key=lambda x: x[0])
         for ws, groupe in itertools.groupby(flux, key=lambda x: x[0]):
@@ -187,8 +198,9 @@ class Fusion:
 
     def _flux(self, o, j):
         """(ws, o, j, fenêtre) du journal `j` de `o` par ws croissant (FORMAT §3.2 ; sinon FUSION/ordre, Q-RB2-7) ;
-        ruptures, `trou` et `reprise` rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit ; tête
-        de la relecture égale à celle de la passe 1, sinon FUSION/relecture (Q-RB2-5)."""
+        ruptures, `trou` et `reprise` rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit, ou
+        rendus en `sans_fenetre` si aucun ne les suit (C-3 de la G2) ; intégrité de la relecture (`releve`) égale à
+        celle de la passe 1, sinon FUSION/relecture (Q-RB2-5 ; C-2 de la G2)."""
         lec, f, attente = Lecteur(self.dossiers[o], j), None, {k: [] for k in ATTENTE}
         for genre, *x in lec:
             if genre == "rupture":
@@ -211,10 +223,10 @@ class Fusion:
             self._ranger(o, j, f, e)
         if f is not None:
             yield f["ws"], o, j, f
-        if lec.tete != self.tetes[o, j]:
-            raise RefusFusion("FUSION/relecture", f"{o}/{j} : tête {lec.tete}, {self.tetes[o, j]} en passe 1")
-        self.integrite[o, j] = {"tete": lec.tete, "ruptures": lec.ruptures, "queues": lec.queues,
-                                "queue_finale": lec.queue_finale}
+        if releve(lec) != self.passe1[o, j]:
+            raise RefusFusion("FUSION/relecture", f"{o}/{j} : intégrité autre qu'en passe 1 (tête {lec.tete}, "
+                                                  f"{self.passe1[o, j]['tete']} en passe 1)")
+        self.integrite[o, j] = {**releve(lec), "sans_fenetre": attente}
 
     def _ranger(self, o, j, f, e):
         """Range l'enregistrement de fenêtre `e` dans `f` ; `lecture` aux champs exacts (FUSION/lecture), de forme
@@ -245,21 +257,27 @@ class Fusion:
             f["autres"].append({"type": t, **c})
 
     def _redecoder(self, o, j, e, dec):
-        """E-R-03 : octets de `brut` (base64 strict) re-décodés par le décodeur scellé `dec` de la forme ; égalité
-        exigée du sha256 journalisé, du statut, des valeurs, puis de leurs `extra`. Verdict « egal », compté, ou cause
+        """E-R-03 : `brut` exigé égal au base64 canonique de ses octets (FORMAT §9.1 ; `b64decode` admet des bits de
+        fin non nuls, et un remplissage en trop jusqu'à 3.12 : C-1 de la G2), sha256 journalisé contrôlé, puis octets
+        re-décodés par le décodeur scellé `dec` de la forme ; égalité exigée du statut, des valeurs, puis de leurs
+        `extra`. Verdict « egal », compté, ou cause
         de l'écart, consignée ; une égalité fausse est un constat, jamais une réparation : la lecture garde ses valeurs
         journalisées. Statut hors REDECODES : None (corps jamais décodé par le collecteur)."""
         if e["statut"] not in REDECODES:
             return None
         try:
             octets = base64.b64decode(e["brut"], validate=True)
+            canonique = base64.b64encode(octets).decode("ascii") == e["brut"]
         except (binascii.Error, TypeError, ValueError):     # alphabet, remplissage, type ; texte non ASCII
+            canonique = False
+        if not canonique:
             cause = "base64"
+        elif hashlib.sha256(octets).hexdigest() != e["sha256"]:
+            cause = "sha256"                                # octets non authentifiés : jamais décodés
         else:
             statut, valeurs = decoder(dec, octets)
-            cause = next((n for n, egal in (
-                ("sha256", hashlib.sha256(octets).hexdigest() == e["sha256"]), ("statut", statut == e["statut"]),
-                ("valeurs", _canonique(_sans_extra(valeurs)) == _canonique(_sans_extra(e["valeurs"]))),
+            cause = next((n for n, egal in (("statut", statut == e["statut"]), (
+                "valeurs", _canonique(_sans_extra(valeurs)) == _canonique(_sans_extra(e["valeurs"]))),
                 ("extra", _canonique(valeurs) == _canonique(e["valeurs"]))) if not egal), None)
         if cause is None:
             self.redecodage["egalites"] += 1

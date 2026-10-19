@@ -3,6 +3,7 @@ synthétiques seulement, écrits par l'écrivain de collecte/journal.py ; `run_p
 (`configurer`, `configurer_secondaire`, `_liste`, `_run_params`) sur les configurations de production et des
 descripteurs d'essai ; aucun journal de campagne. Attendus écrits ici (listes, codes nommés, sha256 par hashlib sur les
 octets des fichiers), indépendants du code de la fusion."""
+import base64
 import hashlib
 import json
 import os
@@ -492,3 +493,119 @@ class Absents(Base):                        # C-1 (adjudication de Q-RB2-13) : o
                 with self.assertRaises(fusion.RefusLecteur) as e:
                     fusion.Fusion(d, CONFIG, COMMIT)
                 self.assertEqual(e.exception.code, code)
+
+
+class RevueG2(Base):                        # corrections de la relecture G2 de RB-2 (C-1, C-2, C-3, C-5)
+    def test_base64_canonique_et_sha256_avant_le_decodeur(self):
+        """C-1 : `brut` égal au base64 canonique de ses octets (FORMAT §9.1), sous chaque version : bits de fin non
+        nuls (kraken_btc, 308 octets, un « = » : mêmes octets, admis par `b64decode` de 3.10 à 3.13) et remplissage en
+        trop (binance_btc, 45 octets, sans « = » : admis de 3.10 à 3.12), `brut` nul ou non ASCII (C-7) : « base64 » ;
+        sha256 faux, valeurs comprises (ordre des causes, Q-RB2-6) : « sha256 », décodeur jamais appelé."""
+        lus = {n: ok(n, m(1)) for n in ("kraken_btc", "binance_btc")}
+        brut = {n: lu.enregistrement()["brut"] for n, lu in lus.items()}
+        alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        bits = brut["kraken_btc"][:-2] + alpha[alpha.index(brut["kraken_btc"][-2]) ^ 1] + "="
+        self.assertEqual((len(corps("kraken_btc")), len(corps("binance_btc")), brut["kraken_btc"][-1:],
+                          brut["binance_btc"][-1:] != "=", base64.b64decode(bits, validate=True)),
+                         (308, 45, "=", True, corps("kraken_btc")))                # garde : les fixtures séparent
+        cas = {"canonique": ("kraken_btc", {}, "egal"), "bits": ("kraken_btc", {"brut": bits}, "base64"),
+               "remplissage": ("binance_btc", {"brut": brut["binance_btc"] + "="}, "base64"),
+               "nul": ("kraken_btc", {"brut": None}, "base64"), "non-ascii": ("kraken_btc", {"brut": "é"}, "base64"),
+               "sha256": ("kraken_btc", {"sha256": "0" * 64}, "sha256"), "sha256-et-valeurs": ("kraken_btc", {
+                   "sha256": "0" * 64, "valeurs": [{**lus["kraken_btc"].valeurs[0], "prix": "1"}]}, "sha256")}
+        for nom, (forme, champs, attendu) in cas.items():
+            with self.subTest(nom=nom):
+                obs = Observateurs(tempfile.mkdtemp(dir=self.base))
+                d = obs.quatre(fenetres={("o1", "pool"): [(m(1), [(forme, forme)])]},
+                               lire=lambda x, ws: Faux(lus[x], **champs))
+                f = fusion.Fusion(d, CONFIG, COMMIT)
+                with mock.patch.object(fusion, "decoder", side_effect=decodeurs.decoder) as dec:
+                    vues = list(f.fenetres())
+                self.assertEqual((vues[0][1]["o1"]["pool"]["pool"][forme]["redecodage"], dec.call_count),
+                                 (attendu, int(attendu == "egal")))
+
+    def test_relecture_d_un_fichier_anterieur_refusee(self):
+        """C-2 : premier fichier de o2/pool réécrit entre les passes (commit d'un `run_params` changé, chaîne du
+        fichier refaite) ; la tête, au second fichier (bascule de minuit), reste celle de la passe 1 : refus."""
+        d = self.obs.quatre(fenetres={("o2", "pool"): [(m(n), BTC) for n in (1, 2, 3, 4)]})
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        chemin, prec, neuves = os.path.join(d["o2"], "pool-2026-10-04-0.jsonl"), "0" * 64, []
+        with open(chemin, "rb") as x:
+            lignes = x.readlines()
+        for ligne in lignes:
+            e = json.loads(ligne)
+            e = {**e, "prec": prec, **({"commit": "d" * 40} if e["type"] == "run_params" else {})}
+            neuves.append(journal.canonique(e))
+            prec = hashlib.sha256(neuves[-1]).hexdigest()
+        with open(chemin, "wb") as x:
+            x.write(b"".join(neuves))
+        with self.assertRaises(fusion.RefusFusion) as e:
+            list(f.fenetres())
+        self.assertEqual((e.exception.code, b"d" * 40 in b"".join(neuves), neuves[0] == lignes[0]),
+                         ("FUSION/relecture", True, True))
+
+    def test_reprise_sans_fenetre_qui_la_suive_rendue(self):
+        """C-3 : o1/pool rouvert à m(5) (`reprise`, FORMAT §7) puis arrêté avant tout enregistrement de fenêtre : la
+        reprise est rendue en fin de journal (`sans_fenetre`), jamais perdue ; les autres journaux n'en ont pas."""
+        d = self.obs.quatre(fenetres={("o1", "pool"): [(m(1), BTC)]})
+        journal.Journal(d["o1"], "pool", fsync=lambda fd: None).ouvrir(m(5)).fermer()
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        list(f.fenetres())
+        fin = f.integrite["o1", "pool"]["sans_fenetre"]
+        self.assertEqual(({k: v for k, v in fin.items() if k != "reprises"}, [{k: x[k] for k in x if k != "seq"}
+                                                                             for x in fin["reprises"]]),
+                         ({"ruptures": [], "trous": []}, [{"ws": m(5), "suivante": m(2), "queue": None}]))
+        self.assertEqual({k: v["sans_fenetre"] for k, v in f.integrite.items() if k != ("o1", "pool")},
+                         {(o, j): {"ruptures": [], "trous": [], "reprises": []} for o in OBS for j in fusion.JOURNAUX
+                          if (o, j) != ("o1", "pool")})
+
+    def test_dossier_qui_n_est_pas_un_dossier(self):
+        """C-5 : un fichier à la place du dossier de o3 : refus nommé, jamais une absence ni une OSError."""
+        d = self.obs.quatre()
+        shutil.rmtree(d["o3"])
+        open(d["o3"], "wb").close()
+        self.assertEqual(self.refus(d, CONFIG, COMMIT), "FUSION/dossier")
+
+    def test_porteuses_comparees_sous_forme_canonique(self):
+        """C-7 : `asn` du descripteur à 1 au premier démarrage de o2, `true` au second : discordance (`1 == True` en
+        Python, jamais sous forme canonique, C-15 du lecteur)."""
+        rp = {j: self.obs.run_params("o2", j) for j in fusion.JOURNAUX}
+        rp = {j: {**x, "descripteur": {**x["descripteur"], "asn": 1}} for j, x in rp.items()}
+        d = self.obs.quatre(rp={("o2", j): x for j, x in rp.items()})
+        self.obs.ecrire("o2", "pool", WS + 600, rp={**rp["pool"], "descripteur": {**rp["pool"]["descripteur"],
+                                                                                  "asn": True}})
+        self.assertEqual(({"asn": 1} == {"asn": True}, self.refus(d, CONFIG, COMMIT)),         # garde : `==` les égale
+                         (True, "FUSION/run_params-discordant"))
+
+    def test_temoin_filtre_par_le_decodeur_de_la_forme(self):
+        """C-7 (site d'appel, SHOGEN-MUTANTS-SITE-APPEL-1) : paquet d'essai où la forme du témoin OKX porte un nom
+        autre que son décodeur (`okx_temoin`, décodeur `okx_usdc_usdt`) : au témoin, jamais au pool."""
+        config = os.path.join(self.base, "config")
+        shutil.copytree(CONFIG, config)
+        with open(os.path.join(CONFIG, "formes.json"), "rb") as f:
+            c = json.loads(f.read())
+        c["formes"] = [{**x, "nom": "okx_temoin"} if x["nom"] == "okx_usdc_usdt" else x for x in c["formes"]]
+        with open(os.path.join(config, "formes.json"), "w", encoding="utf-8") as f:
+            json.dump(c, f)
+        obs = Observateurs(tempfile.mkdtemp(dir=self.base), config)
+        d = obs.quatre(fenetres={("o1", "pool"): [(m(1), [("okx_temoin", "okx_usdc_usdt"), BTC[0]])]})
+        p = dict(fusion.Fusion(d, config, COMMIT).fenetres())[m(1)]["o1"]["pool"]
+        self.assertEqual((sorted(p["temoin"]), sorted(p["pool"]), p["temoin"]["okx_temoin"]["decodeur"]),
+                         (["okx_temoin"], ["binance_btc"], "okx_usdc_usdt"))
+
+    def test_suffixe_exact_avec_son_souligne(self):
+        """C-7 : le suffixe est `_remplacant`, souligné compris (Q-RB2-10)."""
+        self.assertEqual([fusion.est_remplacant(n) for n in ("binance_btcremplacant", "remplacant", "x_remplacant")],
+                         [False, False, True])
+
+    def test_panne_decode_du_temoin_sans_blocs_et_panne_http_jamais_redecodee(self):
+        """C-7 : `panne_decode` du témoin Uniswap (corps `[]`, que le décodeur scellé refuse aussi : « egal ») : au
+        témoin, `blocs` None ; `panne_http` de Binance au corps décodable (code 451) : jamais re-décodée (Q-RB2-6)."""
+        lus = {"uniswap_usdc_usdt": Lecture("panne_decode", m(1) * S, m(1) * S + 1, code=200, octets=b"[]"),
+               "binance_btc": Lecture("panne_http", m(1) * S, m(1) * S + 1, code=451, octets=corps("binance_btc"))}
+        d = self.obs.quatre(fenetres={("o1", "pool"): [(m(1), [(n, n) for n in lus])]}, lire=lambda x, ws: lus[x])
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        p = dict(f.fenetres())[m(1)]["o1"]["pool"]
+        t, b = p["temoin"]["uniswap_usdc_usdt"], p["pool"]["binance_btc"]
+        self.assertEqual(((t["statut"], t["redecodage"], t["blocs"]), (b["statut"], b["redecodage"]), f.redecodage),
+                         (("panne_decode", "egal", None), ("panne_http", None), {"egalites": 1, "ecarts": []}))
