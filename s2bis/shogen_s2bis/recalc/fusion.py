@@ -2,7 +2,9 @@
 E-R-04 ; ADR-0029 l.219 ; FORMAT docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md §14.4, §15.6). `Fusion(dossiers,
 config, commit)` lit les journaux `pool` et `secondaire` de chaque observateur par le lecteur en flux de RB-1.
 Passe 1, à la construction, avant tout calcul (E-R-04) : observateurs lus égaux à la liste fermée
-d'`observateurs.json` ; dans chaque journal, un `run_params` au moins, et pour chacun les clés porteuses présentes,
+d'`observateurs.json` ; un observateur sans aucun journal est absent (constat `FUSION/observateur-absent`, D-1 jugé à
+RB-3 ; C-1, adjudication de Q-RB2-13), QUORUM présents au moins, sinon `FUSION/quorum` ; un journal sur deux :
+`LECTEUR/absent`. Dans chaque journal présent, un `run_params` au moins, et pour chacun les clés porteuses présentes,
 `commit` égal au commit scellé, `sha256` et contenus des fichiers scellés égaux à ceux du paquet (CONFIGS, lus en
 octets), descripteur au nom de l'observateur, concordance avec le premier démarrage ; descripteur égal entre les deux
 journaux de l'observateur. Tout écart est un refus nommé (RefusFusion, `FUSION/…` ; ceux du lecteur, `LECTEUR/…`,
@@ -26,7 +28,7 @@ import os
 
 from ..collecte.decodeurs import DECODEURS, decoder
 from .config_analyse import TEMOIN
-from .lecteur import RESERVES, Lecteur, _canonique
+from .lecteur import RESERVES, Lecteur, RefusLecteur, _canonique
 
 JOURNAUX = ("pool", "secondaire")                       # préfixes des deux journaux d'un observateur (FORMAT §15.1)
 CONFIGS = ("formes", "sante", "observateurs", "carte")  # fichiers du paquet (s2bis/config/) portés par `run_params`
@@ -39,6 +41,7 @@ ENSEMBLES = ("pool", "temoin", "carte", "remplacants")  # pool et témoin au jou
 SUFFIXE = "_remplacant"                                 # formes remplaçantes de la carte (GEL-9, Q-C-08)
 ATTENTE = ("ruptures", "trous", "reprises")             # rattachés à la fenêtre qui les suit
 REDECODES = ("ok", "panne_decode")                      # statuts dont le corps a été décodé (E-R-03 ; Q-RB2-6)
+QUORUM = 3                  # observateurs présents au moins (ADR-0029 l.78 : quorum 2 sur 3 ; l.219 : repli M = 3)
 
 
 class RefusFusion(Exception):
@@ -106,14 +109,38 @@ class Fusion:
         self.liste = self.paquet["observateurs"][0]["observateurs"]
         if sorted(dossiers) != sorted(self.liste):
             raise RefusFusion("FUSION/observateurs", f"{sorted(dossiers)} lus, liste fermée {self.liste}")
-        self.run_params, self.tetes = {}, {}
+        self.presents, self.constats = [], []
         for o in self.liste:
+            lus = [j for j in JOURNAUX if self._present(o, j)]
+            if len(lus) == len(JOURNAUX):
+                self.presents.append(o)
+            elif lus:
+                raise RefusLecteur("LECTEUR/absent", f"{o} : {lus[0]} présent, l'autre journal absent")
+            else:
+                self.constats.append({"code": "FUSION/observateur-absent", "observateur": o})
+        self.absents = [c["observateur"] for c in self.constats]
+        if len(self.presents) < QUORUM:
+            raise RefusFusion("FUSION/quorum", f"{len(self.presents)} observateurs présents, {QUORUM} au moins")
+        self.run_params, self.tetes = {}, {}
+        for o in self.presents:
             for j in JOURNAUX:
                 self.run_params[o, j], self.tetes[o, j] = self._demarrages(o, j)
             if len({_canonique(self.run_params[o, j]["descripteur"]) for j in JOURNAUX}) > 1:
                 raise RefusFusion("FUSION/descripteur", f"{o} : descripteurs du pool et du secondaire différents")
         lus = {"pool": self.paquet["formes"][0], "secondaire": self.paquet["carte"][0]}
         self.formes = {j: {x["nom"]: x for x in c["formes"]} for j, c in lus.items()}       # forme : hôte, décodeur
+
+    def _present(self, o, j):
+        """Vrai si le journal `j` de `o` a un fichier au moins ; dossier absent ou aucun fichier : faux (C-1) ; tout
+        autre refus du lecteur (noms hors grammaire) remonte."""
+        try:
+            return bool(Lecteur(self.dossiers[o], j).fichiers())
+        except FileNotFoundError:
+            return False
+        except RefusLecteur as e:
+            if e.code != "LECTEUR/absent":
+                raise
+            return False
 
     def _demarrages(self, o, j):
         """(premier `run_params`, tête) du journal `j` de `o` ; chaque `run_params` contrôlé (`_controler`)."""
@@ -151,7 +178,7 @@ class Fusion:
         qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale} ;
         `redecodage` : égalités, écarts {observateur, journal, seq, ws, forme, cause}."""
         self.integrite, self.redecodage = {}, {"egalites": 0, "ecarts": []}
-        flux = heapq.merge(*(self._flux(o, j) for o in self.liste for j in JOURNAUX), key=lambda x: x[0])
+        flux = heapq.merge(*(self._flux(o, j) for o in self.presents for j in JOURNAUX), key=lambda x: x[0])
         for ws, groupe in itertools.groupby(flux, key=lambda x: x[0]):
             par = {}
             for _ws, o, j, f in groupe:

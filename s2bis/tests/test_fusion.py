@@ -449,3 +449,46 @@ class Filtres(Base):                        # SHOGEN-S2BIS-TEMOIN-RECALC-1, SHOG
                                                              "binance_btc_remplacante", "remplacant_binance",
                                                              "binance_btc_Remplacant")],
                          [True, True, False, False, False, False])
+
+
+class Absents(Base):                        # C-1 (adjudication de Q-RB2-13) : observateur absent, quorum de trois
+    def test_trois_presents_avec_constat(self):
+        """o3 sans dossier, puis o3 au dossier vide : absent, constat nommé, passes 1 et 2 sur o1, o2, o4 seuls."""
+        for vide in (False, True):
+            with self.subTest(vide=vide):
+                obs = Observateurs(tempfile.mkdtemp(dir=self.base))
+                d = obs.quatre(fenetres={(o, "pool"): [(m(1), BTC[:1])] for o in OBS})
+                shutil.rmtree(d["o3"])
+                if vide:
+                    os.mkdir(d["o3"])
+                f = fusion.Fusion(d, CONFIG, COMMIT)
+                vues = list(f.fenetres())
+                self.assertEqual((f.presents, f.absents, f.constats, sorted({o for o, _j in f.run_params}),
+                                  [(ws, sorted(par)) for ws, par in vues]), (
+                    ["o1", "o2", "o4"], ["o3"], [{"code": "FUSION/observateur-absent", "observateur": "o3"}],
+                    ["o1", "o2", "o4"], [(m(1), ["o1", "o2", "o4"])]))
+
+    def test_deux_presents_refuses_avant_tout_calcul(self):
+        d = self.obs.quatre()
+        for o in ("o2", "o4"):
+            shutil.rmtree(d[o])
+        with mock.patch.object(fusion, "Lecteur", side_effect=fusion.Lecteur) as lecteur:
+            self.assertEqual(self.refus(d, CONFIG, COMMIT), "FUSION/quorum")
+        self.assertEqual([c.args for c in lecteur.call_args_list], [(d[o], j) for o in OBS for j in fusion.JOURNAUX])
+
+    def test_un_journal_sur_deux_ou_nom_hors_grammaire(self):
+        """o2 sans son journal secondaire, puis sans son pool : LECTEUR/absent ; o3 au dossier vide d'un nom hors de
+        la grammaire (k à zéro de tête) : LECTEUR/nom, jamais pris pour une absence."""
+        for cas, code in (("secondaire", "LECTEUR/absent"), ("pool", "LECTEUR/absent"), ("nom", "LECTEUR/nom")):
+            with self.subTest(cas=cas):
+                obs = Observateurs(tempfile.mkdtemp(dir=self.base))
+                d = obs.quatre()
+                o = "o3" if cas == "nom" else "o2"
+                for n in os.listdir(d[o]):
+                    if cas == "nom" or n.startswith(cas + "-"):
+                        os.remove(os.path.join(d[o], n))
+                if cas == "nom":
+                    open(os.path.join(d[o], "pool-2026-10-04-01.jsonl"), "wb").close()
+                with self.assertRaises(fusion.RefusLecteur) as e:
+                    fusion.Fusion(d, CONFIG, COMMIT)
+                self.assertEqual(e.exception.code, code)

@@ -3733,3 +3733,28 @@ témoin ; témoin au pool ; plancher.
 
 Suite : 460 tests ; plancher du job : 460, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-h (2026-10-18) : observateur absent admis, quorum de trois observateurs présents (C-1 ; adjudication de Q-RB2-13 ; ADR-0029 l.78, l.219)
+
+Objet : passe 1 : un observateur de la liste fermée dont le dossier manque, ou dont le dossier ne porte aucun des deux
+journaux, est absent : constat nommé (`Fusion.constats`, `FUSION/observateur-absent` et le nom ; `Fusion.absents`), ses
+fenêtres valent D-1 « absence » à RB-3 (la fusion ne juge pas) ; passes 1 et 2 sur les seuls présents
+(`Fusion.presents`), au moins QUORUM = 3, sinon `FUSION/quorum` avant toute lecture de journal ; un journal présent sur
+deux : `LECTEUR/absent` ; un nom hors de la grammaire reste `LECTEUR/nom`, jamais pris pour une absence. La liste
+`observateurs` de chaque `run_params` reste égale à la liste fermée scellée (contenus, RB2-c). Aucune section du FORMAT
+ni document du recalcul ne décrit la fusion : rien d'autre à modifier.
+
+Rouge : sur le code de RB2-g : 6 ERROR (`presents` absent de l'objet, dossier absent lu, `RefusLecteur` absent du
+module).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 269 | — |
+| `tests/test_fusion.py` | 494 | 16 (3 de plus : `Absents`) |
+
+Mutants (même commande, même outil) : 12 classés, 12 tués, 0 vivant, 0 FATAL : quorum à deux ; quorum à quatre ; quorum en `<=` ; constat
+perdu ; journal seul pris pour une absence ; passe 2 sur la liste ; passe 1 sur la liste ; dossier absent non admis ;
+tout refus du lecteur pris pour une absence ; code du constat ; quorum non contrôlé ; plancher.
+
+Suite : 463 tests ; plancher du job : 463, égalité exigée (`--egal`). Compte de R-25 : 75 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
