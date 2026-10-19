@@ -1,0 +1,11 @@
+id	sujet	n_tests
+RB2-a	frontiere d imports : recalc admet DECODEURS et decoder de collecte.decodeurs seuls, fermeture fixee par un test ; ajout date au G0	447
+RB2-b	fusion.py : lecture en octets des configurations du paquet, observateurs lus egaux a la liste fermee sinon refus	449
+RB2-c	passe 1 sur run_params : cles porteuses, commit, sha256 et contenus egaux au paquet, refus nomme avant tout calcul	453
+RB2-d	passe 2 en flux : fusion par fenetre, observateur et journal ; ruptures, trous et reprises rendus a leur place	455
+RB2-e	refus nommes du flux (ordre des fenetres, lecture mal formee, doublons)	456
+RB2-f	re-decodage des octets bruts par le decodeur scelle, egalites comptees, ecarts listes, jamais repares	458
+RB2-g	filtres est_temoin et est_remplacant, datage du temoin par ses blocs ; ferme SHOGEN-S2BIS-TEMOIN-RECALC-1 et SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1	460
+RB2-h	observateur de la liste fermee sans journaux admis comme absent (constat nomme), quorum minimal de trois presents, refus en dessous	463
+RB2-G2-1	G2 : base64 canonique et sha256 controles avant tout decodage, integrite de la passe 1 comparee entierement, enregistrements sans fenetre rendus, fichier a la place d un dossier refuse, tests de mutants	471
+RB2-G2-2	G2 : ajout date au G0 (adjudications de la frontiere et de l observateur absent), ligne de METRIQUES repliee, corrections du rapport	471

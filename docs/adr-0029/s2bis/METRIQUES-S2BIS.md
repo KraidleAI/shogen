@@ -3558,3 +3558,233 @@ passages isolés sous 3.11 (`-X dev -W error`) : verts, 1,8 s chacun.
 
 Suite : 446 tests ; plancher du job : 446, inchangé. Compte de R-25 : 44 lignes de code ajoutées (`.py`) ; hors compte :
 METRIQUES.
+
+## RB2-a (2026-10-18) : frontière du recalcul ouverte aux seuls décodeurs scellés (E-R-03 ; décision de l'orchestrateur, brief de RB-2)
+
+Objet : la règle `recalc` de `tests/test_fitness.py` admet `shogen_s2bis.collecte.decodeurs` par `from … import` de ses
+seuls noms `DECODEURS` et `decoder` (table `NOMMES`, fonction `_admis`) ; `import` du module, autre nom, `*`,
+sous-module, autre module de `collecte` : refusés. `cibles` relève les imports (module, noms) ; test neuf
+`test_fermeture_des_decodeurs` : la fermeture transitive de l'import des décodeurs est exactement `decodeurs`,
+`journal`, `lecture` et leurs deux paquets parents, la bibliothèque standard hors du paquet, sans import dynamique
+(constat Q-RB2-1 : `decodeurs.py` importe `collecte.journal` et `collecte.lecture`). Docstring de
+`recalc/__init__.py` ; ajout daté au G0.
+
+Rouge : `cibles` posée d'abord (refactorisation seule), règle inchangée : 1 FAIL (`test_frontiere_refuse` : l'import
+admis des deux noms refusé) ; le test de fermeture fixe une propriété du code présent, vert dès l'origine, et ses
+mutants (a06 à a08, a11) le montrent discriminant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `tests/test_fitness.py` | 158 | 7 (1 de plus : `test_fermeture_des_decodeurs`) |
+| `shogen_s2bis/recalc/__init__.py` | 2 | — |
+
+Mutants (commande du job `s2bis-unittest`, `scripts/controle/mutants.py` du dépôt, borne 300 s) : 12 classés, 12
+tués, 0 vivant, 0 FATAL : règle `recalc` sans les décodeurs ; nom `journal` admis ; préfixe appliqué au module nommé ;
+`import` simple admis ; un nom admis suffit ; import neuf de `collecte` dans `lecture.py`, dynamique dans
+`journal.py`, de `dns` dans le paquet parent, de `config` dans `decodeurs.py` ; niveau relatif décalé ; noms perdus ;
+plancher.
+
+Suite : 447 tests ; plancher du job : 447, égalité exigée (`--egal`). Compte de R-25 : 70 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : G0, METRIQUES.
+
+## RB2-b (2026-10-18) : fusion, paquet lu en octets et liste fermée des observateurs (E-R-04 ; FORMAT §14.1)
+
+Objet : module neuf `shogen_s2bis/recalc/fusion.py` : `paquet(dossier)` lit en octets les quatre fichiers du paquet
+portés par `run_params` (`formes`, `sante`, `observateurs`, `carte` de `s2bis/config/`), rend données et sha256 (JSON
+illisible ou hors UTF-8 : `FUSION/config`) ; `Fusion(dossiers, config, commit)` refuse, avant toute lecture de journal,
+un ensemble d'observateurs autre que la liste fermée d'`observateurs.json` (`FUSION/observateurs`). Tests neufs :
+`tests/test_fusion.py`, classe `Paquet`.
+
+Rouge : sur un squelette (paquet sans lecture, aucun contrôle) : 6 FAIL (5 sous-cas de la liste fermée, empreintes).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 42 | — |
+| `tests/test_fusion.py` | 53 | 2 (neufs) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : surnuméraires seuls refusés ; nombre seul
+comparé ; liste lue des dossiers ; empreinte d'un texte nettoyé ; latin-1 (vivant au criblage avant la campagne : le cas
+hors UTF-8 tombait aussi en JSON invalide ; cas réécrit, octet 0xFF dans une chaîne) ; erreur JSON non nommée ; `carte`
+hors du paquet ; deux codes ; liste vide admise ; plancher.
+
+Suite : 449 tests ; plancher du job : 449, égalité exigée (`--egal`). Compte de R-25 : 96 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-c (2026-10-18) : `run_params` de chaque journal, concordants et égaux au paquet, avant tout calcul (E-R-04)
+
+Objet : passe 1 à la construction de `Fusion` : chaque journal `pool` et `secondaire` des quatre observateurs lu par le
+lecteur de RB-1 ; au moins un `run_params` (`FUSION/run_params-absent`) ; pour chacun, clés porteuses présentes
+(`commit`, `sha256`, `descripteur`, puis `formes`, `sante`, `observateurs` au pool, `formes`, `carte` au secondaire ;
+`python` non porteuse, Q-RB2-2 ; `FUSION/run_params-cle`), commit égal au commit scellé (`FUSION/commit`), `sha256` aux
+clés exactes et égal au paquet (`FUSION/sha256`), contenus égaux au paquet sous forme canonique (`FUSION/contenu`,
+Q-RB2-3), descripteur au nom de l'observateur (`FUSION/observateur`), clés porteuses égales à celles du premier
+démarrage (`FUSION/run_params-discordant`) ; descripteur égal entre les deux journaux (`FUSION/descripteur`). Tests :
+classe `RunParams` (journaux écrits par `collecte/journal.py`, `run_params` par `entree.configurer`,
+`configurer_secondaire`, `_liste`, `_run_params` sur les configurations de production).
+
+Rouge : sur le code de RB2-b : 22 FAIL (sous-cas de refus non levés), 1 ERROR (`run_params` absent de l'objet).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 92 | — |
+| `tests/test_fusion.py` | 187 | 6 (4 de plus : `RunParams`) |
+
+Mutants (même commande, même outil) : 14 classés, 14 tués, 0 vivant, 0 FATAL : descripteur non porteur ; `python`
+porteuse ; `observateurs` hors des scellés ; commit non contrôlé ; sha256 du premier fichier seul ; clés du `sha256`
+libres ; contenus non contrôlés ; observateur non contrôlé ; concordance avec soi-même ; premier démarrage remplacé ;
+descripteurs des deux journaux ; `run_params` absent admis ; clé absente admise ; plancher.
+
+Suite : 453 tests ; plancher du job : 453, égalité exigée (`--egal`). Compte de R-25 : 187 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-d (2026-10-18) : passe 2 en flux, fenêtres fusionnées, ruptures rendues à leur place (Q-R-03 ; AVIS l.108)
+
+Objet : `Fusion.fenetres()` relit les huit journaux par le lecteur de RB-1 et les fusionne par ws croissant
+(`heapq.merge`, une fenêtre en mémoire par journal) : (ws, {observateur : {journal : fenêtre}}), une fenêtre ne portant
+que les journaux qui y ont écrit ; dans une fenêtre, lectures par forme (ensemble `pool` au journal du pool, `carte` au
+secondaire ; champs journalisés sans `brut`, hôte et décodeur de la forme lus au paquet), `sante`, marqueur, démarrage
+(`run_params`), autres enregistrements (`tetes`, `asn`, `releve_asn`) ; ruptures du lecteur, `trou` et `reprise`
+rattachés à la fenêtre du premier enregistrement de fenêtre qui les suit, sans portée en fenêtres (RB-3) ; après
+l'itération, `integrite` par journal (tête, ruptures, queues déclarées, queue finale). Rien n'est imprimé.
+
+Rouge : sur le code de RB2-c : 2 ERROR (`fenetres` absente).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 161 | — |
+| `tests/test_fusion.py` | 292 | 8 (2 de plus : `Flux`) |
+
+Mutants (même commande, même outil) : 13 classés, 13 tués, 0 vivant, 0 FATAL : rupture perdue ; trou perdu ; attente
+jamais vidée ; une fenêtre par enregistrement ; clé de fusion inversée ; marqueur pris pour démarrage ; `brut` gardé ;
+formes du pool pour le secondaire ; ensemble du secondaire ; `sante` perdue ; intégrité sans ruptures ; autres
+enregistrements perdus ; plancher.
+
+Suite : 455 tests ; plancher du job : 455, égalité exigée (`--egal`). Compte de R-25 : 180 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-e (2026-10-18) : refus nommés du flux (ordre, relecture, lecture, forme, doubles)
+
+Objet : en passe 2, `ws` en recul dans un journal (FORMAT §3.2, impossible par l'écrivain de référence ; Q-RB2-7) :
+`FUSION/ordre` ; tête de la relecture autre que celle de la passe 1 : `FUSION/relecture` (Q-RB2-5) ; `lecture` aux
+champs propres autres que ceux du FORMAT §9.1 et §11.2 : `FUSION/lecture` ; forme hors de la configuration :
+`FUSION/forme` ; forme ou `sante` deux fois dans une fenêtre : `FUSION/double` (Q-RB2-8).
+
+Rouge : sur le code de RB2-d : 5 FAIL (sous-cas de refus non levés), 1 ERROR (forme inconnue : `KeyError`).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 174 | — |
+| `tests/test_fusion.py` | 327 | 9 (1 de plus : `test_refus_du_flux`) |
+
+Mutants (même commande, même outil) : 10 classés, 10 tués, 0 vivant, 0 FATAL : ordre non contrôlé ; recul sauté en
+silence ; relecture non contrôlée ; relecture comparée à l'autre journal ; champ manquant admis ; forme inconnue admise
+; codes permutés ; forme double admise ; `sante` double admise ; plancher.
+
+Suite : 456 tests ; plancher du job : 456, égalité exigée (`--egal`). Compte de R-25 : 54 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-f (2026-10-18) : re-décodage des octets bruts par les décodeurs scellés (E-R-03 ; SHOGEN-RAW-REDECODAGE-1)
+
+Objet : en passe 2, chaque `lecture` `ok` ou `panne_decode` (Q-RB2-6) : `brut` en base64 strict, octets re-décodés par
+`collecte.decodeurs.decoder` sous le décodeur de la forme (paquet ; RB2-a), égalité exigée du sha256 journalisé, du
+statut, des valeurs, puis de leurs `extra` ; verdict `redecodage` de la lecture (« egal » ou la cause : `base64`,
+`sha256`, `statut`, `valeurs`, `extra`), égalités comptées et écarts listés (`Fusion.redecodage`) ; une égalité fausse
+est un constat, jamais une réparation : la lecture garde ses valeurs journalisées ; aucun décodage en passe 1, ni sur un
+refus de `run_params`.
+
+Rouge : sur le code de RB2-e : 1 FAIL (verdict `redecodage` absent de la lecture), 2 ERROR (`redecodage` et `decoder`
+absents du module).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 211 | — |
+| `tests/test_fusion.py` | 389 | 11 (2 de plus : `Redecodage`) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : sha256 seul comparé (mutant obligatoire
+du G0, PROPOSITION §3.4) ; `extra` non comparé ; valeurs comparées avec leurs `extra` ; base64 laxiste ; `panne_decode`
+non re-décodée ; statut non comparé ; égalités non comptées ; décodeur nommé par la forme (site d'appel : la forme
+remplaçante et son décodeur ont des noms différents) ; écart sans observateur ; réparation en place des valeurs ;
+plancher.
+
+Suite : 458 tests ; plancher du job : 458, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-g (2026-10-18) : témoin hors des classes USD et du vote, remplaçants hors de la carte (SHOGEN-S2BIS-TEMOIN-RECALC-1, SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1)
+
+Objet : filtres nommés de `recalc/fusion.py` : `est_temoin` (classe `temoin` du décodeur scellé de la forme, pannes
+comprises, ou d'un relevé journalisé ; ADR-0029 l.174) : la lecture va à l'ensemble descriptif `temoin`, jamais au
+`pool` ; `blocs` : (bloc_avant, bloc_apres) entiers des relevés du témoin sur chaîne, re-décodés à l'égal et `ok`
+seulement (B.115, FORMAT §9.1), sans jugement de leur écart ; `est_remplacant` (suffixe exact `_remplacant` en fin du
+nom de forme, journal `secondaire`) : la lecture va à l'ensemble `remplacants`, hors de `carte` (Q-C-08, GEL-9). Forme
+deux fois dans une fenêtre, tous ensembles confondus : `FUSION/double`.
+
+Rouge : sur le code de RB2-f : 1 FAIL (ensembles `temoin` et `remplacants` absents de la fenêtre), 2 ERROR (`KeyError`
+sur ces deux ensembles).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 242 | — |
+| `tests/test_fusion.py` | 451 | 13 (2 de plus : `Filtres`) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : classe du décodeur ignorée ; classe du
+relevé ignorée ; suffixe n'importe où dans le nom ; filtre appliqué au décodeur (site d'appel) ; blocs permutés ; blocs
+sur un écart de re-décodage ; condition des blocs en « ou » ; double cherché au seul pool ; autre classe prise pour le
+témoin ; témoin au pool ; plancher.
+
+Suite : 460 tests ; plancher du job : 460, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-h (2026-10-18) : observateur absent admis, quorum de trois observateurs présents (C-1 ; adjudication de Q-RB2-13 ; ADR-0029 l.78, l.219)
+
+Objet : passe 1 : un observateur de la liste fermée dont le dossier manque, ou dont le dossier ne porte aucun des deux
+journaux, est absent : constat nommé (`Fusion.constats`, `FUSION/observateur-absent` et le nom ; `Fusion.absents`), ses
+fenêtres valent D-1 « absence » à RB-3 (la fusion ne juge pas) ; passes 1 et 2 sur les seuls présents
+(`Fusion.presents`), au moins QUORUM = 3, sinon `FUSION/quorum` avant toute lecture de journal ; un journal présent sur
+deux : `LECTEUR/absent` ; un nom hors de la grammaire reste `LECTEUR/nom`, jamais pris pour une absence. La liste
+`observateurs` de chaque `run_params` reste égale à la liste fermée scellée (contenus, RB2-c). Aucune section du FORMAT
+ni document du recalcul ne décrit la fusion : rien d'autre à modifier.
+
+Rouge : sur le code de RB2-g : 6 ERROR (`presents` absent de l'objet, dossier absent lu, `RefusLecteur` absent du
+module).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 269 | — |
+| `tests/test_fusion.py` | 494 | 16 (3 de plus : `Absents`) |
+
+Mutants (même commande, même outil) : 12 classés, 12 tués, 0 vivant, 0 FATAL : quorum à deux ; quorum à quatre ;
+quorum en `<=` ; constat perdu ; journal seul pris pour une absence ; passe 2 sur la liste ; passe 1 sur la liste ;
+dossier absent non admis ; tout refus du lecteur pris pour une absence ; code du constat ; quorum non contrôlé ;
+plancher.
+
+Suite : 463 tests ; plancher du job : 463, égalité exigée (`--egal`). Compte de R-25 : 75 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-G2 (2026-10-18) : corrections de la relecture G2 de RB-2 (C-1, C-2, C-3, C-5, C-7)
+
+Objet : `shogen_s2bis/recalc/fusion.py` : C-1, `brut` exigé égal au base64 canonique de ses octets (FORMAT §9.1 ;
+`b64decode(validate=True)` admet des bits de fin non nuls de 3.10 à 3.13 et un remplissage en trop de 3.10 à 3.12 :
+verdict qui changeait avec la version, mesuré), puis sha256 contrôlé avant le décodeur (octets non authentifiés jamais
+décodés) ; C-2, intégrité de la relecture (`releve` : tête, ruptures, queues déclarées, queue finale) égale à celle de
+la passe 1, sinon `FUSION/relecture` (un fichier antérieur réécrit entre les passes, tête inchangée, passait) ; C-3,
+ruptures, `trou` et `reprise` qu'aucun enregistrement de fenêtre ne suit rendus en `integrite[o, j]["sans_fenetre"]`
+(une `reprise` finale était perdue) ; C-5, un fichier à la place du dossier d'un observateur : `FUSION/dossier` (une
+`NotADirectoryError` remontait). Tests neufs : classe `RevueG2` de `tests/test_fusion.py` ; C-7, tests qui tuent les
+six mutants vivants de la relecture (comparaison des porteuses par `==`, `brut` nul ou non ASCII, témoin filtré par le
+nom de la forme, suffixe sans souligné, `blocs` d'une `panne_decode` du témoin, `panne_http` re-décodée).
+
+Rouge : les tests de C-1 à C-5 sur le code de RB2-h : 4 FAIL, 2 ERROR sous 3.11 (le remplissage en trop passe sous
+3.13) ; ceux de C-7 passent sur ce code et tuent chacun son mutant.
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 287 | — |
+| `tests/test_fusion.py` | 611 | 24 (8 de plus : `RevueG2`) |
+
+Mutants (même commande, même outil) : 14 classés, 14 tués, 0 vivant, 0 FATAL : les six vivants de la relecture rejoués
+(r02, r03, r05, r06, r11, r14) ; base64 non canonique admis ; sha256 non contrôlé ; sha256 après le décodeur ;
+relecture par la tête seule ; relecture sans les ruptures ; `sans_fenetre` perdu ; fichier pris pour une absence ;
+plancher.
+
+Suite : 471 tests ; plancher du job : 471, égalité exigée (`--egal`). Compte de R-25 : 156 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

@@ -1,0 +1,35 @@
+# Brief — recalcul de S2-bis, sous-lot RB-2 : fusion des quatre observateurs, `run_params`, commit et configurations, re-décodage (2026-10-18 15:58:48 UTC, `date -u`)
+
+Worker `shogen-worker`, effort high, générateur G1. Dossier : `<scratchpad>/s2bis/rb2/` (`NOTES.md`, `diffs/`, `preuves/`, `mutants/`, `RAPPORT-GENERATEUR.md`, `SHA256SUMS`, tous à produire). Copie de travail : `git clone` local de `/home/user/shogen` dans ton dossier, tête `709d4a7` (fusion de la PR 17 : collecteur gelé) ; dépôt réel en lecture seule, aucune opération git en écriture ; toute commande git qui liste ou compare des chemins est limitée à une liste explicite de chemins ; `TMPDIR` et cible cargo dédiés.
+
+## Rattachement (à lire avant d'écrire)
+- G0 `docs/adr-0029/g0-collecte/G0-COLLECTE-RECALC-DEPLOI.md` (adjudications et ajouts datés), contenu = `docs/adr-0029/g0-collecte/PROPOSITION.md` corrigé par `docs/adr-0029/g0-collecte/AVIS.md` qui prime : RB-2 (PROPOSITION l.470), exigences E-R-01 à E-R-09 (l.427-435 ; surtout E-R-03 re-décodage et E-R-04 concordance de `run_params`), Q-R-03 (l.581-583 ; AVIS l.108 : la portée en fenêtres est RB-3, RB-2 rend les ruptures à leur place), frontière d'imports (PROPOSITION §1 pt 2 ; `s2bis/tests/test_fitness.py` l.10-16).
+- ADR `docs/adr-0029/ADR-0029-campagne-S2-bis.md` l.173-174 (témoin hors des classes USD et hors du vote), l.217-219 (commit et configurations scellés, `run_params`), l.222.
+- Code existant : `s2bis/shogen_s2bis/recalc/lecteur.py` (RB-1, flux, ruptures, queues), `config_analyse.py` (RB-0), `rotation.py`, `oracle_indep.py` ; `s2bis/shogen_s2bis/collecte/decodeurs.py` (décodeurs scellés, `DECODEURS`, `CORPS`), `collecte/journal.py` (écrivain de référence, pour les jeux synthétiques des tests seulement) ; FORMAT `docs/adr-0029/s2bis/FORMAT-JOURNAUX-S2BIS.md` §9 (enregistrement `lecture` : `brut` en base64, `sha256`, `valeurs`, `extra`), §14 pt 4 (`run_params` : `commit`, `sha256` des configurations, contenus, `observateurs`), §15 (journal `secondaire`), §16 (têtes).
+- Configurations scellées de production : `s2bis/config/formes.json`, `sante.json`, `observateurs.json`, `carte.json`, `analyse.json`.
+- Items à fermer dans ce lot (`docs/adr-0028/ANNEXE-B-items.md`, recherche dans ce seul fichier) : SHOGEN-S2BIS-TEMOIN-RECALC-1 (l.1982) et SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1 (l.2005).
+
+## Objet
+1. **RB2-a, frontière (décision de l'orchestrateur)** : E-R-03 exige le re-décodage « par les décodeurs scellés » ; la frontière actuelle n'admet pour `recalc` que `shogen_s2bis.recalc`. Décision : `recalc` peut importer `shogen_s2bis.collecte.decodeurs` **seul** (fonctions pures de décodage, sans entrée-sortie), par une règle nommée de `test_fitness.REGLES`, avec un test de fitness neuf qui prouve que `collecte/decodeurs.py` n'importe que la bibliothèque standard (sinon la frontière fuirait) ; ajout daté au G0 (même forme que les ajouts existants, heure `date -u`) qui l'écrit avec son motif ; aucune copie du code des décodeurs.
+2. **RB2-b à RB2-e, module `s2bis/shogen_s2bis/recalc/fusion.py`** (nom proposé, à produire) :
+   - lecture des journaux `pool` et `secondaire` des quatre observateurs de la liste fermée (`observateurs.json`) par le lecteur de RB-1, ruptures et queues rendues à leur place (Q-R-03 : la portée en fenêtres est laissée à RB-3) ;
+   - **`run_params`** (E-R-04) : par observateur, clés porteuses concordantes entre ses démarrages ; `commit` et `sha256` des configurations égaux à ceux du paquet (les quatre fichiers de `s2bis/config/` lus en octets), sinon **refus nommé avant tout calcul** ; l'ensemble des observateurs lus égal à la liste fermée ou refus nommé ;
+   - **re-décodage** (E-R-03) : pour chaque `lecture` `ok` portant `brut`, octets décodés par le décodeur scellé de la forme, égalité exigée avec `valeurs` et `extra` journalisés, verdict rendu (compte des égalités, liste des écarts ; une égalité fausse est un constat, jamais une réparation) ;
+   - **classe `temoin`** (SHOGEN-S2BIS-TEMOIN-RECALC-1) : filtre nommé qui écarte les relevés de classe `temoin` des classes USD et de tout vote, les gardant dans un ensemble descriptif à part ;
+   - **remplaçants** (SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1) : filtre nommé sur le suffixe `_remplacant` des formes de la carte : écartés des sources de la carte descriptive, gardés dans un ensemble `remplacants` ;
+   - sortie : structure fusionnée par fenêtre, observateur et forme (relevés décodés, pannes, marqueurs, santé), sans rien imprimer ; le rendu est aux sous-lots RB-15 et RB-16.
+3. **Tests** : jeux synthétiques seulement, écrits par `collecte/journal.py` et le câblage de `collecte/entree.py` (les tests sont hors de la frontière) ; **aucune lecture de journal de campagne réel** ; un test par exigence (E-R-03, E-R-04, témoin, remplaçants, liste fermée, ruptures rendues) ; rouge avant le code.
+4. **Toute valeur ou forme que le G0 ne fixe pas devient une question Q-RB2-n avec ta recommandation, que tu codes** (jamais un choix silencieux).
+
+## Règles communes
+- tests d'abord ; mutants : au moins dix par sous-lot de code, classés par la commande du job `s2bis-unittest` (runner puis ligne s2bis de `.github/workflows/gates.yml`, suite entière, borne 300 s ; dépassement = FATAL) ;
+- bibliothèque standard seule (R-8) ; R-13 ; aucun flottant ; `parse_float=Decimal` ; lignes ≤ 120 colonnes ;
+- diffs en série `diffs/RB2-a.diff`, `RB2-b.diff`, … (à produire), chacun ≤ 200 lignes de code ajoutées (R-25), plancher exact du job s2bis relevé à chaque diff (`--egal`, tête : 446, `.github/workflows/gates.yml`), section METRIQUES par diff (`docs/adr-0029/s2bis/METRIQUES-S2BIS.md`, forme des sections GEL) ; `git apply --check` montré ;
+- aucune opération réseau (`unshare -n` avec `lo` : `<scratchpad>/outils/isole.sh`, `env -u SHOGEN_S2_CAMPAGNE_CONTROL`) ; **tout Python s'écrit `python3 -I -B`** ; aucun `__pycache__` laissé ; Python 3.10 à 3.13 en `-X dev -W error` ;
+- avant livraison : runner, jobs s2bis, S2 et sim-bis aux planchers exacts ; `cargo --locked xtask verify` sur ta copie : lignes de verdict seules (S-G9 `docs/17:70` connue sur une copie creuse) ;
+- journal G1 au rapport ([lu], [2nd], [abs]) ; texte de fermeture proposé pour chaque item fermé ; estimation révisée de RB-3 à RB-5 ; un seul processus lourd à la fois (un autre worker travaille en parallèle sur DB-2) ; copies lourdes supprimées à la fin.
+
+## Interdits
+`docs/15-*`, `docs/16-*`, `docs/pocket-report/`, `docs/rapports/`, `docs/adr-0025/`, `docs/adr-0028/monark-m009a/`, `docs/adr-0028/execution/` ; tout `*.jsonl` réel ; toute pièce de D.2 ; ne jamais poser `SHOGEN_S2_CAMPAGNE_CONTROL` ; aucune recherche ou énumération récursive sur `docs/`, sur le dépôt ni sur le scratchpad, même sur tes copies ; aucun fichier sous un `.claude/` du dépôt réel ; rien sur Pocket.
+
+Gate 0 : identifiant exact de ton modèle en tête (attendu `claude-opus-5-5`). Rapport final par message, court, en français ; aussi dans `RAPPORT-GENERATEUR.md`, couvert par `SHA256SUMS`.
