@@ -113,3 +113,21 @@ pour `appliquer`) ; le module n'est pas modifié (code gelé). La fermeture tran
 `test_fermeture_des_decodeurs` : exactement ces trois modules et leurs paquets parents (`shogen_s2bis`,
 `shogen_s2bis.collecte`), hors du paquet la bibliothèque standard seule, aucun import dynamique ; un import neuf dans
 l'un d'eux fait échouer le test. Le texte validé de ce G0 reste tel quel.
+
+*Ajout daté du 2026-10-18 21:27:42 UTC (heure lue par `date -u` à l'écriture du texte ; relecture G2 du sous-lot RB-2,
+correction C-4, à adopter par l'orchestrateur ; adjudications écrites au brief de correction de RB-2
+du 2026-10-18)*, sous-lot RB-2 (fusion des observateurs) : (1) **Q-RB2-1 adoptée** : la fermeture transitive fixée par
+`test_fermeture_des_decodeurs` remplace le test « `collecte/decodeurs.py` n'importe que la bibliothèque standard », que
+le code gelé ne passe pas ; le point (2) de l'ajout du 2026-10-18 16:13:07 UTC n'est plus à adjuger. (2) **Q-RB2-13
+modifiée** (ADR-0029 l.78 : la perte d'un observateur pour toute la campagne laisse un quorum de 2 sur 3 ; l.219 :
+repli M = 3 nommé au paquet) : un observateur de la liste fermée dont le dossier manque, ou ne porte aucun des deux
+journaux, est admis comme absent : constat nommé `FUSION/observateur-absent` (`Fusion.constats`, `Fusion.absents`) ;
+ses fenêtres valent D-1 « absence » au sous-lot RB-3 (la fusion ne juge pas) ; le recalcul tourne sur les observateurs
+présents s'ils sont au moins trois (`QUORUM` de `s2bis/shogen_s2bis/recalc/fusion.py`), sinon refus `FUSION/quorum`
+avant toute lecture de journal ; un journal présent sur deux reste un refus (`LECTEUR/absent`) ; E-R-04 s'applique aux
+présents, et la liste `observateurs` de chaque `run_params` reste égale à la liste fermée scellée. (3) Q-RB2-2 à
+Q-RB2-12 adoptées telles que codées : `python` non porteuse ; contenus de `run_params` égaux au paquet ; deux passes,
+intégrité de la relecture égale à celle de la passe 1 (C-2 de la G2) ; re-décodage des `ok` et `panne_decode`, `brut`
+au base64 canonique et sha256 contrôlés avant le décodeur (C-1 de la G2) ; témoin et remplaçants filtrés par nom ;
+lecture RIPEstat des `asn` non re-décodée (SHOGEN-S2BIS-RIPESTAT-REDECODAGE-1, déclencheur RB-14). Le texte validé de
+ce G0 reste tel quel.

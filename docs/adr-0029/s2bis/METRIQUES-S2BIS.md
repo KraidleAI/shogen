@@ -3752,9 +3752,10 @@ module).
 | `shogen_s2bis/recalc/fusion.py` | 269 | — |
 | `tests/test_fusion.py` | 494 | 16 (3 de plus : `Absents`) |
 
-Mutants (même commande, même outil) : 12 classés, 12 tués, 0 vivant, 0 FATAL : quorum à deux ; quorum à quatre ; quorum en `<=` ; constat
-perdu ; journal seul pris pour une absence ; passe 2 sur la liste ; passe 1 sur la liste ; dossier absent non admis ;
-tout refus du lecteur pris pour une absence ; code du constat ; quorum non contrôlé ; plancher.
+Mutants (même commande, même outil) : 12 classés, 12 tués, 0 vivant, 0 FATAL : quorum à deux ; quorum à quatre ;
+quorum en `<=` ; constat perdu ; journal seul pris pour une absence ; passe 2 sur la liste ; passe 1 sur la liste ;
+dossier absent non admis ; tout refus du lecteur pris pour une absence ; code du constat ; quorum non contrôlé ;
+plancher.
 
 Suite : 463 tests ; plancher du job : 463, égalité exigée (`--egal`). Compte de R-25 : 75 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
