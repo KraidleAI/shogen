@@ -3682,3 +3682,29 @@ silence ; relecture non contrôlée ; relecture comparée à l'autre journal ; c
 
 Suite : 456 tests ; plancher du job : 456, égalité exigée (`--egal`). Compte de R-25 : 54 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-f (2026-10-18) : re-décodage des octets bruts par les décodeurs scellés (E-R-03 ; SHOGEN-RAW-REDECODAGE-1)
+
+Objet : en passe 2, chaque `lecture` `ok` ou `panne_decode` (Q-RB2-6) : `brut` en base64 strict, octets re-décodés par
+`collecte.decodeurs.decoder` sous le décodeur de la forme (paquet ; RB2-a), égalité exigée du sha256 journalisé, du
+statut, des valeurs, puis de leurs `extra` ; verdict `redecodage` de la lecture (« egal » ou la cause : `base64`,
+`sha256`, `statut`, `valeurs`, `extra`), égalités comptées et écarts listés (`Fusion.redecodage`) ; une égalité fausse
+est un constat, jamais une réparation : la lecture garde ses valeurs journalisées ; aucun décodage en passe 1, ni sur un
+refus de `run_params`.
+
+Rouge : sur le code de RB2-e : 1 FAIL (verdict `redecodage` absent de la lecture), 2 ERROR (`redecodage` et `decoder`
+absents du module).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 211 | — |
+| `tests/test_fusion.py` | 389 | 11 (2 de plus : `Redecodage`) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : sha256 seul comparé (mutant obligatoire
+du G0, PROPOSITION §3.4) ; `extra` non comparé ; valeurs comparées avec leurs `extra` ; base64 laxiste ; `panne_decode`
+non re-décodée ; statut non comparé ; égalités non comptées ; décodeur nommé par la forme (site d'appel : la forme
+remplaçante et son décodeur ont des noms différents) ; écart sans observateur ; réparation en place des valeurs ;
+plancher.
+
+Suite : 458 tests ; plancher du job : 458, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

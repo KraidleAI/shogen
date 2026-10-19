@@ -10,13 +10,18 @@ remontent tels quels).
 Passe 2 (`fenetres`) : les huit journaux relus en flux et fusionnés par fenêtre, observateur et journal (lectures par
 forme, pannes comprises, `sante`, marqueur, démarrage, autres enregistrements), mémoire d'une fenêtre par journal ;
 ruptures du lecteur, `trou` et `reprise` rendus à leur place, dans la fenêtre qui les suit, sans portée en fenêtres
-(Q-R-03, AVIS l.108 : RB-3) ; rien n'est imprimé (rendu : RB-15, RB-16)."""
+(Q-R-03, AVIS l.108 : RB-3) ; rien n'est imprimé (rendu : RB-15, RB-16). Re-décodage (E-R-03) : chaque `lecture`
+`ok` ou `panne_decode` re-décodée en passe 2 par le décodeur scellé de sa forme (`collecte.decodeurs`, seule entrée de
+`collecte`, RB2-a), verdict `redecodage` : égalités comptées, écarts listés, jamais réparés."""
+import base64
+import binascii
 import hashlib
 import heapq
 import itertools
 import json
 import os
 
+from ..collecte.decodeurs import decoder
 from .lecteur import RESERVES, Lecteur, _canonique
 
 JOURNAUX = ("pool", "secondaire")                       # préfixes des deux journaux d'un observateur (FORMAT §15.1)
@@ -28,6 +33,7 @@ LECTURE = ("forme", "prevu", "statut", "sous_type", "code", "depart", "fin", "ph
            "valeurs")                                   # champs propres exacts d'une `lecture` (FORMAT §9.1, §11.2)
 ENSEMBLE = {"pool": "pool", "secondaire": "carte"}      # ensemble des lectures de chaque journal
 ATTENTE = ("ruptures", "trous", "reprises")             # rattachés à la fenêtre qui les suit
+REDECODES = ("ok", "panne_decode")                      # statuts dont le corps a été décodé (E-R-03 ; Q-RB2-6)
 
 
 class RefusFusion(Exception):
@@ -53,6 +59,11 @@ def paquet(dossier):
 def champs(e):
     """Champs propres de l'enregistrement `e`."""
     return {k: v for k, v in e.items() if k not in STRUCTURE}
+
+
+def _sans_extra(v):
+    """Relevés `v` sans leur `extra` : comparaison des valeurs seules, puis des `extra`."""
+    return [{k: x for k, x in r.items() if k != "extra"} if type(r) is dict else r for r in v] if type(v) is list else v
 
 
 def fenetre(ws):
@@ -112,8 +123,9 @@ class Fusion:
 
     def fenetres(self):
         """Passe 2 : (ws, {observateur : {journal : fenêtre}}) par ws croissant ; une fenêtre ne porte que les journaux
-        qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale}."""
-        self.integrite = {}
+        qui y ont écrit. Après l'itération, `integrite` : {(o, j) : tête, ruptures, queues déclarées, queue finale} ;
+        `redecodage` : égalités, écarts {observateur, journal, seq, ws, forme, cause}."""
+        self.integrite, self.redecodage = {}, {"egalites": 0, "ecarts": []}
         flux = heapq.merge(*(self._flux(o, j) for o in self.liste for j in JOURNAUX), key=lambda x: x[0])
         for ws, groupe in itertools.groupby(flux, key=lambda x: x[0]):
             par = {}
@@ -154,7 +166,7 @@ class Fusion:
 
     def _ranger(self, o, j, f, e):
         """Range l'enregistrement de fenêtre `e` dans `f` ; `lecture` aux champs exacts (FUSION/lecture), de forme
-        configurée (FUSION/forme) ; une forme ou une `sante` deux fois dans la fenêtre : FUSION/double."""
+        configurée (FUSION/forme), re-décodée ; une forme ou une `sante` deux fois dans la fenêtre : FUSION/double."""
         t, c, ou = e["type"], champs(e), f"{o}/{j}, seq {e['seq']}"
         if t == "lecture":
             x = self.formes[j].get(c.get("forme")) if type(c.get("forme")) is str else None
@@ -163,7 +175,8 @@ class Fusion:
             if c["forme"] in f[ENSEMBLE[j]]:
                 raise RefusFusion("FUSION/double", f"{ou} : {c['forme']}")
             f[ENSEMBLE[j]][c["forme"]] = {**{k: v for k, v in c.items() if k not in ("forme", "brut")},
-                                          "hote": x["hote"], "decodeur": x["decodeur"]}
+                                          "hote": x["hote"], "decodeur": x["decodeur"],
+                                          "redecodage": self._redecoder(o, j, e, x["decodeur"])}
         elif t == "sante":
             if f["sante"] is not None:
                 raise RefusFusion("FUSION/double", f"{ou} : sante")
@@ -172,3 +185,27 @@ class Fusion:
             f["marqueur" if t == "marqueur" else "demarrage"] = True
         else:
             f["autres"].append({"type": t, **c})
+
+    def _redecoder(self, o, j, e, dec):
+        """E-R-03 : octets de `brut` (base64 strict) re-décodés par le décodeur scellé `dec` de la forme ; égalité
+        exigée du sha256 journalisé, du statut, des valeurs, puis de leurs `extra`. Verdict « egal », compté, ou cause
+        de l'écart, consignée ; une égalité fausse est un constat, jamais une réparation : la lecture garde ses valeurs
+        journalisées. Statut hors REDECODES : None (corps jamais décodé par le collecteur)."""
+        if e["statut"] not in REDECODES:
+            return None
+        try:
+            octets = base64.b64decode(e["brut"], validate=True)
+        except (binascii.Error, TypeError, ValueError):     # alphabet, remplissage, type ; texte non ASCII
+            cause = "base64"
+        else:
+            statut, valeurs = decoder(dec, octets)
+            cause = next((n for n, egal in (
+                ("sha256", hashlib.sha256(octets).hexdigest() == e["sha256"]), ("statut", statut == e["statut"]),
+                ("valeurs", _canonique(_sans_extra(valeurs)) == _canonique(_sans_extra(e["valeurs"]))),
+                ("extra", _canonique(valeurs) == _canonique(e["valeurs"]))) if not egal), None)
+        if cause is None:
+            self.redecodage["egalites"] += 1
+            return "egal"
+        self.redecodage["ecarts"].append({"observateur": o, "journal": j, "seq": e["seq"], "ws": e["ws"],
+                                          "forme": e["forme"], "cause": cause})
+        return cause

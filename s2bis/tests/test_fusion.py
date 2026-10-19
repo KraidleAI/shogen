@@ -9,6 +9,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 from shogen_s2bis.collecte import decodeurs, entree, journal
 from shogen_s2bis.collecte.lecture import S, Lecture
@@ -81,6 +82,20 @@ def panne(_dec, ws):
 
 
 BTC = [("binance_btc", "binance_btc"), ("coinbase_btc", "coinbase_btc")]
+with open(os.path.join(CONFIG, "formes.json"), "rb") as _f:
+    POOL = [(x["nom"], x["decodeur"]) for x in json.loads(_f.read())["formes"]]    # les 33 formes du pool et du témoin
+
+
+class Faux:
+    """Lecture `lu` dont des champs journalisés sont imposés (`champs`)."""
+
+    def __init__(self, lu, **champs):
+        self.lu, self.champs = lu, champs
+
+    def enregistrement(self):
+        return {**self.lu.enregistrement(), **self.champs}
+
+
 class Observateurs:
     """Dossier d'essai : par observateur, un descripteur et un dossier de journaux `pool` et `secondaire`."""
 
@@ -240,7 +255,7 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
         self.assertEqual({k: v for k, v in p["pool"]["binance_btc"].items() if k not in ("depart", "fin")}, {
             "prevu": m(1) * S, "statut": "ok", "sous_type": None, "code": 200, "phases": {}, "adresse": None,
             "sha256": hashlib.sha256(corps("binance_btc")).hexdigest(), "hote": "data-api.binance.vision",
-            "decodeur": "binance_btc", "valeurs": [{
+            "decodeur": "binance_btc", "redecodage": "egal", "valeurs": [{
                 "actif": "BTC", "classe": "sans_horodatage", "devise": "USDT", "extra": {}, "prix": "64529.50000000",
                 "ts_source": None}]})
         o1, o2 = vues[1][1]["o1"]["pool"], vues[1][1]["o2"]["pool"]
@@ -256,6 +271,7 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
                               "api.binance.com", "binance_btc", "ok")}, [{"type": "asn", "hote": "api.binance.com", "a":
                                                                          None, "ip": None, "ripestat": None,
                                                                          "cymru": None}]))
+        self.assertEqual(f.redecodage, {"egalites": 6, "ecarts": []})
         self.assertEqual(sorted((k, v["ruptures"]) for k, v in f.integrite.items()), [
             ((o, j), []) for o in OBS for j in fusion.JOURNAUX])
 
@@ -325,3 +341,49 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
         with self.assertRaises(fusion.RefusFusion) as e:
             list(f.fenetres())
         self.assertEqual(e.exception.code, "FUSION/relecture")
+
+
+class Redecodage(Base):                                     # E-R-03 ; PROPOSITION §3.4 : écart signalé (M : sha seul)
+    def test_egalite_sur_les_33_formes_et_aucun_decodage_en_passe_1(self):
+        """Les 33 formes de formes.json, lues `ok` sur leurs fixtures et une panne de transport (jamais décodée) ;
+        aucun décodage en passe 1, ni sur un refus de `run_params` qui suit des lectures."""
+        d = self.obs.quatre(fenetres={("o1", "pool"): [(m(1), POOL)], ("o2", "pool"): [(m(1), BTC)]})
+        self.obs.ecrire("o2", "pool", m(2), [(m(3), BTC[1:])], lire=panne)
+        with mock.patch.object(fusion, "decoder", side_effect=decodeurs.decoder) as dec:
+            f = fusion.Fusion(d, CONFIG, COMMIT)
+            avant = dec.call_count
+            vues = list(f.fenetres())
+        self.assertEqual((len(POOL), avant, dec.call_count, f.redecodage), (33, 0, 35, {"egalites": 35, "ecarts": []}))
+        lus = vues[0][1]["o1"]["pool"]["pool"]
+        self.assertEqual(({x["redecodage"] for x in lus.values()}, vues[-1][1]["o2"]["pool"]["pool"]["coinbase_btc"][
+            "redecodage"]), ({"egal"}, None))
+        self.obs.ecrire("o4", "secondaire", m(4), rp={**self.obs.run_params("o4", "secondaire"), "commit": "d" * 40})
+        with mock.patch.object(fusion, "decoder", side_effect=decodeurs.decoder) as dec:
+            with self.assertRaises(fusion.RefusFusion) as e:
+                fusion.Fusion(d, CONFIG, COMMIT)
+        self.assertEqual((e.exception.code, dec.call_count), ("FUSION/commit", 0))
+
+    def test_ecarts_nommes_jamais_repares(self):
+        """Valeurs (prix) changées, sha256 et brut intacts : « valeurs » (M : sha seul comparé) ; `extra` changé ;
+        sha256 faux ; brut hors base64 ; `ok` d'un corps indécodable ; `panne_decode` d'un corps décodable ;
+        `panne_decode` d'un corps indécodable : égal. Les valeurs journalisées restent celles de la fusion."""
+        btc = ok("binance_btc", m(1)).valeurs
+        faux = {"binance_btc": ("valeurs", Faux(ok("binance_btc", m(1)), valeurs=[{**btc[0], "prix": "64529.5"}])),
+                "chainlink_usdc": ("extra", Faux(ok("chainlink_usdc", m(1)), valeurs=[{**ok(
+                    "chainlink_usdc", m(1)).valeurs[0], "extra": {"plafond": "1.06000000", "round_id": "1"}}])),
+                "coinbase_btc": ("sha256", Faux(ok("coinbase_btc", m(1)), sha256="0" * 64)),
+                "kraken_btc": ("base64", Faux(ok("kraken_btc", m(1)), brut="@@@")),
+                "gemini_btc": ("statut", Lecture("ok", 0, 1, code=200, octets=b"{}", valeurs=btc)),
+                "bitstamp_btc": ("statut", Lecture("panne_decode", 0, 1, code=200, octets=corps("bitstamp_btc"))),
+                "okx_index_btc": (None, Lecture("panne_decode", 0, 1, code=200, octets=b"[]"))}
+        d = self.obs.quatre(fenetres={("o1", "pool"): [(m(1), [(n, n) for n in faux])]},
+                            lire=lambda x, ws: faux[x][1])
+        f = fusion.Fusion(d, CONFIG, COMMIT)
+        lus = list(f.fenetres())[0][1]["o1"]["pool"]["pool"]
+        ecarts = [{"observateur": "o1", "journal": "pool", "ws": m(1), "forme": n, "cause": c}
+                  for n, (c, _l) in faux.items() if c]
+        self.assertEqual(([{k: x[k] for k in x if k != "seq"} for x in f.redecodage["ecarts"]],
+                          f.redecodage["egalites"]), (ecarts, 1))
+        self.assertEqual(({n: x["redecodage"] for n, x in lus.items()}, lus["binance_btc"]["valeurs"][0]["prix"],
+                          lus["gemini_btc"]["valeurs"]), ({n: c or "egal" for n, (c, _l) in faux.items()}, "64529.5",
+                                                         btc))
