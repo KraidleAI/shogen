@@ -250,7 +250,7 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
             (m(3), {"o3": ["pool", "secondaire"], "o4": ["pool", "secondaire"]})])
         p = vues[0][1]["o1"]["pool"]
         self.assertEqual({k: p[k] for k in p if k != "pool"}, {
-            "ws": m(1), "carte": {}, "sante": SANTE, "marqueur": True,
+            "ws": m(1), "temoin": {}, "carte": {}, "remplacants": {}, "sante": SANTE, "marqueur": True,
             "demarrage": True, "autres": [], "ruptures": [], "trous": [], "reprises": []})
         self.assertEqual({k: v for k, v in p["pool"]["binance_btc"].items() if k not in ("depart", "fin")}, {
             "prevu": m(1) * S, "statut": "ok", "sous_type": None, "code": 200, "phases": {}, "adresse": None,
@@ -265,7 +265,7 @@ class Flux(Base):                                           # passe 2 ; Q-R-03 :
                                                           "valeurs": None, "hote": "api.exchange.coinbase.com"}))
         s = vues[1][1]["o2"]["secondaire"]
         self.assertEqual((s["demarrage"], s["marqueur"], s["sante"], s["carte"]), (True, False, None, {}))
-        r = vues[0][1]["o1"]["secondaire"]["carte"]
+        r = vues[0][1]["o1"]["secondaire"]["remplacants"]
         self.assertEqual(({n: (x["hote"], x["decodeur"], x["statut"]) for n, x in r.items()},
                           vues[2][1]["o3"]["secondaire"]["autres"]), ({"binance_btc_remplacant": (
                               "api.binance.com", "binance_btc", "ok")}, [{"type": "asn", "hote": "api.binance.com", "a":
@@ -387,3 +387,65 @@ class Redecodage(Base):                                     # E-R-03 ; PROPOSITI
         self.assertEqual(({n: x["redecodage"] for n, x in lus.items()}, lus["binance_btc"]["valeurs"][0]["prix"],
                           lus["gemini_btc"]["valeurs"]), ({n: c or "egal" for n, (c, _l) in faux.items()}, "64529.5",
                                                          btc))
+
+
+class Filtres(Base):                        # SHOGEN-S2BIS-TEMOIN-RECALC-1, SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1
+    def test_temoin_hors_du_vote_date_par_ses_blocs(self):
+        """Les 33 formes : les trois du témoin (FORMAT §9.1) dans `temoin`, aucune au `pool`, aucun relevé de classe
+        `temoin` au pool, USDC/USD gardé ; blocs lus à la main sur les fixtures (`printf %d` : Uniswap 0x18f039f deux
+        fois, 26149791 ; Curve 0x18f03a4 et 0x18f03a5, 26149796 et 26149797), OKX sans bloc. o2 : panne du témoin au
+        témoin ; relevé de classe `temoin` journalisé sous une forme du pool (écart « valeurs ») : au témoin. Sans
+        bloc pour l'une et l'autre."""
+        temoin = ["curve_usdc_usdt", "okx_usdc_usdt", "uniswap_usdc_usdt"]
+        d = self.obs.quatre(fenetres={("o1", "pool"): [(m(1), POOL)]})
+        btc = ok("kraken_btc", m(1)).valeurs
+        self.obs.ecrire("o2", "pool", m(2), [(m(3), [(n, n) for n in ("okx_usdc_usdt", "kraken_btc")])], lire=lambda x,
+                        ws: panne(x, ws) if x == "okx_usdc_usdt" else Faux(ok(x, ws), valeurs=[{**btc[0], "classe":
+                                                                                                "temoin"}]))
+        vues = dict(fusion.Fusion(d, CONFIG, COMMIT).fenetres())
+        p, o2 = vues[m(1)]["o1"]["pool"], vues[m(3)]["o2"]["pool"]
+        self.assertEqual((sorted(p["temoin"]), sorted(p["pool"]), [r["classe"] for x in p["pool"].values() for r in x[
+            "valeurs"] if r["classe"] == "temoin"], p["pool"]["kraken_usdc"]["valeurs"][0]["classe"]), (
+            temoin, sorted({n for n, _d in POOL} - set(temoin)), [], "sans_horodatage"))
+        self.assertEqual({n: x["blocs"] for n, x in p["temoin"].items()}, {"uniswap_usdc_usdt": [(26149791, 26149791)],
+                                                                          "curve_usdc_usdt": [(26149796, 26149797)],
+                                                                          "okx_usdc_usdt": []})
+        self.assertEqual((o2["pool"], {n: (x["statut"], x["redecodage"], x["blocs"]) for n, x in o2["temoin"].items()}),
+                         ({}, {"okx_usdc_usdt": ("panne_transport", None, None),
+                               "kraken_btc": ("ok", "valeurs", None)}))
+        obs = Observateurs(tempfile.mkdtemp(dir=self.base))         # forme du témoin deux fois : FUSION/double
+        d = obs.quatre(fenetres={("o3", "pool"): [(m(1), [("okx_usdc_usdt", "okx_usdc_usdt")] * 2)]})
+        with self.assertRaises(fusion.RefusFusion) as e:
+            list(fusion.Fusion(d, CONFIG, COMMIT).fenetres())
+        self.assertEqual(e.exception.code, "FUSION/double")
+
+    def test_remplacants_hors_de_la_carte(self):
+        """Carte de production : les quatre remplaçants de Binance dans `remplacants`, carte vide ; paquet d'essai dont
+        la carte porte en plus une source sans le suffixe (`coinbase_btc_carte`, hôte `carte.example`, contrôlée par le
+        câblage) : elle seule dans `carte`. Suffixe exact, en fin de nom."""
+        rempl = ["binance_btc_remplacant", "binance_eth_remplacant", "binance_usdc_remplacant",
+                 "binance_usdt_remplacant"]
+        carte = [(n, "binance_" + n.split("_")[1]) for n in rempl]
+        s = dict(fusion.Fusion(self.obs.quatre(fenetres={("o1", "secondaire"): [(m(1), carte)]}), CONFIG,
+                               COMMIT).fenetres())[m(1)]["o1"]["secondaire"]
+        self.assertEqual((sorted(s["remplacants"]), s["carte"], s["pool"], s["temoin"], {x["hote"] for x in s[
+            "remplacants"].values()}), (rempl, {}, {}, {}, {"api.binance.com"}))
+        config = os.path.join(self.base, "config")
+        shutil.copytree(CONFIG, config)
+        with open(os.path.join(CONFIG, "carte.json"), "rb") as f:
+            c = json.loads(f.read())
+        c["places"] = 5                                     # règle `places-formes` : cinq formes
+        c["formes"].append({"nom": "coinbase_btc_carte", "hote": "carte.example", "port": 443, "chemin":
+                            "/products/BTC-USD/ticker", "methode": "GET", "corps": "", "espace": False, "decodeur":
+                            "coinbase_btc"})
+        with open(os.path.join(config, "carte.json"), "w", encoding="utf-8") as f:
+            json.dump(c, f)
+        obs = Observateurs(tempfile.mkdtemp(dir=self.base), config)
+        d = obs.quatre(fenetres={("o1", "secondaire"): [(m(1), carte + [("coinbase_btc_carte", "coinbase_btc")])]})
+        s = dict(fusion.Fusion(d, config, COMMIT).fenetres())[m(1)]["o1"]["secondaire"]
+        self.assertEqual((sorted(s["remplacants"]), sorted(s["carte"]), s["carte"]["coinbase_btc_carte"]["hote"]),
+                         (rempl, ["coinbase_btc_carte"], "carte.example"))
+        self.assertEqual([fusion.est_remplacant(n) for n in ("binance_btc_remplacant", "_remplacant", "binance_btc",
+                                                             "binance_btc_remplacante", "remplacant_binance",
+                                                             "binance_btc_Remplacant")],
+                         [True, True, False, False, False, False])

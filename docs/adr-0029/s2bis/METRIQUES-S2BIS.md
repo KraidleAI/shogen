@@ -3708,3 +3708,28 @@ plancher.
 
 Suite : 458 tests ; plancher du job : 458, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
 (`.py`, `.yml`) ; hors compte : METRIQUES.
+
+## RB2-g (2026-10-18) : témoin hors des classes USD et du vote, remplaçants hors de la carte (SHOGEN-S2BIS-TEMOIN-RECALC-1, SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1)
+
+Objet : filtres nommés de `recalc/fusion.py` : `est_temoin` (classe `temoin` du décodeur scellé de la forme, pannes
+comprises, ou d'un relevé journalisé ; ADR-0029 l.174) : la lecture va à l'ensemble descriptif `temoin`, jamais au
+`pool` ; `blocs` : (bloc_avant, bloc_apres) entiers des relevés du témoin sur chaîne, re-décodés à l'égal et `ok`
+seulement (B.115, FORMAT §9.1), sans jugement de leur écart ; `est_remplacant` (suffixe exact `_remplacant` en fin du
+nom de forme, journal `secondaire`) : la lecture va à l'ensemble `remplacants`, hors de `carte` (Q-C-08, GEL-9). Forme
+deux fois dans une fenêtre, tous ensembles confondus : `FUSION/double`.
+
+Rouge : sur le code de RB2-f : 1 FAIL (ensembles `temoin` et `remplacants` absents de la fenêtre), 2 ERROR (`KeyError`
+sur ces deux ensembles).
+
+| fichier | lignes | tests |
+|---|---|---|
+| `shogen_s2bis/recalc/fusion.py` | 242 | — |
+| `tests/test_fusion.py` | 451 | 13 (2 de plus : `Filtres`) |
+
+Mutants (même commande, même outil) : 11 classés, 11 tués, 0 vivant, 0 FATAL : classe du décodeur ignorée ; classe du
+relevé ignorée ; suffixe n'importe où dans le nom ; filtre appliqué au décodeur (site d'appel) ; blocs permutés ; blocs
+sur un écart de re-décodage ; condition des blocs en « ou » ; double cherché au seul pool ; autre classe prise pour le
+témoin ; témoin au pool ; plancher.
+
+Suite : 460 tests ; plancher du job : 460, égalité exigée (`--egal`). Compte de R-25 : 106 lignes de code ajoutées
+(`.py`, `.yml`) ; hors compte : METRIQUES.

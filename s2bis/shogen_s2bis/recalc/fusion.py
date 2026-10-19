@@ -12,7 +12,10 @@ forme, pannes comprises, `sante`, marqueur, démarrage, autres enregistrements),
 ruptures du lecteur, `trou` et `reprise` rendus à leur place, dans la fenêtre qui les suit, sans portée en fenêtres
 (Q-R-03, AVIS l.108 : RB-3) ; rien n'est imprimé (rendu : RB-15, RB-16). Re-décodage (E-R-03) : chaque `lecture`
 `ok` ou `panne_decode` re-décodée en passe 2 par le décodeur scellé de sa forme (`collecte.decodeurs`, seule entrée de
-`collecte`, RB2-a), verdict `redecodage` : égalités comptées, écarts listés, jamais réparés."""
+`collecte`, RB2-a), verdict `redecodage` : égalités comptées, écarts listés, jamais réparés. Filtres nommés : témoin
+(`est_temoin`, SHOGEN-S2BIS-TEMOIN-RECALC-1 ; ADR-0029 l.174), hors des classes USD et de tout vote, dans l'ensemble
+descriptif `temoin`, daté par ses blocs ; remplaçants de la carte (`est_remplacant`,
+SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1 ; Q-C-08), hors des sources de la carte, dans l'ensemble `remplacants`."""
 import base64
 import binascii
 import hashlib
@@ -21,7 +24,8 @@ import itertools
 import json
 import os
 
-from ..collecte.decodeurs import decoder
+from ..collecte.decodeurs import DECODEURS, decoder
+from .config_analyse import TEMOIN
 from .lecteur import RESERVES, Lecteur, _canonique
 
 JOURNAUX = ("pool", "secondaire")                       # préfixes des deux journaux d'un observateur (FORMAT §15.1)
@@ -31,7 +35,8 @@ PORTEUSES = ("commit", "sha256", "descripteur")         # clés porteuses avec S
 STRUCTURE = ("type", "seq", "prec", "ws")               # champs communs, hors des champs propres
 LECTURE = ("forme", "prevu", "statut", "sous_type", "code", "depart", "fin", "phases", "adresse", "brut", "sha256",
            "valeurs")                                   # champs propres exacts d'une `lecture` (FORMAT §9.1, §11.2)
-ENSEMBLE = {"pool": "pool", "secondaire": "carte"}      # ensemble des lectures de chaque journal
+ENSEMBLES = ("pool", "temoin", "carte", "remplacants")  # pool et témoin au journal `pool`, les autres au secondaire
+SUFFIXE = "_remplacant"                                 # formes remplaçantes de la carte (GEL-9, Q-C-08)
 ATTENTE = ("ruptures", "trous", "reprises")             # rattachés à la fenêtre qui les suit
 REDECODES = ("ok", "panne_decode")                      # statuts dont le corps a été décodé (E-R-03 ; Q-RB2-6)
 
@@ -66,10 +71,30 @@ def _sans_extra(v):
     return [{k: x for k, x in r.items() if k != "extra"} if type(r) is dict else r for r in v] if type(v) is list else v
 
 
+def est_temoin(decodeur, valeurs):
+    """Filtre du témoin (SHOGEN-S2BIS-TEMOIN-RECALC-1 ; ADR-0029 l.174 : « hors des classes USD et hors du vote ») :
+    vrai si le décodeur scellé de la forme est de classe TEMOIN (pannes comprises), ou si un relevé journalisé l'est."""
+    return DECODEURS[decodeur][2] == TEMOIN or type(valeurs) is list and any(
+        type(r) is dict and r.get("classe") == TEMOIN for r in valeurs)
+
+
+def est_remplacant(forme):
+    """Filtre des remplaçants (SHOGEN-S2BIS-CARTE-REMPLACANTS-RECALC-1 ; FORMAT §15.2) : forme de la carte au suffixe
+    SUFFIXE, lue hors du vote (Q-C-08), écartée des sources de la carte descriptive."""
+    return forme.endswith(SUFFIXE)
+
+
+def blocs(valeurs):
+    """Datage du témoin sur chaîne (B.115 ; FORMAT §9.1) : [(bloc_avant, bloc_apres)] entiers des relevés qui les
+    portent ; [] pour OKX, daté par `ts_source`."""
+    return [(int(r["extra"]["bloc_avant"]), int(r["extra"]["bloc_apres"])) for r in valeurs if "bloc_avant" in r[
+        "extra"]]
+
+
 def fenetre(ws):
-    """Fenêtre `ws` d'un journal : lectures par forme dans les ensembles `pool` et `carte`, `sante`, marqueur,
-    démarrage (`run_params`), autres enregistrements (`tetes`, `asn`, `releve_asn`), ruptures, trous et reprises."""
-    return {"ws": ws, **{k: {} for k in ENSEMBLE.values()}, "sante": None, "marqueur": False, "demarrage": False,
+    """Fenêtre `ws` d'un journal : lectures par forme dans les ENSEMBLES, `sante`, marqueur, démarrage
+    (`run_params`), autres enregistrements (`tetes`, `asn`, `releve_asn`), ruptures, trous et reprises."""
+    return {"ws": ws, **{k: {} for k in ENSEMBLES}, "sante": None, "marqueur": False, "demarrage": False,
             "autres": [], **{k: [] for k in ATTENTE}}
 
 
@@ -172,11 +197,17 @@ class Fusion:
             x = self.formes[j].get(c.get("forme")) if type(c.get("forme")) is str else None
             if sorted(c) != sorted(LECTURE) or x is None:
                 raise RefusFusion("FUSION/lecture" if x else "FUSION/forme", f"{ou} : {sorted(c)}")
-            if c["forme"] in f[ENSEMBLE[j]]:
+            if any(c["forme"] in f[k] for k in ENSEMBLES):
                 raise RefusFusion("FUSION/double", f"{ou} : {c['forme']}")
-            f[ENSEMBLE[j]][c["forme"]] = {**{k: v for k, v in c.items() if k not in ("forme", "brut")},
-                                          "hote": x["hote"], "decodeur": x["decodeur"],
-                                          "redecodage": self._redecoder(o, j, e, x["decodeur"])}
+            lu = {**{k: v for k, v in c.items() if k not in ("forme", "brut")}, "hote": x["hote"],
+                  "decodeur": x["decodeur"], "redecodage": self._redecoder(o, j, e, x["decodeur"])}
+            if j == "secondaire":
+                f["remplacants" if est_remplacant(c["forme"]) else "carte"][c["forme"]] = lu
+            elif est_temoin(x["decodeur"], c["valeurs"]):
+                f["temoin"][c["forme"]] = {**lu, "blocs": blocs(c["valeurs"]) if lu["redecodage"] == "egal" and c[
+                    "statut"] == "ok" else None}
+            else:
+                f["pool"][c["forme"]] = lu
         elif t == "sante":
             if f["sante"] is not None:
                 raise RefusFusion("FUSION/double", f"{ou} : sante")
